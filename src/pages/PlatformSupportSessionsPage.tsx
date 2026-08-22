@@ -1,22 +1,44 @@
-import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../lib/api';
 import { saveSupportSessionAccessToken } from '../lib/auth';
 import { platformApiRequest } from '../lib/platformApi';
 import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformSupportSessionsPage.css';
 
-type TenantRow = { id: string; name: string; status?: string };
+type SupportAccessLevel = 'read_only' | 'inventory_support' | 'procurement_support' | 'emergency_admin';
 type SupportStatus = 'pending_approval' | 'active' | 'ended' | 'expired' | 'rejected';
+type TenantSupportPolicy = {
+  support_enabled?: boolean;
+  require_ticket_reference?: boolean;
+  require_customer_consent?: boolean;
+  emergency_admin_requires_approval?: boolean;
+  max_duration_minutes?: number;
+  allowed_access_levels?: SupportAccessLevel[];
+};
+type TenantRow = { id: string; name: string; status?: string | null; support_policy?: TenantSupportPolicy | null };
 type PlatformSupportSession = {
   id: string;
-  platform_user_id: string;
+  platform_user_id?: string | null;
   platform_user_email?: string | null;
   platform_user_name?: string | null;
-  tenant_id: string;
+  platform_user_identity_restricted: boolean;
+  requester_is_current_user: boolean;
+  tenant_id?: string | null;
   tenant_name?: string | null;
+  tenant_identity_restricted: boolean;
+  tenant_linked: boolean;
   reason: string;
-  access_level?: string;
+  access_level: SupportAccessLevel;
   ticket_reference?: string | null;
   customer_consent_note?: string | null;
   status: SupportStatus;
@@ -30,64 +52,124 @@ type PlatformSupportSession = {
   rejected_at?: string | null;
   rejected_by_platform_user_email?: string | null;
   rejection_reason?: string | null;
-  ip_address?: string | null;
-  user_agent?: string | null;
+};
+type SupportSessionResponse = {
+  feature: string;
+  generated_at: string;
+  summary: {
+    total_sessions: number;
+    active_sessions: number;
+    pending_approval_sessions: number;
+    expired_sessions: number;
+    ended_sessions: number;
+    rejected_sessions: number;
+    active_emergency_admin_sessions: number;
+  };
+  evidence_access: { tenant_identity: boolean; platform_user_identity: boolean };
+  available_sources: string[];
+  omitted_sources: string[];
+  evidence_complete: boolean;
+  required_permissions_by_source: Record<string, string[]>;
+  truth_contract: Record<string, boolean>;
+  pagination: { limit: number; offset: number; total: number; has_more: boolean };
+  sessions: PlatformSupportSession[];
 };
 
-function readableError(error: unknown): string {
-  return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error';
-}
+const PAGE_SIZE = 50;
+const ACCESS_LEVELS: Array<{ value: SupportAccessLevel; label: string }> = [
+  { value: 'read_only', label: 'Read-only' },
+  { value: 'inventory_support', label: 'Inventory support' },
+  { value: 'procurement_support', label: 'Procurement support' },
+  { value: 'emergency_admin', label: 'Emergency admin' }
+];
+const DEFAULT_POLICY: Required<TenantSupportPolicy> = {
+  support_enabled: true,
+  require_ticket_reference: true,
+  require_customer_consent: false,
+  emergency_admin_requires_approval: true,
+  max_duration_minutes: 120,
+  allowed_access_levels: ACCESS_LEVELS.map((item) => item.value)
+};
 
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return '-';
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? '-' : parsed.toLocaleString();
+function readableError(error: unknown) { return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error'; }
+function formatDateTime(value?: string | null) { if (!value) return 'Not recorded'; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? 'Not recorded' : parsed.toLocaleString(); }
+function pretty(value?: string | null) { return value ? value.replaceAll('_', ' ') : 'Not recorded'; }
+function accessLabel(value?: string | null) { return ACCESS_LEVELS.find((item) => item.value === value)?.label || pretty(value); }
+function normalizedPolicy(value?: TenantSupportPolicy | null): Required<TenantSupportPolicy> {
+  const allowed = Array.isArray(value?.allowed_access_levels) && value.allowed_access_levels.length ? value.allowed_access_levels : DEFAULT_POLICY.allowed_access_levels;
+  return {
+    support_enabled: value?.support_enabled !== false,
+    require_ticket_reference: value?.require_ticket_reference !== false,
+    require_customer_consent: value?.require_customer_consent === true,
+    emergency_admin_requires_approval: value?.emergency_admin_requires_approval !== false,
+    max_duration_minutes: Number.isFinite(Number(value?.max_duration_minutes)) ? Number(value?.max_duration_minutes) : DEFAULT_POLICY.max_duration_minutes,
+    allowed_access_levels: allowed
+  };
 }
-
-function accessLabel(value?: string): string {
-  switch (value) {
-    case 'read_only': return 'Read-only';
-    case 'inventory_support': return 'Inventory support';
-    case 'procurement_support': return 'Procurement support';
-    case 'emergency_admin': return 'Emergency admin';
-    default: return value || '-';
-  }
-}
-
-function statusLabel(value: SupportStatus): string {
-  return value.replace(/_/g, ' ');
+function statusTone(status: SupportStatus) {
+  if (status === 'active') return 'good';
+  if (status === 'pending_approval') return 'warn';
+  if (status === 'rejected') return 'danger';
+  return 'default';
 }
 
 export default function PlatformSupportSessionsPage() {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({ tenant_id: '', reason: '', access_level: 'read_only', ticket_reference: '', customer_consent_note: '' });
-  const [status, setStatus] = useState<SupportStatus | ''>('active');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [form, setForm] = useState({ tenant_id: '', reason: '', access_level: 'read_only' as SupportAccessLevel, ticket_reference: '', customer_consent_note: '' });
   const [approvalNotes, setApprovalNotes] = useState<Record<string, string>>({});
   const [rejectionReasons, setRejectionReasons] = useState<Record<string, string>>({});
   const [statusMessage, setStatusMessage] = useState('');
 
-  const canStart = hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_START);
+  const canReadTenants = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ);
+  const canReadUsers = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ);
+  const canReadAudit = hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
+  const canStart = hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_START) && canReadTenants;
   const canEnd = hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_END);
-  const canApprove = hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_APPROVE);
+  const canApprove = hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_APPROVE) && canReadTenants;
 
-  const tenants = useQuery({ queryKey: ['platform', 'tenants'], queryFn: () => platformApiRequest<TenantRow[]>('/platform/tenants') });
+  const status = (searchParams.get('status') || '') as SupportStatus | '';
+  const tenantId = canReadTenants ? (searchParams.get('tenant_id') || '') : '';
+  const search = searchParams.get('search') || '';
+  const offset = Math.max(0, Number(searchParams.get('offset') || 0) || 0);
+
+  const tenants = useQuery({
+    queryKey: ['platform', 'tenants', 'support-session-directory'],
+    queryFn: () => platformApiRequest<TenantRow[]>('/platform/tenants'),
+    enabled: canReadTenants,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false
+  });
+
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
-    params.set('limit', '100');
     if (status) params.set('status', status);
+    if (tenantId) params.set('tenant_id', tenantId);
+    if (search.trim()) params.set('search', search.trim());
+    params.set('limit', String(PAGE_SIZE));
+    params.set('offset', String(offset));
     return params.toString();
-  }, [status]);
+  }, [status, tenantId, search, offset]);
 
-  const sessions = useQuery({ queryKey: ['platform', 'support-sessions', queryString], queryFn: () => platformApiRequest<PlatformSupportSession[]>(`/platform/support-sessions?${queryString}`) });
+  const sessions = useQuery({
+    queryKey: ['platform', 'support-sessions', queryString],
+    queryFn: () => platformApiRequest<SupportSessionResponse>(`/platform/support-sessions?${queryString}`),
+    staleTime: 10_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previous) => previous
+  });
 
   const invalidateSessions = async () => {
     await queryClient.invalidateQueries({ queryKey: ['platform', 'support-sessions'] });
     await queryClient.invalidateQueries({ queryKey: ['platform', 'dashboard'] });
     await queryClient.invalidateQueries({ queryKey: ['platform', 'audit'] });
+    await queryClient.invalidateQueries({ queryKey: ['platform', 'tenant-sla'] });
+    await queryClient.invalidateQueries({ queryKey: ['platform', 'tenant-timeline'] });
+    await queryClient.invalidateQueries({ queryKey: ['platform', 'customer-success-admin'] });
   };
 
   const start = useMutation({
-    mutationFn: () => platformApiRequest<PlatformSupportSession>('/platform/support-sessions', {
+    mutationFn: () => platformApiRequest('/platform/support-sessions', {
       method: 'POST',
       body: JSON.stringify({
         tenant_id: form.tenant_id,
@@ -97,276 +179,195 @@ export default function PlatformSupportSessionsPage() {
         customer_consent_note: form.customer_consent_note.trim() || null
       })
     }),
-    onSuccess: async (created) => {
-      setStatusMessage(created.status === 'pending_approval' ? 'Support session request created and waiting for approval.' : 'Support session started.');
+    onSuccess: async () => {
+      setStatusMessage(form.access_level === 'emergency_admin' && selectedPolicy.emergency_admin_requires_approval
+        ? 'Emergency-admin support request created and waiting for another authorized operator to approve it.'
+        : 'Support session started under the tenant’s current support policy.');
       setForm({ tenant_id: '', reason: '', access_level: 'read_only', ticket_reference: '', customer_consent_note: '' });
       await invalidateSessions();
     }
   });
-
   const token = useMutation({
     mutationFn: (id: string) => platformApiRequest<{ accessToken: string }>(`/platform/support-sessions/${id}/access-token`, { method: 'POST' }),
     onSuccess: (payload) => {
-      setStatusMessage('Tenant support access token created. Redirecting to tenant dashboard.');
+      setStatusMessage('Tenant support access created after current policy and lifecycle revalidation.');
       saveSupportSessionAccessToken(payload.accessToken);
       window.location.href = '/dashboard';
     }
   });
-
   const end = useMutation({
     mutationFn: (id: string) => platformApiRequest(`/platform/support-sessions/${id}/end`, { method: 'POST' }),
-    onSuccess: async () => {
-      setStatusMessage('Support session ended.');
-      await invalidateSessions();
-    }
+    onSuccess: async () => { setStatusMessage('Support session ended. Existing support-session tokens are no longer accepted.'); await invalidateSessions(); }
   });
   const approve = useMutation({
     mutationFn: (id: string) => platformApiRequest(`/platform/support-sessions/${id}/approve`, { method: 'POST', body: JSON.stringify({ approval_note: (approvalNotes[id] || '').trim() || null }) }),
-    onSuccess: async (_result, id) => {
-      setStatusMessage('Support session request approved.');
-      setApprovalNotes((current) => ({ ...current, [id]: '' }));
-      await invalidateSessions();
-    }
+    onSuccess: async (_result, id) => { setStatusMessage('Support session request approved after current tenant policy revalidation.'); setApprovalNotes((current) => ({ ...current, [id]: '' })); await invalidateSessions(); }
   });
   const reject = useMutation({
-    mutationFn: (id: string) => platformApiRequest(`/platform/support-sessions/${id}/reject`, { method: 'POST', body: JSON.stringify({ rejection_reason: rejectionReasons[id].trim() }) }),
-    onSuccess: async (_result, id) => {
-      setStatusMessage('Support session request rejected.');
-      setRejectionReasons((current) => ({ ...current, [id]: '' }));
-      await invalidateSessions();
-    }
+    mutationFn: (id: string) => platformApiRequest(`/platform/support-sessions/${id}/reject`, { method: 'POST', body: JSON.stringify({ rejection_reason: (rejectionReasons[id] || '').trim() }) }),
+    onSuccess: async (_result, id) => { setStatusMessage('Support session request rejected.'); setRejectionReasons((current) => ({ ...current, [id]: '' })); await invalidateSessions(); }
   });
 
+  const selectedTenant = (tenants.data || []).find((tenant) => tenant.id === form.tenant_id);
+  const selectedPolicy = normalizedPolicy(selectedTenant?.support_policy);
+  const selectedAccessAllowed = selectedPolicy.allowed_access_levels.includes(form.access_level);
   const trimmedReason = form.reason.trim();
-  const trimmedTicketReference = form.ticket_reference.trim();
-  const startValidationMessage = !form.tenant_id
-    ? 'Select a tenant before starting a support session.'
-    : trimmedTicketReference.length === 0
-      ? 'Enter a ticket/reference before starting a support session.'
-      : trimmedReason.length < 10
-        ? 'Enter a support reason of at least 10 characters.'
-        : '';
-  const canSubmitStart = canStart && !startValidationMessage && !start.isPending;
-  const rows = sessions.data || [];
-  const activeCount = rows.filter((row) => row.status === 'active').length;
-  const pendingCount = rows.filter((row) => row.status === 'pending_approval').length;
-  const emergencyCount = rows.filter((row) => row.access_level === 'emergency_admin').length;
-  const statusFilterLabel = status ? statusLabel(status) : 'all statuses';
+  const trimmedTicket = form.ticket_reference.trim();
+  const trimmedConsent = form.customer_consent_note.trim();
+  const startValidationMessage = !canStart
+    ? 'TENANTS_READ + SUPPORT_SESSION_START are required to start tenant support access.'
+    : !form.tenant_id
+      ? 'Select a tenant.'
+      : selectedTenant?.status === 'archived'
+        ? 'Archived tenants cannot receive new support sessions.'
+        : !selectedPolicy.support_enabled
+          ? 'This tenant has disabled Platform support access.'
+          : !selectedAccessAllowed
+            ? 'The selected access level is not allowed by this tenant support policy.'
+            : selectedPolicy.require_ticket_reference && !trimmedTicket
+              ? 'This tenant requires a ticket/reference.'
+              : selectedPolicy.require_customer_consent && !trimmedConsent
+                ? 'This tenant requires an operator-recorded customer-consent note.'
+                : trimmedReason.length < 10
+                  ? 'Enter a support reason of at least 10 characters.'
+                  : '';
+  const canSubmitStart = !startValidationMessage && !start.isPending;
 
-  const updateForm = (patch: Partial<typeof form>) => {
-    if (start.error) start.reset();
-    setStatusMessage('');
-    setForm({ ...form, ...patch });
+  const data = sessions.data;
+  const summary = data?.summary;
+  const pagination = data?.pagination;
+  const refreshError = sessions.isError && Boolean(data);
+  const mutationError = start.error || token.error || end.error || approve.error || reject.error;
+  const pageStart = pagination?.total ? pagination.offset + 1 : 0;
+  const pageEnd = pagination && data ? Math.min(pagination.offset + data.sessions.length, pagination.total) : 0;
+
+  const updateParams = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(patch)) { if (value) next.set(key, value); else next.delete(key); }
+    if (!Object.prototype.hasOwnProperty.call(patch, 'offset')) next.delete('offset');
+    setSearchParams(next, { replace: true });
   };
+  const updateForm = (patch: Partial<typeof form>) => { if (start.error) start.reset(); setStatusMessage(''); setForm((current) => ({ ...current, ...patch })); };
+  const refreshAll = async () => { setStatusMessage(''); await Promise.all([sessions.refetch(), ...(canReadTenants ? [tenants.refetch()] : [])]); };
+  const tenantDisplay = (row: PlatformSupportSession) => row.tenant_identity_restricted ? 'Restricted tenant identity' : (row.tenant_name || row.tenant_id || 'Tenant');
 
-  const refreshAll = async () => {
-    setStatusMessage('');
-    await Promise.all([sessions.refetch(), tenants.refetch()]);
-  };
+  return <div className="io-operational-page io-workspace-page platform-support-sessions">
+    <OperationalWorkspaceHero
+      iconPath="/platform/support-sessions"
+      eyebrow="Platform Access Governance"
+      title="Support sessions"
+      description="Create, approve, enter and end audited tenant support access. Tenant policy, tenant lifecycle and the originating Platform account are revalidated before and during support access."
+      meta={<>
+        <OperationalWorkspaceMetaPill>SUPPORT_SESSION_READ</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>{data?.evidence_complete ? 'Identity evidence complete' : 'Permission-scoped identities'}</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>Time-bounded access</OperationalWorkspaceMetaPill>
+        {data?.generated_at ? <OperationalWorkspaceMetaPill>Generated {formatDateTime(data.generated_at)}</OperationalWorkspaceMetaPill> : null}
+      </>}
+      aside={<div className="platform-support-sessions__hero-aside">
+        <OperationalWorkspaceStatus value={summary?.active_sessions ? 'Active support access' : summary?.pending_approval_sessions ? 'Approval pending' : 'No active access'} label="recorded application access state" />
+        <button type="button" className="app-button app-button--secondary" disabled={sessions.isFetching || tenants.isFetching} onClick={() => void refreshAll()}>{sessions.isFetching ? 'Refreshing…' : 'Refresh'}</button>
+      </div>}
+    />
 
-  const confirmAndOpenAccess = (row: PlatformSupportSession) => {
-    if (window.confirm(`Create tenant access for ${row.tenant_name || row.tenant_id}? Use this only for ticket ${row.ticket_reference || 'without ticket reference'}.`)) {
-      token.mutate(row.id);
-    }
-  };
+    <OperationalWorkspaceStats ariaLabel="Support session summary">
+      <OperationalWorkspaceStatCard iconPath="/platform/support-sessions" label="Total" value={summary?.total_sessions ?? '—'} helper="Filtered support-session evidence" loading={!data && sessions.isLoading} />
+      <OperationalWorkspaceStatCard iconPath="/platform/support-sessions" label="Active" value={summary?.active_sessions ?? '—'} helper="Unexpired active support sessions" tone={(summary?.active_sessions || 0) > 0 ? 'warn' : 'good'} loading={!data && sessions.isLoading} />
+      <OperationalWorkspaceStatCard iconPath="/platform/support-sessions" label="Pending approval" value={summary?.pending_approval_sessions ?? '—'} helper="Unexpired approval requests" tone={(summary?.pending_approval_sessions || 0) > 0 ? 'warn' : 'default'} loading={!data && sessions.isLoading} />
+      <OperationalWorkspaceStatCard iconPath="/platform/support-sessions" label="Emergency admin" value={summary?.active_emergency_admin_sessions ?? '—'} helper="Current active emergency-admin sessions" tone={(summary?.active_emergency_admin_sessions || 0) > 0 ? 'danger' : 'default'} loading={!data && sessions.isLoading} />
+      <OperationalWorkspaceStatCard iconPath="/platform/support-sessions" label="Expired" value={summary?.expired_sessions ?? '—'} helper="Time-derived expired history" loading={!data && sessions.isLoading} />
+    </OperationalWorkspaceStats>
 
-  const confirmAndEnd = (row: PlatformSupportSession) => {
-    if (window.confirm(`End support session for ${row.tenant_name || row.tenant_id}?`)) {
-      end.mutate(row.id);
-    }
-  };
+    {refreshError ? <div className="platform-support-sessions__warning" role="status"><strong>Showing the last successful snapshot.</strong><span>Refresh failed: {readableError(sessions.error)}</span></div> : null}
+    {data && !data.evidence_complete ? <div className="platform-support-sessions__warning" role="status"><strong>Identity evidence is permission-scoped.</strong><span>Restricted sources: {data.omitted_sources.map(pretty).join(', ')}. Hidden tenant/Platform-user identities are not replaced with guessed values.</span></div> : null}
+    {statusMessage ? <div className="platform-support-sessions__success" role="status">{statusMessage}</div> : null}
+    {mutationError ? <div className="platform-support-sessions__error" role="alert">{readableError(mutationError)}</div> : null}
 
-  const confirmAndApprove = (row: PlatformSupportSession) => {
-    if (window.confirm(`Approve ${accessLabel(row.access_level)} support access for ${row.tenant_name || row.tenant_id}?`)) {
-      approve.mutate(row.id);
-    }
-  };
+    {canStart ? <section className="io-workspace-panel platform-support-sessions__section">
+      <OperationalSectionHeader iconPath="/platform/support-sessions" title="Start support access" description="The selected tenant’s current support policy controls ticket, consent-note, access-level, approval and duration requirements. Emergency-admin access can require approval by a different operator." />
+      <div className="platform-support-sessions__form-grid">
+        <label>Tenant<select value={form.tenant_id} onChange={(event) => updateForm({ tenant_id: event.target.value })}><option value="">Select tenant</option>{(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name} · {pretty(tenant.status)}</option>)}</select></label>
+        <label>Access level<select value={form.access_level} onChange={(event) => updateForm({ access_level: event.target.value as SupportAccessLevel })}>{ACCESS_LEVELS.map((item) => <option key={item.value} value={item.value} disabled={Boolean(form.tenant_id) && !selectedPolicy.allowed_access_levels.includes(item.value)}>{item.label}</option>)}</select></label>
+        <label>Ticket / reference {selectedPolicy.require_ticket_reference ? <span>required</span> : <span>optional</span>}<input value={form.ticket_reference} onChange={(event) => updateForm({ ticket_reference: event.target.value })} maxLength={120} /></label>
+        <label className="platform-support-sessions__wide-field">Support reason <span>required</span><textarea value={form.reason} onChange={(event) => updateForm({ reason: event.target.value })} maxLength={1000} rows={3} /></label>
+        <label className="platform-support-sessions__wide-field">Customer-consent note {selectedPolicy.require_customer_consent ? <span>required by tenant policy</span> : <span>optional operator evidence</span>}<textarea value={form.customer_consent_note} onChange={(event) => updateForm({ customer_consent_note: event.target.value })} maxLength={1000} rows={2} /></label>
+      </div>
+      {form.tenant_id ? <div className="platform-support-sessions__policy-strip">
+        <span data-state={selectedPolicy.support_enabled ? 'good' : 'danger'}>{selectedPolicy.support_enabled ? 'Support enabled' : 'Support disabled'}</span>
+        <span>{selectedPolicy.max_duration_minutes} min maximum active duration</span>
+        <span>{selectedPolicy.require_ticket_reference ? 'Ticket required' : 'Ticket optional'}</span>
+        <span>{selectedPolicy.require_customer_consent ? 'Consent note required' : 'Consent note optional'}</span>
+        <span>{selectedPolicy.emergency_admin_requires_approval ? 'Emergency admin requires approval' : 'Emergency admin policy-authorized'}</span>
+      </div> : null}
+      <div className="platform-support-sessions__form-actions"><button type="button" className="app-button app-button--primary" disabled={!canSubmitStart} onClick={() => start.mutate()}>{start.isPending ? 'Starting…' : form.access_level === 'emergency_admin' && selectedPolicy.emergency_admin_requires_approval ? 'Request emergency access' : 'Start support session'}</button>{startValidationMessage ? <span>{startValidationMessage}</span> : <span>Access is audited and revalidated on every tenant request.</span>}</div>
+    </section> : <div className="platform-support-sessions__warning"><strong>Support-session creation is unavailable.</strong><span>TENANTS_READ + SUPPORT_SESSION_START are required to select a tenant and create tenant support access.</span></div>}
 
-  const confirmAndReject = (row: PlatformSupportSession) => {
-    if (window.confirm(`Reject support session request for ${row.tenant_name || row.tenant_id}?`)) {
-      reject.mutate(row.id);
-    }
-  };
+    <section className="io-workspace-panel platform-support-sessions__section">
+      <OperationalSectionHeader iconPath="/platform/support-sessions" title="Support-session registry" description="Server-side search, status filtering, tenant targeting and pagination. Expiry is derived from the actual expiration timestamp rather than depending on a prior page read to rewrite status." />
+      <div className="platform-support-sessions__filters">
+        <label>Status<select value={status} onChange={(event) => updateParams({ status: event.target.value })}><option value="">All statuses</option><option value="active">Active</option><option value="pending_approval">Pending approval</option><option value="ended">Ended</option><option value="expired">Expired</option><option value="rejected">Rejected</option></select></label>
+        {canReadTenants ? <label>Tenant<select value={tenantId} onChange={(event) => updateParams({ tenant_id: event.target.value })}><option value="">All tenants</option>{(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label> : null}
+        <label className="platform-support-sessions__search">Search<input value={search} onChange={(event) => updateParams({ search: event.target.value })} placeholder={canReadUsers && canReadTenants ? 'Reason, ticket, tenant or requester' : canReadTenants ? 'Reason, ticket or tenant' : 'Reason, ticket, access level or status'} /></label>
+        {(status || tenantId || search) ? <button type="button" className="app-button app-button--secondary" onClick={() => setSearchParams({}, { replace: true })}>Clear filters</button> : null}
+      </div>
 
-  return (
-    <div style={styles.page}>
-      <header style={styles.headerRow}>
-        <div>
-          <h1 style={styles.title}>Support sessions</h1>
-          <p style={styles.subtitle}>Audited platform support access. Emergency admin sessions require approval before tenant access can be created.</p>
-        </div>
-        <button style={styles.button} onClick={() => void refreshAll()} disabled={sessions.isFetching || tenants.isFetching}>Refresh</button>
-      </header>
+      {sessions.isError && !data ? <div className="platform-support-sessions__blocking-error"><strong>Support-session evidence could not be loaded.</strong><span>{readableError(sessions.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => void sessions.refetch()}>Retry</button></div> : null}
+      {sessions.isLoading && !data ? <div className="platform-support-sessions__loading">Loading support-session evidence…</div> : null}
 
-      <section style={styles.metadataPanel}>
-        <span><b>Snapshot:</b> {sessions.isFetching || tenants.isFetching ? 'Refreshing' : 'Loaded'} · {new Date().toLocaleString()}</span>
-        <span><b>Source:</b> /platform/support-sessions, /platform/tenants, /platform/audit</span>
-        <span><b>Filter:</b> {statusFilterLabel} · limit 100</span>
-        <span><b>Rows:</b> {rows.length} listed · {activeCount} active · {pendingCount} pending approval · {emergencyCount} emergency admin</span>
-      </section>
+      {data ? <div className="platform-support-sessions__registry">
+        {data.sessions.map((row) => {
+          const rejectionReason = (rejectionReasons[row.id] || '').trim();
+          const canApproveRow = canApprove && !row.requester_is_current_user && !approve.isPending;
+          const canRejectRow = canApprove && rejectionReason.length >= 5 && !reject.isPending;
+          const canEnterRow = canStart && row.requester_is_current_user && !row.tenant_identity_restricted && !token.isPending;
+          return <article className="platform-support-sessions__card" key={row.id}>
+            <div className="platform-support-sessions__card-header">
+              <div><h4>{tenantDisplay(row)}</h4><p>{accessLabel(row.access_level)} · started {formatDateTime(row.started_at)}</p></div>
+              <span className="platform-support-sessions__status" data-tone={statusTone(row.status)}>{pretty(row.status)}</span>
+            </div>
+            <div className="platform-support-sessions__details-grid">
+              <div><span>Requester</span><strong>{row.platform_user_identity_restricted ? (row.requester_is_current_user ? 'Current Platform operator' : 'Restricted Platform identity') : (row.platform_user_name || row.platform_user_email || 'Platform user')}</strong><small>{row.requester_is_current_user ? 'This operator owns token issuance for the session' : 'Only the requester can create tenant access from this record'}</small></div>
+              <div><span>Ticket / reference</span><strong>{row.ticket_reference || 'Not recorded'}</strong><small>Application reference only</small></div>
+              <div><span>Expires</span><strong>{formatDateTime(row.expires_at)}</strong><small>Every support-token request is checked against this timestamp</small></div>
+              <div><span>Approval</span><strong>{row.status === 'pending_approval' ? 'Waiting for another operator' : row.approved_at ? `Approved ${formatDateTime(row.approved_at)}` : row.status === 'active' ? 'No separate approval recorded' : 'Not applicable'}</strong><small>{row.approved_by_platform_user_email ? `By ${row.approved_by_platform_user_email}` : row.platform_user_identity_restricted && row.approved_at ? 'Approver identity restricted' : row.approval_note || ''}</small></div>
+            </div>
+            <div className="platform-support-sessions__reason"><strong>Recorded support reason</strong><span>{row.reason}</span>{row.customer_consent_note ? <><strong>Operator-recorded customer-consent note</strong><span>{row.customer_consent_note}</span></> : null}</div>
+            {row.rejection_reason ? <div className="platform-support-sessions__decision" data-tone="danger"><strong>Rejected {formatDateTime(row.rejected_at)}</strong><span>{row.rejection_reason}{row.rejected_by_platform_user_email ? ` · ${row.rejected_by_platform_user_email}` : ''}</span></div> : null}
+            {row.ended_at ? <div className="platform-support-sessions__decision"><strong>Ended {formatDateTime(row.ended_at)}</strong><span>{row.ended_by_platform_user_email ? `Ended by ${row.ended_by_platform_user_email}` : row.platform_user_identity_restricted ? 'Ending operator identity restricted' : ''}</span></div> : null}
+            <div className="platform-support-sessions__actions">
+              {row.status === 'pending_approval' ? <>
+                <input placeholder="Approval note (optional)" value={approvalNotes[row.id] || ''} onChange={(event) => setApprovalNotes((current) => ({ ...current, [row.id]: event.target.value }))} maxLength={1000} />
+                <button type="button" className="app-button app-button--secondary" disabled={!canApproveRow} title={row.requester_is_current_user ? 'A requester cannot approve their own support-session request.' : undefined} onClick={() => window.confirm(`Approve ${accessLabel(row.access_level)} support access for ${tenantDisplay(row)}? Current tenant policy will be revalidated.`) && approve.mutate(row.id)}>Approve</button>
+                <input placeholder="Rejection reason" value={rejectionReasons[row.id] || ''} onChange={(event) => setRejectionReasons((current) => ({ ...current, [row.id]: event.target.value }))} maxLength={1000} />
+                <button type="button" className="app-button app-button--secondary" disabled={!canRejectRow} onClick={() => window.confirm(`Reject support-session request for ${tenantDisplay(row)}?`) && reject.mutate(row.id)}>Reject</button>
+                {canEnd ? <button type="button" className="app-button app-button--secondary" disabled={end.isPending} onClick={() => window.confirm(`Cancel this pending support session${row.tenant_name ? ` for ${row.tenant_name}` : ''}?`) && end.mutate(row.id)}>Cancel request</button> : null}
+              </> : null}
+              {row.status === 'active' ? <>
+                {canEnterRow ? <button type="button" className="app-button app-button--primary" onClick={() => window.confirm(`Enter ${tenantDisplay(row)} using this support session? Current tenant policy, tenant lifecycle and Platform account state will be revalidated.`) && token.mutate(row.id)}>Enter tenant</button> : row.requester_is_current_user && !canReadTenants ? <span>TENANTS_READ is required to enter tenant access.</span> : !row.requester_is_current_user ? <span>Only the requesting operator can enter this session.</span> : null}
+                {canEnd ? <button type="button" className="app-button app-button--secondary" disabled={end.isPending} onClick={() => window.confirm(`End this support session${row.tenant_name ? ` for ${row.tenant_name}` : ''}? Existing support-session tokens will stop authenticating.`) && end.mutate(row.id)}>End session</button> : null}
+              </> : null}
+            </div>
+            <div className="platform-support-sessions__links">
+              {canReadTenants && row.tenant_id ? <Link to={`/platform/tenants?tenant_id=${encodeURIComponent(row.tenant_id)}`}>Tenant</Link> : null}
+              {canReadAudit ? <Link to={`/platform/audit?target_type=support_sessions&target_id=${encodeURIComponent(row.id)}`}>Audit evidence</Link> : null}
+              {canReadUsers && row.platform_user_id ? <Link to={`/platform/users?platform_user_id=${encodeURIComponent(row.platform_user_id)}`}>Requester</Link> : null}
+              <span>Session {row.id}</span>
+            </div>
+          </article>;
+        })}
+        {!data.sessions.length ? <div className="platform-support-sessions__empty"><strong>No support sessions match these filters.</strong><span>Change the filters or refresh the registry.</span></div> : null}
+        <div className="platform-support-sessions__pager"><span>Showing {pageStart}–{pageEnd} of {pagination?.total ?? 0}</span><div><button type="button" className="app-button app-button--secondary" disabled={!pagination || pagination.offset === 0 || sessions.isFetching} onClick={() => updateParams({ offset: String(Math.max(0, (pagination?.offset || 0) - PAGE_SIZE)) })}>Previous</button><button type="button" className="app-button app-button--secondary" disabled={!pagination?.has_more || sessions.isFetching} onClick={() => updateParams({ offset: String((pagination?.offset || 0) + PAGE_SIZE) })}>Next</button></div></div>
+      </div> : null}
+    </section>
 
-      <nav style={styles.supportLinks} aria-label="Supporting Platform pages">
-        <a style={styles.supportLink} href="/platform/tenants">Tenants</a>
-        <a style={styles.supportLink} href="/platform/tenant-health">Tenant health</a>
-        <a style={styles.supportLink} href="/platform/incidents">Incidents</a>
-        <a style={styles.supportLink} href="/platform/audit">Audit</a>
-      </nav>
-
-      {statusMessage ? <div style={styles.success}>{statusMessage}</div> : null}
-      {tenants.error ? <div style={styles.errorWithAction}><span>{readableError(tenants.error)}</span><button style={styles.buttonSmall} onClick={() => void tenants.refetch()}>Retry tenants</button></div> : null}
-      {sessions.error ? <div style={styles.errorWithAction}><span>{readableError(sessions.error)}</span><button style={styles.buttonSmall} onClick={() => void sessions.refetch()}>Retry sessions</button></div> : null}
-
-      <section style={styles.panel}>
-        <h2>Start support session</h2>
-        <div style={styles.note}>Emergency admin requests are created as pending approval. A different authorized platform user must approve them.</div>
-        <div style={styles.formGrid}>
-          <label style={styles.label}>Tenant
-            <select style={styles.input} value={form.tenant_id} onChange={(event) => updateForm({ tenant_id: event.target.value })}>
-              <option value="">Select tenant</option>
-              {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name} ({tenant.status || 'active'})</option>)}
-            </select>
-          </label>
-          <label style={styles.label}>Access level
-            <select style={styles.input} value={form.access_level} onChange={(event) => updateForm({ access_level: event.target.value })}>
-              <option value="read_only">Read-only</option>
-              <option value="inventory_support">Inventory support</option>
-              <option value="procurement_support">Procurement support</option>
-              <option value="emergency_admin">Emergency admin - requires approval</option>
-            </select>
-          </label>
-          <label style={styles.label}>Ticket/reference
-            <input style={styles.input} value={form.ticket_reference} onChange={(event) => updateForm({ ticket_reference: event.target.value })} placeholder="Support ticket, case, or customer reference" />
-          </label>
-          <label style={styles.label}>Reason
-            <input style={styles.input} value={form.reason} onChange={(event) => updateForm({ reason: event.target.value })} placeholder="At least 10 characters" />
-          </label>
-          <label style={styles.label}>Customer consent note
-            <input style={styles.input} value={form.customer_consent_note} onChange={(event) => updateForm({ customer_consent_note: event.target.value })} placeholder="Optional unless required by tenant policy" />
-          </label>
-          <button style={canSubmitStart ? styles.button : styles.buttonDisabled} onClick={() => start.mutate()} disabled={!canSubmitStart}>Start/request</button>
-        </div>
-        {!canStart ? <div style={styles.error}>Your platform role cannot start support sessions.</div> : null}
-        {canStart && startValidationMessage ? <div style={styles.warning}>{startValidationMessage}</div> : null}
-        {start.error ? <div style={styles.error}>{readableError(start.error)}</div> : null}
-      </section>
-
-      <section style={styles.panel}>
-        <div style={styles.headerRow}>
-          <h2>Sessions</h2>
-          <select value={status} onChange={(event) => setStatus(event.target.value as SupportStatus | '')} style={styles.input}>
-            <option value="pending_approval">Pending approval</option>
-            <option value="active">Active</option>
-            <option value="ended">Ended</option>
-            <option value="expired">Expired</option>
-            <option value="rejected">Rejected</option>
-            <option value="">All</option>
-          </select>
-        </div>
-        {sessions.isLoading ? 'Loading...' : null}
-        {token.error ? <div style={styles.error}>{readableError(token.error)}</div> : null}
-        {approve.error ? <div style={styles.error}>{readableError(approve.error)}</div> : null}
-        {reject.error ? <div style={styles.error}>{readableError(reject.error)}</div> : null}
-        {end.error ? <div style={styles.error}>{readableError(end.error)}</div> : null}
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Status</th>
-              <th style={styles.th}>Tenant</th>
-              <th style={styles.th}>Access</th>
-              <th style={styles.th}>Ticket</th>
-              <th style={styles.th}>Platform user</th>
-              <th style={styles.th}>Reason</th>
-              <th style={styles.th}>Approval</th>
-              <th style={styles.th}>Timing/evidence</th>
-              <th style={styles.th}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const rejectionReason = (rejectionReasons[row.id] || '').trim();
-              const canRejectRow = canApprove && rejectionReason.length >= 5 && !reject.isPending;
-              return (
-                <tr key={row.id}>
-                  <td style={styles.td}><span style={row.status === 'pending_approval' ? styles.pendingBadge : styles.badge}>{row.status}</span></td>
-                  <td style={styles.td}>
-                    {row.tenant_name || row.tenant_id}
-                    <div style={styles.smallText}>{row.tenant_id}</div>
-                    <a style={styles.evidenceLink} href={`/platform/tenants?search=${encodeURIComponent(row.tenant_name || row.tenant_id)}`}>Tenant evidence</a>
-                  </td>
-                  <td style={styles.td}>{accessLabel(row.access_level)}</td>
-                  <td style={styles.td}>{row.ticket_reference || '-'}</td>
-                  <td style={styles.td}>{row.platform_user_name || row.platform_user_email || row.platform_user_id}</td>
-                  <td style={styles.td}>{row.reason}{row.customer_consent_note ? <div style={styles.smallText}>Consent: {row.customer_consent_note}</div> : null}</td>
-                  <td style={styles.td}>
-                    {row.status === 'pending_approval' ? 'Waiting' : row.approved_at ? `Approved ${formatDateTime(row.approved_at)}` : row.rejected_at ? `Rejected ${formatDateTime(row.rejected_at)}` : '-'}
-                    {row.approved_by_platform_user_email ? <div style={styles.smallText}>by {row.approved_by_platform_user_email}</div> : null}
-                    {row.approval_note ? <div style={styles.smallText}>Note: {row.approval_note}</div> : null}
-                    {row.rejected_by_platform_user_email ? <div style={styles.smallText}>by {row.rejected_by_platform_user_email}</div> : null}
-                    {row.rejection_reason ? <div style={styles.smallText}>{row.rejection_reason}</div> : null}
-                    {row.ended_by_platform_user_email ? <div style={styles.smallText}>Ended by {row.ended_by_platform_user_email}</div> : null}
-                  </td>
-                  <td style={styles.td}>
-                    <div>Started: {formatDateTime(row.started_at)}</div>
-                    <div>Expires: {formatDateTime(row.expires_at)}</div>
-                    {row.ended_at ? <div>Ended: {formatDateTime(row.ended_at)}</div> : null}
-                    <a style={styles.evidenceLink} href={`/platform/audit?search=${encodeURIComponent(row.id)}`}>Audit evidence</a>
-                    <div style={styles.smallText}>Session ID: {row.id}</div>
-                  </td>
-                  <td style={styles.td}>
-                    {row.status === 'pending_approval' ? (
-                      <div style={styles.actionStack}>
-                        <input style={styles.inputSmall} placeholder="Approval note" value={approvalNotes[row.id] || ''} onChange={(event) => setApprovalNotes({ ...approvalNotes, [row.id]: event.target.value })} />
-                        <button style={styles.buttonSmall} onClick={() => confirmAndApprove(row)} disabled={!canApprove || approve.isPending}>Approve</button>
-                        <input style={styles.inputSmall} placeholder="Reject reason" value={rejectionReasons[row.id] || ''} onChange={(event) => setRejectionReasons({ ...rejectionReasons, [row.id]: event.target.value })} />
-                        <button style={canRejectRow ? styles.buttonSmall : styles.buttonDisabledSmall} onClick={() => confirmAndReject(row)} disabled={!canRejectRow}>Reject</button>
-                        <button style={styles.buttonSmall} onClick={() => confirmAndEnd(row)} disabled={!canEnd || end.isPending}>Cancel</button>
-                        {canApprove && !canRejectRow ? <div style={styles.smallText}>Reject reason must be at least 5 characters.</div> : null}
-                      </div>
-                    ) : row.status === 'active' ? (
-                      <>
-                        <button style={styles.buttonSmall} onClick={() => confirmAndOpenAccess(row)} disabled={!canStart || token.isPending}>Enter</button>{' '}
-                        <button style={styles.buttonSmall} onClick={() => confirmAndEnd(row)} disabled={!canEnd || end.isPending}>End</button>
-                      </>
-                    ) : '-'}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </section>
-    </div>
-  );
+    <section className="io-workspace-panel platform-support-sessions__section">
+      <OperationalSectionHeader iconPath="/platform/support-sessions" title="Access and evidence boundary" description="Support-session records are application access-control evidence. They do not prove a customer consented, that support work succeeded, or that an issued token was actually used." />
+      <div className="platform-support-sessions__truth"><strong>Operator assertions are not external proof.</strong><span>A recorded customer-consent note is an operator-entered application record, not independent proof of customer consent. An Active session means the application currently records an unexpired support session; it does not prove a support token was issued or used. Tenant support policy, tenant lifecycle and the originating Platform account are revalidated before tenant access is accepted.</span></div>
+      <div className="platform-support-sessions__coverage">{(data?.available_sources || ['support_sessions']).map((source) => <span key={source} data-state="available">{pretty(source)} · available</span>)}{(data?.omitted_sources || []).map((source) => <span key={source} data-state="restricted">{pretty(source)} · restricted</span>)}</div>
+      <div className="platform-support-sessions__supporting-links">
+        {canReadTenants ? <Link to="/platform/tenants">Tenants</Link> : null}
+        {canReadAudit ? <Link to="/platform/audit?source=support_sessions">Platform Audit</Link> : null}
+        {canReadUsers ? <Link to="/platform/users">Platform Users</Link> : null}
+      </div>
+    </section>
+  </div>;
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  subtitle: { margin: '6px 0 0', color: '#64748b', lineHeight: 1.5 },
-  headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' },
-  metadataPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, color: '#334155', fontSize: 13 },
-  supportLinks: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  supportLink: { border: '1px solid var(--io-primary-border)', background: '#fff', color: 'var(--io-primary-dark)', borderRadius: 999, padding: '7px 11px', textDecoration: 'none', fontSize: 13, fontWeight: 700 },
-  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', overflowX: 'auto', minWidth: 0 },
-  note: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', color: 'var(--io-primary-deep)', borderRadius: 10, padding: 12, marginBottom: 12 },
-  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12, alignItems: 'end' },
-  label: { display: 'flex', flexDirection: 'column', gap: 6, color: '#334155', fontSize: 13, fontWeight: 700 },
-  input: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', color: '#0f172a', minWidth: 0 },
-  inputSmall: { padding: '8px 10px', border: '1px solid #cbd5e1', borderRadius: 9, minWidth: 150, background: '#fff', color: '#0f172a' },
-  button: { padding: '9px 13px', borderRadius: 9, border: '1px solid var(--io-primary)', background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
-  buttonDisabled: { padding: '9px 13px', borderRadius: 9, border: '1px solid #cbd5e1', cursor: 'not-allowed', background: '#e2e8f0', color: '#64748b', fontWeight: 700 },
-  buttonSmall: { padding: '7px 10px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
-  buttonDisabledSmall: { padding: '7px 10px', borderRadius: 8, border: '1px solid #cbd5e1', cursor: 'not-allowed', background: '#e2e8f0', color: '#64748b', fontWeight: 700 },
-  success: { background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 10, padding: 12 },
-  warning: { background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', borderRadius: 10, padding: 12, marginTop: 12 },
-  error: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 10, padding: 12, marginTop: 12 },
-  errorWithAction: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 10, padding: 12 },
-  table: { width: '100%', borderCollapse: 'collapse', color: '#334155' },
-  th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '10px 8px', color: '#64748b', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' },
-  td: { borderBottom: '1px solid #f1f5f9', padding: '12px 8px', verticalAlign: 'top' },
-  badge: { display: 'inline-block', padding: '4px 9px', borderRadius: 999, background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', fontSize: 12, fontWeight: 700 },
-  pendingBadge: { display: 'inline-block', padding: '4px 9px', borderRadius: 999, background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', fontSize: 12, fontWeight: 700 },
-  smallText: { color: '#64748b', fontSize: 12, marginTop: 4 },
-  evidenceLink: { color: 'var(--io-primary-dark)', fontSize: 12, display: 'inline-block', marginTop: 4, fontWeight: 700 },
-  actionStack: { display: 'flex', flexWrap: 'wrap', gap: 8, maxWidth: 380 }
-};
