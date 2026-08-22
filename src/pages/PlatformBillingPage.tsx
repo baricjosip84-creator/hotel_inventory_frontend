@@ -237,6 +237,7 @@ export default function PlatformBillingPage() {
   const [statusMessage, setStatusMessage] = useState('');
 
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_WRITE);
+  const canReadTenantExports = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT);
   const overviewQuery = useQuery({
     queryKey: ['platform', 'billing', statusFilter],
     queryFn: () => platformApiRequest<BillingTenant[]>(`/platform/billing${statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : ''}`)
@@ -629,7 +630,7 @@ export default function PlatformBillingPage() {
           <div style={styles.supportLinks}>
             <Link style={styles.supportLink} to={selectedTenantAuditLink}>Tenant billing audit evidence</Link>
             <Link style={styles.supportLink} to={`/platform/tenant-health?tenant_id=${encodeURIComponent(detailsQuery.data.tenant.id)}`}>Tenant health</Link>
-            <Link style={styles.supportLink} to="/platform/tenant-exports">Tenant exports</Link>
+            {canReadTenantExports ? <Link style={styles.supportLink} to="/platform/tenant-exports">Tenant exports</Link> : null}
           </div>
           {canWrite ? (
             <div style={styles.grid}>

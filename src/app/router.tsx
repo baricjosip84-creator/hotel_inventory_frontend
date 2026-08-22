@@ -1016,7 +1016,7 @@ const router = createBrowserRouter([
       {
         path: 'tenant-exports',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_EXPORT]}>
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.TENANTS_READ, PLATFORM_PERMISSIONS.TENANTS_EXPORT]}>
             <PlatformTenantExportsPage />
           </PlatformProtectedRoute>
         )

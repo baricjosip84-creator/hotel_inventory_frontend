@@ -1,264 +1,209 @@
-import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
+import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformTenantExportsPage.css';
 
 type TenantRow = { id: string; name: string; status?: string; billing_status?: string; plan_code?: string };
-type ExportTablePreview = { table: string; row_count: number | null; error?: string };
+type ExportTablePreview = { table: string; row_count: number | null; error_code?: string; error?: string };
 type TenantExportPreview = {
   tenant: TenantRow;
   generated_at: string;
   tables: ExportTablePreview[];
-  total_rows: number;
+  counted_rows: number;
+  total_rows: number | null;
+  evidence_complete: boolean;
+  failed_tables: string[];
+  export_scope: {
+    tenant_owned_tables_only: boolean;
+    platform_control_plane_tables_excluded: boolean;
+    secret_and_credential_material_excluded: boolean;
+    special_child_tables: string[];
+  };
   notes?: string[];
 };
-
+type ExportedTable = {
+  columns: string[];
+  redacted_columns: string[];
+  rows: unknown[];
+  source_row_count: number;
+  exported_rows: number;
+  truncated: boolean;
+};
 type TenantExportArchive = TenantExportPreview & {
   export_version: number;
   mode: 'summary' | 'full';
   max_rows_per_table: number;
-  data: Record<string, { rows: unknown[]; exported_rows: number; truncated: boolean }>;
+  complete: boolean;
+  truncated_tables: string[];
+  redacted_sensitive_columns_count: number;
+  archive_contract: {
+    repeatable_read_snapshot: boolean;
+    source_read_complete: boolean;
+    row_data_complete: boolean | null;
+    row_data_complete_requires_no_truncation: boolean;
+    audit_event_records_application_generation_only: boolean;
+    does_not_prove_external_delivery_or_receipt: boolean;
+    does_not_prove_database_restore_capability: boolean;
+  };
+  data: Record<string, ExportedTable>;
 };
 
-function readableError(error: unknown): string {
-  return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error';
+function readableError(error: unknown) { return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error'; }
+function dateTime(value?: string | null) {
+  if (!value) return 'Not recorded';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Not recorded' : parsed.toLocaleString();
 }
-
-function formatDateTime(value?: string | null) {
-  return value ? new Date(value).toLocaleString() : '—';
-}
-
-function tableStatusStyle(table: ExportTablePreview): CSSProperties {
-  return table.error ? { ...styles.badge, background: '#fee2e2', color: '#991b1b' } : { ...styles.badge, background: '#dcfce7', color: '#166534' };
-}
-
-function SourceLink({ href, children }: { href: string; children: string }) {
-  return <a href={href} style={styles.sourceLink}>{children}</a>;
-}
-
+function pretty(value?: string | null) { return value ? value.replaceAll('_', ' ') : 'Not recorded'; }
 function downloadJson(filename: string, payload: unknown) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
   URL.revokeObjectURL(url);
 }
 
 export default function PlatformTenantExportsPage() {
-  const [tenantId, setTenantId] = useState(() => new URLSearchParams(window.location.search).get('tenant_id') || '');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tenantId = searchParams.get('tenant_id') || '';
   const [mode, setMode] = useState<'summary' | 'full'>('full');
   const [maxRowsPerTable, setMaxRowsPerTable] = useState(5000);
+  const [message, setMessage] = useState('');
+
+  const canReadAudit = hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
+  const canReadCompliance = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_READ);
+  const canReadRetention = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DATA_RETENTION_READ);
 
   const tenantsQuery = useQuery({
-    queryKey: ['platform', 'tenants'],
-    queryFn: () => platformApiRequest<TenantRow[]>('/platform/tenants')
+    queryKey: ['platform', 'tenants', 'tenant-export-directory'],
+    queryFn: () => platformApiRequest<TenantRow[]>('/platform/tenants'),
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
   });
-
-  const selectedTenant = useMemo(
-    () => (tenantsQuery.data || []).find((tenant) => tenant.id === tenantId) || null,
-    [tenantId, tenantsQuery.data]
-  );
-
+  const selectedTenant = useMemo(() => (tenantsQuery.data || []).find((tenant) => tenant.id === tenantId) || null, [tenantId, tenantsQuery.data]);
   const previewQuery = useQuery({
     queryKey: ['platform', 'tenant-exports', tenantId, 'preview'],
-    queryFn: () => platformApiRequest<TenantExportPreview>(`/platform/tenant-exports/${tenantId}/preview`),
-    enabled: Boolean(tenantId)
+    queryFn: () => platformApiRequest<TenantExportPreview>(`/platform/tenant-exports/${encodeURIComponent(tenantId)}/preview`),
+    enabled: Boolean(tenantId),
+    refetchOnWindowFocus: false,
+    staleTime: 15_000
   });
 
   const exportArchive = useMutation({
-    mutationFn: () => platformApiRequest<TenantExportArchive>(`/platform/tenant-exports/${tenantId}/archive`, {
+    mutationFn: () => platformApiRequest<TenantExportArchive>(`/platform/tenant-exports/${encodeURIComponent(tenantId)}/archive`, {
       method: 'POST',
       body: JSON.stringify({ mode, max_rows_per_table: maxRowsPerTable })
     }),
     onSuccess: (payload) => {
       const safeName = (payload.tenant.name || 'tenant').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-      downloadJson(`${safeName || 'tenant'}-${payload.mode}-export.json`, payload);
+      downloadJson(`${safeName || 'tenant'}-${payload.mode === 'summary' ? 'export-summary' : 'tenant-data-export'}.json`, payload);
+      if (payload.mode === 'full' && payload.truncated_tables.length) {
+        setMessage(`Export generated with ${payload.truncated_tables.length} truncated table${payload.truncated_tables.length === 1 ? '' : 's'}. It is not a complete row-data package.`);
+      } else {
+        setMessage(payload.mode === 'summary' ? 'Summary evidence package generated and downloaded.' : 'Tenant row-data export generated without row-limit truncation.');
+      }
     }
   });
 
+  const setTenant = (value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set('tenant_id', value); else next.delete('tenant_id');
+    setSearchParams(next, { replace: true });
+    setMessage('');
+  };
+  const refresh = async () => {
+    await tenantsQuery.refetch();
+    if (tenantId) await previewQuery.refetch();
+  };
+
+  const data = previewQuery.data;
   const isValidRowLimit = Number.isInteger(maxRowsPerTable) && maxRowsPerTable >= 1 && maxRowsPerTable <= 50000;
-  const isPreparing = exportArchive.isPending;
-  const isRefreshingTenants = tenantsQuery.isFetching && !tenantsQuery.isLoading;
-  const isRefreshingPreview = previewQuery.isFetching && !previewQuery.isLoading;
-  const tablesWithErrors = (previewQuery.data?.tables || []).filter((table) => table.error).length;
-  const readyTables = (previewQuery.data?.tables || []).filter((table) => !table.error).length;
-  const exportDisabled = !tenantId || !isValidRowLimit || isPreparing;
+  const failedTables = data?.failed_tables.length || 0;
+  const readableTables = (data?.tables.length || 0) - failedTables;
+  const canGenerate = Boolean(tenantId && data?.evidence_complete && isValidRowLimit && !exportArchive.isPending);
+  const mutationError = exportArchive.error ? readableError(exportArchive.error) : '';
 
-  return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Tenant exports</h1>
-          <p style={styles.subtitle}>Create audited tenant backup/export packages. This does not restore or mutate tenant data.</p>
-          <div style={styles.metaRow}>
-            <span style={styles.metaPill}>Source: /platform/tenant-exports</span>
-            <span style={styles.metaPill}>Mode: {mode === 'full' ? 'full JSON archive' : 'summary-only evidence'}</span>
-            <span style={styles.metaPill}>Row limit: {isValidRowLimit ? maxRowsPerTable.toLocaleString() : 'invalid'}</span>
-            {selectedTenant ? <span style={styles.metaPill}>Tenant: {selectedTenant.name}</span> : null}
-          </div>
+  return <div className="platform-tenant-exports">
+    <OperationalWorkspaceHero
+      iconPath="/platform/tenant-exports"
+      eyebrow="Platform · Data portability"
+      title="Tenant exports"
+      description="Inspect tenant-scoped export coverage and generate audited JSON evidence packages without mixing Platform control-plane records into tenant data."
+      meta={<><OperationalWorkspaceMetaPill>Requires tenant read + export permission</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>Repeatable-read archive snapshot</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>Secrets and Platform tables excluded</OperationalWorkspaceMetaPill></>}
+      aside={<div className="platform-tenant-exports__hero-aside"><OperationalWorkspaceStatus value={selectedTenant ? selectedTenant.name : 'No tenant'} label={data?.evidence_complete ? 'source preview complete' : tenantId ? 'preview pending / partial' : 'select tenant'} /><button type="button" className="app-button app-button--secondary" disabled={tenantsQuery.isFetching || previewQuery.isFetching} onClick={() => void refresh()}>{tenantsQuery.isFetching || previewQuery.isFetching ? 'Refreshing…' : 'Refresh'}</button></div>}
+    />
+
+    {message ? <div className={message.includes('not a complete') ? 'platform-tenant-exports__warning' : 'platform-tenant-exports__success'}><span>{message}</span><button type="button" className="app-button app-button--secondary" onClick={() => setMessage('')}>Dismiss</button></div> : null}
+    {mutationError ? <div className="platform-tenant-exports__warning"><strong>Export generation failed.</strong><span>{mutationError}</span></div> : null}
+    {previewQuery.isError && data ? <div className="platform-tenant-exports__warning"><strong>Showing the last successful snapshot.</strong><span>{readableError(previewQuery.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => void previewQuery.refetch()}>Retry</button></div> : null}
+    {tenantsQuery.isError && tenantsQuery.data ? <div className="platform-tenant-exports__warning"><strong>Showing the last successful tenant directory.</strong><span>{readableError(tenantsQuery.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => void tenantsQuery.refetch()}>Retry</button></div> : null}
+
+    <section className="platform-tenant-exports__section">
+      <OperationalSectionHeader iconPath="/platform/tenant-exports" title="Export target" description="Choose the tenant and package shape. Full mode includes row data up to the per-table limit; summary mode contains counts and scope evidence only." />
+      {tenantsQuery.isError && !tenantsQuery.data ? <div className="platform-tenant-exports__blocking-error"><strong>Tenant directory could not be loaded.</strong><span>{readableError(tenantsQuery.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => void tenantsQuery.refetch()}>Retry</button></div> : null}
+      <div className="platform-tenant-exports__controls">
+        <label>Tenant<select value={tenantId} onChange={(event) => setTenant(event.target.value)}><option value="">Choose tenant…</option>{(tenantsQuery.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name} · {pretty(tenant.status)} · {tenant.plan_code || 'no plan'}</option>)}</select></label>
+        <label>Package mode<select value={mode} onChange={(event) => setMode(event.target.value as 'summary' | 'full')}><option value="full">Tenant row-data export</option><option value="summary">Summary evidence only</option></select></label>
+        <label>Max rows per table<input type="number" min={1} max={50000} value={maxRowsPerTable} onChange={(event) => setMaxRowsPerTable(Number(event.target.value))} /></label>
+        <button type="button" className="app-button app-button--primary" disabled={!canGenerate} onClick={() => {
+          const warning = mode === 'full'
+            ? 'Generate and download tenant row data? The result contains sensitive tenant business data. Per-table row limits can make the package incomplete; inspect truncation evidence after generation.'
+            : 'Generate and download a tenant export summary? The summary records application evidence only and contains no table row payloads.';
+          if (window.confirm(warning)) exportArchive.mutate();
+        }}>{exportArchive.isPending ? 'Generating…' : mode === 'full' ? 'Generate row-data export' : 'Generate summary'}</button>
+      </div>
+      {!isValidRowLimit ? <div className="platform-tenant-exports__validation">Max rows per table must be a whole number from 1 to 50,000.</div> : null}
+      {tenantId && data && !data.evidence_complete ? <div className="platform-tenant-exports__warning"><strong>Source preview is incomplete.</strong><span>{failedTables} table{failedTables === 1 ? '' : 's'} could not be read. Export generation fails closed until every in-scope source is readable.</span></div> : null}
+    </section>
+
+    <OperationalWorkspaceStats ariaLabel="Tenant export evidence summary">
+      <OperationalWorkspaceStatCard iconPath="/platform/tenant-exports" label="In-scope tables" value={data?.tables.length ?? '—'} helper={data ? `${readableTables} readable · ${failedTables} failed` : 'Select a tenant to inspect export scope'} tone={failedTables ? 'warn' : 'default'} />
+      <OperationalWorkspaceStatCard iconPath="/platform/tenant-exports" label="Counted rows" value={data ? data.counted_rows.toLocaleString() : '—'} helper={data?.evidence_complete ? 'Complete count across current tenant export scope' : data ? 'Partial count; do not treat as total rows' : 'No preview loaded'} tone={data && !data.evidence_complete ? 'warn' : 'default'} />
+      <OperationalWorkspaceStatCard iconPath="/platform/tenant-exports" label="Total rows" value={data?.total_rows == null ? 'Restricted by error' : data.total_rows.toLocaleString()} helper={data?.evidence_complete ? 'Point-in-time preview total' : 'Unavailable until every source count succeeds'} tone={data && !data.evidence_complete ? 'warn' : 'default'} />
+      <OperationalWorkspaceStatCard iconPath="/platform/tenant-exports" label="Snapshot" value={data ? dateTime(data.generated_at) : '—'} helper="Preview timestamp; export generation takes its own repeatable-read snapshot" tone="neutral" />
+    </OperationalWorkspaceStats>
+
+    <section className="platform-tenant-exports__section">
+      <OperationalSectionHeader iconPath="/platform/tenant-exports" title="Export scope evidence" description="The export contract includes tenant-owned application tables and explicit tenant-owned child tables. Platform control-plane tables and reusable credential/authentication material are excluded." actions={tenantId ? <button type="button" className="app-button app-button--secondary" disabled={previewQuery.isFetching} onClick={() => void previewQuery.refetch()}>{previewQuery.isFetching ? 'Refreshing…' : 'Refresh preview'}</button> : undefined} />
+      {previewQuery.isLoading && !data ? <div className="platform-tenant-exports__loading">Loading tenant export preview…</div> : null}
+      {previewQuery.isError && !data ? <div className="platform-tenant-exports__blocking-error"><strong>Tenant export preview could not be loaded.</strong><span>{readableError(previewQuery.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => void previewQuery.refetch()}>Retry</button></div> : null}
+      {!tenantId ? <div className="platform-tenant-exports__empty"><strong>No tenant selected.</strong><span>Select a tenant to inspect its exportable application-data scope.</span></div> : null}
+      {data ? <>
+        <div className="platform-tenant-exports__truth-note"><strong>Evidence boundary</strong><span>A generated package proves only that the application assembled the visible export evidence. It does not prove secure external delivery, recipient receipt, completeness beyond configured row limits, database backup coverage, or restore capability.</span></div>
+        <div className="platform-tenant-exports__scope-grid">
+          <div><span>Tenant-owned tables only</span><strong>{data.export_scope.tenant_owned_tables_only ? 'Yes' : 'No'}</strong></div>
+          <div><span>Platform control plane excluded</span><strong>{data.export_scope.platform_control_plane_tables_excluded ? 'Yes' : 'No'}</strong></div>
+          <div><span>Credential/auth material excluded</span><strong>{data.export_scope.secret_and_credential_material_excluded ? 'Yes' : 'No'}</strong></div>
+          <div><span>Explicit child tables</span><strong>{data.export_scope.special_child_tables.join(', ') || 'None'}</strong></div>
         </div>
-        <div style={styles.headerActions}>
-          <button type="button" style={styles.primaryButton} onClick={() => { tenantsQuery.refetch(); if (tenantId) previewQuery.refetch(); }} disabled={tenantsQuery.isFetching || previewQuery.isFetching}>
-            {isRefreshingTenants || isRefreshingPreview ? 'Refreshing…' : 'Refresh'}
-          </button>
-        </div>
-      </header>
+        <div className="platform-tenant-exports__notes">{(data.notes || []).map((note) => <span key={note}>{note}</span>)}</div>
+        <div className="platform-tenant-exports__table-wrap"><table><thead><tr><th>Table</th><th>Rows</th><th>Preview state</th></tr></thead><tbody>{data.tables.map((table) => <tr key={table.table}><td><strong>{table.table}</strong></td><td>{table.row_count == null ? 'Unavailable' : table.row_count.toLocaleString()}</td><td><span className="platform-tenant-exports__badge" data-tone={table.error ? 'warn' : 'good'}>{table.error ? 'Read failed' : 'Readable'}</span>{table.error ? <small>{table.error}</small> : null}</td></tr>)}</tbody></table></div>
+      </> : null}
+    </section>
 
-      {(tenantsQuery.error || previewQuery.error) ? (
-        <section style={styles.errorCard}>
-          <strong>Unable to load tenant export data.</strong>
-          <p style={styles.subtitle}>{readableError(tenantsQuery.error || previewQuery.error)}</p>
-          <button type="button" style={styles.primaryButton} onClick={() => { tenantsQuery.refetch(); if (tenantId) previewQuery.refetch(); }} disabled={tenantsQuery.isFetching || previewQuery.isFetching}>Retry</button>
-        </section>
-      ) : null}
-
-      <section style={styles.panel}>
-        <h2>Select tenant</h2>
-        <p style={styles.help}>Exports are sensitive tenant packages. Check the preview and keep downloaded JSON files in an approved secure location.</p>
-        <div style={styles.formRow}>
-          <label style={styles.fieldLabel}>
-            Tenant
-            <select style={styles.input} value={tenantId} onChange={(event) => setTenantId(event.target.value)}>
-              <option value="">Choose tenant…</option>
-              {(tenantsQuery.data || []).map((tenant) => (
-                <option key={tenant.id} value={tenant.id}>{tenant.name} · {tenant.status || 'unknown'} · {tenant.plan_code || 'no plan'}</option>
-              ))}
-            </select>
-          </label>
-          <label style={styles.fieldLabel}>
-            Export mode
-            <select style={styles.input} value={mode} onChange={(event) => setMode(event.target.value as 'summary' | 'full')}>
-              <option value="full">Full JSON archive</option>
-              <option value="summary">Summary only</option>
-            </select>
-          </label>
-          <label style={styles.fieldLabel}>
-            Max rows per table
-            <input
-              style={isValidRowLimit ? styles.input : { ...styles.input, borderColor: '#dc2626' }}
-              type="number"
-              min={1}
-              max={50000}
-              value={maxRowsPerTable}
-              onChange={(event) => setMaxRowsPerTable(Number(event.target.value))}
-              aria-label="Max rows per table"
-            />
-          </label>
-          <button
-            type="button"
-            style={exportDisabled ? styles.disabledButton : styles.button}
-            disabled={exportDisabled}
-            onClick={() => {
-              if (mode === 'full' && !window.confirm('Download a full tenant JSON archive? Treat the file as sensitive tenant data and store it only in an approved secure location.')) {
-                return;
-              }
-              exportArchive.mutate();
-            }}
-          >
-            {isPreparing ? 'Preparing…' : 'Download export'}
-          </button>
-        </div>
-        {!isValidRowLimit ? <div style={styles.error}>Max rows per table must be a whole number from 1 to 50,000.</div> : null}
-        {exportArchive.error ? <div style={styles.error}>{readableError(exportArchive.error)}</div> : null}
-        {exportArchive.isSuccess ? <div style={styles.success}>Export package generated and downloaded.</div> : null}
-      </section>
-
-      <section style={styles.panel}>
-        <h2>Supporting Platform pages</h2>
-        <div style={styles.linkGrid}>
-          <SourceLink href="/platform/tenant-offboarding">Tenant Offboarding</SourceLink>
-          <SourceLink href="/platform/compliance-export">Compliance Export</SourceLink>
-          <SourceLink href="/platform/legal-compliance-reporting">Legal & Compliance Reporting</SourceLink>
-          <SourceLink href="/platform/audit">Audit</SourceLink>
-          <SourceLink href="/platform/tenants">Tenants</SourceLink>
-        </div>
-      </section>
-
-      {selectedTenant ? (
-        <section style={styles.panel}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <h2>{selectedTenant.name}</h2>
-              <p style={styles.help}>Tenant status: {selectedTenant.status || 'unknown'} · Billing: {selectedTenant.billing_status || 'unknown'} · Plan: {selectedTenant.plan_code || 'no plan'}</p>
-            </div>
-            <button type="button" style={styles.secondaryButton} onClick={() => previewQuery.refetch()} disabled={previewQuery.isFetching}>{isRefreshingPreview ? 'Refreshing preview…' : 'Refresh preview'}</button>
-          </div>
-          {previewQuery.isLoading ? <p>Loading export preview…</p> : null}
-          {previewQuery.data ? (
-            <>
-              <div style={styles.grid}>
-                <div style={styles.card}><span>Total rows</span><strong>{previewQuery.data.total_rows.toLocaleString()}</strong><small style={styles.help}>Counted by backend preview</small></div>
-                <div style={styles.card}><span>Tables</span><strong>{previewQuery.data.tables.length}</strong><small style={styles.help}>{readyTables} ready · {tablesWithErrors} errors</small></div>
-                <div style={styles.card}><span>Generated</span><strong>{formatDateTime(previewQuery.data.generated_at)}</strong><small style={styles.help}>Snapshot timestamp</small></div>
-              </div>
-
-              <div style={styles.notice}>
-                <strong>Export evidence notes</strong>
-                {(previewQuery.data.notes || []).length ? (previewQuery.data.notes || []).map((note) => <p key={note}>{note}</p>) : <p>No backend notes returned.</p>}
-                <p style={styles.help}>Audit evidence is written by the backend when an archive or summary package is generated.</p>
-              </div>
-
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Table</th>
-                    <th style={styles.th}>Rows</th>
-                    <th style={styles.th}>Status</th>
-                    <th style={styles.th}>Evidence</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewQuery.data.tables.map((table) => (
-                    <tr key={table.table}>
-                      <td style={styles.td}>{table.table}</td>
-                      <td style={styles.td}>{table.row_count == null ? '—' : table.row_count.toLocaleString()}</td>
-                      <td style={styles.td}><span style={tableStatusStyle(table)}>{table.error ? 'Error' : 'Ready'}</span>{table.error ? <div style={styles.errorText}>{table.error}</div> : null}</td>
-                      <td style={styles.td}><SourceLink href="/platform/audit">Audit trail</SourceLink></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          ) : null}
-        </section>
-      ) : null}
-    </div>
-  );
-
+    <section className="platform-tenant-exports__section">
+      <OperationalSectionHeader iconPath="/platform/tenant-exports" title="Supporting evidence" description="Open only the Platform evidence areas you are authorized to read." />
+      <div className="platform-tenant-exports__supporting-links">
+        <Link to={tenantId ? `/platform/tenants?tenant_id=${encodeURIComponent(tenantId)}` : '/platform/tenants'}>Tenants</Link>
+        <Link to={tenantId ? `/platform/tenant-offboarding?tenant_id=${encodeURIComponent(tenantId)}` : '/platform/tenant-offboarding'}>Tenant offboarding</Link>
+        {canReadCompliance ? <Link to="/platform/compliance-export">Compliance export</Link> : null}
+        {canReadCompliance ? <Link to="/platform/legal-compliance-reporting">Legal & compliance</Link> : null}
+        {canReadRetention ? <Link to={tenantId ? `/platform/data-retention?tenant_id=${encodeURIComponent(tenantId)}` : '/platform/data-retention'}>Data retention</Link> : null}
+        {canReadAudit ? <Link to="/platform/audit">Platform audit</Link> : null}
+      </div>
+    </section>
+  </div>;
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  headerActions: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
-  title: { fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a', margin: 0 },
-  subtitle: { color: '#64748b', margin: '6px 0 0', fontSize: 13, lineHeight: 1.5 },
-  metaRow: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 },
-  metaPill: { display: 'inline-flex', border: '1px solid var(--io-primary-border)', background: 'var(--io-primary-soft)', color: 'var(--io-primary-dark)', borderRadius: 999, padding: '4px 9px', fontSize: 12, fontWeight: 700 },
-  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  formRow: { display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' },
-  fieldLabel: { display: 'flex', flexDirection: 'column', gap: 6, fontWeight: 700, color: '#334155', fontSize: 13 },
-  input: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, minWidth: 180, background: '#fff', color: '#0f172a', font: 'inherit' },
-  button: { padding: '9px 13px', border: '1px solid var(--io-primary)', borderRadius: 9, background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
-  primaryButton: { padding: '9px 13px', border: '1px solid var(--io-primary)', borderRadius: 9, background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
-  secondaryButton: { padding: '9px 13px', border: '1px solid #cbd5e1', borderRadius: 9, background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 },
-  disabledButton: { padding: '9px 13px', border: '1px solid #cbd5e1', borderRadius: 9, background: '#e2e8f0', color: '#64748b', cursor: 'not-allowed', fontWeight: 700 },
-  error: { color: '#991b1b', marginTop: 12, fontWeight: 600 },
-  errorText: { color: '#991b1b', marginTop: 4, fontSize: 12 },
-  success: { color: '#166534', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 12px', marginTop: 12 },
-  errorCard: { background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 14, padding: 18, color: '#991b1b' },
-  sectionHeader: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 16 },
-  card: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 8, background: '#fff', color: '#334155' },
-  notice: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, color: '#475569', marginBottom: 16 },
-  table: { width: '100%', borderCollapse: 'collapse', color: '#334155' },
-  th: { textAlign: 'left', padding: '10px 8px', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: 12 },
-  td: { padding: '11px 8px', borderBottom: '1px solid #f1f5f9', verticalAlign: 'top' },
-  help: { color: '#64748b', fontSize: 13 },
-  linkGrid: { display: 'flex', flexWrap: 'wrap', gap: 10 },
-  sourceLink: { color: 'var(--io-primary-dark)', textDecoration: 'none', fontWeight: 700 },
-  badge: { display: 'inline-flex', borderRadius: 999, padding: '4px 9px', fontWeight: 700, fontSize: 12 }
-};

@@ -885,7 +885,7 @@ export default function PlatformLayout() {
               <span>Provisioning presets</span>
             </NavLink>
           ) : null}
-          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT) ? (
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT) ? (
             <NavLink to="/platform/tenant-exports" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/tenant-exports" />
               <span>Tenant Exports</span>

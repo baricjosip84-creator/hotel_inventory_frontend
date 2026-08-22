@@ -80,6 +80,7 @@ function SourceLink({ href, children }: { href: string; children: string }) {
 
 export default function PlatformDataRetentionPage() {
   const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DATA_RETENTION_WRITE);
+  const canReadTenantExports = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT);
   const [rows, setRows] = useState<RetentionRow[]>([]);
   const [tenantId, setTenantId] = useState('');
   const tenantsQuery = useQuery({
@@ -225,7 +226,7 @@ export default function PlatformDataRetentionPage() {
         <strong>Supporting Platform pages</strong>
         <div style={linkRowStyle}>
           <SourceLink href="/platform/tenant-offboarding">Tenant Offboarding</SourceLink>
-          <SourceLink href="/platform/tenant-exports">Tenant Exports</SourceLink>
+          {canReadTenantExports ? <SourceLink href="/platform/tenant-exports">Tenant Exports</SourceLink> : null}
           <SourceLink href="/platform/compliance-documents">Compliance Docs</SourceLink>
           <SourceLink href="/platform/legal-compliance-reporting">Legal & Compliance Reporting</SourceLink>
           <SourceLink href="/platform/audit">Audit Trail</SourceLink>
@@ -266,7 +267,7 @@ export default function PlatformDataRetentionPage() {
           <tbody>
             {rows.map((row) => (
               <tr key={row.tenant_id} style={{ borderTop: '1px solid #e5e7eb' }}>
-                <Td><strong>{row.tenant_name}</strong><br /><small>{row.tenant_id}</small><div style={linkRowStyle}><SourceLink href={`/platform/tenant-lifecycle?tenant_id=${row.tenant_id}`}>Lifecycle</SourceLink><SourceLink href={`/platform/tenant-offboarding?tenant_id=${row.tenant_id}`}>Offboarding</SourceLink><SourceLink href={`/platform/tenant-exports?tenant_id=${row.tenant_id}`}>Export evidence</SourceLink></div></Td>
+                <Td><strong>{row.tenant_name}</strong><br /><small>{row.tenant_id}</small><div style={linkRowStyle}><SourceLink href={`/platform/tenant-lifecycle?tenant_id=${row.tenant_id}`}>Lifecycle</SourceLink><SourceLink href={`/platform/tenant-offboarding?tenant_id=${row.tenant_id}`}>Offboarding</SourceLink>{canReadTenantExports ? <SourceLink href={`/platform/tenant-exports?tenant_id=${row.tenant_id}`}>Export evidence</SourceLink> : null}</div></Td>
                 <Td>{row.tenant_status}{row.write_locked ? ' / locked' : ''}</Td>
                 <Td>{row.retention_policy}</Td>
                 <Td>{formatDate(row.retain_until)}{row.retention_due ? <div style={warningTextStyle}>Due</div> : null}</Td>

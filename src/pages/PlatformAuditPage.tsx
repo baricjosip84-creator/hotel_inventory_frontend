@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { ApiError } from '../lib/api';
 import { platformApiRequest, platformDownload } from '../lib/platformApi';
+import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
 
 type PlatformAuditRow = {
   id: string;
@@ -84,6 +85,7 @@ export default function PlatformAuditPage() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
+  const canReadTenantExports = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -194,7 +196,7 @@ export default function PlatformAuditPage() {
       <nav style={styles.supportLinks} aria-label="Supporting platform pages">
         <Link style={styles.supportLink} to="/platform/security-center">Security Center</Link>
         <Link style={styles.supportLink} to="/platform/support-sessions">Support Sessions</Link>
-        <Link style={styles.supportLink} to="/platform/tenant-exports">Tenant Exports</Link>
+        {canReadTenantExports ? <Link style={styles.supportLink} to="/platform/tenant-exports">Tenant Exports</Link> : null}
         <Link style={styles.supportLink} to="/platform/incidents">Incidents</Link>
       </nav>
 

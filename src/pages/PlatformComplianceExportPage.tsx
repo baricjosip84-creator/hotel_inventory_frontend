@@ -35,7 +35,7 @@ export default function PlatformComplianceExportPage(){
   const invalidOffset=!Number.isInteger(parsedOffset)||parsedOffset<0||parsedOffset>1000000;
   const documentOffset=invalidOffset?0:parsedOffset;
   const canReadPrivacy=hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_PRIVACY_READ);
-  const canReadTenantExports=hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT);
+  const canReadTenantExports=hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)&&hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT);
   const canReadTenants=hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ);
   const canReadAudit=hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
   const canReadRetention=hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DATA_RETENTION_READ);
