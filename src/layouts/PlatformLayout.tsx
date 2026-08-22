@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
 import type { CSSProperties } from 'react';
 import { logoutPlatformSession } from '../lib/platformAuth';
 import { PLATFORM_PERMISSIONS, hasPlatformPermission, PLATFORM_PERMISSION_SNAPSHOT_EVENT } from '../lib/platformPermissions';
@@ -7,6 +8,7 @@ import CopyrightNotice from '../components/CopyrightNotice';
 import { InventoryMark } from '../components/brand/InventoryBrand';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { refreshPlatformPermissionSnapshot } from '../lib/permissionPolicies';
+import { fetchPlatformAnnouncementContext, type PlatformAnnouncementContext } from '../lib/platformAnnouncementContext';
 import './PlatformTheme.css';
 
 export default function PlatformLayout() {
@@ -14,6 +16,17 @@ export default function PlatformLayout() {
   const location = useLocation();
   const mainRef = useRef<HTMLElement | null>(null);
   const [, setPermissionRevision] = useState(0);
+  const [dismissedAnnouncementIds, setDismissedAnnouncementIds] = useState<Set<string>>(() => new Set());
+  const announcementContextQuery = useQuery({
+    queryKey: ['platform', 'announcements', 'current-context'],
+    queryFn: fetchPlatformAnnouncementContext,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    retry: 1
+  });
+  const announcementContext: PlatformAnnouncementContext | null = announcementContextQuery.data ?? null;
+  const visibleAnnouncements = useMemo(() => (announcementContext?.announcements || []).filter((announcement) => !dismissedAnnouncementIds.has(announcement.id)), [announcementContext, dismissedAnnouncementIds]);
 
   useEffect(() => {
     const onPermissionsChanged = () => setPermissionRevision((value) => value + 1);
@@ -1005,6 +1018,14 @@ export default function PlatformLayout() {
         </button>
       </aside>
       <main key={location.pathname} ref={mainRef} style={styles.main} data-route-scroll-container>
+        {visibleAnnouncements.length ? <div style={styles.announcementStack}>
+          {visibleAnnouncements.map((announcement) => <div key={announcement.id} style={{ ...styles.announcementBanner, ...(announcement.severity === 'critical' ? styles.announcementCritical : {}), ...(announcement.severity === 'warning' ? styles.announcementWarning : {}) }}>
+            <div style={styles.announcementHeader}><strong>{announcement.title}</strong>{announcement.dismissible ? <button type="button" style={styles.announcementDismiss} onClick={() => setDismissedAnnouncementIds((current) => new Set([...current, announcement.id]))}>Dismiss</button> : null}</div>
+            <div>{announcement.message}</div>
+            <div style={styles.announcementMeta}>Severity: {announcement.severity}{announcement.ends_at ? ` · Visible until: ${new Date(announcement.ends_at).toLocaleString()}` : ''}{!announcement.dismissible ? ' · Required notice' : ''}</div>
+          </div>)}
+          {announcementContext?.truncated ? <div style={styles.announcementTruncated}>More current Platform announcements exist than this shell returns.</div> : null}
+        </div> : null}
         <Outlet />
         <CopyrightNotice />
       </main>
@@ -1086,6 +1107,14 @@ const styles: Record<string, CSSProperties> = {
     gap: 9,
     fontWeight: 700
   },
+  announcementStack: { display: 'grid', gap: '8px', marginBottom: '14px' },
+  announcementBanner: { background: '#eff6ff', color: '#1e3a8a', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '10px 12px', lineHeight: 1.45 },
+  announcementWarning: { background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a' },
+  announcementCritical: { background: '#7f1d1d', color: '#fff', border: '1px solid #fecaca' },
+  announcementHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' },
+  announcementMeta: { marginTop: '4px', fontSize: '12px', opacity: 0.85 },
+  announcementDismiss: { border: '1px solid currentColor', borderRadius: '8px', background: 'transparent', color: 'inherit', padding: '4px 8px', font: 'inherit', fontWeight: 800, cursor: 'pointer' },
+  announcementTruncated: { color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '8px 12px', fontSize: '12px' },
   main: {
     height: '100dvh',
     overflowY: 'auto',

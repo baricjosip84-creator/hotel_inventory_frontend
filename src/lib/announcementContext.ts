@@ -14,6 +14,9 @@ export type TenantAnnouncement = {
 
 export type AnnouncementContext = {
   announcements: TenantAnnouncement[];
+  total_current?: number;
+  truncated?: boolean;
+  evidence_contract?: Record<string, boolean>;
 };
 
 export async function fetchAnnouncementContext(): Promise<AnnouncementContext> {

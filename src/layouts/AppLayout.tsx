@@ -57,9 +57,20 @@ export default function AppLayout() {
   });
   const hasOpenAlerts = canReadAlerts && (openAlertsIndicatorQuery.data?.length ?? 0) > 0;
 
+  const announcementContextQuery = useQuery({
+    queryKey: ['announcement-context', 'current', tenantAccess.tenantId],
+    queryFn: fetchAnnouncementContext,
+    enabled: tenantAccess.hasTenantContext,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    retry: 1
+  });
+  const announcementContext: AnnouncementContext | null = announcementContextQuery.data ?? null;
+
   const [supportContext, setSupportContext] = useState<CurrentSupportContext | null>(null);
   const [maintenanceContext, setMaintenanceContext] = useState<MaintenanceContext | null>(null);
-  const [announcementContext, setAnnouncementContext] = useState<AnnouncementContext | null>(null);
+  const [dismissedAnnouncementIds, setDismissedAnnouncementIds] = useState<Set<string>>(() => new Set());
   const [incidentContext, setIncidentContext] = useState<IncidentContext | null>(null);
   const [tenantSubscriptionAccess, setTenantSubscriptionAccess] = useState<TenantSubscriptionAccess | null>(null);
   const [, setTenantCurrencyRevision] = useState(0);
@@ -83,6 +94,8 @@ export default function AppLayout() {
       });
     return () => { cancelled = true; };
   }, [tenantAccess.tenantId, tenantAccess.hasTenantContext]);
+
+  const visibleAnnouncements = useMemo(() => (announcementContext?.announcements || []).filter((announcement) => !dismissedAnnouncementIds.has(announcement.id)), [announcementContext, dismissedAnnouncementIds]);
 
   const currentModule = useMemo(() => getTenantModuleForPathname(location.pathname), [location.pathname]);
   const pageMeta = useMemo(() => getTenantPageMeta(location.pathname), [location.pathname]);
@@ -272,26 +285,6 @@ export default function AppLayout() {
       .catch(() => {
         if (!cancelled) {
           setMaintenanceContext(null);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [location.pathname]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    fetchAnnouncementContext()
-      .then((context) => {
-        if (!cancelled) {
-          setAnnouncementContext(context);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAnnouncementContext(null);
         }
       });
 
@@ -582,18 +575,27 @@ export default function AppLayout() {
           </div>
         ) : null}
 
-        {announcementContext?.announcements?.length ? (
-          <div style={{
-            ...styles.announcementBanner,
-            ...(announcementContext.announcements[0].severity === 'critical' ? styles.announcementCritical : {}),
-            ...(announcementContext.announcements[0].severity === 'warning' ? styles.announcementWarning : {})
-          }}>
-            <strong>{announcementContext.announcements[0].title}</strong>
-            <div>{announcementContext.announcements[0].message}</div>
-            <div style={styles.announcementMeta}>
-              Severity: {announcementContext.announcements[0].severity}
-              {announcementContext.announcements[0].ends_at ? ` · Visible until: ${new Date(announcementContext.announcements[0].ends_at).toLocaleString()}` : ''}
-            </div>
+        {visibleAnnouncements.length ? (
+          <div style={styles.announcementStack}>
+            {visibleAnnouncements.map((announcement) => (
+              <div key={announcement.id} style={{
+                ...styles.announcementBanner,
+                ...(announcement.severity === 'critical' ? styles.announcementCritical : {}),
+                ...(announcement.severity === 'warning' ? styles.announcementWarning : {})
+              }}>
+                <div style={styles.announcementHeader}>
+                  <strong>{announcement.title}</strong>
+                  {announcement.dismissible ? <button type="button" style={styles.announcementDismiss} onClick={() => setDismissedAnnouncementIds((current) => new Set([...current, announcement.id]))}>Dismiss</button> : null}
+                </div>
+                <div>{announcement.message}</div>
+                <div style={styles.announcementMeta}>
+                  Severity: {announcement.severity}
+                  {announcement.ends_at ? ` · Visible until: ${new Date(announcement.ends_at).toLocaleString()}` : ''}
+                  {!announcement.dismissible ? ' · Required notice' : ''}
+                </div>
+              </div>
+            ))}
+            {announcementContext?.truncated ? <div style={styles.announcementTruncated}>More current announcements exist than this shell returns. Review Platform communications if you need the complete current set.</div> : null}
           </div>
         ) : null}
 
@@ -658,6 +660,10 @@ const styles: Record<string, CSSProperties> = {
     opacity: 0.85
   },
 
+  announcementStack: { display: 'grid', gap: '8px' },
+  announcementHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' },
+  announcementDismiss: { border: '1px solid currentColor', borderRadius: '8px', background: 'transparent', color: 'inherit', padding: '4px 8px', font: 'inherit', fontWeight: 800, cursor: 'pointer' },
+  announcementTruncated: { margin: '0 24px', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '8px 12px', fontSize: '12px' },
   announcementBanner: {
     margin: '12px 24px 0',
     background: '#eff6ff',

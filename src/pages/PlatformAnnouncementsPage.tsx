@@ -1,25 +1,46 @@
-import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformAnnouncementsPage.css';
 
-type Tenant = { id: string; name: string };
+type Tenant = { id: string; name: string; status?: string | null };
+type AnnouncementStatus = 'draft' | 'published' | 'cancelled' | 'expired';
+type AnnouncementAudience = 'tenant' | 'platform' | 'all';
+type AnnouncementSeverity = 'info' | 'warning' | 'critical';
 type Announcement = {
   id: string;
   title: string;
   message: string;
-  audience: 'tenant' | 'platform' | 'all';
+  audience: AnnouncementAudience;
   tenant_id?: string | null;
   tenant_name?: string | null;
-  severity: 'info' | 'warning' | 'critical';
-  status: 'draft' | 'published' | 'cancelled' | 'expired';
+  tenant_status?: string | null;
+  tenant_present?: boolean;
+  severity: AnnouncementSeverity;
+  status: AnnouncementStatus;
   starts_at: string;
   ends_at?: string | null;
   dismissible: boolean;
+  created_by_platform_user_id?: string | null;
   created_by_email?: string | null;
+  created_by_present?: boolean;
+  published_by_platform_user_id?: string | null;
   published_by_email?: string | null;
+  published_by_present?: boolean;
+  cancelled_by_platform_user_id?: string | null;
   cancelled_by_email?: string | null;
+  cancelled_by_present?: boolean;
   cancellation_reason?: string | null;
   is_current?: boolean;
   created_at?: string | null;
@@ -27,282 +48,334 @@ type Announcement = {
   published_at?: string | null;
   cancelled_at?: string | null;
 };
+type AnnouncementResponse = {
+  announcements: Announcement[];
+  summary: {
+    total: number;
+    draft: number;
+    published: number;
+    expired: number;
+    cancelled: number;
+    current: number;
+    current_tenant_visible: number;
+    current_platform_visible: number;
+    critical_current: number;
+    tenant_specific: number;
+  };
+  pagination: { limit: number; offset: number; total: number; has_more: boolean };
+  available_sources: string[];
+  omitted_sources: string[];
+  evidence_access: { tenant_identity: boolean; platform_user_identity: boolean };
+  evidence_complete: boolean;
+  evidence_contract: {
+    application_announcement_records_only: boolean;
+    effective_expiry_is_derived_from_the_application_time_window: boolean;
+    published_state_means_available_to_the_matching_application_context_during_its_time_window: boolean;
+    publication_does_not_prove_browser_delivery_or_customer_receipt: boolean;
+    dismissible_is_a_client_display_control_not_acknowledgement_evidence: boolean;
+    platform_and_tenant_contexts_expose_only_current_audience_appropriate_message_fields: boolean;
+  };
+  generated_at: string;
+};
+type AnnouncementForm = {
+  title: string;
+  message: string;
+  audience: AnnouncementAudience;
+  tenant_id: string;
+  severity: AnnouncementSeverity;
+  starts_at: string;
+  ends_at: string;
+  dismissible: boolean;
+};
+type EditForm = Pick<AnnouncementForm, 'title' | 'message' | 'severity' | 'starts_at' | 'ends_at' | 'dismissible'>;
 
-function readableError(error: unknown): string {
-  return error instanceof Error ? error.message : 'Unknown error';
-}
-
-function localDateTimeValue(date: Date): string {
-  const offset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
-}
-
-export default function PlatformAnnouncementsPage() {
-  const qc = useQueryClient();
-  const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_ANNOUNCEMENTS_WRITE);
-  const [filters, setFilters] = useState({ status: '', audience: '', include_expired: 'false' });
-  const [cancelReasonById, setCancelReasonById] = useState<Record<string, string>>({});
-  const [statusMessage, setStatusMessage] = useState('');
-  const [form, setForm] = useState({
+const PAGE_SIZE = 50;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function readableError(error: unknown) { return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error'; }
+function localDateTimeValue(value: Date | string) { const date = value instanceof Date ? value : new Date(value); const offset = date.getTimezoneOffset() * 60000; return new Date(date.getTime() - offset).toISOString().slice(0, 16); }
+function formatDateTime(value?: string | null) { if (!value) return 'Not recorded'; const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Not recorded' : date.toLocaleString(); }
+function identityLabel(email: string | null | undefined, present: boolean | undefined, allowed: boolean) { if (!allowed && present) return 'Restricted'; return email || 'Not recorded'; }
+function pretty(value?: string | null) { return value ? value.replaceAll('_', ' ') : 'Not recorded'; }
+function statusTone(status: AnnouncementStatus) { if (status === 'published') return 'good'; if (status === 'cancelled') return 'danger'; if (status === 'expired') return 'neutral'; return 'warn'; }
+function severityTone(severity: AnnouncementSeverity) { if (severity === 'critical') return 'danger'; if (severity === 'warning') return 'warn'; return 'neutral'; }
+function initialForm(): AnnouncementForm {
+  return {
     title: '',
     message: '',
     audience: 'all',
     tenant_id: '',
     severity: 'info',
-    status: 'published',
     starts_at: localDateTimeValue(new Date()),
     ends_at: '',
     dismissible: true
+  };
+}
+function editFrom(row: Announcement): EditForm {
+  return {
+    title: row.title,
+    message: row.message,
+    severity: row.severity,
+    starts_at: localDateTimeValue(row.starts_at),
+    ends_at: row.ends_at ? localDateTimeValue(row.ends_at) : '',
+    dismissible: row.dismissible
+  };
+}
+
+export default function PlatformAnnouncementsPage() {
+  const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_ANNOUNCEMENTS_WRITE);
+  const canReadTenants = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ);
+  const canReadPlatformUsers = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ);
+  const canReadMaintenance = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_MAINTENANCE_READ);
+  const canReadIncidents = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ);
+  const canReadAudit = hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
+
+  const status = searchParams.get('status') || '';
+  const audience = searchParams.get('audience') || '';
+  const search = searchParams.get('search') || '';
+  const requestedTenantId = searchParams.get('tenant_id') || '';
+  const tenantId = canReadTenants && uuidPattern.test(requestedTenantId) ? requestedTenantId : '';
+  const includeExpired = searchParams.get('include_expired') === 'true' || status === 'expired' || status === 'cancelled';
+  const offset = Math.max(0, Number(searchParams.get('offset') || 0) || 0);
+
+  const [form, setForm] = useState<AnnouncementForm>(() => initialForm());
+  const [editing, setEditing] = useState<Announcement | null>(null);
+  const [editForm, setEditForm] = useState<EditForm | null>(null);
+  const [cancelReasonById, setCancelReasonById] = useState<Record<string, string>>({});
+  const [message, setMessage] = useState('');
+
+  const tenantsQuery = useQuery({
+    queryKey: ['platform', 'tenants', 'announcements-directory'],
+    queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants'),
+    enabled: canReadTenants,
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
   });
 
-  const query = new URLSearchParams({ limit: '200', include_expired: filters.include_expired });
-  if (filters.status) query.set('status', filters.status);
-  if (filters.audience) query.set('audience', filters.audience);
+  const listParams = useMemo(() => {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (audience) params.set('audience', audience);
+    if (tenantId) params.set('tenant_id', tenantId);
+    if (search.trim()) params.set('search', search.trim());
+    params.set('include_expired', includeExpired ? 'true' : 'false');
+    params.set('limit', String(PAGE_SIZE));
+    params.set('offset', String(offset));
+    return params.toString();
+  }, [status, audience, tenantId, search, includeExpired, offset]);
 
-  const announcements = useQuery({
-    queryKey: ['platform', 'announcements', filters],
-    queryFn: () => platformApiRequest<Announcement[]>(`/platform/announcements?${query.toString()}`)
+  const announcementsQuery = useQuery({
+    queryKey: ['platform', 'announcements', 'registry', listParams],
+    queryFn: () => platformApiRequest<AnnouncementResponse>(`/platform/announcements?${listParams}`),
+    refetchOnWindowFocus: false,
+    staleTime: 15_000,
+    placeholderData: (previous) => previous
   });
 
-  const tenants = useQuery({
-    queryKey: ['platform', 'tenants', 'for-announcements'],
-    queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants')
-  });
+  const updateParams = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(patch)) { if (value) next.set(key, value); else next.delete(key); }
+    if (!Object.prototype.hasOwnProperty.call(patch, 'offset')) next.delete('offset');
+    const nextStatus = patch.status ?? next.get('status');
+    if (nextStatus === 'expired' || nextStatus === 'cancelled') next.set('include_expired', 'true');
+    setSearchParams(next, { replace: true });
+    setMessage('');
+  };
+  const invalidateAnnouncements = async () => { await queryClient.invalidateQueries({ queryKey: ['platform', 'announcements'] }); };
+  const refresh = async () => {
+    const jobs: Promise<unknown>[] = [announcementsQuery.refetch()];
+    if (canReadTenants) jobs.push(tenantsQuery.refetch());
+    await Promise.allSettled(jobs);
+  };
 
-  const trimmedTitle = form.title.trim();
-  const trimmedMessage = form.message.trim();
-  const startsAtValid = Boolean(form.starts_at && !Number.isNaN(new Date(form.starts_at).getTime()));
-  const endsAtValid = !form.ends_at || (!Number.isNaN(new Date(form.ends_at).getTime()) && new Date(form.ends_at).getTime() > new Date(form.starts_at).getTime());
-  const createBlockedReason = !trimmedTitle
-    ? 'Enter an announcement title before creating.'
-    : !trimmedMessage
-      ? 'Enter an announcement message before creating.'
-      : form.audience === 'tenant' && !form.tenant_id
-        ? 'Select a tenant for a tenant-specific announcement.'
-        : !startsAtValid
-          ? 'Select a valid start time.'
-          : !endsAtValid
-            ? 'End time must be after start time.'
-            : '';
-  const create = useMutation({
+  const createMutation = useMutation({
     mutationFn: () => platformApiRequest<Announcement>('/platform/announcements', {
       method: 'POST',
       body: JSON.stringify({
-        title: trimmedTitle,
-        message: trimmedMessage,
+        title: form.title.trim(),
+        message: form.message.trim(),
         audience: form.audience,
         tenant_id: form.audience === 'tenant' ? form.tenant_id : null,
         severity: form.severity,
-        status: form.status,
         starts_at: new Date(form.starts_at).toISOString(),
         ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
         dismissible: form.dismissible
       })
     }),
-    onSuccess: async (createdAnnouncement) => {
-      setStatusMessage(`Announcement created: ${createdAnnouncement.title}`);
-      setForm({ ...form, title: '', message: '' });
-      await qc.invalidateQueries({ queryKey: ['platform', 'announcements'] });
-    }
+    onSuccess: async (created) => { setForm(initialForm()); setMessage(`Draft announcement created: ${created.title}. Publish it explicitly when ready.`); await invalidateAnnouncements(); }
+  });
+  const editMutation = useMutation({
+    mutationFn: () => {
+      if (!editing || !editForm) throw new Error('Select an announcement to edit.');
+      const body: Record<string, unknown> = {
+        title: editForm.title.trim(),
+        message: editForm.message.trim(),
+        severity: editForm.severity,
+        ends_at: editForm.ends_at ? new Date(editForm.ends_at).toISOString() : null,
+        dismissible: editForm.dismissible
+      };
+      if (editing.status !== 'published') body.starts_at = new Date(editForm.starts_at).toISOString();
+      return platformApiRequest<Announcement>(`/platform/announcements/${encodeURIComponent(editing.id)}`, { method: 'PATCH', body: JSON.stringify(body) });
+    },
+    onSuccess: async (updated) => { setEditing(null); setEditForm(null); setMessage(updated.status === 'expired' ? 'Announcement details updated. It remains Expired until explicitly published again.' : 'Announcement details updated.'); await invalidateAnnouncements(); }
+  });
+  const publishMutation = useMutation({
+    mutationFn: (id: string) => platformApiRequest<Announcement>(`/platform/announcements/${encodeURIComponent(id)}/publish`, { method: 'POST' }),
+    onSuccess: async () => { setMessage('Announcement published. It is available to its matching application audience during the configured time window.'); await invalidateAnnouncements(); }
+  });
+  const cancelMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => platformApiRequest<Announcement>(`/platform/announcements/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: JSON.stringify({ reason: reason.trim() }) }),
+    onSuccess: async (_row, variables) => { setCancelReasonById((current) => ({ ...current, [variables.id]: '' })); setMessage('Announcement cancelled.'); await invalidateAnnouncements(); }
   });
 
-  const publish = useMutation({
-    mutationFn: (id: string) => platformApiRequest(`/platform/announcements/${id}/publish`, { method: 'POST' }),
-    onSuccess: async () => {
-      setStatusMessage('Announcement published.');
-      await qc.invalidateQueries({ queryKey: ['platform', 'announcements'] });
-    }
-  });
+  const data = announcementsQuery.data;
+  const rows = data?.announcements || [];
+  const summary = data?.summary;
+  const pagination = data?.pagination;
+  const blockingError = announcementsQuery.isError && !data;
+  const staleWarning = announcementsQuery.isError && Boolean(data);
+  const invalidTenantFilter = Boolean(requestedTenantId) && (!canReadTenants || !uuidPattern.test(requestedTenantId));
+  const visibleStart = pagination && pagination.total ? pagination.offset + 1 : 0;
+  const visibleEnd = pagination ? Math.min(pagination.offset + rows.length, pagination.total) : rows.length;
 
-  const cancel = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) => platformApiRequest(`/platform/announcements/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason: reason.trim() }) }),
-    onSuccess: async (_result, variables) => {
-      setStatusMessage('Announcement cancelled.');
-      setCancelReasonById((current) => ({ ...current, [variables.id]: '' }));
-      await qc.invalidateQueries({ queryKey: ['platform', 'announcements'] });
-    }
-  });
+  const formStartsValid = Boolean(form.starts_at && !Number.isNaN(new Date(form.starts_at).getTime()));
+  const formEndsValid = !form.ends_at || (formStartsValid && !Number.isNaN(new Date(form.ends_at).getTime()) && new Date(form.ends_at).getTime() > new Date(form.starts_at).getTime());
+  const formBlocked = !form.title.trim() || !form.message.trim() || !formStartsValid || !formEndsValid || (form.audience === 'tenant' && (!canReadTenants || !form.tenant_id));
 
-  const canCreateAnnouncement = canWrite && !createBlockedReason && !create.isPending;
-  const rows = useMemo(() => announcements.data ?? [], [announcements.data]);
-  const currentCount = useMemo(() => rows.filter((row) => row.is_current).length, [rows]);
-  const refreshAll = async () => {
-    setStatusMessage('');
-    await Promise.all([announcements.refetch(), tenants.refetch()]);
-  };
-  const filteredStatusLabel = filters.status || 'all statuses';
-  const filteredAudienceLabel = filters.audience || 'all audiences';
-  const visibilityLabel = filters.include_expired === 'true' ? 'including expired' : 'current/future only';
+  const editStartsValid = Boolean(editForm?.starts_at && !Number.isNaN(new Date(editForm.starts_at).getTime()));
+  const editEndsValid = !editForm?.ends_at || (editStartsValid && !Number.isNaN(new Date(editForm.ends_at).getTime()) && new Date(editForm.ends_at).getTime() > new Date(editForm.starts_at).getTime());
+  const editBlocked = !editForm?.title.trim() || !editForm?.message.trim() || !editStartsValid || !editEndsValid;
 
-  return <div style={styles.page}>
-    <header style={styles.headerRow}>
-      <div>
-        <h1 style={styles.title}>Platform announcements</h1>
-        <p style={styles.muted}>Publish non-maintenance messages to tenants or platform staff. Use maintenance windows only when there is an actual service window.</p>
+  return <div className="platform-announcements">
+    <OperationalWorkspaceHero
+      iconPath="/platform/announcements"
+      eyebrow="Platform communications"
+      title="Announcements"
+      description="Manage application messages for tenants and Platform staff. Create records as drafts, publish deliberately, and keep audience identity behind its source permissions."
+      meta={<>
+        <OperationalWorkspaceMetaPill>Registry: PLATFORM_ANNOUNCEMENTS_READ</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>Tenant identity: TENANTS_READ</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>Operator identity: PLATFORM_USERS_READ</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>{data?.generated_at ? `Snapshot ${formatDateTime(data.generated_at)}` : 'Snapshot pending'}</OperationalWorkspaceMetaPill>
+      </>}
+      aside={<div className="platform-announcements__hero-aside">
+        <OperationalWorkspaceStatus value={summary?.current ?? '—'} label="current application messages" />
+        <button type="button" className="app-button app-button--secondary" onClick={() => void refresh()} disabled={announcementsQuery.isFetching || tenantsQuery.isFetching}>Refresh</button>
+      </div>}
+    />
+
+    {message ? <div className="platform-announcements__success"><span>{message}</span><button type="button" onClick={() => setMessage('')}>Dismiss</button></div> : null}
+    {staleWarning ? <div className="platform-announcements__warning"><strong>Showing the last successful announcement snapshot.</strong><span>{readableError(announcementsQuery.error)}</span><button type="button" onClick={() => void announcementsQuery.refetch()}>Retry</button></div> : null}
+    {invalidTenantFilter ? <div className="platform-announcements__warning">Invalid or unauthorized URL filter was ignored. Tenant filtering requires TENANTS_READ and a valid tenant UUID.</div> : null}
+    {data && !data.evidence_complete ? <div className="platform-announcements__warning"><strong>Partial identity evidence.</strong><span>Restricted sources: {data.omitted_sources.join(', ') || 'none'}.</span></div> : null}
+
+    <OperationalWorkspaceStats ariaLabel="Announcement registry summary">
+      <OperationalWorkspaceStatCard label="Current" value={summary?.current ?? 0} helper="Published and inside its application time window" tone={(summary?.current || 0) ? 'good' : 'neutral'} />
+      <OperationalWorkspaceStatCard label="Tenant visible" value={summary?.current_tenant_visible ?? 0} helper="Current tenant/all audience records" />
+      <OperationalWorkspaceStatCard label="Platform visible" value={summary?.current_platform_visible ?? 0} helper="Current platform/all audience records" />
+      <OperationalWorkspaceStatCard label="Critical current" value={summary?.critical_current ?? 0} helper="Current records marked critical" tone={(summary?.critical_current || 0) ? 'danger' : 'neutral'} />
+    </OperationalWorkspaceStats>
+
+    <section className="io-workspace-section platform-announcements__section">
+      <OperationalSectionHeader iconPath="/platform/announcements" title="Registry filters" description="Status uses effective expiry from the configured end time rather than trusting a stale stored label." />
+      <div className="platform-announcements__filters">
+        <label className="platform-announcements__search">Search<input value={search} onChange={(event) => updateParams({ search: event.target.value || null })} placeholder="Title, message or cancellation reason" /></label>
+        <label>Status<select value={status} onChange={(event) => updateParams({ status: event.target.value || null })}><option value="">All statuses</option><option value="draft">Draft</option><option value="published">Published</option><option value="expired">Expired</option><option value="cancelled">Cancelled</option></select></label>
+        <label>Audience<select value={audience} onChange={(event) => updateParams({ audience: event.target.value || null })}><option value="">All audiences</option><option value="tenant">One tenant</option><option value="platform">Platform staff</option><option value="all">Tenants + Platform</option></select></label>
+        <label>History<select value={includeExpired ? 'true' : 'false'} onChange={(event) => updateParams({ include_expired: event.target.value })}><option value="false">Current/future + drafts</option><option value="true">Include expired/cancelled</option></select></label>
+        {canReadTenants ? <label>Tenant<select value={tenantId} onChange={(event) => updateParams({ tenant_id: event.target.value || null })}><option value="">All tenant targets</option>{(tenantsQuery.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}{tenant.status ? ` · ${tenant.status}` : ''}</option>)}</select></label> : null}
       </div>
-      <button style={styles.secondaryButton} onClick={() => void refreshAll()} disabled={announcements.isFetching || tenants.isFetching}>Refresh</button>
-    </header>
-
-    <section style={styles.metadataPanel}>
-      <span><b>Snapshot:</b> {announcements.isFetching ? 'Refreshing' : 'Loaded'} · {new Date().toLocaleString()}</span>
-      <span><b>Source:</b> /platform/announcements, /platform/tenants, /announcement-context/current</span>
-      <span><b>Filters:</b> {filteredStatusLabel} · {filteredAudienceLabel} · {visibilityLabel}</span>
-      <span><b>Rows:</b> {rows.length} listed · {currentCount} current tenant-visible candidates</span>
     </section>
 
-    <nav style={styles.supportLinks} aria-label="Supporting Platform pages">
-      <a style={styles.supportLink} href="/platform/maintenance">Maintenance</a>
-      <a style={styles.supportLink} href="/platform/incidents">Incidents</a>
-      <a style={styles.supportLink} href="/platform/tenants">Tenants</a>
-      <a style={styles.supportLink} href="/platform/audit">Audit</a>
-    </nav>
-
-    {statusMessage ? <div style={styles.success}>{statusMessage}</div> : null}
-
-    <section style={styles.summaryGrid}>
-      <div style={styles.summaryCard}><b>Current</b><span>{currentCount}</span></div>
-      <div style={styles.summaryCard}><b>Total listed</b><span>{rows.length}</span></div>
-      <div style={styles.summaryCard}><b>Critical</b><span>{rows.filter((row) => row.severity === 'critical').length}</span></div>
-      <div style={styles.summaryCard}><b>Tenant-specific</b><span>{rows.filter((row) => row.audience === 'tenant').length}</span></div>
-    </section>
-
-    {canWrite ? <section style={styles.panel}>
-      <h2>Create announcement</h2>
-      <div style={styles.formGrid}>
-        <label style={styles.field}>Title
-          <input style={styles.input} placeholder="Announcement title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-        </label>
-        <label style={styles.field}>Audience
-          <select style={styles.input} value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value, tenant_id: '' })}>
-            <option value="all">All tenants and platform</option>
-            <option value="tenant">One tenant</option>
-            <option value="platform">Platform staff only</option>
-          </select>
-        </label>
-        {form.audience === 'tenant' ? <label style={styles.field}>Tenant
-          <select style={styles.input} value={form.tenant_id} onChange={(e) => setForm({ ...form, tenant_id: e.target.value })}>
-            <option value="">Select tenant</option>
-            {(tenants.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-          </select>
-        </label> : null}
-        <label style={styles.field}>Severity
-          <select style={styles.input} value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value })}>
-            <option value="info">Info</option><option value="warning">Warning</option><option value="critical">Critical</option>
-          </select>
-        </label>
-        <label style={styles.field}>Publish state
-          <select style={styles.input} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-            <option value="published">Publish now</option><option value="draft">Save as draft</option>
-          </select>
-        </label>
-        <label style={styles.field}>Starts at
-          <input style={styles.input} type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} />
-        </label>
-        <label style={styles.field}>Ends at
-          <input style={styles.input} type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} />
-        </label>
-        <label style={styles.checkboxLabel}><input type="checkbox" checked={form.dismissible} onChange={(e) => setForm({ ...form, dismissible: e.target.checked })} /> Dismissible</label>
+    {canWrite ? <section className="io-workspace-section platform-announcements__section">
+      <OperationalSectionHeader iconPath="/platform/announcements" title="Create draft" description="Creation never publishes. Review the draft in the registry, then use the dedicated Publish action." />
+      <div className="platform-announcements__form-grid">
+        <label>Title<input value={form.title} maxLength={200} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></label>
+        <label>Audience<select value={form.audience} onChange={(event) => setForm((current) => ({ ...current, audience: event.target.value as AnnouncementAudience, tenant_id: '' }))}><option value="all">Tenants + Platform</option><option value="platform">Platform staff only</option><option value="tenant" disabled={!canReadTenants}>One tenant{!canReadTenants ? ' · requires TENANTS_READ' : ''}</option></select></label>
+        {form.audience === 'tenant' ? <label>Tenant<select value={form.tenant_id} onChange={(event) => setForm((current) => ({ ...current, tenant_id: event.target.value }))}><option value="">Select tenant</option>{(tenantsQuery.data || []).filter((tenant) => tenant.status !== 'archived').map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label> : null}
+        <label>Severity<select value={form.severity} onChange={(event) => setForm((current) => ({ ...current, severity: event.target.value as AnnouncementSeverity }))}><option value="info">Info</option><option value="warning">Warning</option><option value="critical">Critical</option></select></label>
+        <label>Starts at<input type="datetime-local" value={form.starts_at} onChange={(event) => setForm((current) => ({ ...current, starts_at: event.target.value }))} /></label>
+        <label>Ends at<input type="datetime-local" value={form.ends_at} onChange={(event) => setForm((current) => ({ ...current, ends_at: event.target.value }))} /></label>
+        <label className="platform-announcements__checkbox"><input type="checkbox" checked={form.dismissible} onChange={(event) => setForm((current) => ({ ...current, dismissible: event.target.checked }))} /> Audience may dismiss this notice in the current app session</label>
+        <label className="platform-announcements__span-all">Message<textarea value={form.message} maxLength={5000} onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))} /></label>
+        {formBlocked ? <div className="platform-announcements__validation">Complete title/message, provide a valid time window, and select an authorized tenant when using the one-tenant audience.</div> : null}
       </div>
-      <label style={styles.field}>Message
-        <textarea style={styles.textarea} placeholder="Message shown to the selected audience" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
-      </label>
-      {createBlockedReason ? <div style={styles.warning}>{createBlockedReason}</div> : null}
-      <button style={canCreateAnnouncement ? styles.button : styles.disabledButton} onClick={() => create.mutate()} disabled={!canCreateAnnouncement}>Create announcement</button>
-      {create.error ? <div style={styles.error}>Create failed: {readableError(create.error)}</div> : null}
+      <div className="platform-announcements__actions"><button type="button" className="app-button app-button--primary" disabled={formBlocked || createMutation.isPending} onClick={() => createMutation.mutate()}>{createMutation.isPending ? 'Creating…' : 'Create draft'}</button></div>
+      {createMutation.isError ? <div className="platform-announcements__warning">Create failed: {readableError(createMutation.error)}</div> : null}
     </section> : null}
 
-    <section style={styles.panel}>
-      <h2>Filters</h2>
-      <div style={styles.filters}>
-        <label style={styles.field}>Status
-          <select style={styles.input} value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
-            <option value="">All statuses</option><option value="draft">draft</option><option value="published">published</option><option value="cancelled">cancelled</option><option value="expired">expired</option>
-          </select>
-        </label>
-        <label style={styles.field}>Audience
-          <select style={styles.input} value={filters.audience} onChange={(e) => setFilters({ ...filters, audience: e.target.value })}>
-            <option value="">All audiences</option><option value="tenant">tenant</option><option value="platform">platform</option><option value="all">all</option>
-          </select>
-        </label>
-        <label style={styles.field}>Visibility
-          <select style={styles.input} value={filters.include_expired} onChange={(e) => setFilters({ ...filters, include_expired: e.target.value })}>
-            <option value="false">Current/future only</option><option value="true">Include expired</option>
-          </select>
-        </label>
+    <section className="io-workspace-section platform-announcements__section">
+      <OperationalSectionHeader
+        iconPath="/platform/announcements"
+        title="Announcement registry"
+        description={pagination ? `Showing ${visibleStart}–${visibleEnd} of ${pagination.total} matching records.` : 'Announcement registry.'}
+        actions={<div className="platform-announcements__supporting-links">
+          {canReadMaintenance ? <Link to="/platform/maintenance">Maintenance</Link> : null}
+          {canReadIncidents ? <Link to="/platform/incidents">Incidents</Link> : null}
+          {canReadTenants ? <Link to="/platform/tenants">Tenants</Link> : null}
+          {canReadAudit ? <Link to="/platform/audit">Audit</Link> : null}
+        </div>}
+      />
+
+      <div className="platform-announcements__truth-note"><strong>Evidence boundary</strong><span>Published means the application record is eligible for its matching tenant or Platform context during its configured window. It does not prove browser delivery, customer receipt, reading, acknowledgement, or successful external communication.</span></div>
+
+      {blockingError ? <div className="platform-announcements__blocking-error"><strong>Announcement registry could not be loaded.</strong><span>{readableError(announcementsQuery.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => void announcementsQuery.refetch()}>Retry</button></div> : null}
+      {announcementsQuery.isLoading && !data ? <div className="platform-announcements__loading">Loading announcement registry…</div> : null}
+      {!blockingError && !announcementsQuery.isLoading && rows.length === 0 ? <div className="platform-announcements__empty"><strong>No application announcement evidence matched.</strong><span>This does not prove no external message was sent; it means no records matched this application registry/filter.</span></div> : null}
+
+      <div className="platform-announcements__list">
+        {rows.map((row) => {
+          const isEditing = editing?.id === row.id && editForm;
+          const cancelReason = cancelReasonById[row.id] || '';
+          const tenantLabel = row.audience !== 'tenant' ? pretty(row.audience) : canReadTenants ? (row.tenant_name || 'Tenant record') : 'Tenant-specific · Restricted identity';
+          const canEdit = canWrite && row.status !== 'cancelled';
+          const canPublish = canWrite && (row.status === 'draft' || row.status === 'expired');
+          return <article key={row.id} className="platform-announcements__card">
+            <div className="platform-announcements__card-header">
+              <div><h4>{row.title}</h4><p>{tenantLabel}</p></div>
+              <div className="platform-announcements__badges"><span data-tone={statusTone(row.status)}>{row.status}</span><span data-tone={severityTone(row.severity)}>{row.severity}</span>{row.is_current ? <span data-tone="good">current</span> : null}</div>
+            </div>
+            <div className="platform-announcements__public-note"><strong>Audience message</strong><span>{row.message}</span></div>
+            <div className="platform-announcements__metrics-grid">
+              <div><span>Starts</span><strong>{formatDateTime(row.starts_at)}</strong></div>
+              <div><span>Ends</span><strong>{row.ends_at ? formatDateTime(row.ends_at) : 'No configured end'}</strong></div>
+              <div><span>Dismissible</span><strong>{row.dismissible ? 'Yes · session display control' : 'No'}</strong></div>
+              <div><span>Created by</span><strong>{identityLabel(row.created_by_email, row.created_by_present, canReadPlatformUsers)}</strong></div>
+              <div><span>Published by</span><strong>{identityLabel(row.published_by_email, row.published_by_present, canReadPlatformUsers)}</strong></div>
+              <div><span>Published at</span><strong>{formatDateTime(row.published_at)}</strong></div>
+            </div>
+            {row.status === 'cancelled' ? <div className="platform-announcements__cancelled"><strong>Cancelled</strong><span>{row.cancellation_reason || 'No cancellation reason recorded'} · {formatDateTime(row.cancelled_at)} · {identityLabel(row.cancelled_by_email, row.cancelled_by_present, canReadPlatformUsers)}</span></div> : null}
+            {row.status === 'expired' ? <div className="platform-announcements__expired"><strong>Expired</strong><span>Editing an expired record does not reactivate it. Give it a future end time if needed, save, then use Publish explicitly.</span></div> : null}
+
+            {canWrite ? <div className="platform-announcements__actions">
+              {canEdit ? <button type="button" className="app-button app-button--secondary" onClick={() => { setEditing(row); setEditForm(editFrom(row)); }}>Edit</button> : null}
+              {canPublish ? <button type="button" className="app-button app-button--primary" disabled={publishMutation.isPending} onClick={() => publishMutation.mutate(row.id)}>Publish</button> : null}
+            </div> : null}
+
+            {isEditing && editForm ? <div className="platform-announcements__edit-panel">
+              <strong>Edit announcement details</strong>
+              <div className="platform-announcements__form-grid">
+                <label>Title<input value={editForm.title} maxLength={200} onChange={(event) => setEditForm({ ...editForm, title: event.target.value })} /></label>
+                <label>Severity<select value={editForm.severity} onChange={(event) => setEditForm({ ...editForm, severity: event.target.value as AnnouncementSeverity })}><option value="info">Info</option><option value="warning">Warning</option><option value="critical">Critical</option></select></label>
+                <label>Starts at<input type="datetime-local" value={editForm.starts_at} disabled={row.status === 'published'} onChange={(event) => setEditForm({ ...editForm, starts_at: event.target.value })} /><small>{row.status === 'published' ? 'Published start history is immutable.' : 'Editable before publication or while preparing an expired record.'}</small></label>
+                <label>Ends at<input type="datetime-local" value={editForm.ends_at} onChange={(event) => setEditForm({ ...editForm, ends_at: event.target.value })} /></label>
+                <label className="platform-announcements__checkbox"><input type="checkbox" checked={editForm.dismissible} onChange={(event) => setEditForm({ ...editForm, dismissible: event.target.checked })} /> Dismissible in the current app session</label>
+                <label className="platform-announcements__span-all">Message<textarea value={editForm.message} maxLength={5000} onChange={(event) => setEditForm({ ...editForm, message: event.target.value })} /></label>
+                {editBlocked ? <div className="platform-announcements__validation">Title/message and a valid time window are required.</div> : null}
+              </div>
+              <div className="platform-announcements__actions"><button type="button" className="app-button app-button--primary" disabled={Boolean(editBlocked) || editMutation.isPending} onClick={() => editMutation.mutate()}>{editMutation.isPending ? 'Saving…' : 'Save details'}</button><button type="button" className="app-button app-button--secondary" onClick={() => { setEditing(null); setEditForm(null); }}>Cancel edit</button></div>
+              {editMutation.isError ? <div className="platform-announcements__warning">Edit failed: {readableError(editMutation.error)}</div> : null}
+            </div> : null}
+
+            {canWrite && row.status !== 'cancelled' ? <div className="platform-announcements__cancel-box"><label>Cancellation reason<input value={cancelReason} maxLength={1000} placeholder="Reason is required" onChange={(event) => setCancelReasonById((current) => ({ ...current, [row.id]: event.target.value }))} /></label><button type="button" className="app-button app-button--danger" disabled={!cancelReason.trim() || cancelMutation.isPending} onClick={() => { if (globalThis.confirm(`Cancel announcement “${row.title}”?`)) cancelMutation.mutate({ id: row.id, reason: cancelReason }); }}>Cancel announcement</button></div> : null}
+          </article>;
+        })}
       </div>
-    </section>
 
-    {announcements.error ? <div style={styles.error}>Announcements load failed: {readableError(announcements.error)} <button style={styles.inlineButton} onClick={() => void announcements.refetch()}>Retry</button></div> : null}
-    {tenants.error ? <div style={styles.error}>Tenant list load failed: {readableError(tenants.error)} <button style={styles.inlineButton} onClick={() => void tenants.refetch()}>Retry</button></div> : null}
-    {publish.error ? <div style={styles.error}>Publish failed: {readableError(publish.error)}</div> : null}
-    {cancel.error ? <div style={styles.error}>Cancel failed: {readableError(cancel.error)}</div> : null}
-
-    <section style={styles.list}>
-      {rows.map((row) => <article key={row.id} style={styles.card}>
-        <div style={styles.cardHeader}>
-          <div>
-            <h3 style={styles.cardTitle}>{row.title}</h3>
-            <p style={styles.muted}>{row.audience === 'tenant' ? `Tenant: ${row.tenant_name || row.tenant_id}` : `Audience: ${row.audience}`}</p>
-          </div>
-          <div style={styles.badgeStack}><span style={styles.badge}>{row.status}</span><span style={styles.badge}>{row.severity}</span></div>
-        </div>
-        <p>{row.message}</p>
-        <p style={styles.muted}>Starts: {new Date(row.starts_at).toLocaleString()} · Ends: {row.ends_at ? new Date(row.ends_at).toLocaleString() : 'no end'} · Dismissible: {row.dismissible ? 'yes' : 'no'} · Current: {row.is_current ? 'yes' : 'no'}</p>
-        <p style={styles.muted}>Created by: {row.created_by_email || '-'} · Published by: {row.published_by_email || '-'}{row.published_at ? ` · Published at: ${new Date(row.published_at).toLocaleString()}` : ''}</p>
-        <p style={styles.muted}>Evidence: announcement {row.id} · Tenant context source: /announcement-context/current</p>
-        <div style={styles.evidenceLinks}>
-          <a style={styles.evidenceLink} href={`/platform/audit?target=${encodeURIComponent(row.id)}`}>Audit evidence</a>
-          {row.audience === 'tenant' && row.tenant_id ? <a style={styles.evidenceLink} href={`/platform/tenants?tenant=${encodeURIComponent(row.tenant_id)}`}>Tenant record</a> : null}
-          {row.audience !== 'platform' ? <a style={styles.evidenceLink} href="/platform/maintenance">Maintenance comparison</a> : null}
-        </div>
-        {row.status === 'cancelled' ? <p style={styles.muted}>Cancelled by: {row.cancelled_by_email || '-'}{row.cancelled_at ? ` · Cancelled at: ${new Date(row.cancelled_at).toLocaleString()}` : ''} · Reason: {row.cancellation_reason || '-'}</p> : null}
-        {canWrite && row.status === 'draft' ? <button style={styles.button} onClick={() => publish.mutate(row.id)} disabled={publish.isPending}>Publish</button> : null}
-        {canWrite && row.status !== 'cancelled' ? <div style={styles.cancelRow}>
-          <label style={styles.field}>Cancellation reason
-            <input style={styles.input} placeholder="Reason required before cancelling" value={cancelReasonById[row.id] || ''} onChange={(e) => setCancelReasonById({ ...cancelReasonById, [row.id]: e.target.value })} />
-          </label>
-          <button style={(cancelReasonById[row.id] || '').trim() ? styles.dangerButton : styles.disabledDangerButton} onClick={() => { const reason = (cancelReasonById[row.id] || '').trim(); if (globalThis.confirm(`Cancel announcement "${row.title}"?`)) cancel.mutate({ id: row.id, reason }); }} disabled={cancel.isPending || !(cancelReasonById[row.id] || '').trim()}>Cancel</button>
-        </div> : null}
-      </article>)}
-      {!announcements.isLoading && rows.length === 0 ? <div style={styles.empty}>No announcements match the current filters.</div> : null}
+      {publishMutation.isError ? <div className="platform-announcements__warning">Publish failed: {readableError(publishMutation.error)}</div> : null}
+      {cancelMutation.isError ? <div className="platform-announcements__warning">Cancellation failed: {readableError(cancelMutation.error)}</div> : null}
+      {pagination && pagination.total > 0 ? <div className="platform-announcements__pagination"><span>{visibleStart}–{visibleEnd} of {pagination.total}</span><button type="button" className="app-button app-button--secondary" disabled={pagination.offset === 0 || announcementsQuery.isFetching} onClick={() => updateParams({ offset: String(Math.max(0, pagination.offset - pagination.limit)) })}>Previous</button><button type="button" className="app-button app-button--secondary" disabled={!pagination.has_more || announcementsQuery.isFetching} onClick={() => updateParams({ offset: String(pagination.offset + pagination.limit) })}>Next</button></div> : null}
     </section>
   </div>;
 }
-
-const styles: Record<string, CSSProperties> = {
-  headerRow: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' },
-  metadataPanel: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, display: 'grid', gap: 6, color: '#475569' },
-  supportLinks: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  supportLink: { color: 'var(--io-primary-dark)', textDecoration: 'none', background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', borderRadius: 999, padding: '6px 10px', fontWeight: 700, fontSize: 12 },
-  evidenceLinks: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  evidenceLink: { color: 'var(--io-primary-dark)', textDecoration: 'none', fontWeight: 700 },
-  secondaryButton: { padding: '9px 13px', border: '1px solid #cbd5e1', borderRadius: 9, background: '#fff', color: '#0f172a', cursor: 'pointer', width: 'fit-content', fontWeight: 700 },
-  inlineButton: { marginLeft: 8, padding: '4px 8px', border: '1px solid #fecaca', borderRadius: 8, background: '#fff', color: '#991b1b', cursor: 'pointer', fontWeight: 700 },
-  success: { color: '#166534', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: 10 },
-  page: { display: 'grid', gap: 18, minWidth: 0, color: '#0f172a' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  muted: { color: '#64748b', margin: '4px 0', fontSize: 13, lineHeight: 1.5 },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 },
-  summaryCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, display: 'flex', justifyContent: 'space-between', color: '#334155' },
-  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, display: 'grid', gap: 12, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 },
-  filters: { display: 'flex', flexWrap: 'wrap', gap: 10 },
-  field: { display: 'grid', gap: 6, fontWeight: 700, color: '#334155', fontSize: 13 },
-  input: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, font: 'inherit', fontWeight: 400, background: '#fff', color: '#0f172a' },
-  textarea: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, minHeight: 90, font: 'inherit', fontWeight: 400, background: '#fff', color: '#0f172a' },
-  checkboxLabel: { display: 'flex', alignItems: 'center', gap: 8, color: '#334155' },
-  button: { padding: '9px 13px', border: '1px solid var(--io-primary)', borderRadius: 9, background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', width: 'fit-content', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
-  disabledButton: { padding: '9px 13px', border: '1px solid #cbd5e1', borderRadius: 9, background: '#e2e8f0', color: '#64748b', cursor: 'not-allowed', width: 'fit-content', fontWeight: 700 },
-  dangerButton: { padding: '9px 13px', border: '1px solid #dc2626', borderRadius: 9, background: '#dc2626', color: '#fff', cursor: 'pointer', height: 'fit-content', alignSelf: 'end', fontWeight: 700 },
-  disabledDangerButton: { padding: '9px 13px', border: '1px solid #fecaca', borderRadius: 9, background: '#fee2e2', color: '#991b1b', cursor: 'not-allowed', height: 'fit-content', alignSelf: 'end', opacity: 0.55, fontWeight: 700 },
-  warning: { color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: 10 },
-  error: { color: '#991b1b', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: 10 },
-  list: { display: 'grid', gap: 12 },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,.02)' },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', gap: 12 },
-  cardTitle: { margin: 0, color: '#0f172a' },
-  badgeStack: { display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
-  badge: { background: 'var(--io-primary-soft-strong)', color: 'var(--io-primary-dark)', padding: '4px 9px', borderRadius: 999, height: 'fit-content', fontSize: 12, fontWeight: 700 },
-  cancelRow: { display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 },
-  empty: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, color: '#64748b' }
-};
