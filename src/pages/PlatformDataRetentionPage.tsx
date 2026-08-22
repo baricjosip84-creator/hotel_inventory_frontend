@@ -1,329 +1,236 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import type { CSSProperties, ReactNode } from 'react';
+import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformDataRetentionPage.css';
 
 type TenantRow = { id: string; name: string; status?: string; plan_code?: string };
-
 type RetentionRow = {
-  tenant_id: string;
-  tenant_name: string;
-  tenant_status: string;
-  write_locked: boolean;
+  tenant_id: string | null;
+  tenant_name: string | null;
+  tenant_status: string | null;
+  write_locked: boolean | null;
+  tenant_present: boolean;
   retention_policy: string;
   retain_until: string | null;
   legal_hold: boolean;
   legal_hold_reason: string | null;
   legal_hold_set_at: string | null;
+  legal_hold_set_by_platform_user_id: string | null;
   legal_hold_set_by_email: string | null;
+  legal_hold_set_by_present: boolean;
   purge_after_offboarding: boolean;
   notes: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
   retention_due: boolean;
   purge_blocked: boolean;
 };
-
-type RetentionForm = {
-  retention_policy: string;
-  retain_until: string;
-  legal_hold: boolean;
-  legal_hold_reason: string;
-  purge_after_offboarding: boolean;
-  notes: string;
+type RetentionSummary = { total: number; legal_holds: number; due: number; purge_after_offboarding: number; purge_blocked: number; write_locked: number | null };
+type RetentionResponse = {
+  records: RetentionRow[];
+  summary: RetentionSummary;
+  pagination: { limit: number; offset: number; total: number; has_more: boolean };
+  available_sources: string[];
+  omitted_sources: string[];
+  evidence_access: { tenant_identity: boolean; platform_user_identity: boolean };
+  evidence_complete: boolean;
+  tenant_registry_complete: boolean;
+  evidence_contract: {
+    application_policy_records_only: boolean;
+    retain_until_due_does_not_prove_deletion: boolean;
+    purge_after_offboarding_is_intent_not_execution: boolean;
+    legal_hold_is_operator_recorded_application_evidence: boolean;
+    purge_execution_implemented_by_this_surface: boolean;
+    no_application_rows_do_not_prove_external_or_backup_copies_absent: boolean;
+    does_not_prove_backup_retention_or_restore_capability: boolean;
+  };
+  generated_at: string;
 };
+type RetentionForm = { retention_policy: string; retain_until: string; purge_after_offboarding: boolean; notes: string };
 
 const policies = ['standard', 'extended', 'contractual', 'delete_after_offboarding', 'custom'];
-
-function readableError(error: unknown): string {
-  return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error';
-}
-
-function formatDate(value?: string | null) {
-  return value ? new Date(value).toLocaleDateString() : '—';
-}
-
-function formatDateTime(value?: string | null) {
-  return value ? new Date(value).toLocaleString() : '—';
-}
-
-function validDateInput(value: string) {
-  return !value || !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
-}
-
-function formFromRow(row: RetentionRow): RetentionForm {
-  return {
-    retention_policy: row.retention_policy || 'standard',
-    retain_until: row.retain_until ? row.retain_until.slice(0, 10) : '',
-    legal_hold: Boolean(row.legal_hold),
-    legal_hold_reason: row.legal_hold_reason || '',
-    purge_after_offboarding: Boolean(row.purge_after_offboarding),
-    notes: row.notes || ''
-  };
-}
-
-function normalizeForm(form: RetentionForm) {
-  return {
-    retention_policy: form.retention_policy,
-    retain_until: form.retain_until || '',
-    legal_hold: Boolean(form.legal_hold),
-    legal_hold_reason: form.legal_hold_reason.trim(),
-    purge_after_offboarding: Boolean(form.purge_after_offboarding),
-    notes: form.notes.trim()
-  };
-}
-
-function SourceLink({ href, children }: { href: string; children: string }) {
-  return <a href={href} style={sourceLinkStyle}>{children}</a>;
-}
+const PAGE_SIZE = 50;
+function readableError(error: unknown) { return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error'; }
+function formatDate(value?: string | null) { if (!value) return 'Not set'; const d = new Date(value); return Number.isNaN(d.getTime()) ? 'Not set' : d.toLocaleDateString(); }
+function formatDateTime(value?: string | null) { if (!value) return 'Not recorded'; const d = new Date(value); return Number.isNaN(d.getTime()) ? 'Not recorded' : d.toLocaleString(); }
+function pretty(value?: string | null) { return value ? value.replaceAll('_', ' ') : 'Not recorded'; }
+function formFromRow(row: RetentionRow): RetentionForm { return { retention_policy: row.retention_policy || 'standard', retain_until: row.retain_until ? row.retain_until.slice(0,10) : '', purge_after_offboarding:Boolean(row.purge_after_offboarding), notes:row.notes || '' }; }
+function normalizeForm(form: RetentionForm) { return { ...form, purge_after_offboarding:Boolean(form.purge_after_offboarding), notes:form.notes.trim() }; }
+function validDateInput(value: string) { return !value || !Number.isNaN(new Date(`${value}T00:00:00`).getTime()); }
+function metric(value: number | null | undefined) { return value === null || value === undefined ? 'Restricted' : value; }
 
 export default function PlatformDataRetentionPage() {
-  const canWrite = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DATA_RETENTION_WRITE);
-  const canReadTenantExports = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT);
-  const [rows, setRows] = useState<RetentionRow[]>([]);
-  const [tenantId, setTenantId] = useState('');
-  const tenantsQuery = useQuery({
-    queryKey: ['platform', 'tenants', 'data-retention-filter'],
-    queryFn: () => platformApiRequest<TenantRow[]>('/platform/tenants')
-  });
-  const [legalHold, setLegalHold] = useState('');
-  const [dueOnly, setDueOnly] = useState('false');
+  const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const canReadTenants = hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ);
+  const canReadPlatformUsers = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ);
+  const canWrite = canReadTenants && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DATA_RETENTION_WRITE);
+  const canReadTenantExports = canReadTenants && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT);
+  const canReadCompliance = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_READ);
+  const canReadAudit = hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
+
+  const requestedTenantId = searchParams.get('tenant_id') || '';
+  const tenantId = canReadTenants ? requestedTenantId : '';
+  const legalHold = searchParams.get('legal_hold') || '';
+  const dueOnly = searchParams.get('due_only') === 'true';
+  const search = searchParams.get('search') || '';
+  const offset = Math.max(0, Number(searchParams.get('offset') || 0) || 0);
   const [editing, setEditing] = useState<RetentionRow | null>(null);
-  const [form, setForm] = useState<RetentionForm>({ retention_policy: 'standard', retain_until: '', legal_hold: false, legal_hold_reason: '', purge_after_offboarding: false, notes: '' });
-  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState<RetentionForm>({ retention_policy:'standard', retain_until:'', purge_after_offboarding:false, notes:'' });
   const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [loadedAt, setLoadedAt] = useState<string | null>(null);
 
-  const selectedTenant = useMemo(
-    () => (tenantsQuery.data || []).find((tenant) => tenant.id === tenantId) || null,
-    [tenantId, tenantsQuery.data]
-  );
+  const tenantsQuery = useQuery({
+    queryKey:['platform','tenants','data-retention-directory'],
+    queryFn:()=>platformApiRequest<TenantRow[]>('/platform/tenants'),
+    enabled:canReadTenants,
+    refetchOnWindowFocus:false,
+    staleTime:30_000
+  });
 
-  const summary = useMemo(() => ({
-    total: rows.length,
-    legalHolds: rows.filter((r) => r.legal_hold).length,
-    due: rows.filter((r) => r.retention_due).length,
-    purgeAfterOffboarding: rows.filter((r) => r.purge_after_offboarding).length,
-    purgeBlocked: rows.filter((r) => r.purge_blocked).length,
-    writeLocked: rows.filter((r) => r.write_locked).length
-  }), [rows]);
+  const params = useMemo(() => {
+    const p = new URLSearchParams();
+    if (tenantId) p.set('tenant_id',tenantId);
+    if (legalHold) p.set('legal_hold',legalHold);
+    if (dueOnly) p.set('due_only','true');
+    if (search.trim()) p.set('search',search.trim());
+    p.set('limit',String(PAGE_SIZE)); p.set('offset',String(offset));
+    return p.toString();
+  },[tenantId,legalHold,dueOnly,search,offset]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = new URLSearchParams();
-      if (tenantId.trim()) params.set('tenant_id', tenantId.trim());
-      if (legalHold) params.set('legal_hold', legalHold);
-      if (dueOnly === 'true') params.set('due_only', 'true');
-      params.set('limit', '200');
-      const data = await platformApiRequest<RetentionRow[]>(`/platform/data-retention?${params.toString()}`);
-      setRows(data || []);
-      setLoadedAt(new Date().toISOString());
-    } catch (err) {
-      setError(readableError(err) || 'Failed to load data retention policies');
-    } finally {
-      setLoading(false);
-    }
-  }, [dueOnly, legalHold, tenantId]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  const startEdit = (row: RetentionRow) => {
-    setEditing(row);
-    scrollToFormSection('platform-data-retention-form');
-    setForm(formFromRow(row));
+  const retentionQuery = useQuery({
+    queryKey:['platform','data-retention',params],
+    queryFn:()=>platformApiRequest<RetentionResponse>(`/platform/data-retention?${params}`),
+    refetchOnWindowFocus:false,
+    staleTime:15_000,
+    placeholderData:(previous)=>previous
+  });
+  const data = retentionQuery.data;
+  const updateParams = (patch: Record<string,string | null>) => {
+    const next = new URLSearchParams(searchParams);
+    for (const [key,value] of Object.entries(patch)) { if (value) next.set(key,value); else next.delete(key); }
+    if (!Object.prototype.hasOwnProperty.call(patch,'offset')) next.delete('offset');
+    setSearchParams(next,{replace:true});
     setMessage('');
-    setError('');
+  };
+
+  const refresh = async () => {
+    if (canReadTenants) await tenantsQuery.refetch();
+    await retentionQuery.refetch();
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!editing?.tenant_id) throw new Error('Tenant identity is required to edit retention policy.');
+      const current = normalizeForm(form);
+      return platformApiRequest<RetentionRow>(`/platform/data-retention/${encodeURIComponent(editing.tenant_id)}`,{method:'PATCH',body:JSON.stringify({retention_policy:current.retention_policy,retain_until:current.retain_until || null,purge_after_offboarding:current.purge_after_offboarding,notes:current.notes || null})});
+    },
+    onSuccess:async()=>{ const name=editing?.tenant_name || 'tenant'; setEditing(null); setMessage(`Retention policy updated for ${name}.`); await queryClient.invalidateQueries({queryKey:['platform','data-retention']}); }
+  });
+
+  const setHoldMutation = useMutation({
+    mutationFn:({tenantId:targetTenantId,reason}:{tenantId:string;reason:string})=>platformApiRequest<RetentionRow>(`/platform/data-retention/${encodeURIComponent(targetTenantId)}/set-legal-hold`,{method:'POST',body:JSON.stringify({reason})}),
+    onSuccess:async()=>{ setMessage('Legal hold set with an audited reason.'); setEditing(null); await queryClient.invalidateQueries({queryKey:['platform','data-retention']}); }
+  });
+
+  const clearHoldMutation = useMutation({
+    mutationFn:({tenantId:targetTenantId,reason}:{tenantId:string;reason:string})=>platformApiRequest<RetentionRow>(`/platform/data-retention/${encodeURIComponent(targetTenantId)}/clear-legal-hold`,{method:'POST',body:JSON.stringify({reason})}),
+    onSuccess:async()=>{ setMessage('Legal hold cleared with an audited reason.'); setEditing(null); await queryClient.invalidateQueries({queryKey:['platform','data-retention']}); }
+  });
+
+  const startEdit = (row:RetentionRow) => { if (!row.tenant_id) return; setEditing(row); setForm(formFromRow(row)); setMessage(''); saveMutation.reset(); setHoldMutation.reset(); clearHoldMutation.reset(); scrollToFormSection('platform-data-retention-form'); };
+  const setLegalHold = (row:RetentionRow) => {
+    if (!row.tenant_id) return;
+    if (!window.confirm(`Set a legal hold for ${row.tenant_name || 'this tenant'}? This records an application-level hold; it does not prove an external legal obligation exists.`)) return;
+    const reason=(window.prompt('Reason for setting the legal hold?') || '').trim();
+    if (!reason) { setMessage(''); return; }
+    setHoldMutation.mutate({tenantId:row.tenant_id,reason});
+  };
+
+  const clearLegalHold = (row:RetentionRow) => {
+    if (!row.tenant_id) return;
+    if (!window.confirm(`Clear legal hold for ${row.tenant_name || 'this tenant'}? This records an application-level hold release; it does not prove any external legal obligation ended.`)) return;
+    const reason=(window.prompt('Reason for clearing the legal hold?') || '').trim();
+    if (!reason) { setMessage(''); return; }
+    clearHoldMutation.mutate({tenantId:row.tenant_id,reason});
   };
 
   const currentForm = normalizeForm(form);
   const originalForm = editing ? normalizeForm(formFromRow(editing)) : null;
-  const formChanged = Boolean(originalForm && JSON.stringify(currentForm) !== JSON.stringify(originalForm));
-  const legalHoldReasonMissing = currentForm.legal_hold && !currentForm.legal_hold_reason;
+  const formChanged = Boolean(originalForm && JSON.stringify(currentForm)!==JSON.stringify(originalForm));
   const retainUntilInvalid = !validDateInput(currentForm.retain_until);
-  const saveDisabled = !editing || !formChanged || legalHoldReasonMissing || retainUntilInvalid;
+  const lifecyclePending = setHoldMutation.isPending || clearHoldMutation.isPending;
+  const saveDisabled = !editing || !formChanged || retainUntilInvalid || saveMutation.isPending || lifecyclePending;
+  const mutationError = saveMutation.error || setHoldMutation.error || clearHoldMutation.error;
+  const pageStart = data?.pagination.total ? data.pagination.offset + 1 : 0;
+  const pageEnd = data ? Math.min(data.pagination.offset + data.records.length,data.pagination.total) : 0;
 
-  const save = async () => {
-    if (!editing || saveDisabled) return;
-    setMessage('');
-    setError('');
-    try {
-      await platformApiRequest(`/platform/data-retention/${editing.tenant_id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          retention_policy: currentForm.retention_policy,
-          retain_until: currentForm.retain_until || null,
-          legal_hold: currentForm.legal_hold,
-          legal_hold_reason: currentForm.legal_hold_reason || null,
-          purge_after_offboarding: currentForm.purge_after_offboarding,
-          notes: currentForm.notes || null
-        })
-      });
-      setEditing(null);
-      setMessage(`Retention policy updated for ${editing.tenant_name}.`);
-      await load();
-    } catch (err) {
-      setError(readableError(err) || 'Failed to save retention policy');
-    }
-  };
+  return <div className="platform-data-retention">
+    <OperationalWorkspaceHero
+      iconPath="/platform/data-retention"
+      eyebrow="Platform · Data governance"
+      title="Data retention"
+      description="Manage application-level tenant retention policy, legal holds, and purge-after-offboarding intent without presenting configuration as proof that data was deleted."
+      meta={<><OperationalWorkspaceMetaPill>Policy records, not purge proof</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>Legal-hold changes are audited</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{canReadTenants?'Tenant registry available':'Tenant identity restricted'}</OperationalWorkspaceMetaPill></>}
+      aside={<div className="platform-data-retention__hero-aside"><OperationalWorkspaceStatus value={data ? (data.evidence_complete?'Complete':'Partial evidence') : 'Loading'} label={data?.generated_at?`snapshot ${formatDateTime(data.generated_at)}`:'snapshot pending'} /><button type="button" className="app-button app-button--secondary" disabled={retentionQuery.isFetching || tenantsQuery.isFetching} onClick={()=>void refresh()}>{retentionQuery.isFetching || tenantsQuery.isFetching?'Refreshing…':'Refresh'}</button></div>}
+    />
 
-  const clearLegalHold = async (row: RetentionRow) => {
-    if (!window.confirm(`Clear legal hold for ${row.tenant_name}? This should only be done after the legal hold is no longer required.`)) return;
-    const reason = (window.prompt('Reason for clearing legal hold?') || '').trim();
-    if (!reason) {
-      setError('Clear hold reason is required before the legal hold can be cleared.');
-      return;
-    }
-    setError('');
-    setMessage('');
-    try {
-      await platformApiRequest(`/platform/data-retention/${row.tenant_id}/clear-legal-hold`, {
-        method: 'POST',
-        body: JSON.stringify({ reason })
-      });
-      setMessage(`Legal hold cleared for ${row.tenant_name}.`);
-      await load();
-    } catch (err) {
-      setError(readableError(err) || 'Failed to clear legal hold');
-    }
-  };
+    {message ? <div className="platform-data-retention__success"><span>{message}</span><button type="button" className="app-button app-button--secondary" onClick={()=>setMessage('')}>Dismiss</button></div> : null}
+    {mutationError ? <div className="platform-data-retention__warning"><strong>Retention change failed.</strong><span>{readableError(mutationError)}</span></div> : null}
+    {retentionQuery.isError && data ? <div className="platform-data-retention__warning"><strong>Showing the last successful snapshot.</strong><span>{readableError(retentionQuery.error)}</span><button type="button" className="app-button app-button--secondary" onClick={()=>void retentionQuery.refetch()}>Retry</button></div> : null}
+    {requestedTenantId && !canReadTenants ? <div className="platform-data-retention__warning"><strong>Tenant filter omitted.</strong><span>TENANTS_READ is required to select or identify a tenant. The retention registry remains visible only at the permitted evidence level.</span></div> : null}
+    {data && !data.evidence_complete ? <div className="platform-data-retention__warning"><strong>Evidence is partial.</strong><span>Restricted source families: {data.omitted_sources.join(', ')}. Restricted values are not converted to zero or “healthy”.</span></div> : null}
 
-  const retryLoad = () => {
-    void tenantsQuery.refetch();
-    void load();
-  };
+    <OperationalWorkspaceStats ariaLabel="Data retention registry summary">
+      <OperationalWorkspaceStatCard iconPath="/platform/data-retention" label={data?.tenant_registry_complete?'Tenants in scope':'Configured records'} value={data ? metric(data.summary.total) : '—'} helper={data ? (data.tenant_registry_complete?'Registry-wide filtered total':'Tenant registry is restricted') : 'Loading registry summary'} />
+      <OperationalWorkspaceStatCard iconPath="/platform/data-retention" label="Legal holds" value={data ? metric(data.summary.legal_holds) : '—'} tone={(data?.summary.legal_holds || 0)>0?'danger':'default'} helper="Application-recorded active holds" />
+      <OperationalWorkspaceStatCard iconPath="/platform/data-retention" label="Retention due" value={data ? metric(data.summary.due) : '—'} tone={(data?.summary.due || 0)>0?'warn':'default'} helper="Due date reached; deletion not proven" />
+      <OperationalWorkspaceStatCard iconPath="/platform/data-retention" label="Offboarding purge intent" value={data ? metric(data.summary.purge_after_offboarding) : '—'} helper="Configuration only" />
+      <OperationalWorkspaceStatCard iconPath="/platform/data-retention" label="Purge blocked" value={data ? metric(data.summary.purge_blocked) : '—'} tone={(data?.summary.purge_blocked || 0)>0?'danger':'default'} helper="Blocked by active legal hold" />
+      <OperationalWorkspaceStatCard iconPath="/platform/data-retention" label="Write locked tenants" value={data ? metric(data.summary.write_locked) : '—'} helper={data ? (data.summary.write_locked===null?'Requires tenant identity evidence':'Current tenant state') : 'Loading tenant state'} />
+    </OperationalWorkspaceStats>
 
-  const filtersLabel = `Tenant: ${selectedTenant?.name || 'All tenants'} · Legal hold: ${legalHold || 'Any'} · Due only: ${dueOnly === 'true' ? 'Yes' : 'No'}`;
+    <section className="platform-data-retention__section">
+      <OperationalSectionHeader iconPath="/platform/data-retention" title="Retention registry" description="Search and filter the server-side registry. Tenant targeting is available only with TENANTS_READ." />
+      <div className="app-panel app-panel--padded platform-data-retention__filters">
+        {canReadTenants ? <label>Tenant<select value={tenantId} onChange={e=>updateParams({tenant_id:e.target.value})}><option value="">All tenants</option>{(tenantsQuery.data || []).map(t=><option key={t.id} value={t.id}>{t.name} · {pretty(t.status)} · {t.plan_code || 'no plan'}</option>)}</select></label> : <div className="platform-data-retention__restricted"><strong>Tenant filter restricted</strong><span>TENANTS_READ is required.</span></div>}
+        <label className="platform-data-retention__search">Search<input value={search} onChange={e=>updateParams({search:e.target.value})} placeholder={canReadTenants?'Tenant, policy, hold reason or notes':'Policy, hold reason or notes'} /></label>
+        <label>Legal hold<select value={legalHold} onChange={e=>updateParams({legal_hold:e.target.value})}><option value="">Any</option><option value="true">Active</option><option value="false">Not active</option></select></label>
+        <label>Due<select value={dueOnly?'true':'false'} onChange={e=>updateParams({due_only:e.target.value==='true'?'true':null})}><option value="false">Any</option><option value="true">Due only</option></select></label>
+      </div>
 
-  return (
-    <div style={{ display: 'grid', gap: 20 }}>
-      <header style={headerStyle}>
-        <div>
-          <h1 style={titleStyle}>Data retention</h1>
-          <p style={subtitleStyle}>Control tenant retention policy, legal hold, and purge-after-offboarding intent.</p>
-          <div style={metaRowStyle}>
-            <span style={metaPillStyle}>Source: /platform/data-retention</span>
-            <span style={metaPillStyle}>Limit: 200</span>
-            <span style={metaPillStyle}>{filtersLabel}</span>
-            <span style={metaPillStyle}>Snapshot: {loadedAt ? formatDateTime(loadedAt) : 'not loaded'}</span>
-          </div>
-        </div>
-        <button type="button" onClick={retryLoad} disabled={loading || tenantsQuery.isFetching} style={buttonStyle}>{loading || tenantsQuery.isFetching ? 'Refreshing…' : 'Refresh'}</button>
-      </header>
+      {retentionQuery.isError && !data ? <div className="platform-data-retention__blocking-error"><strong>Data retention evidence could not be loaded.</strong><span>{readableError(retentionQuery.error)}</span><button type="button" className="app-button app-button--secondary" onClick={()=>void retentionQuery.refetch()}>Retry</button></div> : null}
+      {retentionQuery.isLoading && !data ? <div className="platform-data-retention__loading">Loading retention evidence…</div> : null}
+      {data ? <div className="platform-data-retention__list">
+        {data.records.map((row,index)=><article className="platform-data-retention__card" key={row.tenant_id || `${row.updated_at || 'record'}-${index}`}>
+          <div className="platform-data-retention__card-header"><div><h4>{row.tenant_name || 'Restricted tenant'}</h4><p>{row.tenant_status ? `${pretty(row.tenant_status)}${row.write_locked?' · write locked':''}` : 'Tenant identity/status not available with current permissions.'}</p></div><div className="platform-data-retention__badges"><span>{pretty(row.retention_policy)}</span>{row.retention_due?<span data-tone="warn">Due</span>:null}{row.legal_hold?<span data-tone="danger">Legal hold</span>:<span data-tone="good">No hold</span>}</div></div>
+          <div className="platform-data-retention__metrics-grid"><div><span>Retain until</span><strong>{formatDate(row.retain_until)}</strong></div><div><span>Offboarding purge intent</span><strong>{row.purge_after_offboarding?'Configured':'Not configured'}</strong></div><div><span>Legal hold set</span><strong>{formatDateTime(row.legal_hold_set_at)}</strong>{row.legal_hold_set_by_present?<small>{canReadPlatformUsers?(row.legal_hold_set_by_email || 'Platform user recorded'):'Setter identity restricted'}</small>:null}</div></div>
+          {row.legal_hold_reason ? <div className="platform-data-retention__evidence-note"><strong>Legal hold reason</strong><span>{row.legal_hold_reason}</span></div> : null}
+          {row.notes ? <div className="platform-data-retention__evidence-note"><strong>Operator notes</strong><span>{row.notes}</span></div> : null}
+          <div className="platform-data-retention__card-footer"><div className="platform-data-retention__source-links">{row.tenant_id && canReadTenants?<><Link to={`/platform/tenant-lifecycle?tenant_id=${encodeURIComponent(row.tenant_id)}`}>Lifecycle</Link><Link to={`/platform/tenant-offboarding?tenant_id=${encodeURIComponent(row.tenant_id)}`}>Offboarding</Link>{canReadTenantExports?<Link to={`/platform/tenant-exports?tenant_id=${encodeURIComponent(row.tenant_id)}`}>Export evidence</Link>:null}</>:<span className="platform-data-retention__restricted-inline">Tenant links restricted</span>}</div><div className="platform-data-retention__actions">{canWrite && row.tenant_id?<><button type="button" className="app-button app-button--secondary" disabled={saveMutation.isPending || lifecyclePending} onClick={()=>startEdit(row)}>Edit</button>{row.legal_hold?<button type="button" className="app-button app-button--danger" disabled={saveMutation.isPending || lifecyclePending} onClick={()=>clearLegalHold(row)}>Clear hold</button>:<button type="button" className="app-button app-button--secondary" disabled={saveMutation.isPending || lifecyclePending} onClick={()=>setLegalHold(row)}>Set hold</button>}</>:<span className="platform-data-retention__restricted-inline">Read only</span>}</div></div>
+        </article>)}
+        {!data.records.length?<div className="platform-data-retention__empty"><strong>No retention records match these filters.</strong><span>{data.tenant_registry_complete?'The filtered tenant registry is empty.':'Only configured retention rows can be listed without TENANTS_READ; no matching configured rows were found.'}</span></div>:null}
+        <div className="platform-data-retention__pagination"><span>{pageStart}–{pageEnd} of {data.pagination.total}</span><button type="button" className="app-button app-button--secondary" disabled={offset===0 || retentionQuery.isFetching} onClick={()=>updateParams({offset:String(Math.max(0,offset-PAGE_SIZE))})}>Previous</button><button type="button" className="app-button app-button--secondary" disabled={!data.pagination.has_more || retentionQuery.isFetching} onClick={()=>updateParams({offset:String(offset+PAGE_SIZE)})}>Next</button></div>
+      </div>:null}
+    </section>
 
-      {(error || tenantsQuery.error) ? (
-        <section style={errorStyle}>
-          <strong>Unable to load data retention evidence.</strong>
-          <p style={subtitleStyle}>{error || readableError(tenantsQuery.error)}</p>
-          <button type="button" onClick={retryLoad} disabled={loading || tenantsQuery.isFetching} style={buttonStyle}>Retry</button>
-        </section>
-      ) : null}
+    {editing ? <section id="platform-data-retention-form" className="platform-data-retention__section"><OperationalSectionHeader iconPath="/platform/data-retention" title={`Edit retention · ${editing.tenant_name || 'tenant'}`} description="Ordinary Edit changes policy details only. Set hold and Clear hold are dedicated lifecycle actions with their own audited reason." /><div className="app-panel app-panel--padded platform-data-retention__form-grid"><label>Policy<select value={form.retention_policy} onChange={e=>setForm(f=>({...f,retention_policy:e.target.value}))}>{policies.map(p=><option key={p} value={p}>{pretty(p)}</option>)}</select></label><label>Retain until<input type="date" value={form.retain_until} onChange={e=>setForm(f=>({...f,retain_until:e.target.value}))} /></label><label className="platform-data-retention__checkbox"><input type="checkbox" checked={form.purge_after_offboarding} onChange={e=>setForm(f=>({...f,purge_after_offboarding:e.target.checked}))} /> Purge after offboarding intent</label><div className="platform-data-retention__restricted"><strong>Legal hold lifecycle</strong><span>{editing.legal_hold?'Active — use Clear hold on the registry card to release it.':'Not active — use Set hold on the registry card to activate it.'}</span></div><label className="platform-data-retention__span-all">Notes<textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} /></label>{retainUntilInvalid?<div className="platform-data-retention__validation">Retain until must be a valid date.</div>:null}<div className="platform-data-retention__actions platform-data-retention__span-all"><button type="button" className="app-button app-button--primary" disabled={saveDisabled} onClick={()=>saveMutation.mutate()}>{saveMutation.isPending?'Saving…':'Save changes'}</button><button type="button" className="app-button app-button--secondary" disabled={saveMutation.isPending || lifecyclePending} onClick={()=>setEditing(null)}>Cancel</button></div></div></section> : null}
 
-      <section style={cardStyle}>
-        <strong>Supporting Platform pages</strong>
-        <div style={linkRowStyle}>
-          <SourceLink href="/platform/tenant-offboarding">Tenant Offboarding</SourceLink>
-          {canReadTenantExports ? <SourceLink href="/platform/tenant-exports">Tenant Exports</SourceLink> : null}
-          <SourceLink href="/platform/compliance-documents">Compliance Docs</SourceLink>
-          <SourceLink href="/platform/legal-compliance-reporting">Legal & Compliance Reporting</SourceLink>
-          <SourceLink href="/platform/audit">Audit Trail</SourceLink>
-        </div>
-      </section>
-
-      <section style={cardStyle}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
-          <Metric label="Rows" value={summary.total} />
-          <Metric label="Legal holds" value={summary.legalHolds} />
-          <Metric label="Due" value={summary.due} />
-          <Metric label="Purge after offboarding" value={summary.purgeAfterOffboarding} />
-          <Metric label="Purge blocked" value={summary.purgeBlocked} />
-          <Metric label="Write locked" value={summary.writeLocked} />
-        </div>
-      </section>
-
-      <section style={cardStyle}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 12, alignItems: 'end' }}>
-          <label>Tenant<select value={tenantId} onChange={(e) => setTenantId(e.target.value)} style={inputStyle} disabled={tenantsQuery.isLoading}>
-            <option value="">{tenantsQuery.isLoading ? 'Loading tenants…' : 'All tenants'}</option>
-            {(tenantsQuery.data || []).map((tenant) => (
-              <option key={tenant.id} value={tenant.id}>{tenant.name} · {tenant.status || 'unknown'} · {tenant.plan_code || 'no plan'}</option>
-            ))}
-          </select></label>
-          <label>Legal hold<select value={legalHold} onChange={(e) => setLegalHold(e.target.value)} style={inputStyle}><option value="">Any</option><option value="true">Yes</option><option value="false">No</option></select></label>
-          <label>Due only<select value={dueOnly} onChange={(e) => setDueOnly(e.target.value)} style={inputStyle}><option value="false">No</option><option value="true">Yes</option></select></label>
-          <button onClick={load} disabled={loading} style={buttonStyle}>{loading ? 'Loading…' : 'Apply'}</button>
-        </div>
-        <p style={helpStyle}>Filters are backend-supported. Due means retain_until is set and has reached the current time.</p>
-      </section>
-
-      {message ? <div style={successStyle}>{message}</div> : null}
-
-      <section style={cardStyle}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><Th>Tenant</Th><Th>Status</Th><Th>Policy</Th><Th>Retain until</Th><Th>Legal hold</Th><Th>Offboarding purge</Th><Th>Actions</Th></tr></thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.tenant_id} style={{ borderTop: '1px solid #e5e7eb' }}>
-                <Td><strong>{row.tenant_name}</strong><br /><small>{row.tenant_id}</small><div style={linkRowStyle}><SourceLink href={`/platform/tenant-lifecycle?tenant_id=${row.tenant_id}`}>Lifecycle</SourceLink><SourceLink href={`/platform/tenant-offboarding?tenant_id=${row.tenant_id}`}>Offboarding</SourceLink>{canReadTenantExports ? <SourceLink href={`/platform/tenant-exports?tenant_id=${row.tenant_id}`}>Export evidence</SourceLink> : null}</div></Td>
-                <Td>{row.tenant_status}{row.write_locked ? ' / locked' : ''}</Td>
-                <Td>{row.retention_policy}</Td>
-                <Td>{formatDate(row.retain_until)}{row.retention_due ? <div style={warningTextStyle}>Due</div> : null}</Td>
-                <Td>{row.legal_hold ? <strong style={{ color: '#b91c1c' }}>Active</strong> : 'No'}{row.legal_hold_reason ? <div><small>{row.legal_hold_reason}</small></div> : null}{row.legal_hold_set_at ? <div><small>Set {formatDateTime(row.legal_hold_set_at)}{row.legal_hold_set_by_email ? ` by ${row.legal_hold_set_by_email}` : ''}</small></div> : null}</Td>
-                <Td>{row.purge_after_offboarding ? 'Yes' : 'No'}{row.purge_blocked ? <div><small>blocked by legal hold</small></div> : null}</Td>
-                <Td>
-                  {canWrite ? <button onClick={() => startEdit(row)} style={smallButtonStyle}>Edit</button> : null}
-                  {canWrite && row.legal_hold ? <button onClick={() => clearLegalHold(row)} style={{ ...smallButtonStyle, marginLeft: 8 }}>Clear hold</button> : null}
-                  {!canWrite ? <span style={helpStyle}>Read only</span> : null}
-                </Td>
-              </tr>
-            ))}
-            {!rows.length ? <tr><Td colSpan={7}>No retention records found.</Td></tr> : null}
-          </tbody>
-        </table>
-      </section>
-
-      {editing ? (
-        <section id="platform-data-retention-form" style={cardStyle}>
-          <h2>Edit retention: {editing.tenant_name}</h2>
-          <p style={helpStyle}>Backend requires a legal hold reason when Legal hold is active. Save is disabled for unchanged or invalid edits.</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
-            <label>Policy<select value={form.retention_policy} onChange={(e) => setForm((f) => ({ ...f, retention_policy: e.target.value }))} style={inputStyle}>{policies.map((p) => <option key={p} value={p}>{p}</option>)}</select></label>
-            <label>Retain until<input type="date" value={form.retain_until} onChange={(e) => setForm((f) => ({ ...f, retain_until: e.target.value }))} style={inputStyle} /></label>
-            <label><input type="checkbox" checked={form.legal_hold} onChange={(e) => setForm((f) => ({ ...f, legal_hold: e.target.checked }))} /> Legal hold</label>
-            <label><input type="checkbox" checked={form.purge_after_offboarding} onChange={(e) => setForm((f) => ({ ...f, purge_after_offboarding: e.target.checked }))} /> Purge after offboarding</label>
-            <label style={{ gridColumn: '1 / -1' }}>Legal hold reason<input value={form.legal_hold_reason} onChange={(e) => setForm((f) => ({ ...f, legal_hold_reason: e.target.value }))} style={inputStyle} /></label>
-            <label style={{ gridColumn: '1 / -1' }}>Notes<textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} style={{ ...inputStyle, minHeight: 80 }} /></label>
-          </div>
-          {legalHoldReasonMissing ? <p style={warningTextStyle}>Legal hold reason is required when Legal hold is active.</p> : null}
-          {retainUntilInvalid ? <p style={warningTextStyle}>Retain until must be a valid date.</p> : null}
-          <div style={{ display: 'flex', gap: 12, marginTop: 16 }}><button onClick={save} disabled={saveDisabled} style={saveDisabled ? disabledButtonStyle : buttonStyle}>Save</button><button onClick={() => setEditing(null)} style={secondaryButtonStyle}>Cancel</button></div>
-        </section>
-      ) : null}
-    </div>
-  );
+    <section className="platform-data-retention__section">
+      <OperationalSectionHeader iconPath="/platform/data-retention" title="Evidence boundary" description="What this page records—and what it does not prove." />
+      <div className="platform-data-retention__truth-note"><strong>Retention policy is application configuration, not deletion evidence.</strong><span>A due retain-until date does not prove a purge occurred. “Purge after offboarding” is an operator-configured intent only; this surface has no purge executor. Absence of application rows does not prove backups, exports, replicas, or other external copies are absent or deleted.</span></div>
+      <div className="platform-data-retention__supporting-links">{canReadTenants?<Link to="/platform/tenant-offboarding">Tenant offboarding</Link>:null}{canReadTenantExports?<Link to="/platform/tenant-exports">Tenant exports</Link>:null}{canReadCompliance?<Link to="/platform/compliance-documents">Compliance documents</Link>:null}{canReadCompliance?<Link to="/platform/legal-compliance-reporting">Legal &amp; compliance reporting</Link>:null}{canReadAudit?<Link to="/platform/audit">Audit</Link>:null}</div>
+    </section>
+  </div>;
 }
-
-function Metric({ label, value }: { label: string; value: number }) { return <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, color: '#334155' }}><div style={{ color: '#64748b', fontSize: 13 }}>{label}</div><div style={{ fontSize: 28, fontWeight: 800, color: '#0f172a', marginTop: 4 }}>{value}</div></div>; }
-function Th({ children }: { children: ReactNode }) { return <th style={{ textAlign: 'left', padding: '10px 8px', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: 12 }}>{children}</th>; }
-function Td({ children, colSpan }: { children: ReactNode; colSpan?: number }) { return <td colSpan={colSpan} style={{ padding: '11px 8px', verticalAlign: 'top', borderBottom: '1px solid #f1f5f9', color: '#334155' }}>{children}</td>; }
-
-const cardStyle: CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 };
-const headerStyle: CSSProperties = { ...cardStyle, display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' };
-const titleStyle: CSSProperties = { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' };
-const subtitleStyle: CSSProperties = { color: '#64748b', marginTop: 6, fontSize: 13, lineHeight: 1.5 };
-const helpStyle: CSSProperties = { color: '#64748b', fontSize: 13 };
-const metaRowStyle: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 };
-const metaPillStyle: CSSProperties = { border: '1px solid #e2e8f0', borderRadius: 999, padding: '4px 9px', fontSize: 12, color: '#475569', background: '#f8fafc', fontWeight: 700 };
-const linkRowStyle: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 };
-const sourceLinkStyle: CSSProperties = { color: 'var(--io-primary-dark)', textDecoration: 'none', fontSize: 13, fontWeight: 700 };
-const inputStyle: CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #cbd5e1', marginTop: 6, background: '#fff', color: '#0f172a', font: 'inherit', boxSizing: 'border-box' };
-const buttonStyle: CSSProperties = { padding: '9px 13px', borderRadius: 9, border: '1px solid var(--io-primary)', background: 'var(--io-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' };
-const disabledButtonStyle: CSSProperties = { ...buttonStyle, borderColor: '#cbd5e1', background: '#e2e8f0', color: '#64748b', cursor: 'not-allowed', boxShadow: 'none' };
-const secondaryButtonStyle: CSSProperties = { ...buttonStyle, borderColor: '#cbd5e1', background: '#fff', color: '#0f172a', boxShadow: 'none' };
-const smallButtonStyle: CSSProperties = { padding: '7px 10px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', cursor: 'pointer', fontWeight: 700 };
-const warningTextStyle: CSSProperties = { color: '#92400e', fontSize: 13 };
-const successStyle: CSSProperties = { ...cardStyle, color: '#166534', background: '#f0fdf4', borderColor: '#bbf7d0', boxShadow: 'none' };
-const errorStyle: CSSProperties = { ...cardStyle, color: '#991b1b', background: '#fef2f2', borderColor: '#fecaca', boxShadow: 'none' };

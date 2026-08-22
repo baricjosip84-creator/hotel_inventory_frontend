@@ -6,17 +6,17 @@ type TenantAuditRetention = {
   tenant_id: string;
   tenant_name: string;
   tenant_status: string;
-  retention_policy: string;
-  retention_days: number;
+  retention_policy: string | null;
+  retention_days: number | null;
   retain_until?: string | null;
-  legal_hold: boolean;
+  legal_hold: boolean | null;
   audit_event_count: number;
-  audit_export_events: number;
+  audit_export_events: number | null;
   first_audit_event_at?: string | null;
   last_audit_event_at?: string | null;
   audit_age_days?: number | null;
-  due_for_retention_review: boolean;
-  purge_blocked: boolean;
+  due_for_retention_review: boolean | null;
+  purge_blocked: boolean | null;
   risk_flags: string[];
 };
 
@@ -26,14 +26,17 @@ type AuditRetentionPolicy = {
   step: number;
   posture: string;
   summary: {
-    total_tenants: number;
-    tenants_with_audit_events: number;
-    tenants_due_for_retention_review: number;
-    tenants_with_legal_hold: number;
-    tenants_with_purge_blocked: number;
-    tenants_missing_export_evidence: number;
-    tenants_with_extended_retention: number;
+    total_tenants: number | null;
+    tenants_with_audit_events: number | null;
+    tenants_due_for_retention_review: number | null;
+    tenants_with_legal_hold: number | null;
+    tenants_with_purge_blocked: number | null;
+    tenants_missing_export_evidence: number | null;
+    tenants_with_extended_retention: number | null;
   };
+  available_sources: string[];
+  omitted_sources: string[];
+  evidence_complete: boolean;
   governance_controls: {
     read_only: boolean;
     deletion_owner: string;
@@ -60,6 +63,7 @@ function formatDate(value?: string | null) {
   if (!value) return '—';
   return new Date(value).toLocaleDateString();
 }
+function visibleMetric(value: number | null | undefined) { return value === null || value === undefined ? 'Restricted' : value; }
 
 export default function PlatformAuditRetentionPage() {
   const policy = useQuery({
@@ -83,16 +87,17 @@ export default function PlatformAuditRetentionPage() {
 
       {policy.isLoading ? <section style={styles.card}>Loading audit retention posture…</section> : null}
       {policy.error ? <section style={styles.card}>Unable to load audit retention posture.</section> : null}
+      {data && !data.evidence_complete ? <section style={{...styles.card, background:'#fffbeb', borderColor:'#fde68a', color:'#92400e'}}><strong>Evidence is partial.</strong><div style={styles.subtitle}>Restricted source families: {data.omitted_sources.join(', ')}. Restricted values are not treated as zero or as a clean retention posture.</div></section> : null}
 
       {summary ? (
         <section style={styles.summaryGrid}>
-          <div style={styles.card}><strong>Total tenants</strong><div style={styles.metric}>{summary.total_tenants}</div></div>
-          <div style={styles.card}><strong>Tenants with audit events</strong><div style={styles.metric}>{summary.tenants_with_audit_events}</div></div>
-          <div style={styles.card}><strong>Tenants due for review</strong><div style={styles.metric}>{summary.tenants_due_for_retention_review}</div></div>
-          <div style={styles.card}><strong>Legal holds</strong><div style={styles.metric}>{summary.tenants_with_legal_hold}</div></div>
-          <div style={styles.card}><strong>Purge blocked</strong><div style={styles.metric}>{summary.tenants_with_purge_blocked}</div></div>
-          <div style={styles.card}><strong>Tenants missing export evidence</strong><div style={styles.metric}>{summary.tenants_missing_export_evidence}</div></div>
-          <div style={styles.card}><strong>Extended retention</strong><div style={styles.metric}>{summary.tenants_with_extended_retention}</div></div>
+          <div style={styles.card}><strong>Total tenants</strong><div style={styles.metric}>{visibleMetric(summary.total_tenants)}</div></div>
+          <div style={styles.card}><strong>Tenants with audit events</strong><div style={styles.metric}>{visibleMetric(summary.tenants_with_audit_events)}</div></div>
+          <div style={styles.card}><strong>Tenants due for review</strong><div style={styles.metric}>{visibleMetric(summary.tenants_due_for_retention_review)}</div></div>
+          <div style={styles.card}><strong>Legal holds</strong><div style={styles.metric}>{visibleMetric(summary.tenants_with_legal_hold)}</div></div>
+          <div style={styles.card}><strong>Purge blocked</strong><div style={styles.metric}>{visibleMetric(summary.tenants_with_purge_blocked)}</div></div>
+          <div style={styles.card}><strong>Tenants missing export evidence</strong><div style={styles.metric}>{visibleMetric(summary.tenants_missing_export_evidence)}</div></div>
+          <div style={styles.card}><strong>Extended retention</strong><div style={styles.metric}>{visibleMetric(summary.tenants_with_extended_retention)}</div></div>
         </section>
       ) : null}
 
@@ -124,11 +129,11 @@ export default function PlatformAuditRetentionPage() {
               {tenants.map((tenant) => (
                 <tr key={tenant.tenant_id}>
                   <td style={styles.td}><strong>{tenant.tenant_name}</strong><br /><span style={styles.help}>{tenant.tenant_status}</span></td>
-                  <td style={styles.td}>{tenant.retention_policy}<br /><span style={styles.help}>{tenant.retention_days} days</span></td>
-                  <td style={styles.td}>{tenant.audit_event_count}<br /><span style={styles.help}>{tenant.audit_export_events} exports</span></td>
+                  <td style={styles.td}>{tenant.retention_policy || 'Restricted'}<br /><span style={styles.help}>{tenant.retention_days === null ? 'Restricted' : `${tenant.retention_days} days`}</span></td>
+                  <td style={styles.td}>{tenant.audit_event_count}<br /><span style={styles.help}>{tenant.audit_export_events === null ? 'Export evidence restricted' : `${tenant.audit_export_events} exports`}</span></td>
                   <td style={styles.td}>{tenant.audit_age_days ?? '—'} days<br /><span style={styles.help}>{formatDate(tenant.first_audit_event_at)} → {formatDate(tenant.last_audit_event_at)}</span></td>
                   <td style={styles.td}>{formatDate(tenant.retain_until)}</td>
-                  <td style={styles.td}>{tenant.legal_hold ? 'Yes' : 'No'}</td>
+                  <td style={styles.td}>{tenant.legal_hold === null ? 'Restricted' : tenant.legal_hold ? 'Yes' : 'No'}</td>
                   <td style={styles.td}><FlagList flags={tenant.risk_flags} /></td>
                 </tr>
               ))}
