@@ -44,8 +44,9 @@ type MonitoringPackage = {
   validation_note: string;
 };
 
-type SystemHealthPackage = {
-  tenants: Array<{ tenant_id: string; tenant_name: string }>;
+type TenantDirectoryRow = {
+  id: string;
+  name: string;
 };
 
 type BadgeTone = 'accent' | 'good' | 'warn' | 'danger' | 'neutral';
@@ -164,8 +165,8 @@ export default function PlatformProductionMonitoringReadinessPage() {
   const tenantId = searchParams.get('tenant_id') || '';
 
   const tenantOptions = useQuery({
-    queryKey: ['platform', 'system-health', 'for-production-monitoring-readiness'],
-    queryFn: () => platformApiRequest<SystemHealthPackage>('/platform/system-health'),
+    queryKey: ['platform', 'tenants', 'for-production-monitoring-readiness'],
+    queryFn: () => platformApiRequest<TenantDirectoryRow[]>('/platform/tenants'),
     refetchOnWindowFocus: false,
     staleTime: 60_000
   });
@@ -183,7 +184,10 @@ export default function PlatformProductionMonitoringReadinessPage() {
 
   const data = monitoring.data;
   const summary = data?.summary || {};
-  const tenants = useMemo(() => tenantOptions.data?.tenants || [], [tenantOptions.data]);
+  const tenants = useMemo(
+    () => (tenantOptions.data || []).map((tenant) => ({ tenant_id: tenant.id, tenant_name: tenant.name })),
+    [tenantOptions.data]
+  );
   const selectedTenant = useMemo(
     () => tenants.find((tenant) => tenant.tenant_id === tenantId),
     [tenantId, tenants]

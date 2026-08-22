@@ -293,6 +293,7 @@ const router = createBrowserRouter([
         element: (
           <PlatformProtectedRoute requiredPermissions={[
             PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.TENANTS_READ,
             PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
             PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ
           ]}>
@@ -1274,7 +1275,10 @@ const router = createBrowserRouter([
       {
         path: 'system-health',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[
+            PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+            PLATFORM_PERMISSIONS.TENANTS_READ
+          ]}>
             <PlatformSystemHealthPage />
           </PlatformProtectedRoute>
         )

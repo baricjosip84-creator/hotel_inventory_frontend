@@ -188,6 +188,7 @@ export default function PlatformLayout() {
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ)
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ) ? (
             <NavLink to="/platform/production-monitoring-readiness" style={getPlatformLinkStyle}>
@@ -928,7 +929,8 @@ export default function PlatformLayout() {
               <span>Announcements</span>
             </NavLink>
           ) : null}
-          {hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ) ? (
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+            && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/system-health" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/system-health" />
               <span>System Health</span>

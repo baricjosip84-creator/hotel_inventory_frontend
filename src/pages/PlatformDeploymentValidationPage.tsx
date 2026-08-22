@@ -140,6 +140,7 @@ export default function PlatformDeploymentValidationPage() {
       to: '/platform/production-monitoring-readiness',
       allowed: [
         PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ,
+        PLATFORM_PERMISSIONS.TENANTS_READ,
         PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ,
         PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ
       ].every((permission) => hasPlatformPermission(permission))
@@ -172,6 +173,7 @@ export default function PlatformDeploymentValidationPage() {
       label: 'System health',
       to: '/platform/system-health',
       allowed: hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
+        && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
     }
   ];
   const accessibleSupportingPages = supportingPages.filter((item) => item.allowed);
