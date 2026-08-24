@@ -1,169 +1,271 @@
+import { useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import type { CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
+import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformLicensePlanEnforcementPage.css';
 
-type PlanDefinition = { plan_code: string; commercial_tier: string; required_limits: string[]; required_feature_flags: string[]; recommended_enforcement_mode: string };
-type LicenseItem = { tenant_id: string; tenant_name: string; tenant_status: string; billing_status: string; plan_code?: string | null; commercial_tier?: string | null; recommended_enforcement_mode?: string | null; missing_limits: string[]; missing_feature_flags: string[]; enforcement_gaps: string[]; enforcement_state: string };
-type LicensePackage = { posture: string; plan_definitions: PlanDefinition[]; summary: Record<string, number>; items: LicenseItem[] };
-type Tenant = { id: string; name: string; status?: string; billing_status?: string; plan_code?: string | null };
-type FilterState = { tenant_id: string; plan_code: string; billing_status: string };
+type PlanDefinition = {
+  plan_code: string;
+  commercial_tier: string;
+  required_limits: string[];
+  required_feature_flags: string[];
+  recommended_enforcement_mode: string;
+  runtime_enforced_limits: string[];
+  runtime_unenforced_limits: string[];
+  runtime_enforced_feature_flags: string[];
+  runtime_unenforced_feature_flags: string[];
+  runtime_enforcement_complete: boolean;
+};
 
-const billingStatuses = ['not_configured', 'trialing', 'active', 'past_due', 'cancelled', 'comped'];
+type LicenseItem = {
+  tenant_id: string;
+  tenant_name: string;
+  tenant_status: string;
+  billing_status: string;
+  plan_code?: string | null;
+  commercial_tier?: string | null;
+  recommended_enforcement_mode?: string | null;
+  configuration_complete: boolean;
+  runtime_enforcement_complete: boolean;
+  missing_limits: string[];
+  invalid_limits: string[];
+  missing_feature_flags: string[];
+  runtime_enforced_limits: string[];
+  runtime_unenforced_limits: string[];
+  runtime_enforced_feature_flags: string[];
+  runtime_unenforced_feature_flags: string[];
+  enforcement_gaps: string[];
+  enforcement_state: 'license_enforcement_ready' | 'license_enforcement_review_required' | 'license_enforcement_blocked';
+};
 
-function badgeStyle(value: string): CSSProperties { if (value.includes('blocked')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' }; if (value.includes('review')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' }; return { ...styles.badge, background: '#dcfce7', color: '#166534' }; }
-function Chips({ values }: { values: string[] }) { return <div style={styles.flags}>{values.length ? values.map((value) => <span key={value} style={styles.flag}>{value}</span>) : <span style={styles.help}>None</span>}</div>; }
+type LicenseSummary = {
+  tenants_reviewed: number;
+  ready_tenants: number;
+  tenants_requiring_review: number;
+  blocked_tenants: number;
+  missing_plan_definitions: number;
+  missing_required_limits: number;
+  invalid_required_limits: number;
+  missing_required_feature_flags: number;
+  runtime_incomplete_tenants: number;
+  tenants_with_unenforced_limits: number;
+  tenants_with_unenforced_feature_flags: number;
+  billing_blocked_tenants: number;
+};
 
-function readableError(error: unknown): string { return error instanceof Error ? error.message : 'Unknown error'; }
-function metricLabel(value: string) { return value.replaceAll('_', ' '); }
-function buildQuery(filters: FilterState) {
-  const params = new URLSearchParams();
-  if (filters.tenant_id) params.set('tenant_id', filters.tenant_id);
-  if (filters.plan_code.trim()) params.set('plan_code', filters.plan_code.trim());
-  if (filters.billing_status) params.set('billing_status', filters.billing_status);
-  const query = params.toString();
-  return query ? `/platform/license-plan-enforcement?${query}` : '/platform/license-plan-enforcement';
+type LicensePackage = {
+  feature: string;
+  generated_at: string;
+  posture: string;
+  plan_definitions: PlanDefinition[];
+  runtime_guard_catalog: { enforced_limit_keys: string[]; enforced_feature_keys: string[] };
+  summary: LicenseSummary;
+  pagination: { limit: number; offset: number; total: number; has_more: boolean };
+  evidence_access: Record<string, boolean>;
+  available_sources: string[];
+  omitted_sources: string[];
+  evidence_complete: boolean;
+  truth_contract: Record<string, boolean>;
+  items: LicenseItem[];
+};
+
+const PAGE_SIZE = 50;
+const BILLING_STATUSES = ['not_configured', 'trialing', 'active', 'past_due', 'cancelled', 'comped'];
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function readableError(error: unknown) {
+  return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error';
+}
+
+function pretty(value?: string | null) {
+  return value ? value.replaceAll('_', ' ') : 'Not recorded';
+}
+
+function stateTone(value: string) {
+  if (value.includes('blocked')) return 'danger' as const;
+  if (value.includes('review')) return 'warn' as const;
+  return 'good' as const;
+}
+
+function Chips({ values, empty = 'None' }: { values: string[]; empty?: string }) {
+  return <div className="platform-license-plan__chips">{values.length ? values.map((value) => <span key={value}>{pretty(value)}</span>) : <small>{empty}</small>}</div>;
 }
 
 export default function PlatformLicensePlanEnforcementPage() {
-  const [filters, setFilters] = useState<FilterState>({ tenant_id: '', plan_code: '', billing_status: '' });
-  const endpoint = useMemo(() => buildQuery(filters), [filters]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const canReadAudit = hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
+
+  const requestedTenantId = searchParams.get('tenant_id') || '';
+  const requestedPlanCode = searchParams.get('plan_code') || '';
+  const requestedBillingStatus = searchParams.get('billing_status') || '';
+  const requestedSearch = searchParams.get('search') || '';
+  const planCode = requestedPlanCode.length <= 80 ? requestedPlanCode : '';
+  const billingStatus = BILLING_STATUSES.includes(requestedBillingStatus) ? requestedBillingStatus : '';
+  const search = requestedSearch.length <= 200 ? requestedSearch : '';
+  const includeHistory = searchParams.get('include_history') === 'true';
+  const offset = Math.max(0, Number(searchParams.get('offset') || 0) || 0);
+  const invalidFilters = Boolean(
+    (requestedTenantId && !UUID_RE.test(requestedTenantId))
+    || (requestedPlanCode && !planCode)
+    || (requestedBillingStatus && !billingStatus)
+    || (requestedSearch && !search)
+  );
+
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+    if (requestedTenantId) params.set('tenant_id', requestedTenantId);
+    if (planCode.trim()) params.set('plan_code', planCode.trim());
+    if (billingStatus) params.set('billing_status', billingStatus);
+    if (search.trim()) params.set('search', search.trim());
+    if (includeHistory) params.set('include_history', 'true');
+    return params.toString();
+  }, [requestedTenantId, planCode, billingStatus, search, includeHistory, offset]);
 
   const enforcementQuery = useQuery({
-    queryKey: ['platform', 'license-plan-enforcement', filters],
-    queryFn: () => platformApiRequest<LicensePackage>(endpoint)
-  });
-  const tenantsQuery = useQuery({
-    queryKey: ['platform', 'tenants', 'license-plan-enforcement-filter'],
-    queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants')
+    queryKey: ['platform', 'license-plan-enforcement', queryString],
+    queryFn: () => platformApiRequest<LicensePackage>(`/platform/license-plan-enforcement?${queryString}`),
+    enabled: !invalidFilters,
+    staleTime: 10_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previous) => previous
   });
 
   const data = enforcementQuery.data;
-  const summary = data?.summary || {};
+  const summary = data?.summary;
   const items = data?.items || [];
-  const metrics = ['tenants_reviewed', 'ready_tenants', 'tenants_requiring_review', 'blocked_tenants', 'missing_plan_definitions', 'missing_required_limits', 'missing_required_feature_flags', 'billing_blocked_tenants'];
-  const selectedTenantName = tenantsQuery.data?.find((tenant) => tenant.id === filters.tenant_id)?.name || filters.tenant_id || 'All tenants';
-  const hasFilters = Boolean(filters.tenant_id || filters.plan_code.trim() || filters.billing_status);
-  const planOptions = Array.from(new Set([...(data?.plan_definitions || []).map((plan) => plan.plan_code), 'starter', 'standard', 'enterprise'])).filter(Boolean);
+  const pagination = data?.pagination;
+  const selectedTenant = requestedTenantId ? items.find((item) => item.tenant_id === requestedTenantId) : null;
+  const showingStaleSnapshot = Boolean(enforcementQuery.isError && data);
 
-  async function refreshAll() {
-    await Promise.all([enforcementQuery.refetch(), tenantsQuery.refetch()]);
+  function updateFilters(next: { tenant_id?: string; plan_code?: string; billing_status?: string; search?: string; include_history?: boolean; offset?: number }) {
+    const params = new URLSearchParams(searchParams);
+    const entries = Object.entries(next);
+    for (const [key, value] of entries) {
+      if (value === undefined || value === '' || value === false || value === 0) params.delete(key);
+      else params.set(key, String(value));
+    }
+    if (!Object.prototype.hasOwnProperty.call(next, 'offset')) params.delete('offset');
+    setSearchParams(params, { replace: true });
   }
 
   function clearFilters() {
-    setFilters({ tenant_id: '', plan_code: '', billing_status: '' });
+    setSearchParams({}, { replace: true });
   }
 
-  return <div style={styles.page}>
-    <header style={styles.header}>
-      <div>
-        <h1 style={styles.title}>License & plan enforcement</h1>
-        <p style={styles.subtitle}>Read-only commercial entitlement and plan-limit readiness before runtime enforcement is wired into tenant workflows.</p>
-      </div>
-      <div style={styles.headerActions}>
-        {data ? <span style={badgeStyle(data.posture)}>{data.posture}</span> : null}
-        <button type="button" style={styles.secondaryButton} onClick={refreshAll} disabled={enforcementQuery.isFetching || tenantsQuery.isFetching}>{enforcementQuery.isFetching || tenantsQuery.isFetching ? 'Refreshing…' : 'Refresh'}</button>
-      </div>
-    </header>
+  return <div className="platform-license-plan">
+    <OperationalWorkspaceHero
+      iconPath="/platform/license-plan-enforcement"
+      eyebrow="Platform commercial evidence"
+      title="License & plan enforcement"
+      description="Compare tenant plan configuration with the runtime limit and feature guards that are actually wired into the application. Configured metadata is kept separate from real runtime enforcement coverage."
+      meta={<>
+        <OperationalWorkspaceMetaPill>Tenant identity protected by TENANTS_READ</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>Plan evidence protected by PLATFORM_BILLING_READ</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>Read only</OperationalWorkspaceMetaPill>
+      </>}
+      aside={<div className="platform-license-plan__hero-aside">
+        <OperationalWorkspaceStatus value={pretty(data?.posture || 'Loading')} label="Current application posture" />
+        <button type="button" className="app-button app-button--secondary" onClick={() => enforcementQuery.refetch()} disabled={enforcementQuery.isFetching || invalidFilters}>
+          {enforcementQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>}
+    />
 
-    <section style={styles.metaPanel}>
-      <div><strong>Snapshot source:</strong> GET {endpoint}</div>
-      <div><strong>Tenant filter:</strong> {selectedTenantName}</div>
-      <div><strong>Plan filter:</strong> {filters.plan_code.trim() || 'All plans'}</div>
-      <div><strong>Billing status filter:</strong> {filters.billing_status || 'All statuses'}</div>
-      <div><strong>Displayed tenants:</strong> {items.length}</div>
-      <div><strong>Blocked tenants:</strong> {summary.blocked_tenants ?? 0}</div>
-      <div><strong>Review tenants:</strong> {summary.tenants_requiring_review ?? 0}</div>
-      <div><strong>Billing blocked:</strong> {summary.billing_blocked_tenants ?? 0}</div>
-    </section>
+    {invalidFilters ? <section className="platform-license-plan__error"><strong>Invalid enforcement filters.</strong><span>Clear the URL filters and retry.</span><button type="button" className="app-button app-button--secondary" onClick={clearFilters}>Clear filters</button></section> : null}
+    {enforcementQuery.isError && !data && !invalidFilters ? <section className="platform-license-plan__blocking-error"><strong>License and plan enforcement failed to load.</strong><span>{readableError(enforcementQuery.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => enforcementQuery.refetch()}>Retry</button></section> : null}
+    {showingStaleSnapshot ? <section className="platform-license-plan__warning"><strong>Showing the last successful snapshot.</strong><span>The latest refresh failed: {readableError(enforcementQuery.error)}</span></section> : null}
 
-    <nav style={styles.supportLinks} aria-label="Supporting Platform pages">
-      <Link style={styles.supportLink} to="/platform/billing">Billing</Link>
-      <Link style={styles.supportLink} to="/platform/subscription-readiness">Subscription Readiness</Link>
-      <Link style={styles.supportLink} to="/platform/tenants">Tenants</Link>
-      <Link style={styles.supportLink} to="/platform/tenant-health">Tenant Health</Link>
-      <Link style={styles.supportLink} to="/platform/audit">System Audit</Link>
-    </nav>
+    <OperationalWorkspaceStats ariaLabel="License and plan enforcement summary">
+      <OperationalWorkspaceStatCard label="Reviewed" value={summary?.tenants_reviewed ?? '—'} helper="Registry-wide for current filters" loading={enforcementQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Ready" value={summary?.ready_tenants ?? '—'} tone="good" helper="Configured and runtime-covered" loading={enforcementQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Review" value={summary?.tenants_requiring_review ?? '—'} tone="warn" helper="Configuration or runtime coverage gap" loading={enforcementQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Blocked" value={summary?.blocked_tenants ?? '—'} tone="danger" helper="Billing or plan-definition blocker" loading={enforcementQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Runtime incomplete" value={summary?.runtime_incomplete_tenants ?? '—'} tone="warn" helper="Required controls not wired to guards" loading={enforcementQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Invalid limits" value={summary?.invalid_required_limits ?? '—'} tone="warn" helper="Configured value is not enforceable" loading={enforcementQuery.isLoading && !data} />
+    </OperationalWorkspaceStats>
 
-    <section style={styles.card}>
-      <h2 style={styles.cardTitle}>Enforcement filters</h2>
-      <div style={styles.filterGrid}>
-        <label style={styles.label}>Tenant
-          <select style={styles.input} value={filters.tenant_id} onChange={(event) => setFilters({ ...filters, tenant_id: event.target.value })}>
-            <option value="">All tenants</option>
-            {(tenantsQuery.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-          </select>
+    <section className="io-workspace-panel platform-license-plan__section">
+      <OperationalSectionHeader iconPath="/platform/license-plan-enforcement" title="Enforcement filters" description="Filters are URL-backed so links from Billing, Customer Success and commercial-readiness workspaces open the intended evidence." />
+      <div className="platform-license-plan__filters">
+        <label>Search tenant / plan / billing status
+          <input value={search} maxLength={200} onChange={(event) => updateFilters({ search: event.target.value })} placeholder="Search…" />
         </label>
-        <label style={styles.label}>Plan code
-          <select style={styles.input} value={filters.plan_code} onChange={(event) => setFilters({ ...filters, plan_code: event.target.value })}>
+        <label>Plan code
+          <select value={planCode} onChange={(event) => updateFilters({ plan_code: event.target.value })}>
             <option value="">All plans</option>
-            {planOptions.map((planCode) => <option key={planCode} value={planCode}>{planCode}</option>)}
+            {(data?.plan_definitions || []).map((plan) => <option key={plan.plan_code} value={plan.plan_code}>{plan.plan_code}</option>)}
           </select>
         </label>
-        <label style={styles.label}>Billing status
-          <select style={styles.input} value={filters.billing_status} onChange={(event) => setFilters({ ...filters, billing_status: event.target.value })}>
+        <label>Billing status
+          <select value={billingStatus} onChange={(event) => updateFilters({ billing_status: event.target.value })}>
             <option value="">All statuses</option>
-            {billingStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+            {BILLING_STATUSES.map((status) => <option key={status} value={status}>{pretty(status)}</option>)}
           </select>
         </label>
-        <div style={styles.filterActions}>
-          <button type="button" style={styles.secondaryButton} onClick={() => enforcementQuery.refetch()} disabled={enforcementQuery.isFetching}>Apply / retry</button>
-          {hasFilters ? <button type="button" style={styles.linkButton} onClick={clearFilters}>Clear filters</button> : null}
+        <label className="platform-license-plan__history"><input type="checkbox" checked={includeHistory} onChange={(event) => updateFilters({ include_history: event.target.checked })} />Include archived tenants</label>
+        <div className="platform-license-plan__filter-actions">
+          <button type="button" className="app-button app-button--secondary" onClick={clearFilters} disabled={!searchParams.toString()}>Clear filters</button>
         </div>
       </div>
-      {tenantsQuery.error ? <p style={styles.errorText}>Tenant filter failed to load: {readableError(tenantsQuery.error)}</p> : null}
+      {requestedTenantId ? <div className="platform-license-plan__scope"><strong>Tenant scope:</strong> {selectedTenant?.tenant_name || requestedTenantId}</div> : null}
     </section>
 
-    {enforcementQuery.isLoading ? <section style={styles.card}>Loading license and plan enforcement…</section> : null}
-    {enforcementQuery.error ? <section style={styles.errorPanel}><strong>License and plan enforcement failed to load.</strong><span>{readableError(enforcementQuery.error)}</span><button type="button" style={styles.retryButton} onClick={() => enforcementQuery.refetch()}>Retry license enforcement</button></section> : null}
+    <section className="io-workspace-panel platform-license-plan__section">
+      <OperationalSectionHeader iconPath="/platform/license-plan-enforcement" title="Plan catalog vs runtime guard coverage" description="The plan catalog defines commercial metadata. Runtime coverage is derived separately from the tenant plan-limit and feature-entitlement guard catalogs currently wired into the application." />
+      {data ? <div className="platform-license-plan__plan-grid">{data.plan_definitions.map((plan) => <article key={plan.plan_code} className="platform-license-plan__plan-card">
+        <div className="platform-license-plan__plan-head"><div><strong>{plan.plan_code}</strong><small>{pretty(plan.commercial_tier)}</small></div><span className="platform-license-plan__badge" data-tone={plan.runtime_enforcement_complete ? 'good' : 'warn'}>{plan.runtime_enforcement_complete ? 'Runtime covered' : 'Runtime incomplete'}</span></div>
+        <dl><div><dt>Catalog mode</dt><dd>{pretty(plan.recommended_enforcement_mode)}</dd></div></dl>
+        <div><strong>Required limits</strong><Chips values={plan.required_limits} /></div>
+        <div><strong>Runtime-enforced limits</strong><Chips values={plan.runtime_enforced_limits} /></div>
+        <div><strong>Unenforced required limits</strong><Chips values={plan.runtime_unenforced_limits} empty="None — all required limits have a runtime guard" /></div>
+        <div><strong>Required features</strong><Chips values={plan.required_feature_flags} /></div>
+        <div><strong>Runtime-enforced features</strong><Chips values={plan.runtime_enforced_feature_flags} /></div>
+        <div><strong>Unenforced required features</strong><Chips values={plan.runtime_unenforced_feature_flags} empty="None — all required features have a runtime guard" /></div>
+        <Link to={`/platform/license-plan-enforcement?plan_code=${encodeURIComponent(plan.plan_code)}`}>Filter tenant evidence</Link>
+      </article>)}</div> : <div className="platform-license-plan__empty">Loading plan catalog…</div>}
+    </section>
 
-    {data ? <section style={styles.summaryGrid}>{metrics.map((key) => <div key={key} style={styles.card}><strong>{metricLabel(key)}</strong><div style={styles.metric}>{summary[key] ?? 0}</div></div>)}</section> : null}
+    <section className="io-workspace-panel platform-license-plan__section">
+      <OperationalSectionHeader iconPath="/platform/license-plan-enforcement" title="Tenant enforcement evidence" description="A tenant is Ready only when the plan is known, application billing state is not blocked, required metadata is configured, and every required plan control has runtime guard coverage." />
+      {data ? <>
+        <div className="platform-license-plan__table-wrap"><table className="platform-license-plan__table">
+          <thead><tr><th>Tenant</th><th>Billing / plan</th><th>Configuration</th><th>Runtime coverage</th><th>Gaps</th><th>Evidence</th></tr></thead>
+          <tbody>{items.map((item) => <tr key={item.tenant_id}>
+            <td><strong>{item.tenant_name}</strong><small>{pretty(item.tenant_status)}</small></td>
+            <td><span className="platform-license-plan__badge" data-tone={stateTone(item.enforcement_state)}>{pretty(item.billing_status)}</span><strong>{item.plan_code || 'No plan code'}</strong><small>{pretty(item.commercial_tier)} · catalog mode {pretty(item.recommended_enforcement_mode)}</small></td>
+            <td><strong>{item.configuration_complete ? 'Configuration complete' : 'Configuration review'}</strong><small>Missing limits</small><Chips values={item.missing_limits} /><small>Invalid limits</small><Chips values={item.invalid_limits} /><small>Missing features</small><Chips values={item.missing_feature_flags} /></td>
+            <td><span className="platform-license-plan__badge" data-tone={item.runtime_enforcement_complete ? 'good' : 'warn'}>{item.runtime_enforcement_complete ? 'Complete' : 'Incomplete'}</span><small>Unenforced limits</small><Chips values={item.runtime_unenforced_limits} /><small>Unenforced features</small><Chips values={item.runtime_unenforced_feature_flags} /></td>
+            <td><span className="platform-license-plan__badge" data-tone={stateTone(item.enforcement_state)}>{pretty(item.enforcement_state)}</span><Chips values={item.enforcement_gaps} empty="No defined gaps" /></td>
+            <td><div className="platform-license-plan__links"><Link to={`/platform/tenants?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Tenant record</Link><Link to={`/platform/billing?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Billing record</Link><Link to={`/platform/subscription-readiness?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Subscription readiness</Link>{canReadAudit ? <Link to={`/platform/audit?tenant_id=${encodeURIComponent(item.tenant_id)}&source=billing`}>Billing audit</Link> : null}</div></td>
+          </tr>)}{!items.length ? <tr><td colSpan={6}><div className="platform-license-plan__empty">No license/plan rows match the current filters.</div></td></tr> : null}</tbody>
+        </table></div>
+        <div className="platform-license-plan__pagination"><span>Showing {pagination ? Math.min(pagination.offset + 1, pagination.total) : 0}–{pagination ? Math.min(pagination.offset + items.length, pagination.total) : items.length} of {pagination?.total ?? items.length}</span><button type="button" className="app-button app-button--secondary" disabled={!pagination || pagination.offset <= 0 || enforcementQuery.isFetching} onClick={() => updateFilters({ offset: Math.max(0, (pagination?.offset || 0) - PAGE_SIZE) })}>Previous</button><button type="button" className="app-button app-button--secondary" disabled={!pagination?.has_more || enforcementQuery.isFetching} onClick={() => updateFilters({ offset: (pagination?.offset || 0) + PAGE_SIZE })}>Next</button></div>
+      </> : null}
+    </section>
 
-    {data ? <section style={styles.card}>
-      <h2 style={styles.cardTitle}>Plan definitions</h2>
-      <p style={styles.helpBlock}>Source: backend plan catalog used by GET /platform/license-plan-enforcement. These rows are evidence for required limits, feature flags, commercial tier, and recommended enforcement mode.</p>
-      <div style={styles.tableWrap}><table style={styles.table}><thead><tr><th style={styles.th}>Plan</th><th style={styles.th}>Tier</th><th style={styles.th}>Limits</th><th style={styles.th}>Features</th><th style={styles.th}>Mode</th><th style={styles.th}>Evidence</th></tr></thead><tbody>{data.plan_definitions.map((plan) => <tr key={plan.plan_code}><td style={styles.td}><strong>{plan.plan_code}</strong></td><td style={styles.td}>{plan.commercial_tier}</td><td style={styles.td}><Chips values={plan.required_limits} /></td><td style={styles.td}><Chips values={plan.required_feature_flags} /></td><td style={styles.td}>{plan.recommended_enforcement_mode}</td><td style={styles.td}><Link style={styles.evidenceLink} to={`/platform/license-plan-enforcement?plan_code=${encodeURIComponent(plan.plan_code)}`}>Filter tenants</Link></td></tr>)}</tbody></table></div>
-    </section> : null}
+    <section className="io-workspace-panel platform-license-plan__section">
+      <OperationalSectionHeader iconPath="/platform/license-plan-enforcement" title="Evidence meaning" description="This page reports application plan configuration and the runtime guard coverage implemented in this codebase. It is not an external licensing or contract certification system." />
+      <div className="platform-license-plan__truth-grid">
+        <div><strong>Configured ≠ enforced</strong><span>A feature flag or limit stored on the tenant is configuration evidence. It is only called runtime-covered here when the current tenant guard catalog contains a matching control.</span></div>
+        <div><strong>Catalog mode ≠ implementation</strong><span>A recommended mode such as contract limit enforcement is plan-catalog metadata. Its presence does not prove a matching runtime engine exists.</span></div>
+        <div><strong>Ready is narrow</strong><span>Ready means the defined application billing/plan/configuration checks are clear and required controls have runtime guard coverage. It does not prove a commercial contract, payment, or external license state.</span></div>
+        <div><strong>Current known gaps</strong><span>Standard and Enterprise can remain Review Required when required integration/API/identity controls are configured but not yet represented by current tenant runtime guards.</span></div>
+      </div>
+    </section>
 
-    <section style={styles.card}>
-      <h2 style={styles.cardTitle}>Tenant enforcement evidence</h2>
-      <div style={styles.tableWrap}><table style={styles.table}><thead><tr><th style={styles.th}>Tenant</th><th style={styles.th}>Billing</th><th style={styles.th}>Plan</th><th style={styles.th}>Missing limits</th><th style={styles.th}>Missing features</th><th style={styles.th}>Gaps</th><th style={styles.th}>Evidence</th></tr></thead><tbody>{items.map((item) => <tr key={item.tenant_id}><td style={styles.td}><strong>{item.tenant_name}</strong><br /><span style={styles.help}>{item.tenant_status} · {item.enforcement_state}</span></td><td style={styles.td}>{item.billing_status}</td><td style={styles.td}>{item.plan_code || '—'}<br /><span style={styles.help}>{item.commercial_tier || '—'} · {item.recommended_enforcement_mode || '—'}</span></td><td style={styles.td}><Chips values={item.missing_limits} /></td><td style={styles.td}><Chips values={item.missing_feature_flags} /></td><td style={styles.td}><Chips values={item.enforcement_gaps} /></td><td style={styles.td}><div style={styles.evidenceLinks}><Link style={styles.evidenceLink} to={`/platform/tenants?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Tenant record</Link><Link style={styles.evidenceLink} to={`/platform/billing?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Billing record</Link><Link style={styles.evidenceLink} to={`/platform/subscription-readiness?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Subscription readiness</Link><Link style={styles.evidenceLink} to={`/platform/audit?tenant_id=${encodeURIComponent(item.tenant_id)}&category=billing`}>Billing audit</Link></div></td></tr>)}{!items.length ? <tr><td style={styles.td} colSpan={7}>No license enforcement rows available.</td></tr> : null}</tbody></table></div>
+    <section className="io-workspace-panel platform-license-plan__section">
+      <OperationalSectionHeader iconPath="/platform/license-plan-enforcement" title="Supporting operations" description="Use the source records to correct plan configuration or investigate the commercial state behind an enforcement finding." />
+      <div className="platform-license-plan__links platform-license-plan__links--row"><Link to="/platform/billing">Billing</Link><Link to="/platform/subscription-readiness">Subscription readiness</Link><Link to="/platform/billing-subscription-activation">Billing activation</Link><Link to="/platform/tenants">Tenants</Link><Link to="/platform/tenant-health">Tenant health</Link>{canReadAudit ? <Link to="/platform/audit?source=billing">Billing audit</Link> : null}</div>
     </section>
   </div>;
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' },
-  headerActions: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  subtitle: { margin: '6px 0 0', color: '#64748b', lineHeight: 1.5 },
-  badge: { padding: '5px 10px', borderRadius: 999, fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap', border: '1px solid transparent' },
-  metaPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, padding: 14, border: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: 12, color: '#334155', fontSize: 13 },
-  supportLinks: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  supportLink: { border: '1px solid var(--io-primary-border)', background: '#fff', color: 'var(--io-primary-dark)', borderRadius: 999, padding: '7px 11px', textDecoration: 'none', fontWeight: 700, fontSize: 13 },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metric: { fontSize: 28, fontWeight: 800, marginTop: 8, color: '#0f172a' },
-  cardTitle: { margin: '0 0 10px', fontSize: 18, letterSpacing: '-.015em', color: '#0f172a' },
-  filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'end' },
-  filterActions: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
-  label: { display: 'flex', flexDirection: 'column', gap: 6, color: '#334155', fontWeight: 700, fontSize: 13 },
-  input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', font: 'inherit', background: '#fff', color: '#0f172a' },
-  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '9px 13px', cursor: 'pointer', fontWeight: 700 },
-  retryButton: { border: '1px solid #fecaca', background: '#fff', color: '#b91c1c', borderRadius: 9, padding: '8px 11px', cursor: 'pointer', fontWeight: 700, width: 'fit-content' },
-  linkButton: { border: 'none', background: 'transparent', color: 'var(--io-primary-dark)', cursor: 'pointer', fontWeight: 700, padding: 0 },
-  errorPanel: { display: 'flex', flexDirection: 'column', gap: 8, background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 12, padding: 14 },
-  errorText: { color: '#991b1b', margin: '10px 0 0', fontSize: 13 },
-  flags: { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  flag: { background: 'var(--io-primary-soft-strong)', color: 'var(--io-primary-dark)', border: '1px solid var(--io-primary-border)', padding: '4px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700 },
-  help: { color: '#64748b', fontSize: 12 },
-  helpBlock: { color: '#64748b', fontSize: 13, marginTop: -4, lineHeight: 1.5 },
-  tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse', color: '#334155' },
-  th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '10px 8px', color: '#64748b', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' },
-  td: { borderBottom: '1px solid #f1f5f9', padding: '12px 8px', verticalAlign: 'top' },
-  evidenceLinks: { display: 'flex', flexDirection: 'column', gap: 6 },
-  evidenceLink: { color: 'var(--io-primary-dark)', fontSize: 12, fontWeight: 700, textDecoration: 'none' }
-};

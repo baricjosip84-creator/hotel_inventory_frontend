@@ -986,7 +986,7 @@ export default function PlatformLayout() {
               <span>Subscription readiness</span>
             </NavLink>
           ) : null}
-          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ) ? (
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/license-plan-enforcement" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/license-plan-enforcement" />
               <span>License enforcement</span>
