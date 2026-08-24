@@ -1338,7 +1338,7 @@ const router = createBrowserRouter([
       {
         path: 'subscription-readiness',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ, PLATFORM_PERMISSIONS.TENANTS_READ]}>
             <PlatformSubscriptionReadinessPage />
           </PlatformProtectedRoute>
         )

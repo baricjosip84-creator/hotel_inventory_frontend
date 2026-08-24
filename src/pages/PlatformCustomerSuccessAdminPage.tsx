@@ -10,7 +10,7 @@ type CustomerSuccessItem = {
   tenant_id: string;
   tenant_name: string;
   tenant_status: string;
-  billing_status: string;
+  billing_status: string | null;
   plan_code?: string | null;
   primary_contacts: number;
   open_tasks: number;
@@ -20,14 +20,14 @@ type CustomerSuccessItem = {
   days_since_last_touch?: number | null;
   open_support_sessions: number;
   open_incidents: number | null;
-  subscription_readiness_state: string;
-  license_enforcement_state: string;
+  subscription_readiness_state: string | null;
+  license_enforcement_state: string | null;
   success_risk_score: number;
   customer_success_state: string;
   risk_flags: RiskFlag[];
   recommended_admin_actions: string[];
 };
-type CustomerSuccessPackage = { posture: string; health_states: string[]; summary: Record<string, number>; evidence_access?: { incidents?: boolean }; omitted_sources?: string[]; items: CustomerSuccessItem[] };
+type CustomerSuccessPackage = { posture: string; health_states: string[]; summary: Record<string, number>; evidence_access?: { incidents?: boolean; billing_subscription?: boolean }; omitted_sources?: string[]; items: CustomerSuccessItem[] };
 type Tenant = { id: string; name: string; status?: string };
 type FilterState = { tenant_id: string; state: string };
 
@@ -92,6 +92,7 @@ function actionTarget(action: string, tenantId: string) {
 
 export default function PlatformCustomerSuccessAdminPage() {
   const canReadIncidents = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ);
+  const canReadBilling = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ);
   const [filters, setFilters] = useState<FilterState>({ tenant_id: '', state: '' });
   const endpoint = useMemo(() => buildQuery(filters), [filters]);
 
@@ -149,9 +150,9 @@ export default function PlatformCustomerSuccessAdminPage() {
       <Link style={styles.supportLink} to="/platform/communications">Communications</Link>
       <Link style={styles.supportLink} to="/platform/support-sessions">Support Sessions</Link>
       {canReadIncidents ? <Link style={styles.supportLink} to="/platform/incidents">Incidents</Link> : null}
-      <Link style={styles.supportLink} to="/platform/billing">Billing</Link>
-      <Link style={styles.supportLink} to="/platform/subscription-readiness">Subscription Readiness</Link>
-      <Link style={styles.supportLink} to="/platform/license-plan-enforcement">License Enforcement</Link>
+      {canReadBilling ? <Link style={styles.supportLink} to="/platform/billing">Billing</Link> : null}
+      {canReadBilling ? <Link style={styles.supportLink} to="/platform/subscription-readiness">Subscription Readiness</Link> : null}
+      {canReadBilling ? <Link style={styles.supportLink} to="/platform/license-plan-enforcement">License Enforcement</Link> : null}
       <Link style={styles.supportLink} to="/platform/audit">System Audit</Link>
     </nav>
 
@@ -191,7 +192,7 @@ export default function PlatformCustomerSuccessAdminPage() {
 
     <section style={styles.card}>
       <h2 style={styles.cardTitle}>Tenant customer success evidence</h2>
-      <div style={styles.tableWrap}><table style={styles.table}><thead><tr><th style={styles.th}>Tenant</th><th style={styles.th}>Commercial state</th><th style={styles.th}>Contacts & tasks</th><th style={styles.th}>Touch & support</th><th style={styles.th}>Risk</th><th style={styles.th}>Actions</th><th style={styles.th}>Evidence</th></tr></thead><tbody>{items.map((item) => <tr key={item.tenant_id}><td style={styles.td}><strong>{item.tenant_name}</strong><br /><span style={styles.help}>{item.tenant_status} · {item.customer_success_state}</span></td><td style={styles.td}>{item.billing_status}<br /><span style={styles.help}>{item.plan_code || '—'} · {item.subscription_readiness_state} · {item.license_enforcement_state}</span></td><td style={styles.td}>Contacts: {item.primary_contacts}<br /><span style={styles.help}>Open: {item.open_tasks}, urgent: {item.open_urgent_tasks}, overdue: {item.overdue_tasks}</span></td><td style={styles.td}>Last touch: {item.days_since_last_touch ?? '—'} days<br /><span style={styles.help}>Follow-ups: {item.unresolved_follow_ups}, support: {item.open_support_sessions}, incidents: {item.open_incidents ?? 'Restricted'}</span></td><td style={styles.td}><strong>{item.success_risk_score}</strong><br /><RiskChips values={item.risk_flags} /></td><td style={styles.td}><div style={styles.evidenceLinks}>{item.recommended_admin_actions.length ? item.recommended_admin_actions.map((action) => <Link key={action} style={styles.evidenceLink} to={actionTarget(action, item.tenant_id)}>{action}</Link>) : <span style={styles.help}>None</span>}</div></td><td style={styles.td}><div style={styles.evidenceLinks}><Link style={styles.evidenceLink} to={`/platform/tenants?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Tenant record</Link><Link style={styles.evidenceLink} to={`/platform/tenant-health?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Tenant health</Link><Link style={styles.evidenceLink} to={`/platform/billing?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Billing record</Link><Link style={styles.evidenceLink} to={`/platform/audit?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Audit evidence</Link></div></td></tr>)}{!items.length ? <tr><td style={styles.td} colSpan={7}>No customer success admin rows available.</td></tr> : null}</tbody></table></div>
+      <div style={styles.tableWrap}><table style={styles.table}><thead><tr><th style={styles.th}>Tenant</th><th style={styles.th}>Commercial state</th><th style={styles.th}>Contacts & tasks</th><th style={styles.th}>Touch & support</th><th style={styles.th}>Risk</th><th style={styles.th}>Actions</th><th style={styles.th}>Evidence</th></tr></thead><tbody>{items.map((item) => <tr key={item.tenant_id}><td style={styles.td}><strong>{item.tenant_name}</strong><br /><span style={styles.help}>{item.tenant_status} · {item.customer_success_state}</span></td><td style={styles.td}>{data?.evidence_access?.billing_subscription ? item.billing_status : 'Restricted'}<br /><span style={styles.help}>{data?.evidence_access?.billing_subscription ? `${item.plan_code || '—'} · ${item.subscription_readiness_state || '—'} · ${item.license_enforcement_state || '—'}` : 'PLATFORM_BILLING_READ required'}</span></td><td style={styles.td}>Contacts: {item.primary_contacts}<br /><span style={styles.help}>Open: {item.open_tasks}, urgent: {item.open_urgent_tasks}, overdue: {item.overdue_tasks}</span></td><td style={styles.td}>Last touch: {item.days_since_last_touch ?? '—'} days<br /><span style={styles.help}>Follow-ups: {item.unresolved_follow_ups}, support: {item.open_support_sessions}, incidents: {item.open_incidents ?? 'Restricted'}</span></td><td style={styles.td}><strong>{item.success_risk_score}</strong><br /><RiskChips values={item.risk_flags} /></td><td style={styles.td}><div style={styles.evidenceLinks}>{item.recommended_admin_actions.length ? item.recommended_admin_actions.map((action) => <Link key={action} style={styles.evidenceLink} to={actionTarget(action, item.tenant_id)}>{action}</Link>) : <span style={styles.help}>None</span>}</div></td><td style={styles.td}><div style={styles.evidenceLinks}><Link style={styles.evidenceLink} to={`/platform/tenants?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Tenant record</Link><Link style={styles.evidenceLink} to={`/platform/tenant-health?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Tenant health</Link>{canReadBilling ? <Link style={styles.evidenceLink} to={`/platform/billing?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Billing record</Link> : null}<Link style={styles.evidenceLink} to={`/platform/audit?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Audit evidence</Link></div></td></tr>)}{!items.length ? <tr><td style={styles.td} colSpan={7}>No customer success admin rows available.</td></tr> : null}</tbody></table></div>
     </section>
   </div>;
 }

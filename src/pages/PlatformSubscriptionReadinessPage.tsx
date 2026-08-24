@@ -1,246 +1,228 @@
+import { useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import type { CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
+import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformSubscriptionReadinessPage.css';
 
-type Tenant = { id: string; name: string; status?: string; billing_status?: string; plan_code?: string | null };
 type SubscriptionItem = {
   tenant_id: string;
   tenant_name: string;
   tenant_status: string;
   billing_status: string;
   plan_code?: string | null;
-  readiness_state: string;
-  risk_flags: string[];
+  billing_customer_reference_present: boolean;
+  trial_ends_at?: string | null;
+  current_period_ends_at?: string | null;
   days_until_trial_end?: number | null;
   days_until_period_end?: number | null;
   billing_event_count: number;
+  payment_provider_event_count: number;
+  operator_recorded_event_count: number;
   last_billing_event_at?: string | null;
+  last_payment_provider_event_at?: string | null;
+  risk_flags: string[];
+  readiness_state: 'subscription_ready' | 'subscription_review_required' | 'subscription_blocked';
 };
-type SubscriptionPackage = { posture: string; summary: Record<string, number>; items: SubscriptionItem[] };
 
-type FilterState = { tenant_id: string; status: string };
+type SubscriptionSummary = {
+  tenants_reviewed: number;
+  ready_tenants: number;
+  tenants_requiring_review: number;
+  blocked_tenants: number;
+  trials_ending_soon: number;
+  periods_ending_soon: number;
+  past_due_tenants: number;
+  missing_plan_codes: number;
+  missing_customer_references: number;
+  missing_billing_event_history: number;
+  payment_provider_events: number;
+  operator_recorded_events: number;
+};
 
-const billingStatuses = ['not_configured', 'trialing', 'active', 'past_due', 'cancelled', 'comped'];
-const metricEntries = [
-  'tenants_reviewed',
-  'ready_tenants',
-  'tenants_requiring_review',
-  'blocked_tenants',
-  'trials_ending_soon',
-  'past_due_tenants',
-  'missing_plan_codes',
-  'missing_customer_references',
-  'missing_billing_event_history'
-];
+type SubscriptionPackage = {
+  feature: string;
+  generated_at: string;
+  posture: string;
+  summary: SubscriptionSummary;
+  pagination: { limit: number; offset: number; total: number; has_more: boolean };
+  evidence_access: { tenant_identity: boolean; billing_subscription: boolean };
+  available_sources: string[];
+  omitted_sources: string[];
+  evidence_complete: boolean;
+  required_permissions_by_source: Record<string, string[]>;
+  truth_contract: Record<string, boolean>;
+  items: SubscriptionItem[];
+};
 
-function badgeStyle(value: string): CSSProperties {
-  if (value.includes('blocked')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  if (value.includes('review')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+const PAGE_SIZE = 50;
+const BILLING_STATUSES = ['not_configured', 'trialing', 'active', 'past_due', 'cancelled', 'comped'];
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function readableError(error: unknown) {
+  return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error';
 }
 
-function readableError(error: unknown): string {
-  return error instanceof Error ? error.message : 'Unknown error';
+function pretty(value?: string | null) {
+  return value ? value.replaceAll('_', ' ') : 'Not recorded';
 }
 
-function FlagList({ flags }: { flags: string[] }) {
-  return (
-    <div style={styles.flags}>
-      {flags.length ? flags.map((flag) => <span key={flag} style={styles.flag}>{flag}</span>) : <span style={styles.help}>No flags</span>}
-    </div>
-  );
+function formatDateTime(value?: string | null) {
+  if (!value) return 'Not recorded';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Not recorded' : date.toLocaleString();
 }
 
-function dateOnly(value?: string | null) {
-  return value ? new Date(value).toLocaleDateString() : '—';
-}
-
-function metricLabel(value: string) {
-  return value.replaceAll('_', ' ');
-}
-
-function buildQuery(filters: FilterState) {
-  const params = new URLSearchParams();
-  if (filters.tenant_id) params.set('tenant_id', filters.tenant_id);
-  if (filters.status) params.set('status', filters.status);
-  const query = params.toString();
-  return query ? `/platform/subscription-readiness?${query}` : '/platform/subscription-readiness';
+function stateTone(value: string) {
+  if (value === 'subscription_blocked') return 'danger' as const;
+  if (value === 'subscription_review_required') return 'warn' as const;
+  return 'good' as const;
 }
 
 export default function PlatformSubscriptionReadinessPage() {
-  const [filters, setFilters] = useState<FilterState>({ tenant_id: '', status: '' });
-  const endpoint = useMemo(() => buildQuery(filters), [filters]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const canReadAudit = hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
+
+  const requestedTenantId = searchParams.get('tenant_id') || '';
+  const requestedStatus = searchParams.get('status') || '';
+  const status = BILLING_STATUSES.includes(requestedStatus) ? requestedStatus : '';
+  const requestedSearch = searchParams.get('search') || '';
+  const search = requestedSearch.length <= 200 ? requestedSearch : '';
+  const offset = Math.max(0, Number(searchParams.get('offset') || 0) || 0);
+  const invalidFilters = Boolean((requestedTenantId && !UUID_RE.test(requestedTenantId)) || (requestedStatus && !status) || (requestedSearch && !search));
+
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+    if (requestedTenantId) params.set('tenant_id', requestedTenantId);
+    if (status) params.set('status', status);
+    if (search.trim()) params.set('search', search.trim());
+    return params.toString();
+  }, [requestedTenantId, status, search, offset]);
 
   const readinessQuery = useQuery({
-    queryKey: ['platform', 'subscription-readiness', filters],
-    queryFn: () => platformApiRequest<SubscriptionPackage>(endpoint)
-  });
-
-  const tenantsQuery = useQuery({
-    queryKey: ['platform', 'tenants', 'subscription-readiness-filter'],
-    queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants')
+    queryKey: ['platform', 'subscription-readiness', queryString],
+    queryFn: () => platformApiRequest<SubscriptionPackage>(`/platform/subscription-readiness?${queryString}`),
+    enabled: !invalidFilters,
+    staleTime: 10_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previous) => previous
   });
 
   const data = readinessQuery.data;
-  const summary = data?.summary || {};
+  const summary = data?.summary;
   const items = data?.items || [];
-  const selectedTenantName = tenantsQuery.data?.find((tenant) => tenant.id === filters.tenant_id)?.name || filters.tenant_id || 'All tenants';
-  const blockedCount = summary.blocked_tenants ?? 0;
-  const reviewCount = summary.tenants_requiring_review ?? 0;
-  const missingEvidenceCount = summary.missing_billing_event_history ?? 0;
-  const hasFilters = Boolean(filters.tenant_id || filters.status);
+  const pagination = data?.pagination;
+  const selectedTenant = requestedTenantId ? items.find((item) => item.tenant_id === requestedTenantId) : null;
+  const showingStaleSnapshot = Boolean(readinessQuery.isError && data);
 
-  async function refreshAll() {
-    await Promise.all([readinessQuery.refetch(), tenantsQuery.refetch()]);
+  function updateFilters(next: { tenant_id?: string; status?: string; search?: string; offset?: number }) {
+    const params = new URLSearchParams(searchParams);
+    const entries: Array<[string, string | number | undefined]> = Object.entries(next) as Array<[string, string | number | undefined]>;
+    for (const [key, value] of entries) {
+      if (value === undefined || value === '' || value === 0) params.delete(key);
+      else params.set(key, String(value));
+    }
+    if (!Object.prototype.hasOwnProperty.call(next, 'offset')) params.delete('offset');
+    setSearchParams(params, { replace: true });
   }
 
   function clearFilters() {
-    setFilters({ tenant_id: '', status: '' });
+    setSearchParams({}, { replace: true });
   }
 
-  return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Subscription readiness</h1>
-          <p style={styles.subtitle}>Read-only billing and subscription posture for commercial activation, renewal, and blocker review.</p>
+  return <div className="platform-subscription-readiness">
+    <OperationalWorkspaceHero
+      iconPath="/platform/subscription-readiness"
+      eyebrow="Platform commercial evidence"
+      title="Subscription readiness"
+      description="Review application billing/subscription configuration, lifecycle windows and billing-history evidence before commercial activation or renewal decisions."
+      meta={<>
+        <OperationalWorkspaceMetaPill>Tenant identity protected by TENANTS_READ</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>Billing evidence protected by PLATFORM_BILLING_READ</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>Read only</OperationalWorkspaceMetaPill>
+      </>}
+      aside={<div className="platform-subscription-readiness__hero-aside">
+        <OperationalWorkspaceStatus value={pretty(data?.posture || 'Loading')} label="Current application posture" />
+        <button type="button" className="app-button app-button--secondary" onClick={() => readinessQuery.refetch()} disabled={readinessQuery.isFetching || invalidFilters}>
+          {readinessQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>}
+    />
+
+    {invalidFilters ? <section className="platform-subscription-readiness__error"><strong>Invalid readiness filters.</strong><span>Clear the URL filters and retry.</span><button type="button" className="app-button app-button--secondary" onClick={clearFilters}>Clear filters</button></section> : null}
+    {readinessQuery.isError && !data && !invalidFilters ? <section className="platform-subscription-readiness__blocking-error"><strong>Subscription readiness failed to load.</strong><span>{readableError(readinessQuery.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => readinessQuery.refetch()}>Retry</button></section> : null}
+    {showingStaleSnapshot ? <section className="platform-subscription-readiness__warning"><strong>Showing the last successful snapshot.</strong><span>The latest refresh failed: {readableError(readinessQuery.error)}</span></section> : null}
+
+    <OperationalWorkspaceStats ariaLabel="Subscription readiness summary">
+      <OperationalWorkspaceStatCard label="Reviewed" value={summary?.tenants_reviewed ?? '—'} helper="Registry-wide for current filters" loading={readinessQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Ready" value={summary?.ready_tenants ?? '—'} tone="good" helper="Application readiness clear" loading={readinessQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Review" value={summary?.tenants_requiring_review ?? '—'} tone="warn" helper="Attention but not hard-blocked" loading={readinessQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Blocked" value={summary?.blocked_tenants ?? '—'} tone="danger" helper="Billing/period blocker present" loading={readinessQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Past due" value={summary?.past_due_tenants ?? '—'} tone="danger" helper="Application billing status" loading={readinessQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="No billing history" value={summary?.missing_billing_event_history ?? '—'} tone="warn" helper="No application billing-event rows" loading={readinessQuery.isLoading && !data} />
+    </OperationalWorkspaceStats>
+
+    <section className="io-workspace-panel platform-subscription-readiness__section">
+      <OperationalSectionHeader iconPath="/platform/subscription-readiness" title="Readiness filters" description="Filters are URL-backed so links from Billing, Customer Success and other Platform workspaces open the intended tenant evidence." />
+      <div className="platform-subscription-readiness__filters">
+        <label>Search tenant / plan / customer reference
+          <input value={search} maxLength={200} onChange={(event) => updateFilters({ search: event.target.value })} placeholder="Search…" />
+        </label>
+        <label>Billing status
+          <select value={status} onChange={(event) => updateFilters({ status: event.target.value })}>
+            <option value="">All statuses</option>
+            {BILLING_STATUSES.map((value) => <option key={value} value={value}>{pretty(value)}</option>)}
+          </select>
+        </label>
+        <div className="platform-subscription-readiness__filter-actions">
+          {requestedTenantId ? <span className="platform-subscription-readiness__scope">Tenant: {selectedTenant?.tenant_name || requestedTenantId}</span> : null}
+          {(requestedTenantId || status || search) ? <button type="button" className="app-button app-button--secondary" onClick={clearFilters}>Clear filters</button> : null}
         </div>
-        <div style={styles.headerActions}>
-          {data ? <span style={badgeStyle(data.posture)}>{data.posture}</span> : null}
-          <button type="button" style={styles.secondaryButton} onClick={refreshAll} disabled={readinessQuery.isFetching || tenantsQuery.isFetching}>
-            {readinessQuery.isFetching || tenantsQuery.isFetching ? 'Refreshing…' : 'Refresh'}
-          </button>
-        </div>
-      </header>
+      </div>
+    </section>
 
-      <section style={styles.metaPanel}>
-        <div><strong>Snapshot source:</strong> GET {endpoint}</div>
-        <div><strong>Tenant filter:</strong> {selectedTenantName}</div>
-        <div><strong>Billing status filter:</strong> {filters.status || 'All statuses'}</div>
-        <div><strong>Displayed tenants:</strong> {items.length}</div>
-        <div><strong>Blocked tenants:</strong> {blockedCount}</div>
-        <div><strong>Review tenants:</strong> {reviewCount}</div>
-        <div><strong>Missing billing evidence:</strong> {missingEvidenceCount}</div>
-      </section>
+    <section className="io-workspace-panel platform-subscription-readiness__section">
+      <OperationalSectionHeader iconPath="/platform/billing" title="Tenant subscription evidence" description="The table is paginated; KPI totals describe the full filtered registry, not just this page." />
+      {readinessQuery.isLoading && !data ? <div className="platform-subscription-readiness__empty">Loading subscription readiness…</div> : null}
+      {data ? <>
+        <div className="platform-subscription-readiness__table-wrap"><table className="platform-subscription-readiness__table">
+          <thead><tr><th>Tenant</th><th>Billing</th><th>Plan</th><th>Lifecycle windows</th><th>Billing history</th><th>Readiness</th><th>Evidence</th></tr></thead>
+          <tbody>{items.map((item) => <tr key={item.tenant_id}>
+            <td><strong>{item.tenant_name}</strong><small>{pretty(item.tenant_status)}</small></td>
+            <td><span className="platform-subscription-readiness__badge" data-tone={stateTone(item.readiness_state)}>{pretty(item.billing_status)}</span><small>Customer reference: {item.billing_customer_reference_present ? 'recorded' : 'missing / not required'}</small></td>
+            <td><strong>{item.plan_code || 'Not recorded'}</strong></td>
+            <td><strong>Trial: {item.days_until_trial_end ?? '—'} days</strong><small>{formatDateTime(item.trial_ends_at)}</small><strong>Period: {item.days_until_period_end ?? '—'} days</strong><small>{formatDateTime(item.current_period_ends_at)}</small></td>
+            <td><strong>{item.billing_event_count} total</strong><small>{item.payment_provider_event_count} provider-shaped · {item.operator_recorded_event_count} operator-recorded</small><small>Last: {formatDateTime(item.last_billing_event_at)}</small></td>
+            <td><span className="platform-subscription-readiness__badge" data-tone={stateTone(item.readiness_state)}>{pretty(item.readiness_state)}</span><div className="platform-subscription-readiness__flags">{item.risk_flags.length ? item.risk_flags.map((flag) => <span key={flag}>{pretty(flag)}</span>) : <small>No readiness flags</small>}</div></td>
+            <td><div className="platform-subscription-readiness__links"><Link to={`/platform/billing?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Billing record</Link><Link to={`/platform/tenants?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Tenant record</Link>{canReadAudit ? <Link to={`/platform/audit?tenant_id=${encodeURIComponent(item.tenant_id)}&source=billing`}>Billing audit</Link> : null}</div></td>
+          </tr>)}{!items.length ? <tr><td colSpan={7}><div className="platform-subscription-readiness__empty">No subscription-readiness rows match the current filters.</div></td></tr> : null}</tbody>
+        </table></div>
+        <div className="platform-subscription-readiness__pagination"><span>Showing {pagination ? Math.min(pagination.offset + 1, pagination.total) : 0}–{pagination ? Math.min(pagination.offset + items.length, pagination.total) : items.length} of {pagination?.total ?? items.length}</span><button type="button" className="app-button app-button--secondary" disabled={!pagination || pagination.offset <= 0 || readinessQuery.isFetching} onClick={() => updateFilters({ offset: Math.max(0, (pagination?.offset || 0) - PAGE_SIZE) })}>Previous</button><button type="button" className="app-button app-button--secondary" disabled={!pagination?.has_more || readinessQuery.isFetching} onClick={() => updateFilters({ offset: (pagination?.offset || 0) + PAGE_SIZE })}>Next</button></div>
+      </> : null}
+    </section>
 
-      <nav style={styles.supportLinks} aria-label="Supporting Platform pages">
-        <Link style={styles.supportLink} to="/platform/billing">Billing</Link>
-        <Link style={styles.supportLink} to="/platform/tenants">Tenants</Link>
-        <Link style={styles.supportLink} to="/platform/audit">System Audit</Link>
-        <Link style={styles.supportLink} to="/platform/tenant-health">Tenant Health</Link>
-      </nav>
+    <section className="io-workspace-panel platform-subscription-readiness__section">
+      <OperationalSectionHeader iconPath="/platform/subscription-readiness" title="Evidence meaning" description="This page is intentionally narrower than external payment, legal or customer-success certification." />
+      <div className="platform-subscription-readiness__truth-grid">
+        <div><strong>Subscription ready</strong><span>The current application billing configuration, required dates and application billing history have no defined blocker/review flag. It is not payment certification.</span></div>
+        <div><strong>Billing event history</strong><span>Shows records stored by the application. A note, invoice-sent entry or lifecycle event does not prove an external payment occurred or a customer received anything.</span></div>
+        <div><strong>Provider-shaped event</strong><span>Shows application-ingested provider evidence under the Billing contract. It does not independently prove bank settlement, refund completion or external account ownership.</span></div>
+        <div><strong>Comped subscription</strong><span>A comped tenant does not require a paid current-period end. Historical paid-period dates therefore do not create a false expiration blocker.</span></div>
+      </div>
+    </section>
 
-      <section style={styles.card}>
-        <h2 style={styles.cardTitle}>Readiness filters</h2>
-        <div style={styles.filterGrid}>
-          <label style={styles.label}>Tenant
-            <select style={styles.input} value={filters.tenant_id} onChange={(event) => setFilters({ ...filters, tenant_id: event.target.value })}>
-              <option value="">All tenants</option>
-              {(tenantsQuery.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-            </select>
-          </label>
-          <label style={styles.label}>Billing status
-            <select style={styles.input} value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}>
-              <option value="">All statuses</option>
-              {billingStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
-            </select>
-          </label>
-          <div style={styles.filterActions}>
-            <button type="button" style={styles.secondaryButton} onClick={() => readinessQuery.refetch()} disabled={readinessQuery.isFetching}>Apply / retry</button>
-            {hasFilters ? <button type="button" style={styles.linkButton} onClick={clearFilters}>Clear filters</button> : null}
-          </div>
-        </div>
-        {tenantsQuery.error ? <p style={styles.errorText}>Tenant filter failed to load: {readableError(tenantsQuery.error)}</p> : null}
-      </section>
-
-      {readinessQuery.isLoading ? <section style={styles.card}>Loading subscription readiness…</section> : null}
-      {readinessQuery.error ? (
-        <section style={styles.errorPanel}>
-          <strong>Subscription readiness failed to load.</strong>
-          <span>{readableError(readinessQuery.error)}</span>
-          <button type="button" style={styles.retryButton} onClick={() => readinessQuery.refetch()}>Retry subscription readiness</button>
-        </section>
-      ) : null}
-
-      {data ? <section style={styles.summaryGrid}>{metricEntries.map((key) => <div key={key} style={styles.card}><strong>{metricLabel(key)}</strong><div style={styles.metric}>{summary[key] ?? 0}</div></div>)}</section> : null}
-
-      <section style={styles.card}>
-        <h2 style={styles.cardTitle}>Tenant subscription evidence</h2>
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Tenant</th>
-                <th style={styles.th}>Billing</th>
-                <th style={styles.th}>Plan</th>
-                <th style={styles.th}>Windows</th>
-                <th style={styles.th}>Events</th>
-                <th style={styles.th}>Flags</th>
-                <th style={styles.th}>Evidence</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.tenant_id}>
-                  <td style={styles.td}>
-                    <strong>{item.tenant_name}</strong><br />
-                    <span style={styles.help}>{item.tenant_status} · {item.readiness_state}</span>
-                  </td>
-                  <td style={styles.td}>{item.billing_status}</td>
-                  <td style={styles.td}>{item.plan_code || '—'}</td>
-                  <td style={styles.td}>Trial: {item.days_until_trial_end ?? '—'} days<br /><span style={styles.help}>Period: {item.days_until_period_end ?? '—'} days</span></td>
-                  <td style={styles.td}>{item.billing_event_count}<br /><span style={styles.help}>Last event: {dateOnly(item.last_billing_event_at)}</span></td>
-                  <td style={styles.td}><FlagList flags={item.risk_flags} /></td>
-                  <td style={styles.td}>
-                    <div style={styles.evidenceLinks}>
-                      <Link style={styles.evidenceLink} to={`/platform/billing?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Billing record</Link>
-                      <Link style={styles.evidenceLink} to={`/platform/tenants?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Tenant record</Link>
-                      <Link style={styles.evidenceLink} to={`/platform/audit?tenant_id=${encodeURIComponent(item.tenant_id)}&category=billing`}>Billing audit</Link>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!items.length ? <tr><td style={styles.td} colSpan={7}>No subscription readiness rows available.</td></tr> : null}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  );
+    <section className="io-workspace-panel platform-subscription-readiness__section">
+      <OperationalSectionHeader iconPath="/platform/subscription-readiness" title="Supporting operations" description="Use the source records when a readiness flag needs investigation or correction." />
+      <div className="platform-subscription-readiness__links platform-subscription-readiness__links--row"><Link to="/platform/billing">Billing</Link><Link to="/platform/billing-subscription-activation">Billing activation</Link><Link to="/platform/tenants">Tenants</Link>{canReadAudit ? <Link to="/platform/audit?source=billing">Billing audit</Link> : null}</div>
+    </section>
+  </div>;
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' },
-  headerActions: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  subtitle: { margin: '6px 0 0', color: '#64748b', lineHeight: 1.5 },
-  badge: { padding: '5px 10px', borderRadius: 999, fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap', border: '1px solid transparent' },
-  metaPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, padding: 14, border: '1px solid #e2e8f0', background: '#f8fafc', borderRadius: 12, color: '#334155', fontSize: 13 },
-  supportLinks: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  supportLink: { border: '1px solid var(--io-primary-border)', background: '#fff', color: 'var(--io-primary-dark)', borderRadius: 999, padding: '7px 11px', textDecoration: 'none', fontWeight: 700, fontSize: 13 },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metric: { fontSize: 28, fontWeight: 800, marginTop: 8, color: '#0f172a' },
-  cardTitle: { margin: '0 0 10px', fontSize: 18, letterSpacing: '-.015em', color: '#0f172a' },
-  filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'end' },
-  filterActions: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
-  label: { display: 'flex', flexDirection: 'column', gap: 6, color: '#334155', fontWeight: 700, fontSize: 13 },
-  input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', font: 'inherit', background: '#fff', color: '#0f172a' },
-  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '9px 13px', cursor: 'pointer', fontWeight: 700 },
-  retryButton: { border: '1px solid #fecaca', background: '#fff', color: '#b91c1c', borderRadius: 9, padding: '8px 11px', cursor: 'pointer', fontWeight: 700, width: 'fit-content' },
-  linkButton: { border: 'none', background: 'transparent', color: 'var(--io-primary-dark)', cursor: 'pointer', fontWeight: 700, padding: 0 },
-  errorPanel: { display: 'flex', flexDirection: 'column', gap: 8, background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 12, padding: 14 },
-  errorText: { color: '#991b1b', margin: '10px 0 0', fontSize: 13 },
-  flags: { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  flag: { background: 'var(--io-primary-soft-strong)', color: 'var(--io-primary-dark)', border: '1px solid var(--io-primary-border)', padding: '4px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700 },
-  help: { color: '#64748b', fontSize: 12 },
-  tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse', color: '#334155' },
-  th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '10px 8px', color: '#64748b', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' },
-  td: { borderBottom: '1px solid #f1f5f9', padding: '12px 8px', verticalAlign: 'top' },
-  evidenceLinks: { display: 'flex', flexDirection: 'column', gap: 6 },
-  evidenceLink: { color: 'var(--io-primary-dark)', fontSize: 12, fontWeight: 700, textDecoration: 'none' }
-};
