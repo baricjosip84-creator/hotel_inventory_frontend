@@ -71,14 +71,19 @@ for (const anchor of requiredCssAnchors) {
 if (!router.includes("path: 'billing-subscription-activation'")) {
   throw new Error('Platform Billing Activation check failed: route missing.');
 }
-if (!router.includes('<PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ]}>')) {
-  throw new Error('Platform Billing Activation check failed: billing-read permission guard missing.');
+const activationRouteStart = router.indexOf("path: 'billing-subscription-activation'");
+const activationRouteSlice = router.slice(activationRouteStart, activationRouteStart + 480);
+if (activationRouteStart < 0 || !activationRouteSlice.includes('PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ') || !activationRouteSlice.includes('PLATFORM_PERMISSIONS.TENANTS_READ')) {
+  throw new Error('Platform Billing Activation check failed: billing-read + tenant-identity permission guard missing.');
 }
+
 if (!layout.includes('<NavLink to="/platform/billing-subscription-activation"')) {
   throw new Error('Platform Billing Activation check failed: navigation entry missing.');
 }
-if (!layout.includes('hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ)')) {
-  throw new Error('Platform Billing Activation check failed: navigation permission check missing.');
+const activationNavStart = layout.indexOf('to="/platform/billing-subscription-activation"');
+const activationNavSlice = layout.slice(Math.max(0, activationNavStart - 360), activationNavStart + 280);
+if (activationNavStart < 0 || !activationNavSlice.includes('PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ') || !activationNavSlice.includes('PLATFORM_PERMISSIONS.TENANTS_READ')) {
+  throw new Error('Platform Billing Activation check failed: navigation must require billing-read + tenant identity.');
 }
 
 console.log('Platform Billing Activation hardening checks passed.');

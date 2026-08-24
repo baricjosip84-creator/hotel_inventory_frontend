@@ -257,7 +257,7 @@ const router = createBrowserRouter([
       {
         path: 'billing-subscription-activation',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ, PLATFORM_PERMISSIONS.TENANTS_READ]}>
             <PlatformBillingSubscriptionActivationPage />
           </PlatformProtectedRoute>
         )
@@ -1330,7 +1330,7 @@ const router = createBrowserRouter([
       {
         path: 'billing',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ]}>
+          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ, PLATFORM_PERMISSIONS.TENANTS_READ]}>
             <PlatformBillingPage />
           </PlatformProtectedRoute>
         )

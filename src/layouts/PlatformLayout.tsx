@@ -172,7 +172,7 @@ export default function PlatformLayout() {
               <span>Provisioning hardening</span>
             </NavLink>
           ) : null}
-          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ) ? (
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/billing-subscription-activation" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/billing-subscription-activation" />
               <span>Billing activation</span>
@@ -974,7 +974,7 @@ export default function PlatformLayout() {
               <span>Platform Sessions</span>
             </NavLink>
           ) : null}
-          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ) ? (
+          {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/billing" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/billing" />
               <span>Billing</span>
