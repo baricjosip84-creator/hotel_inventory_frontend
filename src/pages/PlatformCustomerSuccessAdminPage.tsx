@@ -1,11 +1,21 @@
+import { useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import type { CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import { hasPlatformPermission, PLATFORM_PERMISSIONS } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformCustomerSuccessAdminPage.css';
 
 type RiskFlag = { code: string; severity: string; points: number; message: string };
+type CustomerSuccessState = 'customer_success_ready' | 'customer_success_watch' | 'customer_success_at_risk' | 'customer_success_partial_evidence';
 type CustomerSuccessItem = {
   tenant_id: string;
   tenant_name: string;
@@ -17,217 +27,244 @@ type CustomerSuccessItem = {
   open_urgent_tasks: number;
   overdue_tasks: number;
   unresolved_follow_ups: number;
+  last_customer_touch_at?: string | null;
   days_since_last_touch?: number | null;
-  open_support_sessions: number;
+  open_support_sessions: number | null;
   open_incidents: number | null;
   subscription_readiness_state: string | null;
   license_enforcement_state: string | null;
   success_risk_score: number;
-  customer_success_state: string;
+  customer_success_state: CustomerSuccessState;
   risk_flags: RiskFlag[];
   recommended_admin_actions: string[];
 };
-type CustomerSuccessPackage = { posture: string; health_states: string[]; summary: Record<string, number>; evidence_access?: { incidents?: boolean; billing_subscription?: boolean }; omitted_sources?: string[]; items: CustomerSuccessItem[] };
-type Tenant = { id: string; name: string; status?: string };
-type FilterState = { tenant_id: string; state: string };
 
-const healthStates = ['customer_success_ready', 'customer_success_watch', 'customer_success_at_risk'];
-const metrics = ['tenants_reviewed', 'ready_tenants', 'watch_tenants', 'at_risk_tenants', 'tenants_missing_primary_contact', 'tenants_with_overdue_tasks', 'tenants_with_unresolved_follow_ups', 'tenants_with_support_escalations'];
+type CustomerSuccessSummary = {
+  tenants_reviewed: number;
+  ready_tenants: number;
+  watch_tenants: number;
+  at_risk_tenants: number;
+  partial_evidence_tenants: number;
+  tenants_missing_primary_contact: number;
+  tenants_with_overdue_tasks: number;
+  tenants_with_unresolved_follow_ups: number;
+  tenants_without_recent_touch: number;
+  tenants_with_open_support_sessions: number | null;
+  tenants_with_open_incidents: number | null;
+  tenants_with_support_escalations: number | null;
+};
 
-function badgeStyle(value: string): CSSProperties {
-  if (value.includes('risk')) return { ...styles.badge, background: '#fee2e2', color: '#991b1b' };
-  if (value.includes('watch')) return { ...styles.badge, background: '#fef3c7', color: '#92400e' };
-  return { ...styles.badge, background: '#dcfce7', color: '#166534' };
+type CustomerSuccessPackage = {
+  feature: string;
+  generated_at: string;
+  posture: string;
+  health_states: CustomerSuccessState[];
+  summary: CustomerSuccessSummary;
+  pagination: { limit: number; offset: number; total: number; has_more: boolean };
+  evidence_access: {
+    tenant_directory: boolean;
+    tenant_contacts: boolean;
+    tenant_tasks: boolean;
+    tenant_communications: boolean;
+    support_sessions: boolean;
+    incidents: boolean;
+    billing_subscription: boolean;
+    license_plan_enforcement: boolean;
+  };
+  available_sources: string[];
+  omitted_sources: string[];
+  evidence_complete: boolean;
+  truth_contract: Record<string, boolean>;
+  items: CustomerSuccessItem[];
+};
+
+const PAGE_SIZE = 50;
+const HEALTH_STATES: CustomerSuccessState[] = ['customer_success_ready', 'customer_success_watch', 'customer_success_at_risk', 'customer_success_partial_evidence'];
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function readableError(error: unknown) {
+  return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error';
 }
 
-function severityStyle(value: string): CSSProperties {
-  if (value === 'critical' || value === 'high') return { ...styles.flag, background: '#fee2e2', color: '#991b1b' };
-  if (value === 'medium' || value === 'warning') return { ...styles.flag, background: '#fef3c7', color: '#92400e' };
-  return styles.flag;
+function pretty(value?: string | null) {
+  return value ? value.replaceAll('_', ' ') : 'Not recorded';
 }
 
-function Chips({ values }: { values: string[] }) {
-  return <div style={styles.flags}>{values.length ? values.map((value) => <span key={value} style={styles.flag}>{value}</span>) : <span style={styles.help}>None</span>}</div>;
+function stateTone(value?: string | null) {
+  if (!value) return 'neutral' as const;
+  if (value.includes('at_risk') || value.includes('blocked')) return 'danger' as const;
+  if (value.includes('watch') || value.includes('review')) return 'warn' as const;
+  if (value.includes('partial')) return 'neutral' as const;
+  return 'good' as const;
 }
 
 function RiskChips({ values }: { values: RiskFlag[] }) {
-  return <div style={styles.flags}>{values.length ? values.map((flag) => <span key={flag.code} style={severityStyle(flag.severity)} title={`${flag.message} (${flag.points} points)`}>{flag.code} · {flag.points}</span>) : <span style={styles.help}>None</span>}</div>;
+  if (!values.length) return <small className="platform-customer-success__muted">No known application risk flags.</small>;
+  return <div className="platform-customer-success__chips">{values.map((flag) => <span key={flag.code} data-tone={flag.severity === 'critical' || flag.severity === 'high' ? 'danger' : flag.severity === 'warning' || flag.severity === 'medium' ? 'warn' : 'neutral'} title={`${flag.message} (${flag.points} points)`}>{pretty(flag.code)} · {flag.points}</span>)}</div>;
 }
 
-function readableError(error: unknown): string {
-  return error instanceof Error ? error.message : 'Unknown error';
-}
-
-function metricLabel(value: string) {
-  return value.replaceAll('_', ' ');
-}
-
-function buildQuery(filters: FilterState) {
-  const params = new URLSearchParams();
-  if (filters.tenant_id) params.set('tenant_id', filters.tenant_id);
-  if (filters.state) params.set('state', filters.state);
-  const query = params.toString();
-  return query ? `/platform/customer-success-admin?${query}` : '/platform/customer-success-admin';
+function actionLabel(action: string) {
+  return pretty(action);
 }
 
 function actionTarget(action: string, tenantId: string) {
   switch (action) {
-    case 'assign_primary_customer_contact':
-      return `/platform/tenant-contacts?tenant_id=${encodeURIComponent(tenantId)}`;
+    case 'assign_primary_customer_contact': return `/platform/tenant-contacts?tenant_id=${encodeURIComponent(tenantId)}`;
     case 'schedule_customer_check_in':
-    case 'resolve_customer_follow_ups':
-      return `/platform/communications?tenant_id=${encodeURIComponent(tenantId)}`;
-    case 'clear_customer_success_task_backlog':
-      return `/platform/tenant-tasks?tenant_id=${encodeURIComponent(tenantId)}`;
-    case 'review_subscription_billing_blockers':
-      return `/platform/subscription-readiness?tenant_id=${encodeURIComponent(tenantId)}`;
-    case 'review_license_plan_enforcement_blockers':
-      return `/platform/license-plan-enforcement?tenant_id=${encodeURIComponent(tenantId)}`;
-    case 'coordinate_support_escalation':
-      return `/platform/support-sessions?tenant_id=${encodeURIComponent(tenantId)}`;
-    default:
-      return `/platform/tenants?tenant_id=${encodeURIComponent(tenantId)}`;
+    case 'resolve_customer_follow_ups': return `/platform/communications?tenant_id=${encodeURIComponent(tenantId)}`;
+    case 'clear_customer_success_task_backlog': return `/platform/tenant-tasks?tenant_id=${encodeURIComponent(tenantId)}`;
+    case 'review_subscription_billing_blockers': return `/platform/subscription-readiness?tenant_id=${encodeURIComponent(tenantId)}`;
+    case 'review_license_plan_enforcement_blockers': return `/platform/license-plan-enforcement?tenant_id=${encodeURIComponent(tenantId)}`;
+    case 'coordinate_support_escalation': return `/platform/support-sessions?tenant_id=${encodeURIComponent(tenantId)}`;
+    case 'review_incident_escalation': return `/platform/incidents?tenant_id=${encodeURIComponent(tenantId)}`;
+    default: return `/platform/tenants?tenant_id=${encodeURIComponent(tenantId)}`;
   }
 }
 
 export default function PlatformCustomerSuccessAdminPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const canReadIncidents = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ);
   const canReadBilling = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ);
-  const [filters, setFilters] = useState<FilterState>({ tenant_id: '', state: '' });
-  const endpoint = useMemo(() => buildQuery(filters), [filters]);
+  const canReadSupportSessions = hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ);
+  const canReadAudit = hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
+
+  const requestedTenantId = searchParams.get('tenant_id') || '';
+  const requestedState = searchParams.get('state') || '';
+  const requestedSearch = searchParams.get('search') || '';
+  const state = HEALTH_STATES.includes(requestedState as CustomerSuccessState) ? requestedState as CustomerSuccessState : '';
+  const search = requestedSearch.length <= 200 ? requestedSearch : '';
+  const includeHistory = searchParams.get('include_history') === 'true';
+  const offset = Math.max(0, Number(searchParams.get('offset') || 0) || 0);
+  const invalidFilters = Boolean((requestedTenantId && !UUID_RE.test(requestedTenantId)) || (requestedState && !state) || (requestedSearch && !search));
+
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+    if (requestedTenantId) params.set('tenant_id', requestedTenantId);
+    if (state) params.set('state', state);
+    if (search.trim()) params.set('search', search.trim());
+    if (includeHistory) params.set('include_history', 'true');
+    return params.toString();
+  }, [requestedTenantId, state, search, includeHistory, offset]);
 
   const successQuery = useQuery({
-    queryKey: ['platform', 'customer-success-admin', filters],
-    queryFn: () => platformApiRequest<CustomerSuccessPackage>(endpoint)
-  });
-  const tenantsQuery = useQuery({
-    queryKey: ['platform', 'tenants', 'customer-success-admin-filter'],
-    queryFn: () => platformApiRequest<Tenant[]>('/platform/tenants')
+    queryKey: ['platform', 'customer-success-admin', queryString],
+    queryFn: () => platformApiRequest<CustomerSuccessPackage>(`/platform/customer-success-admin?${queryString}`),
+    enabled: !invalidFilters,
+    staleTime: 10_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previous) => previous
   });
 
   const data = successQuery.data;
-  const summary = data?.summary || {};
+  const summary = data?.summary;
   const items = data?.items || [];
-  const selectedTenantName = tenantsQuery.data?.find((tenant) => tenant.id === filters.tenant_id)?.name || filters.tenant_id || 'All tenants';
-  const hasFilters = Boolean(filters.tenant_id || filters.state);
-  const atRiskCount = summary.at_risk_tenants ?? items.filter((item) => item.customer_success_state === 'customer_success_at_risk').length;
-  const watchCount = summary.watch_tenants ?? items.filter((item) => item.customer_success_state === 'customer_success_watch').length;
+  const pagination = data?.pagination;
+  const selectedTenant = requestedTenantId ? items.find((item) => item.tenant_id === requestedTenantId) : null;
+  const showingStaleSnapshot = Boolean(successQuery.isError && data);
 
-  async function refreshAll() {
-    await Promise.all([successQuery.refetch(), tenantsQuery.refetch()]);
+  function updateFilters(next: { tenant_id?: string; state?: string; search?: string; include_history?: boolean; offset?: number }) {
+    const params = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(next)) {
+      if (value === undefined || value === '' || value === false || value === 0) params.delete(key);
+      else params.set(key, String(value));
+    }
+    if (!Object.prototype.hasOwnProperty.call(next, 'offset')) params.delete('offset');
+    setSearchParams(params, { replace: true });
   }
 
   function clearFilters() {
-    setFilters({ tenant_id: '', state: '' });
+    setSearchParams({}, { replace: true });
   }
 
-  return <div style={styles.page}>
-    <header style={styles.header}>
-      <div>
-        <h1 style={styles.title}>Customer success admin</h1>
-        <p style={styles.subtitle}>Commercial admin cockpit for tenant success risk, lifecycle blockers, contacts, communications, support escalations, and recommended admin actions.</p>
-      </div>
-      <div style={styles.headerActions}>
-        {data ? <span style={badgeStyle(data.posture)}>{data.posture}</span> : null}
-        <button type="button" style={styles.secondaryButton} onClick={refreshAll} disabled={successQuery.isFetching || tenantsQuery.isFetching}>{successQuery.isFetching || tenantsQuery.isFetching ? 'Refreshing…' : 'Refresh'}</button>
-      </div>
-    </header>
+  return <div className="platform-customer-success">
+    <OperationalWorkspaceHero
+      iconPath="/platform/customer-success-admin"
+      eyebrow="Platform customer operations"
+      title="Customer success"
+      description="Triage tenant customer-success signals from application contacts, tasks, communications and independently permission-scoped Billing, Support Session and Incident evidence. Partial evidence is never called Ready."
+      meta={<>
+        <OperationalWorkspaceMetaPill>Tenant evidence protected by TENANTS_READ</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>Protected sources scoped independently</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>Read only</OperationalWorkspaceMetaPill>
+      </>}
+      aside={<div className="platform-customer-success__hero-aside">
+        <OperationalWorkspaceStatus value={pretty(data?.posture || 'Loading')} label="Current application posture" />
+        <button type="button" className="app-button app-button--secondary" onClick={() => successQuery.refetch()} disabled={successQuery.isFetching || invalidFilters}>{successQuery.isFetching ? 'Refreshing…' : 'Refresh'}</button>
+      </div>}
+    />
 
-    <section style={styles.metaPanel}>
-      <div><strong>Snapshot source:</strong> GET {endpoint}</div>
-      <div><strong>Tenant filter:</strong> {selectedTenantName}</div>
-      <div><strong>Health filter:</strong> {filters.state || 'All health states'}</div>
-      <div><strong>Displayed tenants:</strong> {items.length}</div>
-      <div><strong>At-risk tenants:</strong> {atRiskCount}</div>
-      <div><strong>Watch tenants:</strong> {watchCount}</div>
-      <div><strong>Missing primary contact:</strong> {summary.tenants_missing_primary_contact ?? 0}</div>
-      <div><strong>Support escalations:</strong> {summary.tenants_with_support_escalations ?? 0}</div>
-    </section>
+    {invalidFilters ? <section className="platform-customer-success__error"><strong>Invalid Customer Success filters.</strong><span>Clear the URL filters and retry.</span><button type="button" className="app-button app-button--secondary" onClick={clearFilters}>Clear filters</button></section> : null}
+    {successQuery.isError && !data && !invalidFilters ? <section className="platform-customer-success__blocking-error"><strong>Customer Success failed to load.</strong><span>{readableError(successQuery.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => successQuery.refetch()}>Retry</button></section> : null}
+    {showingStaleSnapshot ? <section className="platform-customer-success__warning"><strong>Showing the last successful snapshot.</strong><span>The latest refresh failed: {readableError(successQuery.error)}</span></section> : null}
+    {data && !data.evidence_complete ? <section className="platform-customer-success__warning"><strong>Partial evidence.</strong><span>Restricted source families: {data.omitted_sources.map(pretty).join(', ') || 'None'}. Known blockers remain visible, but otherwise-clean tenants are not called Ready until protected evidence is available.</span></section> : null}
 
-    <nav style={styles.supportLinks} aria-label="Supporting Platform pages">
-      <Link style={styles.supportLink} to="/platform/tenant-contacts">Tenant Contacts</Link>
-      <Link style={styles.supportLink} to="/platform/tenant-tasks">Tenant Tasks</Link>
-      <Link style={styles.supportLink} to="/platform/communications">Communications</Link>
-      <Link style={styles.supportLink} to="/platform/support-sessions">Support Sessions</Link>
-      {canReadIncidents ? <Link style={styles.supportLink} to="/platform/incidents">Incidents</Link> : null}
-      {canReadBilling ? <Link style={styles.supportLink} to="/platform/billing">Billing</Link> : null}
-      {canReadBilling ? <Link style={styles.supportLink} to="/platform/subscription-readiness">Subscription Readiness</Link> : null}
-      {canReadBilling ? <Link style={styles.supportLink} to="/platform/license-plan-enforcement">License Enforcement</Link> : null}
-      <Link style={styles.supportLink} to="/platform/audit">System Audit</Link>
-    </nav>
+    <OperationalWorkspaceStats ariaLabel="Customer Success summary">
+      <OperationalWorkspaceStatCard label="Reviewed" value={summary?.tenants_reviewed ?? '—'} helper="Registry-wide for current filters" loading={successQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Ready" value={summary?.ready_tenants ?? '—'} tone="good" helper="Complete authorized evidence; no defined risk" loading={successQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Watch" value={summary?.watch_tenants ?? '—'} tone="warn" helper="Known application follow-up signal" loading={successQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="At risk" value={summary?.at_risk_tenants ?? '—'} tone="danger" helper="Known high-weight application blockers" loading={successQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Partial evidence" value={summary?.partial_evidence_tenants ?? '—'} helper="Otherwise clean, but protected sources omitted" loading={successQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Missing primary contact" value={summary?.tenants_missing_primary_contact ?? '—'} tone="warn" helper="Application contact registry" loading={successQuery.isLoading && !data} />
+    </OperationalWorkspaceStats>
 
-    <section style={styles.card}>
-      <h2 style={styles.cardTitle}>Customer success filters</h2>
-      <div style={styles.filterGrid}>
-        <label style={styles.label}>Tenant
-          <select style={styles.input} value={filters.tenant_id} onChange={(event) => setFilters({ ...filters, tenant_id: event.target.value })}>
-            <option value="">All tenants</option>
-            {(tenantsQuery.data || []).map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-          </select>
+    <section className="io-workspace-panel platform-customer-success__section">
+      <OperationalSectionHeader iconPath="/platform/customer-success-admin" title="Customer Success filters" description="Filters are URL-backed so links from Tenants, Contacts, Tasks, Communications and commercial-readiness workspaces open the intended tenant evidence." />
+      <div className="platform-customer-success__filters">
+        <label>Search tenant
+          <input value={search} maxLength={200} onChange={(event) => updateFilters({ search: event.target.value })} placeholder="Tenant name…" />
         </label>
-        <label style={styles.label}>Health state
-          <select style={styles.input} value={filters.state} onChange={(event) => setFilters({ ...filters, state: event.target.value })}>
+        <label>Customer Success state
+          <select value={state} onChange={(event) => updateFilters({ state: event.target.value })}>
             <option value="">All states</option>
-            {healthStates.map((state) => <option key={state} value={state}>{state}</option>)}
+            {HEALTH_STATES.map((value) => <option key={value} value={value}>{pretty(value)}</option>)}
           </select>
         </label>
-        <div style={styles.filterActions}>
-          <button type="button" style={styles.secondaryButton} onClick={() => successQuery.refetch()} disabled={successQuery.isFetching}>Apply / retry</button>
-          {hasFilters ? <button type="button" style={styles.linkButton} onClick={clearFilters}>Clear filters</button> : null}
-        </div>
+        <label className="platform-customer-success__history"><input type="checkbox" checked={includeHistory} onChange={(event) => updateFilters({ include_history: event.target.checked })} />Include archived tenants</label>
+        <div className="platform-customer-success__filter-actions"><button type="button" className="app-button app-button--secondary" onClick={clearFilters} disabled={!searchParams.toString()}>Clear filters</button></div>
       </div>
-      {tenantsQuery.error ? <p style={styles.errorText}>Tenant filter failed to load: {readableError(tenantsQuery.error)}</p> : null}
+      {requestedTenantId ? <div className="platform-customer-success__scope"><strong>Tenant scope:</strong> {selectedTenant?.tenant_name || requestedTenantId}</div> : null}
     </section>
 
-    {successQuery.isLoading ? <section style={styles.card}>Loading customer success admin tooling…</section> : null}
-    {successQuery.error ? <section style={styles.errorPanel}><strong>Customer success admin tooling failed to load.</strong><span>{readableError(successQuery.error)}</span><button type="button" style={styles.retryButton} onClick={() => successQuery.refetch()}>Retry customer success</button></section> : null}
+    <section className="io-workspace-panel platform-customer-success__section">
+      <OperationalSectionHeader iconPath="/platform/customer-success-admin" title="Evidence access" description="Customer Success uses TENANTS_READ-owned contacts/tasks/communications and independently protected Support Session, Incident and Billing evidence. Restricted sources are not queried." />
+      <div className="platform-customer-success__source-grid">
+        {Object.entries(data?.evidence_access || {}).map(([source, available]) => <div key={source}><strong>{pretty(source)}</strong><span className="platform-customer-success__badge" data-tone={available ? 'good' : 'neutral'}>{available ? 'Available' : 'Restricted'}</span></div>)}
+        {!data ? <div className="platform-customer-success__empty">Loading evidence access…</div> : null}
+      </div>
+    </section>
 
-    {data ? <section style={styles.summaryGrid}>{metrics.map((key) => <div key={key} style={styles.card}><strong>{metricLabel(key)}</strong><div style={styles.metric}>{summary[key] ?? 0}</div></div>)}</section> : null}
+    <section className="io-workspace-panel platform-customer-success__section">
+      <OperationalSectionHeader iconPath="/platform/customer-success-admin" title="Tenant Customer Success evidence" description="The score is an application triage heuristic. Known blockers remain visible even when another protected source is unavailable; incomplete evidence never upgrades a tenant to Ready." />
+      {data ? <>
+        <div className="platform-customer-success__table-wrap"><table className="platform-customer-success__table">
+          <thead><tr><th>Tenant</th><th>Commercial</th><th>Contacts & tasks</th><th>Touch & escalation</th><th>Risk</th><th>Recommended actions</th><th>Evidence</th></tr></thead>
+          <tbody>{items.map((item) => <tr key={item.tenant_id}>
+            <td><strong>{item.tenant_name}</strong><span className="platform-customer-success__badge" data-tone={stateTone(item.customer_success_state)}>{pretty(item.customer_success_state)}</span><small>{pretty(item.tenant_status)}</small></td>
+            <td>{data.evidence_access.billing_subscription ? <><strong>{pretty(item.billing_status)}</strong><small>{item.plan_code || 'No plan'} · {pretty(item.subscription_readiness_state)} · {pretty(item.license_enforcement_state)}</small></> : <><strong>Restricted</strong><small>PLATFORM_BILLING_READ required</small></>}</td>
+            <td><strong>Contacts {item.primary_contacts}</strong><small>Open tasks {item.open_tasks} · urgent {item.open_urgent_tasks} · overdue {item.overdue_tasks}</small></td>
+            <td><strong>Last recorded touch {item.days_since_last_touch ?? '—'} days</strong><small>Follow-ups {item.unresolved_follow_ups} · support {item.open_support_sessions ?? 'Restricted'} · incidents {item.open_incidents ?? 'Restricted'}</small></td>
+            <td><strong>Score {item.success_risk_score}</strong><RiskChips values={item.risk_flags} /></td>
+            <td><div className="platform-customer-success__links">{item.recommended_admin_actions.length ? item.recommended_admin_actions.map((action) => <Link key={action} to={actionTarget(action, item.tenant_id)}>{actionLabel(action)}</Link>) : <small className="platform-customer-success__muted">No defined action from visible evidence.</small>}</div></td>
+            <td><div className="platform-customer-success__links"><Link to={`/platform/tenants?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Tenant record</Link><Link to={`/platform/tenant-health?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Tenant health</Link>{canReadSupportSessions ? <Link to={`/platform/support-sessions?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Support Sessions</Link> : null}{canReadIncidents ? <Link to={`/platform/incidents?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Incidents</Link> : null}{canReadBilling ? <Link to={`/platform/billing?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Billing</Link> : null}{canReadAudit ? <Link to={`/platform/audit?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Audit</Link> : null}</div></td>
+          </tr>)}{!items.length ? <tr><td colSpan={7}><div className="platform-customer-success__empty">No Customer Success rows match the current filters.</div></td></tr> : null}</tbody>
+        </table></div>
+        <div className="platform-customer-success__pagination"><span>Showing {pagination ? Math.min(pagination.offset + 1, pagination.total) : 0}–{pagination ? Math.min(pagination.offset + items.length, pagination.total) : items.length} of {pagination?.total ?? items.length}</span><button type="button" className="app-button app-button--secondary" disabled={!pagination || pagination.offset <= 0 || successQuery.isFetching} onClick={() => updateFilters({ offset: Math.max(0, (pagination?.offset || 0) - PAGE_SIZE) })}>Previous</button><button type="button" className="app-button app-button--secondary" disabled={!pagination?.has_more || successQuery.isFetching} onClick={() => updateFilters({ offset: (pagination?.offset || 0) + PAGE_SIZE })}>Next</button></div>
+      </> : <div className="platform-customer-success__empty">Loading Customer Success evidence…</div>}
+    </section>
 
-    {data ? <section style={styles.card}>
-      <h2 style={styles.cardTitle}>Health states</h2>
-      <p style={styles.helpBlock}>Source: backend customer-success snapshot. State filters are backend-supported and this page remains read-only.</p>
-      <Chips values={data.health_states} />
-    </section> : null}
+    <section className="io-workspace-panel platform-customer-success__section">
+      <OperationalSectionHeader iconPath="/platform/customer-success-admin" title="Evidence meaning" description="This workspace is an internal application triage surface. It does not independently prove customer sentiment, communication, payment, support acceptance, incident impact or commercial success." />
+      <div className="platform-customer-success__truth-grid">
+        <div><strong>Recorded touch ≠ external contact proof</strong><span>Communication timestamps only show records stored in this application. Calls, meetings or messages outside the application may not be represented.</span></div>
+        <div><strong>Risk score is a heuristic</strong><span>The score combines defined application signals for operator triage. It is not a measured customer-health, churn-probability or satisfaction score.</span></div>
+        <div><strong>Billing state ≠ settlement</strong><span>Application billing/subscription records do not independently prove bank settlement, contract status or customer receipt.</span></div>
+        <div><strong>Ready requires complete evidence</strong><span>If Billing, Support Session or Incident evidence is restricted, an otherwise-clean tenant is reported as Partial evidence rather than Ready.</span></div>
+      </div>
+    </section>
 
-    <section style={styles.card}>
-      <h2 style={styles.cardTitle}>Tenant customer success evidence</h2>
-      <div style={styles.tableWrap}><table style={styles.table}><thead><tr><th style={styles.th}>Tenant</th><th style={styles.th}>Commercial state</th><th style={styles.th}>Contacts & tasks</th><th style={styles.th}>Touch & support</th><th style={styles.th}>Risk</th><th style={styles.th}>Actions</th><th style={styles.th}>Evidence</th></tr></thead><tbody>{items.map((item) => <tr key={item.tenant_id}><td style={styles.td}><strong>{item.tenant_name}</strong><br /><span style={styles.help}>{item.tenant_status} · {item.customer_success_state}</span></td><td style={styles.td}>{data?.evidence_access?.billing_subscription ? item.billing_status : 'Restricted'}<br /><span style={styles.help}>{data?.evidence_access?.billing_subscription ? `${item.plan_code || '—'} · ${item.subscription_readiness_state || '—'} · ${item.license_enforcement_state || '—'}` : 'PLATFORM_BILLING_READ required'}</span></td><td style={styles.td}>Contacts: {item.primary_contacts}<br /><span style={styles.help}>Open: {item.open_tasks}, urgent: {item.open_urgent_tasks}, overdue: {item.overdue_tasks}</span></td><td style={styles.td}>Last touch: {item.days_since_last_touch ?? '—'} days<br /><span style={styles.help}>Follow-ups: {item.unresolved_follow_ups}, support: {item.open_support_sessions}, incidents: {item.open_incidents ?? 'Restricted'}</span></td><td style={styles.td}><strong>{item.success_risk_score}</strong><br /><RiskChips values={item.risk_flags} /></td><td style={styles.td}><div style={styles.evidenceLinks}>{item.recommended_admin_actions.length ? item.recommended_admin_actions.map((action) => <Link key={action} style={styles.evidenceLink} to={actionTarget(action, item.tenant_id)}>{action}</Link>) : <span style={styles.help}>None</span>}</div></td><td style={styles.td}><div style={styles.evidenceLinks}><Link style={styles.evidenceLink} to={`/platform/tenants?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Tenant record</Link><Link style={styles.evidenceLink} to={`/platform/tenant-health?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Tenant health</Link>{canReadBilling ? <Link style={styles.evidenceLink} to={`/platform/billing?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Billing record</Link> : null}<Link style={styles.evidenceLink} to={`/platform/audit?tenant_id=${encodeURIComponent(item.tenant_id)}`}>Audit evidence</Link></div></td></tr>)}{!items.length ? <tr><td style={styles.td} colSpan={7}>No customer success admin rows available.</td></tr> : null}</tbody></table></div>
+    <section className="io-workspace-panel platform-customer-success__section">
+      <OperationalSectionHeader iconPath="/platform/customer-success-admin" title="Supporting operations" description="Open the source workspaces you are authorized to use. Links to protected evidence are hidden when the corresponding permission is unavailable." />
+      <div className="platform-customer-success__links platform-customer-success__links--row"><Link to="/platform/tenant-contacts">Tenant contacts</Link><Link to="/platform/tenant-tasks">Tenant tasks</Link><Link to="/platform/communications">Communications</Link>{canReadSupportSessions ? <Link to="/platform/support-sessions">Support Sessions</Link> : null}{canReadIncidents ? <Link to="/platform/incidents">Incidents</Link> : null}{canReadBilling ? <Link to="/platform/billing">Billing</Link> : null}{canReadBilling ? <Link to="/platform/subscription-readiness">Subscription readiness</Link> : null}{canReadBilling ? <Link to="/platform/license-plan-enforcement">License enforcement</Link> : null}{canReadAudit ? <Link to="/platform/audit">Platform Audit</Link> : null}</div>
     </section>
   </div>;
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' },
-  headerActions: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  subtitle: { margin: '6px 0 0', color: '#64748b', lineHeight: 1.5, maxWidth: 900 },
-  badge: { padding: '6px 10px', borderRadius: 999, fontWeight: 700, whiteSpace: 'nowrap', fontSize: 13 },
-  metaPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, padding: 14, border: '1px solid var(--io-primary-border)', background: 'var(--io-primary-soft)', borderRadius: 12, color: 'var(--io-primary-deep)', fontSize: 13 },
-  supportLinks: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  supportLink: { border: '1px solid var(--io-primary-border)', background: '#fff', color: 'var(--io-primary-dark)', borderRadius: 999, padding: '6px 10px', textDecoration: 'none', fontWeight: 700, fontSize: 13 },
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 },
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', minWidth: 0 },
-  metric: { fontSize: 28, fontWeight: 800, marginTop: 8, color: '#0f172a' },
-  cardTitle: { margin: '0 0 10px', fontSize: 18, color: '#0f172a', letterSpacing: '-.015em' },
-  filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'end' },
-  filterActions: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
-  label: { display: 'flex', flexDirection: 'column', gap: 6, color: '#334155', fontWeight: 700, fontSize: 13 },
-  input: { border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', font: 'inherit', background: '#fff', color: '#0f172a' },
-  secondaryButton: { border: '1px solid #cbd5e1', background: '#fff', color: '#0f172a', borderRadius: 9, padding: '9px 13px', cursor: 'pointer', fontWeight: 700 },
-  retryButton: { border: '1px solid #dc2626', background: '#fff', color: '#b91c1c', borderRadius: 9, padding: '9px 13px', cursor: 'pointer', fontWeight: 700, width: 'fit-content' },
-  linkButton: { border: 'none', background: 'transparent', color: 'var(--io-primary-dark)', cursor: 'pointer', fontWeight: 700, padding: 0 },
-  errorPanel: { display: 'flex', flexDirection: 'column', gap: 8, background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 12, padding: 14 },
-  errorText: { color: '#991b1b', margin: '10px 0 0', fontSize: 13 },
-  flags: { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  flag: { background: '#e2e8f0', color: '#475569', padding: '4px 8px', borderRadius: 999, fontSize: 12, fontWeight: 700 },
-  help: { color: '#64748b', fontSize: 12 },
-  helpBlock: { color: '#64748b', fontSize: 13, marginTop: -4, lineHeight: 1.5 },
-  tableWrap: { overflowX: 'auto' },
-  table: { width: '100%', borderCollapse: 'collapse', color: '#334155' },
-  th: { textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '10px 8px', color: '#64748b', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' },
-  td: { borderBottom: '1px solid #f1f5f9', padding: '12px 8px', verticalAlign: 'top', color: '#334155' },
-  evidenceLinks: { display: 'flex', flexDirection: 'column', gap: 6 },
-  evidenceLink: { color: 'var(--io-primary-dark)', fontSize: 12, fontWeight: 700, textDecoration: 'none' }
-};

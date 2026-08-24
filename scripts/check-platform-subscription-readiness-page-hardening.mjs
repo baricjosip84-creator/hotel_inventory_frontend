@@ -25,7 +25,7 @@ requireText(page, 'Billing event history', 'page must explain billing-history se
 requireText(page, 'does not independently prove bank settlement', 'page must reject external payment proof claims');
 requireText(page, 'comped tenant does not require a paid current-period end', 'page must explain comped-period semantics');
 requireText(customerSuccess, 'canReadBilling', 'Customer Success must permission-scope Billing links');
-requireText(customerSuccess, "'PLATFORM_BILLING_READ required'", 'Customer Success must render restricted Billing evidence truthfully');
+requireText(customerSuccess, 'PLATFORM_BILLING_READ required', 'Customer Success must render restricted Billing evidence truthfully');
 requireText(css, '.platform-subscription-readiness__table', 'Subscription Readiness workspace CSS missing');
 
 if (/style=\{styles\./.test(page)) failures.push('Subscription Readiness must not use the legacy inline-style shell');
