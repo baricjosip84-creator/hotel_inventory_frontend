@@ -169,7 +169,7 @@ export default function PlatformPermissionAuditPage(){
         {canReadSupport?<Link to="/platform/support-sessions">Support sessions</Link>:null}
         {canReadRolePermissions?<Link to="/platform/permissions">Role permissions</Link>:null}
         {canReadApiKeys?<Link to="/platform/api-keys">API keys</Link>:null}
-        {canReadSecurity?<Link to="/platform/security/admin">Security admin</Link>:null}
+        {canReadSecurity?<Link to="/platform/security">My Security</Link>:null}
         {canReadAudit?<Link to="/platform/audit">Platform audit</Link>:null}
         {canReadTenants?<Link to="/platform/tenants">Tenants</Link>:null}
       </div>

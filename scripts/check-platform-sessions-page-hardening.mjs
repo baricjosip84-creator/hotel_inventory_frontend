@@ -25,7 +25,7 @@ const navStart=layout.indexOf('to="/platform/sessions"');
 const navSlice=layout.slice(Math.max(0,navStart-260),navStart+260);
 if(navStart<0||!navSlice.includes('PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ')) throw new Error('Platform Sessions sidebar must require PLATFORM_SESSIONS_READ.');
 for(const token of ['canRevokeSessions && canEndSupportSessions',"? (user.active_session_count ?? 0) : 'Restricted'","? (user.open_support_session_count ?? 0) : 'Restricted'",'/platform/sessions?platform_user_id=']) if(!users.includes(token)) throw new Error(`Platform Users downstream session contract missing: ${token}`);
-for(const token of ['canReadPlatformUsers','canReadPlatformSessions','platform_user_identity_restricted','Hidden user/session evidence is not replaced with zero']) if(!security.includes(token)) throw new Error(`Platform Security downstream session contract missing: ${token}`);
+for(const token of ['canReadPlatformUsers','canReadPlatformSessions','platform_user_identity_restricted','Restricted evidence is null/Restricted, never converted to zero']) if(!security.includes(token)) throw new Error(`Platform Security downstream session contract missing: ${token}`);
 if(!pkg.scripts?.['check:platform-sessions-page-hardening']) throw new Error('Platform Sessions checker script missing from package.json.');
 if(!pkg.scripts?.['check:ci']?.includes('check:platform-sessions-page-hardening')) throw new Error('Platform Sessions checker is not wired into check:ci.');
 console.log('Platform Sessions page hardening check: PASS');

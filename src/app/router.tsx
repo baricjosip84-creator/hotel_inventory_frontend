@@ -1378,7 +1378,7 @@ const router = createBrowserRouter([
       {
         path: 'security',
         element: (
-          <PlatformProtectedRoute requiredPermissions={[PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ]}>
+          <PlatformProtectedRoute>
             <PlatformSecurityPage />
           </PlatformProtectedRoute>
         )

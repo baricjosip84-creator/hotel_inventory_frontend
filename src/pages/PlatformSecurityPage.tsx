@@ -1,19 +1,36 @@
-import type { CSSProperties } from 'react';
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ApiError } from '../lib/api';
 import { platformApiRequest } from '../lib/platformApi';
 import qrCodeSvg from '../lib/qrCodeSvg';
 import { PLATFORM_PERMISSIONS, hasPlatformPermission } from '../lib/platformPermissions';
+import {
+  OperationalSectionHeader,
+  OperationalWorkspaceHero,
+  OperationalWorkspaceMetaPill,
+  OperationalWorkspaceStatCard,
+  OperationalWorkspaceStats,
+  OperationalWorkspaceStatus
+} from '../components/ui/OperationalWorkspace';
+import './PlatformSecurityPage.css';
 
 type Security = {
   email: string;
+  name?: string | null;
   role: string;
   failed_login_count: number;
   locked_until?: string | null;
   last_login_at?: string | null;
   password_changed_at?: string | null;
   mfa_enabled: boolean;
+  mfa_confirmed_at?: string | null;
   active_sessions: number;
+  truth_contract: {
+    mfa_enabled_means_application_totp_is_enforced_at_platform_login: boolean;
+    mfa_state_does_not_prove_device_identity_or_hardware_backing: boolean;
+    active_sessions_are_application_session_records_not_proof_of_human_presence: boolean;
+  };
 };
 
 type SecurityUser = {
@@ -32,6 +49,7 @@ type SecurityUser = {
 };
 
 type SecurityAdminOverview = {
+  generated_at: string;
   summary: {
     total_users: number | null;
     active_users: number | null;
@@ -58,31 +76,55 @@ type SecurityAdminOverview = {
   available_sources: string[];
   omitted_sources: string[];
   evidence_complete: boolean;
+  limits: { users: number; active_sessions: number };
+  truncated: { users: boolean | null; active_sessions: boolean | null };
+  risk_policy: {
+    password_review_age_days: number;
+    password_age_is_review_signal_not_enforced_expiry: boolean;
+    mfa_flag_is_application_totp_state_not_external_identity_assurance: boolean;
+    session_records_do_not_prove_device_or_human_identity: boolean;
+  };
 };
 
+type MfaSetup = { secret: string; otpauth_url: string; algorithm?: string; digits?: number; period_seconds?: number };
+type SessionMutationResult = { other_sessions_revoked: number };
+
+type AdminMfaClearResult = { sessions_revoked: number };
+
+function readableError(error: unknown) {
+  return error instanceof ApiError || error instanceof Error ? error.message : 'Unknown error';
+}
+
 function formatDate(value?: string | null) {
-  if (!value) return '—';
-  return new Date(value).toLocaleString();
+  if (!value) return 'Not recorded';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Invalid timestamp' : parsed.toLocaleString();
 }
 
-function dataUpdatedText(value: number) {
-  return value ? new Date(value).toLocaleString() : 'not loaded';
+function prettyFlag(value: string) {
+  return value.replaceAll('_', ' ');
 }
 
-function SourceLink({ href, children }: { href: string; children: string }) {
-  return <a href={href} style={styles.sourceLink}>{children}</a>;
+function restrictedValue(value: number | null | undefined) {
+  return value === null || value === undefined ? 'Restricted' : value;
 }
 
 export default function PlatformSecurityPage() {
   const qc = useQueryClient();
   const [pwd, setPwd] = useState({ current_password: '', new_password: '' });
   const [mfaCode, setMfaCode] = useState('');
-  const [setup, setSetup] = useState<{ secret: string; otpauth_url: string; algorithm?: string; digits?: number; period_seconds?: number } | null>(null);
+  const [disableMfaForm, setDisableMfaForm] = useState({ current_password: '', code: '' });
+  const [setup, setSetup] = useState<MfaSetup | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
   const canReadAdminSecurity = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ);
   const canWriteAdminSecurity = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_WRITE);
   const canReadPlatformUsers = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ);
   const canReadPlatformSessions = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ);
+  const canRevokePlatformSessions = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_REVOKE);
+  const canReadAudit = hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ);
+  const canReadAccessReviews = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_ACCESS_REVIEWS_READ);
+  const canReadRolePermissions = hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_ROLE_PERMISSIONS_READ);
 
   const q = useQuery({
     queryKey: ['platform', 'security', 'me'],
@@ -100,36 +142,48 @@ export default function PlatformSecurityPage() {
   };
 
   const change = useMutation({
-    mutationFn: () => platformApiRequest('/platform/security/me/change-password', { method: 'POST', body: JSON.stringify({ current_password: pwd.current_password.trim(), new_password: pwd.new_password.trim() }) }),
-    onSuccess: async () => {
+    mutationFn: () => platformApiRequest<SessionMutationResult>('/platform/security/me/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ current_password: pwd.current_password, new_password: pwd.new_password })
+    }),
+    onSuccess: async (result) => {
       setPwd({ current_password: '', new_password: '' });
-      setStatusMessage('Password changed. Existing sessions were revoked.');
+      setStatusMessage(`Password changed. ${result.other_sessions_revoked} other active session(s) were revoked; this browser session was preserved.`);
       await invalidateSecurity();
     }
   });
 
   const setupMfa = useMutation({
-    mutationFn: () => platformApiRequest<{ secret: string; otpauth_url: string; algorithm?: string; digits?: number; period_seconds?: number }>('/platform/security/me/mfa/setup', { method: 'POST' }),
+    mutationFn: () => platformApiRequest<MfaSetup>('/platform/security/me/mfa/setup', { method: 'POST', skipIdempotencyKey: true }),
     onSuccess: (result) => {
       setSetup(result);
-      setStatusMessage('MFA setup started. Scan the QR code or use the manual setup key, then confirm the 6-digit code.');
+      setMfaCode('');
+      setStatusMessage('MFA setup started. MFA is not enabled until the current 6-digit authenticator code is confirmed.');
     }
   });
 
   const confirm = useMutation({
-    mutationFn: () => platformApiRequest('/platform/security/me/mfa/confirm', { method: 'POST', body: JSON.stringify({ code: mfaCode.trim() }) }),
-    onSuccess: async () => {
+    mutationFn: () => platformApiRequest<SessionMutationResult & { mfa_enabled: boolean }>('/platform/security/me/mfa/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ code: mfaCode.trim() })
+    }),
+    onSuccess: async (result) => {
       setMfaCode('');
       setSetup(null);
-      setStatusMessage('MFA confirmed successfully. Security data was refreshed.');
+      setStatusMessage(`MFA enabled. ${result.other_sessions_revoked} other active session(s) were revoked so future sign-ins must use MFA.`);
       await invalidateSecurity();
     }
   });
 
   const disable = useMutation({
-    mutationFn: () => platformApiRequest('/platform/security/me/mfa/disable', { method: 'POST' }),
-    onSuccess: async () => {
-      setStatusMessage('MFA disabled successfully. Security data was refreshed.');
+    mutationFn: () => platformApiRequest<SessionMutationResult & { mfa_enabled: boolean }>('/platform/security/me/mfa/disable', {
+      method: 'POST',
+      body: JSON.stringify({ current_password: disableMfaForm.current_password, code: disableMfaForm.code.trim() })
+    }),
+    onSuccess: async (result) => {
+      setDisableMfaForm({ current_password: '', code: '' });
+      setSetup(null);
+      setStatusMessage(`MFA disabled after password and TOTP verification. ${result.other_sessions_revoked} other active session(s) were revoked.`);
       await invalidateSecurity();
     }
   });
@@ -137,223 +191,191 @@ export default function PlatformSecurityPage() {
   const unlock = useMutation({
     mutationFn: (id: string) => platformApiRequest(`/platform/security/admin/users/${id}/unlock`, { method: 'POST' }),
     onSuccess: async () => {
-      setStatusMessage('Platform user unlocked successfully. Staff security review was refreshed.');
+      setStatusMessage('Locked Platform user unlocked. Staff security evidence was refreshed.');
       await qc.invalidateQueries({ queryKey: ['platform', 'security', 'admin'] });
     }
   });
 
   const clearMfa = useMutation({
-    mutationFn: (id: string) => platformApiRequest(`/platform/security/admin/users/${id}/clear-mfa`, { method: 'POST' }),
-    onSuccess: async () => {
-      setStatusMessage('Platform user MFA was cleared and that user’s sessions were revoked.');
+    mutationFn: (id: string) => platformApiRequest<AdminMfaClearResult>(`/platform/security/admin/users/${id}/clear-mfa`, { method: 'POST' }),
+    onSuccess: async (result) => {
+      setStatusMessage(`Platform user MFA was administratively cleared and ${result.sessions_revoked} active session(s) were revoked.`);
       await qc.invalidateQueries({ queryKey: ['platform', 'security', 'admin'] });
     }
   });
 
-  const canChangePassword = pwd.current_password.trim().length > 0 && pwd.new_password.trim().length >= 10;
-  const canConfirmMfa = mfaCode.trim().length === 6;
+  const refreshAll = async () => {
+    const requests: Promise<unknown>[] = [q.refetch()];
+    if (canReadAdminSecurity) requests.push(admin.refetch());
+    await Promise.all(requests);
+  };
+
+  const canChangePassword = pwd.current_password.length > 0 && pwd.new_password.length >= 10 && pwd.new_password.length <= 512;
+  const canConfirmMfa = Boolean(setup) && /^\d{6}$/.test(mfaCode.trim());
+  const canDisableMfa = Boolean(q.data?.mfa_enabled)
+    && disableMfaForm.current_password.length > 0
+    && /^\d{6}$/.test(disableMfaForm.code.trim());
+  const canUnlockAdminUsers = canWriteAdminSecurity && canReadPlatformUsers;
+  const canClearAdminMfa = canWriteAdminSecurity && canReadPlatformUsers && canRevokePlatformSessions;
   const mfaEnabled = Boolean(q.data?.mfa_enabled);
   const adminUsers = admin.data?.users || [];
   const adminSessions = admin.data?.active_sessions || [];
+  const showingStaleSelf = q.isError && Boolean(q.data);
+  const showingStaleAdmin = canReadAdminSecurity && admin.isError && Boolean(admin.data);
 
-  return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Platform security</h1>
-          <p style={styles.muted}>Your own platform account hardening plus platform staff security review for authorized security/admin roles.</p>
-          <div style={styles.metaRow}>
-            <span style={styles.metaPill}>Source: GET /platform/security/me</span>
-            <span style={styles.metaPill}>Admin source: GET /platform/security/admin</span>
-            <span style={styles.metaPill}>Last updated: {dataUpdatedText(Math.max(q.dataUpdatedAt || 0, admin.dataUpdatedAt || 0))}</span>
-            <span style={styles.metaPill}>Permissions: platform.security.read / write</span>
-          </div>
+  return <div className="platform-security">
+    <OperationalWorkspaceHero
+      iconPath="/platform/security"
+      eyebrow="Authenticated account security"
+      title="My Security"
+      description="Manage your own Platform password and TOTP MFA. Staff-wide security evidence is a separate permission-scoped view and does not turn this self-service page into an alternate Platform Users or Sessions registry."
+      meta={<>
+        <OperationalWorkspaceMetaPill>Self-service: authenticated Platform user</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>Staff review: PLATFORM_SECURITY_READ</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>User/session evidence scoped independently</OperationalWorkspaceMetaPill>
+      </>}
+      aside={<div className="platform-security__hero-aside">
+        <OperationalWorkspaceStatus value={q.data?.mfa_enabled ? 'MFA enabled' : 'MFA disabled'} label="Application TOTP state" />
+        <button type="button" className="app-button app-button--secondary" onClick={() => void refreshAll()} disabled={q.isFetching || (canReadAdminSecurity && admin.isFetching)}>{q.isFetching || (canReadAdminSecurity && admin.isFetching) ? 'Refreshing…' : 'Refresh'}</button>
+      </div>}
+    />
+
+    {q.isError && !q.data ? <section className="platform-security__blocking-error"><strong>My Security failed to load.</strong><span>{readableError(q.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => q.refetch()}>Retry</button></section> : null}
+    {showingStaleSelf ? <section className="platform-security__warning"><strong>Showing the last successful account-security snapshot.</strong><span>The latest self-security refresh failed. Existing data remains visible until refresh succeeds.</span></section> : null}
+    {showingStaleAdmin ? <section className="platform-security__warning"><strong>Showing the last successful staff-security snapshot.</strong><span>The latest admin refresh failed. Existing permission-scoped evidence remains visible.</span></section> : null}
+    {canReadAdminSecurity && admin.isError && !admin.data ? <section className="platform-security__warning"><strong>Staff security review is unavailable.</strong><span>{readableError(admin.error)} Self-service password and MFA controls remain independent.</span><button type="button" className="app-button app-button--secondary" onClick={() => admin.refetch()}>Retry staff review</button></section> : null}
+    {statusMessage ? <section className="platform-security__success">{statusMessage}</section> : null}
+
+    <OperationalWorkspaceStats ariaLabel="My account security summary">
+      <OperationalWorkspaceStatCard label="MFA" value={q.data ? (q.data.mfa_enabled ? 'Enabled' : 'Disabled') : '—'} tone={q.data?.mfa_enabled ? 'good' : 'warn'} helper="Application TOTP login enforcement" loading={q.isLoading && !q.data} iconPath="/platform/security" />
+      <OperationalWorkspaceStatCard label="Active sessions" value={q.data?.active_sessions ?? '—'} helper="Current application session records" loading={q.isLoading && !q.data} iconPath="/platform/sessions" />
+      <OperationalWorkspaceStatCard label="Failed logins" value={q.data?.failed_login_count ?? '—'} tone={(q.data?.failed_login_count || 0) > 0 ? 'warn' : 'good'} helper="Current account counter" loading={q.isLoading && !q.data} />
+      <OperationalWorkspaceStatCard label="Account lock" value={q.data?.locked_until && new Date(q.data.locked_until).getTime() > Date.now() ? 'Locked' : 'Clear'} tone={q.data?.locked_until && new Date(q.data.locked_until).getTime() > Date.now() ? 'danger' : 'good'} helper={q.data?.locked_until ? formatDate(q.data.locked_until) : 'No active lock'} loading={q.isLoading && !q.data} />
+      <OperationalWorkspaceStatCard label="Password changed" value={q.data?.password_changed_at ? new Date(q.data.password_changed_at).toLocaleDateString() : 'Not recorded'} helper="Application account timestamp" loading={q.isLoading && !q.data} />
+      <OperationalWorkspaceStatCard label="Last login" value={q.data?.last_login_at ? new Date(q.data.last_login_at).toLocaleDateString() : 'Not recorded'} helper="Application login record" loading={q.isLoading && !q.data} />
+    </OperationalWorkspaceStats>
+
+    <section className="io-workspace-panel platform-security__section">
+      <OperationalSectionHeader iconPath="/platform/security" title="My account" description="These values belong to the currently authenticated Platform account only; no staff-wide permission is required to view your own security state." />
+      {q.data ? <div className="platform-security__account-grid">
+        <div><span>Name</span><strong>{q.data.name || 'Not recorded'}</strong></div>
+        <div><span>Email</span><strong>{q.data.email}</strong></div>
+        <div><span>Role</span><strong>{q.data.role}</strong></div>
+        <div><span>MFA confirmed</span><strong>{formatDate(q.data.mfa_confirmed_at)}</strong></div>
+      </div> : q.isLoading ? <div className="platform-security__empty">Loading current account security…</div> : null}
+      <div className="platform-security__truth-note">MFA enabled means this application requires a valid TOTP code at Platform login. It does not prove device identity, hardware-backed authentication, or a person’s physical presence. Session records likewise show application sessions, not verified human presence.</div>
+    </section>
+
+    <section className="io-workspace-panel platform-security__section">
+      <OperationalSectionHeader iconPath="/platform/security" title="Change password" description="Your current password is verified. The new password is stored exactly as entered; leading or trailing spaces are not silently removed. Other active Platform sessions are revoked while this browser session is preserved." />
+      <div className="platform-security__form-grid">
+        <label>Current password<input type="password" autoComplete="current-password" maxLength={512} value={pwd.current_password} onChange={(event) => setPwd((current) => ({ ...current, current_password: event.target.value }))} /></label>
+        <label>New password<input type="password" autoComplete="new-password" minLength={10} maxLength={512} value={pwd.new_password} onChange={(event) => setPwd((current) => ({ ...current, new_password: event.target.value }))} /></label>
+        <button type="button" className="app-button app-button--primary" disabled={!canChangePassword || change.isPending} onClick={() => window.confirm('Change your Platform password and revoke your other active sessions?') && change.mutate()}>{change.isPending ? 'Changing…' : 'Change password'}</button>
+      </div>
+      <small>Minimum 10 characters. The new password must differ from the current password.</small>
+      {change.isError ? <div className="platform-security__inline-error">{readableError(change.error)}</div> : null}
+    </section>
+
+    <section className="io-workspace-panel platform-security__section">
+      <OperationalSectionHeader iconPath="/platform/security" title="TOTP multi-factor authentication" description="Starting setup never disables an already-enabled MFA configuration. Confirming MFA revokes other sessions so future sign-ins use the new TOTP requirement." />
+      <div className="platform-security__mfa-actions">
+        <button type="button" className="app-button app-button--primary" onClick={() => setupMfa.mutate()} disabled={setupMfa.isPending || mfaEnabled}>{setupMfa.isPending ? 'Starting…' : mfaEnabled ? 'MFA already enabled' : 'Start MFA setup'}</button>
+        <span>{mfaEnabled ? 'To replace the current authenticator, first use the verified disable flow below.' : 'MFA remains disabled until setup is confirmed.'}</span>
+      </div>
+      {setupMfa.isError ? <div className="platform-security__inline-error">{readableError(setupMfa.error)}</div> : null}
+
+      {setup ? <div className="platform-security__mfa-setup">
+        <div><strong>Scan authenticator QR code</strong><img src={qrCodeSvg.createQrSvgDataUri(setup.otpauth_url)} alt="Authenticator app setup QR code" /><small>Use a standards-compatible TOTP authenticator.</small></div>
+        <div><strong>Manual setup key</strong><code>{setup.secret}</code><small>Algorithm {setup.algorithm || 'SHA1'} · {setup.digits || 6} digits · {setup.period_seconds || 30}-second period</small></div>
+      </div> : null}
+
+      <div className="platform-security__form-grid platform-security__confirm-grid">
+        <label>Setup confirmation code<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={mfaCode} onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit code" disabled={!setup} /></label>
+        <button type="button" className="app-button app-button--primary" disabled={!canConfirmMfa || confirm.isPending} onClick={() => confirm.mutate()}>{confirm.isPending ? 'Confirming…' : 'Confirm MFA'}</button>
+      </div>
+      {confirm.isError ? <div className="platform-security__inline-error">{readableError(confirm.error)}</div> : null}
+
+      {mfaEnabled ? <div className="platform-security__danger-zone">
+        <strong>Disable MFA</strong>
+        <p>Disabling MFA weakens login protection, so the backend requires both your current password and a current TOTP code. Other active sessions are revoked after the change.</p>
+        <div className="platform-security__form-grid">
+          <label>Current password<input type="password" autoComplete="current-password" maxLength={512} value={disableMfaForm.current_password} onChange={(event) => setDisableMfaForm((current) => ({ ...current, current_password: event.target.value }))} /></label>
+          <label>Current TOTP code<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={disableMfaForm.code} onChange={(event) => setDisableMfaForm((current) => ({ ...current, code: event.target.value.replace(/\D/g, '').slice(0, 6) }))} /></label>
+          <button type="button" className="app-button app-button--danger" disabled={!canDisableMfa || disable.isPending} onClick={() => window.confirm('Disable MFA for your Platform account after password and TOTP verification?') && disable.mutate()}>{disable.isPending ? 'Disabling…' : 'Disable MFA'}</button>
         </div>
-        <div style={styles.headerActions}>
-          <button style={styles.secondaryButton} onClick={() => { q.refetch(); admin.refetch(); }} disabled={q.isFetching || admin.isFetching}>{q.isFetching || admin.isFetching ? 'Refreshing…' : 'Refresh'}</button>
-        </div>
-      </header>
+        {disable.isError ? <div className="platform-security__inline-error">{readableError(disable.error)}</div> : null}
+      </div> : null}
+    </section>
 
-      {statusMessage ? <p style={styles.success}>{statusMessage}</p> : null}
+    {canReadAdminSecurity ? <section className="io-workspace-panel platform-security__section">
+      <OperationalSectionHeader iconPath="/platform/users" title="Staff security evidence" description="This is a bounded security snapshot, not a replacement for Platform Users or Platform Sessions. User and session evidence remain independently permission-scoped." />
+      {admin.data && !admin.data.evidence_complete ? <div className="platform-security__warning-inline">Restricted sources: {admin.data.omitted_sources.map(prettyFlag).join(', ') || 'None'}. Restricted evidence is null/Restricted, never converted to zero.</div> : null}
+      {admin.data ? <>
+        <OperationalWorkspaceStats ariaLabel="Staff security summary">
+          <OperationalWorkspaceStatCard label="Platform users" value={restrictedValue(admin.data.summary.total_users)} helper="Registry-wide count when PLATFORM_USERS_READ is available" />
+          <OperationalWorkspaceStatCard label="Active users" value={restrictedValue(admin.data.summary.active_users)} helper="Registry-wide authorized evidence" />
+          <OperationalWorkspaceStatCard label="Locked users" value={restrictedValue(admin.data.summary.locked_users)} tone={(admin.data.summary.locked_users || 0) > 0 ? 'danger' : 'good'} helper="Current application lock window" />
+          <OperationalWorkspaceStatCard label="Active without MFA" value={restrictedValue(admin.data.summary.users_without_mfa)} tone={(admin.data.summary.users_without_mfa || 0) > 0 ? 'warn' : 'good'} helper="Application TOTP flag only" />
+          <OperationalWorkspaceStatCard label="Failed-login users" value={restrictedValue(admin.data.summary.users_with_failed_logins)} tone={(admin.data.summary.users_with_failed_logins || 0) > 0 ? 'warn' : 'good'} helper="Current login counters" />
+          <OperationalWorkspaceStatCard label="Active sessions" value={restrictedValue(admin.data.summary.active_sessions)} helper="Registry-wide count when PLATFORM_SESSIONS_READ is available" />
+        </OperationalWorkspaceStats>
+        <div className="platform-security__truth-note">The “stale password review” flag is a {admin.data.risk_policy.password_review_age_days}-day application review heuristic, not an enforced password-expiry policy or legal/security standard. The displayed user/session lists are bounded to {admin.data.limits.users} users and {admin.data.limits.active_sessions} sessions; summary counts remain registry-wide.</div>
+      </> : admin.isLoading ? <div className="platform-security__empty">Loading authorized staff security evidence…</div> : null}
+    </section> : null}
 
-      {(q.error || admin.error) ? (
-        <section style={styles.errorCard}>
-          <strong>Unable to load all platform security data.</strong>
-          <p style={styles.muted}>Check your platform session, platform.security.read access, and backend availability, then retry.</p>
-          <button style={styles.secondaryButton} onClick={() => { q.refetch(); admin.refetch(); }} disabled={q.isFetching || admin.isFetching}>Retry</button>
-        </section>
-      ) : null}
+    {canReadAdminSecurity && canReadPlatformUsers && admin.data ? <section className="io-workspace-panel platform-security__section">
+      <OperationalSectionHeader iconPath="/platform/users" title="Priority staff review" description={`Up to ${admin.data.limits.users} Platform users, ordered with active lock/MFA/login-risk signals first. Use Platform Users for full registry workflows.`} />
+      {!canWriteAdminSecurity ? <div className="platform-security__warning-inline">Read-only security access: staff mutation controls are unavailable.</div> : null}
+      {canWriteAdminSecurity && !canRevokePlatformSessions ? <div className="platform-security__warning-inline">Administrative MFA clearing is unavailable without PLATFORM_SESSIONS_REVOKE because clearing MFA revokes that user’s active sessions.</div> : null}
+      <div className="platform-security__table-wrap"><table><thead><tr><th>User</th><th>Security state</th><th>Last login</th><th>Sessions</th><th>Evidence</th><th>Actions</th></tr></thead><tbody>
+        {adminUsers.map((user) => {
+          const locked = user.risk_flags.includes('locked');
+          return <tr key={user.id}>
+            <td><strong>{user.name}</strong><small>{user.email} · {user.role}</small></td>
+            <td>{user.risk_flags.length ? <div className="platform-security__chips">{user.risk_flags.map((flag) => <span key={flag}>{prettyFlag(flag)}</span>)}</div> : 'No current application flags'}</td>
+            <td>{formatDate(user.last_login_at)}</td>
+            <td>{user.active_sessions === null ? 'Restricted' : user.active_sessions}</td>
+            <td>{canReadAudit ? <Link to={`/platform/audit?source=security&target_type=platform_users&target_id=${encodeURIComponent(user.id)}`}>Audit history</Link> : 'Audit restricted'}</td>
+            <td><div className="platform-security__row-actions">
+              <button type="button" className="app-button app-button--secondary" disabled={!canUnlockAdminUsers || !locked || unlock.isPending} title={!locked ? 'User is not currently locked.' : undefined} onClick={() => window.confirm(`Unlock Platform user ${user.email}?`) && unlock.mutate(user.id)}>Unlock</button>
+              <button type="button" className="app-button app-button--danger" disabled={!canClearAdminMfa || !user.mfa_enabled || clearMfa.isPending} onClick={() => window.confirm(`Administratively clear MFA for ${user.email} and revoke all of that user's active Platform sessions?`) && clearMfa.mutate(user.id)}>{user.mfa_enabled ? 'Clear MFA' : 'MFA clear'}</button>
+            </div></td>
+          </tr>;
+        })}
+        {!adminUsers.length ? <tr><td colSpan={6} className="platform-security__empty">No authorized Platform user evidence returned.</td></tr> : null}
+      </tbody></table></div>
+      {admin.data.truncated.users ? <small>Priority list truncated. Open Platform Users for the complete registry.</small> : null}
+      {unlock.isError ? <div className="platform-security__inline-error">{readableError(unlock.error)}</div> : null}
+      {clearMfa.isError ? <div className="platform-security__inline-error">{readableError(clearMfa.error)}</div> : null}
+    </section> : null}
 
-      <section style={styles.panel}>
-        <h2>My account</h2>
-        {q.data ? (
-          <div style={styles.cards}>
-            <div style={styles.card}>Email<br /><b>{q.data.email}</b></div>
-            <div style={styles.card}>Role<br /><b>{q.data.role}</b></div>
-            <div style={styles.card}>MFA<br /><b>{q.data.mfa_enabled ? 'Enabled' : 'Disabled'}</b></div>
-            <div style={styles.card}>Active sessions<br /><b>{q.data.active_sessions}</b></div>
-            <div style={styles.card}>Failed logins<br /><b>{q.data.failed_login_count}</b></div>
-            <div style={styles.card}>Last login<br /><b>{formatDate(q.data.last_login_at)}</b></div>
-          </div>
-        ) : q.isLoading ? 'Loading…' : null}
-      </section>
+    {canReadAdminSecurity && canReadPlatformSessions && admin.data ? <section className="io-workspace-panel platform-security__section">
+      <OperationalSectionHeader iconPath="/platform/sessions" title="Recent active staff sessions" description={`Up to ${admin.data.limits.active_sessions} active Platform session records. Platform-user identity remains hidden when PLATFORM_USERS_READ is unavailable.`} />
+      <div className="platform-security__table-wrap"><table><thead><tr><th>User</th><th>IP</th><th>Last used</th><th>Expires</th><th>User agent</th></tr></thead><tbody>
+        {adminSessions.map((session) => <tr key={session.id}>
+          <td>{session.platform_user_identity_restricted ? <strong>Restricted Platform user</strong> : <><strong>{session.name || session.email || 'Platform user'}</strong><small>{session.email} · {session.role}</small></>}</td>
+          <td>{session.ip_address || 'Not recorded'}</td>
+          <td>{formatDate(session.last_used_at || session.created_at)}</td>
+          <td>{formatDate(session.expires_at)}</td>
+          <td className="platform-security__wrap">{session.user_agent || 'Not recorded'}</td>
+        </tr>)}
+        {!adminSessions.length ? <tr><td colSpan={5} className="platform-security__empty">No active session evidence returned.</td></tr> : null}
+      </tbody></table></div>
+      {admin.data.truncated.active_sessions ? <small>Session list truncated. Open Platform Sessions for the complete registry.</small> : null}
+    </section> : null}
 
-      <section style={styles.panel}>
-        <h2>Supporting Platform pages</h2>
-        <p style={styles.muted}>Use these pages to investigate session, audit, permission, and access-review evidence. This page manages account security only.</p>
-        <div style={styles.linkGrid}>
-          {canReadPlatformSessions ? <SourceLink href="/platform/sessions">Platform Sessions</SourceLink> : null}
-          <SourceLink href="/platform/system-audit">System Audit</SourceLink>
-          <SourceLink href="/platform/permission-audit">Permission Audit</SourceLink>
-          <SourceLink href="/platform/access-reviews">Access Reviews</SourceLink>
-          <SourceLink href="/platform/enterprise-identity">Enterprise Identity</SourceLink>
-        </div>
-      </section>
-
-      <section style={styles.panel}>
-        <h2>Snapshot metadata</h2>
-        <div style={styles.flags}>
-          <span style={styles.flag}>current account: {q.data ? 'loaded' : q.isLoading ? 'loading' : 'not loaded'}</span>
-          <span style={styles.flag}>staff review: {admin.data ? 'loaded' : canReadAdminSecurity ? admin.isLoading ? 'loading' : 'not loaded' : 'not permitted'}</span>
-          <span style={styles.flag}>staff users: {canReadPlatformUsers ? adminUsers.length : 'Restricted'}</span>
-          <span style={styles.flag}>active staff sessions: {canReadPlatformSessions ? adminSessions.length : 'Restricted'}</span>
-          <span style={styles.flag}>MFA state: {q.data?.mfa_enabled ? 'enabled' : 'disabled or unknown'}</span>
-        </div>
-      </section>
-
-      <section style={styles.panel}>
-        <h2>Change password</h2>
-        <div style={styles.form}>
-          <input style={styles.input} type="password" placeholder="Current password" value={pwd.current_password} onChange={(e) => setPwd({ ...pwd, current_password: e.target.value })} />
-          <input style={styles.input} type="password" placeholder="New password" value={pwd.new_password} onChange={(e) => setPwd({ ...pwd, new_password: e.target.value })} />
-          <button style={styles.button} onClick={() => change.mutate()} disabled={change.isPending || !canChangePassword}>Change password</button>
-        </div>
-        <p style={styles.muted}>New password must be at least 10 characters. The payload is trimmed before save.</p>
-        {change.error ? <p style={styles.error}>{change.error instanceof Error ? change.error.message : 'Password change failed'}</p> : null}
-      </section>
-
-      <section style={styles.panel}>
-        <h2>MFA</h2>
-        <button style={styles.button} onClick={() => setupMfa.mutate()} disabled={setupMfa.isPending}>{setupMfa.isPending ? 'Starting…' : 'Start MFA setup'}</button>{' '}
-        <button style={styles.dangerButton} onClick={() => window.confirm('Disable MFA for your own platform account?') && disable.mutate()} disabled={disable.isPending || !mfaEnabled}>{disable.isPending ? 'Disabling…' : mfaEnabled ? 'Disable MFA' : 'MFA already disabled'}</button>
-        {setup ? (
-          <div style={styles.mfaSetup}>
-            <div>
-              <h3 style={styles.mfaTitle}>Scan this QR code</h3>
-              <p style={styles.muted}>Use Google Authenticator, Microsoft Authenticator, Authy, or another TOTP app.</p>
-              <img src={qrCodeSvg.createQrSvgDataUri(setup.otpauth_url)} alt="Authenticator app setup QR code" style={styles.qrCode} />
-            </div>
-            <div style={styles.secretBox}>
-              <b>Manual setup key</b>
-              <code style={styles.secretCode}>{setup.secret}</code>
-              <p style={styles.muted}>Use this only if your authenticator app cannot scan the QR code.</p>
-              <p style={styles.muted}>Algorithm: {setup.algorithm || 'SHA1'} · Digits: {setup.digits || 6} · Period: {setup.period_seconds || 30}s</p>
-            </div>
-          </div>
-        ) : null}
-        <div style={styles.form}>
-          <input style={styles.input} placeholder="6-digit authenticator code" value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} />
-          <button style={styles.button} onClick={() => confirm.mutate()} disabled={confirm.isPending || !canConfirmMfa}>Confirm MFA</button>
-        </div>
-        {confirm.error ? <p style={styles.error}>{confirm.error instanceof Error ? confirm.error.message : 'MFA confirmation failed'}</p> : null}
-        {disable.error ? <p style={styles.error}>{disable.error instanceof Error ? disable.error.message : 'MFA disable failed'}</p> : null}
-      </section>
-
-      {canReadAdminSecurity && admin.data && !admin.data.evidence_complete ? <p style={styles.notice}>Security review evidence is permission-scoped. Restricted sources: {admin.data.omitted_sources.join(', ')}. Hidden user/session evidence is not replaced with zero.</p> : null}
-
-      {canReadAdminSecurity && canReadPlatformUsers ? (
-        <section style={styles.panel}>
-          <h2>Platform staff security review</h2>
-          {!canWriteAdminSecurity ? <p style={styles.notice}>Write actions are disabled because your role does not have platform.security.write.</p> : null}
-          {admin.data ? (
-            <>
-              <div style={styles.cards}>
-                <div style={styles.card}>Total users<br /><b>{admin.data.summary.total_users}</b></div>
-                <div style={styles.card}>Active users<br /><b>{admin.data.summary.active_users}</b></div>
-                <div style={styles.card}>Locked users<br /><b>{admin.data.summary.locked_users}</b></div>
-                <div style={styles.card}>Without MFA<br /><b>{admin.data.summary.users_without_mfa}</b></div>
-                <div style={styles.card}>Failed-login users<br /><b>{admin.data.summary.users_with_failed_logins}</b></div>
-                <div style={styles.card}>Active sessions<br /><b>{admin.data.summary.active_sessions}</b></div>
-              </div>
-              <table style={styles.table}>
-                <thead><tr><th style={styles.th}>User</th><th style={styles.th}>Security state</th><th style={styles.th}>Last login</th><th style={styles.th}>Sessions</th><th style={styles.th}>Evidence</th><th style={styles.th}>Actions</th></tr></thead>
-                <tbody>
-                  {adminUsers.map((user) => (
-                    <tr key={user.id}>
-                      <td style={styles.td}><b>{user.name}</b><br /><span style={styles.muted}>{user.email} · {user.role}</span></td>
-                      <td style={styles.td}>{user.risk_flags.length ? user.risk_flags.join(', ') : 'ok'}</td>
-                      <td style={styles.td}>{formatDate(user.last_login_at)}</td>
-                      <td style={styles.td}>{user.active_sessions}</td>
-                      <td style={styles.td}><a href={`/platform/system-audit?search=${encodeURIComponent(user.email)}`} style={styles.sourceLink}>Audit evidence</a></td>
-                      <td style={styles.td}>
-                        <button style={styles.secondaryButton} disabled={!canWriteAdminSecurity || unlock.isPending} onClick={() => window.confirm(`Unlock platform user ${user.email}?`) && unlock.mutate(user.id)}>Unlock</button>{' '}
-                        <button style={styles.dangerButton} disabled={!canWriteAdminSecurity || clearMfa.isPending || !user.mfa_enabled} onClick={() => window.confirm(`Clear MFA for ${user.email}? This revokes that user's active platform sessions.`) && clearMfa.mutate(user.id)}>{user.mfa_enabled ? 'Clear MFA' : 'MFA already clear'}</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          ) : admin.isLoading ? 'Loading security review…' : null}
-        </section>
-      ) : null}
-
-      {canReadAdminSecurity && canReadPlatformSessions ? (
-        <section style={styles.panel}>
-          <h2>Active staff session evidence</h2>
-          <p style={styles.muted}>Session details returned by the admin security endpoint. Use the Platform Sessions page for revocation workflows.</p>
-          <table style={styles.table}>
-            <thead><tr><th style={styles.th}>User</th><th style={styles.th}>IP</th><th style={styles.th}>Last used</th><th style={styles.th}>Expires</th><th style={styles.th}>User agent</th></tr></thead>
-            <tbody>
-              {adminSessions.map((session) => (
-                <tr key={session.id}>
-                  <td style={styles.td}>{session.platform_user_identity_restricted ? <b>Restricted Platform user</b> : <><b>{session.name || session.email}</b><br /><span style={styles.muted}>{session.email} · {session.role}</span></>}</td>
-                  <td style={styles.td}>{session.ip_address || '—'}</td>
-                  <td style={styles.td}>{formatDate(session.last_used_at || session.created_at)}</td>
-                  <td style={styles.td}>{formatDate(session.expires_at)}</td>
-                  <td style={styles.td}><span style={styles.wrap}>{session.user_agent || '—'}</span></td>
-                </tr>
-              ))}
-              {!adminSessions.length ? <tr><td style={styles.td} colSpan={5}>No active staff sessions returned.</td></tr> : null}
-            </tbody>
-          </table>
-        </section>
-      ) : null}
-    </div>
-  );
+    <section className="io-workspace-panel platform-security__section">
+      <OperationalSectionHeader iconPath="/platform/security" title="Supporting operations" description="Only destinations allowed by the current live Platform permission snapshot are shown. My Security itself remains available to every authenticated Platform user." />
+      <div className="platform-security__links">
+        {canReadPlatformUsers ? <Link to="/platform/users">Platform users</Link> : null}
+        {canReadPlatformSessions ? <Link to="/platform/sessions">Platform sessions</Link> : null}
+        {canReadAudit ? <Link to="/platform/audit?source=security">Platform audit</Link> : null}
+        {canReadAccessReviews ? <Link to="/platform/access-reviews">Access reviews</Link> : null}
+        {canReadAccessReviews ? <Link to="/platform/permission-audit">Permission audit</Link> : null}
+        {canReadRolePermissions ? <Link to="/platform/permissions">Role permissions</Link> : null}
+        {canReadAdminSecurity ? <Link to="/platform/enterprise-identity">Enterprise identity</Link> : null}
+      </div>
+    </section>
+  </div>;
 }
-
-const styles: Record<string, CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0, color: '#0f172a' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' },
-  title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em', color: '#0f172a' },
-  headerActions: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' },
-  muted: { color: '#64748b', lineHeight: 1.5 },
-  panel: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,.03), 0 8px 24px rgba(15,23,42,.04)', overflowX: 'auto', minWidth: 0 },
-  errorCard: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 12, padding: 14 },
-  cards: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 },
-  card: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', color: '#334155' },
-  form: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10, marginTop: 10, alignItems: 'end' },
-  input: { padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 10, background: '#fff', color: '#0f172a', font: 'inherit' },
-  button: { padding: '9px 13px', borderRadius: 9, border: '1px solid var(--io-primary)', cursor: 'pointer', background: 'var(--io-primary)', color: '#fff', fontWeight: 700, boxShadow: '0 1px 2px rgba(15,23,42,.05)' },
-  secondaryButton: { padding: '9px 13px', borderRadius: 9, border: '1px solid #cbd5e1', cursor: 'pointer', background: '#fff', color: '#0f172a', fontWeight: 700 },
-  dangerButton: { padding: '9px 13px', borderRadius: 9, border: '1px solid #dc2626', cursor: 'pointer', background: '#dc2626', color: '#fff', fontWeight: 700 },
-  notice: { background: 'var(--io-primary-soft)', color: 'var(--io-primary-deep)', border: '1px solid var(--io-primary-border)', padding: 12, borderRadius: 10, marginTop: 10 },
-  metaRow: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 },
-  metaPill: { background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', borderRadius: 999, padding: '4px 8px', fontSize: 12, fontWeight: 700 },
-  flags: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  flag: { background: '#e2e8f0', color: '#475569', padding: '4px 8px', borderRadius: 999, fontSize: 12, fontWeight: 700 },
-  linkGrid: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  sourceLink: { color: 'var(--io-primary-dark)', fontWeight: 700, textDecoration: 'none' },
-  mfaSetup: { background: 'var(--io-primary-soft)', border: '1px solid var(--io-primary-border)', padding: 16, borderRadius: 12, marginTop: 10, display: 'grid', gridTemplateColumns: 'minmax(180px, 260px) 1fr', gap: 16, alignItems: 'start' },
-  mfaTitle: { margin: '0 0 6px', color: '#0f172a' },
-  qrCode: { width: 220, height: 220, border: '1px solid #cbd5e1', borderRadius: 12, background: '#fff', padding: 8 },
-  secretBox: { display: 'flex', flexDirection: 'column', gap: 8 },
-  secretCode: { display: 'block', padding: 10, borderRadius: 10, background: '#fff', border: '1px solid #cbd5e1', color: '#0f172a', wordBreak: 'break-all' },
-  success: { background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 10, padding: 10 },
-  error: { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 10, padding: 10 },
-  table: { width: '100%', borderCollapse: 'collapse', marginTop: 12, color: '#334155' },
-  th: { textAlign: 'left', padding: '10px 8px', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' },
-  td: { padding: '12px 8px', borderBottom: '1px solid #f1f5f9', verticalAlign: 'top', color: '#334155' },
-  wrap: { overflowWrap: 'anywhere' }
-};
