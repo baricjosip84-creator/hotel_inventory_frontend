@@ -218,12 +218,30 @@ export default function PlatformSecurityPage() {
   const canUnlockAdminUsers = canWriteAdminSecurity && canReadPlatformUsers;
   const canClearAdminMfa = canWriteAdminSecurity && canReadPlatformUsers && canRevokePlatformSessions;
   const mfaEnabled = Boolean(q.data?.mfa_enabled);
-  const adminUsers = admin.data?.users || [];
-  const adminSessions = admin.data?.active_sessions || [];
+  const adminData = admin.data;
+  const adminUsers = Array.isArray(adminData?.users) ? adminData.users.map((user) => ({
+    ...user,
+    risk_flags: Array.isArray(user.risk_flags) ? user.risk_flags : []
+  })) : [];
+  const adminSessions = Array.isArray(adminData?.active_sessions) ? adminData.active_sessions : [];
+  const adminSummary = adminData?.summary || {
+    total_users: null, active_users: null, locked_users: null, users_without_mfa: null,
+    users_with_failed_logins: null, active_sessions: null
+  };
+  const adminOmittedSources = Array.isArray(adminData?.omitted_sources) ? adminData.omitted_sources : [];
+  const adminLimits = {
+    users: adminData?.limits?.users ?? adminUsers.length,
+    active_sessions: adminData?.limits?.active_sessions ?? adminSessions.length
+  };
+  const adminTruncated = {
+    users: adminData?.truncated?.users ?? false,
+    active_sessions: adminData?.truncated?.active_sessions ?? false
+  };
+  const passwordReviewAgeDays = adminData?.risk_policy?.password_review_age_days ?? 180;
   const showingStaleSelf = q.isError && Boolean(q.data);
   const showingStaleAdmin = canReadAdminSecurity && admin.isError && Boolean(admin.data);
 
-  return <div className="platform-security">
+  return <div className="io-operational-page io-workspace-page platform-security">
     <OperationalWorkspaceHero
       iconPath="/platform/security"
       eyebrow="Authenticated account security"
@@ -310,22 +328,22 @@ export default function PlatformSecurityPage() {
 
     {canReadAdminSecurity ? <section className="io-workspace-panel platform-security__section">
       <OperationalSectionHeader iconPath="/platform/users" title="Staff security evidence" description="This is a bounded security snapshot, not a replacement for Platform Users or Platform Sessions. User and session evidence remain independently permission-scoped." />
-      {admin.data && !admin.data.evidence_complete ? <div className="platform-security__warning-inline">Restricted sources: {admin.data.omitted_sources.map(prettyFlag).join(', ') || 'None'}. Restricted evidence is null/Restricted, never converted to zero.</div> : null}
-      {admin.data ? <>
+      {adminData && !adminData.evidence_complete ? <div className="platform-security__warning-inline">Restricted sources: {adminOmittedSources.map(prettyFlag).join(', ') || 'None'}. Restricted evidence is null/Restricted, never converted to zero.</div> : null}
+      {adminData ? <>
         <OperationalWorkspaceStats ariaLabel="Staff security summary">
-          <OperationalWorkspaceStatCard label="Platform users" value={restrictedValue(admin.data.summary.total_users)} helper="Registry-wide count when PLATFORM_USERS_READ is available" />
-          <OperationalWorkspaceStatCard label="Active users" value={restrictedValue(admin.data.summary.active_users)} helper="Registry-wide authorized evidence" />
-          <OperationalWorkspaceStatCard label="Locked users" value={restrictedValue(admin.data.summary.locked_users)} tone={(admin.data.summary.locked_users || 0) > 0 ? 'danger' : 'good'} helper="Current application lock window" />
-          <OperationalWorkspaceStatCard label="Active without MFA" value={restrictedValue(admin.data.summary.users_without_mfa)} tone={(admin.data.summary.users_without_mfa || 0) > 0 ? 'warn' : 'good'} helper="Application TOTP flag only" />
-          <OperationalWorkspaceStatCard label="Failed-login users" value={restrictedValue(admin.data.summary.users_with_failed_logins)} tone={(admin.data.summary.users_with_failed_logins || 0) > 0 ? 'warn' : 'good'} helper="Current login counters" />
-          <OperationalWorkspaceStatCard label="Active sessions" value={restrictedValue(admin.data.summary.active_sessions)} helper="Registry-wide count when PLATFORM_SESSIONS_READ is available" />
+          <OperationalWorkspaceStatCard label="Platform users" value={restrictedValue(adminSummary.total_users)} helper="Registry-wide count when PLATFORM_USERS_READ is available" />
+          <OperationalWorkspaceStatCard label="Active users" value={restrictedValue(adminSummary.active_users)} helper="Registry-wide authorized evidence" />
+          <OperationalWorkspaceStatCard label="Locked users" value={restrictedValue(adminSummary.locked_users)} tone={(adminSummary.locked_users || 0) > 0 ? 'danger' : 'good'} helper="Current application lock window" />
+          <OperationalWorkspaceStatCard label="Active without MFA" value={restrictedValue(adminSummary.users_without_mfa)} tone={(adminSummary.users_without_mfa || 0) > 0 ? 'warn' : 'good'} helper="Application TOTP flag only" />
+          <OperationalWorkspaceStatCard label="Failed-login users" value={restrictedValue(adminSummary.users_with_failed_logins)} tone={(adminSummary.users_with_failed_logins || 0) > 0 ? 'warn' : 'good'} helper="Current login counters" />
+          <OperationalWorkspaceStatCard label="Active sessions" value={restrictedValue(adminSummary.active_sessions)} helper="Registry-wide count when PLATFORM_SESSIONS_READ is available" />
         </OperationalWorkspaceStats>
-        <div className="platform-security__truth-note">The “stale password review” flag is a {admin.data.risk_policy.password_review_age_days}-day application review heuristic, not an enforced password-expiry policy or legal/security standard. The displayed user/session lists are bounded to {admin.data.limits.users} users and {admin.data.limits.active_sessions} sessions; summary counts remain registry-wide.</div>
+        <div className="platform-security__truth-note">The “stale password review” flag is a {passwordReviewAgeDays}-day application review heuristic, not an enforced password-expiry policy or legal/security standard. The displayed user/session lists are bounded to {adminLimits.users} users and {adminLimits.active_sessions} sessions; summary counts remain registry-wide.</div>
       </> : admin.isLoading ? <div className="platform-security__empty">Loading authorized staff security evidence…</div> : null}
     </section> : null}
 
-    {canReadAdminSecurity && canReadPlatformUsers && admin.data ? <section className="io-workspace-panel platform-security__section">
-      <OperationalSectionHeader iconPath="/platform/users" title="Priority staff review" description={`Up to ${admin.data.limits.users} Platform users, ordered with active lock/MFA/login-risk signals first. Use Platform Users for full registry workflows.`} />
+    {canReadAdminSecurity && canReadPlatformUsers && adminData ? <section className="io-workspace-panel platform-security__section">
+      <OperationalSectionHeader iconPath="/platform/users" title="Priority staff review" description={`Up to ${adminLimits.users} Platform users, ordered with active lock/MFA/login-risk signals first. Use Platform Users for full registry workflows.`} />
       {!canWriteAdminSecurity ? <div className="platform-security__warning-inline">Read-only security access: staff mutation controls are unavailable.</div> : null}
       {canWriteAdminSecurity && !canRevokePlatformSessions ? <div className="platform-security__warning-inline">Administrative MFA clearing is unavailable without PLATFORM_SESSIONS_REVOKE because clearing MFA revokes that user’s active sessions.</div> : null}
       <div className="platform-security__table-wrap"><table><thead><tr><th>User</th><th>Security state</th><th>Last login</th><th>Sessions</th><th>Evidence</th><th>Actions</th></tr></thead><tbody>
@@ -345,13 +363,13 @@ export default function PlatformSecurityPage() {
         })}
         {!adminUsers.length ? <tr><td colSpan={6} className="platform-security__empty">No authorized Platform user evidence returned.</td></tr> : null}
       </tbody></table></div>
-      {admin.data.truncated.users ? <small>Priority list truncated. Open Platform Users for the complete registry.</small> : null}
+      {adminTruncated.users ? <small>Priority list truncated. Open Platform Users for the complete registry.</small> : null}
       {unlock.isError ? <div className="platform-security__inline-error">{readableError(unlock.error)}</div> : null}
       {clearMfa.isError ? <div className="platform-security__inline-error">{readableError(clearMfa.error)}</div> : null}
     </section> : null}
 
-    {canReadAdminSecurity && canReadPlatformSessions && admin.data ? <section className="io-workspace-panel platform-security__section">
-      <OperationalSectionHeader iconPath="/platform/sessions" title="Recent active staff sessions" description={`Up to ${admin.data.limits.active_sessions} active Platform session records. Platform-user identity remains hidden when PLATFORM_USERS_READ is unavailable.`} />
+    {canReadAdminSecurity && canReadPlatformSessions && adminData ? <section className="io-workspace-panel platform-security__section">
+      <OperationalSectionHeader iconPath="/platform/sessions" title="Recent active staff sessions" description={`Up to ${adminLimits.active_sessions} active Platform session records. Platform-user identity remains hidden when PLATFORM_USERS_READ is unavailable.`} />
       <div className="platform-security__table-wrap"><table><thead><tr><th>User</th><th>IP</th><th>Last used</th><th>Expires</th><th>User agent</th></tr></thead><tbody>
         {adminSessions.map((session) => <tr key={session.id}>
           <td>{session.platform_user_identity_restricted ? <strong>Restricted Platform user</strong> : <><strong>{session.name || session.email || 'Platform user'}</strong><small>{session.email} · {session.role}</small></>}</td>
@@ -362,7 +380,7 @@ export default function PlatformSecurityPage() {
         </tr>)}
         {!adminSessions.length ? <tr><td colSpan={5} className="platform-security__empty">No active session evidence returned.</td></tr> : null}
       </tbody></table></div>
-      {admin.data.truncated.active_sessions ? <small>Session list truncated. Open Platform Sessions for the complete registry.</small> : null}
+      {adminTruncated.active_sessions ? <small>Session list truncated. Open Platform Sessions for the complete registry.</small> : null}
     </section> : null}
 
     <section className="io-workspace-panel platform-security__section">

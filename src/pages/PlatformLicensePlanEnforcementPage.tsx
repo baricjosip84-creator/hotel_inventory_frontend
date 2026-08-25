@@ -142,7 +142,26 @@ export default function PlatformLicensePlanEnforcementPage() {
 
   const data = enforcementQuery.data;
   const summary = data?.summary;
-  const items = data?.items || [];
+  const planDefinitions = Array.isArray(data?.plan_definitions) ? data.plan_definitions.map((plan) => ({
+    ...plan,
+    required_limits: Array.isArray(plan.required_limits) ? plan.required_limits : [],
+    required_feature_flags: Array.isArray(plan.required_feature_flags) ? plan.required_feature_flags : [],
+    runtime_enforced_limits: Array.isArray(plan.runtime_enforced_limits) ? plan.runtime_enforced_limits : [],
+    runtime_unenforced_limits: Array.isArray(plan.runtime_unenforced_limits) ? plan.runtime_unenforced_limits : [],
+    runtime_enforced_feature_flags: Array.isArray(plan.runtime_enforced_feature_flags) ? plan.runtime_enforced_feature_flags : [],
+    runtime_unenforced_feature_flags: Array.isArray(plan.runtime_unenforced_feature_flags) ? plan.runtime_unenforced_feature_flags : []
+  })) : [];
+  const items = Array.isArray(data?.items) ? data.items.map((item) => ({
+    ...item,
+    missing_limits: Array.isArray(item.missing_limits) ? item.missing_limits : [],
+    invalid_limits: Array.isArray(item.invalid_limits) ? item.invalid_limits : [],
+    missing_feature_flags: Array.isArray(item.missing_feature_flags) ? item.missing_feature_flags : [],
+    runtime_enforced_limits: Array.isArray(item.runtime_enforced_limits) ? item.runtime_enforced_limits : [],
+    runtime_unenforced_limits: Array.isArray(item.runtime_unenforced_limits) ? item.runtime_unenforced_limits : [],
+    runtime_enforced_feature_flags: Array.isArray(item.runtime_enforced_feature_flags) ? item.runtime_enforced_feature_flags : [],
+    runtime_unenforced_feature_flags: Array.isArray(item.runtime_unenforced_feature_flags) ? item.runtime_unenforced_feature_flags : [],
+    enforcement_gaps: Array.isArray(item.enforcement_gaps) ? item.enforcement_gaps : []
+  })) : [];
   const pagination = data?.pagination;
   const selectedTenant = requestedTenantId ? items.find((item) => item.tenant_id === requestedTenantId) : null;
   const showingStaleSnapshot = Boolean(enforcementQuery.isError && data);
@@ -162,7 +181,7 @@ export default function PlatformLicensePlanEnforcementPage() {
     setSearchParams({}, { replace: true });
   }
 
-  return <div className="platform-license-plan">
+  return <div className="io-operational-page io-workspace-page platform-license-plan">
     <OperationalWorkspaceHero
       iconPath="/platform/license-plan-enforcement"
       eyebrow="Platform commercial evidence"
@@ -203,7 +222,7 @@ export default function PlatformLicensePlanEnforcementPage() {
         <label>Plan code
           <select value={planCode} onChange={(event) => updateFilters({ plan_code: event.target.value })}>
             <option value="">All plans</option>
-            {(data?.plan_definitions || []).map((plan) => <option key={plan.plan_code} value={plan.plan_code}>{plan.plan_code}</option>)}
+            {planDefinitions.map((plan) => <option key={plan.plan_code} value={plan.plan_code}>{plan.plan_code}</option>)}
           </select>
         </label>
         <label>Billing status
@@ -222,7 +241,7 @@ export default function PlatformLicensePlanEnforcementPage() {
 
     <section className="io-workspace-panel platform-license-plan__section">
       <OperationalSectionHeader iconPath="/platform/license-plan-enforcement" title="Plan catalog vs runtime guard coverage" description="The plan catalog defines commercial metadata. Runtime coverage is derived separately from the tenant plan-limit and feature-entitlement guard catalogs currently wired into the application." />
-      {data ? <div className="platform-license-plan__plan-grid">{data.plan_definitions.map((plan) => <article key={plan.plan_code} className="platform-license-plan__plan-card">
+      {data ? <div className="platform-license-plan__plan-grid">{planDefinitions.map((plan) => <article key={plan.plan_code} className="platform-license-plan__plan-card">
         <div className="platform-license-plan__plan-head"><div><strong>{plan.plan_code}</strong><small>{pretty(plan.commercial_tier)}</small></div><span className="platform-license-plan__badge" data-tone={plan.runtime_enforcement_complete ? 'good' : 'warn'}>{plan.runtime_enforcement_complete ? 'Runtime covered' : 'Runtime incomplete'}</span></div>
         <dl><div><dt>Catalog mode</dt><dd>{pretty(plan.recommended_enforcement_mode)}</dd></div></dl>
         <div><strong>Required limits</strong><Chips values={plan.required_limits} /></div>

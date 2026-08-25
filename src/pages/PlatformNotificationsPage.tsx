@@ -88,7 +88,7 @@ function pretty(value?: string | null) {
 }
 
 function countFor(summary: NotificationSummary | undefined, status: NotificationStatus) {
-  return summary?.by_status.find((row) => row.status === status)?.count ?? 0;
+  return summary?.by_status?.find((row) => row.status === status)?.count ?? 0;
 }
 
 function actionsForStatus(status: NotificationStatus): NotificationAction[] {
@@ -169,8 +169,16 @@ export default function PlatformNotificationsPage() {
   });
 
   const data = notificationsQuery.data;
-  const notifications = data?.notifications || [];
-  const summary = summaryQuery.data;
+  const notifications = Array.isArray(data?.notifications) ? data.notifications : [];
+  const summaryRaw = summaryQuery.data;
+  const summary = summaryRaw ? {
+    ...summaryRaw,
+    by_status: Array.isArray(summaryRaw.by_status) ? summaryRaw.by_status : [],
+    active_by_severity: Array.isArray(summaryRaw.active_by_severity) ? summaryRaw.active_by_severity : [],
+    available_sources: Array.isArray(summaryRaw.available_sources) ? summaryRaw.available_sources : [],
+    omitted_sources: Array.isArray(summaryRaw.omitted_sources) ? summaryRaw.omitted_sources : [],
+    evidence_access: summaryRaw.evidence_access || {}
+  } : undefined;
   const showingStaleSnapshot = Boolean((notificationsQuery.isError && data) || (summaryQuery.isError && summary));
   const selectedVisible = notifications.filter((row) => selectedIds.includes(row.id));
 
@@ -319,7 +327,7 @@ export default function PlatformNotificationsPage() {
   })();
   const bulkRoutingValid = selectedIntegrationNotifications.length > 0 && selectedIntegrationNotifications.length <= 100 && bulkRoutingHasTarget && bulkRoutingUrlValid;
 
-  return <div className="platform-notifications">
+  return <div className="io-operational-page io-workspace-page platform-notifications">
     <OperationalWorkspaceHero
       iconPath="/platform/notifications"
       eyebrow="Platform operational evidence"
@@ -346,7 +354,7 @@ export default function PlatformNotificationsPage() {
       <OperationalWorkspaceStatCard label="Acknowledged" value={summary ? countFor(summary, 'acknowledged') : '—'} helper="Authorized source families only" loading={summaryQuery.isLoading && !summary} />
       <OperationalWorkspaceStatCard label="Resolved" value={summary ? countFor(summary, 'resolved') : '—'} tone="good" helper="Historical application workflow state" loading={summaryQuery.isLoading && !summary} />
       <OperationalWorkspaceStatCard label="Dismissed" value={summary ? countFor(summary, 'dismissed') : '—'} helper="Historical application workflow state" loading={summaryQuery.isLoading && !summary} />
-      <OperationalWorkspaceStatCard label="Visible rows" value={data?.pagination.total ?? '—'} helper="Current filters and authorized source scope" loading={notificationsQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Visible rows" value={data?.pagination?.total ?? '—'} helper="Current filters and authorized source scope" loading={notificationsQuery.isLoading && !data} />
       <OperationalWorkspaceStatCard label="Oldest open" value={summary?.oldest_open_at ? new Date(summary.oldest_open_at).toLocaleDateString() : 'None'} helper="Authorized open evidence" loading={summaryQuery.isLoading && !summary} />
     </OperationalWorkspaceStats>
 
@@ -433,7 +441,7 @@ export default function PlatformNotificationsPage() {
         </article>;
       })}</div> : notificationsQuery.isLoading ? <div className="platform-notifications__empty">Loading notifications…</div> : <div className="platform-notifications__empty">No authorized notifications match the current filters.</div>}
 
-      {data?.pagination ? <div className="platform-notifications__pagination"><span>Showing {data.pagination.total ? data.pagination.offset + 1 : 0}–{Math.min(data.pagination.offset + data.notifications.length, data.pagination.total)} of {data.pagination.total}</span><div><button type="button" className="app-button app-button--secondary" disabled={data.pagination.offset === 0} onClick={() => updateFilters({ offset: Math.max(0, data.pagination.offset - data.pagination.limit) })}>Previous</button><button type="button" className="app-button app-button--secondary" disabled={!data.pagination.has_more} onClick={() => updateFilters({ offset: data.pagination.offset + data.pagination.limit })}>Next</button></div></div> : null}
+      {data?.pagination ? <div className="platform-notifications__pagination"><span>Showing {data.pagination.total ? data.pagination.offset + 1 : 0}–{Math.min(data.pagination.offset + notifications.length, data.pagination.total)} of {data.pagination.total}</span><div><button type="button" className="app-button app-button--secondary" disabled={data.pagination.offset === 0} onClick={() => updateFilters({ offset: Math.max(0, data.pagination.offset - data.pagination.limit) })}>Previous</button><button type="button" className="app-button app-button--secondary" disabled={!data.pagination.has_more} onClick={() => updateFilters({ offset: data.pagination.offset + data.pagination.limit })}>Next</button></div></div> : null}
     </section>
 
     <section className="io-workspace-panel platform-notifications__section">

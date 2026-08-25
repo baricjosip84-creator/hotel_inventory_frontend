@@ -82,13 +82,17 @@ export default function PlatformEnterpriseIdentityGovernancePage() {
   });
 
   const data = governanceQuery.data;
-  const providerEntries = Object.entries(data?.config.providers || {});
-  const enforcementEntries = Object.entries(data?.config.enforcement || {});
-  const auditEntries = Object.entries(data?.config.audit || {});
-  const runtimeEntries = Object.entries(data?.runtime_capabilities || {});
+  const enabledProviders = Array.isArray(data?.enabled_providers) ? data.enabled_providers : [];
+  const configurationAttention = Array.isArray(data?.configuration_attention) ? data.configuration_attention : [];
+  const runtimeAttention = Array.isArray(data?.runtime_attention) ? data.runtime_attention : [];
+  const runtimeCapabilities = data?.runtime_capabilities || {};
+  const providerEntries = Object.entries(data?.config?.providers || {});
+  const enforcementEntries = Object.entries(data?.config?.enforcement || {});
+  const auditEntries = Object.entries(data?.config?.audit || {});
+  const runtimeEntries = Object.entries(runtimeCapabilities);
   const showingStaleSnapshot = Boolean(governanceQuery.isError && data);
 
-  return <div className="platform-enterprise-identity">
+  return <div className="io-operational-page io-workspace-page platform-enterprise-identity">
     <OperationalWorkspaceHero
       iconPath="/platform/enterprise-identity"
       eyebrow="Platform security evidence"
@@ -119,16 +123,16 @@ export default function PlatformEnterpriseIdentityGovernancePage() {
     </section> : null}
 
     <OperationalWorkspaceStats ariaLabel="Enterprise identity summary">
-      <OperationalWorkspaceStatCard label="Configured provider flags" value={data?.provider_count ?? '—'} helper={data?.enabled_providers.length ? data.enabled_providers.map((value) => value.toUpperCase()).join(', ') : 'No provider enabled in application environment metadata'} tone={data?.provider_count ? 'warn' : 'neutral'} loading={governanceQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Configured provider flags" value={data?.provider_count ?? '—'} helper={enabledProviders.length ? enabledProviders.map((value) => value.toUpperCase()).join(', ') : 'No provider enabled in application environment metadata'} tone={data?.provider_count ? 'warn' : 'neutral'} loading={governanceQuery.isLoading && !data} />
       <OperationalWorkspaceStatCard label="Runtime SSO providers" value={data?.runtime_sso_provider_count ?? '—'} helper="OIDC/SAML providers actually wired into Platform authentication" tone={data?.runtime_sso_provider_count ? 'good' : 'warn'} loading={governanceQuery.isLoading && !data} />
-      <OperationalWorkspaceStatCard label="Password login" value={data?.runtime_capabilities.platform_password_login ? 'Available' : 'Unavailable'} helper="Current Platform authentication path" tone={data?.runtime_capabilities.platform_password_login ? 'neutral' : 'danger'} loading={governanceQuery.isLoading && !data} />
-      <OperationalWorkspaceStatCard label="TOTP MFA" value={data?.runtime_capabilities.platform_totp_mfa ? 'Available' : 'Unavailable'} helper="Optional MFA capability in current Platform auth" tone={data?.runtime_capabilities.platform_totp_mfa ? 'good' : 'warn'} loading={governanceQuery.isLoading && !data} />
-      <OperationalWorkspaceStatCard label="Configuration signals" value={data?.configuration_attention.length ?? '—'} helper="Environment metadata needing review" tone={data?.configuration_attention.length ? 'warn' : 'good'} loading={governanceQuery.isLoading && !data} />
-      <OperationalWorkspaceStatCard label="Runtime gaps" value={data?.runtime_attention.length ?? '—'} helper="Configured or desired controls not enforced by current auth code" tone={data?.runtime_attention.length ? 'warn' : 'good'} loading={governanceQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Password login" value={runtimeCapabilities.platform_password_login ? 'Available' : 'Unavailable'} helper="Current Platform authentication path" tone={runtimeCapabilities.platform_password_login ? 'neutral' : 'danger'} loading={governanceQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="TOTP MFA" value={runtimeCapabilities.platform_totp_mfa ? 'Available' : 'Unavailable'} helper="Optional MFA capability in current Platform auth" tone={runtimeCapabilities.platform_totp_mfa ? 'good' : 'warn'} loading={governanceQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Configuration signals" value={configurationAttention.length ?? '—'} helper="Environment metadata needing review" tone={configurationAttention.length ? 'warn' : 'good'} loading={governanceQuery.isLoading && !data} />
+      <OperationalWorkspaceStatCard label="Runtime gaps" value={runtimeAttention.length ?? '—'} helper="Configured or desired controls not enforced by current auth code" tone={runtimeAttention.length ? 'warn' : 'good'} loading={governanceQuery.isLoading && !data} />
     </OperationalWorkspaceStats>
 
     {data ? <>
-      <section className="platform-enterprise-identity__section">
+      <section className="io-workspace-panel platform-enterprise-identity__section">
         <OperationalSectionHeader iconPath="/platform/enterprise-identity" title="Configuration vs runtime" description="The left side is deployment/environment governance metadata. The right side is the current application authentication contract." />
         <div className="platform-enterprise-identity__split-grid">
           <article>
@@ -148,14 +152,14 @@ export default function PlatformEnterpriseIdentityGovernancePage() {
         </div>
       </section>
 
-      <section className="platform-enterprise-identity__section">
+      <section className="io-workspace-panel platform-enterprise-identity__section">
         <OperationalSectionHeader iconPath="/platform/enterprise-identity" title="Provider configuration" description="Provider entries show non-secret configuration presence only. No provider connectivity, token exchange, assertion processing, or login success is verified here." />
         <div className="platform-enterprise-identity__table-wrap">
           <table className="platform-enterprise-identity__table">
             <thead><tr><th>Provider</th><th>Environment enabled</th><th>Configuration metadata</th><th>Live authentication</th></tr></thead>
             <tbody>
               {providerEntries.map(([provider, config]) => {
-                const runtimeAvailable = provider === 'oidc' ? Boolean(data.runtime_capabilities.oidc_login_execution) : Boolean(data.runtime_capabilities.saml_assertion_processing);
+                const runtimeAvailable = provider === 'oidc' ? Boolean(runtimeCapabilities.oidc_login_execution) : Boolean(runtimeCapabilities.saml_assertion_processing);
                 return <tr key={provider}>
                   <td><strong>{provider.toUpperCase()}</strong></td>
                   <td><BoolBadge value={Boolean(config.enabled)} trueLabel="Enabled flag" falseLabel="Disabled" /></td>
@@ -168,22 +172,22 @@ export default function PlatformEnterpriseIdentityGovernancePage() {
         </div>
       </section>
 
-      <section className="platform-enterprise-identity__section">
+      <section className="io-workspace-panel platform-enterprise-identity__section">
         <OperationalSectionHeader iconPath="/platform/enterprise-identity" title="Review signals" description="Configuration defects and runtime implementation gaps are reported separately so a clean environment file cannot hide missing authentication execution." />
         <div className="platform-enterprise-identity__signal-grid">
-          <article><h4>Configuration attention</h4><SignalList values={data.configuration_attention} empty="No configuration-metadata attention signals." /></article>
-          <article><h4>Runtime attention</h4><SignalList values={data.runtime_attention} empty="No runtime identity gaps reported." /></article>
+          <article><h4>Configuration attention</h4><SignalList values={configurationAttention} empty="No configuration-metadata attention signals." /></article>
+          <article><h4>Runtime attention</h4><SignalList values={runtimeAttention} empty="No runtime identity gaps reported." /></article>
         </div>
       </section>
 
-      <section className="platform-enterprise-identity__section">
+      <section className="io-workspace-panel platform-enterprise-identity__section">
         <OperationalSectionHeader iconPath="/platform/audit" title="Audit requirement metadata" description="These flags describe configured audit requirements. They do not prove that an external identity provider event was emitted, received, retained, or correlated." />
         <div className="platform-enterprise-identity__chips">
           {auditEntries.map(([key, value]) => <span key={key}><b>{pretty(key)}</b>{valueText(value)}</span>)}
         </div>
       </section>
 
-      <section className="platform-enterprise-identity__section">
+      <section className="io-workspace-panel platform-enterprise-identity__section">
         <OperationalSectionHeader iconPath="/platform/security" title="Supporting Platform evidence" description="Links are shown only when the operator can actually open the underlying protected evidence source." />
         <div className="platform-enterprise-identity__links">
           <SourceLink href="/platform/security">My Security</SourceLink>
@@ -198,7 +202,7 @@ export default function PlatformEnterpriseIdentityGovernancePage() {
         </div>
       </section>
 
-      <section className="platform-enterprise-identity__section platform-enterprise-identity__truth">
+      <section className="io-workspace-panel platform-enterprise-identity__section platform-enterprise-identity__truth">
         <OperationalSectionHeader iconPath="/platform/enterprise-identity" title="Evidence boundary" description="What this page can and cannot prove." />
         <div className="platform-enterprise-identity__truth-grid">
           <article><strong>Environment configuration is not runtime enforcement.</strong><span>An enabled OIDC/SAML flag does not route Platform login through that provider.</span></article>

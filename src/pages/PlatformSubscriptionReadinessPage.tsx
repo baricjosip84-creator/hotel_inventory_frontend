@@ -119,7 +119,7 @@ export default function PlatformSubscriptionReadinessPage() {
 
   const data = readinessQuery.data;
   const summary = data?.summary;
-  const items = data?.items || [];
+  const items = Array.isArray(data?.items) ? data.items.map((item) => ({ ...item, risk_flags: Array.isArray(item.risk_flags) ? item.risk_flags : [] })) : [];
   const pagination = data?.pagination;
   const selectedTenant = requestedTenantId ? items.find((item) => item.tenant_id === requestedTenantId) : null;
   const showingStaleSnapshot = Boolean(readinessQuery.isError && data);
@@ -139,7 +139,7 @@ export default function PlatformSubscriptionReadinessPage() {
     setSearchParams({}, { replace: true });
   }
 
-  return <div className="platform-subscription-readiness">
+  return <div className="io-operational-page io-workspace-page platform-subscription-readiness">
     <OperationalWorkspaceHero
       iconPath="/platform/subscription-readiness"
       eyebrow="Platform commercial evidence"

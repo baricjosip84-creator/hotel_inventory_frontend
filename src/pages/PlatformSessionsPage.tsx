@@ -136,13 +136,19 @@ export default function PlatformSessionsPage() {
     }
   });
 
-  const data = sessionsQuery.data;
+  const rawData = sessionsQuery.data as PlatformSessionsResponse | Session[] | undefined;
+  const legacySessions = Array.isArray(rawData) ? rawData : null;
+  const data = legacySessions ? undefined : rawData;
+  const sessions = legacySessions || (Array.isArray(data?.sessions) ? data.sessions : []);
   const summary = data?.summary;
   const pagination = data?.pagination;
   const currentSession = data?.current_session;
-  const refreshError = sessionsQuery.isError && Boolean(data);
+  const evidenceAccess = data?.evidence_access || { platform_sessions: true, platform_user_identity: canReadUsers };
+  const evidenceComplete = data?.evidence_complete ?? canReadUsers;
+  const directoryUsers = Array.isArray(usersQuery.data) ? usersQuery.data : [];
+  const refreshError = sessionsQuery.isError && Boolean(rawData);
   const pageStart = pagination?.total ? pagination.offset + 1 : 0;
-  const pageEnd = pagination && data ? Math.min(pagination.offset + data.sessions.length, pagination.total) : 0;
+  const pageEnd = pagination ? Math.min(pagination.offset + sessions.length, pagination.total) : sessions.length;
 
   const updateParams = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);
@@ -174,7 +180,7 @@ export default function PlatformSessionsPage() {
       description="Review application session records for Platform staff, identify the currently authenticated browser record, and revoke another active session through an audited lifecycle action. Platform-user identity is independently permission-scoped."
       meta={<>
         <OperationalWorkspaceMetaPill>PLATFORM_SESSIONS_READ</OperationalWorkspaceMetaPill>
-        <OperationalWorkspaceMetaPill>{data?.evidence_access.platform_user_identity ? 'Platform identity visible' : 'Platform identity restricted'}</OperationalWorkspaceMetaPill>
+        <OperationalWorkspaceMetaPill>{evidenceAccess.platform_user_identity ? 'Platform identity visible' : 'Platform identity restricted'}</OperationalWorkspaceMetaPill>
         <OperationalWorkspaceMetaPill>{canRevoke ? 'Revocation enabled' : 'Read-only registry'}</OperationalWorkspaceMetaPill>
         {data?.generated_at ? <OperationalWorkspaceMetaPill>Generated {formatDateTime(data.generated_at)}</OperationalWorkspaceMetaPill> : null}
       </>}
@@ -192,14 +198,14 @@ export default function PlatformSessionsPage() {
     </OperationalWorkspaceStats>
 
     {refreshError ? <div className="platform-sessions__warning" role="status"><strong>Showing the last successful snapshot.</strong><span>Refresh failed: {readableError(sessionsQuery.error)}</span></div> : null}
-    {data && !data.evidence_complete ? <div className="platform-sessions__warning" role="status"><strong>Platform-user identity evidence is restricted.</strong><span>Session state, IP/user-agent request metadata and lifecycle remain visible; names, emails, roles and user-target filters require PLATFORM_USERS_READ.</span></div> : null}
+    {rawData && !evidenceComplete ? <div className="platform-sessions__warning" role="status"><strong>Platform-user identity evidence is restricted.</strong><span>Session state, IP/user-agent request metadata and lifecycle remain visible; names, emails, roles and user-target filters require PLATFORM_USERS_READ.</span></div> : null}
     {revokeMutation.error ? <div className="platform-sessions__error" role="alert">{readableError(revokeMutation.error)}</div> : null}
 
     <section className="io-workspace-panel platform-sessions__section">
       <OperationalSectionHeader iconPath="/platform/sessions" title="Session registry" description="Filter server-side across the full Platform-session registry. Search always covers session ID, IP and user-agent metadata; Platform-user name/email/role are added only when PLATFORM_USERS_READ is available." />
       <div className="platform-sessions__filter-grid">
         <label>Status<select value={status} onChange={(event) => updateParams({ status: event.target.value || null })}><option value="">All record states</option><option value="active">Active</option><option value="revoked">Revoked</option><option value="expired">Expired</option></select></label>
-        {canReadUsers ? <label>Platform user<select value={requestedUserId} onChange={(event) => updateParams({ platform_user_id: event.target.value || null })}><option value="">All Platform users</option>{(usersQuery.data || []).map((user) => <option key={user.id} value={user.id}>{user.name || user.email} · {pretty(user.role)}</option>)}</select></label> : null}
+        {canReadUsers ? <label>Platform user<select value={requestedUserId} onChange={(event) => updateParams({ platform_user_id: event.target.value || null })}><option value="">All Platform users</option>{directoryUsers.map((user) => <option key={user.id} value={user.id}>{user.name || user.email} · {pretty(user.role)}</option>)}</select></label> : null}
         <label className="platform-sessions__search">Search<input value={requestedSearch} onChange={(event) => updateParams({ search: event.target.value || null })} maxLength={200} placeholder={canReadUsers ? 'Session ID, IP, user agent, name, email or role' : 'Session ID, IP or user agent'} /></label>
         <div className="platform-sessions__filter-actions"><button type="button" className="app-button app-button--secondary" disabled={!status && !requestedUserId && !requestedSearch} onClick={() => setSearchParams({}, { replace: true })}>Clear filters</button></div>
       </div>
@@ -209,7 +215,7 @@ export default function PlatformSessionsPage() {
       {!data && sessionsQuery.isLoading ? <div className="platform-sessions__loading">Loading Platform session evidence…</div> : null}
       {!data && sessionsQuery.isError ? <div className="platform-sessions__blocking-error" role="alert"><strong>Platform Sessions could not be loaded.</strong><span>{readableError(sessionsQuery.error)}</span><button type="button" className="app-button app-button--secondary" disabled={sessionsQuery.isFetching} onClick={() => void sessionsQuery.refetch()}>Retry</button></div> : null}
 
-      {data?.sessions.length ? <div className="platform-sessions__table-wrap"><table className="platform-sessions__table"><thead><tr><th>Session</th><th>Platform user</th><th>Status</th><th>Network evidence</th><th>Activity</th><th>Expires</th><th>Actions</th></tr></thead><tbody>{data.sessions.map((session) => <tr key={session.id}>
+      {sessions.length ? <div className="platform-sessions__table-wrap"><table className="platform-sessions__table"><thead><tr><th>Session</th><th>Platform user</th><th>Status</th><th>Network evidence</th><th>Activity</th><th>Expires</th><th>Actions</th></tr></thead><tbody>{sessions.map((session) => <tr key={session.id}>
         <td><strong>{shortId(session.id)}</strong><small>{session.id}</small></td>
         <td>{session.platform_user_identity_restricted ? <><strong>Restricted Platform user</strong><small>PLATFORM_USERS_READ required</small></> : <><strong>{session.platform_user_name || session.platform_user_email || 'Platform user'}</strong><small>{session.platform_user_email || 'No email'} · {pretty(session.platform_user_role)}</small></>}</td>
         <td><span className="platform-sessions__badge" data-tone={statusTone(session)}>{statusLabel(session)}</span>{session.is_current ? <small>This browser</small> : null}</td>
@@ -217,7 +223,7 @@ export default function PlatformSessionsPage() {
         <td><strong>{formatDateTime(session.last_used_at || session.created_at)}</strong><small>Created {formatDateTime(session.created_at)}</small></td>
         <td>{formatDateTime(session.expires_at)}</td>
         <td>{session.is_current && session.is_active ? <span className="platform-sessions__action-note">Sign out to end this browser session.</span> : session.is_active && canRevoke ? <button type="button" className="app-button app-button--danger" disabled={revokeMutation.isPending} onClick={() => window.confirm('Revoke this active Platform session? The bearer will be rejected on its next authenticated request.') && revokeMutation.mutate(session.id)}>Revoke session</button> : session.is_active ? <span className="platform-sessions__action-note">PLATFORM_SESSIONS_REVOKE required</span> : <span className="platform-sessions__action-note">Historical record</span>}</td>
-      </tr>)}</tbody></table></div> : data ? <div className="platform-sessions__empty"><strong>No Platform sessions matched.</strong><span>No application session record matched the current permission-scoped filters.</span></div> : null}
+      </tr>)}</tbody></table></div> : rawData ? <div className="platform-sessions__empty"><strong>No Platform sessions matched.</strong><span>No application session record matched the current permission-scoped filters.</span></div> : null}
 
       {pagination ? <div className="platform-sessions__pagination"><span>Showing {pageStart}–{pageEnd} of {pagination.total}</span><button type="button" className="app-button app-button--secondary" disabled={pagination.offset === 0 || sessionsQuery.isFetching} onClick={() => updateParams({ offset: String(Math.max(0, pagination.offset - PAGE_SIZE)) })}>Previous</button><button type="button" className="app-button app-button--secondary" disabled={!pagination.has_more || sessionsQuery.isFetching} onClick={() => updateParams({ offset: String(pagination.offset + PAGE_SIZE) })}>Next</button></div> : null}
     </section>

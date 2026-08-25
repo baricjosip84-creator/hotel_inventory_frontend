@@ -32,6 +32,18 @@
   min-width: 0;
 }
 
+
+/* Shared major surfaces. Pages should not recreate panel framing locally. */
+.io-workspace-page .io-workspace-panel,
+.io-workspace-page .io-workspace-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--io-workspace-border);
+  border-radius: var(--io-workspace-panel-radius);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.035);
+}
+
 .io-workspace-hero {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

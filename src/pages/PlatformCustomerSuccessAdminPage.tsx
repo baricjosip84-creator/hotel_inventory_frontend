@@ -157,8 +157,17 @@ export default function PlatformCustomerSuccessAdminPage() {
 
   const data = successQuery.data;
   const summary = data?.summary;
-  const items = data?.items || [];
+  const items = Array.isArray(data?.items) ? data.items.map((item) => ({
+    ...item,
+    risk_flags: Array.isArray(item.risk_flags) ? item.risk_flags : [],
+    recommended_admin_actions: Array.isArray(item.recommended_admin_actions) ? item.recommended_admin_actions : []
+  })) : [];
   const pagination = data?.pagination;
+  const evidenceAccess = data?.evidence_access || {
+    tenant_directory: false, tenant_contacts: false, tenant_tasks: false, tenant_communications: false,
+    support_sessions: false, incidents: false, billing_subscription: false, license_plan_enforcement: false
+  };
+  const omittedSources = Array.isArray(data?.omitted_sources) ? data.omitted_sources : [];
   const selectedTenant = requestedTenantId ? items.find((item) => item.tenant_id === requestedTenantId) : null;
   const showingStaleSnapshot = Boolean(successQuery.isError && data);
 
@@ -176,7 +185,7 @@ export default function PlatformCustomerSuccessAdminPage() {
     setSearchParams({}, { replace: true });
   }
 
-  return <div className="platform-customer-success">
+  return <div className="io-operational-page io-workspace-page platform-customer-success">
     <OperationalWorkspaceHero
       iconPath="/platform/customer-success-admin"
       eyebrow="Platform customer operations"
@@ -196,7 +205,7 @@ export default function PlatformCustomerSuccessAdminPage() {
     {invalidFilters ? <section className="platform-customer-success__error"><strong>Invalid Customer Success filters.</strong><span>Clear the URL filters and retry.</span><button type="button" className="app-button app-button--secondary" onClick={clearFilters}>Clear filters</button></section> : null}
     {successQuery.isError && !data && !invalidFilters ? <section className="platform-customer-success__blocking-error"><strong>Customer Success failed to load.</strong><span>{readableError(successQuery.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => successQuery.refetch()}>Retry</button></section> : null}
     {showingStaleSnapshot ? <section className="platform-customer-success__warning"><strong>Showing the last successful snapshot.</strong><span>The latest refresh failed: {readableError(successQuery.error)}</span></section> : null}
-    {data && !data.evidence_complete ? <section className="platform-customer-success__warning"><strong>Partial evidence.</strong><span>Restricted source families: {data.omitted_sources.map(pretty).join(', ') || 'None'}. Known blockers remain visible, but otherwise-clean tenants are not called Ready until protected evidence is available.</span></section> : null}
+    {data && !data.evidence_complete ? <section className="platform-customer-success__warning"><strong>Partial evidence.</strong><span>Restricted source families: {omittedSources.map(pretty).join(', ') || 'None'}. Known blockers remain visible, but otherwise-clean tenants are not called Ready until protected evidence is available.</span></section> : null}
 
     <OperationalWorkspaceStats ariaLabel="Customer Success summary">
       <OperationalWorkspaceStatCard label="Reviewed" value={summary?.tenants_reviewed ?? '—'} helper="Registry-wide for current filters" loading={successQuery.isLoading && !data} />
@@ -228,7 +237,7 @@ export default function PlatformCustomerSuccessAdminPage() {
     <section className="io-workspace-panel platform-customer-success__section">
       <OperationalSectionHeader iconPath="/platform/customer-success-admin" title="Evidence access" description="Customer Success uses TENANTS_READ-owned contacts/tasks/communications and independently protected Support Session, Incident and Billing evidence. Restricted sources are not queried." />
       <div className="platform-customer-success__source-grid">
-        {Object.entries(data?.evidence_access || {}).map(([source, available]) => <div key={source}><strong>{pretty(source)}</strong><span className="platform-customer-success__badge" data-tone={available ? 'good' : 'neutral'}>{available ? 'Available' : 'Restricted'}</span></div>)}
+        {Object.entries(data ? evidenceAccess : {}).map(([source, available]) => <div key={source}><strong>{pretty(source)}</strong><span className="platform-customer-success__badge" data-tone={available ? 'good' : 'neutral'}>{available ? 'Available' : 'Restricted'}</span></div>)}
         {!data ? <div className="platform-customer-success__empty">Loading evidence access…</div> : null}
       </div>
     </section>
@@ -240,7 +249,7 @@ export default function PlatformCustomerSuccessAdminPage() {
           <thead><tr><th>Tenant</th><th>Commercial</th><th>Contacts & tasks</th><th>Touch & escalation</th><th>Risk</th><th>Recommended actions</th><th>Evidence</th></tr></thead>
           <tbody>{items.map((item) => <tr key={item.tenant_id}>
             <td><strong>{item.tenant_name}</strong><span className="platform-customer-success__badge" data-tone={stateTone(item.customer_success_state)}>{pretty(item.customer_success_state)}</span><small>{pretty(item.tenant_status)}</small></td>
-            <td>{data.evidence_access.billing_subscription ? <><strong>{pretty(item.billing_status)}</strong><small>{item.plan_code || 'No plan'} · {pretty(item.subscription_readiness_state)} · {pretty(item.license_enforcement_state)}</small></> : <><strong>Restricted</strong><small>PLATFORM_BILLING_READ required</small></>}</td>
+            <td>{evidenceAccess.billing_subscription ? <><strong>{pretty(item.billing_status)}</strong><small>{item.plan_code || 'No plan'} · {pretty(item.subscription_readiness_state)} · {pretty(item.license_enforcement_state)}</small></> : <><strong>Restricted</strong><small>PLATFORM_BILLING_READ required</small></>}</td>
             <td><strong>Contacts {item.primary_contacts}</strong><small>Open tasks {item.open_tasks} · urgent {item.open_urgent_tasks} · overdue {item.overdue_tasks}</small></td>
             <td><strong>Last recorded touch {item.days_since_last_touch ?? '—'} days</strong><small>Follow-ups {item.unresolved_follow_ups} · support {item.open_support_sessions ?? 'Restricted'} · incidents {item.open_incidents ?? 'Restricted'}</small></td>
             <td><strong>Score {item.success_risk_score}</strong><RiskChips values={item.risk_flags} /></td>

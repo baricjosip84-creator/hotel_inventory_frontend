@@ -144,8 +144,11 @@ export default function PlatformUsersPage() {
     onError: (error) => setMutationError(readableError(error))
   });
 
-  const data = usersQuery.data;
-  const roles = data?.roles?.length ? data.roles : DEFAULT_ROLES;
+  const rawData = usersQuery.data as PlatformUsersResponse | PlatformUser[] | undefined;
+  const legacyUsers = Array.isArray(rawData) ? rawData : null;
+  const data = legacyUsers ? undefined : rawData;
+  const users = legacyUsers || (Array.isArray(data?.users) ? data.users : []);
+  const roles = Array.isArray(data?.roles) && data.roles.length ? data.roles : DEFAULT_ROLES;
   const summary = data?.summary;
   const pagination = data?.pagination;
   const mutating = create.isPending || update.isPending || lifecycle.isPending || resetPassword.isPending || revoke.isPending;
@@ -154,12 +157,15 @@ export default function PlatformUsersPage() {
 
   function updateFilters(next: Record<string, string>) {
     const params = new URLSearchParams(searchParams);
-    for (const [key, value] of Object.entries(next)) value ? params.set(key, value) : params.delete(key);
+    for (const [key, value] of Object.entries(next)) {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    }
     setSearchParams(params, { replace: true });
   }
   function startEdit(user: PlatformUser) { setEditingId(user.id); setEditForm({ name: user.name, role: user.role }); setMutationError(''); setMessage(''); }
 
-  return <div className="platform-users">
+  return <div className="io-operational-page io-workspace-page platform-users">
     <OperationalWorkspaceHero
       iconPath="/platform/users"
       eyebrow="Platform · Identity governance"
@@ -209,7 +215,7 @@ export default function PlatformUsersPage() {
       <OperationalSectionHeader iconPath="/platform/users" title="Platform identity registry" description="Account state is current application evidence. MFA/session flags do not independently prove device possession, employee status or organizational authorization outside this application." />
       {!usersQuery.data && usersQuery.isLoading ? <div className="platform-users__loading">Loading Platform users…</div> : null}
       {!usersQuery.data && usersQuery.error ? <div className="platform-users__blocking-error"><strong>Platform users could not be loaded.</strong><span>{readableError(usersQuery.error)}</span><button type="button" className="app-button app-button--secondary" onClick={() => usersQuery.refetch()}>Retry</button></div> : null}
-      {data?.users.length ? <div className="platform-users__list">{data.users.map((user) => {
+      {users.length ? <div className="platform-users__list">{users.map((user) => {
         const current = user.id === currentPlatformUserId;
         const editing = editingId === user.id;
         const tone = statusTone(user);
@@ -220,7 +226,7 @@ export default function PlatformUsersPage() {
           {passwordTarget?.id === user.id ? <div className="platform-users__password-reset"><label>New temporary password<input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="At least 10 characters" /></label><div className="platform-users__actions"><button type="button" className="app-button app-button--danger" disabled={newPassword.length < 10 || mutating} onClick={() => resetPassword.mutate({ id: user.id, password: newPassword })}>Reset password & revoke access</button><button type="button" className="app-button app-button--secondary" disabled={mutating} onClick={() => { setPasswordTarget(null); setNewPassword(''); }}>Cancel</button></div></div> : null}
           <div className="platform-users__card-footer"><div className="platform-users__source-links">{canReadSessions ? <Link to={`/platform/sessions?platform_user_id=${encodeURIComponent(user.id)}`}>Platform sessions</Link> : null}{canReadSecurity ? <Link to="/platform/security">Security</Link> : null}{canReadAudit ? <Link to={`/platform/audit?target_type=platform_users&target_id=${encodeURIComponent(user.id)}`}>Audit history</Link> : null}</div>{canWrite ? <div className="platform-users__actions"><button type="button" className="app-button app-button--secondary" disabled={mutating} onClick={() => startEdit(user)}>Edit details</button><button type="button" className="app-button app-button--secondary" disabled={mutating} onClick={() => { setPasswordTarget(user); setNewPassword(''); }}>Reset password</button>{canRevokeSessions && canEndSupportSessions ? <button type="button" className="app-button app-button--secondary" disabled={mutating} onClick={() => window.confirm(`Revoke all current application access for ${user.email}? This also ends active Support Sessions.`) && revoke.mutate(user)}>Revoke access</button> : null}{user.is_active ? <button type="button" className="app-button app-button--danger" disabled={mutating || current} title={current ? 'You cannot deactivate your own Platform account.' : undefined} onClick={() => window.confirm(`Deactivate ${user.email}? Active Platform and Support Session access will be revoked.`) && lifecycle.mutate({ user, action: 'deactivate' })}>Deactivate</button> : <button type="button" className="app-button" disabled={mutating} onClick={() => window.confirm(`Reactivate ${user.email}? Previous sessions will not be restored.`) && lifecycle.mutate({ user, action: 'activate' })}>Activate</button>}</div> : null}</div>
         </article>;
-      })}</div> : data ? <div className="platform-users__empty"><strong>No Platform users matched.</strong><span>No application identity record matched the current filters.</span></div> : null}
+      })}</div> : rawData ? <div className="platform-users__empty"><strong>No Platform users matched.</strong><span>No application identity record matched the current filters.</span></div> : null}
       {pagination ? <div className="platform-users__pagination"><button type="button" className="app-button app-button--secondary" onClick={() => setOffset((value) => Math.max(0, value - PAGE_SIZE))} disabled={offset === 0 || usersQuery.isFetching}>Previous</button><span>Page {pageNumber} · {pagination.total} matching user{pagination.total === 1 ? '' : 's'}</span><button type="button" className="app-button app-button--secondary" onClick={() => setOffset((value) => value + PAGE_SIZE)} disabled={!pagination.has_more || usersQuery.isFetching}>Next</button></div> : null}
     </section>
 

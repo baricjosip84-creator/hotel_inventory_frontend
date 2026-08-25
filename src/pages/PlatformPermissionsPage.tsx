@@ -28,9 +28,17 @@ export default function PlatformPermissionsPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const roles = useMemo(() => Array.isArray(query.data?.roles) ? query.data.roles.map((role) => ({
+    ...role,
+    default_permissions: Array.isArray(role.default_permissions) ? role.default_permissions : [],
+    effective_permissions: Array.isArray(role.effective_permissions) ? role.effective_permissions : [],
+    locked_permissions: Array.isArray(role.locked_permissions) ? role.locked_permissions : [],
+    forbidden_permissions: Array.isArray(role.forbidden_permissions) ? role.forbidden_permissions : []
+  })) : [], [query.data?.roles]);
+  const permissionCatalog = Array.isArray(query.data?.permission_catalog) ? query.data.permission_catalog : [];
   const activeRole = useMemo(
-    () => query.data?.roles.find((role) => role.role === selectedRole),
-    [query.data, selectedRole]
+    () => roles.find((role) => role.role === selectedRole),
+    [roles, selectedRole]
   );
   const draftPermissions = draftByRole[selectedRole] ?? activeRole?.effective_permissions ?? [];
   const dirty = Boolean(activeRole) && (
@@ -138,8 +146,8 @@ export default function PlatformPermissionsPage() {
       description="Govern the application authorization policy for fixed Platform roles. Superadmin remains immutable. Changes are concurrency-protected, audited, and enforced against current policy on active requests; they do not prove access to any external system."
       scopeLabel="Platform"
       reservedLabel="Superadmin only"
-      roles={query.data.roles}
-      catalog={query.data.permission_catalog}
+      roles={roles}
+      catalog={permissionCatalog}
       selectedRole={selectedRole}
       onDiscardDraft={() => {
         setDraftByRole((current) => {
@@ -168,7 +176,7 @@ export default function PlatformPermissionsPage() {
       workspaceIconPath="/permissions"
       workspaceEyebrow="Platform access governance"
       footerAddon={(
-        <section className="platform-permissions__evidence app-panel">
+        <section className="io-workspace-panel platform-permissions__evidence">
           <div>
             <strong>Authorization evidence boundary</strong>
             <p>
