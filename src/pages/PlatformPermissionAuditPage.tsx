@@ -93,7 +93,7 @@ export default function PlatformPermissionAuditPage(){
   const users=data?.platform_users||[];
   const apiKeys=data?.api_keys||[];
 
-  return <div className="platform-permission-audit io-workspace-shell">
+  return <div className="io-operational-page io-workspace-page platform-permission-audit io-workspace-shell">
     <OperationalWorkspaceHero
       iconPath="/platform/permission-audit"
       eyebrow="Security governance"

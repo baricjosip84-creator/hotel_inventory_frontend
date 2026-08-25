@@ -139,7 +139,7 @@ export default function PlatformTenantTimelinePage() {
   const heroLabel = invalidFilters ? 'Clear invalid URL filters' : initialTimelineError ? 'Retry required' : refreshTimelineError ? 'Last successful data retained' : 'Permission-scoped tenant history';
 
   return (
-    <div className="platform-tenant-timeline">
+    <div className="io-operational-page io-workspace-page platform-tenant-timeline">
       <OperationalWorkspaceHero
         iconPath="/platform/tenant-timeline"
         eyebrow="Platform tenant operations"

@@ -167,7 +167,7 @@ export default function PlatformVendorsPage() {
   const startEdit = (vendor: Vendor) => { setMessage(''); setMutationError(''); setEditingId(vendor.id); setForm(toForm(vendor)); scrollToFormSection('platform-vendors-form'); };
   const cancelEdit = () => { setEditingId(''); setForm(emptyForm()); setMutationError(''); setMessage('Vendor edit cancelled.'); };
 
-  return <div className="platform-vendors">
+  return <div className="io-operational-page io-workspace-page platform-vendors">
     <OperationalWorkspaceHero
       iconPath="/platform/vendors" eyebrow="Platform operations" title="Vendors"
       description="Maintain the internal registry of external vendors and partners that can affect Platform operations, contracts, dependencies, security, and compliance."

@@ -49,7 +49,7 @@ export default function PlatformComplianceExportPage(){
   const data=query.data;const summary=data?.summary;const pagination=data?.document_pagination;const staleWarning=Boolean(query.isError&&data);const blockingError=Boolean(query.isError&&!data);
   const setOffset=(offset:number)=>{const next=new URLSearchParams(searchParams);if(offset>0)next.set('document_offset',String(offset));else next.delete('document_offset');setSearchParams(next,{replace:true});};
 
-  return <div className="platform-compliance-export io-workspace-shell">
+  return <div className="io-operational-page io-workspace-page platform-compliance-export io-workspace-shell">
     <OperationalWorkspaceHero
       iconPath="/platform/compliance-export"
       eyebrow="Compliance governance"

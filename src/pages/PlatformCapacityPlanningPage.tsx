@@ -254,7 +254,7 @@ export default function PlatformCapacityPlanningPage() {
   };
   const usageDraftInvalid = !Number.isFinite(Number(usage.current_usage)) || Number(usage.current_usage) < 0 || !Number.isFinite(Number(usage.capacity_limit)) || Number(usage.capacity_limit) < 0 || Boolean(usage.projected_exhaustion_at && Number.isNaN(new Date(usage.projected_exhaustion_at).getTime()));
 
-  return <div className="platform-capacity-planning">
+  return <div className="io-operational-page io-workspace-page platform-capacity-planning">
     <OperationalWorkspaceHero
       iconPath="/platform/capacity-planning" eyebrow="Platform operations" title="Capacity planning"
       description="Track operator-recorded capacity limits, usage observations, scaling plans and projected exhaustion without presenting application records as live infrastructure telemetry."

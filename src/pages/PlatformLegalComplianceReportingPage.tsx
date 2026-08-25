@@ -203,7 +203,7 @@ export default function PlatformLegalComplianceReportingPage() {
   };
   const applySearch = (event: FormEvent) => { event.preventDefault(); setPageState({ search: searchDraft.trim(), offset: 0 }); };
 
-  return <div className="platform-legal-compliance io-workspace-shell">
+  return <div className="io-operational-page io-workspace-page platform-legal-compliance io-workspace-shell">
     <OperationalWorkspaceHero
       iconPath="/platform/legal-compliance-reporting"
       eyebrow="Legal & compliance governance"

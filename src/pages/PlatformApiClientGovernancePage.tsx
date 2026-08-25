@@ -202,7 +202,7 @@ export default function PlatformApiClientGovernancePage() {
   };
 
   return (
-    <div className="platform-api-client-governance">
+    <div className="io-operational-page io-workspace-page platform-api-client-governance">
       <OperationalWorkspaceHero
         iconPath="/platform/api-client-governance"
         eyebrow="Platform operations"

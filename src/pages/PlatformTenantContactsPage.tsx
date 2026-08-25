@@ -257,7 +257,7 @@ export default function PlatformTenantContactsPage() {
   const selectedTenantLabel = selectedTenant?.name || (tenantId ? 'Selected tenant' : 'All tenants');
 
   return (
-    <div className="platform-tenant-contacts">
+    <div className="io-operational-page io-workspace-page platform-tenant-contacts">
       <OperationalWorkspaceHero
         iconPath="/platform/tenant-contacts"
         eyebrow="Platform tenant operations"

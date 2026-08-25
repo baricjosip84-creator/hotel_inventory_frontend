@@ -256,7 +256,7 @@ export default function PlatformTenantNotesPage() {
   const saving = createNote.isPending || updateNote.isPending;
 
   return (
-    <div className="platform-tenant-notes">
+    <div className="io-operational-page io-workspace-page platform-tenant-notes">
       <OperationalWorkspaceHero
         iconPath="/platform/tenant-notes"
         eyebrow="Platform tenant operations"

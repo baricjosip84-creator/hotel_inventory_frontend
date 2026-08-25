@@ -254,7 +254,7 @@ export default function PlatformIncidentsPage() {
 
   const beginEdit = (incident: Incident) => { setEditing(incident); setEditForm(editFormFromIncident(incident)); editMutation.reset(); };
 
-  return <div className="platform-incidents">
+  return <div className="io-operational-page io-workspace-page platform-incidents">
     <OperationalWorkspaceHero
       iconPath="/platform/incidents"
       eyebrow="Platform operations"

@@ -136,7 +136,7 @@ export default function PlatformTenantExportsPage() {
   const canGenerate = Boolean(tenantId && data?.evidence_complete && isValidRowLimit && !exportArchive.isPending);
   const mutationError = exportArchive.error ? readableError(exportArchive.error) : '';
 
-  return <div className="platform-tenant-exports">
+  return <div className="io-operational-page io-workspace-page platform-tenant-exports">
     <OperationalWorkspaceHero
       iconPath="/platform/tenant-exports"
       eyebrow="Platform · Data portability"

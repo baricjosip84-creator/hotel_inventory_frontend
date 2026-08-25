@@ -172,7 +172,7 @@ export default function PlatformTenantHealthPage() {
   const heroLabel = invalidFilters ? 'Clear invalid URL filters' : initialHealthError ? 'Retry required' : refreshHealthError ? 'Last successful data retained' : partialEvidence ? 'Final score withheld' : 'Complete permitted evidence';
 
   return (
-    <div className="platform-tenant-health">
+    <div className="io-operational-page io-workspace-page platform-tenant-health">
       <OperationalWorkspaceHero
         iconPath="/platform/tenant-health"
         eyebrow="Platform tenant operations"

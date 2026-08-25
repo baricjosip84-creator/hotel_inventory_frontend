@@ -228,7 +228,7 @@ export default function PlatformProvisioningPage() {
     await Promise.all([presetsQuery.refetch(), tenantsQuery.refetch(), selectedTenantId && selectedPreset ? previewQuery.refetch() : Promise.resolve()]);
   };
 
-  return <div className="platform-provisioning">
+  return <div className="io-operational-page io-workspace-page platform-provisioning">
     <OperationalWorkspaceHero
       iconPath="/platform/provisioning"
       eyebrow="Platform operations · Tenant setup"

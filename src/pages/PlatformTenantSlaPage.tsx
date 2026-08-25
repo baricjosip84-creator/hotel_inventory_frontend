@@ -310,7 +310,7 @@ export default function PlatformTenantSlaPage() {
           : 'Application SLA evidence and persisted policy state.';
 
   return (
-    <div className="platform-tenant-sla">
+    <div className="io-operational-page io-workspace-page platform-tenant-sla">
       <OperationalWorkspaceHero
         iconPath="/platform/tenant-sla"
         eyebrow="Platform tenant operations"

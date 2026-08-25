@@ -288,7 +288,7 @@ export default function PlatformProvisioningPresetsPage() {
   const editValid = Boolean(editForm.label.trim() && editForm.organization_type.trim() && editForm.storage_locations.every((location) => location.name.trim()));
   const pageCount = Math.max(1, Math.ceil((data?.pagination.total || 0) / PAGE_SIZE));
 
-  return <div className="platform-provisioning-presets">
+  return <div className="io-operational-page io-workspace-page platform-provisioning-presets">
     <OperationalWorkspaceHero
       iconPath="/platform/provisioning-presets"
       eyebrow="Platform operations"

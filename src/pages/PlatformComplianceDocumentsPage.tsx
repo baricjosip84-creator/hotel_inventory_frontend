@@ -116,7 +116,7 @@ export default function PlatformComplianceDocumentsPage() {
   const initialError=!response && documents.isError;
   const staleError=Boolean(response && documents.isError);
 
-  return <div className="platform-compliance-documents">
+  return <div className="io-operational-page io-workspace-page platform-compliance-documents">
     <OperationalWorkspaceHero iconPath="/platform/compliance-documents" eyebrow="Platform governance" title="Compliance documents" description="Maintain the Platform registry for contracts, DPAs, security/privacy records, subprocessors, SLAs, policies and review/expiry evidence." meta={<><OperationalWorkspaceMetaPill>Registry-wide filtered summary</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{response?.evidence_access.tenant_identity?'Tenant identity available':'Tenant identity restricted'}</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{response?.evidence_access.platform_user_identity?'Platform-user identity available':'Platform-user identity restricted'}</OperationalWorkspaceMetaPill></>} aside={<div className="platform-compliance-documents__hero-aside"><OperationalWorkspaceStatus value="Application evidence" label="Not external document verification"/><button type="button" className="app-button app-button--secondary" onClick={refresh} disabled={documents.isFetching}>{documents.isFetching?'Refreshing…':'Refresh'}</button></div>} />
 
     {message?<div className="platform-compliance-documents__success">{message}<button type="button" className="app-button app-button--secondary" onClick={()=>setMessage('')}>Dismiss</button></div>:null}

@@ -102,7 +102,7 @@ export default function PlatformTenantOffboardingPage(){
   const checks=detail.data?.checks||null;
   const blockerCount=checks?[checks.active_tenant_sessions,checks.active_support_sessions,checks.open_incidents,checks.open_tasks].filter((v)=>typeof v==='number'&&v>0).length+(checks.legal_hold?1:0):0;
 
-  return <div className="platform-tenant-offboarding">
+  return <div className="io-operational-page io-workspace-page platform-tenant-offboarding">
     <OperationalWorkspaceHero iconPath="/platform/tenant-offboarding" eyebrow="Platform governance" title="Tenant offboarding" description="Coordinate Platform-recorded tenant shutdown, operational blocker checks, final application archive/write-lock actions and offboarding evidence without treating operator checklist assertions as proof of external outcomes." meta={<><OperationalWorkspaceMetaPill>Registry-wide filtered summary</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{list.data?.completion_evidence_complete?'Completion blocker evidence available':'Completion blocker evidence partial'}</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{canReadUsers?'Platform-user identity available':'Owner identity restricted'}</OperationalWorkspaceMetaPill></>} aside={<div className="platform-tenant-offboarding__hero-aside"><OperationalWorkspaceStatus value="Application evidence" label="Not proof of external closure"/><button type="button" className="app-button app-button--secondary" onClick={refresh} disabled={list.isFetching}>{list.isFetching?'Refreshing…':'Refresh'}</button></div>} />
 
     {staleWarning?<div className="platform-tenant-offboarding__warning"><strong>Showing the last successful snapshot.</strong><span>{readableError(list.error)}</span></div>:null}

@@ -289,7 +289,7 @@ export default function PlatformApiKeysPage() {
   const contract = apiKeys.data?.public_api_contract;
 
   return (
-    <div className="platform-api-keys">
+    <div className="io-operational-page io-workspace-page platform-api-keys">
       <OperationalWorkspaceHero
         iconPath="/platform/api-keys"
         eyebrow="Platform operations"

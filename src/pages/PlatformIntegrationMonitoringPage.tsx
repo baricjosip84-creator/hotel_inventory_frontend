@@ -310,7 +310,7 @@ export default function PlatformIntegrationMonitoringPage() {
   };
 
   return (
-    <div className="platform-integration-monitoring">
+    <div className="io-operational-page io-workspace-page platform-integration-monitoring">
       <OperationalWorkspaceHero
         iconPath="/platform/integration-monitoring"
         eyebrow="Platform operations"

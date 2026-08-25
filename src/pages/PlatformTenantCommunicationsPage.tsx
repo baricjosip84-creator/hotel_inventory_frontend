@@ -343,7 +343,7 @@ export default function PlatformTenantCommunicationsPage() {
   const heroStatusLabel = invalidFilters ? 'Clear invalid URL filters' : initialCommunicationsError ? 'Retry required' : refreshCommunicationsError ? 'Last successful data retained' : 'Application-recorded communications';
 
   return (
-    <div className="platform-tenant-communications">
+    <div className="io-operational-page io-workspace-page platform-tenant-communications">
       <OperationalWorkspaceHero
         iconPath="/platform/tenant-communications"
         eyebrow="Platform tenant operations"

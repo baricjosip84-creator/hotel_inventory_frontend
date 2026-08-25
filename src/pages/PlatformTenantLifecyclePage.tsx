@@ -206,7 +206,7 @@ export default function PlatformTenantLifecyclePage() {
   };
 
   return (
-    <div className="platform-tenant-lifecycle">
+    <div className="io-operational-page io-workspace-page platform-tenant-lifecycle">
       <OperationalWorkspaceHero
         iconPath="/platform/tenant-lifecycle"
         eyebrow="Platform tenant operations"

@@ -261,7 +261,7 @@ export default function PlatformMaintenancePage() {
   const visibleEnd = pagination ? Math.min(pagination.offset + windows.length, pagination.total) : windows.length;
 
   return (
-    <div className="platform-maintenance">
+    <div className="io-operational-page io-workspace-page platform-maintenance">
       <OperationalWorkspaceHero
         iconPath="/platform/maintenance"
         eyebrow="Platform operations"

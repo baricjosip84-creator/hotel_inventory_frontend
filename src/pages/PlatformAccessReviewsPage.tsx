@@ -131,7 +131,7 @@ export default function PlatformAccessReviewsPage() {
   const blockingError = Boolean(reviews.isError && !response);
   const pageNumber = response ? Math.floor(response.pagination.offset / response.pagination.limit) + 1 : 1;
 
-  return <div className="platform-access-reviews io-workspace-shell">
+  return <div className="io-operational-page io-workspace-page platform-access-reviews io-workspace-shell">
     <OperationalWorkspaceHero iconPath="/platform/access-reviews" eyebrow="Security governance" title="Access reviews" description="Create evidence snapshots for privileged access governance, decide each captured item, and close the review only when its application evidence has been assessed." meta={<><OperationalWorkspaceMetaPill>Source-scoped evidence</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>Platform audit recorded</OperationalWorkspaceMetaPill></>} aside={<OperationalWorkspaceStatus value={response?.summary.open ?? '—'} label="open reviews" />} />
 
     {message ? <div className="platform-access-reviews__message" data-tone="good">{message}</div> : null}

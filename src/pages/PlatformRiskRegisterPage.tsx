@@ -223,7 +223,7 @@ export default function PlatformRiskRegisterPage() {
     setMessage(''); setMutationError(''); setEditingId(risk.id); setForm(toForm(risk)); scrollToFormSection('platform-risk-register-form');
   };
 
-  return <div className="platform-risk-register">
+  return <div className="io-operational-page io-workspace-page platform-risk-register">
     <OperationalWorkspaceHero
       iconPath="/platform/risk-register" eyebrow="Platform operations" title="Risk register"
       description="Maintain the application risk registry, review cadence, mitigation context and explicit workflow status without presenting internal records as proof of external risk outcomes."

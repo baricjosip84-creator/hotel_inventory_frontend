@@ -247,7 +247,7 @@ export default function PlatformAnnouncementsPage() {
   const editEndsValid = !editForm?.ends_at || (editStartsValid && !Number.isNaN(new Date(editForm.ends_at).getTime()) && new Date(editForm.ends_at).getTime() > new Date(editForm.starts_at).getTime());
   const editBlocked = !editForm?.title.trim() || !editForm?.message.trim() || !editStartsValid || !editEndsValid;
 
-  return <div className="platform-announcements">
+  return <div className="io-operational-page io-workspace-page platform-announcements">
     <OperationalWorkspaceHero
       iconPath="/platform/announcements"
       eyebrow="Platform communications"

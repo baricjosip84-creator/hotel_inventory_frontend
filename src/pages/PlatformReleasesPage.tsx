@@ -165,7 +165,7 @@ export default function PlatformReleasesPage() {
   const startEdit = (release: Release) => { if (TERMINAL.has(release.status)) return; setMessage(''); setMutationError(''); setEditingId(release.id); setForm(toForm(release)); scrollToFormSection('platform-releases-form'); };
   const runTransition = (release: Release, nextStatus: string, prompt: string) => { if (window.confirm(prompt)) transition.mutate({ id: release.id, status: nextStatus }); };
 
-  return <div className="platform-releases">
+  return <div className="io-operational-page io-workspace-page platform-releases">
     <OperationalWorkspaceHero
       iconPath="/platform/releases" eyebrow="Platform operations" title="Releases"
       description="Track the application release registry, planned tenant impact and recorded lifecycle transitions without treating registry status as proof that an external deployment or rollback actually occurred."

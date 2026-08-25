@@ -353,7 +353,7 @@ export default function PlatformTenantTasksPage() {
   const currentAssignedUserMissing = Boolean(form.assigned_platform_user_id && !activePlatformUsers.some((user) => user.id === form.assigned_platform_user_id));
 
   return (
-    <div className="platform-tenant-tasks">
+    <div className="io-operational-page io-workspace-page platform-tenant-tasks">
       <OperationalWorkspaceHero
         iconPath="/platform/tenant-tasks"
         eyebrow="Platform tenant operations"

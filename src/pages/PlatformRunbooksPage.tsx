@@ -328,7 +328,7 @@ export default function PlatformRunbooksPage() {
   const heroLabel = invalidFilters ? 'Clear invalid URL filters' : initialError ? 'Retry required' : staleError ? 'Last successful data retained' : 'Runbook registry and execution evidence';
 
   return (
-    <div className="platform-runbooks">
+    <div className="io-operational-page io-workspace-page platform-runbooks">
       <OperationalWorkspaceHero
         iconPath="/platform/runbooks"
         eyebrow="Platform operations"

@@ -317,7 +317,7 @@ export default function PlatformChangeManagementPage() {
   const access = changes.data?.evidence_access || { tenant: canReadTenants, maintenance: canReadMaintenance, runbook: canReadRunbooks, platform_user_identity: canReadPlatformUsers };
 
   return (
-    <div className="platform-change-management">
+    <div className="io-operational-page io-workspace-page platform-change-management">
       <OperationalWorkspaceHero
         iconPath="/platform/change-management"
         eyebrow="Platform operations"

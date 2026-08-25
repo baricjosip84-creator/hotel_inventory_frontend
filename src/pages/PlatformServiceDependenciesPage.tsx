@@ -179,7 +179,7 @@ export default function PlatformServiceDependenciesPage() {
   const startEdit = (dependency: Dependency) => { setMessage(''); setMutationError(''); setEditingId(dependency.id); setForm(toForm(dependency)); scrollToFormSection('platform-service-dependencies-form'); };
   const cancelEdit = () => { setEditingId(''); setForm(emptyForm()); setMutationError(''); setMessage('Dependency edit cancelled.'); };
 
-  return <div className="platform-service-dependencies">
+  return <div className="io-operational-page io-workspace-page platform-service-dependencies">
     <OperationalWorkspaceHero
       iconPath="/platform/service-dependencies" eyebrow="Platform operations" title="Service dependencies"
       description="Maintain application-recorded dependencies on external services, their operator-recorded status, business impact, escalation destinations, ownership, and vendor linkage."

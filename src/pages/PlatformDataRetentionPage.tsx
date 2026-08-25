@@ -176,7 +176,7 @@ export default function PlatformDataRetentionPage() {
   const pageStart = data?.pagination.total ? data.pagination.offset + 1 : 0;
   const pageEnd = data ? Math.min(data.pagination.offset + data.records.length,data.pagination.total) : 0;
 
-  return <div className="platform-data-retention">
+  return <div className="io-operational-page io-workspace-page platform-data-retention">
     <OperationalWorkspaceHero
       iconPath="/platform/data-retention"
       eyebrow="Platform · Data governance"
