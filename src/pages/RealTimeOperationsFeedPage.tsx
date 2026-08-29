@@ -492,7 +492,9 @@ export default function RealTimeOperationsFeedPage() {
               <TenantNavIcon path="/real-time-operations-feed" size={14} />{feedQuery.isFetching ? ui('Refreshing…') : ui('Refresh feed')}
             </button>
             <Link className="button button--secondary operations-feed-page__toolbar-action" to="/action-center"><TenantNavIcon path="/action-center" size={14} />{ui("Open Action Center")}</Link>
+            {/* Workspace shortcut intentionally hidden; Action Center is the visible operational action inbox.
             <Link className="button button--secondary operations-feed-page__toolbar-action" to="/workspace"><TenantNavIcon path="/workspace" size={14} />{ui("Open Workspace")}</Link>
+            */}
           </div>
 
           {feedQuery.isLoading ? (

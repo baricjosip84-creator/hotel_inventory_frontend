@@ -53,6 +53,10 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
         section: 'Command',
         permission: TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ
       },
+      // Workspace is intentionally hidden from normal tenant navigation.
+      // Its page/backend implementation is preserved for possible future redesign,
+      // while Action Center remains the single visible operational action inbox.
+      /*
       {
         to: '/workspace',
         label: 'Workspace',
@@ -60,6 +64,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
         section: 'Command',
         permission: TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ
       },
+      */
       {
         to: '/mobile-execution',
         label: 'Mobile Execution',

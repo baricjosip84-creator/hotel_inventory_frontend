@@ -448,7 +448,10 @@ export default function DigitalTwinVisualizationPage() {
               </div>
             </div>
             <div className="digital-twin-shortcuts">
+              {/* Workspace shortcut intentionally hidden; keep the old route available in code for future redesign.
               <Link className="button button--secondary digital-twin-link-button" to="/workspace"><TenantNavIcon path="/workspace" size={16} /> {ui('Open Workspace')}</Link>
+              */}
+              <Link className="button button--secondary digital-twin-link-button" to="/action-center"><TenantNavIcon path="/action-center" size={16} /> {ui('Open Action Center')}</Link>
               <Link className="button button--secondary digital-twin-link-button" to="/collaboration"><TenantNavIcon path="/collaboration" size={16} /> {ui('Open Collaboration')}</Link>
             </div>
           </div>
