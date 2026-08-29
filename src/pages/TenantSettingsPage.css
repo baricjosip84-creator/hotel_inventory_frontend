@@ -196,6 +196,7 @@
 }
 
 .tenant-settings-field input,
+.tenant-settings-field select,
 .tenant-settings-field textarea {
   width: 100%;
   min-width: 0;
@@ -218,6 +219,7 @@
 }
 
 .tenant-settings-field input:focus,
+.tenant-settings-field select:focus,
 .tenant-settings-field textarea:focus {
   outline: 2px solid rgba(37, 99, 235, .16);
   outline-offset: 1px;
@@ -225,6 +227,7 @@
 }
 
 .tenant-settings-field input:disabled,
+.tenant-settings-field select:disabled,
 .tenant-settings-field textarea:disabled {
   background: #f8fafc;
   color: #64748b;

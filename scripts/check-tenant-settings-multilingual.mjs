@@ -7,6 +7,7 @@ const fail = (message) => { console.error(`FAIL: ${message}`); process.exitCode 
 const pass = (message) => console.log(`PASS: ${message}`);
 
 const page = read('src/pages/TenantSettingsPage.tsx');
+const css = read('src/pages/TenantSettingsPage.css');
 const catalog = read('src/i18n/tenantUiTranslations.ts');
 const router = read('src/app/router.tsx');
 const permissions = read('src/lib/permissions.ts');
@@ -86,6 +87,12 @@ for (const required of [
   'default_locale: formState.default_locale',
 ]) if (!page.includes(required)) fail(`Tenant Settings endpoint/payload/runtime invariant missing: ${required}`);
 if (!process.exitCode) pass('Tenant Settings GET/PUT endpoint, currency confirmation, active currency, and default-locale contracts remain intact.');
+
+for (const required of [
+  'This does not change your personal language. Use the language selector in the sidebar.',
+]) if (!page.includes(required)) fail(`Tenant Settings default-language UX clarification missing: ${required}`);
+if (!css.includes('.tenant-settings-field select')) fail('Tenant Settings select controls are not covered by the standard field styling contract.');
+if (!process.exitCode) pass('Tenant Settings clearly separates tenant default language from personal language and styles the selector consistently.');
 
 for (const required of [
   'canReadTenants = hasPermission(TENANT_PERMISSIONS.TENANT_READ, role)',

@@ -677,7 +677,7 @@ export default function TenantSettingsPage() {
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
-                <small>{ui('Used for tenant users who have not selected a personal language preference.')}</small>
+                <small>{ui('This does not change your personal language. Use the language selector in the sidebar. This default applies only to tenant users without a personal language preference.')}</small>
               </label>
             </div>
           </section>
