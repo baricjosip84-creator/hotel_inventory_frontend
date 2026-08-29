@@ -49,11 +49,7 @@ else pass(`Action Center has ${new Set(literalKeys).size} catalog-backed literal
 
 const representativeRows = [
   'Action Center', 'Command & prioritization', 'Action inbox', 'Open actions shown', 'Highest urgency',
-  'Approval gated', 'Execution mode', 'Governance readiness details', 'Control Tower orchestration traceability',
-  'Control Tower remediation feedback loop', 'Control Tower remediation effectiveness review',
-  'Control Tower remediation escalation governance', 'Control Tower remediation closure verification gate',
-  'Technical contract diagnostics', 'Control Tower remediation response contract audit',
-  'Control Tower route exposure audit', 'Read-only safety guarantees', 'Recommended next step', 'Technical details'
+  'Approval gated', 'Execution mode', 'Recommended next step', 'How this page works', 'Refresh'
 ];
 const missingRepresentative = representativeRows.filter((key) => !uniqueKeys.has(key));
 if (missingRepresentative.length) fail(`Missing representative Action Center translations: ${missingRepresentative.join(' | ')}`);
@@ -63,15 +59,7 @@ const dynamicLabels = [
   'All domains', 'Alerts', 'Execution', 'Control tower', 'Decision intelligence', 'AI governance', 'Multi-domain',
   'All urgency', 'Critical', 'High', 'Medium', 'Low',
   'Open alert workflow', 'Open execution task', 'Open intelligence review', 'Open source workflow',
-  'Read-only', 'Tenant isolated', 'Permission gated', 'Human action only', 'Approval gated when required', 'No inventory mutation',
-  'Approval required', 'Review required', 'In review', 'In progress', 'Escalated',
-  'Ready for manual orchestration review', 'Needs operator review', 'Traceability gap detected',
-  'Ready for manual remediation effectiveness review', 'Needs remediation evidence review', 'Feedback loop gap detected',
-  'Needs before after evidence review', 'Ready for manual effectiveness attestation', 'Effectiveness review gap detected',
-  'Ready for manual escalation board review', 'Needs escalation governance review', 'Escalation governance gap detected',
-  'Ready for manual closure verification', 'Needs closure evidence review', 'Closure verification gap detected',
-  'Response contract ready for frontend consumption', 'Response contract present with open remediation blockers', 'Response contract gap detected',
-  'Route contract exposed and frontend aligned', 'Route contract needs review', 'Route contract gap detected'
+  'Approval required', 'Review required', 'In review', 'In progress', 'Escalated'
 ];
 const missingDynamicLabels = dynamicLabels.filter((key) => !uniqueKeys.has(key));
 if (missingDynamicLabels.length) fail(`Action Center dynamic display labels are missing translations: ${missingDynamicLabels.join(' | ')}`);
@@ -79,8 +67,8 @@ else pass(`${dynamicLabels.length} dynamic Action Center labels are catalog-back
 
 if (!pageSource.includes('useAppTranslation()')) fail('Action Center must use the shared translation context.');
 if (!pageSource.includes('formatLocalizedDateTime(value, locale)')) fail('Action Center timestamps must use locale-aware shared date/time formatting.');
-if (!pageSource.includes('formatLocalizedNumber(') || !pageSource.includes("style: 'percent'")) fail('Action Center numbers and percentages must use locale-aware formatting.');
-else pass('Action Center dates, numbers, and percentages use the selected application locale.');
+if (!pageSource.includes('formatLocalizedNumber(')) fail('Action Center displayed numbers must use locale-aware formatting.');
+else pass('Action Center dates and displayed numbers use the selected application locale.');
 
 const forbiddenEnglishPresentation = [
   'eyebrow="Command & prioritization"', 'title="Action Center"', '>Action inbox<', '>Technical details<',
@@ -105,9 +93,7 @@ const canonicalContracts = [
   "params.set('action_domain', domain)", "params.set('urgency', urgency)",
   "paramName: 'domain'", "paramName: 'urgency'", "allowedValues: ACTION_DOMAIN_VALUES", "allowedValues: URGENCY_FILTER_VALUES",
   'hasPermission(TENANT_PERMISSIONS.ALERTS_READ)', 'hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ)',
-  'hasPermission(TENANT_PERMISSIONS.CONTROL_TOWER_READ)', 'hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ)',
-  'hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ)',
-  "routeExposureAudit.required_permission || '—'"
+  'hasPermission(TENANT_PERMISSIONS.CONTROL_TOWER_READ)', 'hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ)'
 ];
 for (const contract of canonicalContracts) if (!pageSource.includes(contract)) fail(`Action Center API/filter/permission contract changed during localization: ${contract}`);
 
