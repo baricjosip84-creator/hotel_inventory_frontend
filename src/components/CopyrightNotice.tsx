@@ -10,7 +10,7 @@ export default function CopyrightNotice() {
 
   return (
     <footer aria-label={ui('Copyright notice')} style={styles.notice}>
-      © {yearLabel} Josip Barić. {ui('All rights reserved.')}
+      © {yearLabel} SMOOOZ. {ui('All rights reserved.')}
     </footer>
   );
 }

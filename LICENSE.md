@@ -1,6 +1,6 @@
 # Proprietary Software Licence
 
-Copyright © 2025–2026 Josip Barić. All rights reserved.
+Copyright © 2025–2026 SMOOOZ. All rights reserved.
 
 This repository contains proprietary software. It is not distributed under an open-source licence.
 

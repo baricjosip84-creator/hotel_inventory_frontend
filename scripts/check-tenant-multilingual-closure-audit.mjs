@@ -66,7 +66,7 @@ assert(graph.size >= 250, `reachable tenant source graph unexpectedly small: ${g
 
 const allowedRawJsx = new Set([
   '/api/public/v1',
-  'Josip Barić.',
+  'SMOOOZ.',
   'Inventory Operations',
   'INVENTORY OPERATIONS PLATFORM',
   'SKU',
