@@ -49,7 +49,6 @@ type FormState = { tenant_id: string; request_type: string; priority: string; re
 const PAGE_SIZE = 50;
 const REQUEST_TYPES = ['access', 'export', 'deletion', 'correction', 'consent', 'restriction', 'objection', 'other'];
 const STATUSES = ['intake', 'verifying', 'in_progress', 'waiting_tenant', 'fulfilled', 'rejected', 'cancelled'];
-const OPEN_STATUSES = ['intake', 'verifying', 'in_progress', 'waiting_tenant'];
 const PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 const emptyForm = (): FormState => ({ tenant_id:'', request_type:'access', priority:'normal', requester_name:'', requester_email:'', subject_identifier:'', summary:'', due_at:'', assigned_platform_user_id:'' });
 

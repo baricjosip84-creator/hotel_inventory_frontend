@@ -216,7 +216,7 @@ export default function PlatformProvisioningPresetsPage() {
     enabled: !invalidFilters
   });
   const data = versionsQuery.data;
-  const rows = data?.preset_versions || [];
+  const rows = useMemo(() => data?.preset_versions || [], [data]);
   const selected = useMemo(() => rows.find((row) => row.id === selectedId) || null, [rows, selectedId]);
 
   useEffect(() => {

@@ -79,7 +79,6 @@ export default function PlatformTenantOffboardingPage(){
   const pagination=list.data?.pagination;
   const initialError=Boolean(list.error&&!list.data);
   const staleWarning=Boolean(list.error&&list.data);
-  const mutationBusy=false;
 
   useEffect(()=>{if(tenantId&&!inspectedTenantId)setInspectedTenantId(tenantId);},[tenantId,inspectedTenantId]);
   const setFilter=(key:string,value:string)=>{const next=new URLSearchParams(params);if(value)next.set(key,value);else next.delete(key);next.delete('offset');setParams(next,{replace:true});};
@@ -98,7 +97,6 @@ export default function PlatformTenantOffboardingPage(){
   const mutationError=save.error||changeStatus.error||complete.error||cancel.error;
   const validForm=Boolean(form.tenant_id&&!Number.isNaN(form.scheduled_for?new Date(form.scheduled_for).getTime():0));
   const canSave=canWrite&&validForm&&!save.isPending;
-  const selected=detail.data?.offboarding||null;
   const checks=detail.data?.checks||null;
   const blockerCount=checks?[checks.active_tenant_sessions,checks.active_support_sessions,checks.open_incidents,checks.open_tasks].filter((v)=>typeof v==='number'&&v>0).length+(checks.legal_hold?1:0):0;
 

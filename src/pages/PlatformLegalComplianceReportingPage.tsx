@@ -196,7 +196,9 @@ export default function PlatformLegalComplianceReportingPage() {
   const setPageState = (updates: { source?: SourceKey; search?: string; offset?: number }) => {
     const next = new URLSearchParams(searchParams);
     if (updates.source) next.set('source', updates.source);
-    if (updates.search !== undefined) updates.search ? next.set('search', updates.search) : next.delete('search');
+    if (updates.search !== undefined) {
+      if (updates.search) next.set('search', updates.search); else next.delete('search');
+    }
     const nextOffset = updates.offset ?? 0;
     if (nextOffset > 0) next.set('offset', String(nextOffset)); else next.delete('offset');
     setSearchParams(next, { replace: true });

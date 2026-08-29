@@ -76,7 +76,6 @@ const PAGE_SIZE = 50;
 const RESOURCE_TYPES = ['database', 'storage', 'compute', 'queue', 'email', 'sms', 'api', 'integration', 'support', 'other'];
 const ENVIRONMENTS = ['development', 'staging', 'production', 'shared'];
 const STATUSES = ['tracking', 'watch', 'scaling_needed', 'scaling_in_progress', 'resolved', 'archived'];
-const MUTABLE_STATUSES = STATUSES.filter((status) => status !== 'archived');
 const emptyForm = (): CapacityForm => ({
   dependency_id: '', name: '', resource_type: 'other', environment: 'production', status: 'tracking', unit: 'units', current_usage: '0', capacity_limit: '0',
   warning_threshold_percent: '75', critical_threshold_percent: '90', projected_exhaustion_at: '', owner_platform_user_id: '', scaling_plan: '', notes: ''
