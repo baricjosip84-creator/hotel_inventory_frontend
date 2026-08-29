@@ -6,7 +6,7 @@ import { apiRequest } from '../lib/api';
 import { getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { fetchTenantSubscriptionAccess, isTenantFeatureAllowed } from '../lib/tenantSubscriptionAccess';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 
@@ -463,9 +463,9 @@ function PremiumEmptyState(props: {
   );
 }
 
-function ActionLink(props: { to: string; label: string; iconPath?: string }) {
+function ActionLink(props: { to: string; label: string; iconPath?: string; nowrap?: boolean }) {
   return (
-    <Link to={props.to} style={styles.actionLink}>
+    <Link to={props.to} style={props.nowrap ? { ...styles.actionLink, ...styles.actionLinkNoWrap } : styles.actionLink}>
       {props.iconPath ? <TenantNavIcon path={props.iconPath} size={16} /> : null}
       <span>{props.label}</span>
     </Link>
@@ -637,11 +637,6 @@ export default function DashboardPage() {
         eyebrow={ui('Operations overview')}
         title={ui('Operations workspace')}
         description={ui('Monitor stock, shipments, alerts, outbound work, supplier pressure, and operational health from one tenant-level overview.')}
-        meta={<>
-          <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui('Permission-aware')}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui('Live operational summary')}</OperationalWorkspaceMetaPill>
-        </>}
       />
 
       <div className="app-grid-stats io-workspace-stats" style={styles.kpiGrid}>
@@ -1080,6 +1075,7 @@ export default function DashboardPage() {
                               to={`/shipments?shipmentId=${encodeURIComponent(row.id)}`}
                               label={ui('Open Shipment')}
                               iconPath="/shipments"
+                              nowrap
                             />
                           ) : null}
                         </td>
@@ -1090,6 +1086,7 @@ export default function DashboardPage() {
                               to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`}
                               label={ui('Open Supplier')}
                               iconPath="/suppliers"
+                              nowrap
                             />
                           ) : null}
                         </td>
@@ -1792,5 +1789,9 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
     textAlign: 'center',
     boxShadow: '0 1px 1px rgba(15, 23, 42, 0.02)'
+  },
+  actionLinkNoWrap: {
+    whiteSpace: 'nowrap',
+    flexShrink: 0
   }
 };
