@@ -107,6 +107,20 @@ requireText(
   'Reconfirm deployed services immediately before runtime gate',
   'deployment-readiness workflow'
 );
+requireText(workflow, 'id: reconfirm-deployed-services', 'deployment-readiness workflow');
+requireText(workflow, 'timeout-minutes: 15', 'deployment-readiness workflow');
+
+const installChromiumIndex = workflow.indexOf('- name: Install Chromium');
+const reconfirmIndex = workflow.indexOf('- name: Reconfirm deployed services immediately before runtime gate');
+const runtimeGateIndex = workflow.indexOf('- name: Run deployed frontend and backend readiness gate');
+if (
+  installChromiumIndex < 0 ||
+  reconfirmIndex < 0 ||
+  runtimeGateIndex < 0 ||
+  !(installChromiumIndex < reconfirmIndex && reconfirmIndex < runtimeGateIndex)
+) {
+  errors.push('deployment-readiness workflow must reconfirm deployed services after Chromium installation and immediately before the Playwright runtime gate.');
+}
 
 const frontendValidationWorkflow = read('.github/workflows/frontend-validation.yml');
 [
