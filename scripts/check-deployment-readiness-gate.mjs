@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const errors = [];
-const strictWorkflowValidation = process.argv.includes('--strict-workflow') || process.env.GITHUB_WORKFLOW === 'Deployment Readiness Gate';
+const strictWorkflowValidation = process.argv.includes('--strict-workflow');
 const read = (relativePath) => {
   const absolutePath = path.join(root, relativePath);
   if (!fs.existsSync(absolutePath)) {
@@ -171,6 +171,8 @@ if (strictWorkflowValidation) {
 [
   'EXPECTED_FRONTEND_COMMIT',
   "optionalCommit('GITHUB_SHA')",
+  "GITHUB_EVENT_PATH",
+  "workflow_run?.head_sha",
   'EXPECTED_BACKEND_COMMIT',
   '/deployment-version.json',
   '/health/ready',

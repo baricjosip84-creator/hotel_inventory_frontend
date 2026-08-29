@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 function requiredOrigin(name) {
@@ -20,6 +21,33 @@ function optionalCommit(name) {
     throw new Error(`${name} must be a full 40-character Git commit SHA when provided.`);
   }
   return value;
+}
+
+
+function resolveExpectedFrontendCommit() {
+  const explicitCommit = optionalCommit('EXPECTED_FRONTEND_COMMIT');
+  if (explicitCommit) return explicitCommit;
+
+  const eventPath = process.env.GITHUB_EVENT_PATH?.trim();
+  if (eventPath) {
+    try {
+      const eventPayload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+      const workflowRunCommit = typeof eventPayload?.workflow_run?.head_sha === 'string'
+        ? eventPayload.workflow_run.head_sha.trim().toLowerCase()
+        : '';
+      if (workflowRunCommit) {
+        if (!/^[0-9a-f]{40}$/.test(workflowRunCommit)) {
+          throw new Error('workflow_run.head_sha must be a full 40-character Git commit SHA when provided.');
+        }
+        return workflowRunCommit;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Unable to resolve frontend commit from GITHUB_EVENT_PATH: ${message}`);
+    }
+  }
+
+  return optionalCommit('GITHUB_SHA');
 }
 
 async function readJson(url) {
@@ -57,7 +85,7 @@ async function waitFor(name, check, attempts, delayMs) {
 
 const frontendOrigin = requiredOrigin('DEPLOYMENT_FRONTEND_URL');
 const backendOrigin = requiredOrigin('DEPLOYMENT_BACKEND_URL');
-const expectedFrontendCommit = optionalCommit('EXPECTED_FRONTEND_COMMIT') || optionalCommit('GITHUB_SHA');
+const expectedFrontendCommit = resolveExpectedFrontendCommit();
 const expectedBackendCommit = optionalCommit('EXPECTED_BACKEND_COMMIT');
 const attempts = Number.parseInt(process.env.DEPLOYMENT_WAIT_ATTEMPTS || '90', 10);
 const delayMs = Number.parseInt(process.env.DEPLOYMENT_WAIT_DELAY_MS || '20000', 10);
