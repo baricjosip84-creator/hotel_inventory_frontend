@@ -57,7 +57,7 @@ async function waitFor(name, check, attempts, delayMs) {
 
 const frontendOrigin = requiredOrigin('DEPLOYMENT_FRONTEND_URL');
 const backendOrigin = requiredOrigin('DEPLOYMENT_BACKEND_URL');
-const expectedFrontendCommit = optionalCommit('EXPECTED_FRONTEND_COMMIT');
+const expectedFrontendCommit = optionalCommit('EXPECTED_FRONTEND_COMMIT') || optionalCommit('GITHUB_SHA');
 const expectedBackendCommit = optionalCommit('EXPECTED_BACKEND_COMMIT');
 const attempts = Number.parseInt(process.env.DEPLOYMENT_WAIT_ATTEMPTS || '90', 10);
 const delayMs = Number.parseInt(process.env.DEPLOYMENT_WAIT_DELAY_MS || '20000', 10);

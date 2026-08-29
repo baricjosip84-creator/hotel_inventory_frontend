@@ -9,7 +9,7 @@ The production gate now runs automatically in both release paths:
 1. **Frontend release:** after **Frontend Validation** succeeds on `main`, the workflow waits until Vercel serves the exact triggering commit from `/deployment-version.json`, then runs the complete gate.
 2. **Backend release:** after backend **Phase 16 Production Validation** succeeds on `main`, the backend workflow waits until Render reports the exact `RENDER_GIT_COMMIT` from `/health/ready`, then dispatches this frontend gate with that backend commit.
 
-The manual **Run workflow** option remains available as a fallback. Normal production pushes no longer require a manual click.
+The manual **Run workflow** option remains available as a fallback. Manual and backend-dispatched runs also pin the frontend to the workflow's exact Git commit, so an HTTP 200 from an older Vercel deployment can never satisfy the deployment wait. Normal production pushes no longer require a manual click.
 
 The workflow performs the deployment wait twice: once before source/runtime-gate preparation and again immediately before Playwright starts. The second check closes the gap where Vercel or Render can begin a rollout/restart while dependencies, static checks, or Chromium are being prepared.
 
@@ -57,7 +57,7 @@ The backend sends only the expected backend commit SHA to `deployment-readiness.
 
 ## Deployment identity
 
-Vercel exposes `VERCEL_GIT_COMMIT_SHA` during builds. The frontend writes that value to `/deployment-version.json` with `Cache-Control: no-store` so the workflow can wait for the exact commit instead of accidentally testing the previous deployment.
+Vercel exposes `VERCEL_GIT_COMMIT_SHA` during builds. The frontend writes that value to `/deployment-version.json` with `Cache-Control: no-store` so the workflow can wait for the exact commit instead of accidentally testing the previous deployment. `EXPECTED_FRONTEND_COMMIT` is supplied explicitly by the workflow, and the deployment waiter also falls back to GitHub's `GITHUB_SHA` in CI so the exact-commit guarantee survives workflow-environment drift.
 
 Render exposes `RENDER_GIT_COMMIT` at runtime. The backend includes it in `/health/live` and `/health/ready`, allowing the same exact-commit check for backend releases.
 
@@ -80,4 +80,4 @@ It does not create products, change stock, receive shipments, alter tenant setti
 
 ## Manual fallback
 
-Open **Actions → Deployment Readiness Gate → Run workflow**, select `production`, leave `expected_backend_commit` blank, and run it. A successful run uploads a 30-day HTML/JSON evidence artifact.
+Open **Actions → Deployment Readiness Gate → Run workflow**, select `production`, leave `expected_backend_commit` blank unless a specific backend deployment must be paired, and run it. The selected workflow commit is always required to be live on Vercel before Playwright starts. A successful run uploads a 30-day HTML/JSON evidence artifact.
