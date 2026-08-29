@@ -242,7 +242,10 @@ export default function ReplenishmentPlanningPage() {
     try {
       return formatLocalizedCurrency(numberValue(value), normalizeCurrencyCode(currency || getActiveTenantCurrency()), locale, { maximumFractionDigits: 4 });
     } catch {
-      return formatCurrencyAmount(value, currency, 4);
+      const fallbackValue = typeof value === 'number' || typeof value === 'string' || value == null
+        ? value
+        : String(value);
+      return formatCurrencyAmount(fallbackValue, currency, 4);
     }
   };
   const formatUiPercent = (ratio: unknown): string => ui('{percent}%').replace('{percent}', formatLocalizedNumber(numberValue(ratio) * 100, locale, { maximumFractionDigits: 0 }));

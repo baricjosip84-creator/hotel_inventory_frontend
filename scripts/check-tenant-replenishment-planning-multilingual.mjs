@@ -80,7 +80,8 @@ for (const required of [
   'formatLocalizedNumber(numberValue(value), locale, { maximumFractionDigits })',
   'formatLocalizedDateTime(value, locale)',
   'formatLocalizedCurrency(numberValue(value), normalizeCurrencyCode(currency || getActiveTenantCurrency()), locale, { maximumFractionDigits: 4 })',
-  'return formatCurrencyAmount(value, currency, 4);',
+  "const fallbackValue = typeof value === 'number' || typeof value === 'string' || value == null",
+  'return formatCurrencyAmount(fallbackValue, currency, 4);',
   "ui('{percent}%').replace('{percent}', formatLocalizedNumber(numberValue(ratio) * 100, locale, { maximumFractionDigits: 0 }))",
   'canonicalDisplayLabel',
   'decisionDisplayLabel'
