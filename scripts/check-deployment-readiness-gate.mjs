@@ -51,6 +51,7 @@ requireText(pkg.scripts?.['check:ci'] || '', 'check:deployment-readiness-gate', 
 [
   "testDir: './tests/deployment'",
   'workers: 1',
+  'timeout: 150 * 1000',
   "trace: 'retain-on-failure'",
   "screenshot: 'only-on-failure'"
 ].forEach((expected) => requireText(config, expected, 'playwright.deployment.config.ts'));
@@ -78,6 +79,10 @@ requireText(pkg.scripts?.['check:ci'] || '', 'check:deployment-readiness-gate', 
   'Refresh token must never be exposed in JSON',
   'must not overflow horizontally',
   "page.locator('.io-workspace-hero').first()",
+  'OPERATIONAL_WORKSPACE_READY_TIMEOUT_MS = 30_000',
+  'for (let attempt = 1; attempt <= 2; attempt += 1)',
+  "page.reload({ waitUntil: 'domcontentloaded' })",
+  'did not reach its loaded Operational Workspace state after one bounded retry',
   "page.locator('#login-email')",
   "page.locator('#login-password')",
   "form[data-auth-form=\"true\"] button[type=\"submit\"]",

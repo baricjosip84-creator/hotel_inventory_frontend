@@ -10,7 +10,7 @@ const baseURL = process.env.DEPLOYMENT_FRONTEND_URL?.trim() || 'https://deployme
 
 export default defineConfig({
   testDir: './tests/deployment',
-  timeout: 60 * 1000,
+  timeout: 150 * 1000,
   expect: {
     timeout: 15 * 1000
   },

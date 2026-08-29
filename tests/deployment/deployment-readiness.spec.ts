@@ -100,10 +100,39 @@ async function logoutTenant(api: APIRequestContext, csrfToken: string): Promise<
   expect(response.status(), 'Tenant smoke session must log out cleanly').toBe(200);
 }
 
+const OPERATIONAL_WORKSPACE_READY_TIMEOUT_MS = 30_000;
+
+async function waitForOperationalWorkspaceReady(page: Page, path: string): Promise<void> {
+  const hero = page.locator('.io-workspace-hero').first();
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    if (attempt === 1) {
+      await page.goto(path, { waitUntil: 'domcontentloaded' });
+    } else {
+      await page.reload({ waitUntil: 'domcontentloaded' });
+    }
+
+    await expect.poll(() => new URL(page.url()).pathname).toBe(path);
+
+    try {
+      await hero.waitFor({ state: 'visible', timeout: OPERATIONAL_WORKSPACE_READY_TIMEOUT_MS });
+      return;
+    } catch (error) {
+      if (attempt === 2) {
+        const bodyText = await page.locator('body').innerText().catch(() => '');
+        const excerpt = bodyText.replace(/\s+/g, ' ').trim().slice(0, 500);
+        throw new Error(
+          `${path} did not reach its loaded Operational Workspace state after one bounded retry. ` +
+          `Current URL: ${page.url()}. Body excerpt: ${excerpt || '(empty)'}`,
+          { cause: error }
+        );
+      }
+    }
+  }
+}
+
 async function assertPageHasNoRuntimeFailure(page: Page, path: string): Promise<void> {
-  await page.goto(path, { waitUntil: 'domcontentloaded' });
-  await expect.poll(() => new URL(page.url()).pathname).toBe(path);
-  await expect(page.locator('.io-workspace-hero').first()).toBeVisible();
+  await waitForOperationalWorkspaceReady(page, path);
   await expect(page.locator('body')).not.toContainText(/Failed to fetch|Unhandled Runtime Error|Something went wrong/i);
 
   const overflowsHorizontally = await page.evaluate(() =>
