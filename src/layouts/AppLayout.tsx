@@ -464,7 +464,7 @@ export default function AppLayout() {
         </div>
 
         <div style={styles.sidebarFooter}>
-          <LanguageSelector scope="tenant" compact />
+          <div style={styles.sidebarLanguageSelector}><LanguageSelector scope="tenant" compact appearance="sidebar" /></div>
           <div style={styles.sidebarIdentity}><div style={styles.sidebarAvatar}>{(accessRoleLabel || 'U').trim().charAt(0).toUpperCase()}</div><div style={styles.sidebarIdentityText}><div style={styles.sidebarIdentityName}>{tenantSubscriptionAccess?.tenant.name || t('common.tenantWorkspace')}</div><div style={styles.sidebarIdentityRole}>{accessRoleLabel || t('common.tenantUser')}</div></div></div>
           <button type="button" data-tenant-logout="true" style={styles.logoutButton} onClick={handleLogout} disabled={isLoggingOut}><TenantNavIcon path="/logout" size={17}/><span>{isLoggingOut ? t('common.loggingOut') : supportSession.isSupportSession ? t('common.exitSupportMode') : t('common.logout')}</span></button>
         </div>
@@ -851,6 +851,10 @@ const styles: Record<string, CSSProperties> = {
   },
   sidebarFooter: {
     padding: '13px 7px 0', marginTop: '8px', borderTop: '1px solid rgba(255,255,255,.10)', flexShrink: 0
+  },
+  sidebarLanguageSelector: {
+    marginTop: '-6px',
+    marginBottom: '12px'
   },
   logoutButton: {
     width: '100%', border: '1px solid rgba(255,255,255,.10)', borderRadius: '8px', padding: '9px 10px', background: 'rgba(255,255,255,.04)', color: 'rgba(255,255,255,.78)', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'

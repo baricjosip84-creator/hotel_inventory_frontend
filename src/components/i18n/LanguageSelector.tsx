@@ -11,6 +11,7 @@ type LanguageSelectorProps = {
   scope?: 'local' | 'tenant' | 'platform';
   compact?: boolean;
   className?: string;
+  appearance?: 'default' | 'sidebar';
 };
 
 type LocalePreferenceResponse = {
@@ -19,7 +20,7 @@ type LocalePreferenceResponse = {
   effective_locale?: string | null;
 };
 
-export function LanguageSelector({ scope = 'local', compact = false, className }: LanguageSelectorProps) {
+export function LanguageSelector({ scope = 'local', compact = false, className, appearance = 'default' }: LanguageSelectorProps) {
   const { locale, setLocale, t } = useAppTranslation();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
@@ -70,7 +71,7 @@ export function LanguageSelector({ scope = 'local', compact = false, className }
         value={locale}
         disabled={saving}
         onChange={(event) => void handleChange(event.target.value as AppLocale)}
-        style={{ ...styles.select, ...(compact ? styles.compactSelect : {}), ...(saveError ? styles.errorSelect : {}) }}
+        style={{ ...styles.select, ...(compact ? styles.compactSelect : {}), ...(appearance === 'sidebar' ? styles.sidebarSelect : {}), ...(saveError ? styles.errorSelect : {}) }}
       >
         {LOCALE_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
@@ -89,5 +90,14 @@ const styles: Record<string, CSSProperties> = {
     background: '#fff', color: '#0f172a', padding: '0 10px', fontWeight: 700, fontSize: 13
   },
   compactSelect: { minHeight: 34, minWidth: 125, fontSize: 12, padding: '0 8px' },
+  sidebarSelect: {
+    minHeight: 34,
+    border: '1px solid rgba(148,163,184,.24)',
+    background: '#102846',
+    color: '#f8fafc',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,.035)',
+    colorScheme: 'dark',
+    cursor: 'pointer'
+  },
   errorSelect: { borderColor: '#dc2626' }
 };
