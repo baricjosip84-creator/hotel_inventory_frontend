@@ -171,9 +171,9 @@ assertIncludes(tenantPage, [
   'Create custom role',
   'Starting template',
   'Custom role library',
-  'Manage ${roleName(activeRole)}',
-  "setErrorMessage('Reassign all users before deactivating this custom role.')",
-  "setErrorMessage('Reassign all users before deleting this custom role.')",
+  'title={`${ui("Manage")} ${roleName(activeRole)}`}',
+  'setErrorMessage(ui("Reassign all users before deactivating this custom role."))',
+  'setErrorMessage(ui("Reassign all users before deleting this custom role."))',
   'Reassign all users before deleting this role.',
   'activeRole.can_deactivate === false',
   'activeRole.can_delete === false',
@@ -190,7 +190,7 @@ assertIncludes(usersPage, [
   "'/users/role-options'",
   'roleSelection',
   'custom_role_id',
-  '<optgroup label="Custom roles">',
+  '<optgroup label={ui("Custom roles")}>',
   'Tenant custom role'
 ], 'tenant users custom assignment UI');
 assertIncludes(permissionSnapshot, [
@@ -200,8 +200,8 @@ assertIncludes(permissionSnapshot, [
   'export function getCurrentAccessRoleLabel()'
 ], 'frontend effective permission snapshot');
 assertIncludes(editor, ['Custom roles', 'Reset to starting template', 'role.display_name'], 'shared role editor');
-assertIncludes(appLayout, ['getCurrentAccessRoleLabel', "{accessRoleLabel || 'Tenant user'}"], 'custom role shell label');
-assertIncludes(roleAwareWorkspace, ['getCurrentAccessRoleLabel', 'getTenantPermissionSnapshot', 'custom_role_name', 'Prepared for the current access role:'], 'custom role workspace label');
+assertIncludes(appLayout, ['getCurrentAccessRoleLabel', "accessRoleLabel || t('common.tenantUser')"], 'custom role shell label');
+assertIncludes(roleAwareWorkspace, ['getCurrentAccessRoleDisplay', 'getTenantPermissionSnapshot', 'custom_role_name', 'ui("Prepared for the current access role:")'], 'custom role workspace label');
 for (const [label, source, feedbackMarker] of customRolePermissionSurfaces) {
   assertIncludes(source, ['Current access role:', feedbackMarker], `${label} custom role feedback`);
   assertNotIncludes(source, [

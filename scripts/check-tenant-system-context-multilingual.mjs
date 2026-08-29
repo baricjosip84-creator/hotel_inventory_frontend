@@ -3,7 +3,10 @@ import path from 'node:path';
 
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
-const readSibling = (file) => fs.readFileSync(path.join(root, '..', 'hotel-inventory-backend', file), 'utf8');
+const defaultBackendRoot = path.join(root, '..', 'hotel-inventory-backend');
+const backendRoot = path.resolve(process.argv[2] || process.env.BACKEND_ROOT || defaultBackendRoot);
+const backendExplicitlyConfigured = Boolean(process.argv[2] || process.env.BACKEND_ROOT);
+const readBackend = (file) => fs.readFileSync(path.join(backendRoot, file), 'utf8');
 const fail = (message) => { console.error(`FAIL: ${message}`); process.exitCode = 1; };
 const pass = (message) => console.log(`PASS: ${message}`);
 
@@ -12,8 +15,11 @@ const catalog = read('src/i18n/tenantUiTranslations.ts');
 const router = read('src/app/router.tsx');
 const permissions = read('src/lib/permissions.ts');
 let backendRoute = '';
-try { backendRoute = readSibling('src/routes/systemContext.js'); }
-catch { fail('System Context backend sibling is unavailable; create the temporary hotel-inventory-backend sibling alias for cross-repo validation.'); }
+try { backendRoute = readBackend('src/routes/systemContext.js'); }
+catch {
+  if (backendExplicitlyConfigured) fail(`System Context backend route is unavailable under configured BACKEND_ROOT: ${backendRoot}`);
+  else pass('System Context backend contract validation deferred to the cross-repository CI job (BACKEND_ROOT not configured in frontend-only validation).');
+}
 
 const rows = [];
 for (const line of catalog.split(/\r?\n/)) {

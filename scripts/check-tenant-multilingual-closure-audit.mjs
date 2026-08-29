@@ -129,7 +129,9 @@ const closureFiles = {
   outbound: read('src/pages/OutboundPage.tsx'),
   appProviders: read('src/app/AppProviders.tsx'),
   api: read('src/lib/api.ts'),
-  actionFeedback: read('src/lib/actionFeedback.ts')
+  actionFeedback: read('src/lib/actionFeedback.ts'),
+  systemContextChecker: read('scripts/check-tenant-system-context-multilingual.mjs'),
+  frontendValidationWorkflow: read('.github/workflows/frontend-validation.yml')
 };
 
 assert(closureFiles.alerts.includes("ui('Use this only for a real operational issue"), 'manual-alert guidance must be catalog-backed');
@@ -152,6 +154,8 @@ assert(closureFiles.appProviders.includes('canonicalTenantUiText(locale, label)'
 assert(closureFiles.appProviders.includes("item.surface === 'tenant'"), 'toast rendering must distinguish tenant from Platform feedback');
 assert(closureFiles.appProviders.includes('translateTenantFeedbackMessage(ui, item.message)'), 'tenant API feedback must translate only explicitly frontend-owned messages');
 assert(closureFiles.appProviders.includes("aria-label={tenant ? ui('Dismiss message') : 'Dismiss platform message'}"), 'tenant toast accessibility label must be translated without converting Platform presentation');
+assert(closureFiles.systemContextChecker.includes('process.env.BACKEND_ROOT') && closureFiles.systemContextChecker.includes('backend contract validation deferred to the cross-repository CI job'), 'System Context checker must honor BACKEND_ROOT and remain frontend-only-CI compatible');
+assert(closureFiles.frontendValidationWorkflow.includes('BACKEND_ROOT: ${{ github.workspace }}/backend') && closureFiles.frontendValidationWorkflow.includes('npm run check:tenant-system-context-multilingual'), 'cross-repository CI must enforce the System Context backend contract with BACKEND_ROOT configured');
 
 const requiredFeedbackKeys = new Set([
   'Action failed', 'Action failed.', 'Request ID', 'Dismiss message', 'Confirm action: {label}?', '{label} submitted.',
