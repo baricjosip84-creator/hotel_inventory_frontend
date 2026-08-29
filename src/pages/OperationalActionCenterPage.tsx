@@ -213,6 +213,48 @@ type ActionCenterResponse = {
 };
 
 
+const ACTION_DOMAIN_VALUES = ['all', 'alerts', 'execution', 'control_tower', 'decision_intelligence', 'ai_governance', 'multi_domain'] as const;
+
+const ACTION_DOMAINS: Array<{ value: ActionDomain; label: string }> = [
+  { value: 'all', label: 'All domains' },
+  { value: 'alerts', label: 'Alerts' },
+  { value: 'execution', label: 'Execution' },
+  { value: 'control_tower', label: 'Control tower' },
+  { value: 'decision_intelligence', label: 'Decision intelligence' },
+  { value: 'ai_governance', label: 'AI governance' },
+  { value: 'multi_domain', label: 'Multi-domain' }
+];
+
+const URGENCY_FILTER_VALUES = ['all', 'critical', 'high', 'medium', 'low'] as const;
+
+const URGENCY_FILTERS: Array<{ value: 'all' | ActionUrgency; label: string }> = [
+  { value: 'all', label: 'All urgency' },
+  { value: 'critical', label: 'Critical' },
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' }
+];
+
+
+
+const toolbarStyle: CSSProperties = {
+  display: 'flex',
+  gap: 12,
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  marginBottom: 16
+};
+
+const selectStyle: CSSProperties = {
+  border: '1px solid var(--color-border)',
+  borderRadius: 12,
+  padding: '10px 12px',
+  background: '#ffffff',
+  color: '#0f172a',
+  minHeight: 44,
+  minWidth: 190
+};
+
 const actionListStyle: CSSProperties = {
   display: 'grid',
   gap: 12
