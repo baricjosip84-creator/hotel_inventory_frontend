@@ -65,7 +65,7 @@
     "check:dependency-update-governance": "node scripts/check-dependency-update-governance.mjs",
     "check:auth-browser-security-hardening": "node scripts/check-auth-browser-security-hardening.mjs",
     "check:decision-intelligence-layout": "node scripts/check-decision-intelligence-layout.mjs",
-    "test:deployment-readiness": "playwright test --config=playwright.deployment.config.ts",
+    "test:deployment-readiness": "npm run wait:production-deployment && playwright test --config=playwright.deployment.config.ts",
     "check:deployment-readiness-gate": "node scripts/check-deployment-readiness-gate.mjs",
     "typecheck:deployment-readiness": "tsc -p tsconfig.deployment.json --noEmit",
     "wait:production-deployment": "node scripts/wait-for-production-deployment.mjs",
@@ -268,7 +268,8 @@
     "check:tenant-admin-system-multilingual": "node scripts/check-tenant-admin-system-multilingual.mjs",
     "check:tenant-insights-multilingual": "node scripts/check-tenant-insights-multilingual.mjs",
     "check:tenant-system-context-multilingual": "node scripts/check-tenant-system-context-multilingual.mjs",
-    "check:tenant-multilingual-closure-audit": "node scripts/check-tenant-multilingual-closure-audit.mjs"
+    "check:tenant-multilingual-closure-audit": "node scripts/check-tenant-multilingual-closure-audit.mjs",
+    "check:deployment-readiness-workflow": "node scripts/check-deployment-readiness-gate.mjs --strict-workflow"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
