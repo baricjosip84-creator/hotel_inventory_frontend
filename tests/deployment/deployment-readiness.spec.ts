@@ -4,6 +4,7 @@ import {
   test,
   type APIRequestContext,
   type APIResponse,
+  type BrowserContext,
   type Page
 } from '@playwright/test';
 
@@ -102,43 +103,101 @@ async function logoutTenant(api: APIRequestContext, csrfToken: string): Promise<
 
 const OPERATIONAL_WORKSPACE_READY_TIMEOUT_MS = 30_000;
 
-async function waitForOperationalWorkspaceReady(page: Page, path: string): Promise<void> {
-  const hero = page.locator('.io-workspace-hero').first();
+type CriticalTenantRoute = {
+  path: string;
+  apiPath: string;
+};
 
+const CRITICAL_TENANT_ROUTES: CriticalTenantRoute[] = [
+  { path: '/dashboard', apiPath: '/api/dashboard/summary' },
+  { path: '/decision-learning-feedback', apiPath: '/api/decision-intelligence/continuous-learning-summary' },
+  { path: '/probabilistic-forecasting', apiPath: '/api/decision-intelligence/probabilistic-forecasting-summary' },
+  { path: '/cross-domain-optimization', apiPath: '/api/decision-intelligence/cross-domain-optimization-summary' }
+];
+
+function attachBrowserFailureCollection(page: Page, backendUrl: string, serverFailures: string[], pageErrors: string[]): void {
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('response', (response) => {
+    const responseUrl = new URL(response.url());
+    const isBackendResponse = response.url().startsWith(backendUrl) || responseUrl.pathname.startsWith('/api/');
+    if (isBackendResponse && response.status() >= 500) {
+      serverFailures.push(`${response.status()} ${responseUrl.pathname}`);
+    }
+  });
+}
+
+async function criticalRouteDiagnostic(page: Page, route: CriticalTenantRoute, detail: string): Promise<Error> {
+  const mainText = await page.locator('.io-operational-page').first().innerText().catch(() => '');
+  const bodyText = mainText || await page.locator('body').innerText().catch(() => '');
+  const excerpt = bodyText.replace(/\s+/g, ' ').trim().slice(0, 800);
+  return new Error(
+    `${route.path} did not reach its loaded state after one bounded retry. ${detail} ` +
+    `Current URL: ${page.url()}. Page excerpt: ${excerpt || '(empty)'}`
+  );
+}
+
+async function waitForCriticalRouteReady(page: Page, route: CriticalTenantRoute): Promise<void> {
   for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const apiResponsePromise = page.waitForResponse((response) => {
+      const responseUrl = new URL(response.url());
+      return response.request().method() === 'GET' && responseUrl.pathname === route.apiPath;
+    }, { timeout: OPERATIONAL_WORKSPACE_READY_TIMEOUT_MS });
+
     if (attempt === 1) {
-      await page.goto(path, { waitUntil: 'domcontentloaded' });
+      await page.goto(route.path, { waitUntil: 'domcontentloaded' });
     } else {
       await page.reload({ waitUntil: 'domcontentloaded' });
     }
 
-    await expect.poll(() => new URL(page.url()).pathname).toBe(path);
+    await expect.poll(() => new URL(page.url()).pathname).toBe(route.path);
 
     try {
-      await hero.waitFor({ state: 'visible', timeout: OPERATIONAL_WORKSPACE_READY_TIMEOUT_MS });
+      const apiResponse = await apiResponsePromise;
+      if (apiResponse.status() < 200 || apiResponse.status() >= 300) {
+        throw await criticalRouteDiagnostic(
+          page,
+          route,
+          `Browser route API returned HTTP ${apiResponse.status()} for ${route.apiPath}.`
+        );
+      }
+
+      await page.locator('.io-workspace-hero').first().waitFor({
+        state: 'visible',
+        timeout: OPERATIONAL_WORKSPACE_READY_TIMEOUT_MS
+      });
       return;
     } catch (error) {
       if (attempt === 2) {
-        const bodyText = await page.locator('body').innerText().catch(() => '');
-        const excerpt = bodyText.replace(/\s+/g, ' ').trim().slice(0, 500);
-        throw new Error(
-          `${path} did not reach its loaded Operational Workspace state after one bounded retry. ` +
-          `Current URL: ${page.url()}. Body excerpt: ${excerpt || '(empty)'}`,
-          { cause: error }
+        if (error instanceof Error && error.message.includes('Browser route API returned HTTP')) throw error;
+        throw await criticalRouteDiagnostic(
+          page,
+          route,
+          `Browser route API ${route.apiPath} or loaded workspace did not complete within ${OPERATIONAL_WORKSPACE_READY_TIMEOUT_MS}ms.`
         );
       }
     }
   }
 }
 
-async function assertPageHasNoRuntimeFailure(page: Page, path: string): Promise<void> {
-  await waitForOperationalWorkspaceReady(page, path);
+async function assertPageHasNoRuntimeFailure(page: Page, route: CriticalTenantRoute): Promise<void> {
+  await waitForCriticalRouteReady(page, route);
   await expect(page.locator('body')).not.toContainText(/Failed to fetch|Unhandled Runtime Error|Something went wrong/i);
 
   const overflowsHorizontally = await page.evaluate(() =>
     document.documentElement.scrollWidth > document.documentElement.clientWidth + 2
   );
-  expect(overflowsHorizontally, `${path} must not overflow horizontally at the deployment-gate viewport`).toBe(false);
+  expect(overflowsHorizontally, `${route.path} must not overflow horizontally at the deployment-gate viewport`).toBe(false);
+}
+
+async function openIsolatedAuthenticatedPage(
+  context: BrowserContext,
+  backendUrl: string,
+  serverFailures: string[],
+  pageErrors: string[]
+): Promise<Page> {
+  const isolatedPage = await context.newPage();
+  attachBrowserFailureCollection(isolatedPage, backendUrl, serverFailures, pageErrors);
+  return isolatedPage;
 }
 
 test.describe('deployed service readiness', () => {
@@ -246,10 +305,16 @@ test.describe('deployed service readiness', () => {
       expect(dashboard.status(), 'Tenant dashboard summary must succeed').toBe(200);
 
       if (booleanSetting('DEPLOYMENT_REQUIRE_DECISION_INTELLIGENCE', true)) {
-        const decision = await api.get('/api/decision-intelligence/probabilistic-forecasting-summary', {
-          headers: authorization
-        });
-        expect(decision.status(), 'Decision Intelligence summary must succeed for the smoke tenant').toBe(200);
+        const decisionReadinessEndpoints = [
+          '/api/decision-intelligence/continuous-learning-summary?limit=25',
+          '/api/decision-intelligence/probabilistic-forecasting-summary?limit=25',
+          '/api/decision-intelligence/cross-domain-optimization-summary?limit=25'
+        ];
+
+        for (const endpoint of decisionReadinessEndpoints) {
+          const decision = await api.get(endpoint, { headers: authorization });
+          expect(decision.status(), `Decision Intelligence smoke endpoint ${endpoint} must succeed`).toBe(200);
+        }
       }
 
       const refresh = await api.post('/api/auth/refresh', {
@@ -279,17 +344,11 @@ test.describe('deployed service readiness', () => {
 
   test('browser login and critical tenant pages render without runtime or layout failure', async ({ page }) => {
     const backendUrl = deploymentUrl('DEPLOYMENT_BACKEND_URL');
+    const context = page.context();
     const serverFailures: string[] = [];
     const pageErrors: string[] = [];
 
-    page.on('pageerror', (error) => pageErrors.push(error.message));
-    page.on('response', (response) => {
-      const responseUrl = new URL(response.url());
-      const isBackendResponse = response.url().startsWith(backendUrl) || responseUrl.pathname.startsWith('/api/');
-      if (isBackendResponse && response.status() >= 500) {
-        serverFailures.push(`${response.status()} ${responseUrl.pathname}`);
-      }
-    });
+    attachBrowserFailureCollection(page, backendUrl, serverFailures, pageErrors);
 
     await page.goto('/login', { waitUntil: 'domcontentloaded' });
     await page.locator('#login-email').fill(requiredValue('E2E_EMAIL'));
@@ -297,19 +356,36 @@ test.describe('deployed service readiness', () => {
     await page.locator('form[data-auth-form="true"] button[type="submit"]').click();
     await expect(page).toHaveURL(/\/dashboard$/);
 
-    await assertPageHasNoRuntimeFailure(page, '/dashboard');
+    // Close the login/dashboard page before route-by-route validation so its
+    // background dashboard requests cannot occupy the browser API concurrency
+    // queue while the next critical route is being tested.
+    await page.close();
 
-    if (booleanSetting('DEPLOYMENT_REQUIRE_DECISION_INTELLIGENCE', true)) {
-      await assertPageHasNoRuntimeFailure(page, '/decision-learning-feedback');
-      await assertPageHasNoRuntimeFailure(page, '/probabilistic-forecasting');
-      await assertPageHasNoRuntimeFailure(page, '/cross-domain-optimization');
+    const routes = booleanSetting('DEPLOYMENT_REQUIRE_DECISION_INTELLIGENCE', true)
+      ? CRITICAL_TENANT_ROUTES
+      : CRITICAL_TENANT_ROUTES.filter((route) => route.path === '/dashboard');
+
+    for (const route of routes) {
+      const routePage = await openIsolatedAuthenticatedPage(context, backendUrl, serverFailures, pageErrors);
+      try {
+        await assertPageHasNoRuntimeFailure(routePage, route);
+      } finally {
+        await routePage.close();
+      }
     }
 
     expect(serverFailures, 'Critical pages must not receive backend 5xx responses').toEqual([]);
     expect(pageErrors, 'Critical pages must not emit browser runtime errors').toEqual([]);
 
-    await page.locator('[data-tenant-logout="true"]').click();
-    await expect(page).toHaveURL(/\/login$/);
+    const logoutPage = await openIsolatedAuthenticatedPage(context, backendUrl, serverFailures, pageErrors);
+    try {
+      await logoutPage.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+      await expect(logoutPage.locator('[data-tenant-logout="true"]')).toBeVisible();
+      await logoutPage.locator('[data-tenant-logout="true"]').click();
+      await expect(logoutPage).toHaveURL(/\/login$/);
+    } finally {
+      await logoutPage.close();
+    }
   });
 
   test('platform authentication and deployment-validation API pass when required', async () => {
