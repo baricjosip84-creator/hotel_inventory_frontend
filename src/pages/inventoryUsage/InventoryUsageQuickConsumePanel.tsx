@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useAppTranslation } from '../../i18n/I18nContext';
+import { formatLocalizedDate, formatLocalizedNumber } from '../../i18n/formatters';
 import { OperationalSectionHeader } from '../../components/ui/OperationalWorkspace';
 import { USAGE_REASON_OPTIONS } from './inventoryUsageConfig';
-import { toNumber } from './inventoryUsageFormatting';
 import { styles } from './inventoryUsageStyles';
 import { InventoryUsageCameraScanner } from './InventoryUsageCameraScanner';
 import type { InventoryUsageBarcodeRequest, InventoryUsageBarcodePreviewResponse, InventoryUsageBarcodeResponse, InventoryUsageStorageLocationOption } from './inventoryUsageTypes';
@@ -77,31 +78,31 @@ const createClientScanId = () => {
   });
 };
 
-const formatBarcodeTraceability = (match?: InventoryUsageBarcodeResponse['barcode_match']): string => {
+const formatBarcodeTraceability = (match: InventoryUsageBarcodeResponse['barcode_match'] | undefined, ui: (text: string) => string, locale: Parameters<typeof formatLocalizedDate>[1]): string => {
   if (!match?.matched_label_barcode) return '';
   return [
-    match.lot_number ? `Lot ${match.lot_number}` : '',
-    match.batch_number ? `Batch ${match.batch_number}` : '',
-    match.expiry_date ? `Expiry ${new Date(match.expiry_date).toLocaleDateString()}` : ''
+    match.lot_number ? `${ui('Lot')} ${match.lot_number}` : '',
+    match.batch_number ? `${ui('Batch')} ${match.batch_number}` : '',
+    match.expiry_date ? `${ui('Expiry')} ${formatLocalizedDate(match.expiry_date, locale)}` : ''
   ].filter(Boolean).join(' · ');
 };
 
-const formatPolicyReason = (reason: string) => {
+const formatPolicyReason = (reason: string, ui: (text: string) => string) => {
   switch (reason) {
     case 'missing_stock_row':
-      return 'No stock row exists at the selected location';
+      return ui('No stock row exists at the selected location');
     case 'insufficient_stock':
-      return 'The scan would make stock negative';
+      return ui('The scan would make stock negative');
     case 'reserved_stock':
-      return 'The scan would use stock reserved for active commitments';
+      return ui('The scan would use stock reserved for active commitments');
     case 'critical_alert':
-      return 'A critical unresolved alert blocks consumption';
+      return ui('A critical unresolved alert blocks consumption');
     case 'closed_period':
-      return 'The selected usage timestamp is inside a closed period';
+      return ui('The selected usage timestamp is inside a closed period');
     case 'stock_risk':
-      return 'Stock-impact acknowledgement is required';
+      return ui('Stock-impact acknowledgement is required');
     case 'missing_evidence':
-      return 'Evidence metadata or missing-evidence acknowledgement is required';
+      return ui('Evidence metadata or missing-evidence acknowledgement is required');
     default:
       return reason.replace(/_/g, ' ');
   }
@@ -255,6 +256,13 @@ export function InventoryUsageQuickConsumePanel({
   onPreviewBarcodeUsage,
   onRecordBarcodeUsage
 }: InventoryUsageQuickConsumePanelProps) {
+  const { locale, ui } = useAppTranslation();
+  const formatNumber = (value: number | string | null | undefined, maximumFractionDigits = 4) => {
+    if (value === null || value === undefined || value === "") return "—";
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return String(value);
+    return formatLocalizedNumber(numeric, locale, { maximumFractionDigits });
+  };
   const [draft, setDraft] = useState<InventoryUsageBarcodeRequest>(buildInitialDraft);
   const [successMessage, setSuccessMessage] = useState(completionMessage);
   const [completionError, setCompletionError] = useState('');
@@ -387,14 +395,14 @@ export function InventoryUsageQuickConsumePanel({
     && (!previewRequiresEvidenceAcknowledgement || missingEvidenceAcknowledged);
 
   const missingPreviewRequirements = [
-    draft.barcode.trim().length === 0 ? 'scan, paste, or enter a barcode' : '',
-    draft.storage_location_id.trim().length === 0 ? 'select a stock location' : '',
-    packageCount <= 0 ? 'enter a scan quantity greater than zero' : ''
+    draft.barcode.trim().length === 0 ? ui('scan, paste, or enter a barcode') : '',
+    draft.storage_location_id.trim().length === 0 ? ui('select a stock location') : '',
+    packageCount <= 0 ? ui('enter a scan quantity greater than zero') : ''
   ].filter(Boolean);
 
   const actionGuidance = (() => {
     if (!canRecord) {
-      return 'Recording permission is required before previewing or consuming stock.';
+      return ui('Recording permission is required before previewing or consuming stock.');
     }
 
     if (missingPreviewRequirements.length > 0) {
@@ -402,44 +410,44 @@ export function InventoryUsageQuickConsumePanel({
     }
 
     if (previewing) {
-      return 'Stock-impact preview is running. Wait for it to finish.';
+      return ui('Stock-impact preview is running. Wait for it to finish.');
     }
 
     if (recording) {
-      return 'Quick consume is being recorded. Wait for it to finish.';
+      return ui('Quick consume is being recorded. Wait for it to finish.');
     }
 
     if (requiresFreshPreview && !previewMatchesDraft) {
       return hasStalePreview
-        ? 'The draft changed after the last preview. Preview stock impact again before quick consume.'
-        : 'Preview stock impact first. Quick consume remains disabled until this exact draft passes preview.';
+        ? ui('The draft changed after the last preview. Preview stock impact again before quick consume.')
+        : ui('Preview stock impact first. Quick consume remains disabled until this exact draft passes preview.');
     }
 
     if (criticalAlertBlocksSubmit) {
-      return 'Quick consume is blocked by an unresolved critical alert.';
+      return ui('Quick consume is blocked by an unresolved critical alert.');
     }
 
     if (closedPeriodBlocksSubmit) {
-      return 'Quick consume is blocked because the selected usage time is inside a closed period.';
+      return ui('Quick consume is blocked because the selected usage time is inside a closed period.');
     }
 
     if (missingStockRowBlocksSubmit) {
-      return 'Quick consume is blocked because no stock row exists at the selected location.';
+      return ui('Quick consume is blocked because no stock row exists at the selected location.');
     }
 
     if (insufficientStockBlocksSubmit) {
-      return 'Quick consume is blocked because the requested quantity exceeds available stock.';
+      return ui('Quick consume is blocked because the requested quantity exceeds available stock.');
     }
 
     if ((activePreviewRisk && !riskAcknowledged) || (previewRequiresEvidenceAcknowledgement && !missingEvidenceAcknowledged) || (requiresMissingEvidenceAcknowledgement && !missingEvidenceAcknowledged)) {
-      return 'Complete the required acknowledgement before quick consume.';
+      return ui('Complete the required acknowledgement before quick consume.');
     }
 
     if (canSubmit) {
-      return 'Preview is current. Quick consume is ready.';
+      return ui('Preview is current. Quick consume is ready.');
     }
 
-    return 'Complete the required fields and preview this draft before quick consume.';
+    return ui('Complete the required fields and preview this draft before quick consume.');
   })();
 
   const updateDraft = (patch: Partial<InventoryUsageBarcodeRequest>) => {
@@ -508,8 +516,8 @@ export function InventoryUsageQuickConsumePanel({
     } catch (caughtError) {
       const message = caughtError instanceof Error
         ? caughtError.message
-        : 'Unexpected error while recording quick consume.';
-      setCompletionError(`Quick consume failed: ${message}`);
+        : ui('Unexpected error while recording quick consume.');
+      setCompletionError(`${ui('Quick consume failed: ')}${message}`);
     }
   };
 
@@ -551,19 +559,18 @@ export function InventoryUsageQuickConsumePanel({
     <section style={styles.card}>
       <OperationalSectionHeader
         iconPath="/scanner"
-        title="Barcode quick consume"
-        description="Scan a product, package, or inventory-label barcode with this device camera, or paste/type its value. Package barcode quantity means packages; product and inventory-label quantity means base units."
+        title={ui("Barcode quick consume")}
+        description={ui("Scan a product, package, or inventory-label barcode with this device camera, or paste/type its value. Package barcode quantity means packages; product and inventory-label quantity means base units.")}
         actions={
           <span style={canRecord ? styles.successPill : styles.warningPill}>
-            {canRecord ? 'Ready to record' : 'Record permission required'}
+            {canRecord ? ui('Ready to record') : ui('Record permission required')}
           </span>
         }
       />
 
       <div style={styles.filterGrid}>
         <label style={styles.fieldLabel}>
-          Barcode
-          <input
+          {ui("Barcode")}<input
             style={styles.input}
             value={draft.barcode}
             onChange={(event) => updateDraft({ barcode: event.target.value })}
@@ -573,7 +580,7 @@ export function InventoryUsageQuickConsumePanel({
                 handleScannerEnter();
               }
             }}
-            placeholder="Paste or enter barcode value"
+            placeholder={ui("Paste or enter barcode value")}
             autoComplete="off"
             disabled={recording}
           />
@@ -585,14 +592,13 @@ export function InventoryUsageQuickConsumePanel({
         />
 
         <label style={styles.fieldLabel}>
-          Stock location
-          <select
+          {ui("Stock location")}<select
             style={styles.input}
             value={draft.storage_location_id}
             onChange={(event) => updateDraft({ storage_location_id: event.target.value })}
             disabled={recording || storageLocationsLoading || activeLocations.length === 0}
           >
-            <option value="">{storageLocationsLoading ? 'Loading locations...' : 'Select location'}</option>
+            <option value="">{storageLocationsLoading ? ui('Loading locations...') : ui('Select location')}</option>
             {activeLocations.map((location) => (
               <option key={location.id} value={location.id}>
                 {location.name}{location.temperature_zone ? ` · ${location.temperature_zone}` : ''}
@@ -602,8 +608,7 @@ export function InventoryUsageQuickConsumePanel({
         </label>
 
         <label style={styles.fieldLabel}>
-          Scan quantity
-          <input
+          {ui("Scan quantity")}<input
             type="number"
             min="0.0001"
             step="0.0001"
@@ -615,21 +620,19 @@ export function InventoryUsageQuickConsumePanel({
         </label>
 
         <label style={styles.fieldLabel}>
-          Serial numbers
-          <textarea
+          {ui("Serial numbers")}<textarea
             style={{ ...styles.input, minHeight: 82, resize: 'vertical' }}
             value={(draft.serial_numbers || []).join('\n')}
             onChange={(event) => updateDraft({
               serial_numbers: event.target.value.split(/[\n,]+/).map((value) => value.trim()).filter(Boolean)
             })}
-            placeholder="One serial per unit; required only for products configured to require serials"
+            placeholder={ui("One serial per unit; required only for products configured to require serials")}
             disabled={recording}
           />
         </label>
 
         <label style={styles.fieldLabel}>
-          Reason
-          <select
+          {ui("Reason")}<select
             style={styles.input}
             value={draft.consumption_reason || 'internal_use'}
             onChange={(event) => updateDraft({ consumption_reason: event.target.value })}
@@ -642,30 +645,27 @@ export function InventoryUsageQuickConsumePanel({
         </label>
 
         <label style={styles.fieldLabel}>
-          Department / team
-          <input
+          {ui("Department / team")}<input
             style={styles.input}
             value={draft.department || ''}
             onChange={(event) => updateDraft({ department: event.target.value })}
-            placeholder="Housekeeping, kitchen, maintenance..."
+            placeholder={ui("Housekeeping, kitchen, maintenance...")}
             disabled={recording}
           />
         </label>
 
         <label style={styles.fieldLabel}>
-          Event / job
-          <input
+          {ui("Event / job")}<input
             style={styles.input}
             value={draft.event_name || ''}
             onChange={(event) => updateDraft({ event_name: event.target.value })}
-            placeholder="Optional event or work order"
+            placeholder={ui("Optional event or work order")}
             disabled={recording}
           />
         </label>
 
         <label style={styles.fieldLabel}>
-          Consumed at
-          <input
+          {ui("Consumed at")}<input
             type="datetime-local"
             style={styles.input}
             value={draft.consumed_at || ''}
@@ -678,13 +678,11 @@ export function InventoryUsageQuickConsumePanel({
       <div style={styles.importPanel}>
         <div style={styles.sectionHeader}>
           <div>
-            <h3 style={styles.subsectionTitle}>Shift-floor defaults</h3>
+            <h3 style={styles.subsectionTitle}>{ui("Shift-floor defaults")}</h3>
             <p style={styles.sectionDescription}>
-              Keep the selected location, reason, department, and event between scans for mobile or scanner-heavy workflows.
-              Barcode, quantity, notes, and evidence fields still reset after each successful consume.
-            </p>
+              {ui("Keep the selected location, reason, department, and event between scans for mobile or scanner-heavy workflows. Barcode, quantity, notes, and evidence fields still reset after each successful consume.")}</p>
           </div>
-          <span style={shiftDefaultsEnabled ? styles.successPill : styles.warningPill}>{shiftDefaultsEnabled ? 'Defaults saved' : 'One-off scan'}</span>
+          <span style={shiftDefaultsEnabled ? styles.successPill : styles.warningPill}>{shiftDefaultsEnabled ? ui('Defaults saved') : ui('One-off scan')}</span>
         </div>
         <div style={styles.bulkFooter}>
           <label style={styles.checkboxLabel}>
@@ -693,8 +691,7 @@ export function InventoryUsageQuickConsumePanel({
               checked={shiftDefaultsEnabled}
               onChange={(event) => setShiftDefaultsEnabled(event.target.checked)}
             />
-            Reuse these shift defaults for the next barcode scans on this device.
-          </label>
+            {ui("Reuse these shift defaults for the next barcode scans on this device.")}</label>
           <button
             type="button"
             style={styles.secondaryButton}
@@ -703,73 +700,66 @@ export function InventoryUsageQuickConsumePanel({
               writeQuickConsumeShiftDefaults({ enabled: false });
             }}
           >
-            Clear saved defaults
-          </button>
+            {ui("Clear saved defaults")}</button>
         </div>
       </div>
 
       <div style={styles.importPanel}>
         <div style={styles.sectionHeader}>
           <div>
-            <h3 style={styles.subsectionTitle}>Advanced evidence link</h3>
+            <h3 style={styles.subsectionTitle}>{ui("Advanced evidence link")}</h3>
             <p style={styles.sectionDescription}>
-              Optional advanced fields for linking a file that has already been stored elsewhere. This panel does not upload a file.
-              {requiresEvidencePrompt ? ' Damage and waste scans should include evidence whenever possible.' : ''}
+              {ui("Optional advanced fields for linking a file that has already been stored elsewhere. This panel does not upload a file.")}{requiresEvidencePrompt ? ` ${ui("Damage and waste scans should include evidence whenever possible.")}` : ""}
             </p>
           </div>
-          <span style={requiresEvidencePrompt ? styles.warningPill : styles.successPill}>{requiresEvidencePrompt ? 'Evidence recommended' : 'Optional'}</span>
+          <span style={requiresEvidencePrompt ? styles.warningPill : styles.successPill}>{requiresEvidencePrompt ? ui("Evidence recommended") : ui("Optional")}</span>
         </div>
         <div style={styles.filterGrid}>
           <label style={styles.fieldLabel}>
-            Original filename
-            <input
+            {ui("Original filename")}<input
               style={styles.input}
               value={draft.evidence_original_filename || ''}
               onChange={(event) => updateDraft({ evidence_original_filename: event.target.value })}
-              placeholder="damage-photo.jpg"
+              placeholder={"damage-photo.jpg"}
               disabled={recording}
             />
           </label>
           <label style={styles.fieldLabel}>
-            Stored filename
-            <input
+            {ui("Stored filename")}<input
               style={styles.input}
               value={draft.evidence_stored_filename || ''}
               onChange={(event) => updateDraft({ evidence_stored_filename: event.target.value })}
-              placeholder="tenant/uploads/damage-photo.jpg"
+              placeholder={"tenant/uploads/damage-photo.jpg"}
               disabled={recording}
             />
           </label>
           <label style={styles.fieldLabel}>
-            MIME type
-            <input
+            {ui("MIME type")}<input
               style={styles.input}
               value={draft.evidence_mime_type || ''}
               onChange={(event) => updateDraft({ evidence_mime_type: event.target.value })}
-              placeholder="image/jpeg"
+              placeholder={"image/jpeg"}
               disabled={recording}
             />
           </label>
           <label style={styles.fieldLabel}>
-            File size bytes
-            <input
+            {ui("File size bytes")}<input
               type="number"
               min="0"
               step="1"
               style={styles.input}
               value={draft.evidence_file_size_bytes || ''}
               onChange={(event) => updateDraft({ evidence_file_size_bytes: event.target.value })}
-              placeholder="Optional"
+              placeholder={ui("Optional")}
               disabled={recording}
             />
           </label>
           <label style={styles.fieldLabel}>
-            Storage path
-            <input
+            {ui("Storage path")}<input
               style={styles.input}
               value={draft.evidence_storage_path || ''}
               onChange={(event) => updateDraft({ evidence_storage_path: event.target.value })}
-              placeholder="Optional object storage path or URL"
+              placeholder={ui("Optional object storage path or URL")}
               disabled={recording}
             />
           </label>
@@ -778,13 +768,12 @@ export function InventoryUsageQuickConsumePanel({
 
       <div style={styles.importPanel}>
         <label style={styles.fieldLabel}>
-          Notes
-          <textarea
+          {ui("Notes")}<textarea
             style={styles.textarea}
             rows={3}
             value={draft.notes || ''}
             onChange={(event) => updateDraft({ notes: event.target.value })}
-            placeholder="Optional notes for governance, damage/waste detail, or shift context"
+            placeholder={ui("Optional notes for governance, damage/waste detail, or shift context")}
             disabled={recording}
           />
         </label>
@@ -797,20 +786,18 @@ export function InventoryUsageQuickConsumePanel({
               onChange={(event) => updateMissingEvidenceAcknowledgement(event.target.checked)}
               disabled={recording}
             />
-            Record this damage/waste scan without evidence attachment metadata.
-          </label>
+            {ui("Record this damage/waste scan without evidence attachment metadata.")}</label>
         ) : hasEvidenceMetadata ? (
-          <p style={styles.successText}>Evidence metadata will be linked to the usage log after recording.</p>
+          <p style={styles.successText}>{ui("Evidence metadata will be linked to the usage log after recording.")}</p>
         ) : null}
 
         <div style={styles.bulkFooter}>
           <p style={styles.sectionDescription}>
-            Preview before recording. The preview checks the selected location, available unreserved stock, critical alerts, closed periods, reason, and evidence requirements. A successful record creates the usage log and its linked stock movement.
-          </p>
+            {ui("Preview before recording. The preview checks the selected location, available unreserved stock, critical alerts, closed periods, reason, and evidence requirements. A successful record creates the usage log and its linked stock movement.")}</p>
           {requiresFreshPreview && !previewMatchesDraft ? (
-            <p style={styles.warningText}>Preview the current scan before recording so stock, alert, period, reason, and evidence controls are checked against this exact draft.</p>
+            <p style={styles.warningText}>{ui("Preview the current scan before recording so stock, alert, period, reason, and evidence controls are checked against this exact draft.")}</p>
           ) : draftConsumedAt === '' && previewMatchesDraft ? (
-            <p style={styles.sectionDescription}>Preview checked the current server-side usage timestamp because no manual consumed-at value is set.</p>
+            <p style={styles.sectionDescription}>{ui("Preview checked the current server-side usage timestamp because no manual consumed-at value is set.")}</p>
           ) : null}
           <p style={canSubmit ? styles.successText : styles.warningText}>{actionGuidance}</p>
           {successMessage ? (
@@ -829,9 +816,9 @@ export function InventoryUsageQuickConsumePanel({
               onClick={handlePreview}
               disabled={!canPreview}
               aria-disabled={!canPreview}
-              title={!canPreview ? actionGuidance : 'Preview stock impact for this draft'}
+              title={!canPreview ? actionGuidance : ui("Preview stock impact for this draft")}
             >
-              {previewing ? 'Previewing...' : 'Preview stock impact'}
+              {previewing ? ui("Previewing...") : ui("Preview stock impact")}
             </button>
           ) : null}
           <button
@@ -844,9 +831,9 @@ export function InventoryUsageQuickConsumePanel({
             onClick={handleSubmit}
             disabled={!canSubmit}
             aria-disabled={!canSubmit}
-            title={!canSubmit ? actionGuidance : 'Record this barcode quick consume'}
+            title={!canSubmit ? actionGuidance : ui("Record this barcode quick consume")}
           >
-            {recording ? 'Recording...' : 'Quick consume'}
+            {recording ? ui('Recording...') : ui('Quick consume')}
           </button>
         </div>
         {completionError ? (
@@ -855,7 +842,7 @@ export function InventoryUsageQuickConsumePanel({
           </div>
         ) : error ? (
           <div role="alert" style={styles.errorText}>
-            Quick consume failed: {error.message}
+            {ui("Quick consume failed: ")}{error.message}
           </div>
         ) : null}
       </div>
@@ -866,10 +853,10 @@ export function InventoryUsageQuickConsumePanel({
         <div style={styles.importPanel}>
           <div style={styles.sectionHeader}>
             <div>
-              <h3 style={styles.subsectionTitle}>Recent barcode scans</h3>
-              <p style={styles.sectionDescription}>Reuse common scan/location combinations for fast shift-floor consumption without retyping metadata.</p>
+              <h3 style={styles.subsectionTitle}>{ui("Recent barcode scans")}</h3>
+              <p style={styles.sectionDescription}>{ui("Reuse common scan/location combinations for fast shift-floor consumption without retyping metadata.")}</p>
             </div>
-            <button type="button" style={styles.secondaryButton} onClick={handleClearRecentScans}>Clear recent</button>
+            <button type="button" style={styles.secondaryButton} onClick={handleClearRecentScans}>{ui("Clear recent")}</button>
           </div>
           <div style={styles.breakdownList}>
             {recentScans.map((scan) => (
@@ -877,57 +864,55 @@ export function InventoryUsageQuickConsumePanel({
                 <div>
                   <strong>{scan.productLabel}</strong>
                   <p style={styles.sectionDescription}>
-                    Barcode {scan.barcode} · {scan.locationLabel || scan.storage_location_id}
+                    {ui("Barcode ")}{scan.barcode} · {scan.locationLabel || scan.storage_location_id}
                     {scan.department ? ` · ${scan.department}` : ''}
                     {scan.event_name ? ` · ${scan.event_name}` : ''}
                   </p>
                 </div>
                 <button type="button" style={styles.secondaryButton} onClick={() => handleReuseRecentScan(scan)}>
-                  Reuse
-                </button>
+                  {ui("Reuse")}</button>
               </div>
             ))}
           </div>
         </div>
       ) : null}
 
-      {previewError ? <p style={styles.errorText}>Barcode preview failed: {previewError.message}</p> : null}
+      {previewError ? <p style={styles.errorText}>{ui("Barcode preview failed: ")}{previewError.message}</p> : null}
       {previewResult?.preview ? (
         <div style={styles.importPanel}>
           <strong>{previewResult.barcode_match?.product_name || previewResult.barcode_match?.product_id}</strong>
           <p style={styles.sectionDescription}>
             {previewResult.barcode_match?.matched_label_barcode
-              ? 'Inventory label · '
+              ? ui("Inventory label · ")
               : previewResult.barcode_match?.package_name
                 ? `${previewResult.barcode_match.package_name} · `
                 : ''}
-            {toNumber(previewResult.preview.package_count)} {previewResult.barcode_match?.matched_label_barcode ? 'label(s)' : 'package(s)'} = {toNumber(previewResult.preview.quantity_to_consume)} {previewResult.barcode_match?.product_unit || 'units'}.
-            {formatBarcodeTraceability(previewResult.barcode_match) ? ` ${formatBarcodeTraceability(previewResult.barcode_match)}.` : ''}
-            {previewResult.preview.storage_location_name ? ` Location: ${previewResult.preview.storage_location_name}.` : ''}
-            Current stock {toNumber(previewResult.preview.current_quantity)} → projected {toNumber(previewResult.preview.resulting_quantity)}.
+            {formatNumber(previewResult.preview.package_count)} {previewResult.barcode_match?.matched_label_barcode ? ui('label(s)') : ui('package(s)')} = {formatNumber(previewResult.preview.quantity_to_consume)} {previewResult.barcode_match?.product_unit || ui('units')}.
+            {formatBarcodeTraceability(previewResult.barcode_match, ui, locale) ? ` ${formatBarcodeTraceability(previewResult.barcode_match, ui, locale)}.` : ''}
+            {previewResult.preview.storage_location_name ? ` ${ui("Location:")} ${previewResult.preview.storage_location_name}.` : ""}
+            {ui("Current stock ")}{formatNumber(previewResult.preview.current_quantity)} {ui("→ projected ")}{formatNumber(previewResult.preview.resulting_quantity)}.
           </p>
           {missingStockRowBlocksSubmit ? (
-            <p style={styles.errorText}>No stock row exists for this product at {previewResult.preview.storage_location_name || 'the selected location'}. Create or receive stock at this location before recording barcode quick consume.</p>
+            <p style={styles.errorText}>{ui("No stock row exists for this product at ")}{previewResult.preview.storage_location_name || ui('the selected location')}{ui(". Create or receive stock at this location before recording barcode quick consume.")}</p>
           ) : null}
           {insufficientStockBlocksSubmit ? (
-            <p style={styles.errorText}>This scan would make stock negative at the selected location. Receive stock, reduce package count, or choose another location before recording.</p>
+            <p style={styles.errorText}>{ui("This scan would make stock negative at the selected location. Receive stock, reduce package count, or choose another location before recording.")}</p>
           ) : null}
           {hasStalePreview ? (
-            <p style={styles.warningText}>Preview is stale because barcode, location, package count, consumed-at timestamp, reason, or evidence metadata changed. Preview again before recording.</p>
+            <p style={styles.warningText}>{ui("Preview is stale because barcode, location, package count, consumed-at timestamp, reason, or evidence metadata changed. Preview again before recording.")}</p>
           ) : draftConsumedAt === '' && previewMatchesDraft ? (
-            <p style={styles.sectionDescription}>No consumed-at override is set; this preview used the current server-side usage timestamp.</p>
+            <p style={styles.sectionDescription}>{ui("No consumed-at override is set; this preview used the current server-side usage timestamp.")}</p>
           ) : null}
           {previewResult.preview.blocked_by_critical_alert ? (
             <div style={styles.errorText}>
               <p style={{ margin: 0 }}>
-                A critical unresolved alert currently blocks consumption for this product or tenant. Resolve the alert before recording.
-                {previewResult.preview.critical_alert_count ? ` ${previewResult.preview.critical_alert_count} blocking alert(s) found.` : ''}
+                {ui("A critical unresolved alert currently blocks consumption for this product or tenant. Resolve the alert before recording.")}{previewResult.preview.critical_alert_count ? ` ${formatNumber(previewResult.preview.critical_alert_count, 0)} ${ui("blocking alert(s) found.")}` : ""}
               </p>
               {(previewResult.preview.critical_alerts || []).length > 0 ? (
                 <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
                   {(previewResult.preview.critical_alerts || []).slice(0, 3).map((alert) => (
                     <li key={alert.id || `${alert.type}-${alert.message}`}>
-                      <strong>{alert.type || 'Critical alert'}</strong>{alert.message ? ` — ${alert.message}` : ''}
+                      <strong>{alert.type || ui('Critical alert')}</strong>{alert.message ? ` — ${alert.message}` : ''}
                     </li>
                   ))}
                 </ul>
@@ -935,48 +920,46 @@ export function InventoryUsageQuickConsumePanel({
             </div>
           ) : null}
           {previewResult.preview.blocked_by_closed_period ? (
-            <p style={styles.errorText}>The selected usage timestamp is inside a closed usage period. Reopen the period or choose a different timestamp before recording.</p>
+            <p style={styles.errorText}>{ui("The selected usage timestamp is inside a closed usage period. Reopen the period or choose a different timestamp before recording.")}</p>
           ) : null}
           {previewResult.preview.blocked_by_reserved_stock ? (
             <p style={styles.errorText}>
-              This scan is blocked because it would use stock reserved for active commitments.
-              Release or reallocate the reservation, or consume a smaller quantity.
-            </p>
+              {ui("This scan is blocked because it would use stock reserved for active commitments. Release or reallocate the reservation, or consume a smaller quantity.")}</p>
           ) : null}
           {previewResult.preview.will_deplete && !previewResult.preview.blocked_by_insufficient_stock && !previewResult.preview.blocked_by_reserved_stock ? (
-            <p style={styles.warningText}>This scan will deplete the selected location.</p>
+            <p style={styles.warningText}>{ui("This scan will deplete the selected location.")}</p>
           ) : previewResult.preview.will_go_below_minimum ? (
-            <p style={styles.warningText}>This scan will leave stock below the configured minimum.</p>
+            <p style={styles.warningText}>{ui("This scan will leave stock below the configured minimum.")}</p>
           ) : previewResult.preview.has_sufficient_unreserved_stock && !previewResult.preview.blocked_by_critical_alert && !previewResult.preview.blocked_by_closed_period ? (
-            <p style={styles.successText}>Stock is available for this quick-consume scan.</p>
+            <p style={styles.successText}>{ui("Stock is available for this quick-consume scan.")}</p>
           ) : null}
           {previewResult.preview.requires_evidence_or_acknowledgement ? (
-            <p style={styles.warningText}>Backend policy requires evidence metadata or a missing-evidence acknowledgement for this reason before recording.</p>
+            <p style={styles.warningText}>{ui("Backend policy requires evidence metadata or a missing-evidence acknowledgement for this reason before recording.")}</p>
           ) : null}
           {(previewResult.preview.blocking_reasons || []).length > 0 ? (
             <div style={styles.errorText}>
-              <p style={{ margin: 0 }}>Backend policy hard-blocks this scan for:</p>
+              <p style={{ margin: 0 }}>{ui("Backend policy hard-blocks this scan for:")}</p>
               <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
                 {(previewResult.preview.blocking_reasons || []).map((reason) => (
-                  <li key={reason}>{formatPolicyReason(reason)}</li>
+                  <li key={reason}>{formatPolicyReason(reason, ui)}</li>
                 ))}
               </ul>
             </div>
           ) : null}
           {(previewResult.preview.acknowledgement_required_reasons || []).length > 0 ? (
             <div style={styles.warningText}>
-              <p style={{ margin: 0 }}>Backend policy requires acknowledgement for:</p>
+              <p style={{ margin: 0 }}>{ui("Backend policy requires acknowledgement for:")}</p>
               <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
                 {(previewResult.preview.acknowledgement_required_reasons || []).map((reason) => (
-                  <li key={reason}>{formatPolicyReason(reason)}</li>
+                  <li key={reason}>{formatPolicyReason(reason, ui)}</li>
                 ))}
               </ul>
             </div>
           ) : null}
           {previewResult.preview.can_record_without_acknowledgement ? (
-            <p style={styles.successText}>Backend preview confirms this scan can be recorded without additional acknowledgements.</p>
+            <p style={styles.successText}>{ui("Backend preview confirms this scan can be recorded without additional acknowledgements.")}</p>
           ) : previewResult.preview.recordable_after_acknowledgement ? (
-            <p style={styles.warningText}>Backend preview confirms this scan can be recorded after the required acknowledgement(s) are completed.</p>
+            <p style={styles.warningText}>{ui("Backend preview confirms this scan can be recorded after the required acknowledgement(s) are completed.")}</p>
           ) : null}
           {activePreviewRisk ? (
             <label style={styles.checkboxLabel}>
@@ -985,50 +968,48 @@ export function InventoryUsageQuickConsumePanel({
                 checked={riskAcknowledged}
                 onChange={(event) => updateRiskAcknowledgement(event.target.checked)}
               />
-              I reviewed this stock-impact warning and still want to record the quick consume.
-            </label>
+              {ui("I reviewed this stock-impact warning and still want to record the quick consume.")}</label>
           ) : null}
         </div>
       ) : null}
-      {storageLocationsError ? <p style={styles.errorText}>Could not load storage locations: {storageLocationsError.message}</p> : null}
+      {storageLocationsError ? <p style={styles.errorText}>{ui("Could not load storage locations: ")}{storageLocationsError.message}</p> : null}
       {!storageLocationsLoading && activeLocations.length === 0 ? (
-        <p style={styles.warningText}>Create an active storage location before using barcode quick consume.</p>
+        <p style={styles.warningText}>{ui("Create an active storage location before using barcode quick consume.")}</p>
       ) : null}
       {barcodePolicyErrorDetails ? (
         <div style={styles.importPanel}>
-          <h3 style={styles.subsectionTitle}>Backend policy response</h3>
+          <h3 style={styles.subsectionTitle}>{ui("Backend policy response")}</h3>
           <p style={styles.sectionDescription}>
-            The server returned safe policy details for this failed quick-consume attempt
-            {barcodePolicyErrorDetails.storage_location_name ? ` at ${barcodePolicyErrorDetails.storage_location_name}` : ''}.
-            {barcodePolicyErrorDetails.current_quantity !== undefined || barcodePolicyErrorDetails.resulting_quantity !== undefined ? ` Stock ${toNumber(barcodePolicyErrorDetails.current_quantity)} → ${toNumber(barcodePolicyErrorDetails.resulting_quantity)}.` : ''}
+            {ui("The server returned safe policy details for this failed quick-consume attempt")}{barcodePolicyErrorDetails.storage_location_name ? ` ${ui("at")} ${barcodePolicyErrorDetails.storage_location_name}` : ""}.
+            {barcodePolicyErrorDetails.current_quantity !== undefined || barcodePolicyErrorDetails.resulting_quantity !== undefined ? `${ui(" Stock ")}${formatNumber(barcodePolicyErrorDetails.current_quantity)} → ${formatNumber(barcodePolicyErrorDetails.resulting_quantity)}.` : ''}
           </p>
           {(barcodePolicyErrorDetails.blocking_reasons || []).length > 0 ? (
             <div style={styles.errorText}>
-              <p style={{ margin: 0 }}>Blocked by:</p>
+              <p style={{ margin: 0 }}>{ui("Blocked by:")}</p>
               <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
                 {(barcodePolicyErrorDetails.blocking_reasons || []).map((reason) => (
-                  <li key={reason}>{formatPolicyReason(reason)}</li>
+                  <li key={reason}>{formatPolicyReason(reason, ui)}</li>
                 ))}
               </ul>
             </div>
           ) : null}
           {(barcodePolicyErrorDetails.acknowledgement_required_reasons || []).length > 0 ? (
             <div style={styles.warningText}>
-              <p style={{ margin: 0 }}>Acknowledgement required:</p>
+              <p style={{ margin: 0 }}>{ui("Acknowledgement required:")}</p>
               <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
                 {(barcodePolicyErrorDetails.acknowledgement_required_reasons || []).map((reason) => (
-                  <li key={reason}>{formatPolicyReason(reason)}</li>
+                  <li key={reason}>{formatPolicyReason(reason, ui)}</li>
                 ))}
               </ul>
             </div>
           ) : null}
           {(barcodePolicyErrorDetails.critical_alerts || []).length > 0 ? (
             <div style={styles.errorText}>
-              <p style={{ margin: 0 }}>Critical alert details:</p>
+              <p style={{ margin: 0 }}>{ui("Critical alert details:")}</p>
               <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
                 {(barcodePolicyErrorDetails.critical_alerts || []).slice(0, 3).map((alert) => (
                   <li key={alert.id || `${alert.type}-${alert.message}`}>
-                    <strong>{alert.type || 'Critical alert'}</strong>{alert.message ? ` — ${alert.message}` : ''}
+                    <strong>{alert.type || ui('Critical alert')}</strong>{alert.message ? ` — ${alert.message}` : ''}
                   </li>
                 ))}
               </ul>
@@ -1039,16 +1020,14 @@ export function InventoryUsageQuickConsumePanel({
       {isClientScanIdConflict ? (
         <div style={styles.importPanel}>
           <p style={styles.warningText}>
-            This device scan id already belongs to a different recorded barcode usage. Start a new scan id before retrying this draft.
-          </p>
+            {ui("This device scan id already belongs to a different recorded barcode usage. Start a new scan id before retrying this draft.")}</p>
           <button type="button" style={styles.secondaryButton} onClick={handleStartNewScanAfterConflict}>
-            Start new scan id
-          </button>
+            {ui("Start new scan id")}</button>
         </div>
       ) : null}
-      {evidenceError ? <p style={styles.errorText}>Usage was recorded, but evidence linking failed: {evidenceError.message}</p> : null}
-      {evidenceLinking ? <p style={styles.sectionDescription}>Linking evidence attachment...</p> : null}
-      {evidenceResult?.id ? <p style={styles.successText}>Evidence linked: {evidenceResult.original_filename || evidenceResult.id}</p> : null}
+      {evidenceError ? <p style={styles.errorText}>{ui("Usage was recorded, but evidence linking failed: ")}{evidenceError.message}</p> : null}
+      {evidenceLinking ? <p style={styles.sectionDescription}>{ui("Linking evidence attachment...")}</p> : null}
+      {evidenceResult?.id ? <p style={styles.successText}>{ui("Evidence linked: ")}{evidenceResult.original_filename || evidenceResult.id}</p> : null}
     </section>
   );
 }

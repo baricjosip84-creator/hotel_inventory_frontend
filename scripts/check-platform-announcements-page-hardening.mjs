@@ -40,10 +40,10 @@ const navStart = layout.indexOf('to="/platform/announcements"');
 const navSlice = layout.slice(Math.max(0, navStart - 220), navStart + 240);
 if (navStart < 0 || !navSlice.includes('PLATFORM_ANNOUNCEMENTS_READ')) throw new Error('Announcements sidebar visibility must require PLATFORM_ANNOUNCEMENTS_READ.');
 
-for (const token of ['fetchPlatformAnnouncementContext', '/platform/announcement-context/current', 'visibleAnnouncements.map', 'announcement.dismissible', 'Required notice']) {
+for (const token of ['fetchPlatformAnnouncementContext', '/platform/announcement-context/current', 'visibleAnnouncements.map', 'announcement.dismissible', "t('common.requiredNotice')"]) {
   requireToken(layout + platformContext, token, 'Platform announcement delivery');
 }
-for (const token of ['visibleAnnouncements.map', 'announcement.dismissible', 'dismissedAnnouncementIds', 'announcementContext?.truncated', 'Required notice']) {
+for (const token of ['visibleAnnouncements.map', 'announcement.dismissible', 'dismissedAnnouncementIds', 'announcementContext?.truncated', "t('common.requiredNotice')"]) {
   requireToken(tenantLayout, token, 'Tenant announcement delivery');
 }
 for (const token of ['total_current?: number', 'truncated?: boolean']) requireToken(tenantContext, token, 'Tenant announcement context contract');

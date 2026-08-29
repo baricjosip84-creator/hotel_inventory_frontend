@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
+import type { AppLocale } from '../i18n/config';
 import { ApiError, apiMutationRequest, apiRequest } from '../lib/api';
 import { getCurrentTenantUserId } from '../lib/auth';
 import { getRoleCapabilities } from '../lib/permissions';
@@ -247,8 +250,8 @@ function toNumber(value: number | string | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatNumber(value: number | string | null | undefined): string {
-  return toNumber(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
+function formatReservationNumber(value: number | string | null | undefined, locale: AppLocale): string {
+  return formatLocalizedNumber(toNumber(value), locale, { maximumFractionDigits: 2 });
 }
 
 function getOpenReservedQuantity(item: ReservationItem): number {
@@ -261,20 +264,20 @@ function getOpenReservedQuantity(item: ReservationItem): number {
   );
 }
 
-function formatDate(value?: string | null): string {
+function formatReservationDate(value: string | null | undefined, locale: AppLocale): string {
   if (!value) return '—';
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString();
+  return formatLocalizedDateTime(parsed, locale);
 }
 
 
-function formatAuditMetadata(metadata?: Record<string, unknown> | null): string {
+function formatAuditMetadata(metadata: Record<string, unknown> | null | undefined, ui: (englishText: string) => string): string {
   if (!metadata || !Object.keys(metadata).length) return '—';
   try {
     return JSON.stringify(metadata, null, 2);
   } catch {
-    return 'Metadata unavailable';
+    return ui('Metadata unavailable');
   }
 }
 
@@ -321,9 +324,9 @@ function getReservationActionState(reservation: InventoryReservation) {
   };
 }
 
-function getErrorMessage(error: unknown): string {
+function getErrorMessage(error: unknown, ui: (englishText: string) => string): string {
   if (error instanceof ApiError || error instanceof Error) return error.message;
-  return 'Unknown request failure.';
+  return ui('Unknown request failure.');
 }
 
 function buildReservationQuery(filters: Filters, limit = '100', offset = '0'): string {
@@ -345,18 +348,18 @@ async function fetchReservationOptions(): Promise<ReservationOptionsResponse> {
   return apiRequest<ReservationOptionsResponse>('/inventory-reservations/options');
 }
 
-function getSelectedProductLabel(product?: ReservationProductOption): string {
+function getSelectedProductLabel(product: ReservationProductOption | undefined, ui: (englishText: string) => string): string {
   if (!product) return '';
   const unit = product.unit ? ` (${product.unit})` : '';
   const barcode = product.barcode ? ` · ${product.barcode}` : '';
-  const retired = product.is_active ? '' : ' · Retired';
+  const retired = product.is_active ? '' : ` · ${ui('Retired')}`;
   return `${product.name}${unit}${barcode}${retired}`;
 }
 
-function getSelectedLocationLabel(location?: StorageLocationOption): string {
+function getSelectedLocationLabel(location: StorageLocationOption | undefined, ui: (englishText: string) => string): string {
   if (!location) return '';
   const zone = location.temperature_zone ? ` · ${location.temperature_zone}` : '';
-  const retired = location.is_active ? '' : ' · Retired';
+  const retired = location.is_active ? '' : ` · ${ui('Retired')}`;
   return `${location.name}${zone}${retired}`;
 }
 
@@ -474,11 +477,12 @@ function buildCreatePayload(draft: ReservationDraft) {
   };
 }
 
-function formatCode(value?: string | null): string {
+function formatReservationCode(value: string | null | undefined, ui: (englishText: string) => string): string {
   if (!value) return '—';
-  return value
+  const english = value
     .replace(/[._-]+/g, ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return ui(english);
 }
 
 function isPositiveQuantity(value: string): boolean {
@@ -519,6 +523,10 @@ function getDraftValidationMessage(draftValue: ReservationDraft): string {
 
 export default function InventoryReservationsPage() {
   const queryClient = useQueryClient();
+  const { locale, ui } = useAppTranslation();
+  const formatNumber = (value: number | string | null | undefined): string => formatReservationNumber(value, locale);
+  const formatDate = (value: string | null | undefined): string => formatReservationDate(value, locale);
+  const formatCode = (value: string | null | undefined): string => formatReservationCode(value, ui);
   const [searchParams, setSearchParams] = useSearchParams();
   const permissions = getRoleCapabilities();
   const currentUserId = getCurrentTenantUserId();
@@ -549,8 +557,8 @@ export default function InventoryReservationsPage() {
     setLocalError('');
   }, [selectedReservationId]);
 
-  const draftValidationMessage = getDraftValidationMessage(draft);
-  const editDraftValidationMessage = editDraft ? getDraftValidationMessage(editDraft) : '';
+  const draftValidationMessage = ui(getDraftValidationMessage(draft));
+  const editDraftValidationMessage = editDraft ? ui(getDraftValidationMessage(editDraft)) : '';
 
   const handleSelectReservation = (reservationId: string) => {
     setSelectedReservationId(reservationId);
@@ -642,7 +650,7 @@ export default function InventoryReservationsPage() {
     }),
     onSuccess: (reservation) => {
       setLocalError('');
-      setFeedback(`Updated draft ${reservation.reservation_number}.`);
+      setFeedback(`${ui('Updated draft')} ${reservation.reservation_number}.`);
       setEditDraft(null);
       handleSelectReservation(reservation.id);
       refreshReservationQueries();
@@ -657,7 +665,7 @@ export default function InventoryReservationsPage() {
     }),
     onSuccess: (reservation) => {
       setLocalError('');
-      setFeedback(`Created ${reservation.reservation_number}.`);
+      setFeedback(`${ui('Created')} ${reservation.reservation_number}.`);
       setDraft(defaultDraft());
       handleSelectReservation(reservation.id);
       refreshReservationQueries();
@@ -677,7 +685,7 @@ export default function InventoryReservationsPage() {
     }),
     onSuccess: (reservation) => {
       setLocalError('');
-      setFeedback(`Resolved conflict for ${reservation.reservation_number}; status is now ${formatCode(reservation.status)}.`);
+      setFeedback(`${ui('Resolved conflict for')} ${reservation.reservation_number}; ${ui('status is now')} ${formatCode(reservation.status)}.`);
       setActionNote('');
       refreshReservationQueries();
     }
@@ -691,7 +699,7 @@ export default function InventoryReservationsPage() {
     }),
     onSuccess: (result) => {
       setLocalError('');
-      setFeedback(`Expired ${result.expired_count} due reservations; scanned ${result.scanned_count}${result.failed_count ? `, failed ${result.failed_count}` : ''}.`);
+      setFeedback(`${ui('Expired')} ${formatNumber(result.expired_count)} ${ui('due reservations; scanned')} ${formatNumber(result.scanned_count)}${result.failed_count ? `, ${ui('failed')} ${formatNumber(result.failed_count)}` : ''}.`);
       setActionNote('');
       refreshReservationQueries();
     }
@@ -714,7 +722,7 @@ export default function InventoryReservationsPage() {
     },
     onSuccess: (reservation) => {
       setLocalError('');
-      setFeedback(`Updated ${reservation.reservation_number} to ${formatCode(reservation.status)}.`);
+      setFeedback(`${ui('Updated')} ${reservation.reservation_number} ${ui('to')} ${formatCode(reservation.status)}.`);
       setActionNote('');
       setFulfillmentQuantities({});
       refreshReservationQueries();
@@ -732,7 +740,7 @@ export default function InventoryReservationsPage() {
     }),
     onSuccess: (reservation) => {
       setLocalError('');
-      setFeedback(`Fulfilled selected quantities for ${reservation.reservation_number}; status is now ${formatCode(reservation.status)}.`);
+      setFeedback(`${ui('Fulfilled selected quantities for')} ${reservation.reservation_number}; ${ui('status is now')} ${formatCode(reservation.status)}.`);
       setActionNote('');
       setFulfillmentQuantities({});
       refreshReservationQueries();
@@ -753,11 +761,11 @@ export default function InventoryReservationsPage() {
     const quantity = Number(rawValue);
     const openReservedQuantity = getOpenReservedQuantity(item);
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      selectedFulfillmentValidationMessage = 'Every entered fulfillment quantity must be greater than zero.';
+      selectedFulfillmentValidationMessage = ui('Every entered fulfillment quantity must be greater than zero.');
       break;
     }
     if (quantity > openReservedQuantity) {
-      selectedFulfillmentValidationMessage = `Fulfillment for ${item.product_name || item.product_id} cannot exceed ${formatNumber(openReservedQuantity)} open reserved units.`;
+      selectedFulfillmentValidationMessage = `${ui('Fulfillment for')} ${item.product_name || item.product_id} ${ui('cannot exceed')} ${formatNumber(openReservedQuantity)} ${ui('open reserved units.')}`;
       break;
     }
     selectedFulfillmentLines.push({ reservation_item_id: item.id, quantity });
@@ -768,9 +776,9 @@ export default function InventoryReservationsPage() {
       setIsExporting(true);
       setLocalError('');
       await downloadReservationCsv(filters);
-      setFeedback('Reservation CSV export generated.');
+      setFeedback(ui('Reservation CSV export generated.'));
     } catch (error) {
-      setLocalError(getErrorMessage(error));
+      setLocalError(getErrorMessage(error, ui));
     } finally {
       setIsExporting(false);
     }
@@ -808,28 +816,28 @@ export default function InventoryReservationsPage() {
   const runLifecycleAction = (action: 'activate' | 'allocate' | 'release' | 'cancel' | 'expire' | 'fulfill') => {
     if (!selectedReservation) return;
     if (action === 'cancel' && !actionNote.trim()) {
-      setLocalError('Enter a cancellation reason before cancelling this reservation.');
+      setLocalError(ui('Enter a cancellation reason before cancelling this reservation.'));
       return;
     }
     const labels: Record<typeof action, string> = {
-      activate: 'activate this reservation',
-      allocate: 'allocate currently available stock',
-      release: "release this reservation's remaining commitment",
-      cancel: 'cancel this reservation',
-      expire: selectedReservation.expires_at ? 'expire this due reservation' : 'manually expire this reservation',
-      fulfill: 'fulfill all currently reserved quantity and reduce stock'
+      activate: ui('activate this reservation'),
+      allocate: ui('allocate currently available stock'),
+      release: ui("release this reservation's remaining commitment"),
+      cancel: ui('cancel this reservation'),
+      expire: selectedReservation.expires_at ? ui('expire this due reservation') : ui('manually expire this reservation'),
+      fulfill: ui('fulfill all currently reserved quantity and reduce stock')
     };
-    if (!window.confirm(`Are you sure you want to ${labels[action]}?`)) return;
+    if (!window.confirm(`${ui('Are you sure you want to')} ${labels[action]}?`)) return;
     setLocalError('');
     actionMutation.mutate({ id: selectedReservation.id, action });
   };
 
   const handleFulfillSelected = () => {
     if (!selectedReservation || !selectedFulfillmentLines.length || selectedFulfillmentValidationMessage) {
-      setLocalError(selectedFulfillmentValidationMessage || 'Enter a fulfillment quantity for at least one reservation line.');
+      setLocalError(selectedFulfillmentValidationMessage || ui('Enter a fulfillment quantity for at least one reservation line.'));
       return;
     }
-    if (!window.confirm(`Fulfill the entered quantities for ${selectedReservation.reservation_number} and reduce stock now?`)) return;
+    if (!window.confirm(`${ui('Fulfill the entered quantities for')} ${selectedReservation.reservation_number} ${ui('and reduce stock now?')}`)) return;
     setLocalError('');
     fulfillSelectedMutation.mutate({ id: selectedReservation.id, items: selectedFulfillmentLines });
   };
@@ -842,178 +850,170 @@ export default function InventoryReservationsPage() {
     <div className="io-operational-page io-reservations-page io-workspace-page" id="reservation-workspace-top" style={pageStyles.page}>
       <OperationalWorkspaceHero
         iconPath="/inventory-reservations"
-        eyebrow="Reservation operations"
-        title="Stock reservations"
-        description="Reserve future stock, allocate available inventory, protect commitments, and preserve a traceable lifecycle through fulfillment, release, expiration, or cancellation."
+        eyebrow={ui("Reservation operations")}
+        title={ui("Stock reservations")}
+        description={ui("Reserve future stock, allocate available inventory, protect commitments, and preserve a traceable lifecycle through fulfillment, release, expiration, or cancellation.")}
         meta={<>
-          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>Stock-protected allocation</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{permissions.canCreateInventoryReservations ? 'Reservation write access' : 'Review-only for current role'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Stock-protected allocation")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{permissions.canCreateInventoryReservations ? ui('Reservation write access') : ui('Review-only for current role')}</OperationalWorkspaceMetaPill>
         </>}
         aside={
           <div style={pageStyles.buttonRow}>
             <button type="button" style={pageStyles.secondaryButton} disabled={summaryQuery.isFetching || reservationsQuery.isFetching} onClick={refreshReservationQueries}>
-              {(summaryQuery.isFetching || reservationsQuery.isFetching) ? 'Refreshing…' : 'Refresh page'}
+              {(summaryQuery.isFetching || reservationsQuery.isFetching) ? ui('Refreshing…') : ui('Refresh page')}
             </button>
           </div>
         }
       />
 
-      <OperationalWorkspaceStats ariaLabel="Reservation summary">
+      <OperationalWorkspaceStats ariaLabel={ui("Reservation summary")}>
         <OperationalWorkspaceStatCard
-          label="Open reservations"
+          label={ui("Open reservations")}
           value={formatNumber(summaryQuery.data?.active_reservations)}
-          helper="Active commitments still moving through allocation or fulfillment"
+          helper={ui("Active commitments still moving through allocation or fulfillment")}
           iconPath="/inventory-reservations"
           loading={summaryQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Drafts"
+          label={ui("Drafts")}
           value={formatNumber(summaryQuery.data?.draft_reservations)}
-          helper="Reservation drafts not yet activated"
+          helper={ui("Reservation drafts not yet activated")}
           iconPath="/inventory-requisitions"
           loading={summaryQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Reserved quantity"
+          label={ui("Reserved quantity")}
           value={formatNumber(summaryQuery.data?.open_reserved_quantity_total)}
-          helper="Open quantity currently protected from other demand"
+          helper={ui("Open quantity currently protected from other demand")}
           tone="blue"
           iconPath="/stock"
           loading={summaryQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Expiration attention"
+          label={ui("Expiration attention")}
           value={formatNumber(summaryQuery.data?.expiration_attention_count)}
-          helper="Reservations due for expiration review"
+          helper={ui("Reservations due for expiration review")}
           tone={toNumber(summaryQuery.data?.expiration_attention_count) > 0 ? 'warn' : 'good'}
           iconPath="/alerts"
           loading={summaryQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Expired"
+          label={ui("Expired")}
           value={formatNumber(summaryQuery.data?.expired_reservations)}
-          helper="Reservations already closed by expiration"
+          helper={ui("Reservations already closed by expiration")}
           tone={toNumber(summaryQuery.data?.expired_reservations) > 0 ? 'neutral' : 'good'}
           iconPath="/inventory-reservations"
           loading={summaryQuery.isLoading}
         />
       </OperationalWorkspaceStats>
 
-      <OperationalWorkspaceTabs ariaLabel="Reservation work areas" hint="Jump to the part of reservation operations you want to review.">
+      <OperationalWorkspaceTabs ariaLabel={ui("Reservation work areas")} hint={ui("Jump to the part of reservation operations you want to review.")}>
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'overview'}
           iconPath="/dashboard"
-          label="Overview"
+          label={ui("Overview")}
           onClick={() => navigateWorkspaceSection('overview', 'reservation-workspace-top')}
         />
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'create'}
           iconPath="/inventory-reservations"
-          label="Create reservation"
+          label={ui("Create reservation")}
           onClick={() => navigateWorkspaceSection('create', 'reservation-create')}
         />
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'queue'}
           iconPath="/execution-tasks"
-          label="Reservation queue"
+          label={ui("Reservation queue")}
           count={toNumber(summaryQuery.data?.active_reservations) || undefined}
           onClick={() => navigateWorkspaceSection('queue', 'reservation-queue')}
         />
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'capacity'}
           iconPath="/insights"
-          label="Capacity & conflicts"
+          label={ui("Capacity & conflicts")}
           count={(conflictsQuery.data || []).length || undefined}
           onClick={() => navigateWorkspaceSection('capacity', 'reservation-capacity')}
         />
       </OperationalWorkspaceTabs>
 
       {feedback ? <div style={pageStyles.success}>{feedback}</div> : null}
-      {localError ? <div style={pageStyles.error}>{localError}</div> : latestError ? <div style={pageStyles.error}>{getErrorMessage(latestError)}</div> : null}
+      {localError ? <div style={pageStyles.error}>{localError}</div> : latestError ? <div style={pageStyles.error}>{getErrorMessage(latestError, ui)}</div> : null}
 
       {permissions.canCreateInventoryReservations ? (
         <section className="app-panel" id="reservation-create" style={{ ...pageStyles.card, scrollMarginTop: '1rem' }}>
           <OperationalSectionHeader
             iconPath="/inventory-reservations"
-            title="Create draft reservation"
-            description="Create a manual, event, department, or forecast reservation. Linked requisition and purchase-order commitments stay owned by their source workflows."
+            title={ui("Create draft reservation")}
+            description={ui("Create a manual, event, department, or forecast reservation. Linked requisition and purchase-order commitments stay owned by their source workflows.")}
           />
           <div style={{ ...pageStyles.formGrid, marginTop: '1rem' }}>
-            <label style={pageStyles.label}>Source type
-              <select style={pageStyles.input} value={draft.source_type} onChange={(event) => setDraft({ ...draft, source_type: event.target.value, source_id: event.target.value === 'manual' ? '' : draft.source_id })}>
-                <option value="manual">Manual</option>
-                <option value="event">Event</option>
-                <option value="department">Department</option>
-                <option value="forecast">Forecast</option>
+            <label style={pageStyles.label}>{ui("Source type")} <select style={pageStyles.input} value={draft.source_type} onChange={(event) => setDraft({ ...draft, source_type: event.target.value, source_id: event.target.value === 'manual' ? '' : draft.source_id })}>
+                <option value="manual">{ui("Manual")}</option>
+                <option value="event">{ui("Event")}</option>
+                <option value="department">{ui("Department")}</option>
+                <option value="forecast">{ui("Forecast")}</option>
               </select>
             </label>
-            <p style={{ ...pageStyles.muted, gridColumn: '1 / -1', margin: 0 }}>Requisition and purchase-order reservations are created from their source workflow so quantities and ownership stay validated.</p>
+            <p style={{ ...pageStyles.muted, gridColumn: '1 / -1', margin: 0 }}>{ui("Requisition and purchase-order reservations are created from their source workflow so quantities and ownership stay validated.")}</p>
             {draft.source_type !== 'manual' ? (
-              <label style={pageStyles.label}>Linked source ID (UUID)
-                <input style={pageStyles.input} value={draft.source_id} onChange={(event) => setDraft({ ...draft, source_id: event.target.value })} placeholder="Required UUID for linked source" />
+              <label style={pageStyles.label}>{ui("Linked source ID (UUID)")} <input style={pageStyles.input} value={draft.source_id} onChange={(event) => setDraft({ ...draft, source_id: event.target.value })} placeholder={ui("Required UUID for linked source")} />
               </label>
             ) : null}
-            <label style={pageStyles.label}>Requesting department
-              <input list="reservation-departments" style={pageStyles.input} value={draft.requesting_department} onChange={(event) => setDraft({ ...draft, requesting_department: event.target.value })} />
+            <label style={pageStyles.label}>{ui("Requesting department")} <input list="reservation-departments" style={pageStyles.input} value={draft.requesting_department} onChange={(event) => setDraft({ ...draft, requesting_department: event.target.value })} />
             </label>
-            <label style={pageStyles.label}>Target department
-              <input list="reservation-departments" style={pageStyles.input} value={draft.target_department} onChange={(event) => setDraft({ ...draft, target_department: event.target.value })} />
+            <label style={pageStyles.label}>{ui("Target department")} <input list="reservation-departments" style={pageStyles.input} value={draft.target_department} onChange={(event) => setDraft({ ...draft, target_department: event.target.value })} />
             </label>
-            <label style={pageStyles.label}>Priority
-              <select style={pageStyles.input} value={draft.priority} onChange={(event) => setDraft({ ...draft, priority: event.target.value })}>
-                <option value="low">Low</option>
-                <option value="normal">Normal</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
+            <label style={pageStyles.label}>{ui("Priority")} <select style={pageStyles.input} value={draft.priority} onChange={(event) => setDraft({ ...draft, priority: event.target.value })}>
+                <option value="low">{ui("Low")}</option>
+                <option value="normal">{ui("Normal")}</option>
+                <option value="high">{ui("High")}</option>
+                <option value="urgent">{ui("Urgent")}</option>
               </select>
             </label>
-            <label style={pageStyles.label}>Needed by
-              <input type="datetime-local" style={pageStyles.input} value={draft.needed_by} onChange={(event) => setDraft({ ...draft, needed_by: event.target.value })} />
+            <label style={pageStyles.label}>{ui("Needed by")} <input type="datetime-local" style={pageStyles.input} value={draft.needed_by} onChange={(event) => setDraft({ ...draft, needed_by: event.target.value })} />
             </label>
-            <label style={pageStyles.label}>Expires at
-              <input type="datetime-local" style={pageStyles.input} value={draft.expires_at} onChange={(event) => setDraft({ ...draft, expires_at: event.target.value })} />
+            <label style={pageStyles.label}>{ui("Expires at")} <input type="datetime-local" style={pageStyles.input} value={draft.expires_at} onChange={(event) => setDraft({ ...draft, expires_at: event.target.value })} />
             </label>
-            <label style={pageStyles.label}>Notes
-              <input style={pageStyles.input} value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} />
+            <label style={pageStyles.label}>{ui("Notes")} <input style={pageStyles.input} value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} />
             </label>
           </div>
           <datalist id="reservation-departments">
             {(optionsQuery.data?.departments || []).map((department) => <option key={department} value={department} />)}
           </datalist>
 
-          <h3 style={{ ...pageStyles.sectionTitle, marginTop: '1rem' }}>Lines</h3>
+          <h3 style={{ ...pageStyles.sectionTitle, marginTop: '1rem' }}>{ui("Lines")}</h3>
           <div style={pageStyles.tableWrap}>
             <table style={pageStyles.lineTable}>
               <thead>
-                <tr><th style={pageStyles.th}>Product</th><th style={pageStyles.th}>Storage location</th><th style={pageStyles.th}>Quantity</th><th style={pageStyles.th}>Unit</th><th style={pageStyles.th}>Allocation method</th><th style={pageStyles.th}>Line note</th><th style={pageStyles.th}></th></tr>
+                <tr><th style={pageStyles.th}>{ui("Product")}</th><th style={pageStyles.th}>{ui("Storage location")}</th><th style={pageStyles.th}>{ui("Quantity")}</th><th style={pageStyles.th}>{ui("Unit")}</th><th style={pageStyles.th}>{ui("Allocation method")}</th><th style={pageStyles.th}>{ui("Line note")}</th><th style={pageStyles.th}></th></tr>
               </thead>
               <tbody>
                 {draft.items.map((item, index) => (
                   <tr key={index}>
                     <td style={pageStyles.td}>
                       <select style={pageStyles.input} value={item.product_id} onChange={(event) => updateDraftLine(index, { product_id: event.target.value, uom_code: '' })}>
-                        <option value="">{optionsQuery.isLoading ? 'Loading products…' : 'Select product'}</option>
+                        <option value="">{optionsQuery.isLoading ? ui('Loading products…') : ui('Select product')}</option>
                         {activeProducts.map((product) => (
-                          <option key={product.id} value={product.id}>{getSelectedProductLabel(product)}</option>
+                          <option key={product.id} value={product.id}>{getSelectedProductLabel(product, ui)}</option>
                         ))}
                       </select>
                     </td>
                     <td style={pageStyles.td}>
                       <select style={pageStyles.input} disabled={item.allocation_strategy !== 'specific_location'} value={item.storage_location_id} onChange={(event) => updateDraftLine(index, { storage_location_id: event.target.value, allocation_strategy: event.target.value ? 'specific_location' : 'any_location' })}>
-                        <option value="">{optionsQuery.isLoading ? 'Loading locations…' : item.allocation_strategy === 'specific_location' ? 'Select location' : 'Chosen during allocation'}</option>
+                        <option value="">{optionsQuery.isLoading ? ui('Loading locations…') : item.allocation_strategy === 'specific_location' ? ui('Select location') : ui('Chosen during allocation')}</option>
                         {activeLocations.map((location) => (
-                          <option key={location.id} value={location.id}>{getSelectedLocationLabel(location)}</option>
+                          <option key={location.id} value={location.id}>{getSelectedLocationLabel(location, ui)}</option>
                         ))}
                       </select>
                     </td>
                     <td style={pageStyles.td}><input type="number" min="0" step="0.01" style={pageStyles.input} value={item.requested_quantity} onChange={(event) => updateDraftLine(index, { requested_quantity: event.target.value })} /></td>
-                    <td style={pageStyles.td}><ProductUomSelect productId={item.product_id} value={item.uom_code} purpose="issue" onChange={(value) => updateDraftLine(index, { uom_code: value })} style={pageStyles.input} ariaLabel={`Unit of measure for reservation line ${index + 1}`} /></td>
+                    <td style={pageStyles.td}><ProductUomSelect productId={item.product_id} value={item.uom_code} purpose="issue" onChange={(value) => updateDraftLine(index, { uom_code: value })} style={pageStyles.input} ariaLabel={`${ui('Unit of measure for reservation line')} ${formatNumber(index + 1)}`} /></td>
                     <td style={pageStyles.td}>
                       <select style={pageStyles.input} value={item.allocation_strategy} onChange={(event) => updateDraftLine(index, { allocation_strategy: event.target.value, storage_location_id: event.target.value === 'specific_location' ? item.storage_location_id : '' })}>
-                        <option value="specific_location">Specific location</option>
-                        <option value="any_location">Best available location</option>
-                        <option value="inbound">Inbound stock commitment</option>
+                        <option value="specific_location">{ui("Specific location")}</option>
+                        <option value="any_location">{ui("Best available location")}</option>
+                        <option value="inbound">{ui("Inbound stock commitment")}</option>
                       </select>
                     </td>
                     <td style={pageStyles.td}><input style={pageStyles.input} value={item.allocation_note} onChange={(event) => updateDraftLine(index, { allocation_note: event.target.value })} /></td>
@@ -1021,7 +1021,7 @@ export default function InventoryReservationsPage() {
                       <button type="button" style={pageStyles.secondaryButton} onClick={() => setDraft((current) => {
                         const items = current.items.filter((_, itemIndex) => itemIndex !== index);
                         return { ...current, items: items.length ? items : [emptyLine()] };
-                      })}>Remove</button>
+                      })}>{ui("Remove")}</button>
                     </td>
                   </tr>
                 ))}
@@ -1029,9 +1029,9 @@ export default function InventoryReservationsPage() {
             </table>
           </div>
           <div style={{ ...pageStyles.buttonRow, marginTop: '0.75rem' }}>
-            <button type="button" style={pageStyles.secondaryButton} onClick={() => setDraft((current) => ({ ...current, items: [...current.items, emptyLine()] }))}>Add line</button>
+            <button type="button" style={pageStyles.secondaryButton} onClick={() => setDraft((current) => ({ ...current, items: [...current.items, emptyLine()] }))}>{ui("Add line")}</button>
             <button type="button" style={pageStyles.button} disabled={createMutation.isPending || Boolean(draftValidationMessage)} onClick={() => createMutation.mutate()}>
-              {createMutation.isPending ? 'Creating…' : 'Create draft reservation'}
+              {createMutation.isPending ? ui('Creating…') : ui('Create draft reservation')}
             </button>
             {draftValidationMessage ? <span style={pageStyles.muted}>{draftValidationMessage}</span> : null}
           </div>
@@ -1040,88 +1040,80 @@ export default function InventoryReservationsPage() {
         <section className="app-panel" id="reservation-create" style={{ ...pageStyles.card, scrollMarginTop: '1rem' }}>
           <OperationalSectionHeader
             iconPath="/inventory-reservations"
-            title="Create draft reservation"
-            description="Your current role can review reservation commitments but cannot create or edit reservation drafts."
+            title={ui("Create draft reservation")}
+            description={ui("Your current role can review reservation commitments but cannot create or edit reservation drafts.")}
           />
-          <div className="app-empty-state" style={{ marginTop: '0.85rem' }}>Creation controls are hidden for this role. Use the queue and reservation detail to review existing commitments.</div>
+          <div className="app-empty-state" style={{ marginTop: '0.85rem' }}>{ui("Creation controls are hidden for this role. Use the queue and reservation detail to review existing commitments.")}</div>
         </section>
       )}
 
       <section className="app-panel" id="reservation-queue" style={{ ...pageStyles.card, scrollMarginTop: '1rem' }}>
         <OperationalSectionHeader
           iconPath="/execution-tasks"
-          title="Reservation queue"
-          description="Filter and review reservations, then open one for lifecycle, fulfillment, or audit work."
+          title={ui("Reservation queue")}
+          description={ui("Filter and review reservations, then open one for lifecycle, fulfillment, or audit work.")}
           actions={
             <div style={pageStyles.buttonRow}>
               <button type="button" style={pageStyles.secondaryButton} disabled={isExporting} onClick={handleExportCsv}>
-                {isExporting ? 'Exporting…' : 'Export filtered CSV'}
+                {isExporting ? ui('Exporting…') : ui('Export filtered CSV')}
               </button>
-              <button type="button" style={pageStyles.secondaryButton} onClick={() => { setFilters(defaultFilters); setOffset(0); }}>Clear filters</button>
+              <button type="button" style={pageStyles.secondaryButton} onClick={() => { setFilters(defaultFilters); setOffset(0); }}>{ui("Clear filters")}</button>
               {permissions.canExpireInventoryReservations ? (
                 <button type="button" style={pageStyles.secondaryButton} disabled={expireDueMutation.isPending || !toNumber(summaryQuery.data?.expiration_attention_count)} onClick={() => {
-                  if (window.confirm('Expire all currently due reservations in this tenant? Open reserved quantities will be released.')) expireDueMutation.mutate();
+                  if (window.confirm(ui('Expire all currently due reservations in this tenant? Open reserved quantities will be released.'))) expireDueMutation.mutate();
                 }}>
-                  {expireDueMutation.isPending ? 'Expiring due…' : 'Expire due reservations'}
+                  {expireDueMutation.isPending ? ui('Expiring due…') : ui('Expire due reservations')}
                 </button>
               ) : null}
             </div>
           }
         />
         <div style={{ ...pageStyles.formGrid, marginTop: '1rem' }}>
-          <label style={pageStyles.label}>Status
-            <select style={pageStyles.input} value={filters.status} onChange={(event) => updateFilters({ status: event.target.value })}>
-              <option value="">All</option>
-              <option value="draft">Draft</option>
-              <option value="active">Active</option>
-              <option value="partially_allocated">Partially allocated</option>
-              <option value="allocated">Allocated</option>
-              <option value="partially_fulfilled">Partially fulfilled</option>
-              <option value="fulfilled">Fulfilled</option>
-              <option value="released">Released</option>
-              <option value="expired">Expired</option>
-              <option value="cancelled">Cancelled</option>
+          <label style={pageStyles.label}>{ui("Status")} <select style={pageStyles.input} value={filters.status} onChange={(event) => updateFilters({ status: event.target.value })}>
+              <option value="">{ui("All")}</option>
+              <option value="draft">{ui("Draft")}</option>
+              <option value="active">{ui("Active")}</option>
+              <option value="partially_allocated">{ui("Partially allocated")}</option>
+              <option value="allocated">{ui("Allocated")}</option>
+              <option value="partially_fulfilled">{ui("Partially fulfilled")}</option>
+              <option value="fulfilled">{ui("Fulfilled")}</option>
+              <option value="released">{ui("Released")}</option>
+              <option value="expired">{ui("Expired")}</option>
+              <option value="cancelled">{ui("Cancelled")}</option>
             </select>
           </label>
-          <label style={pageStyles.label}>Source type
-            <select style={pageStyles.input} value={filters.sourceType} onChange={(event) => updateFilters({ sourceType: event.target.value })}>
-              <option value="">All</option>
-              <option value="manual">Manual</option>
-              <option value="requisition">Requisition</option>
-              <option value="event">Event</option>
-              <option value="department">Department</option>
-              <option value="procurement_inbound">Procurement inbound</option>
-              <option value="forecast">Forecast</option>
-              <option value="system">System</option>
-              <option value="outbound">Outbound customer order</option>
+          <label style={pageStyles.label}>{ui("Source type")} <select style={pageStyles.input} value={filters.sourceType} onChange={(event) => updateFilters({ sourceType: event.target.value })}>
+              <option value="">{ui("All")}</option>
+              <option value="manual">{ui("Manual")}</option>
+              <option value="requisition">{ui("Requisition")}</option>
+              <option value="event">{ui("Event")}</option>
+              <option value="department">{ui("Department")}</option>
+              <option value="procurement_inbound">{ui("Procurement inbound")}</option>
+              <option value="forecast">{ui("Forecast")}</option>
+              <option value="system">{ui("System")}</option>
+              <option value="outbound">{ui("Outbound customer order")}</option>
             </select>
           </label>
-          <label style={pageStyles.label}>Source ID (full or partial)
-            <input style={pageStyles.input} value={filters.sourceId} onChange={(event) => updateFilters({ sourceId: event.target.value })} />
+          <label style={pageStyles.label}>{ui("Source ID (full or partial)")} <input style={pageStyles.input} value={filters.sourceId} onChange={(event) => updateFilters({ sourceId: event.target.value })} />
           </label>
-          <label style={pageStyles.label}>Requesting department
-            <input style={pageStyles.input} value={filters.requestingDepartment} onChange={(event) => updateFilters({ requestingDepartment: event.target.value })} />
+          <label style={pageStyles.label}>{ui("Requesting department")} <input style={pageStyles.input} value={filters.requestingDepartment} onChange={(event) => updateFilters({ requestingDepartment: event.target.value })} />
           </label>
-          <label style={pageStyles.label}>Target department
-            <input style={pageStyles.input} value={filters.targetDepartment} onChange={(event) => updateFilters({ targetDepartment: event.target.value })} />
+          <label style={pageStyles.label}>{ui("Target department")} <input style={pageStyles.input} value={filters.targetDepartment} onChange={(event) => updateFilters({ targetDepartment: event.target.value })} />
           </label>
-          <label style={pageStyles.label}>Priority
-            <select style={pageStyles.input} value={filters.priority} onChange={(event) => updateFilters({ priority: event.target.value })}>
-              <option value="">All</option>
-              <option value="low">Low</option>
-              <option value="normal">Normal</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
+          <label style={pageStyles.label}>{ui("Priority")} <select style={pageStyles.input} value={filters.priority} onChange={(event) => updateFilters({ priority: event.target.value })}>
+              <option value="">{ui("All")}</option>
+              <option value="low">{ui("Low")}</option>
+              <option value="normal">{ui("Normal")}</option>
+              <option value="high">{ui("High")}</option>
+              <option value="urgent">{ui("Urgent")}</option>
             </select>
           </label>
-          <label style={pageStyles.label}>Product
-            <select style={pageStyles.input} value={filters.productId} onChange={(event) => updateFilters({ productId: event.target.value })}>
-              <option value="">All products</option>
-              {allProducts.map((product) => <option key={product.id} value={product.id}>{getSelectedProductLabel(product)}</option>)}
+          <label style={pageStyles.label}>{ui("Product")} <select style={pageStyles.input} value={filters.productId} onChange={(event) => updateFilters({ productId: event.target.value })}>
+              <option value="">{ui("All products")}</option>
+              {allProducts.map((product) => <option key={product.id} value={product.id}>{getSelectedProductLabel(product, ui)}</option>)}
             </select>
           </label>
-          <label style={pageStyles.label}>Search
-            <input style={pageStyles.input} value={filters.search} onChange={(event) => updateFilters({ search: event.target.value })} placeholder="Number, source ID, department, note, product, barcode, or location" />
+          <label style={pageStyles.label}>{ui("Search")} <input style={pageStyles.input} value={filters.search} onChange={(event) => updateFilters({ search: event.target.value })} placeholder={ui("Number, source ID, department, note, product, barcode, or location")} />
           </label>
         </div>
 
@@ -1129,37 +1121,37 @@ export default function InventoryReservationsPage() {
         <div style={{ ...pageStyles.tableWrap, marginTop: '0.75rem' }}>
           <table style={pageStyles.table}>
             <thead>
-              <tr><th style={pageStyles.th}>Reservation</th><th style={pageStyles.th}>Status</th><th style={pageStyles.th}>Source</th><th style={pageStyles.th}>Priority</th><th style={pageStyles.th}>Needed</th><th style={pageStyles.th}>Open reserved</th><th style={pageStyles.th}></th></tr>
+              <tr><th style={pageStyles.th}>{ui("Reservation")}</th><th style={pageStyles.th}>{ui("Status")}</th><th style={pageStyles.th}>{ui("Source")}</th><th style={pageStyles.th}>{ui("Priority")}</th><th style={pageStyles.th}>{ui("Needed")}</th><th style={pageStyles.th}>{ui("Open reserved")}</th><th style={pageStyles.th}></th></tr>
             </thead>
             <tbody>
               {reservations.map((reservation) => (
                 <tr key={reservation.id}>
-                  <td style={pageStyles.td}><strong>{reservation.reservation_number}</strong><br /><span style={pageStyles.muted}>{reservation.requesting_department || 'No department'}</span></td>
+                  <td style={pageStyles.td}><strong>{reservation.reservation_number}</strong><br /><span style={pageStyles.muted}>{reservation.requesting_department || ui('No department')}</span></td>
                   <td style={pageStyles.td}><span style={pageStyles.pill}>{formatCode(reservation.status)}</span></td>
                   <td style={pageStyles.td}>{formatCode(reservation.source_type)}{reservation.source_id ? <><br /><span style={pageStyles.muted}>{reservation.source_id}</span></> : null}</td>
                   <td style={pageStyles.td}>{formatCode(reservation.priority || 'normal')}</td>
                   <td style={pageStyles.td}>{formatDate(reservation.needed_by)}</td>
                   <td style={pageStyles.td}>{formatNumber(reservation.open_reserved_quantity_total)}</td>
-                  <td style={pageStyles.td}><button type="button" style={pageStyles.secondaryButton} onClick={() => handleSelectReservation(reservation.id)}>Open</button></td>
+                  <td style={pageStyles.td}><button type="button" style={pageStyles.secondaryButton} onClick={() => handleSelectReservation(reservation.id)}>{ui("Open")}</button></td>
                 </tr>
               ))}
-              {!reservations.length ? <tr><td style={pageStyles.td} colSpan={7}>{reservationsQuery.isLoading ? 'Loading reservations…' : 'No reservations match these filters.'}</td></tr> : null}
+              {!reservations.length ? <tr><td style={pageStyles.td} colSpan={7}>{reservationsQuery.isLoading ? ui('Loading reservations…') : ui('No reservations match these filters.')}</td></tr> : null}
             </tbody>
           </table>
         </div>
         <div style={pageStyles.pagination}>
-          <span style={pageStyles.muted}>Showing {visibleStart}–{visibleEnd}</span>
+          <span style={pageStyles.muted}>{ui('Showing')} {formatNumber(visibleStart)}–{formatNumber(visibleEnd)}</span>
           <div style={pageStyles.buttonRow}>
             <label style={pageStyles.pageSizeControl}>
-              <span>Rows per page</span>
+              <span>{ui("Rows per page")}</span>
               <select style={{ ...pageStyles.input, ...pageStyles.pageSizeSelect }} value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setOffset(0); }}>
                 <option value={25}>25</option>
                 <option value={50}>50</option>
                 <option value={100}>100</option>
               </select>
             </label>
-            <button type="button" style={pageStyles.secondaryButton} disabled={offset === 0 || reservationsQuery.isFetching} onClick={() => setOffset(Math.max(0, offset - pageSize))}>Previous</button>
-            <button type="button" style={pageStyles.secondaryButton} disabled={!canGoNext || reservationsQuery.isFetching} onClick={() => setOffset(offset + pageSize)}>Next</button>
+            <button type="button" style={pageStyles.secondaryButton} disabled={offset === 0 || reservationsQuery.isFetching} onClick={() => setOffset(Math.max(0, offset - pageSize))}>{ui("Previous")}</button>
+            <button type="button" style={pageStyles.secondaryButton} disabled={!canGoNext || reservationsQuery.isFetching} onClick={() => setOffset(offset + pageSize)}>{ui("Next")}</button>
           </div>
         </div>
       </section>
@@ -1167,37 +1159,36 @@ export default function InventoryReservationsPage() {
       <section className="app-panel" id="reservation-detail" style={{ ...pageStyles.card, scrollMarginTop: '1rem' }}>
         <OperationalSectionHeader
           iconPath="/inventory-reservations"
-          title="Reservation detail"
-          description="Inspect reservation lines, protected quantity, lifecycle actions, fulfillment readiness, and audit history."
+          title={ui("Reservation detail")}
+          description={ui("Inspect reservation lines, protected quantity, lifecycle actions, fulfillment readiness, and audit history.")}
         />
-        {!selectedReservationId ? <div className="app-empty-state" style={{ marginTop: '1rem' }}>Open a reservation from the queue to inspect its lines and available lifecycle actions.</div> : null}
+        {!selectedReservationId ? <div className="app-empty-state" style={{ marginTop: '1rem' }}>{ui("Open a reservation from the queue to inspect its lines and available lifecycle actions.")}</div> : null}
         {selectedReservation ? (
           <div style={pageStyles.page}>
             <div style={pageStyles.buttonRow}>
               <strong>{selectedReservation.reservation_number}</strong>
               <span style={pageStyles.pill}>{formatCode(selectedReservation.status)}</span>
-              <span style={pageStyles.muted}>Open reserved: {formatNumber(selectedReservation.open_reserved_quantity_total)}</span>
+              <span style={pageStyles.muted}>{ui('Open reserved:')} {formatNumber(selectedReservation.open_reserved_quantity_total)}</span>
               {permissions.canCreateInventoryReservations && !isProtectedLinkedReservationSource(selectedReservation.source_type) && (permissions.canCancelAnyInventoryReservations || (currentUserId && selectedReservation.created_by_user_id === currentUserId)) && selectedReservation.status === 'draft' && !editDraft ? (
-                <button type="button" style={pageStyles.secondaryButton} onClick={() => setEditDraft(buildDraftFromReservation(selectedReservation))}>Edit draft</button>
+                <button type="button" style={pageStyles.secondaryButton} onClick={() => setEditDraft(buildDraftFromReservation(selectedReservation))}>{ui("Edit draft")}</button>
               ) : null}
             </div>
             <div style={pageStyles.formGrid}>
-              <div><span style={pageStyles.muted}>Source</span><br /><strong>{formatCode(selectedReservation.source_type)}</strong>{selectedReservation.source_id ? <><br /><span style={pageStyles.muted}>{selectedReservation.source_id}</span></> : null}</div>
-              <div><span style={pageStyles.muted}>Requesting department</span><br /><strong>{selectedReservation.requesting_department || 'Unassigned'}</strong></div>
-              <div><span style={pageStyles.muted}>Target department</span><br /><strong>{selectedReservation.target_department || 'Unassigned'}</strong></div>
-              <div><span style={pageStyles.muted}>Priority</span><br /><strong>{formatCode(selectedReservation.priority || 'normal')}</strong></div>
-              <div><span style={pageStyles.muted}>Needed by</span><br /><strong>{formatDate(selectedReservation.needed_by)}</strong></div>
-              <div><span style={pageStyles.muted}>Expires at</span><br /><strong>{formatDate(selectedReservation.expires_at)}</strong></div>
-              <div style={{ gridColumn: '1 / -1' }}><span style={pageStyles.muted}>Notes</span><br /><span>{selectedReservation.notes || 'No notes recorded.'}</span></div>
+              <div><span style={pageStyles.muted}>{ui("Source")}</span><br /><strong>{formatCode(selectedReservation.source_type)}</strong>{selectedReservation.source_id ? <><br /><span style={pageStyles.muted}>{selectedReservation.source_id}</span></> : null}</div>
+              <div><span style={pageStyles.muted}>{ui("Requesting department")}</span><br /><strong>{selectedReservation.requesting_department || ui('Unassigned')}</strong></div>
+              <div><span style={pageStyles.muted}>{ui("Target department")}</span><br /><strong>{selectedReservation.target_department || ui('Unassigned')}</strong></div>
+              <div><span style={pageStyles.muted}>{ui("Priority")}</span><br /><strong>{formatCode(selectedReservation.priority || 'normal')}</strong></div>
+              <div><span style={pageStyles.muted}>{ui("Needed by")}</span><br /><strong>{formatDate(selectedReservation.needed_by)}</strong></div>
+              <div><span style={pageStyles.muted}>{ui("Expires at")}</span><br /><strong>{formatDate(selectedReservation.expires_at)}</strong></div>
+              <div style={{ gridColumn: '1 / -1' }}><span style={pageStyles.muted}>{ui("Notes")}</span><br /><span>{selectedReservation.notes || ui('No notes recorded.')}</span></div>
             </div>
             {selectedReservation.source_type === 'requisition' ? (
-              <p style={pageStyles.muted}>Fulfill this linked demand from the Requisitions page. Allocation and release stay here; fulfillment is recorded from the requisition so both records remain synchronized.</p>
+              <p style={pageStyles.muted}>{ui("Fulfill this linked demand from the Requisitions page. Allocation and release stay here; fulfillment is recorded from the requisition so both records remain synchronized.")}</p>
             ) : null}
             {selectedReservation.source_type === 'procurement_inbound' ? (
-              <p style={pageStyles.muted}>This is a tracking-only inbound commitment from a purchase order. Receive stock through Shipments; current on-hand stock cannot be allocated or fulfilled from this reservation.</p>
+              <p style={pageStyles.muted}>{ui("This is a tracking-only inbound commitment from a purchase order. Receive stock through Shipments; current on-hand stock cannot be allocated or fulfilled from this reservation.")}</p>
             ) : null}
-            {selectedReservation.source_type !== 'outbound' ? <label style={pageStyles.label}>Lifecycle note
-              <input style={pageStyles.input} value={actionNote} onChange={(event) => setActionNote(event.target.value)} placeholder="Required for cancellation; optional context for release, expiration, or fulfillment" />
+            {selectedReservation.source_type !== 'outbound' ? <label style={pageStyles.label}>{ui("Lifecycle note")} <input style={pageStyles.input} value={actionNote} onChange={(event) => setActionNote(event.target.value)} placeholder={ui("Required for cancellation; optional context for release, expiration, or fulfillment")} />
             </label> : null}
             {(() => {
               const actionState = selectedActionState;
@@ -1211,95 +1202,87 @@ export default function InventoryReservationsPage() {
                 ((permissions.canCancelAnyInventoryReservations || (permissions.canCancelOwnInventoryReservations && currentUserId && selectedReservation?.created_by_user_id === currentUserId)) && actionState.canCancel);
 
               if (!hasVisibleAction) {
-                return <p style={pageStyles.muted}>{actionState.managedFromOutbound ? 'This stock reservation belongs to a customer order. Manage it from Outbound.' : 'No lifecycle actions are currently available for this reservation.'}</p>;
+                return <p style={pageStyles.muted}>{actionState.managedFromOutbound ? ui('This stock reservation belongs to a customer order. Manage it from Outbound.') : ui('No lifecycle actions are currently available for this reservation.')}</p>;
               }
 
               return (
                 <div style={pageStyles.buttonRow}>
-                  {permissions.canAllocateInventoryReservations && actionState.canActivate ? <button type="button" style={pageStyles.button} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending} onClick={() => runLifecycleAction('activate')}>Activate</button> : null}
-                  {permissions.canAllocateInventoryReservations && actionState.canAllocate ? <button type="button" style={pageStyles.button} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending} onClick={() => runLifecycleAction('allocate')}>Allocate</button> : null}
-                  {permissions.canFulfillInventoryReservations && actionState.canFulfill ? <button type="button" style={pageStyles.button} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending} onClick={() => runLifecycleAction('fulfill')}>Fulfill all reserved</button> : null}
-                  {permissions.canReleaseInventoryReservations && actionState.canRelease ? <button type="button" style={pageStyles.secondaryButton} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending} onClick={() => runLifecycleAction('release')}>Release remaining</button> : null}
-                  {permissions.canExpireInventoryReservations && actionState.canExpire ? <button type="button" style={pageStyles.secondaryButton} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending} onClick={() => runLifecycleAction('expire')}>{selectedReservation.expires_at ? 'Expire due reservation' : 'Expire manually'}</button> : null}
-                  {(permissions.canCancelAnyInventoryReservations || (permissions.canCancelOwnInventoryReservations && currentUserId && selectedReservation?.created_by_user_id === currentUserId)) && actionState.canCancel ? <button type="button" style={pageStyles.dangerButton} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending || !actionNote.trim()} onClick={() => runLifecycleAction('cancel')}>Cancel</button> : null}
+                  {permissions.canAllocateInventoryReservations && actionState.canActivate ? <button type="button" style={pageStyles.button} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending} onClick={() => runLifecycleAction('activate')}>{ui("Activate")}</button> : null}
+                  {permissions.canAllocateInventoryReservations && actionState.canAllocate ? <button type="button" style={pageStyles.button} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending} onClick={() => runLifecycleAction('allocate')}>{ui("Allocate")}</button> : null}
+                  {permissions.canFulfillInventoryReservations && actionState.canFulfill ? <button type="button" style={pageStyles.button} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending} onClick={() => runLifecycleAction('fulfill')}>{ui("Fulfill all reserved")}</button> : null}
+                  {permissions.canReleaseInventoryReservations && actionState.canRelease ? <button type="button" style={pageStyles.secondaryButton} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending} onClick={() => runLifecycleAction('release')}>{ui("Release remaining")}</button> : null}
+                  {permissions.canExpireInventoryReservations && actionState.canExpire ? <button type="button" style={pageStyles.secondaryButton} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending} onClick={() => runLifecycleAction('expire')}>{selectedReservation.expires_at ? ui('Expire due reservation') : ui('Expire manually')}</button> : null}
+                  {(permissions.canCancelAnyInventoryReservations || (permissions.canCancelOwnInventoryReservations && currentUserId && selectedReservation?.created_by_user_id === currentUserId)) && actionState.canCancel ? <button type="button" style={pageStyles.dangerButton} disabled={actionMutation.isPending || fulfillSelectedMutation.isPending || !actionNote.trim()} onClick={() => runLifecycleAction('cancel')}>{ui("Cancel")}</button> : null}
                 </div>
               );
             })()}
             {selectedReservation.expires_at && new Date(selectedReservation.expires_at).getTime() > Date.now() && !['fulfilled', 'released', 'expired', 'cancelled'].includes(String(selectedReservation.status)) ? (
-              <p style={pageStyles.muted}>This reservation cannot be expired manually until {formatDate(selectedReservation.expires_at)}.</p>
+              <p style={pageStyles.muted}>{ui('This reservation cannot be expired manually until')} {formatDate(selectedReservation.expires_at)}.</p>
             ) : null}
             {editDraft && selectedReservation.status === 'draft' && (permissions.canCancelAnyInventoryReservations || (currentUserId && selectedReservation.created_by_user_id === currentUserId)) ? (
               <div style={pageStyles.card}>
-                <h3 style={pageStyles.sectionTitle}>Edit draft reservation</h3>
+                <h3 style={pageStyles.sectionTitle}>{ui("Edit draft reservation")}</h3>
                 <div style={pageStyles.formGrid}>
-                  <label style={pageStyles.label}>Source type
-                    <select style={pageStyles.input} value={editDraft.source_type} onChange={(event) => setEditDraft({ ...editDraft, source_type: event.target.value, source_id: event.target.value === 'manual' ? '' : editDraft.source_id })}>
-                      <option value="manual">Manual</option>
-                      <option value="event">Event</option>
-                      <option value="department">Department</option>
-                      <option value="forecast">Forecast</option>
+                  <label style={pageStyles.label}>{ui("Source type")} <select style={pageStyles.input} value={editDraft.source_type} onChange={(event) => setEditDraft({ ...editDraft, source_type: event.target.value, source_id: event.target.value === 'manual' ? '' : editDraft.source_id })}>
+                      <option value="manual">{ui("Manual")}</option>
+                      <option value="event">{ui("Event")}</option>
+                      <option value="department">{ui("Department")}</option>
+                      <option value="forecast">{ui("Forecast")}</option>
                     </select>
                   </label>
                   {editDraft.source_type !== 'manual' ? (
-                    <label style={pageStyles.label}>Linked source ID (UUID)
-                      <input style={pageStyles.input} value={editDraft.source_id} onChange={(event) => setEditDraft({ ...editDraft, source_id: event.target.value })} placeholder="Required UUID for linked source" />
+                    <label style={pageStyles.label}>{ui("Linked source ID (UUID)")} <input style={pageStyles.input} value={editDraft.source_id} onChange={(event) => setEditDraft({ ...editDraft, source_id: event.target.value })} placeholder={ui("Required UUID for linked source")} />
                     </label>
                   ) : null}
-                  <label style={pageStyles.label}>Requesting department
-                    <input list="reservation-departments" style={pageStyles.input} value={editDraft.requesting_department} onChange={(event) => setEditDraft({ ...editDraft, requesting_department: event.target.value })} />
+                  <label style={pageStyles.label}>{ui("Requesting department")} <input list="reservation-departments" style={pageStyles.input} value={editDraft.requesting_department} onChange={(event) => setEditDraft({ ...editDraft, requesting_department: event.target.value })} />
                   </label>
-                  <label style={pageStyles.label}>Target department
-                    <input list="reservation-departments" style={pageStyles.input} value={editDraft.target_department} onChange={(event) => setEditDraft({ ...editDraft, target_department: event.target.value })} />
+                  <label style={pageStyles.label}>{ui("Target department")} <input list="reservation-departments" style={pageStyles.input} value={editDraft.target_department} onChange={(event) => setEditDraft({ ...editDraft, target_department: event.target.value })} />
                   </label>
-                  <label style={pageStyles.label}>Priority
-                    <select style={pageStyles.input} value={editDraft.priority} onChange={(event) => setEditDraft({ ...editDraft, priority: event.target.value })}>
-                      <option value="low">Low</option>
-                      <option value="normal">Normal</option>
-                      <option value="high">High</option>
-                      <option value="urgent">Urgent</option>
+                  <label style={pageStyles.label}>{ui("Priority")} <select style={pageStyles.input} value={editDraft.priority} onChange={(event) => setEditDraft({ ...editDraft, priority: event.target.value })}>
+                      <option value="low">{ui("Low")}</option>
+                      <option value="normal">{ui("Normal")}</option>
+                      <option value="high">{ui("High")}</option>
+                      <option value="urgent">{ui("Urgent")}</option>
                     </select>
                   </label>
-                  <label style={pageStyles.label}>Needed by
-                    <input type="datetime-local" style={pageStyles.input} value={editDraft.needed_by} onChange={(event) => setEditDraft({ ...editDraft, needed_by: event.target.value })} />
+                  <label style={pageStyles.label}>{ui("Needed by")} <input type="datetime-local" style={pageStyles.input} value={editDraft.needed_by} onChange={(event) => setEditDraft({ ...editDraft, needed_by: event.target.value })} />
                   </label>
-                  <label style={pageStyles.label}>Expires at
-                    <input type="datetime-local" style={pageStyles.input} value={editDraft.expires_at} onChange={(event) => setEditDraft({ ...editDraft, expires_at: event.target.value })} />
+                  <label style={pageStyles.label}>{ui("Expires at")} <input type="datetime-local" style={pageStyles.input} value={editDraft.expires_at} onChange={(event) => setEditDraft({ ...editDraft, expires_at: event.target.value })} />
                   </label>
-                  <label style={pageStyles.label}>Notes
-                    <input style={pageStyles.input} value={editDraft.notes} onChange={(event) => setEditDraft({ ...editDraft, notes: event.target.value })} />
+                  <label style={pageStyles.label}>{ui("Notes")} <input style={pageStyles.input} value={editDraft.notes} onChange={(event) => setEditDraft({ ...editDraft, notes: event.target.value })} />
                   </label>
                 </div>
                 <div style={{ ...pageStyles.tableWrap, marginTop: '0.75rem' }}>
                   <table style={pageStyles.lineTable}>
-                    <thead><tr><th style={pageStyles.th}>Product</th><th style={pageStyles.th}>Storage location</th><th style={pageStyles.th}>Quantity</th><th style={pageStyles.th}>Unit</th><th style={pageStyles.th}>Allocation method</th><th style={pageStyles.th}>Line note</th><th style={pageStyles.th}></th></tr></thead>
+                    <thead><tr><th style={pageStyles.th}>{ui("Product")}</th><th style={pageStyles.th}>{ui("Storage location")}</th><th style={pageStyles.th}>{ui("Quantity")}</th><th style={pageStyles.th}>{ui("Unit")}</th><th style={pageStyles.th}>{ui("Allocation method")}</th><th style={pageStyles.th}>{ui("Line note")}</th><th style={pageStyles.th}></th></tr></thead>
                     <tbody>
                       {editDraft.items.map((item, index) => (
                         <tr key={index}>
                           <td style={pageStyles.td}>
                             <select style={pageStyles.input} value={item.product_id} onChange={(event) => updateEditDraftLine(index, { product_id: event.target.value, uom_code: '' })}>
-                              <option value="">{optionsQuery.isLoading ? 'Loading products…' : 'Select product'}</option>
+                              <option value="">{optionsQuery.isLoading ? ui('Loading products…') : ui('Select product')}</option>
                               {allProducts.map((product) => (
-                                <option key={product.id} value={product.id} disabled={!product.is_active && product.id !== item.product_id}>{getSelectedProductLabel(product)}</option>
+                                <option key={product.id} value={product.id} disabled={!product.is_active && product.id !== item.product_id}>{getSelectedProductLabel(product, ui)}</option>
                               ))}
                             </select>
-                            {item.product_id && !productById.has(item.product_id) ? <p style={pageStyles.muted}>Current product ID: {item.product_id}</p> : null}
+                            {item.product_id && !productById.has(item.product_id) ? <p style={pageStyles.muted}>{ui('Current product ID:')} {item.product_id}</p> : null}
                           </td>
                           <td style={pageStyles.td}>
                             <select style={pageStyles.input} disabled={item.allocation_strategy !== 'specific_location'} value={item.storage_location_id} onChange={(event) => updateEditDraftLine(index, { storage_location_id: event.target.value, allocation_strategy: event.target.value ? 'specific_location' : 'any_location' })}>
-                              <option value="">{optionsQuery.isLoading ? 'Loading locations…' : item.allocation_strategy === 'specific_location' ? 'Select location' : 'Chosen during allocation'}</option>
+                              <option value="">{optionsQuery.isLoading ? ui('Loading locations…') : item.allocation_strategy === 'specific_location' ? ui('Select location') : ui('Chosen during allocation')}</option>
                               {allLocations.map((location) => (
-                                <option key={location.id} value={location.id} disabled={!location.is_active && location.id !== item.storage_location_id}>{getSelectedLocationLabel(location)}</option>
+                                <option key={location.id} value={location.id} disabled={!location.is_active && location.id !== item.storage_location_id}>{getSelectedLocationLabel(location, ui)}</option>
                               ))}
                             </select>
-                            {item.storage_location_id && !locationById.has(item.storage_location_id) ? <p style={pageStyles.muted}>Current location ID: {item.storage_location_id}</p> : null}
+                            {item.storage_location_id && !locationById.has(item.storage_location_id) ? <p style={pageStyles.muted}>{ui('Current location ID:')} {item.storage_location_id}</p> : null}
                           </td>
                           <td style={pageStyles.td}><input type="number" min="0" step="0.01" style={pageStyles.input} value={item.requested_quantity} onChange={(event) => updateEditDraftLine(index, { requested_quantity: event.target.value })} /></td>
-                          <td style={pageStyles.td}><ProductUomSelect productId={item.product_id} value={item.uom_code} purpose="issue" onChange={(value) => updateEditDraftLine(index, { uom_code: value })} style={pageStyles.input} ariaLabel={`Unit of measure for reservation edit line ${index + 1}`} /></td>
+                          <td style={pageStyles.td}><ProductUomSelect productId={item.product_id} value={item.uom_code} purpose="issue" onChange={(value) => updateEditDraftLine(index, { uom_code: value })} style={pageStyles.input} ariaLabel={`${ui('Unit of measure for reservation edit line')} ${formatNumber(index + 1)}`} /></td>
                           <td style={pageStyles.td}>
                             <select style={pageStyles.input} value={item.allocation_strategy} onChange={(event) => updateEditDraftLine(index, { allocation_strategy: event.target.value, storage_location_id: event.target.value === 'specific_location' ? item.storage_location_id : '' })}>
-                              <option value="specific_location">Specific location</option>
-                              <option value="any_location">Best available location</option>
-                              <option value="inbound">Inbound stock commitment</option>
+                              <option value="specific_location">{ui("Specific location")}</option>
+                              <option value="any_location">{ui("Best available location")}</option>
+                              <option value="inbound">{ui("Inbound stock commitment")}</option>
                             </select>
                           </td>
                           <td style={pageStyles.td}><input style={pageStyles.input} value={item.allocation_note} onChange={(event) => updateEditDraftLine(index, { allocation_note: event.target.value })} /></td>
@@ -1307,26 +1290,26 @@ export default function InventoryReservationsPage() {
                             if (!current) return current;
                             const items = current.items.filter((_, itemIndex) => itemIndex !== index);
                             return { ...current, items: items.length ? items : [emptyLine()] };
-                          })}>Remove</button></td>
+                          })}>{ui("Remove")}</button></td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
                 <div style={{ ...pageStyles.buttonRow, marginTop: '0.75rem' }}>
-                  <button type="button" style={pageStyles.secondaryButton} onClick={() => setEditDraft((current) => current ? { ...current, items: [...current.items, emptyLine()] } : current)}>Add line</button>
+                  <button type="button" style={pageStyles.secondaryButton} onClick={() => setEditDraft((current) => current ? { ...current, items: [...current.items, emptyLine()] } : current)}>{ui("Add line")}</button>
                   <button type="button" style={pageStyles.button} disabled={updateDraftMutation.isPending || Boolean(editDraftValidationMessage)} onClick={() => updateDraftMutation.mutate({ id: selectedReservation.id, draft: editDraft })}>
-                    {updateDraftMutation.isPending ? 'Saving…' : 'Save draft changes'}
+                    {updateDraftMutation.isPending ? ui('Saving…') : ui('Save draft changes')}
                   </button>
                   {editDraftValidationMessage ? <span style={pageStyles.muted}>{editDraftValidationMessage}</span> : null}
-                  <button type="button" style={pageStyles.secondaryButton} onClick={() => setEditDraft(null)}>Cancel edit</button>
+                  <button type="button" style={pageStyles.secondaryButton} onClick={() => setEditDraft(null)}>{ui("Cancel edit")}</button>
                 </div>
               </div>
             ) : null}
 
             <div style={pageStyles.tableWrap}>
               <table style={pageStyles.table}>
-                <thead><tr><th style={pageStyles.th}>Product</th><th style={pageStyles.th}>Location</th><th style={pageStyles.th}>Requested</th><th style={pageStyles.th}>Reserved</th><th style={pageStyles.th}>Open reserved</th><th style={pageStyles.th}>Fulfilled</th><th style={pageStyles.th}>Released</th><th style={pageStyles.th}>Status</th>{permissions.canFulfillInventoryReservations && selectedActionState?.canFulfill ? <th style={pageStyles.th}>Fulfill now</th> : null}</tr></thead>
+                <thead><tr><th style={pageStyles.th}>{ui("Product")}</th><th style={pageStyles.th}>{ui("Location")}</th><th style={pageStyles.th}>{ui("Requested")}</th><th style={pageStyles.th}>{ui("Reserved")}</th><th style={pageStyles.th}>{ui("Open reserved")}</th><th style={pageStyles.th}>{ui("Fulfilled")}</th><th style={pageStyles.th}>{ui("Released")}</th><th style={pageStyles.th}>{ui("Status")}</th>{permissions.canFulfillInventoryReservations && selectedActionState?.canFulfill ? <th style={pageStyles.th}>{ui("Fulfill now")}</th> : null}</tr></thead>
                 <tbody>
                   {(selectedReservation.items || []).map((item) => {
                     const openReservedQuantity = getOpenReservedQuantity(item);
@@ -1343,7 +1326,7 @@ export default function InventoryReservationsPage() {
                         {permissions.canFulfillInventoryReservations && selectedActionState?.canFulfill ? (
                           <td style={pageStyles.td}>
                             <input
-                              aria-label={`Fulfill quantity for ${item.product_name || item.product_id}`}
+                              aria-label={`${ui('Fulfill quantity for')} ${item.product_name || item.product_id}`}
                               type="number"
                               min="0"
                               max={openReservedQuantity}
@@ -1352,7 +1335,7 @@ export default function InventoryReservationsPage() {
                               disabled={openReservedQuantity <= 0 || fulfillSelectedMutation.isPending}
                               value={fulfillmentQuantities[item.id] || ''}
                               onChange={(event) => setFulfillmentQuantities((current) => ({ ...current, [item.id]: event.target.value }))}
-                              placeholder={openReservedQuantity > 0 ? `Max ${formatNumber(openReservedQuantity)}` : 'None open'}
+                              placeholder={openReservedQuantity > 0 ? `${ui('Max')} ${formatNumber(openReservedQuantity)}` : ui('None open')}
                             />
                           </td>
                         ) : null}
@@ -1365,49 +1348,49 @@ export default function InventoryReservationsPage() {
             {permissions.canFulfillInventoryReservations && selectedActionState?.canFulfill ? (
               <div style={{ ...pageStyles.buttonRow, marginTop: '0.75rem' }}>
                 <button type="button" style={pageStyles.button} disabled={fulfillSelectedMutation.isPending || !selectedFulfillmentLines.length || Boolean(selectedFulfillmentValidationMessage)} onClick={handleFulfillSelected}>
-                  {fulfillSelectedMutation.isPending ? 'Fulfilling…' : 'Fulfill entered quantities'}
+                  {fulfillSelectedMutation.isPending ? ui('Fulfilling…') : ui('Fulfill entered quantities')}
                 </button>
-                <span style={pageStyles.muted}>{selectedFulfillmentValidationMessage || 'Enter one or more line quantities to perform a partial fulfillment. Stock is reduced immediately.'}</span>
+                <span style={pageStyles.muted}>{selectedFulfillmentValidationMessage || ui('Enter one or more line quantities to perform a partial fulfillment. Stock is reduced immediately.')}</span>
               </div>
             ) : null}
             <div style={{ marginTop: '1rem' }}>
-              <h3 style={pageStyles.sectionTitle}>Reservation audit trail</h3>
+              <h3 style={pageStyles.sectionTitle}>{ui("Reservation audit trail")}</h3>
               <div style={pageStyles.tableWrap}>
                 <table style={pageStyles.table}>
-                  <thead><tr><th style={pageStyles.th}>Time</th><th style={pageStyles.th}>Action</th><th style={pageStyles.th}>User</th><th style={pageStyles.th}>Metadata</th></tr></thead>
+                  <thead><tr><th style={pageStyles.th}>{ui("Time")}</th><th style={pageStyles.th}>{ui("Action")}</th><th style={pageStyles.th}>{ui("User")}</th><th style={pageStyles.th}>{ui("Metadata")}</th></tr></thead>
                   <tbody>
                     {(auditTrailQuery.data || []).map((event) => (
                       <tr key={event.id}>
                         <td style={pageStyles.td}>{formatDate(event.created_at)}</td>
                         <td style={pageStyles.td}><span style={pageStyles.pill}>{formatCode(event.action)}</span></td>
-                        <td style={pageStyles.td}>{event.user_id || 'System/support'}</td>
-                        <td style={pageStyles.td}><details><summary>View details</summary><code style={{ display: 'block', marginTop: '0.5rem', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{formatAuditMetadata(event.metadata)}</code></details></td>
+                        <td style={pageStyles.td}>{event.user_id || ui('System/support')}</td>
+                        <td style={pageStyles.td}><details><summary>{ui("View details")}</summary><code style={{ display: 'block', marginTop: '0.5rem', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{formatAuditMetadata(event.metadata, ui)}</code></details></td>
                       </tr>
                     ))}
-                    {!auditTrailQuery.data?.length ? <tr><td style={pageStyles.td} colSpan={4}>{auditTrailQuery.isLoading ? 'Loading audit trail…' : 'No reservation audit events found.'}</td></tr> : null}
+                    {!auditTrailQuery.data?.length ? <tr><td style={pageStyles.td} colSpan={4}>{auditTrailQuery.isLoading ? ui('Loading audit trail…') : ui('No reservation audit events found.')}</td></tr> : null}
                   </tbody>
                 </table>
               </div>
             </div>
           </div>
-        ) : selectedReservationId && detailQuery.isLoading ? <p>Loading reservation detail…</p> : null}
+        ) : selectedReservationId && detailQuery.isLoading ? <p>{ui("Loading reservation detail…")}</p> : null}
       </section>
 
 
       <section className="app-panel" id="reservation-capacity" style={{ ...pageStyles.card, scrollMarginTop: '1rem' }}>
         <OperationalSectionHeader
           iconPath="/insights"
-          title="Source / department reservation demand"
-          description="Groups reservation demand by source type, source ID, requesting department, and target department so commitments are visible before conflicts appear."
+          title={ui("Source / department reservation demand")}
+          description={ui("Groups reservation demand by source type, source ID, requesting department, and target department so commitments are visible before conflicts appear.")}
         />
         <div style={{ ...pageStyles.tableWrap, marginTop: '1rem' }}>
           <table style={pageStyles.table}>
-            <thead><tr><th style={pageStyles.th}>Source</th><th style={pageStyles.th}>Requesting → Target</th><th style={pageStyles.th}>Reservations</th><th style={pageStyles.th}>Active</th><th style={pageStyles.th}>Draft</th><th style={pageStyles.th}>Expiration attention</th><th style={pageStyles.th}>Requested</th><th style={pageStyles.th}>Open reserved</th></tr></thead>
+            <thead><tr><th style={pageStyles.th}>{ui("Source")}</th><th style={pageStyles.th}>{ui("Requesting → Target")}</th><th style={pageStyles.th}>{ui("Reservations")}</th><th style={pageStyles.th}>{ui("Active")}</th><th style={pageStyles.th}>{ui("Draft")}</th><th style={pageStyles.th}>{ui("Expiration attention")}</th><th style={pageStyles.th}>{ui("Requested")}</th><th style={pageStyles.th}>{ui("Open reserved")}</th></tr></thead>
             <tbody>
               {(sourceSummaryQuery.data || []).map((row) => (
                 <tr key={`${row.source_type}-${row.source_id || 'none'}-${row.requesting_department || 'none'}-${row.target_department || 'none'}`}>
                   <td style={pageStyles.td}><strong>{formatCode(row.source_type)}</strong>{row.source_id ? <><br /><span style={pageStyles.muted}>{row.source_id}</span></> : null}</td>
-                  <td style={pageStyles.td}>{row.requesting_department || 'Unassigned'} → {row.target_department || 'Unassigned'}</td>
+                  <td style={pageStyles.td}>{row.requesting_department || ui('Unassigned')} → {row.target_department || ui('Unassigned')}</td>
                   <td style={pageStyles.td}>{formatNumber(row.reservation_count)}</td>
                   <td style={pageStyles.td}>{formatNumber(row.active_reservation_count)}</td>
                   <td style={pageStyles.td}>{formatNumber(row.draft_reservation_count)}</td>
@@ -1416,7 +1399,7 @@ export default function InventoryReservationsPage() {
                   <td style={pageStyles.td}>{formatNumber(row.open_reserved_quantity_total)}</td>
                 </tr>
               ))}
-              {!sourceSummaryQuery.data?.length ? <tr><td style={pageStyles.td} colSpan={8}>{sourceSummaryQuery.isLoading ? 'Loading source demand…' : 'No source demand rows yet.'}</td></tr> : null}
+              {!sourceSummaryQuery.data?.length ? <tr><td style={pageStyles.td} colSpan={8}>{sourceSummaryQuery.isLoading ? ui('Loading source demand…') : ui('No source demand rows yet.')}</td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -1425,33 +1408,33 @@ export default function InventoryReservationsPage() {
       <section className="app-panel" style={pageStyles.card}>
         <OperationalSectionHeader
           iconPath="/alerts"
-          title="Allocation conflict queue"
-          description="Active reservation lines where remaining demand or open reservations exceed projected free stock."
+          title={ui("Allocation conflict queue")}
+          description={ui("Active reservation lines where remaining demand or open reservations exceed projected free stock.")}
         />
         <div style={{ ...pageStyles.tableWrap, marginTop: '1rem' }}>
           <table style={pageStyles.table}>
-            <thead><tr><th style={pageStyles.th}>Reservation</th><th style={pageStyles.th}>Product</th><th style={pageStyles.th}>Location</th><th style={pageStyles.th}>Reason</th><th style={pageStyles.th}>Remaining</th><th style={pageStyles.th}>Projected free</th><th style={pageStyles.th}>Conflict qty</th><th style={pageStyles.th}></th></tr></thead>
+            <thead><tr><th style={pageStyles.th}>{ui("Reservation")}</th><th style={pageStyles.th}>{ui("Product")}</th><th style={pageStyles.th}>{ui("Location")}</th><th style={pageStyles.th}>{ui("Reason")}</th><th style={pageStyles.th}>{ui("Remaining")}</th><th style={pageStyles.th}>{ui("Projected free")}</th><th style={pageStyles.th}>{ui("Conflict qty")}</th><th style={pageStyles.th}></th></tr></thead>
             <tbody>
               {(conflictsQuery.data || []).map((row) => (
                 <tr key={row.reservation_item_id}>
                   <td style={pageStyles.td}><strong>{row.reservation_number}</strong><br /><span style={pageStyles.muted}>{formatCode(row.priority || 'normal')} · {formatCode(row.status)}</span></td>
                   <td style={pageStyles.td}>{row.product_name || row.product_id}</td>
-                  <td style={pageStyles.td}>{row.storage_location_name || row.storage_location_id || 'Any location'}</td>
+                  <td style={pageStyles.td}>{row.storage_location_name || row.storage_location_id || ui('Any location')}</td>
                   <td style={pageStyles.td}><span style={pageStyles.pill}>{formatCode(row.conflict_reason)}</span></td>
                   <td style={pageStyles.td}>{formatNumber(row.remaining_to_allocate)}</td>
                   <td style={pageStyles.td}>{formatNumber(row.projected_free_quantity)}</td>
                   <td style={pageStyles.td}>{formatNumber(row.conflict_quantity)}</td>
                   <td style={pageStyles.td}>
                     <div style={pageStyles.buttonRow}>
-                      <button type="button" style={pageStyles.secondaryButton} onClick={() => handleSelectReservation(row.reservation_id)}>Open</button>
-                      {row.source_type !== 'outbound' && row.source_type !== 'procurement_inbound' && permissions.canAllocateInventoryReservations ? <button type="button" style={pageStyles.button} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Allocate currently available stock to ${row.reservation_number}?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'allocate_remaining' }); }}>Allocate</button> : null}
-                      {row.source_type !== 'outbound' && permissions.canReleaseInventoryReservations ? <button type="button" style={pageStyles.secondaryButton} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Release the open protected quantity for ${row.reservation_number}?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'release_open' }); }}>Release</button> : null}
-                      {row.source_type !== 'outbound' && (permissions.canCancelAnyInventoryReservations || (permissions.canCancelOwnInventoryReservations && currentUserId && row.created_by_user_id === currentUserId)) ? <button type="button" style={pageStyles.dangerButton} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`Cancel ${row.reservation_number} to resolve this conflict?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'cancel_reservation' }); }}>Cancel</button> : null}
+                      <button type="button" style={pageStyles.secondaryButton} onClick={() => handleSelectReservation(row.reservation_id)}>{ui("Open")}</button>
+                      {row.source_type !== 'outbound' && row.source_type !== 'procurement_inbound' && permissions.canAllocateInventoryReservations ? <button type="button" style={pageStyles.button} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`${ui('Allocate currently available stock to')} ${row.reservation_number}?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'allocate_remaining' }); }}>{ui("Allocate")}</button> : null}
+                      {row.source_type !== 'outbound' && permissions.canReleaseInventoryReservations ? <button type="button" style={pageStyles.secondaryButton} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`${ui('Release the open protected quantity for')} ${row.reservation_number}?`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'release_open' }); }}>{ui("Release")}</button> : null}
+                      {row.source_type !== 'outbound' && (permissions.canCancelAnyInventoryReservations || (permissions.canCancelOwnInventoryReservations && currentUserId && row.created_by_user_id === currentUserId)) ? <button type="button" style={pageStyles.dangerButton} disabled={conflictResolutionMutation.isPending} onClick={() => { if (window.confirm(`${ui('Cancel')} ${row.reservation_number} ${ui('to resolve this conflict?')}`)) conflictResolutionMutation.mutate({ id: row.reservation_id, action: 'cancel_reservation' }); }}>{ui("Cancel")}</button> : null}
                     </div>
                   </td>
                 </tr>
               ))}
-              {!conflictsQuery.data?.length ? <tr><td style={pageStyles.td} colSpan={8}>{conflictsQuery.isLoading ? 'Loading conflicts…' : 'No allocation conflicts detected.'}</td></tr> : null}
+              {!conflictsQuery.data?.length ? <tr><td style={pageStyles.td} colSpan={8}>{conflictsQuery.isLoading ? ui('Loading conflicts…') : ui('No allocation conflicts detected.')}</td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -1460,12 +1443,12 @@ export default function InventoryReservationsPage() {
       <section className="app-panel" style={pageStyles.card}>
         <OperationalSectionHeader
           iconPath="/stock"
-          title="Projected free stock"
-          description="Current stock minus open reserved quantity. Showing up to 500 stock positions; use the queue Product filter to narrow this table."
+          title={ui("Projected free stock")}
+          description={ui("Current stock minus open reserved quantity. Showing up to 500 stock positions; use the queue Product filter to narrow this table.")}
         />
         <div style={{ ...pageStyles.tableWrap, marginTop: '1rem' }}>
           <table style={pageStyles.table}>
-            <thead><tr><th style={pageStyles.th}>Product</th><th style={pageStyles.th}>Location</th><th style={pageStyles.th}>On hand</th><th style={pageStyles.th}>Reserved</th><th style={pageStyles.th}>Projected free</th></tr></thead>
+            <thead><tr><th style={pageStyles.th}>{ui("Product")}</th><th style={pageStyles.th}>{ui("Location")}</th><th style={pageStyles.th}>{ui("On hand")}</th><th style={pageStyles.th}>{ui("Reserved")}</th><th style={pageStyles.th}>{ui("Projected free")}</th></tr></thead>
             <tbody>
               {(projectedFreeStockQuery.data || []).slice(0, 50).map((row) => (
                 <tr key={`${row.product_id}-${row.storage_location_id || 'none'}`}>
@@ -1476,7 +1459,7 @@ export default function InventoryReservationsPage() {
                   <td style={pageStyles.td}>{formatNumber(row.projected_free_quantity)}</td>
                 </tr>
               ))}
-              {!projectedFreeStockQuery.data?.length ? <tr><td style={pageStyles.td} colSpan={5}>{projectedFreeStockQuery.isLoading ? 'Loading projected free stock…' : 'No projected free stock rows yet.'}</td></tr> : null}
+              {!projectedFreeStockQuery.data?.length ? <tr><td style={pageStyles.td} colSpan={5}>{projectedFreeStockQuery.isLoading ? ui('Loading projected free stock…') : ui('No projected free stock rows yet.')}</td></tr> : null}
             </tbody>
           </table>
         </div>

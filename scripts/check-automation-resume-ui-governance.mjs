@@ -10,7 +10,7 @@ const requiredTokens = [
   "method: 'POST'",
   "schedule.status === 'draft' || schedule.status === 'paused'",
   'canResumeAutomationSchedules',
-  '>Activate</button>'
+  ">{ui('Activate')}</button>"
 ];
 
 for (const token of requiredTokens) {

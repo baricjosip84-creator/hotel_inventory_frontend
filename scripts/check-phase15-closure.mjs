@@ -74,7 +74,7 @@ const requiredLayoutSignals = [
   'getTenantPageMeta',
   'getTenantAccessSnapshot',
   'InventoryBrand',
-  "tenantSubscriptionAccess?.tenant.name || 'Company workspace'",
+  "tenantSubscriptionAccess?.tenant.name || t('common.companyWorkspace')",
   'getCurrentAccessRoleLabel'
 ];
 

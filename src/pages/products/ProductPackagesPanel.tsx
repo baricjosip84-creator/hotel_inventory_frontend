@@ -2,6 +2,7 @@ import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import type { ProductItem, ProductPackageItem } from '../../types/inventory';
 import type { PackageFormState } from './productPackageApi';
 import { styles } from './productStyles';
+import { useAppTranslation } from '../../i18n/I18nContext';
 
 type PackagesQueryState = {
   isLoading: boolean;
@@ -46,6 +47,7 @@ export function ProductPackagesPanel({
   onStartEditPackage,
   onDeletePackage
 }: ProductPackagesPanelProps) {
+  const { ui } = useAppTranslation();
   if (!selectedPackageProduct) {
     return null;
   }
@@ -56,19 +58,19 @@ export function ProductPackagesPanel({
     <section id="product-packages-panel" style={styles.panel}>
       <div style={styles.packageHeader}>
         <div>
-          <h3 style={styles.panelTitle}>Packages for {selectedPackageProduct.name}</h3>
+          <h3 style={styles.panelTitle}>{ui("Packages for")} {selectedPackageProduct.name}</h3>
           <p style={styles.panelSubtitle}>
-            Add scannable package formats such as bottle, 6-pack, case, or crate. Receiving converts package counts into base stock units.
+            {ui("Add scannable package formats such as bottle, 6-pack, case, or crate. Receiving converts package counts into base stock units.")}
           </p>
         </div>
 
         <button type="button" style={styles.secondaryButton} onClick={onClosePackages}>
-          Close Packages
+          {ui("Close Packages")}
         </button>
       </div>
 
       {!canManageProductPackages ? (
-        <div style={styles.warningBox}>Packages are read-only because the current role does not have product_packages.write permission.</div>
+        <div style={styles.warningBox}>{ui("Packages are read-only because the current role does not have product_packages.write permission.")}</div>
       ) : null}
 
       {packageError ? <div style={styles.errorBox}>{packageError}</div> : null}
@@ -76,7 +78,7 @@ export function ProductPackagesPanel({
 
       <form onSubmit={onSubmit} style={styles.formGrid}>
         <div>
-          <label htmlFor="product-package-name" style={styles.label}>Package Name</label>
+          <label htmlFor="product-package-name" style={styles.label}>{ui("Package Name")}</label>
           <input
             id="product-package-name"
             style={styles.input}
@@ -84,14 +86,14 @@ export function ProductPackagesPanel({
             onChange={(event) =>
               setPackageForm((current) => ({ ...current, package_name: event.target.value }))
             }
-            placeholder="Example: 6-pack"
+            placeholder={ui("Example: 6-pack")}
             required
             disabled={fieldsDisabled}
           />
         </div>
 
         <div>
-          <label htmlFor="product-package-barcode" style={styles.label}>Package Barcode</label>
+          <label htmlFor="product-package-barcode" style={styles.label}>{ui("Package Barcode")}</label>
           <input
             id="product-package-barcode"
             style={styles.input}
@@ -99,14 +101,14 @@ export function ProductPackagesPanel({
             onChange={(event) =>
               setPackageForm((current) => ({ ...current, barcode: event.target.value }))
             }
-            placeholder="Scan or enter package barcode"
+            placeholder={ui("Scan or enter package barcode")}
             required
             disabled={fieldsDisabled}
           />
         </div>
 
         <div>
-          <label htmlFor="product-package-units" style={styles.label}>Units Per Package</label>
+          <label htmlFor="product-package-units" style={styles.label}>{ui("Units Per Package")}</label>
           <input
             id="product-package-units"
             style={styles.input}
@@ -133,7 +135,7 @@ export function ProductPackagesPanel({
             }
             disabled={fieldsDisabled}
           />
-          Default package
+          {ui("Default package")}
         </label>
 
         <div style={styles.formActions}>
@@ -144,26 +146,26 @@ export function ProductPackagesPanel({
           >
             {isPackageSubmitting
               ? editingPackage
-                ? 'Updating...'
-                : 'Creating...'
+                ? ui('Updating...')
+                : ui('Creating...')
               : editingPackage
-                ? 'Update Package'
-                : 'Create Package'}
+                ? ui('Update Package')
+                : ui('Create Package')}
           </button>
 
           {editingPackage ? (
             <button type="button" style={styles.secondaryButton} onClick={onCancelPackageEdit}>
-              Cancel
+              {ui("Cancel")}
             </button>
           ) : null}
         </div>
       </form>
 
       <div style={styles.packageTableBlock}>
-        {packagesQuery.isLoading ? <div style={styles.emptyCell}>Loading packages...</div> : null}
+        {packagesQuery.isLoading ? <div style={styles.emptyCell}>{ui("Loading packages...")}</div> : null}
 
         {packagesQuery.isError ? (
-          <div style={styles.errorBox}>Failed to load packages: {(packagesQuery.error as Error).message || 'Unknown error'}</div>
+          <div style={styles.errorBox}>{ui("Failed to load packages:")} {(packagesQuery.error as Error).message || ui('Unknown error')}</div>
         ) : null}
 
         {!packagesQuery.isLoading && !packagesQuery.isError ? (
@@ -171,19 +173,19 @@ export function ProductPackagesPanel({
             <table style={styles.packageTable}>
               <thead>
                 <tr>
-                  <th style={styles.th}>Package</th>
-                  <th style={styles.th}>Barcode</th>
-                  <th style={styles.th}>Units</th>
-                  <th style={styles.th}>Default</th>
-                  <th style={styles.th}>Version</th>
-                  <th style={styles.th}>Actions</th>
+                  <th style={styles.th}>{ui("Package")}</th>
+                  <th style={styles.th}>{ui("Barcode")}</th>
+                  <th style={styles.th}>{ui("Units")}</th>
+                  <th style={styles.th}>{ui("Default")}</th>
+                  <th style={styles.th}>{ui("Version")}</th>
+                  <th style={styles.th}>{ui("Actions")}</th>
                 </tr>
               </thead>
               <tbody>
                 {packages.length === 0 ? (
                   <tr>
                     <td style={styles.emptyCell} colSpan={6}>
-                      No packages found for this product.
+                      {ui("No packages found for this product.")}
                     </td>
                   </tr>
                 ) : (
@@ -191,7 +193,7 @@ export function ProductPackagesPanel({
                     <tr key={packageItem.id}>
                       <td style={styles.td}>
                         <div style={styles.rowTitle}>{packageItem.package_name}</div>
-                        <div style={styles.rowSubtle}>Package ID: {packageItem.id}</div>
+                        <div style={styles.rowSubtle}>{ui("Package ID:")} {packageItem.id}</div>
                       </td>
                       <td style={styles.td}>
                         <span style={styles.barcodeValue}>{packageItem.barcode}</span>
@@ -199,13 +201,13 @@ export function ProductPackagesPanel({
                       <td style={styles.td}>{String(packageItem.units_per_package)}</td>
                       <td style={styles.td}>
                         {packageItem.is_default ? (
-                          <span style={styles.defaultBadge}>Default</span>
+                          <span style={styles.defaultBadge}>{ui("Default")}</span>
                         ) : (
                           '-'
                         )}
                       </td>
                       <td style={styles.td}>
-                        <span style={styles.badgeVersion}>v{packageItem.version}</span>
+                        <span style={styles.badgeVersion}>{ui("v")}{packageItem.version}</span>
                       </td>
                       <td style={styles.td}>
                         <div style={styles.actionGroup}>
@@ -215,7 +217,7 @@ export function ProductPackagesPanel({
                             onClick={() => onStartEditPackage(packageItem)}
                             disabled={!canManageProductPackages}
                           >
-                            Edit
+                            {ui("Edit")}
                           </button>
 
                           <button
@@ -224,7 +226,7 @@ export function ProductPackagesPanel({
                             onClick={() => onDeletePackage(packageItem)}
                             disabled={deletePackagePending || !canManageProductPackages}
                           >
-                            Delete
+                            {ui("Delete")}
                           </button>
                         </div>
                       </td>

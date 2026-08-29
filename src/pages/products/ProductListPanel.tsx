@@ -2,6 +2,7 @@ import type { ProductItem, SupplierItem } from '../../types/inventory';
 import { ProductListFiltersPanel } from './ProductListFiltersPanel';
 import { ProductListTablePanel } from './ProductListTablePanel';
 import { styles } from './productStyles';
+import { useAppTranslation } from '../../i18n/I18nContext';
 
 type ProductsQueryState = {
   isLoading: boolean;
@@ -64,11 +65,12 @@ export function ProductListPanel({
   onStartEdit,
   onDelete
 }: ProductListPanelProps) {
+  const { ui } = useAppTranslation();
   return (
     <section id="product-list-panel" style={styles.panel}>
-      <h3 style={styles.panelTitle}>Product List</h3>
+      <h3 style={styles.panelTitle}>{ui("Product List")}</h3>
       <p style={styles.panelSubtitle}>
-        Search and review products available to stock, shipment, receiving, and reporting workflows.
+        {ui("Search and review products available to stock, shipment, receiving, and reporting workflows.")}
       </p>
 
       <ProductListFiltersPanel
@@ -94,7 +96,7 @@ export function ProductListPanel({
       <ProductListTablePanel
         productsQuery={productsQuery}
         products={products}
-        emptyMessage={search.trim() ? 'No products match the current search and filters.' : 'No products found for the current filters.'}
+        emptyMessage={search.trim() ? ui('No products match the current search and filters.') : ui('No products found for the current filters.')}
         canManageProducts={canManageProducts}
         canViewProductPackages={canViewProductPackages}
         deleteProductPending={deleteProductPending}

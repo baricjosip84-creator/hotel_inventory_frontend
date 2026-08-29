@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useSearchParams } from 'react-router';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedCurrency, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
+import type { AppLocale } from '../i18n/config';
 import { apiRequest, ApiError } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
-import { formatCurrencyAmount } from '../lib/tenantCurrency';
+import { getActiveTenantCurrency } from '../lib/tenantCurrency';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
@@ -55,28 +58,39 @@ const controlledValueLabels: Record<ControlledRequestType, string> = {
   product_min_stock_update: 'New minimum stock'
 };
 
-function formatDateTime(value?: string | null): string {
+function formatDateTime(value: string | null | undefined, locale: AppLocale): string {
   if (!value) return '-';
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return String(value);
-  return parsed.toLocaleString();
+  return formatLocalizedDateTime(parsed, locale);
 }
 
-function label(value?: string | null): string {
-  return value ? value.replace(/_/g, ' ') : '-';
+type UiFn = (text: string) => string;
+
+function label(value: string | null | undefined, ui: UiFn): string {
+  if (!value) return '-';
+  const canonicalLabels: Record<string, string> = {
+    draft: 'Draft', pending_review: 'Pending review', approved: 'Approved', rejected: 'Rejected', cancelled: 'Cancelled',
+    cost_review: 'Cost review', cost_standard_update: 'Standard cost update', product_min_stock_update: 'Minimum stock update',
+    product_pricing_update: 'Product pricing update', supplier_review: 'Supplier review', inventory_review: 'Inventory review',
+    system_recommendation: 'System recommendation', completed: 'Completed', failed: 'Failed', not_executed: 'Not executed',
+    noop_completed: 'Completed without change', complete: 'Complete', ready_with_watch_items: 'Ready with watch items', needs_fix: 'Needs fix',
+    supported: 'Supported', review_only: 'Review only', enabled: 'Enabled', disabled: 'Disabled', ready: 'Ready', blocked: 'Blocked'
+  };
+  return canonicalLabels[value] ? ui(canonicalLabels[value]) : value.replace(/_/g, ' ');
 }
 
-function executionStatusLabel(value?: string | null): string {
-  if (!value || value === 'not_executed') return 'Not executed';
-  if (value === 'noop_completed') return 'Completed without change';
-  return label(value);
+function executionStatusLabel(value: string | null | undefined, ui: UiFn): string {
+  if (!value || value === 'not_executed') return ui('Not executed');
+  if (value === 'noop_completed') return ui('Completed without change');
+  return label(value, ui);
 }
 
-function workflowSafeguardStatusLabel(value?: string | null): string {
-  if (value === 'complete') return 'Safeguards ready';
-  if (value === 'ready_with_watch_items') return 'Review recommended';
-  if (value === 'needs_fix') return 'Attention required';
-  return value ? label(value) : 'Loading';
+function workflowSafeguardStatusLabel(value: string | null | undefined, ui: UiFn): string {
+  if (value === 'complete') return ui('Safeguards ready');
+  if (value === 'ready_with_watch_items') return ui('Review recommended');
+  if (value === 'needs_fix') return ui('Attention required');
+  return value ? label(value, ui) : ui('Loading');
 }
 
 const beforeAfterFieldLabels: Record<string, string> = {
@@ -88,13 +102,13 @@ const beforeAfterFieldLabels: Record<string, string> = {
   version: 'Version'
 };
 
-function labelBeforeAfterField(key: string): string {
-  return beforeAfterFieldLabels[key] || label(key);
+function labelBeforeAfterField(key: string, ui: UiFn): string {
+  return beforeAfterFieldLabels[key] ? ui(beforeAfterFieldLabels[key]) : label(key, ui);
 }
 
-function formatBeforeAfterValue(key: string, value: unknown): string {
+function formatBeforeAfterValue(key: string, value: unknown, locale: AppLocale): string {
   if (key.endsWith('_at')) {
-    return formatDateTime(formatUnknown(value));
+    return formatDateTime(formatUnknown(value), locale);
   }
   return formatUnknown(value);
 }
@@ -110,11 +124,11 @@ function isSystemContextRequest(request: ExecutionRequest): boolean {
   return request.request_type === 'system_recommendation' && request.payload?.source === 'system_context_page';
 }
 
-function getRequestProductLabel(request: ExecutionRequest): string {
+function getRequestProductLabel(request: ExecutionRequest, ui: UiFn): string {
   const name = request.payload?.product_name;
   if (name) return String(name);
   const id = request.payload?.product_id;
-  return id ? `Product ${String(id).slice(0, 8)}…` : '-';
+  return id ? `${ui('Product')} ${String(id).slice(0, 8)}…` : '-';
 }
 
 function getRequestedValue(request: ExecutionRequest): unknown {
@@ -155,6 +169,7 @@ function downloadCsv(filename: string, rows: string[][]) {
 }
 
 export default function ExecutionRequestsPage() {
+  const { locale, ui } = useAppTranslation();
   const capabilities = getRoleCapabilities();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedRequestId = searchParams.get('request_id');
@@ -229,11 +244,11 @@ export default function ExecutionRequestsPage() {
       setHardeningSummary(hardeningResult.status === 'fulfilled' ? hardeningResult.value : null);
 
       const unavailableSections: string[] = [];
-      if (optionsResult.status === 'rejected') unavailableSections.push('creation options');
-      if (adaptersResult.status === 'rejected') unavailableSections.push('adapter registry');
-      if (hardeningResult.status === 'rejected') unavailableSections.push('governance summary');
+      if (optionsResult.status === 'rejected') unavailableSections.push(ui('Creation options'));
+      if (adaptersResult.status === 'rejected') unavailableSections.push(ui('Adapter registry'));
+      if (hardeningResult.status === 'rejected') unavailableSections.push(ui('Governance summary'));
       setSecondaryWarning(unavailableSections.length
-        ? `The request registry loaded, but ${unavailableSections.join(', ')} could not be loaded. Refresh the page before using those sections.`
+        ? ui('The request registry loaded, but {sections} could not be loaded. Refresh the page before using those sections.').replace('{sections}', unavailableSections.join(', '))
         : null);
 
       setSelected((currentSelected) => {
@@ -241,11 +256,11 @@ export default function ExecutionRequestsPage() {
         return response.rows.find((row) => row.id === currentSelected.id) || currentSelected;
       });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load execution requests');
+      setError(err instanceof ApiError ? err.message : ui('Failed to load execution requests'));
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, [query, ui]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -274,7 +289,7 @@ export default function ExecutionRequestsPage() {
         window.requestAnimationFrame(() => registrySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : 'Failed to open the linked Execution Request');
+          setError(err instanceof ApiError ? err.message : ui('Failed to open the linked Execution Request'));
         }
       } finally {
         if (!cancelled) setSaving(false);
@@ -285,7 +300,7 @@ export default function ExecutionRequestsPage() {
     return () => {
       cancelled = true;
     };
-  }, [requestedRequestId]);
+  }, [requestedRequestId, ui]);
 
 
   const loadOptionalExecutionContextSnapshots = useCallback(async () => {
@@ -335,9 +350,9 @@ export default function ExecutionRequestsPage() {
       nextParams.set('request_id', created.id);
       setSearchParams(nextParams, { replace: true });
       await loadRequests();
-      showTenantActionSuccess('Recommendation draft created.');
+      showTenantActionSuccess(ui('Recommendation draft created.'));
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Failed to create execution request';
+      const message = err instanceof ApiError ? err.message : ui('Failed to create execution request');
       setError(message);
       showTenantActionError(message);
     } finally {
@@ -350,11 +365,11 @@ export default function ExecutionRequestsPage() {
     const parsedValue = Number(createValue);
 
     if (!product) {
-      setError('Select an active product.');
+      setError(ui('Select an active product.'));
       return;
     }
     if (!Number.isFinite(parsedValue) || parsedValue < 0) {
-      setError(`${controlledValueLabels[createType]} must be a non-negative number.`);
+      setError(ui('{label} must be a non-negative number.').replace('{label}', ui(controlledValueLabels[createType])));
       return;
     }
 
@@ -393,10 +408,10 @@ export default function ExecutionRequestsPage() {
       nextParams.set('request_id', created.id);
       setSearchParams(nextParams, { replace: true });
       await loadRequests();
-      showTenantActionSuccess(`${controlledRequestLabels[createType]} draft created.`);
+      showTenantActionSuccess(ui('{label} draft created.').replace('{label}', ui(controlledRequestLabels[createType])));
       window.requestAnimationFrame(() => registrySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Failed to create controlled product update request';
+      const message = err instanceof ApiError ? err.message : ui('Failed to create controlled product update request');
       setError(message);
       showTenantActionError(message);
     } finally {
@@ -414,9 +429,9 @@ export default function ExecutionRequestsPage() {
       });
       setSelected(updated);
       await loadRequests();
-      showTenantActionSuccess('Execution request submitted for review.');
+      showTenantActionSuccess(ui('Execution request submitted for review.'));
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Failed to submit execution request';
+      const message = err instanceof ApiError ? err.message : ui('Failed to submit execution request');
       setError(message);
       showTenantActionError(message);
     } finally {
@@ -425,8 +440,8 @@ export default function ExecutionRequestsPage() {
   };
 
   const approveRequest = async (request: ExecutionRequest) => {
-    if (!window.confirm('Approve this request? Approval does not execute it, but it makes the request eligible for a permitted execution step.')) return;
-    const reviewNote = window.prompt('Approval note (optional)') || '';
+    if (!window.confirm(ui('Approve this request? Approval does not execute it, but it makes the request eligible for a permitted execution step.'))) return;
+    const reviewNote = window.prompt(ui('Approval note (optional)')) || '';
 
     setSaving(true);
     setError(null);
@@ -437,9 +452,9 @@ export default function ExecutionRequestsPage() {
       });
       setSelected(updated);
       await loadRequests();
-      showTenantActionSuccess('Execution request approved.');
+      showTenantActionSuccess(ui('Execution request approved.'));
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Failed to approve execution request';
+      const message = err instanceof ApiError ? err.message : ui('Failed to approve execution request');
       setError(message);
       showTenantActionError(message);
     } finally {
@@ -448,7 +463,7 @@ export default function ExecutionRequestsPage() {
   };
 
   const rejectRequest = async (request: ExecutionRequest) => {
-    const rejectionReason = window.prompt('Rejection reason');
+    const rejectionReason = window.prompt(ui('Rejection reason'));
     if (!rejectionReason || rejectionReason.trim().length < 3) return;
 
     setSaving(true);
@@ -460,9 +475,9 @@ export default function ExecutionRequestsPage() {
       });
       setSelected(updated);
       await loadRequests();
-      showTenantActionSuccess('Execution request rejected.');
+      showTenantActionSuccess(ui('Execution request rejected.'));
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Failed to reject execution request';
+      const message = err instanceof ApiError ? err.message : ui('Failed to reject execution request');
       setError(message);
       showTenantActionError(message);
     } finally {
@@ -471,11 +486,11 @@ export default function ExecutionRequestsPage() {
   };
 
   const executeRequest = async (request: ExecutionRequest) => {
-    const adapterLabel = request.adapter?.label || label(request.request_type);
-    const confirmed = window.confirm(`Execute approved request: ${adapterLabel}? This is only enabled for controlled product-field updates.`);
+    const adapterLabel = request.adapter?.label || label(request.request_type, ui);
+    const confirmed = window.confirm(ui('Execute approved request: {adapter}? This is only enabled for controlled product-field updates.').replace('{adapter}', adapterLabel));
     if (!confirmed) return;
 
-    const note = window.prompt('Execution note (optional)') || '';
+    const note = window.prompt(ui('Execution note (optional)')) || '';
 
     setSaving(true);
     setError(null);
@@ -487,14 +502,14 @@ export default function ExecutionRequestsPage() {
       setSelected(updated);
       await loadRequests();
       if (updated.execution_status === 'failed') {
-        const failureMessage = String(updated.execution_result?.failure_reason || 'The controlled execution failed. Review the stored failure evidence before deciding the next step.');
+        const failureMessage = String(updated.execution_result?.failure_reason || ui('The controlled execution failed. Review the stored failure evidence before deciding the next step.'));
         setError(failureMessage);
         showTenantActionError(failureMessage);
       } else {
-        showTenantActionSuccess('Controlled execution completed.');
+        showTenantActionSuccess(ui('Controlled execution completed.'));
       }
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Failed to execute request';
+      const message = err instanceof ApiError ? err.message : ui('Failed to execute request');
       setError(message);
       showTenantActionError(message);
     } finally {
@@ -503,8 +518,8 @@ export default function ExecutionRequestsPage() {
   };
 
   const executeNoopRequest = async (request: ExecutionRequest) => {
-    if (!window.confirm('Complete this approved request without changing business data? This records a safe workflow completion only.')) return;
-    const note = window.prompt('Completion note (optional)') || '';
+    if (!window.confirm(ui('Complete this approved request without changing business data? This records a safe workflow completion only.'))) return;
+    const note = window.prompt(ui('Completion note (optional)')) || '';
 
     setSaving(true);
     setError(null);
@@ -515,9 +530,9 @@ export default function ExecutionRequestsPage() {
       });
       setSelected(updated);
       await loadRequests();
-      showTenantActionSuccess('Request completed without a business-data change.');
+      showTenantActionSuccess(ui('Request completed without a business-data change.'));
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Failed to complete request without change';
+      const message = err instanceof ApiError ? err.message : ui('Failed to complete request without change');
       setError(message);
       showTenantActionError(message);
     } finally {
@@ -538,7 +553,7 @@ export default function ExecutionRequestsPage() {
       nextParams.set('request_id', detail.id);
       setSearchParams(nextParams, { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load execution request detail');
+      setError(err instanceof ApiError ? err.message : ui('Failed to load execution request detail'));
     } finally {
       setSaving(false);
     }
@@ -551,7 +566,7 @@ export default function ExecutionRequestsPage() {
       const response = await apiRequest<ExecutionRequestAuditPackResponse>(`/execution-requests/${request.id}/audit-pack`);
       setAuditPack(response);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load audit pack');
+      setError(err instanceof ApiError ? err.message : ui('Failed to load audit pack'));
     } finally {
       setSaving(false);
     }
@@ -564,7 +579,7 @@ export default function ExecutionRequestsPage() {
       const response = await apiRequest<ExecutionRequestSecurityAuditResponse>(`/execution-requests/${request.id}/security-audit`);
       setSecurityAudit(response);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load security audit');
+      setError(err instanceof ApiError ? err.message : ui('Failed to load security audit'));
     } finally {
       setSaving(false);
     }
@@ -577,16 +592,16 @@ export default function ExecutionRequestsPage() {
       const response = await apiRequest<ExecutionRequestExecutionReviewResponse>(`/execution-requests/${request.id}/execution-review`);
       setExecutionReview(response);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to load execution review');
+      setError(err instanceof ApiError ? err.message : ui('Failed to load execution review'));
     } finally {
       setSaving(false);
     }
   };
 
   const prepareRetryRequest = async (request: ExecutionRequest) => {
-    const retryReason = window.prompt('Retry reason');
+    const retryReason = window.prompt(ui('Retry reason'));
     if (!retryReason || retryReason.trim().length < 3) return;
-    const note = window.prompt('Retry preparation note (optional)') || '';
+    const note = window.prompt(ui('Retry preparation note (optional)')) || '';
 
     setSaving(true);
     setError(null);
@@ -597,9 +612,9 @@ export default function ExecutionRequestsPage() {
       });
       setSelected(updated);
       await loadRequests();
-      showTenantActionSuccess('Failed execution prepared for one controlled retry.');
+      showTenantActionSuccess(ui('Failed execution prepared for one controlled retry.'));
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Failed to prepare retry';
+      const message = err instanceof ApiError ? err.message : ui('Failed to prepare retry');
       setError(message);
       showTenantActionError(message);
     } finally {
@@ -608,7 +623,7 @@ export default function ExecutionRequestsPage() {
   };
 
   const cancelRequest = async (request: ExecutionRequest) => {
-    const cancelReason = window.prompt('Cancel reason');
+    const cancelReason = window.prompt(ui('Cancel reason'));
     if (!cancelReason || cancelReason.trim().length < 3) return;
 
     setSaving(true);
@@ -620,9 +635,9 @@ export default function ExecutionRequestsPage() {
       });
       setSelected(updated);
       await loadRequests();
-      showTenantActionSuccess('Execution request cancelled.');
+      showTenantActionSuccess(ui('Execution request cancelled.'));
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Failed to cancel execution request';
+      const message = err instanceof ApiError ? err.message : ui('Failed to cancel execution request');
       setError(message);
       showTenantActionError(message);
     } finally {
@@ -634,9 +649,9 @@ export default function ExecutionRequestsPage() {
     if (!selected?.id) return;
     try {
       await navigator.clipboard.writeText(selected.id);
-      showTenantActionSuccess('Execution request ID copied successfully.');
+      showTenantActionSuccess(ui('Execution request ID copied successfully.'));
     } catch {
-      showTenantActionError('Could not copy request ID. Copy it from the detail panel instead.');
+      showTenantActionError(ui('Could not copy request ID. Copy it from the detail panel instead.'));
     }
   };
 
@@ -684,13 +699,13 @@ export default function ExecutionRequestsPage() {
 
       const rows: string[][] = exported.slice(0, maximumRows).map((request) => [
         request.id,
-        label(request.status),
-        label(request.request_type),
+        label(request.status, ui),
+        label(request.request_type, ui),
         String(request.payload?.product_name || request.payload?.product_id || ''),
         request.requested_by_name || request.requested_by || '',
-        formatDateTime(request.created_at),
-        formatDateTime(request.updated_at),
-        executionStatusLabel(request.execution_status),
+        formatDateTime(request.created_at, locale),
+        formatDateTime(request.updated_at, locale),
+        executionStatusLabel(request.execution_status, ui),
         request.reviewed_by_name || request.reviewed_by || '',
         request.executed_by_name || request.executed_by || '',
         request.review_note || '',
@@ -702,12 +717,12 @@ export default function ExecutionRequestsPage() {
         ['Request ID', 'Workflow status', 'Request type', 'Product', 'Requested by', 'Created', 'Updated', 'Execution outcome', 'Reviewed by', 'Executed by', 'Review note', 'Rejection reason', 'Cancellation reason'],
         ...rows
       ]);
-      showTenantActionSuccess(`Exported ${rows.length} execution request${rows.length === 1 ? '' : 's'}.`);
+      showTenantActionSuccess(rows.length === 1 ? ui('Exported 1 execution request.') : ui('Exported {count} execution requests.').replace('{count}', formatLocalizedNumber(rows.length, locale)));
       if (total > maximumRows) {
-        setError(`The export is limited to the first ${maximumRows} matching requests.`);
+        setError(ui('The export is limited to the first {count} matching requests.').replace('{count}', formatLocalizedNumber(maximumRows, locale)));
       }
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Failed to export execution requests';
+      const message = err instanceof ApiError ? err.message : ui('Failed to export execution requests');
       setError(message);
       showTenantActionError(message);
     } finally {
@@ -745,105 +760,105 @@ export default function ExecutionRequestsPage() {
     >
       <OperationalWorkspaceHero
         iconPath="/execution-requests"
-        eyebrow="Execution workflow"
-        title="Controlled execution requests"
-        description="Propose, review, approve, and safely apply tightly scoped product changes. Approval never changes a product by itself; execution stays permission-checked, auditable, and protected from duplicate runs."
+        eyebrow={ui('Execution workflow')}
+        title={ui('Controlled execution requests')}
+        description={ui('Propose, review, approve, and safely apply tightly scoped product changes. Approval never changes a product by itself; execution stays permission-checked, auditable, and protected from duplicate runs.')}
         meta={
           <>
-            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Human approval required</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Human approval required')}</OperationalWorkspaceMetaPill>
             <OperationalWorkspaceMetaPill>
               {canExecuteExecutionRequests
-                ? 'Execution access'
+                ? ui('Execution access')
                 : canReviewExecutionRequests
-                  ? 'Review access'
+                  ? ui('Review access')
                   : canCreateExecutionRequests
-                    ? 'Draft creation access'
-                    : 'Read-only access'}
+                    ? ui('Draft creation access')
+                    : ui('Read-only access')}
             </OperationalWorkspaceMetaPill>
           </>
         }
         aside={
           <div style={styles.actions}>
             <button type="button" className="btn btn-secondary" onClick={loadRequests} disabled={loading || saving}>
-              {loading ? 'Refreshing…' : 'Refresh'}
+              {loading ? ui('Refreshing…') : ui('Refresh')}
             </button>
             {canCreateExecutionRequests && canViewSystemContext ? (
               <button type="button" className="btn btn-secondary" onClick={createSystemRecommendation} disabled={saving}>
-                Create recommendation draft
+                {ui('Create recommendation draft')}
               </button>
             ) : null}
           </div>
         }
       />
 
-      <OperationalWorkspaceStats ariaLabel="Execution request summary">
+      <OperationalWorkspaceStats ariaLabel={ui('Execution request summary')}>
         <OperationalWorkspaceStatCard
-          label="Needs action"
+          label={ui('Needs action')}
           value={summaryCounts.pending}
-          helper="Drafts or requests awaiting review"
+          helper={ui('Drafts or requests awaiting review')}
           tone={summaryCounts.pending > 0 ? 'warn' : 'good'}
           iconPath="/execution-requests"
           loading={loading && !hardeningSummary}
         />
         <OperationalWorkspaceStatCard
-          label="Approved waiting"
+          label={ui('Approved waiting')}
           value={summaryCounts.approvedWaiting}
-          helper="Approved requests waiting for completion"
+          helper={ui('Approved requests waiting for completion')}
           tone={summaryCounts.approvedWaiting > 0 ? 'blue' : 'neutral'}
           iconPath="/execution-tasks"
           loading={loading && !hardeningSummary}
         />
         <OperationalWorkspaceStatCard
-          label="Completed"
+          label={ui('Completed')}
           value={summaryCounts.executed}
-          helper="Applied changes and safe completions without change"
+          helper={ui('Applied changes and safe completions without change')}
           tone="good"
           iconPath="/audit"
           loading={loading && !hardeningSummary}
         />
         <OperationalWorkspaceStatCard
-          label="Failed executions"
+          label={ui('Failed executions')}
           value={summaryCounts.failed}
-          helper="Failures retained for review and retry control"
+          helper={ui('Failures retained for review and retry control')}
           tone={summaryCounts.failed > 0 ? 'danger' : 'good'}
           iconPath="/alerts"
           loading={loading && !hardeningSummary}
         />
         <OperationalWorkspaceStatCard
-          label="Recommendation drafts"
+          label={ui('Recommendation drafts')}
           value={summaryCounts.systemContext}
-          helper="System Context recommendations captured for review"
+          helper={ui('System Context recommendations captured for review')}
           tone="slate"
           iconPath="/system-context"
           loading={loading && !hardeningSummary}
         />
       </OperationalWorkspaceStats>
 
-      <OperationalWorkspaceTabs ariaLabel="Execution request work areas" hint="Jump to the part of the workflow you need.">
+      <OperationalWorkspaceTabs ariaLabel={ui('Execution request work areas')} hint={ui('Jump to the part of the workflow you need.')}>
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'overview'}
           iconPath="/dashboard"
-          label="Overview"
+          label={ui('Overview')}
           onClick={() => navigateWorkspaceSection('overview', 'execution-requests-workspace-top')}
         />
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'create'}
           iconPath="/execution-requests"
-          label="Create request"
+          label={ui('Create request')}
           onClick={() => navigateWorkspaceSection('create', 'execution-request-create')}
         />
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'queue'}
           iconPath="/execution-tasks"
-          label="Request queue"
+          label={ui('Request queue')}
           count={total}
           onClick={() => navigateWorkspaceSection('queue', 'execution-request-queue')}
         />
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'controls'}
           iconPath="/permissions"
-          label="Safeguards"
+          label={ui('Safeguards')}
           onClick={() => navigateWorkspaceSection('controls', 'execution-request-controls')}
         />
       </OperationalWorkspaceTabs>
@@ -854,23 +869,23 @@ export default function ExecutionRequestsPage() {
       <section className="app-panel" id="execution-request-create" style={styles.sectionCard}>
         <OperationalSectionHeader
           iconPath="/execution-requests"
-          title="Create controlled product change"
-          description="Create a draft for a standard-cost or minimum-stock change. Submission, review, approval, and execution remain separate governed steps."
+          title={ui('Create controlled product change')}
+          description={ui('Create a draft for a standard-cost or minimum-stock change. Submission, review, approval, and execution remain separate governed steps.')}
         />
         {canCreateExecutionRequests ? (
           <>
             <div style={styles.createGrid}>
               <label style={styles.field}>
-                <span>Change type</span>
+                <span>{ui('Change type')}</span>
                 <select value={createType} onChange={(event) => { setCreateType(event.target.value as ControlledRequestType); setCreateValue(''); setError(null); }} disabled={saving}>
-                  <option value="cost_standard_update">Standard cost update</option>
-                  <option value="product_min_stock_update">Minimum stock update</option>
+                  <option value="cost_standard_update">{ui('Standard cost update')}</option>
+                  <option value="product_min_stock_update">{ui('Minimum stock update')}</option>
                 </select>
               </label>
               <label style={styles.field}>
-                <span>Product</span>
+                <span>{ui('Product')}</span>
                 <select value={createProductId} onChange={(event) => { setCreateProductId(event.target.value); setError(null); }} disabled={saving || !options?.products.length}>
-                  <option value="">{options?.products.length ? 'Select active product' : 'No active products available'}</option>
+                  <option value="">{options?.products.length ? ui('Select active product') : ui('No active products available')}</option>
                   {(options?.products || []).map((product) => (
                     <option key={product.id} value={product.id}>
                       {product.name}{product.category ? ` · ${product.category}` : ''}{product.unit ? ` · ${product.unit}` : ''}
@@ -879,30 +894,30 @@ export default function ExecutionRequestsPage() {
                 </select>
               </label>
               <label style={styles.field}>
-                <span>{controlledValueLabels[createType]}</span>
+                <span>{ui(controlledValueLabels[createType])}</span>
                 <input type="number" min="0" step="any" value={createValue} onChange={(event) => { setCreateValue(event.target.value); setError(null); }} placeholder="0" disabled={saving} />
               </label>
               <label style={styles.fieldWide}>
-                <span>Business reason <span style={styles.optional}>(optional)</span></span>
-                <input value={createReason} onChange={(event) => setCreateReason(event.target.value)} maxLength={1000} placeholder="Why this change is being proposed" disabled={saving} />
+                <span>{ui('Business reason')} <span style={styles.optional}>({ui('optional')})</span></span>
+                <input value={createReason} onChange={(event) => setCreateReason(event.target.value)} maxLength={1000} placeholder={ui('Why this change is being proposed')} disabled={saving} />
               </label>
             </div>
             <div style={styles.createFooter}>
               <div style={styles.currentValuePanel}>
-                <strong>{selectedCreateProduct ? selectedCreateProduct.name : 'Select a product'}</strong>
+                <strong>{selectedCreateProduct ? selectedCreateProduct.name : ui('Select a product')}</strong>
                 <span style={styles.meta}>
                   {selectedCreateProduct
-                    ? `Current ${controlledValueLabels[createType].replace(/^New /, '').toLowerCase()}: ${formatUnknown(currentCreateValue)}${selectedCreateProduct.unit ? ` · Unit: ${selectedCreateProduct.unit}` : ''}`
-                    : 'The current product value is stored with the request so execution can detect an outdated approval.'}
+                    ? `${ui('Current')} ${ui(controlledValueLabels[createType].replace(/^New /, '')).toLocaleLowerCase(locale)}: ${formatUnknown(currentCreateValue, locale, ui)}${selectedCreateProduct.unit ? ` · ${ui('Unit')}: ${selectedCreateProduct.unit}` : ''}`
+                    : ui('The current product value is stored with the request so execution can detect an outdated approval.')}
                 </span>
               </div>
               <button type="button" className="btn btn-primary" onClick={createControlledProductRequest} disabled={saving || !createProductId || createValue === ''}>
-                {saving ? 'Working…' : 'Create draft request'}
+                {saving ? ui('Working…') : ui('Create draft request')}
               </button>
             </div>
           </>
         ) : (
-          <div className="app-empty-state">Your role can view execution requests but cannot create new drafts.</div>
+          <div className="app-empty-state">{ui('Your role can view execution requests but cannot create new drafts.')}</div>
         )}
       </section>
 
@@ -910,11 +925,11 @@ export default function ExecutionRequestsPage() {
         <section className="app-panel" style={styles.sectionCard}>
           <OperationalSectionHeader
             iconPath="/execution-tasks"
-            title="Request queue"
-            description="Filter tenant requests, review their status, and open a request for workflow actions and evidence."
+            title={ui('Request queue')}
+            description={ui('Filter tenant requests, review their status, and open a request for workflow actions and evidence.')}
             actions={
               <label style={styles.compactField}>
-                <span>Rows</span>
+                <span>{ui('Rows')}</span>
                 <select value={limit} onChange={(event) => { setLimit(Number(event.target.value)); setOffset(0); }}>
                   <option value={25}>25</option>
                   <option value={50}>50</option>
@@ -926,97 +941,95 @@ export default function ExecutionRequestsPage() {
 
           <div style={styles.filterGrid}>
             <label style={styles.field}>
-              <span>Workflow status</span>
+              <span>{ui('Workflow status')}</span>
               <select value={status} onChange={(event) => { setStatus(event.target.value as StatusFilter); setOffset(0); }}>
-                <option value="">All workflow statuses</option>
-                {statuses.map((item) => <option key={item} value={item}>{label(item)}</option>)}
+                <option value="">{ui('All workflow statuses')}</option>
+                {statuses.map((item) => <option key={item} value={item}>{label(item, ui)}</option>)}
               </select>
             </label>
             <label style={styles.field}>
-              <span>Request type</span>
+              <span>{ui('Request type')}</span>
               <select value={requestType} onChange={(event) => { setRequestType(event.target.value as TypeFilter); setOffset(0); }}>
-                <option value="">All request types</option>
-                {requestTypes.map((item) => <option key={item} value={item}>{label(item)}</option>)}
+                <option value="">{ui('All request types')}</option>
+                {requestTypes.map((item) => <option key={item} value={item}>{label(item, ui)}</option>)}
               </select>
             </label>
             <label style={styles.field}>
-              <span>Execution outcome</span>
+              <span>{ui('Execution outcome')}</span>
               <select value={executionStatus} onChange={(event) => { setExecutionStatus(event.target.value as ExecutionStatusFilter); setOffset(0); }}>
-                <option value="">All execution outcomes</option>
-                {executionStatuses.map((item) => <option key={item} value={item}>{executionStatusLabel(item)}</option>)}
+                <option value="">{ui('All execution outcomes')}</option>
+                {executionStatuses.map((item) => <option key={item} value={item}>{executionStatusLabel(item, ui)}</option>)}
               </select>
             </label>
             <label style={styles.searchField}>
-              <span>Search</span>
-              <input value={search} onChange={(event) => { setSearch(event.target.value); setOffset(0); }} placeholder="Search by ID, product, person, type, status, or reason" />
+              <span>{ui('Search')}</span>
+              <input value={search} onChange={(event) => { setSearch(event.target.value); setOffset(0); }} placeholder={ui('Search by ID, product, person, type, status, or reason')} />
             </label>
             <div style={styles.filterActions}>
-              <button type="button" className="btn btn-secondary" onClick={clearFilters} disabled={saving || (!status && !requestType && !executionStatus && !search)}>Clear filters</button>
-              <button type="button" className="btn btn-secondary" onClick={exportFilteredRequests} disabled={saving || loading}>Export CSV</button>
+              <button type="button" className="btn btn-secondary" onClick={clearFilters} disabled={saving || (!status && !requestType && !executionStatus && !search)}>{ui('Clear filters')}</button>
+              <button type="button" className="btn btn-secondary" onClick={exportFilteredRequests} disabled={saving || loading}>{ui('Export CSV')}</button>
             </div>
           </div>
 
           <div style={styles.queueHeader}>
             <div>
-              <strong>Request registry</strong>
-              <div style={styles.meta}>{loading ? 'Loading…' : `${visibleStart}–${visibleEnd} of ${total}`}</div>
+              <strong>{ui('Request registry')}</strong>
+              <div style={styles.meta}>{loading ? ui('Loading…') : `${formatLocalizedNumber(visibleStart, locale)}–${formatLocalizedNumber(visibleEnd, locale)} ${ui('of')} ${formatLocalizedNumber(total, locale)}`}</div>
             </div>
           </div>
           <div style={styles.tableWrap}>
             <table style={styles.table}>
               <thead>
                 <tr>
-                  <th>Workflow</th>
-                  <th>Request</th>
-                  <th>Type</th>
-                  <th>Product / subject</th>
-                  <th>Requested by</th>
-                  <th>Created</th>
-                  <th>Execution</th>
-                  <th>Actions</th>
+                  <th>{ui('Workflow')}</th>
+                  <th>{ui('Request')}</th>
+                  <th>{ui('Type')}</th>
+                  <th>{ui('Product / subject')}</th>
+                  <th>{ui('Requested by')}</th>
+                  <th>{ui('Created')}</th>
+                  <th>{ui('Execution')}</th>
+                  <th>{ui('Actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {requests.map((request) => (
                   <tr key={request.id} style={selected?.id === request.id ? styles.selectedRow : undefined}>
-                    <td><span style={{ ...styles.badge, ...statusTone(request.status) }}>{label(request.status)}</span></td>
+                    <td><span style={{ ...styles.badge, ...statusTone(request.status) }}>{label(request.status, ui)}</span></td>
                     <td><code style={styles.requestId} title={request.id}>{request.id.slice(0, 8)}…</code></td>
-                    <td>{request.adapter?.label || label(request.request_type)}</td>
-                    <td>{request.request_type === 'system_recommendation' ? 'System Context recommendation' : getRequestProductLabel(request)}</td>
-                    <td>{request.requested_by_name || request.requested_by || 'System/support'}</td>
-                    <td>{formatDateTime(request.created_at)}</td>
-                    <td>{request.execution_status ? <span style={{ ...styles.badge, ...executionTone(request.execution_status) }}>{executionStatusLabel(request.execution_status)}</span> : <span style={styles.meta}>Not executed</span>}</td>
+                    <td>{request.adapter?.label || label(request.request_type, ui)}</td>
+                    <td>{request.request_type === 'system_recommendation' ? ui('System Context recommendation') : getRequestProductLabel(request, ui)}</td>
+                    <td>{request.requested_by_name || request.requested_by || ui('System/support')}</td>
+                    <td>{formatDateTime(request.created_at, locale)}</td>
+                    <td>{request.execution_status ? <span style={{ ...styles.badge, ...executionTone(request.execution_status) }}>{executionStatusLabel(request.execution_status, ui)}</span> : <span style={styles.meta}>{ui('Not executed')}</span>}</td>
                     <td>
                       <div style={styles.rowActions}>
-                        <button type="button" className="btn btn-secondary" disabled={saving} data-skip-global-action-feedback="true" onClick={() => loadRequestDetail(request)}>Open</button>
-                        {canSubmitExecutionRequests && request.status === 'draft' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => submitRequest(request)}>Submit</button> : null}
-                        {canReviewExecutionRequests && request.status === 'pending_review' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => approveRequest(request)}>Approve</button> : null}
-                        {canReviewExecutionRequests && request.status === 'pending_review' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => rejectRequest(request)}>Reject</button> : null}
-                        {canExecuteExecutionRequests && canWriteProducts && request.status === 'approved' && !request.execution_status && request.adapter?.execution_enabled ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => executeRequest(request)}>Execute</button> : null}
-                        {canExecuteExecutionRequests && request.status === 'approved' && !request.execution_status && !request.adapter?.execution_enabled ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => executeNoopRequest(request)}>Complete without change</button> : null}
-                        {canExecuteExecutionRequests && request.status === 'approved' && request.execution_review?.retry_eligibility?.eligible ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => prepareRetryRequest(request)}>Prepare retry</button> : null}
-                        {canCancelExecutionRequests && (request.status === 'draft' || request.status === 'pending_review') ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => cancelRequest(request)}>Cancel</button> : null}
+                        <button type="button" className="btn btn-secondary" disabled={saving} data-skip-global-action-feedback="true" onClick={() => loadRequestDetail(request)}>{ui('Open')}</button>
+                        {canSubmitExecutionRequests && request.status === 'draft' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => submitRequest(request)}>{ui('Submit')}</button> : null}
+                        {canReviewExecutionRequests && request.status === 'pending_review' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => approveRequest(request)}>{ui('Approve')}</button> : null}
+                        {canReviewExecutionRequests && request.status === 'pending_review' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => rejectRequest(request)}>{ui('Reject')}</button> : null}
+                        {canExecuteExecutionRequests && canWriteProducts && request.status === 'approved' && !request.execution_status && request.adapter?.execution_enabled ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => executeRequest(request)}>{ui('Execute')}</button> : null}
+                        {canExecuteExecutionRequests && request.status === 'approved' && !request.execution_status && !request.adapter?.execution_enabled ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => executeNoopRequest(request)}>{ui('Complete without change')}</button> : null}
+                        {canExecuteExecutionRequests && request.status === 'approved' && request.execution_review?.retry_eligibility?.eligible ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => prepareRetryRequest(request)}>{ui('Prepare retry')}</button> : null}
+                        {canCancelExecutionRequests && (request.status === 'draft' || request.status === 'pending_review') ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => cancelRequest(request)}>{ui('Cancel')}</button> : null}
                       </div>
                     </td>
                   </tr>
                 ))}
                 {!loading && !requests.length ? (
-                  <tr><td colSpan={8} style={styles.empty}>No execution requests match the selected filters.</td></tr>
+                  <tr><td colSpan={8} style={styles.empty}>{ui('No execution requests match the selected filters.')}</td></tr>
                 ) : null}
               </tbody>
             </table>
           </div>
           <div style={styles.pagination}>
-            <button type="button" className="btn btn-secondary" disabled={loading || saving || !canGoPrevious} onClick={() => setOffset(Math.max(0, offset - limit))}>Previous</button>
-            <span style={styles.meta}>{visibleStart}–{visibleEnd} of {total}</span>
-            <button type="button" className="btn btn-secondary" disabled={loading || saving || !canGoNext} onClick={() => setOffset(offset + limit)}>Next</button>
+            <button type="button" className="btn btn-secondary" disabled={loading || saving || !canGoPrevious} onClick={() => setOffset(Math.max(0, offset - limit))}>{ui('Previous')}</button>
+            <span style={styles.meta}>{formatLocalizedNumber(visibleStart, locale)}–{formatLocalizedNumber(visibleEnd, locale)} {ui('of')} {formatLocalizedNumber(total, locale)}</span>
+            <button type="button" className="btn btn-secondary" disabled={loading || saving || !canGoNext} onClick={() => setOffset(offset + limit)}>{ui('Next')}</button>
           </div>
-          <div style={styles.queueGuidance}>
-            Approving a request does not apply the change. An authorized user must execute it separately.
-          </div>
+          <div style={styles.queueGuidance}>{ui('Approving a request does not apply the change. An authorized user must execute it separately.')}</div>
           {data?.notes?.length ? (
             <details style={styles.technicalNotes}>
-              <summary style={styles.technicalSummary}>Advanced workflow notes</summary>
+              <summary style={styles.technicalSummary}>{ui('Advanced workflow notes')}</summary>
               {data.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
             </details>
           ) : null}
@@ -1027,59 +1040,59 @@ export default function ExecutionRequestsPage() {
         <section className="app-panel" id="execution-request-detail" style={styles.sectionCard}>
           <OperationalSectionHeader
             iconPath="/audit"
-            title="Selected request"
+            title={ui('Selected request')}
             description={selected.id}
-            actions={<button type="button" className="btn btn-secondary" data-skip-global-action-feedback="true" onClick={copySelectedId}>Copy ID</button>}
+            actions={<button type="button" className="btn btn-secondary" data-skip-global-action-feedback="true" onClick={copySelectedId}>{ui('Copy ID')}</button>}
           />
           <div style={styles.detail}>
             <div style={styles.badgeRow}>
-              <span style={{ ...styles.badge, ...statusTone(selected.status) }}>{label(selected.status)}</span>
-              <span style={{ ...styles.badge, ...executionTone(selected.execution_status) }}>{executionStatusLabel(selected.execution_status)}</span>
-              {isSystemContextRequest(selected) ? <span style={styles.badge}>System Context</span> : null}
-              <span style={styles.badge}>{selected.adapter?.execution_enabled ? 'Controlled product change' : 'Completes without business change'}</span>
+              <span style={{ ...styles.badge, ...statusTone(selected.status) }}>{label(selected.status, ui)}</span>
+              <span style={{ ...styles.badge, ...executionTone(selected.execution_status) }}>{executionStatusLabel(selected.execution_status, ui)}</span>
+              {isSystemContextRequest(selected) ? <span style={styles.badge}>{ui('System Context')}</span> : null}
+              <span style={styles.badge}>{selected.adapter?.execution_enabled ? ui('Controlled product change') : ui('Completes without business change')}</span>
             </div>
 
             <div style={styles.detailActions}>
-              {canSubmitExecutionRequests && selected.status === 'draft' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => submitRequest(selected)}>Submit for review</button> : null}
-              {canReviewExecutionRequests && selected.status === 'pending_review' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => approveRequest(selected)}>Approve</button> : null}
-              {canReviewExecutionRequests && selected.status === 'pending_review' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => rejectRequest(selected)}>Reject</button> : null}
-              {canExecuteExecutionRequests && canWriteProducts && selected.status === 'approved' && !selected.execution_status && selected.adapter?.execution_enabled ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => executeRequest(selected)}>Execute approved change</button> : null}
-              {canExecuteExecutionRequests && selected.status === 'approved' && !selected.execution_status && !selected.adapter?.execution_enabled ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => executeNoopRequest(selected)}>Complete without change</button> : null}
-              {canExecuteExecutionRequests && !canWriteProducts && selected.status === 'approved' && !selected.execution_status && selected.adapter?.execution_enabled ? <span style={styles.meta}>Applying the approved change also requires product-edit permission.</span> : null}
-              {canExecuteExecutionRequests && selected.status === 'approved' && selected.execution_review?.retry_eligibility?.eligible ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => prepareRetryRequest(selected)}>Prepare retry</button> : null}
-              {canCancelExecutionRequests && (selected.status === 'draft' || selected.status === 'pending_review') ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => cancelRequest(selected)}>Cancel request</button> : null}
-              <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadRequestDetail(selected)}>Refresh detail</button>
+              {canSubmitExecutionRequests && selected.status === 'draft' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => submitRequest(selected)}>{ui('Submit for review')}</button> : null}
+              {canReviewExecutionRequests && selected.status === 'pending_review' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => approveRequest(selected)}>{ui('Approve')}</button> : null}
+              {canReviewExecutionRequests && selected.status === 'pending_review' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => rejectRequest(selected)}>{ui('Reject')}</button> : null}
+              {canExecuteExecutionRequests && canWriteProducts && selected.status === 'approved' && !selected.execution_status && selected.adapter?.execution_enabled ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => executeRequest(selected)}>{ui('Execute approved change')}</button> : null}
+              {canExecuteExecutionRequests && selected.status === 'approved' && !selected.execution_status && !selected.adapter?.execution_enabled ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => executeNoopRequest(selected)}>{ui('Complete without change')}</button> : null}
+              {canExecuteExecutionRequests && !canWriteProducts && selected.status === 'approved' && !selected.execution_status && selected.adapter?.execution_enabled ? <span style={styles.meta}>{ui('Applying the approved change also requires product-edit permission.')}</span> : null}
+              {canExecuteExecutionRequests && selected.status === 'approved' && selected.execution_review?.retry_eligibility?.eligible ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => prepareRetryRequest(selected)}>{ui('Prepare retry')}</button> : null}
+              {canCancelExecutionRequests && (selected.status === 'draft' || selected.status === 'pending_review') ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => cancelRequest(selected)}>{ui('Cancel request')}</button> : null}
+              <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadRequestDetail(selected)}>{ui('Refresh detail')}</button>
             </div>
 
             <div style={styles.summaryGrid}>
-              <div style={styles.summaryTile}><span style={styles.summaryLabel}>Type</span><strong>{selected.adapter?.label || label(selected.request_type)}</strong></div>
-              <div style={styles.summaryTile}><span style={styles.summaryLabel}>Product / subject</span><strong>{selected.request_type === 'system_recommendation' ? 'System Context recommendation' : getRequestProductLabel(selected)}</strong></div>
-              <div style={styles.summaryTile}><span style={styles.summaryLabel}>Requested change</span><strong>{selected.request_type === 'cost_standard_update' || selected.request_type === 'product_pricing_update' ? formatCurrencyAmount(getRequestedValue(selected) as number | string | null | undefined) : formatUnknown(getRequestedValue(selected))}</strong></div>
-              <div style={styles.summaryTile}><span style={styles.summaryLabel}>Value at request time</span><strong>{selected.request_type === 'cost_standard_update' || selected.request_type === 'product_pricing_update' ? formatCurrencyAmount(getExpectedValue(selected) as number | string | null | undefined) : formatUnknown(getExpectedValue(selected))}</strong></div>
+              <div style={styles.summaryTile}><span style={styles.summaryLabel}>{ui('Type')}</span><strong>{selected.adapter?.label || label(selected.request_type, ui)}</strong></div>
+              <div style={styles.summaryTile}><span style={styles.summaryLabel}>{ui('Product / subject')}</span><strong>{selected.request_type === 'system_recommendation' ? ui('System Context recommendation') : getRequestProductLabel(selected, ui)}</strong></div>
+              <div style={styles.summaryTile}><span style={styles.summaryLabel}>{ui('Requested change')}</span><strong>{selected.request_type === 'cost_standard_update' || selected.request_type === 'product_pricing_update' ? formatLocalizedCurrency(Number(getRequestedValue(selected)), getActiveTenantCurrency(), locale, { maximumFractionDigits: 2 }) : formatUnknown(getRequestedValue(selected), locale, ui)}</strong></div>
+              <div style={styles.summaryTile}><span style={styles.summaryLabel}>{ui('Value at request time')}</span><strong>{selected.request_type === 'cost_standard_update' || selected.request_type === 'product_pricing_update' ? formatLocalizedCurrency(Number(getExpectedValue(selected)), getActiveTenantCurrency(), locale, { maximumFractionDigits: 2 }) : formatUnknown(getExpectedValue(selected), locale, ui)}</strong></div>
             </div>
 
             <div style={styles.detailFacts}>
-              <KeyValue label="Requested by" value={selected.requested_by_name || selected.requested_by || 'System/support'} />
-              <KeyValue label="Created" value={formatDateTime(selected.created_at)} />
-              <KeyValue label="Updated" value={formatDateTime(selected.updated_at)} />
-              <KeyValue label="Business reason" value={String(selected.payload?.reason || selected.payload?.note || '-')} />
-              <KeyValue label="Reviewed by" value={selected.reviewed_by_name || selected.reviewed_by || '-'} />
-              <KeyValue label="Reviewed at" value={formatDateTime(selected.reviewed_at)} />
-              <KeyValue label="Review note" value={selected.review_note || '-'} />
-              <KeyValue label="Rejection reason" value={selected.rejection_reason || '-'} />
-              <KeyValue label="Cancellation reason" value={selected.cancel_reason || '-'} />
-              <KeyValue label="Executed by" value={selected.executed_by_name || selected.executed_by || '-'} />
-              <KeyValue label="Executed at" value={formatDateTime(selected.executed_at)} />
+              <KeyValue label={ui('Requested by')} value={selected.requested_by_name || selected.requested_by || ui('System/support')} />
+              <KeyValue label={ui('Created')} value={formatDateTime(selected.created_at, locale)} />
+              <KeyValue label={ui('Updated')} value={formatDateTime(selected.updated_at, locale)} />
+              <KeyValue label={ui('Business reason')} value={String(selected.payload?.reason || selected.payload?.note || '-')} />
+              <KeyValue label={ui('Reviewed by')} value={selected.reviewed_by_name || selected.reviewed_by || '-'} />
+              <KeyValue label={ui('Reviewed at')} value={formatDateTime(selected.reviewed_at, locale)} />
+              <KeyValue label={ui('Review note')} value={selected.review_note || '-'} />
+              <KeyValue label={ui('Rejection reason')} value={selected.rejection_reason || '-'} />
+              <KeyValue label={ui('Cancellation reason')} value={selected.cancel_reason || '-'} />
+              <KeyValue label={ui('Executed by')} value={selected.executed_by_name || selected.executed_by || '-'} />
+              <KeyValue label={ui('Executed at')} value={formatDateTime(selected.executed_at, locale)} />
             </div>
 
             {selected.timeline?.length ? (
               <details style={styles.detailsPanel}>
-                <summary style={styles.detailsSummary}>Workflow timeline</summary>
+                <summary style={styles.detailsSummary}>{ui('Workflow timeline')}</summary>
                 <div style={styles.auditTrail}>
                   {selected.timeline.map((event, index) => (
                     <div key={`${event.status}-${event.at || index}`} style={styles.auditEvent}>
                       <strong>{event.label}</strong>
-                      <div style={styles.meta}>{event.at ? formatDateTime(event.at) : 'Exact time available in the audit pack'} · {event.by || 'Unknown actor'}</div>
+                      <div style={styles.meta}>{event.at ? formatDateTime(event.at, locale) : ui('Exact time available in the audit pack')} · {event.by || ui('Unknown actor')}</div>
                     </div>
                   ))}
                 </div>
@@ -1087,70 +1100,70 @@ export default function ExecutionRequestsPage() {
             ) : null}
 
             <details style={styles.detailsPanel}>
-              <summary style={styles.detailsSummary}>Security and separation-of-duties review</summary>
-              <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadSecurityAudit(selected)}>Load security review</button>
+              <summary style={styles.detailsSummary}>{ui('Security and separation-of-duties review')}</summary>
+              <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadSecurityAudit(selected)}>{ui('Load security review')}</button>
               <ExecutionSecurityAuditPanel securityAudit={securityAudit} />
             </details>
 
             <details style={styles.detailsPanel}>
-              <summary style={styles.detailsSummary}>Audit pack</summary>
-              <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadAuditPack(selected)}>Load audit pack</button>
+              <summary style={styles.detailsSummary}>{ui('Audit pack')}</summary>
+              <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadAuditPack(selected)}>{ui('Load audit pack')}</button>
               <ExecutionAuditPackPanel auditPack={auditPack} />
             </details>
 
             <details style={styles.detailsPanel}>
-              <summary style={styles.detailsSummary}>Execution result and before/after evidence</summary>
-              <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadExecutionReview(selected)}>Load execution review</button>
+              <summary style={styles.detailsSummary}>{ui('Execution result and before/after evidence')}</summary>
+              <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadExecutionReview(selected)}>{ui('Load execution review')}</button>
               <ExecutionReviewPanel request={selected} executionReview={executionReview} />
             </details>
 
             <details style={styles.detailsPanel}>
-              <summary style={styles.detailsSummary}>Technical snapshots (advanced)</summary>
-              <div style={styles.meta}>Stored technical evidence is available here when troubleshooting or auditing. Normal workflow decisions should use the readable fields above.</div>
-              <h3 style={styles.subheading}>Payload snapshot</h3>
+              <summary style={styles.detailsSummary}>{ui('Technical snapshots (advanced)')}</summary>
+              <div style={styles.meta}>{ui('Stored technical evidence is available here when troubleshooting or auditing. Normal workflow decisions should use the readable fields above.')}</div>
+              <h3 style={styles.subheading}>{ui('Payload snapshot')}</h3>
               <JsonBlock value={selected.payload} />
-              <h3 style={styles.subheading}>Gate snapshot</h3>
+              <h3 style={styles.subheading}>{ui('Gate snapshot')}</h3>
               <JsonBlock value={selected.gate_snapshot} />
-              <h3 style={styles.subheading}>Context snapshot</h3>
+              <h3 style={styles.subheading}>{ui('Context snapshot')}</h3>
               <JsonBlock value={selected.context_snapshot} />
-              <h3 style={styles.subheading}>Execution result snapshot</h3>
+              <h3 style={styles.subheading}>{ui('Execution result snapshot')}</h3>
               <JsonBlock value={selected.execution_result} />
             </details>
           </div>
         </section>
       ) : (
-        <div style={styles.selectionHint}>Select <strong>Open</strong> on a request to review its workflow, approvals, actions, and audit evidence.</div>
+        <div style={styles.selectionHint}>{ui('Select')} <strong>{ui('Open')}</strong> {ui('on a request to review its workflow, approvals, actions, and audit evidence.')}</div>
       )}
 
       <details id="execution-request-controls" style={styles.governanceDetails}>
         <summary style={styles.governanceSummary}>
           <span style={styles.governanceSummaryCopy}>
-            <strong>Workflow safeguards</strong>
-            <span style={styles.meta}>Approval rules, duplicate protection, and retry safeguards</span>
+            <strong>{ui('Workflow safeguards')}</strong>
+            <span style={styles.meta}>{ui('Approval rules, duplicate protection, and retry safeguards')}</span>
           </span>
           <span style={{ ...styles.badge, ...statusTone(hardeningSummary?.module_status === 'needs_fix' ? 'rejected' : hardeningSummary?.module_status === 'complete' ? 'approved' : 'pending_review') }}>
-            {workflowSafeguardStatusLabel(hardeningSummary?.module_status)}
+            {workflowSafeguardStatusLabel(hardeningSummary?.module_status, ui)}
           </span>
         </summary>
         <div style={styles.governanceBody}>
           <ExecutionModuleHardeningPanel hardeningSummary={hardeningSummary} />
           <section style={styles.card}>
             <div style={styles.cardHeader}>
-              <h2 style={styles.cardTitle}>Supported request actions</h2>
-              <span style={styles.meta}>{adapterRegistry ? `${adapterRegistry.summary.execution_enabled_count} change-capable / ${adapterRegistry.summary.total_adapters} total` : 'Loading…'}</span>
+              <h2 style={styles.cardTitle}>{ui('Supported request actions')}</h2>
+              <span style={styles.meta}>{adapterRegistry ? `${formatLocalizedNumber(adapterRegistry.summary.execution_enabled_count, locale)} ${ui('change-capable')} / ${formatLocalizedNumber(adapterRegistry.summary.total_adapters, locale)} ${ui('total')}` : ui('Loading…')}</span>
             </div>
-            <p style={styles.note}>Standard cost and minimum stock requests can apply approved product changes. Other request types remain review-only and can complete safely without changing business data.</p>
+            <p style={styles.note}>{ui('Standard cost and minimum stock requests can apply approved product changes. Other request types remain review-only and can complete safely without changing business data.')}</p>
             <div style={styles.adapterGrid}>
               {(adapterRegistry?.adapters || []).map((adapter) => (
                 <div key={adapter.request_type} style={styles.adapterCard}>
                   <div style={styles.adapterTopline}>
                     <strong>{adapter.label}</strong>
-                    <span style={{ ...styles.badge, ...riskTone(adapter.risk_level) }}>{label(adapter.risk_level)}</span>
+                    <span style={{ ...styles.badge, ...riskTone(adapter.risk_level) }}>{label(adapter.risk_level, ui)}</span>
                   </div>
-                  <div style={styles.meta}>{label(adapter.category)}</div>
+                  <div style={styles.meta}>{label(adapter.category, ui)}</div>
                   <p style={styles.adapterDescription}>{adapter.description}</p>
-                  <KeyValue label="Controlled product change" value={adapter.execution_enabled ? 'Enabled' : 'Disabled'} />
-                  <KeyValue label="Completion without change" value="Available after approval" />
+                  <KeyValue label={ui('Controlled product change')} value={adapter.execution_enabled ? ui('Enabled') : ui('Disabled')} />
+                  <KeyValue label={ui('Completion without change')} value={ui('Available after approval')} />
                 </div>
               ))}
             </div>
@@ -1162,20 +1175,21 @@ export default function ExecutionRequestsPage() {
   );
 }
 
-function formatUnknown(value: unknown): string {
+function formatUnknown(value: unknown, locale?: AppLocale, ui?: UiFn): string {
   if (value === undefined || value === null || value === '') return '-';
-  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : '-';
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'number') return Number.isFinite(value) ? (locale ? formatLocalizedNumber(value, locale, { maximumFractionDigits: 2 }) : String(value)) : '-';
+  if (typeof value === 'boolean') return ui ? (value ? ui('Yes') : ui('No')) : (value ? 'Yes' : 'No');
   return String(value);
 }
 
 function ExecutionModuleHardeningPanel({ hardeningSummary }: { hardeningSummary: ExecutionModuleHardeningSummaryResponse | null }) {
+  const { locale, ui } = useAppTranslation();
   if (!hardeningSummary) {
     return (
       <section style={styles.card}>
         <div style={styles.cardHeader}>
-          <h2 style={styles.cardTitle}>Workflow safeguard status</h2>
-          <span style={styles.meta}>Loading…</span>
+          <h2 style={styles.cardTitle}>{ui('Workflow safeguard status')}</h2>
+          <span style={styles.meta}>{ui('Loading…')}</span>
         </div>
       </section>
     );
@@ -1184,25 +1198,25 @@ function ExecutionModuleHardeningPanel({ hardeningSummary }: { hardeningSummary:
   return (
     <section style={styles.card}>
       <div style={styles.cardHeader}>
-        <h2 style={styles.cardTitle}>Workflow safeguard status</h2>
+        <h2 style={styles.cardTitle}>{ui('Workflow safeguard status')}</h2>
         <span style={{ ...styles.badge, ...statusTone(hardeningSummary.module_status === 'complete' ? 'approved' : hardeningSummary.module_status === 'needs_fix' ? 'rejected' : 'pending_review') }}>
-          {workflowSafeguardStatusLabel(hardeningSummary.module_status)}
+          {workflowSafeguardStatusLabel(hardeningSummary.module_status, ui)}
         </span>
       </div>
       <p style={styles.note}>{hardeningSummary.closeout_recommendation}</p>
       <div style={styles.metricsGrid}>
-        <KeyValue label="Total Requests" value={formatUnknown(hardeningSummary.totals.total_requests)} />
-        <KeyValue label="Approved Waiting" value={formatUnknown(hardeningSummary.totals.approved_waiting_execution)} />
-        <KeyValue label="Ready for controlled change" value={formatUnknown(hardeningSummary.totals.real_execution_ready)} />
-        <KeyValue label="Completed changes" value={formatUnknown(hardeningSummary.totals.completed_executions)} />
-        <KeyValue label="Failed Executions" value={formatUnknown(hardeningSummary.totals.failed_executions)} />
-        <KeyValue label="Completed without change" value={formatUnknown(hardeningSummary.totals.noop_executions)} />
+        <KeyValue label={ui('Total Requests')} value={formatUnknown(hardeningSummary.totals.total_requests, locale, ui)} />
+        <KeyValue label={ui('Approved Waiting')} value={formatUnknown(hardeningSummary.totals.approved_waiting_execution, locale, ui)} />
+        <KeyValue label={ui('Ready for controlled change')} value={formatUnknown(hardeningSummary.totals.real_execution_ready, locale, ui)} />
+        <KeyValue label={ui('Completed changes')} value={formatUnknown(hardeningSummary.totals.completed_executions, locale, ui)} />
+        <KeyValue label={ui('Failed Executions')} value={formatUnknown(hardeningSummary.totals.failed_executions, locale, ui)} />
+        <KeyValue label={ui('Completed without change')} value={formatUnknown(hardeningSummary.totals.noop_executions, locale, ui)} />
       </div>
-      <h3 style={styles.subheading}>Safety checks</h3>
+      <h3 style={styles.subheading}>{ui('Safety checks')}</h3>
       <div style={styles.checkList}>
         {hardeningSummary.checks.map((check) => (
           <div key={check.key} style={styles.checkItem}>
-            <span style={{ ...styles.badge, ...statusTone(check.status === 'pass' ? 'approved' : check.status === 'fail' ? 'rejected' : 'pending_review') }}>{label(check.status)}</span>
+            <span style={{ ...styles.badge, ...statusTone(check.status === 'pass' ? 'approved' : check.status === 'fail' ? 'rejected' : 'pending_review') }}>{label(check.status, ui)}</span>
             <div>
               <strong>{check.label}</strong>
               <div style={styles.meta}>{check.detail}</div>
@@ -1210,14 +1224,14 @@ function ExecutionModuleHardeningPanel({ hardeningSummary }: { hardeningSummary:
           </div>
         ))}
       </div>
-      <h3 style={styles.subheading}>Built-in protections</h3>
+      <h3 style={styles.subheading}>{ui('Built-in protections')}</h3>
       <div style={styles.metricsGrid}>
-        <KeyValue label="Approval required" value={hardeningSummary.safety_contract.approval_required ? 'Yes' : 'No'} />
-        <KeyValue label="Duplicate execution blocked" value={hardeningSummary.safety_contract.duplicate_execution_blocked ? 'Yes' : 'No'} />
-        <KeyValue label="Retry requires preparation" value={hardeningSummary.safety_contract.retry_requires_explicit_preparation ? 'Yes' : 'No'} />
-        <KeyValue label="Changes stock quantities" value={hardeningSummary.safety_contract.mutates_inventory ? 'Yes' : 'No'} />
-        <KeyValue label="Changes shipments" value={hardeningSummary.safety_contract.mutates_shipments ? 'Yes' : 'No'} />
-        <KeyValue label="Starts background jobs" value={hardeningSummary.safety_contract.creates_background_jobs ? 'Yes' : 'No'} />
+        <KeyValue label={ui('Approval required')} value={hardeningSummary.safety_contract.approval_required ? ui('Yes') : ui('No')} />
+        <KeyValue label={ui('Duplicate execution blocked')} value={hardeningSummary.safety_contract.duplicate_execution_blocked ? ui('Yes') : ui('No')} />
+        <KeyValue label={ui('Retry requires preparation')} value={hardeningSummary.safety_contract.retry_requires_explicit_preparation ? ui('Yes') : ui('No')} />
+        <KeyValue label={ui('Changes stock quantities')} value={hardeningSummary.safety_contract.mutates_inventory ? ui('Yes') : ui('No')} />
+        <KeyValue label={ui('Changes shipments')} value={hardeningSummary.safety_contract.mutates_shipments ? ui('Yes') : ui('No')} />
+        <KeyValue label={ui('Starts background jobs')} value={hardeningSummary.safety_contract.creates_background_jobs ? ui('Yes') : ui('No')} />
       </div>
       {hardeningSummary.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
     </section>
@@ -1225,42 +1239,43 @@ function ExecutionModuleHardeningPanel({ hardeningSummary }: { hardeningSummary:
 }
 
 function ExecutionSecurityAuditPanel({ securityAudit }: { securityAudit: ExecutionRequestSecurityAuditResponse | null }) {
+  const { locale, ui } = useAppTranslation();
   if (!securityAudit) {
-    return <div className="app-empty-state">Load the security audit to review permissions, support context, and separation-of-duties posture.</div>;
+    return <div className="app-empty-state">{ui('Load the security audit to review permissions, support context, and separation-of-duties posture.')}</div>;
   }
 
   return (
     <div style={styles.securityPanel}>
       <div style={styles.reviewHeader}>
         <div>
-          <strong>Security review</strong>
-          <div style={styles.meta}>Generated {formatDateTime(securityAudit.generated_at)}</div>
+          <strong>{ui('Security review')}</strong>
+          <div style={styles.meta}>{ui('Generated')} {formatDateTime(securityAudit.generated_at, locale)}</div>
         </div>
         <span style={{ ...styles.badge, ...securityTone(securityAudit.summary.security_posture) }}>
-          {label(securityAudit.summary.security_posture)}
+          {label(securityAudit.summary.security_posture, ui)}
         </span>
       </div>
-      <KeyValue label="Actor Role" value={securityAudit.actor.role || '-'} />
-      <KeyValue label="Support Session" value={securityAudit.actor.support_session_id ? 'Yes' : 'No'} />
-      <KeyValue label="Can Execute" value={securityAudit.permission_matrix.can_execute ? 'Yes' : 'No'} />
-      <KeyValue label="Can Update Products" value={securityAudit.permission_matrix.can_update_products ? 'Yes' : 'No'} />
-      <KeyValue label="Has Required Execution Permissions" value={securityAudit.permission_matrix.current_actor_has_required_execution_permissions ? 'Yes' : 'No'} />
-      <KeyValue label="Requester / Reviewer Same" value={securityAudit.separation_of_duties.requester_reviewer_same ? 'Yes' : 'No'} />
-      <KeyValue label="Reviewer / Executor Same" value={securityAudit.separation_of_duties.reviewer_executor_same ? 'Yes' : 'No'} />
-      <KeyValue label="Recommended For Real Execution" value={securityAudit.separation_of_duties.recommended_for_real_execution ? 'Yes' : 'Review recommended'} />
-      <h3 style={styles.subheading}>Checks</h3>
+      <KeyValue label={ui('Actor Role')} value={securityAudit.actor.role || '-'} />
+      <KeyValue label={ui('Support Session')} value={securityAudit.actor.support_session_id ? ui('Yes') : ui('No')} />
+      <KeyValue label={ui('Can Execute')} value={securityAudit.permission_matrix.can_execute ? ui('Yes') : ui('No')} />
+      <KeyValue label={ui('Can Update Products')} value={securityAudit.permission_matrix.can_update_products ? ui('Yes') : ui('No')} />
+      <KeyValue label={ui('Has Required Execution Permissions')} value={securityAudit.permission_matrix.current_actor_has_required_execution_permissions ? ui('Yes') : ui('No')} />
+      <KeyValue label={ui('Requester / Reviewer Same')} value={securityAudit.separation_of_duties.requester_reviewer_same ? ui('Yes') : ui('No')} />
+      <KeyValue label={ui('Reviewer / Executor Same')} value={securityAudit.separation_of_duties.reviewer_executor_same ? ui('Yes') : ui('No')} />
+      <KeyValue label={ui('Recommended For Real Execution')} value={securityAudit.separation_of_duties.recommended_for_real_execution ? ui('Yes') : ui('Review recommended')} />
+      <h3 style={styles.subheading}>{ui('Checks')}</h3>
       <div style={styles.auditTrail}>
         {securityAudit.checks.map((check) => (
           <div key={check.key} style={check.passed ? styles.securityCheck : styles.securityWarning}>
-            <strong>{label(check.key)}</strong>
-            <div style={styles.meta}>{label(check.severity)} · {check.passed ? 'Passed' : 'Review'}</div>
+            <strong>{label(check.key, ui)}</strong>
+            <div style={styles.meta}>{label(check.severity, ui)} · {check.passed ? ui('Passed') : ui('Review')}</div>
             <div style={styles.meta}>{check.message}</div>
           </div>
         ))}
       </div>
       {securityAudit.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
       <details style={styles.technicalDetails}>
-        <summary style={styles.technicalSummary}>Technical security evidence</summary>
+        <summary style={styles.technicalSummary}>{ui('Technical security evidence')}</summary>
         <JsonBlock value={securityAudit} />
       </details>
     </div>
@@ -1268,46 +1283,47 @@ function ExecutionSecurityAuditPanel({ securityAudit }: { securityAudit: Executi
 }
 
 function ExecutionAuditPackPanel({ auditPack }: { auditPack: ExecutionRequestAuditPackResponse | null }) {
+  const { locale, ui } = useAppTranslation();
   if (!auditPack) {
-    return <div className="app-empty-state">Load the audit pack to review consolidated evidence for this request.</div>;
+    return <div className="app-empty-state">{ui('Load the audit pack to review consolidated evidence for this request.')}</div>;
   }
 
   return (
     <div style={styles.auditPanel}>
       <div style={styles.reviewHeader}>
         <div>
-          <strong>Audit pack</strong>
-          <div style={styles.meta}>Generated {formatDateTime(auditPack.generated_at)}</div>
+          <strong>{ui('Audit pack')}</strong>
+          <div style={styles.meta}>{ui('Generated')} {formatDateTime(auditPack.generated_at, locale)}</div>
         </div>
         <span style={{ ...styles.badge, ...(auditPack.completeness.safe_for_governance_review ? styles.successTone : styles.pendingTone) }}>
-          {auditPack.completeness.safe_for_governance_review ? 'Audit ready' : 'Review gaps'}
+          {auditPack.completeness.safe_for_governance_review ? ui('Audit ready') : ui('Review gaps')}
         </span>
       </div>
-      <KeyValue label="Audit events" value={formatUnknown(auditPack.completeness.audit_event_count)} />
-      <KeyValue label="Complete" value={auditPack.completeness.complete ? 'Yes' : 'No'} />
-      <KeyValue label="Payload snapshot" value={auditPack.completeness.has_payload_snapshot ? 'Yes' : 'No'} />
-      <KeyValue label="Gate snapshot" value={auditPack.completeness.has_gate_snapshot ? 'Yes' : 'No'} />
-      <KeyValue label="Context snapshot" value={auditPack.completeness.has_context_snapshot ? 'Yes' : 'No'} />
-      <KeyValue label="Execution result" value={auditPack.completeness.has_execution_result ? 'Yes' : 'No'} />
+      <KeyValue label={ui('Audit events')} value={formatUnknown(auditPack.completeness.audit_event_count, locale, ui)} />
+      <KeyValue label={ui('Complete')} value={auditPack.completeness.complete ? ui('Yes') : ui('No')} />
+      <KeyValue label={ui('Payload snapshot')} value={auditPack.completeness.has_payload_snapshot ? ui('Yes') : ui('No')} />
+      <KeyValue label={ui('Gate snapshot')} value={auditPack.completeness.has_gate_snapshot ? ui('Yes') : ui('No')} />
+      <KeyValue label={ui('Context snapshot')} value={auditPack.completeness.has_context_snapshot ? ui('Yes') : ui('No')} />
+      <KeyValue label={ui('Execution result')} value={auditPack.completeness.has_execution_result ? ui('Yes') : ui('No')} />
       {auditPack.completeness.missing_actions.length ? (
         <div style={styles.failurePanel}>
-          <strong>Missing audit actions</strong>
+          <strong>{ui('Missing audit actions')}</strong>
           {auditPack.completeness.missing_actions.map((action) => <div key={action} style={styles.meta}>{action}</div>)}
         </div>
       ) : null}
-      <h3 style={styles.subheading}>Audit trail</h3>
+      <h3 style={styles.subheading}>{ui('Audit trail')}</h3>
       <div style={styles.auditTrail}>
         {auditPack.audit_trail.map((event) => (
           <div key={event.id} style={styles.auditEvent}>
-            <strong>{label(event.action)}</strong>
-            <div style={styles.meta}>{formatDateTime(event.created_at)} · {event.user_name || event.user_id || 'system/support'}</div>
+            <strong>{label(event.action, ui)}</strong>
+            <div style={styles.meta}>{formatDateTime(event.created_at, locale)} · {event.user_name || event.user_id || ui('System/support')}</div>
           </div>
         ))}
-        {!auditPack.audit_trail.length ? <div style={styles.meta}>No audit events found for this request.</div> : null}
+        {!auditPack.audit_trail.length ? <div style={styles.meta}>{ui('No audit events found for this request.')}</div> : null}
       </div>
       {auditPack.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
       <details style={styles.technicalDetails}>
-        <summary style={styles.technicalSummary}>Technical audit evidence</summary>
+        <summary style={styles.technicalSummary}>{ui('Technical audit evidence')}</summary>
         <JsonBlock value={auditPack} />
       </details>
     </div>
@@ -1315,42 +1331,43 @@ function ExecutionAuditPackPanel({ auditPack }: { auditPack: ExecutionRequestAud
 }
 
 function ExecutionReviewPanel({ request, executionReview }: { request: ExecutionRequest; executionReview: ExecutionRequestExecutionReviewResponse | null }) {
+  const { locale, ui } = useAppTranslation();
   const review = executionReview?.request_id === request.id ? executionReview.execution_review : request.execution_review;
 
   if (!review) {
-    return <div className="app-empty-state">Execution review evidence is not available for this request.</div>;
+    return <div className="app-empty-state">{ui('Execution review evidence is not available for this request.')}</div>;
   }
 
   return (
     <div style={styles.reviewPanel}>
       <div style={styles.reviewHeader}>
         <div>
-          <strong>Execution review</strong>
-          <div style={styles.meta}>{executionReview?.request_id === request.id ? 'Loaded from /execution-requests/:id/execution-review.' : 'Embedded execution review evidence from request detail/list.'}</div>
+          <strong>{ui('Execution review')}</strong>
+          <div style={styles.meta}>{executionReview?.request_id === request.id ? ui('Loaded from /execution-requests/:id/execution-review.') : ui('Embedded execution review evidence from request detail/list.')}</div>
         </div>
         <span style={{ ...styles.badge, ...(review.available ? styles.successTone : styles.pendingTone) }}>
-          {review.available ? 'Available' : 'Not executed'}
+          {review.available ? ui('Available') : ui('Not executed')}
         </span>
       </div>
-      <KeyValue label="Executor" value={review.executor ? label(review.executor) : '-'} />
-      <KeyValue label="Outcome" value={review.outcome ? label(review.outcome) : '-'} />
-      <KeyValue label="Changed business data" value={review.executed_real_action ? 'Yes' : 'No'} />
-      <KeyValue label="Executed At" value={formatDateTime(review.executed_at)} />
-      <KeyValue label="Executed By" value={review.executed_by_name || review.executed_by || '-'} />
-      <KeyValue label="Retry Eligible" value={review.retry_eligibility?.eligible ? 'Yes' : 'No'} />
-      <KeyValue label="Retry Reason" value={review.retry_eligibility?.reason || '-'} />
-      <KeyValue label="Retry Count" value={formatUnknown(review.retry_eligibility?.retry_count)} />
-      <KeyValue label="Max Retries" value={formatUnknown(review.retry_eligibility?.max_retry_count)} />
-      <KeyValue label="Retry Prepared At" value={formatDateTime(review.retry_eligibility?.prepared_at)} />
+      <KeyValue label={ui('Executor')} value={review.executor ? label(review.executor, ui) : '-'} />
+      <KeyValue label={ui('Outcome')} value={review.outcome ? label(review.outcome, ui) : '-'} />
+      <KeyValue label={ui('Changed business data')} value={review.executed_real_action ? ui('Yes') : ui('No')} />
+      <KeyValue label={ui('Executed At')} value={formatDateTime(review.executed_at, locale)} />
+      <KeyValue label={ui('Executed By')} value={review.executed_by_name || review.executed_by || '-'} />
+      <KeyValue label={ui('Retry Eligible')} value={review.retry_eligibility?.eligible ? ui('Yes') : ui('No')} />
+      <KeyValue label={ui('Retry Reason')} value={review.retry_eligibility?.reason || '-'} />
+      <KeyValue label={ui('Retry Count')} value={formatUnknown(review.retry_eligibility?.retry_count, locale, ui)} />
+      <KeyValue label={ui('Max Retries')} value={formatUnknown(review.retry_eligibility?.max_retry_count, locale, ui)} />
+      <KeyValue label={ui('Retry Prepared At')} value={formatDateTime(review.retry_eligibility?.prepared_at, locale)} />
 
       {review.failure ? (
         <div style={styles.failurePanel}>
-          <strong>Failure details</strong>
-          <KeyValue label="Error Code" value={review.failure.error_code || '-'} />
-          <KeyValue label="Error Message" value={review.failure.error_message || '-'} />
-          <KeyValue label="Failed At" value={formatDateTime(review.failure.failed_at)} />
-          <KeyValue label="Rollback Applied" value={review.failure.rollback_applied ? 'Yes' : 'No'} />
-          <KeyValue label="Duplicate Execution Blocked" value={review.failure.retry_eligibility?.duplicate_execution_blocked ? 'Yes' : 'No'} />
+          <strong>{ui('Failure details')}</strong>
+          <KeyValue label={ui('Error Code')} value={review.failure.error_code || '-'} />
+          <KeyValue label={ui('Error Message')} value={review.failure.error_message || '-'} />
+          <KeyValue label={ui('Failed At')} value={formatDateTime(review.failure.failed_at, locale)} />
+          <KeyValue label={ui('Rollback Applied')} value={review.failure.rollback_applied ? ui('Yes') : ui('No')} />
+          <KeyValue label={ui('Duplicate Execution Blocked')} value={review.failure.retry_eligibility?.duplicate_execution_blocked ? ui('Yes') : ui('No')} />
         </div>
       ) : null}
 
@@ -1364,6 +1381,7 @@ function ExecutionReviewPanel({ request, executionReview }: { request: Execution
 }
 
 function BeforeAfterEvidence({ beforeAfter }: { beforeAfter: NonNullable<ExecutionRequestExecutionReview['before_after']> }) {
+  const { locale, ui } = useAppTranslation();
   const before = beforeAfter.before || {};
   const after = beforeAfter.after || {};
   const fieldKeys = getBeforeAfterFieldKeys(before, after);
@@ -1372,27 +1390,27 @@ function BeforeAfterEvidence({ beforeAfter }: { beforeAfter: NonNullable<Executi
     <div style={styles.reviewPanel}>
       <div style={styles.reviewHeader}>
         <div>
-          <strong>Before / after evidence</strong>
-          <div style={styles.meta}>{beforeAfter.product_name || beforeAfter.product_id || 'Product-field execution snapshot'}</div>
+          <strong>{ui('Before / after evidence')}</strong>
+          <div style={styles.meta}>{beforeAfter.product_name || beforeAfter.product_id || ui('Product-field execution snapshot')}</div>
         </div>
         <span style={{ ...styles.badge, ...(beforeAfter.changed ? styles.successTone : styles.pendingTone) }}>
-          {beforeAfter.changed ? 'Changed' : 'No field change'}
+          {beforeAfter.changed ? ui('Changed') : ui('No field change')}
         </span>
       </div>
       <div style={styles.beforeAfterGrid}>
         <div style={styles.snapshotCard}>
-          <strong>Before</strong>
+          <strong>{ui('Before')}</strong>
           {fieldKeys.map((key) => (
-            <KeyValue key={key} label={labelBeforeAfterField(key)} value={formatBeforeAfterValue(key, before[key])} />
+            <KeyValue key={key} label={labelBeforeAfterField(key, ui)} value={formatBeforeAfterValue(key, before[key], locale)} />
           ))}
-          {!fieldKeys.length ? <div style={styles.meta}>No before-state fields were returned.</div> : null}
+          {!fieldKeys.length ? <div style={styles.meta}>{ui('No before-state fields were returned.')}</div> : null}
         </div>
         <div style={styles.snapshotCard}>
-          <strong>After</strong>
+          <strong>{ui('After')}</strong>
           {fieldKeys.map((key) => (
-            <KeyValue key={key} label={labelBeforeAfterField(key)} value={formatBeforeAfterValue(key, after[key])} />
+            <KeyValue key={key} label={labelBeforeAfterField(key, ui)} value={formatBeforeAfterValue(key, after[key], locale)} />
           ))}
-          {!fieldKeys.length ? <div style={styles.meta}>No after-state fields were returned.</div> : null}
+          {!fieldKeys.length ? <div style={styles.meta}>{ui('No after-state fields were returned.')}</div> : null}
         </div>
       </div>
     </div>

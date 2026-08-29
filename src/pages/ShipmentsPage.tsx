@@ -1,8 +1,10 @@
-import { formatCurrencyAmount } from '../lib/tenantCurrency';
+import { formatCurrencyAmount, getActiveTenantCurrency, normalizeCurrencyCode } from '../lib/tenantCurrency';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedNumber } from '../i18n/formatters';
 import { apiRequest, ApiError } from '../lib/api';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
 import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
@@ -477,10 +479,6 @@ function toNumber(value: number | string | null | undefined): number {
   return 0;
 }
 
-function formatQuantity(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(2);
-}
-
 function formatCurrency(value: number | string | null | undefined, currency?: string | null): string {
   return formatCurrencyAmount(value, currency, 4);
 }
@@ -536,15 +534,6 @@ function makeDefaultReceiveDraft(item: ShipmentItem): ReceiveDraft {
   };
 }
 
-function formatDate(dateString: string | null | undefined): string {
-  if (!dateString) return '-';
-
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return dateString;
-
-  return date.toLocaleDateString();
-}
-
 function formatShipmentStatus(status: string | null | undefined): string {
   if (!status) return '-';
 
@@ -591,6 +580,7 @@ function useIsMobile(breakpoint = 1024): boolean {
 
 export default function ShipmentsPage() {
   const queryClient = useQueryClient();
+  const { locale, ui } = useAppTranslation();
 
   const {
     canManageShipments,
@@ -606,6 +596,41 @@ export default function ShipmentsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
+
+  const formatShipmentDate = (value: string | null | undefined): string => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return formatLocalizedDate(date, locale);
+  };
+
+  const formatShipmentNumber = (
+    value: number | string | null | undefined,
+    maximumFractionDigits = 2
+  ): string =>
+    formatLocalizedNumber(toNumber(value), locale, { maximumFractionDigits });
+
+  const shipmentStatusLabel = (status: string | null | undefined): string => {
+    if (!status) return '-';
+    if (status === 'pending') return ui('Pending');
+    if (status === 'partial') return ui('Partial');
+    if (status === 'received') return ui('Received');
+    return formatShipmentStatus(status);
+  };
+
+  const formatShipmentQuantity = (value: number | string | null | undefined): string =>
+    formatLocalizedNumber(toNumber(value), locale, { maximumFractionDigits: 2 });
+
+  const formatShipmentCurrency = (value: number | string | null | undefined, currency?: string | null): string => {
+    if (value === null || value === undefined || value === '') return '-';
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) return String(value);
+    try {
+      return formatLocalizedCurrency(amount, normalizeCurrencyCode(currency || getActiveTenantCurrency()), locale, { maximumFractionDigits: 4 });
+    } catch {
+      return formatCurrency(value, currency);
+    }
+  };
 
   const [workspaceSection, setWorkspaceSection] = useState<ShipmentWorkspaceSection>('overview');
   const [selectedShipmentId, setSelectedShipmentId] = useState('');
@@ -676,7 +701,7 @@ export default function ShipmentsPage() {
       if (error instanceof ApiError) {
         setPageError(error.message);
       } else {
-        setPageError('Failed to create shipment.');
+        setPageError(ui('Failed to create shipment.'));
       }
       setPageMessage(null);
     }
@@ -696,7 +721,7 @@ export default function ShipmentsPage() {
       if (error instanceof ApiError) {
         setPageError(error.message);
       } else {
-        setPageError('Failed to add shipment item.');
+        setPageError(ui('Failed to add shipment item.'));
       }
       setPageMessage(null);
     }
@@ -707,14 +732,14 @@ export default function ShipmentsPage() {
     onSuccess: async (shipment) => {
       setEditingShipment(false);
       setPageError(null);
-      setPageMessage('Shipment updated successfully.');
+      setPageMessage(ui('Shipment updated successfully.'));
       setSelectedShipmentId(shipment.id);
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
     onError: (error) => {
       setPageMessage(null);
-      setPageError(error instanceof ApiError ? error.message : 'Failed to update shipment.');
+      setPageError(error instanceof ApiError ? error.message : ui('Failed to update shipment.'));
     }
   });
 
@@ -729,13 +754,13 @@ export default function ShipmentsPage() {
       setPendingAutoReceive(null);
       autoReceiveAttemptKeyRef.current = '';
       setPageError(null);
-      setPageMessage(result.message || 'Shipment deleted successfully.');
+      setPageMessage(result.message || ui('Shipment deleted successfully.'));
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
     onError: (error) => {
       setPageMessage(null);
-      setPageError(error instanceof ApiError ? error.message : 'Failed to delete shipment.');
+      setPageError(error instanceof ApiError ? error.message : ui('Failed to delete shipment.'));
     }
   });
 
@@ -743,13 +768,13 @@ export default function ShipmentsPage() {
     mutationFn: updateShipmentItem,
     onSuccess: async () => {
       setPageError(null);
-      setPageMessage('Shipment item updated successfully.');
+      setPageMessage(ui('Shipment item updated successfully.'));
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
       await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
     },
     onError: (error) => {
       setPageMessage(null);
-      setPageError(error instanceof ApiError ? error.message : 'Failed to update shipment item.');
+      setPageError(error instanceof ApiError ? error.message : ui('Failed to update shipment item.'));
     }
   });
 
@@ -757,13 +782,13 @@ export default function ShipmentsPage() {
     mutationFn: deleteShipmentItem,
     onSuccess: async (result) => {
       setPageError(null);
-      setPageMessage(result.message || 'Shipment item deleted successfully.');
+      setPageMessage(result.message || ui('Shipment item deleted successfully.'));
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
       await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
     },
     onError: (error) => {
       setPageMessage(null);
-      setPageError(error instanceof ApiError ? error.message : 'Failed to delete shipment item.');
+      setPageError(error instanceof ApiError ? error.message : ui('Failed to delete shipment item.'));
     }
   });
 
@@ -771,13 +796,13 @@ export default function ShipmentsPage() {
     mutationFn: recordReceivingDiscrepancy,
     onSuccess: async () => {
       setPageError(null);
-      setPageMessage('Shortage reason saved. This incomplete line can now be finalized as a documented discrepancy.');
+      setPageMessage(ui('Shortage reason saved. This incomplete line can now be finalized as a documented discrepancy.'));
       await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
     },
     onError: (error) => {
       setPageMessage(null);
-      setPageError(error instanceof ApiError ? error.message : 'Failed to save shortage reason.');
+      setPageError(error instanceof ApiError ? error.message : ui('Failed to save shortage reason.'));
     }
   });
 
@@ -786,14 +811,14 @@ export default function ShipmentsPage() {
     onSuccess: async (result) => {
       const createdCount = result.created_shipments?.length ?? result.shipments?.length ?? 0;
       setPageError(null);
-      setPageMessage(result.message || `Auto reorder completed. ${createdCount} shipment${createdCount === 1 ? '' : 's'} created.`);
+      setPageMessage(result.message || ui('Auto reorder completed. {count} shipment(s) created.').replace('{count}', formatShipmentNumber(createdCount, 0)));
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-low-stock'] });
     },
     onError: (error) => {
       setPageMessage(null);
-      setPageError(error instanceof ApiError ? error.message : 'Failed to run shipment auto reorder.');
+      setPageError(error instanceof ApiError ? error.message : ui('Failed to run shipment auto reorder.'));
     }
   });
 
@@ -804,16 +829,23 @@ export default function ShipmentsPage() {
 
       const matchedItem = shipmentItems.find((item) => item.product_id === variables.item.product_id);
       const quantityLabel = variables.item.package_count_received
-        ? `${formatQuantity(variables.item.package_count_received)} package${variables.item.package_count_received === 1 ? '' : 's'}`
-        : formatQuantity(variables.item.quantity_received ?? 0);
+        ? ui('{count} package(s)').replace('{count}', formatShipmentQuantity(variables.item.package_count_received))
+        : formatShipmentQuantity(variables.item.quantity_received ?? 0);
       const productLabel = matchedItem?.product_name || matchedItem?.product_id || variables.item.product_id;
 
       const poSummary = data.linked_purchase_order_receiving_summary;
       const poProgressLabel = poSummary
-        ? ` PO progress: ${formatQuantity(poSummary.received_quantity)} / ${formatQuantity(poSummary.ordered_quantity)} received.`
+        ? ` ${ui('PO progress: {received} / {ordered} received.')
+            .replace('{received}', formatShipmentQuantity(poSummary.received_quantity))
+            .replace('{ordered}', formatShipmentQuantity(poSummary.ordered_quantity))}`
         : '';
 
-      setPageMessage(`✔ ${productLabel} +${quantityLabel} received into stock.${poProgressLabel}`);
+      setPageMessage(
+        ui('✔ {product} +{quantity} received into stock.{poProgress}')
+          .replace('{product}', productLabel)
+          .replace('{quantity}', quantityLabel)
+          .replace('{poProgress}', poProgressLabel)
+      );
 
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
       await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
@@ -832,7 +864,7 @@ export default function ShipmentsPage() {
       if (error instanceof ApiError) {
         setPageError(error.message);
       } else {
-        setPageError('Failed to receive shipment item.');
+        setPageError(ui('Failed to receive shipment item.'));
       }
       setPageMessage(null);
     }
@@ -844,8 +876,9 @@ export default function ShipmentsPage() {
       setPageError(null);
       setPageMessage(
         data.finalized_with_discrepancies
-          ? `✔ Shipment finalized with ${data.incomplete_line_count ?? 0} documented receiving discrepancy line(s).`
-          : '✔ Shipment finalized and locked for receiving.'
+          ? ui('✔ Shipment finalized with {count} documented receiving discrepancy line(s).')
+              .replace('{count}', formatShipmentNumber(data.incomplete_line_count ?? 0, 0))
+          : ui('✔ Shipment finalized and locked for receiving.')
       );
 
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
@@ -863,7 +896,7 @@ export default function ShipmentsPage() {
       if (error instanceof ApiError) {
         setPageError(error.message);
       } else {
-        setPageError('Failed to finalize shipment.');
+        setPageError(ui('Failed to finalize shipment.'));
       }
       setPageMessage(null);
     }
@@ -881,26 +914,32 @@ export default function ShipmentsPage() {
     onError: (error) => {
       setSupplierEmailPreview(null);
       setPageMessage(null);
-      setPageError(error instanceof ApiError ? error.message : 'Failed to prepare supplier email preview.');
+      setPageError(error instanceof ApiError ? error.message : ui('Failed to prepare supplier email preview.'));
     }
   });
 
   const sendShipmentToSupplierMutation = useMutation({
     mutationFn: sendShipmentToSupplier,
     onSuccess: async (data) => {
-      const recipientEmail = data.recipient_email || data.supplier_email || 'supplier';
-      const poLabel = data.po_number ? ` for PO ${data.po_number}` : '';
+      const recipientEmail = data.recipient_email || data.supplier_email || ui('supplier');
+      const poLabel = data.po_number ? ui(' for PO {po}').replace('{po}', data.po_number) : '';
       const attachmentNames =
         data.attachments
           ?.map((attachment) => attachment.filename)
           .filter((filename): filename is string => Boolean(filename)) ?? [];
 
       const attachmentLabel = attachmentNames.length > 0
-        ? ` Attachments: ${attachmentNames.join(', ')}.`
-        : ' QR information was included by the backend when available.';
+        ? ui(' Attachments: {attachments}.').replace('{attachments}', attachmentNames.join(', '))
+        : ui(' QR information was included by the backend when available.');
       const fallbackMessage = data.sandbox_capture
-        ? `✔ Purchase order test email${poLabel} captured in Mailtrap Sandbox for ${recipientEmail}.${attachmentLabel}`
-        : `✔ Purchase order${poLabel} emailed to ${recipientEmail}.${attachmentLabel}`;
+        ? ui('✔ Purchase order test email{poLabel} captured in Mailtrap Sandbox for {recipient}.{attachmentLabel}')
+            .replace('{poLabel}', poLabel)
+            .replace('{recipient}', recipientEmail)
+            .replace('{attachmentLabel}', attachmentLabel)
+        : ui('✔ Purchase order{poLabel} emailed to {recipient}.{attachmentLabel}')
+            .replace('{poLabel}', poLabel)
+            .replace('{recipient}', recipientEmail)
+            .replace('{attachmentLabel}', attachmentLabel);
 
       setPageError(null);
       setPageMessage(data.message || fallbackMessage);
@@ -913,12 +952,12 @@ export default function ShipmentsPage() {
     onError: (error) => {
       if (error instanceof ApiError) {
         if (error.code === 'EMAIL_NOT_CONFIGURED') {
-          setPageError('Supplier email is not configured on this server. The shipment was not changed; continue receiving/finalizing manually or configure backend email settings before using supplier email.');
+          setPageError(ui('Supplier email is not configured on this server. The shipment was not changed; continue receiving/finalizing manually or configure backend email settings before using supplier email.'));
         } else {
           setPageError(error.message);
         }
       } else {
-        setPageError('Failed to email shipment to supplier.');
+        setPageError(ui('Failed to email shipment to supplier.'));
       }
       setPageMessage(null);
     }
@@ -1067,18 +1106,20 @@ export default function ShipmentsPage() {
 
   const finalizeReadinessMessage =
     !selectedShipment
-      ? 'Select a shipment first.'
+      ? ui('Select a shipment first.')
       : !canViewShipmentItems
-        ? 'Shipment item read permission is required to review finalization readiness.'
+        ? ui('Shipment item read permission is required to review finalization readiness.')
       : selectedShipment.status === 'received'
-        ? 'Shipment already finalized.'
+        ? ui('Shipment already finalized.')
         : shipmentItems.length === 0
-          ? 'Add shipment items before finalizing.'
+          ? ui('Add shipment items before finalizing.')
           : incompleteShipmentLinesWithoutReason.length > 0
-            ? `${incompleteShipmentLinesWithoutReason.length} incomplete line(s) need a saved discrepancy reason before finalization.`
+            ? ui('{count} incomplete line(s) need a saved discrepancy reason before finalization.')
+                .replace('{count}', formatShipmentNumber(incompleteShipmentLinesWithoutReason.length, 0))
             : incompleteShipmentLines.length > 0
-              ? `${incompleteShipmentLines.length} incomplete line(s) have documented shortage reasons and can be finalized as discrepancies.`
-              : 'All lines are fully received and ready to finalize.';
+              ? ui('{count} incomplete line(s) have documented shortage reasons and can be finalized as discrepancies.')
+                  .replace('{count}', formatShipmentNumber(incompleteShipmentLines.length, 0))
+              : ui('All lines are fully received and ready to finalize.');
 
   const selectedScannerLocationName =
     storageLocations.find((location) => location.id === selectedScannerLocationId)?.name ?? '';
@@ -1087,49 +1128,49 @@ export default function ShipmentsPage() {
   const hasRemainingQuantity = selectedShipmentRemainingTotal > 0;
   const scannerReceivingBlockedReason =
     !canReceiveShipments
-      ? 'Shipment receive permission is required.'
+      ? ui('Shipment receive permission is required.')
       : !selectedShipment
-        ? 'Select a shipment first.'
+        ? ui('Select a shipment first.')
         : selectedShipment.status === 'received'
-          ? 'This shipment is already finalized.'
+          ? ui('This shipment is already finalized.')
           : !hasShipmentItems
-            ? 'Add at least one shipment item before scanning.'
+            ? ui('Add at least one shipment item before scanning.')
             : !hasRemainingQuantity
-              ? 'All shipment items are already fully received.'
+              ? ui('All shipment items are already fully received.')
               : !selectedScannerLocationId
-                ? 'Select a default scan location first.'
+                ? ui('Select a default scan location first.')
                 : null;
   const scannerReceivingReady = scannerReceivingBlockedReason === null;
   const shipmentWorkflowSteps = [
     {
-      label: '1. Select Shipment',
-      detail: selectedShipment ? 'Shipment selected and ready for receiving.' : 'Choose the inbound shipment you want to process.',
+      label: ui('1. Select Shipment'),
+      detail: selectedShipment ? ui('Shipment selected and ready for receiving.') : ui('Choose the inbound shipment you want to process.'),
       complete: Boolean(selectedShipment)
     },
     {
-      label: '2. Set Scan Location',
+      label: ui('2. Set Scan Location'),
       detail: selectedScannerLocationId
-        ? `Scanning into ${selectedScannerLocationName}.`
+        ? ui('Scanning into {location}.').replace('{location}', selectedScannerLocationName)
         : hasStorageLocations
-          ? 'Choose the default storage location before scanning.'
-          : 'Create a storage location before receiving or scanning.',
+          ? ui('Choose the default storage location before scanning.')
+          : ui('Create a storage location before receiving or scanning.'),
       complete: Boolean(selectedScannerLocationId)
     },
     {
-      label: '3. Receive Items',
+      label: ui('3. Receive Items'),
       detail: !canViewShipmentItems
-        ? 'Shipment item details are hidden for this role.'
+        ? ui('Shipment item details are hidden for this role.')
         : shipmentItemsQuery.isError
-          ? 'Shipment lines could not be loaded. Refresh the page before receiving or finalizing.'
+          ? ui('Shipment lines could not be loaded. Refresh the page before receiving or finalizing.')
           : hasShipmentItems
             ? hasRemainingQuantity
-              ? 'Receive lines manually or through the receiving barcode scanner.'
-              : 'All current shipment lines are fully received.'
-            : 'Add shipment items before receiving inventory.',
+              ? ui('Receive lines manually or through the receiving barcode scanner.')
+              : ui('All current shipment lines are fully received.')
+            : ui('Add shipment items before receiving inventory.'),
       complete: canViewShipmentItems && !shipmentItemsQuery.isError && hasShipmentItems && !hasRemainingQuantity
     },
     {
-      label: '4. Finalize Shipment',
+      label: ui('4. Finalize Shipment'),
       detail: finalizeReadinessMessage,
       complete: selectedShipment?.status === 'received'
     }
@@ -1202,7 +1243,7 @@ export default function ShipmentsPage() {
     const matchedShipment = shipments.find((shipment) => shipment.id === shipmentIdFromQuery);
 
     if (!matchedShipment) {
-      setPageError('Scanned shipment was not found in the current shipment list.');
+      setPageError(ui('Scanned shipment was not found in the current shipment list.'));
       return;
     }
 
@@ -1246,16 +1287,16 @@ export default function ShipmentsPage() {
       if (!locationIdFromQuery) {
         setPendingAutoReceive(null);
         const labelTraceability = [
-          labelLotFromQuery ? `Lot ${labelLotFromQuery}` : '',
-          labelBatchFromQuery ? `Batch ${labelBatchFromQuery}` : '',
-          labelExpiryFromQuery ? `Expires ${new Date(labelExpiryFromQuery).toLocaleDateString()}` : ''
+          labelLotFromQuery ? `${ui('Lot')} ${labelLotFromQuery}` : '',
+          labelBatchFromQuery ? `${ui('Batch')} ${labelBatchFromQuery}` : '',
+          labelExpiryFromQuery ? `${ui('Expires')} ${formatLocalizedDate(new Date(labelExpiryFromQuery), locale)}` : ''
         ].filter(Boolean).join(' · ');
         setPageMessage(
           scannedBarcode
             ? barcodeLabelIdFromQuery
-              ? `Inventory label ${labelBarcodeFromQuery || scannedBarcode} matched${labelTraceability ? ` · ${labelTraceability}` : ''}. Select a default scan location before receiving.`
-              : `Product barcode ${scannedBarcode} matched inside selected shipment. Select a default scan location before receiving.`
-            : 'Shipment item matched from scanner. Select a default scan location before receiving.'
+              ? ui('Inventory label {barcode} matched{traceability}. Select a default scan location before receiving.').replace('{barcode}', labelBarcodeFromQuery || scannedBarcode).replace('{traceability}', labelTraceability ? ` · ${labelTraceability}` : '')
+              : ui('Product barcode {barcode} matched inside selected shipment. Select a default scan location before receiving.').replace('{barcode}', scannedBarcode)
+            : ui('Shipment item matched from scanner. Select a default scan location before receiving.')
         );
       } else {
         setPendingAutoReceive({
@@ -1284,26 +1325,26 @@ export default function ShipmentsPage() {
         });
 
         const labelTraceability = [
-          labelLotFromQuery ? `Lot ${labelLotFromQuery}` : '',
-          labelBatchFromQuery ? `Batch ${labelBatchFromQuery}` : '',
-          labelExpiryFromQuery ? `Expires ${new Date(labelExpiryFromQuery).toLocaleDateString()}` : ''
+          labelLotFromQuery ? `${ui('Lot')} ${labelLotFromQuery}` : '',
+          labelBatchFromQuery ? `${ui('Batch')} ${labelBatchFromQuery}` : '',
+          labelExpiryFromQuery ? `${ui('Expires')} ${formatLocalizedDate(new Date(labelExpiryFromQuery), locale)}` : ''
         ].filter(Boolean).join(' · ');
 
         setPageMessage(
           scannedBarcode
             ? barcodeLabelIdFromQuery
-              ? `Inventory label ${labelBarcodeFromQuery || scannedBarcode} matched inside selected shipment${labelTraceability ? ` · ${labelTraceability}` : ''}.`
+              ? ui('Inventory label {barcode} matched inside selected shipment{traceability}.').replace('{barcode}', labelBarcodeFromQuery || scannedBarcode).replace('{traceability}', labelTraceability ? ` · ${labelTraceability}` : '')
               : packageNameFromQuery && unitsPerPackageFromQuery
-                ? `Package barcode ${scannedBarcode} matched: ${packageNameFromQuery} (${unitsPerPackageFromQuery} units/package).`
-                : `Product barcode ${scannedBarcode} matched inside selected shipment.`
-            : 'Shipment item matched from scanner.'
+                ? ui('Package barcode {barcode} matched: {package} ({units} units/package).').replace('{barcode}', scannedBarcode).replace('{package}', packageNameFromQuery).replace('{units}', formatLocalizedNumber(Number(unitsPerPackageFromQuery), locale, { maximumFractionDigits: 2 }))
+                : ui('Product barcode {barcode} matched inside selected shipment.').replace('{barcode}', scannedBarcode)
+            : ui('Shipment item matched from scanner.')
         );
       }
     } else {
       setHighlightedItemId('');
       setPendingAutoReceive(null);
       autoReceiveAttemptKeyRef.current = '';
-      setPageMessage('Shipment opened from scanner.');
+      setPageMessage(ui('Shipment opened from scanner.'));
     }
 
     const nextParams = new URLSearchParams(searchParams);
@@ -1327,7 +1368,7 @@ export default function ShipmentsPage() {
     nextParams.delete('requiresExpiryDate');
     nextParams.delete('requiresSerialOnReceipt');
     setSearchParams(nextParams, { replace: true });
-  }, [shipments, searchParams, setSearchParams]);
+  }, [shipments, searchParams, setSearchParams, locale, ui]);
 
   useEffect(() => {
     if (!highlightedItemId || shipmentItems.length === 0) {
@@ -1454,7 +1495,7 @@ export default function ShipmentsPage() {
     if (remaining <= 0) {
       autoReceiveAttemptKeyRef.current = attemptKey;
       setPendingAutoReceive(null);
-      setPageMessage('Scanned item is already fully received.');
+      setPageMessage(ui('Scanned item is already fully received.'));
       return;
     }
 
@@ -1470,7 +1511,7 @@ export default function ShipmentsPage() {
       autoReceiveAttemptKeyRef.current = attemptKey;
       setPendingAutoReceive(null);
       setPageMessage(
-        'Product matched. Quantity was set to 1, but auto receive stopped because you must choose a storage location first.'
+        ui('Product matched. Quantity was set to 1, but auto receive stopped because you must choose a storage location first.')
       );
       return;
     }
@@ -1483,7 +1524,7 @@ export default function ShipmentsPage() {
       autoReceiveAttemptKeyRef.current = attemptKey;
       setPendingAutoReceive(null);
       setPageError(
-        `${pendingAutoReceive.packageName || 'Scanned package'} contains ${formatQuantity(baseQuantityToReceive)} base units, but only ${formatQuantity(remaining)} remain on this shipment line.`
+        ui('{package} contains {packageUnits} base units, but only {remaining} remain on this shipment line.').replace('{package}', pendingAutoReceive.packageName || ui('Scanned package')).replace('{packageUnits}', formatLocalizedNumber(baseQuantityToReceive, locale, { maximumFractionDigits: 2 })).replace('{remaining}', formatLocalizedNumber(remaining, locale, { maximumFractionDigits: 2 }))
       );
       setPageMessage(null);
       return;
@@ -1511,13 +1552,13 @@ export default function ShipmentsPage() {
 
     const missingTrackingDetails: string[] = [];
     if (pendingAutoReceive.requiresSerialOnReceipt) {
-      missingTrackingDetails.push('serial number(s)');
+      missingTrackingDetails.push(ui('serial number(s)'));
     }
     if (pendingAutoReceive.requiresLotTracking && !effectiveLotNumber && !effectiveBatchNumber) {
-      missingTrackingDetails.push('lot or batch');
+      missingTrackingDetails.push(ui('lot or batch'));
     }
     if (pendingAutoReceive.requiresExpiryDate && !effectiveExpiryDate) {
-      missingTrackingDetails.push('expiry date');
+      missingTrackingDetails.push(ui('expiry date'));
     }
 
     autoReceiveAttemptKeyRef.current = attemptKey;
@@ -1527,19 +1568,19 @@ export default function ShipmentsPage() {
     if (missingTrackingDetails.length > 0) {
       setHighlightedItemId(matchedItem.id);
       setPageMessage(
-        `Barcode matched and receiving details were prefilled. Enter the required ${missingTrackingDetails.join(', ')} below, then click Receive.`
+        ui('Barcode matched and receiving details were prefilled. Enter the required {details} below, then click Receive.').replace('{details}', missingTrackingDetails.join(', '))
       );
       return;
     }
 
     setPageMessage(
       shouldReceiveByPackage
-        ? `${pendingAutoReceive.packageName || 'Scanned package'} matched. Auto receiving 1 package (${formatQuantity(baseQuantityToReceive)} base units)...`
+        ? ui('{package} matched. Auto receiving 1 package ({quantity} base units)...').replace('{package}', pendingAutoReceive.packageName || ui('Scanned package')).replace('{quantity}', formatLocalizedNumber(baseQuantityToReceive, locale, { maximumFractionDigits: 2 }))
         : pendingAutoReceive.barcodeLabelId
-          ? `Inventory label ${pendingAutoReceive.labelBarcode || pendingAutoReceive.scannedBarcode || ''} matched. Auto receiving ${formatQuantity(baseQuantityToReceive)} unit...`
+          ? ui('Inventory label {barcode} matched. Auto receiving {quantity} unit(s)...').replace('{barcode}', pendingAutoReceive.labelBarcode || pendingAutoReceive.scannedBarcode || '').replace('{quantity}', formatLocalizedNumber(baseQuantityToReceive, locale, { maximumFractionDigits: 2 }))
           : pendingAutoReceive.scannedBarcode
-            ? `Barcode ${pendingAutoReceive.scannedBarcode} matched. Auto receiving ${formatQuantity(baseQuantityToReceive)} unit...`
-            : `Scanner matched item. Auto receiving ${formatQuantity(baseQuantityToReceive)} unit...`
+            ? ui('Barcode {barcode} matched. Auto receiving {quantity} unit(s)...').replace('{barcode}', pendingAutoReceive.scannedBarcode).replace('{quantity}', formatLocalizedNumber(baseQuantityToReceive, locale, { maximumFractionDigits: 2 }))
+            : ui('Scanner matched item. Auto receiving {quantity} unit(s)...').replace('{quantity}', formatLocalizedNumber(baseQuantityToReceive, locale, { maximumFractionDigits: 2 }))
     );
 
     receiveShipmentMutation.mutate({
@@ -1578,7 +1619,9 @@ export default function ShipmentsPage() {
     selectedScannerLocationId,
     receiveShipmentMutation,
     receiveDrafts,
-    getReceiveDraft
+    getReceiveDraft,
+    locale,
+    ui
   ]);
 
   const updateReceiveDraft = (
@@ -1603,11 +1646,11 @@ export default function ShipmentsPage() {
 
   const handleAutoReorderShipments = () => {
     if (!canAutoReorderShipments) {
-      setPageError('Your current role cannot run shipment auto reorder.');
+      setPageError(ui('Your current role cannot run shipment auto reorder.'));
       return;
     }
 
-    const confirmed = window.confirm('Run auto reorder now? This may create shipments from current reorder rules.');
+    const confirmed = window.confirm(ui('Run auto reorder now? This may create shipments from current reorder rules.'));
     if (!confirmed) return;
 
     setPageError(null);
@@ -1619,17 +1662,17 @@ export default function ShipmentsPage() {
     event.preventDefault();
 
     if (!canManageShipments) {
-      setPageError('Your current role cannot update shipments.');
+      setPageError(ui('Your current role cannot update shipments.'));
       return;
     }
 
     if (!selectedShipment) {
-      setPageError('Select a shipment first.');
+      setPageError(ui('Select a shipment first.'));
       return;
     }
 
     if (selectedShipment.status !== 'pending') {
-      setPageError('Shipment headers can only be edited while the shipment is pending.');
+      setPageError(ui('Shipment headers can only be edited while the shipment is pending.'));
       return;
     }
 
@@ -1644,21 +1687,21 @@ export default function ShipmentsPage() {
 
   const handleDeleteShipment = () => {
     if (!canManageShipments) {
-      setPageError('Your current role cannot delete shipments.');
+      setPageError(ui('Your current role cannot delete shipments.'));
       return;
     }
 
     if (!selectedShipment) {
-      setPageError('Select a shipment first.');
+      setPageError(ui('Select a shipment first.'));
       return;
     }
 
     if (selectedShipment.status !== 'pending') {
-      setPageError('Only pending shipments can be deleted.');
+      setPageError(ui('Only pending shipments can be deleted.'));
       return;
     }
 
-    const confirmed = window.confirm('Delete this shipment? This uses the current shipment version and cannot be undone.');
+    const confirmed = window.confirm(ui('Delete this shipment? This uses the current shipment version and cannot be undone.'));
     if (!confirmed) return;
 
     setPageError(null);
@@ -1678,23 +1721,23 @@ export default function ShipmentsPage() {
 
   const handleUpdateShipmentItem = (item: ShipmentItem) => {
     if (!canManageShipmentItems) {
-      setPageError('Your current role cannot update shipment items.');
+      setPageError(ui('Your current role cannot update shipment items.'));
       return;
     }
 
     if (!selectedShipmentIsPending) {
-      setPageError('Shipment lines can only be changed while the shipment is pending.');
+      setPageError(ui('Shipment lines can only be changed while the shipment is pending.'));
       return;
     }
 
     if (item.version === undefined || item.version === null) {
-      setPageError('Cannot update this shipment item because the backend did not return a version. Refresh and try again.');
+      setPageError(ui('Cannot update this shipment item because the backend did not return a version. Refresh and try again.'));
       return;
     }
 
     const quantity = Number(itemEditDrafts[item.id]);
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      setPageError('Shipment item quantity must be greater than zero.');
+      setPageError(ui('Shipment item quantity must be greater than zero.'));
       return;
     }
 
@@ -1709,21 +1752,21 @@ export default function ShipmentsPage() {
 
   const handleDeleteShipmentItem = (item: ShipmentItem) => {
     if (!canManageShipmentItems) {
-      setPageError('Your current role cannot delete shipment items.');
+      setPageError(ui('Your current role cannot delete shipment items.'));
       return;
     }
 
     if (!selectedShipmentIsPending) {
-      setPageError('Shipment lines can only be deleted while the shipment is pending.');
+      setPageError(ui('Shipment lines can only be deleted while the shipment is pending.'));
       return;
     }
 
     if (item.version === undefined || item.version === null) {
-      setPageError('Cannot delete this shipment item because the backend did not return a version. Refresh and try again.');
+      setPageError(ui('Cannot delete this shipment item because the backend did not return a version. Refresh and try again.'));
       return;
     }
 
-    const confirmed = window.confirm('Delete this shipment item? This uses the current item version and cannot be undone.');
+    const confirmed = window.confirm(ui('Delete this shipment item? This uses the current item version and cannot be undone.'));
     if (!confirmed) return;
 
     setPageError(null);
@@ -1736,23 +1779,23 @@ export default function ShipmentsPage() {
 
   const handleSaveShortageReason = (item: ShipmentItem) => {
     if (!canReceiveShipments) {
-      setPageError('Shipment receive permission is required to document a receiving shortage.');
+      setPageError(ui('Shipment receive permission is required to document a receiving shortage.'));
       return;
     }
 
     if (selectedShipment?.status === 'received') {
-      setPageError('This shipment is already finalized.');
+      setPageError(ui('This shipment is already finalized.'));
       return;
     }
 
     if (item.version === undefined || item.version === null) {
-      setPageError('Cannot save the shortage reason because the item version is missing. Refresh and try again.');
+      setPageError(ui('Cannot save the shortage reason because the item version is missing. Refresh and try again.'));
       return;
     }
 
     const reason = getReceiveDraft(item).discrepancy_reason.trim();
     if (!reason) {
-      setPageError('Enter a shortage reason before saving it.');
+      setPageError(ui('Enter a shortage reason before saving it.'));
       return;
     }
 
@@ -1791,12 +1834,12 @@ export default function ShipmentsPage() {
     setPageMessage(null);
 
     if (!canManageShipments) {
-      setPageError('Your current role cannot create shipments.');
+      setPageError(ui('Your current role cannot create shipments.'));
       return;
     }
 
     if (!shipmentForm.supplier_id || !shipmentForm.delivery_date) {
-      setPageError('Select a supplier and delivery date before creating a shipment.');
+      setPageError(ui('Select a supplier and delivery date before creating a shipment.'));
       return;
     }
 
@@ -1807,30 +1850,30 @@ export default function ShipmentsPage() {
     event.preventDefault();
 
     if (!canManageShipmentItems) {
-      setPageError('Your current role cannot add shipment items. Shipment item writes are restricted by the existing backend permission.');
+      setPageError(ui('Your current role cannot add shipment items. Shipment item writes are restricted by the existing backend permission.'));
       return;
     }
     setPageError(null);
     setPageMessage(null);
 
     if (!selectedShipmentId || !selectedShipment) {
-      setPageError('Select a shipment first.');
+      setPageError(ui('Select a shipment first.'));
       return;
     }
 
     if (!selectedShipmentIsPending) {
-      setPageError('Shipment items can only be added while the shipment is pending.');
+      setPageError(ui('Shipment items can only be added while the shipment is pending.'));
       return;
     }
 
     if (!itemForm.product_id) {
-      setPageError('Select a product before adding a shipment item.');
+      setPageError(ui('Select a product before adding a shipment item.'));
       return;
     }
 
     const quantity = Number(itemForm.quantity);
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      setPageError('Shipment item quantity must be greater than zero.');
+      setPageError(ui('Shipment item quantity must be greater than zero.'));
       return;
     }
 
@@ -1839,7 +1882,7 @@ export default function ShipmentsPage() {
     );
 
     if (!selectedProduct) {
-      setPageError('The selected product is no longer available. Refresh the page and choose it again.');
+      setPageError(ui('The selected product is no longer available. Refresh the page and choose it again.'));
       return;
     }
 
@@ -1848,7 +1891,7 @@ export default function ShipmentsPage() {
       selectedProduct.supplier_id !== selectedShipment.supplier_id
     ) {
       setPageError(
-        'Product supplier does not match the selected shipment supplier. Choose a product from this supplier, or use an unassigned product.'
+        ui('Product supplier does not match the selected shipment supplier. Choose a product from this supplier, or use an unassigned product.')
       );
       return;
     }
@@ -1856,7 +1899,7 @@ export default function ShipmentsPage() {
     const parsedUnitCost = itemForm.unit_cost.trim() === '' ? null : Number(itemForm.unit_cost);
 
     if (parsedUnitCost !== null && (!Number.isFinite(parsedUnitCost) || parsedUnitCost < 0)) {
-      setPageError('Unit cost must be a valid non-negative number, or left blank.');
+      setPageError(ui('Unit cost must be a valid non-negative number, or left blank.'));
       return;
     }
 
@@ -1894,34 +1937,34 @@ export default function ShipmentsPage() {
     const hasPhysicalReceipt = quantityReceived > 0 || damagedQuantity > 0 || rejectedQuantity > 0 || quarantineQuantity > 0;
 
     setPageError(null);
-    setPageMessage(`Receive click detected at ${clickedAt}. Preparing backend request...`);
+    setPageMessage(ui('Receive click detected at {time}. Preparing backend request...').replace('{time}', clickedAt));
 
     if (!canReceiveShipments) {
-      setPageError('Receive click detected, but your current role cannot receive shipments. Log in as tenant admin or manager.');
+      setPageError(ui('Receive click detected, but your current role cannot receive shipments. Log in as tenant admin or manager.'));
       setPageMessage(null);
       return;
     }
 
     if (!selectedShipment) {
-      setPageError('Receive click detected, but no shipment is selected. Select PO-001 again and retry.');
+      setPageError(ui('Receive click detected, but no shipment is selected. Select the shipment again and retry.'));
       setPageMessage(null);
       return;
     }
 
     if (remaining <= 0) {
-      setPageError('Receive click detected, but this shipment line is already fully received.');
+      setPageError(ui('Receive click detected, but this shipment line is already fully received.'));
       setPageMessage(null);
       return;
     }
 
     if (!Number.isFinite(quantityReceived) || quantityReceived < 0 || !hasPhysicalReceipt) {
-      setPageError('Enter a usable, damaged, rejected, or quarantine quantity before receiving this line.');
+      setPageError(ui('Enter a usable, damaged, rejected, or quarantine quantity before receiving this line.'));
       setPageMessage(null);
       return;
     }
 
     if (!safeStorageLocationId) {
-      setPageError('Receive click detected, but no storage location is available. Set Scan Location to Main Warehouse, then retry.');
+      setPageError(ui('Receive click detected, but no storage location is available. Select a scan location, then retry.'));
       setPageMessage(null);
       return;
     }
@@ -1936,7 +1979,7 @@ export default function ShipmentsPage() {
       }
     }));
 
-    setPageMessage(`Sending receive request for ${formatQuantity(quantityReceived)} unit${quantityReceived === 1 ? '' : 's'} of ${item.product_name || item.product_id}...`);
+    setPageMessage(ui('Sending receive request for {quantity} unit(s) of {product}...').replace('{quantity}', formatShipmentQuantity(quantityReceived)).replace('{product}', item.product_name || item.product_id));
 
     receiveShipmentMutation.mutate({
       shipmentId: selectedShipment.id,
@@ -1964,7 +2007,7 @@ export default function ShipmentsPage() {
 
   const handleFinalizeShipment = () => {
     if (!canFinalizeShipments) {
-      setPageError('Your current role does not have the shipments.finalize permission required to finalize shipments.');
+      setPageError(ui('Your current role does not have the shipments.finalize permission required to finalize shipments.'));
       return;
     }
 
@@ -1972,31 +2015,33 @@ export default function ShipmentsPage() {
     setPageMessage(null);
 
     if (!selectedShipment) {
-      setPageError('Select a shipment first.');
+      setPageError(ui('Select a shipment first.'));
       return;
     }
 
     if (shipmentItems.length === 0) {
-      setPageError('Add shipment items before finalizing.');
+      setPageError(ui('Add shipment items before finalizing.'));
       return;
     }
 
     if (selectedShipment.status === 'received') {
-      setPageError('Shipment is already finalized.');
+      setPageError(ui('Shipment is already finalized.'));
       return;
     }
 
     if (incompleteShipmentLinesWithoutReason.length > 0) {
       setPageError(
-        `${incompleteShipmentLinesWithoutReason.length} incomplete line(s) still need a saved discrepancy reason before finalization. Enter a shortage reason on each incomplete line and use Save shortage reason; receiving additional stock is not required.`
+        ui('{count} incomplete line(s) still need a saved discrepancy reason before finalization. Enter a shortage reason on each incomplete line and use Save shortage reason; receiving additional stock is not required.')
+          .replace('{count}', formatShipmentNumber(incompleteShipmentLinesWithoutReason.length, 0))
       );
       return;
     }
 
     const confirmed = window.confirm(
       incompleteShipmentLines.length > 0
-        ? `Finalize shipment with ${incompleteShipmentLines.length} documented shortage/discrepancy line(s)? This will lock the shipment as received.`
-        : 'Finalize this fully received shipment? This will lock receiving.'
+        ? ui('Finalize shipment with {count} documented shortage/discrepancy line(s)? This will lock the shipment as received.')
+            .replace('{count}', formatShipmentNumber(incompleteShipmentLines.length, 0))
+        : ui('Finalize this fully received shipment? This will lock receiving.')
     );
 
     if (!confirmed) {
@@ -2011,7 +2056,7 @@ export default function ShipmentsPage() {
 
   const handleSendShipmentToSupplier = () => {
     if (!canSendShipments) {
-      setPageError('Your current role does not have the shipments.send permission required to email suppliers.');
+      setPageError(ui('Your current role does not have the shipments.send permission required to email suppliers.'));
       return;
     }
 
@@ -2019,12 +2064,12 @@ export default function ShipmentsPage() {
     setPageMessage(null);
 
     if (!selectedShipment) {
-      setPageError('Select a shipment first.');
+      setPageError(ui('Select a shipment first.'));
       return;
     }
 
     if (shipmentItems.length === 0) {
-      setPageError('Add at least one shipment item before preparing the supplier Purchase Order / Receiving Reference.');
+      setPageError(ui('Add at least one shipment item before preparing the supplier Purchase Order / Receiving Reference.'));
       return;
     }
 
@@ -2035,7 +2080,7 @@ export default function ShipmentsPage() {
     if (!selectedShipment || !supplierEmailPreview) return;
     const recipient = supplierEmailRecipient.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
-      setPageError('Enter a valid supplier email address before sending.');
+      setPageError(ui('Enter a valid supplier email address before sending.'));
       return;
     }
 
@@ -2067,32 +2112,32 @@ export default function ShipmentsPage() {
 
   const openProductScanner = () => {
     if (!canReceiveShipments) {
-      setPageError('Shipment receive permission is required before opening the receiving barcode scanner.');
+      setPageError(ui('Shipment receive permission is required before opening the receiving barcode scanner.'));
       return;
     }
 
     if (!selectedShipmentId) {
-      setPageError('Select a shipment before opening product scanner.');
+      setPageError(ui('Select a shipment before opening product scanner.'));
       return;
     }
 
     if (selectedShipment?.status === 'received') {
-      setPageError('This shipment is already finalized. Barcode receiving is closed.');
+      setPageError(ui('This shipment is already finalized. Barcode receiving is closed.'));
       return;
     }
 
     if (!hasShipmentItems) {
-      setPageError('Add at least one shipment item before opening the receiving barcode scanner.');
+      setPageError(ui('Add at least one shipment item before opening the receiving barcode scanner.'));
       return;
     }
 
     if (!hasRemainingQuantity) {
-      setPageError('All shipment items are already fully received. There is nothing left to scan into stock.');
+      setPageError(ui('All shipment items are already fully received. There is nothing left to scan into stock.'));
       return;
     }
 
     if (!selectedScannerLocationId) {
-      setPageError('Select a default storage location before opening product scanner.');
+      setPageError(ui('Select a default storage location before opening product scanner.'));
       return;
     }
 
@@ -2126,7 +2171,7 @@ export default function ShipmentsPage() {
         ? queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] })
         : Promise.resolve()
     ]);
-    setPageMessage('Shipment data refreshed.');
+    setPageMessage(ui('Shipment data refreshed.'));
   };
 
   return (
@@ -2134,14 +2179,14 @@ export default function ShipmentsPage() {
       <div id="shipments-overview">
         <OperationalWorkspaceHero
           iconPath="/shipments"
-          eyebrow="Procurement"
-          title="Inbound shipments"
-          description="Receive supplier deliveries into inventory, keep partial receipts visible, document shortages, and finalize only when the shipment record is complete."
+          eyebrow={ui('Procurement')}
+          title={ui('Inbound shipments')}
+          description={ui('Receive supplier deliveries into inventory, keep partial receipts visible, document shortages, and finalize only when the shipment record is complete.')}
           meta={
             <>
-              <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-              <OperationalWorkspaceMetaPill>Receiving updates stock</OperationalWorkspaceMetaPill>
-              <OperationalWorkspaceMetaPill>Purchase-order aware</OperationalWorkspaceMetaPill>
+              <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+              <OperationalWorkspaceMetaPill>{ui('Receiving updates stock')}</OperationalWorkspaceMetaPill>
+              <OperationalWorkspaceMetaPill>{ui('Purchase-order aware')}</OperationalWorkspaceMetaPill>
             </>
           }
           aside={
@@ -2151,79 +2196,79 @@ export default function ShipmentsPage() {
               onClick={handleRefreshPage}
               disabled={shipmentsQuery.isFetching || shipmentOptionsQuery.isFetching}
             >
-              {shipmentsQuery.isFetching || shipmentOptionsQuery.isFetching ? 'Refreshing...' : 'Refresh'}
+              {shipmentsQuery.isFetching || shipmentOptionsQuery.isFetching ? ui('Refreshing...') : ui('Refresh')}
             </button>
           }
         />
       </div>
 
-      <OperationalWorkspaceStats ariaLabel="Shipment receiving summary">
+      <OperationalWorkspaceStats ariaLabel={ui('Shipment receiving summary')}>
         <OperationalWorkspaceStatCard
-          label="Total shipments"
-          value={shipmentSummary.total}
-          helper="Current tenant shipment records"
+          label={ui('Total shipments')}
+          value={formatShipmentNumber(shipmentSummary.total, 0)}
+          helper={ui('Current tenant shipment records')}
           tone="neutral"
           iconPath="/shipments"
           loading={shipmentsQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Awaiting receiving"
-          value={shipmentSummary.pending}
-          helper="Created but not yet received"
+          label={ui('Awaiting receiving')}
+          value={formatShipmentNumber(shipmentSummary.pending, 0)}
+          helper={ui('Created but not yet received')}
           tone={shipmentSummary.pending ? 'warn' : 'good'}
           iconPath="/alerts"
           loading={shipmentsQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Partially received"
-          value={shipmentSummary.partial}
-          helper="Still waiting for remaining quantity"
+          label={ui('Partially received')}
+          value={formatShipmentNumber(shipmentSummary.partial, 0)}
+          helper={ui('Still waiting for remaining quantity')}
           tone={shipmentSummary.partial ? 'warn' : 'good'}
           iconPath="/shipments"
           loading={shipmentsQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Completed"
-          value={shipmentSummary.received}
-          helper="Finalized receiving records"
+          label={ui('Completed')}
+          value={formatShipmentNumber(shipmentSummary.received, 0)}
+          helper={ui('Finalized receiving records')}
           tone="good"
           iconPath="/shipments"
           loading={shipmentsQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Overdue"
-          value={shipmentSummary.overdue}
-          helper="Open shipments past delivery date"
+          label={ui('Overdue')}
+          value={formatShipmentNumber(shipmentSummary.overdue, 0)}
+          helper={ui('Open shipments past delivery date')}
           tone={shipmentSummary.overdue ? 'danger' : 'good'}
           iconPath="/alerts"
           loading={shipmentsQuery.isLoading}
         />
       </OperationalWorkspaceStats>
 
-      <OperationalWorkspaceTabs ariaLabel="Shipment work areas" hint="Jump to the part of the receiving workflow you need.">
+      <OperationalWorkspaceTabs ariaLabel={ui('Shipment work areas')} hint={ui('Jump to the part of the receiving workflow you need.')}>
         <OperationalWorkspaceTab
           active={workspaceSection === 'overview'}
           iconPath="/dashboard"
-          label="Overview"
+          label={ui('Overview')}
           onClick={() => jumpToWorkspaceSection('overview', 'shipments-overview')}
         />
         <OperationalWorkspaceTab
           active={workspaceSection === 'shipments'}
           iconPath="/shipments"
-          label="Shipment list"
+          label={ui('Shipment list')}
           count={filteredShipments.length}
           onClick={() => jumpToWorkspaceSection('shipments', 'shipments-list')}
         />
         <OperationalWorkspaceTab
           active={workspaceSection === 'create'}
           iconPath="/purchase-orders"
-          label="Create shipment"
+          label={ui('Create shipment')}
           onClick={() => jumpToWorkspaceSection('create', 'shipments-create')}
         />
         <OperationalWorkspaceTab
           active={workspaceSection === 'receiving'}
           iconPath="/scanner"
-          label="Receive & finalize"
+          label={ui('Receive & finalize')}
           count={selectedShipment ? 1 : undefined}
           onClick={() => jumpToWorkspaceSection('receiving', 'shipments-detail')}
         />
@@ -2231,7 +2276,7 @@ export default function ShipmentsPage() {
           <OperationalWorkspaceTab
             active={workspaceSection === 'advanced'}
             iconPath="/admin-system"
-            label="Advanced"
+            label={ui('Advanced')}
             onClick={() => jumpToWorkspaceSection('advanced', 'shipments-advanced')}
           />
         ) : null}
@@ -2242,39 +2287,42 @@ export default function ShipmentsPage() {
 
       {shipmentsQuery.isError ? (
         <div style={styles.errorBox}>
-          Shipment list could not be loaded. {shipmentsQuery.error instanceof ApiError ? shipmentsQuery.error.message : 'Refresh the page and try again.'}
+          {ui('Shipment list could not be loaded. {detail}').replace(
+            '{detail}',
+            shipmentsQuery.error instanceof ApiError ? shipmentsQuery.error.message : ui('Refresh the page and try again.')
+          )}
         </div>
       ) : null}
 
       {shipmentOptionsQuery.isError ? (
         <div style={styles.warningBox}>
-          Some shipment form choices could not be loaded. The shipment list remains available, but creating shipments, adding lines, or choosing receiving locations may be unavailable until the options refresh succeeds.
+          {ui('Some shipment form choices could not be loaded. The shipment list remains available, but creating shipments, adding lines, or choosing receiving locations may be unavailable until the options refresh succeeds.')}
         </div>
       ) : null}
 
       {canViewPurchaseOrders && subscriptionAccessQuery.isError ? (
         <div style={styles.warningBox}>
-          Purchase Order linking is temporarily unavailable because feature access could not be verified. Shipments can still be managed without a linked Purchase Order when your permissions allow it.
+          {ui('Purchase Order linking is temporarily unavailable because feature access could not be verified. Shipments can still be managed without a linked Purchase Order when your permissions allow it.')}
         </div>
       ) : null}
 
       {!canManageShipments || !canManageShipmentItems || !canFinalizeShipments ? (
         <div style={styles.warningBox}>
-          Current access role: {accessRoleLabel}.{' '}
+          {ui('Current access role: {role}.').replace('{role}', accessRoleLabel)}{' '}
           {[
-            !canManageShipments ? 'This role cannot create or edit shipment headers.' : null,
-            !canManageShipmentItems ? 'This role cannot change ordered shipment lines.' : null,
-            !canFinalizeShipments ? 'This role cannot finalize shipments.' : null,
+            !canManageShipments ? ui('This role cannot create or edit shipment headers.') : null,
+            !canManageShipmentItems ? ui('This role cannot change ordered shipment lines.') : null,
+            !canFinalizeShipments ? ui('This role cannot finalize shipments.') : null,
             canReceiveShipments
-              ? 'Receiving is available.'
-              : 'This role cannot receive stock from shipments.'
+              ? ui('Receiving is available.')
+              : ui('This role cannot receive stock from shipments.')
           ].filter(Boolean).join(' ')}
         </div>
       ) : null}
 
       {!canViewShipmentItems ? (
         <div style={styles.warningBox}>
-          Shipment item read permission is not available for this role. Shipment headers can still be reviewed, but line-level receiving progress and item details are hidden.
+          {ui('Shipment item read permission is not available for this role. Shipment headers can still be reviewed, but line-level receiving progress and item details are hidden.')}
         </div>
       ) : null}
 
@@ -2283,8 +2331,8 @@ export default function ShipmentsPage() {
           <div style={styles.sectionHeaderWrap}>
             <OperationalSectionHeader
               iconPath="/shipments"
-              title="Shipment List"
-              description="Find an inbound shipment, review its receiving state, and open it for line receiving or finalization."
+              title={ui('Shipment List')}
+              description={ui('Find an inbound shipment, review its receiving state, and open it for line receiving or finalization.')}
             />
           </div>
 
@@ -2297,7 +2345,7 @@ export default function ShipmentsPage() {
             <input
               style={styles.input}
               type="text"
-              placeholder="Search by PO, supplier, shipment ID, status..."
+              placeholder={ui('Search by PO, supplier, shipment ID, status...')}
               value={shipmentSearch}
               onChange={(event) => setShipmentSearch(event.target.value)}
               maxLength={255}
@@ -2308,10 +2356,10 @@ export default function ShipmentsPage() {
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
             >
-              <option value="">All statuses</option>
-              <option value="pending">Pending</option>
-              <option value="partial">Partial</option>
-              <option value="received">Received</option>
+              <option value="">{ui('All statuses')}</option>
+              <option value="pending">{ui('Pending')}</option>
+              <option value="partial">{ui('Partial')}</option>
+              <option value="received">{ui('Received')}</option>
             </select>
           </div>
 
@@ -2321,9 +2369,9 @@ export default function ShipmentsPage() {
             }}
           >
             {shipmentsQuery.isLoading ? (
-              <p style={styles.emptyState}>Loading shipments...</p>
+              <p style={styles.emptyState}>{ui('Loading shipments...')}</p>
             ) : filteredShipments.length === 0 ? (
-              <p style={styles.emptyState}>No shipments match the current filter.</p>
+              <p style={styles.emptyState}>{ui('No shipments match the current filter.')}</p>
             ) : (
               pagedShipments.map((shipment) => {
                 const isSelected = shipment.id === selectedShipmentId;
@@ -2349,35 +2397,37 @@ export default function ShipmentsPage() {
                     >
                       <div style={styles.shipmentCardTitleBlock}>
                         <div style={styles.shipmentCardTitle}>
-                          {shipment.po_number || 'No PO Number'}
+                          {shipment.po_number || ui('No PO Number')}
                         </div>
-                        <div style={styles.shipmentCardSubtle}>Reference: {shipment.id.slice(0, 8)}…</div>
+                        <div style={styles.shipmentCardSubtle}>
+                          {ui('Reference: {reference}').replace('{reference}', `${shipment.id.slice(0, 8)}…`)}
+                        </div>
                       </div>
 
                       <span style={statusBadgeStyle(shipment.status)}>
-                        {shipment.status.toUpperCase()}
+                        {shipmentStatusLabel(shipment.status)}
                       </span>
                     </div>
 
                     <div style={styles.shipmentCardMeta}>
                       <div>
-                        <strong>Supplier:</strong> {shipment.supplier_name || shipment.supplier_id}
-                        {shipment.supplier_retired ? ' (retired)' : ''}
+                        <strong>{ui('Supplier:')}</strong> {shipment.supplier_name || shipment.supplier_id}
+                        {shipment.supplier_retired ? ` ${ui('(retired)')}` : ''}
                       </div>
                       <div>
-                        <strong>Linked PO:</strong> {shipment.linked_purchase_order_number || '-'}
+                        <strong>{ui('Linked PO:')}</strong> {shipment.linked_purchase_order_number || '-'}
                       </div>
                       <div>
-                        <strong>Delivery:</strong> {formatDate(shipment.delivery_date)}
+                        <strong>{ui('Delivery:')}</strong> {formatShipmentDate(shipment.delivery_date)}
                       </div>
                       <div>
-                        <strong>Lines:</strong> {shipment.line_count ?? 0}
+                        <strong>{ui('Lines:')}</strong> {formatShipmentNumber(shipment.line_count ?? 0, 0)}
                       </div>
                       <div>
-                        <strong>Ordered:</strong> {ordered}
+                        <strong>{ui('Ordered:')}</strong> {formatShipmentNumber(ordered)}
                       </div>
                       <div>
-                        <strong>Received:</strong> {received}
+                        <strong>{ui('Received:')}</strong> {formatShipmentNumber(received)}
                       </div>
                     </div>
                   </button>
@@ -2390,17 +2440,20 @@ export default function ShipmentsPage() {
             <div style={styles.paginationRow}>
               <div style={styles.paginationMetaRow}>
                 <span style={styles.paginationSummary}>
-                  Showing {(safeShipmentPage - 1) * shipmentPageSize + 1}–{Math.min(safeShipmentPage * shipmentPageSize, filteredShipments.length)} of {filteredShipments.length}
+                  {ui('Showing {start}–{end} of {count}')
+                    .replace('{start}', formatShipmentNumber((safeShipmentPage - 1) * shipmentPageSize + 1, 0))
+                    .replace('{end}', formatShipmentNumber(Math.min(safeShipmentPage * shipmentPageSize, filteredShipments.length), 0))
+                    .replace('{count}', formatShipmentNumber(filteredShipments.length, 0))}
                 </span>
                 <select
                   style={styles.compactSelect}
                   value={shipmentPageSize}
                   onChange={(event) => setShipmentPageSize(Number(event.target.value))}
-                  aria-label="Shipments per page"
+                  aria-label={ui('Shipments per page')}
                 >
-                  <option value={25}>25 / page</option>
-                  <option value={50}>50 / page</option>
-                  <option value={100}>100 / page</option>
+                  <option value={25}>{ui('{count} / page').replace('{count}', formatShipmentNumber(25, 0))}</option>
+                  <option value={50}>{ui('{count} / page').replace('{count}', formatShipmentNumber(50, 0))}</option>
+                  <option value={100}>{ui('{count} / page').replace('{count}', formatShipmentNumber(100, 0))}</option>
                 </select>
               </div>
               <div style={styles.paginationControls}>
@@ -2414,9 +2467,13 @@ export default function ShipmentsPage() {
                   onClick={() => setShipmentPage((page) => Math.max(1, page - 1))}
                   disabled={safeShipmentPage <= 1}
                 >
-                  Previous
+                  {ui('Previous')}
                 </button>
-                <span style={styles.paginationPageLabel}>Page {safeShipmentPage} of {shipmentPageCount}</span>
+                <span style={styles.paginationPageLabel}>
+                  {ui('Page {page} of {pages}')
+                    .replace('{page}', formatShipmentNumber(safeShipmentPage, 0))
+                    .replace('{pages}', formatShipmentNumber(shipmentPageCount, 0))}
+                </span>
                 <button
                   type="button"
                   style={{
@@ -2427,7 +2484,7 @@ export default function ShipmentsPage() {
                   onClick={() => setShipmentPage((page) => Math.min(shipmentPageCount, page + 1))}
                   disabled={safeShipmentPage >= shipmentPageCount}
                 >
-                  Next
+                  {ui('Next')}
                 </button>
               </div>
             </div>
@@ -2438,14 +2495,14 @@ export default function ShipmentsPage() {
           <div style={styles.sectionHeaderWrap}>
             <OperationalSectionHeader
               iconPath="/shipments"
-              title="Create shipment"
-              description="Create the inbound record first. Supplier, expected delivery, and optional purchase-order linkage can be set before receiving begins."
+              title={ui('Create shipment')}
+              description={ui('Create the inbound record first. Supplier, expected delivery, and optional purchase-order linkage can be set before receiving begins.')}
             />
           </div>
 
           {!canManageShipments ? (
             <div style={styles.readOnlyNotice}>
-              This role can review shipments but cannot create or edit shipment headers.
+              {ui('This role can review shipments but cannot create or edit shipment headers.')}
             </div>
           ) : (
           <form
@@ -2454,7 +2511,7 @@ export default function ShipmentsPage() {
             data-skip-global-action-feedback="true"
           >
             <div>
-              <label style={styles.label}>Supplier</label>
+              <label style={styles.label}>{ui('Supplier')}</label>
               <select
                 style={styles.input}
                 value={shipmentForm.supplier_id}
@@ -2467,7 +2524,7 @@ export default function ShipmentsPage() {
                 }
                 required
               >
-                <option value="">Select supplier</option>
+                <option value="">{ui('Select supplier')}</option>
                 {suppliers.map((supplier) => (
                   <option key={supplier.id} value={supplier.id}>
                     {supplier.name}
@@ -2477,7 +2534,7 @@ export default function ShipmentsPage() {
             </div>
 
             <div>
-              <label style={styles.label}>Delivery Date</label>
+              <label style={styles.label}>{ui('Delivery Date')}</label>
               <input
                 style={styles.input}
                 type="date"
@@ -2493,7 +2550,7 @@ export default function ShipmentsPage() {
             </div>
 
             <div>
-              <label style={styles.label}>PO Number</label>
+              <label style={styles.label}>{ui('PO Number')}</label>
               <input
                 style={styles.input}
                 type="text"
@@ -2504,7 +2561,7 @@ export default function ShipmentsPage() {
                     po_number: event.target.value
                   }))
                 }
-                placeholder="Optional purchase order number"
+                placeholder={ui('Optional purchase order number')}
                 maxLength={100}
               />
             </div>
@@ -2512,13 +2569,13 @@ export default function ShipmentsPage() {
             {purchaseOrdersFeatureReady ? (
             <div>
               <div style={styles.fieldLabelRow}>
-                <label style={styles.labelInline}>Linked Purchase Order</label>
+                <label style={styles.labelInline}>{ui('Linked Purchase Order')}</label>
                 <span
                   style={styles.infoBadge}
                   role="note"
                   tabIndex={0}
-                  aria-label="Optional bridge only. Linking an approved Purchase Order does not change stock or receiving logic."
-                  title="Optional bridge only: this links an approved Purchase Order to the shipment without changing stock or receiving logic."
+                  aria-label={ui('Optional bridge only. Linking an approved Purchase Order does not change stock or receiving logic.')}
+                  title={ui('Optional bridge only: this links an approved Purchase Order to the shipment without changing stock or receiving logic.')}
                 >
                   i
                 </span>
@@ -2538,11 +2595,11 @@ export default function ShipmentsPage() {
                   }));
                 }}
               >
-                <option value="">No linked PO yet</option>
+                <option value="">{ui('No linked PO yet')}</option>
                 {linkablePurchaseOrders.map((order) => (
                   <option key={order.id} value={order.id}>
                     {order.po_number} · {order.supplier_name || order.supplier_id}
-                    {order.expected_delivery_date ? ` · ${formatDate(order.expected_delivery_date)}` : ''}
+                    {order.expected_delivery_date ? ` · ${formatShipmentDate(order.expected_delivery_date)}` : ''}
                   </option>
                 ))}
               </select>
@@ -2550,7 +2607,7 @@ export default function ShipmentsPage() {
             ) : null}
 
             <div style={styles.formActionRow}>
-              <span style={styles.actionLabelSpacer} aria-hidden="true">Action</span>
+              <span style={styles.actionLabelSpacer} aria-hidden="true">{ui('Action')}</span>
               <button
                 type="submit"
                 style={{
@@ -2560,17 +2617,17 @@ export default function ShipmentsPage() {
                 disabled={!canSubmitCreateShipment}
                 title={
                   !canManageShipments
-                    ? 'Shipments write permission required'
+                    ? ui('Shipments write permission required')
                     : !shipmentForm.supplier_id || !shipmentForm.delivery_date
-                      ? 'Select a supplier and delivery date first'
+                      ? ui('Select a supplier and delivery date first')
                       : undefined
                 }
               >
-                {createShipmentMutation.isPending ? 'Creating...' : 'Create Shipment'}
+                {createShipmentMutation.isPending ? ui('Creating...') : ui('Create Shipment')}
               </button>
               {!shipmentForm.supplier_id || !shipmentForm.delivery_date ? (
                 <p style={styles.formActionHint}>
-                  Select a supplier and delivery date before creating a shipment.
+                  {ui('Select a supplier and delivery date before creating a shipment.')}
                 </p>
               ) : null}
             </div>
@@ -2582,17 +2639,16 @@ export default function ShipmentsPage() {
           <div style={styles.sectionHeaderWrap}>
             <OperationalSectionHeader
               iconPath="/scanner"
-              title="Selected Shipment"
-              description="Add shipment lines, receive stock into locations, document shortages, and finalize the shipment."
+              title={ui('Selected Shipment')}
+              description={ui('Add shipment lines, receive stock into locations, document shortages, and finalize the shipment.')}
             />
           </div>
 
           {!selectedShipment ? (
             <div style={styles.guidedEmptyState}>
-              <div style={styles.guidedEmptyStateTitle}>Select a shipment to continue</div>
+              <div style={styles.guidedEmptyStateTitle}>{ui('Select a shipment to continue')}</div>
               <div style={styles.guidedEmptyStateText}>
-                Use the shipment list on the left to open one pending or partial shipment.
-                After that, operators can choose a scan location, receive line items, and finalize the shipment.
+                {ui('Use the shipment list to open one pending or partial shipment. Operators can then choose a scan location, receive line items, and finalize the shipment.')}
               </div>
               <div style={styles.workflowGuideGrid}>
                 {shipmentWorkflowSteps.map((step) => (
@@ -2630,26 +2686,26 @@ export default function ShipmentsPage() {
                   }}
                 >
                   <div>
-                    <strong>Status</strong>
+                    <strong>{ui('Status')}</strong>
                     <div>{formatShipmentStatus(selectedShipment.status)}</div>
                   </div>
                   <div>
-                    <strong>Supplier</strong>
+                    <strong>{ui('Supplier')}</strong>
                     <div style={{ wordBreak: 'break-word' }}>
                       {selectedShipment.supplier_name || selectedShipment.supplier_id}
-                      {selectedShipment.supplier_retired ? ' (retired)' : ''}
+                      {selectedShipment.supplier_retired ? ` (${ui('Retired')})` : ''}
                     </div>
                   </div>
                   <div>
-                    <strong>Delivery Date</strong>
-                    <div>{formatDate(selectedShipment.delivery_date)}</div>
+                    <strong>{ui('Delivery Date')}</strong>
+                    <div>{formatShipmentDate(selectedShipment.delivery_date)}</div>
                   </div>
                   <div>
-                    <strong>PO Number</strong>
+                    <strong>{ui('PO Number')}</strong>
                     <div style={{ wordBreak: 'break-all' }}>{selectedShipment.po_number || '-'}</div>
                   </div>
                   <div>
-                    <strong>Linked Purchase Order</strong>
+                    <strong>{ui('Linked Purchase Order')}</strong>
                     <div style={{ wordBreak: 'break-all' }}>
                       {selectedShipment.linked_purchase_order_number || selectedShipment.purchase_order_id || '-'}
                     </div>
@@ -2660,10 +2716,10 @@ export default function ShipmentsPage() {
                           style={{ ...styles.secondaryButton, marginTop: 8 }}
                           onClick={() => navigate(`/purchase-orders?purchaseOrderId=${encodeURIComponent(selectedShipment.purchase_order_id as string)}`)}
                         >
-                          Open PO
+                          {ui('Open PO')}
                         </button>
                         <div style={{ marginTop: 8, color: '#64748b', fontSize: '0.85rem', lineHeight: 1.4 }}>
-                          Receiving this shipment updates stock through the existing shipment flow and refreshes linked PO progress.
+                          {ui('Receiving this shipment updates stock through the existing shipment flow and refreshes linked PO progress.')}
                         </div>
                       </>
                     ) : null}
@@ -2672,9 +2728,9 @@ export default function ShipmentsPage() {
               </div>
 
               <details style={{ ...styles.advancedPanel, marginTop: 14, marginBottom: 0 }}>
-                <summary style={styles.advancedSummary}>Advanced shipment details</summary>
+                <summary style={styles.advancedSummary}>{ui('Advanced shipment details')}</summary>
                 <p style={styles.panelSubtitle}>
-                  Internal reference, record version, and QR payload are kept here for support, scanner troubleshooting, or detailed audit work.
+                  {ui('Internal reference, record version, and QR payload are kept here for support, scanner troubleshooting, or detailed audit work.')}
                 </p>
                 <div
                   style={{
@@ -2683,15 +2739,15 @@ export default function ShipmentsPage() {
                   }}
                 >
                   <div>
-                    <strong>Shipment reference</strong>
+                    <strong>{ui('Shipment reference')}</strong>
                     <div style={{ wordBreak: 'break-all' }}>{selectedShipment.id}</div>
                   </div>
                   <div>
-                    <strong>Record version</strong>
-                    <div>{selectedShipment.version}</div>
+                    <strong>{ui('Record version')}</strong>
+                    <div>{formatShipmentNumber(selectedShipment.version, 0)}</div>
                   </div>
                   <div>
-                    <strong>QR payload</strong>
+                    <strong>{ui('QR payload')}</strong>
                     <div style={{ wordBreak: 'break-all' }}>{selectedShipment.qr_code}</div>
                   </div>
                 </div>
@@ -2705,7 +2761,7 @@ export default function ShipmentsPage() {
                     onClick={() => setEditingShipment((current) => !current)}
                     disabled={updateShipmentMutation.isPending || deleteShipmentMutation.isPending}
                   >
-                    {editingShipment ? 'Cancel Edit' : 'Edit Shipment'}
+                    {editingShipment ? ui('Cancel Edit') : ui('Edit Shipment')}
                   </button>
                   <button
                     type="button"
@@ -2713,19 +2769,19 @@ export default function ShipmentsPage() {
                     onClick={handleDeleteShipment}
                     disabled={deleteShipmentMutation.isPending}
                   >
-                    {deleteShipmentMutation.isPending ? 'Deleting...' : 'Delete Shipment'}
+                    {deleteShipmentMutation.isPending ? ui('Deleting...') : ui('Delete Shipment')}
                   </button>
                 </div>
               ) : canManageShipments ? (
                 <div style={styles.readOnlyNotice}>
-                  Shipment header and line structure are locked after receiving starts. Receiving and finalization remain available according to your permissions.
+                  {ui('Shipment header and line structure are locked after receiving starts. Receiving and finalization remain available according to your permissions.')}
                 </div>
               ) : null}
 
               {editingShipment ? (
                 <form onSubmit={handleUpdateShipment} style={styles.formGrid}>
                   <div>
-                    <label style={styles.label}>Supplier</label>
+                    <label style={styles.label}>{ui('Supplier')}</label>
                     <select
                       style={styles.input}
                       value={editShipmentForm.supplier_id}
@@ -2738,7 +2794,7 @@ export default function ShipmentsPage() {
                       }
                       required
                     >
-                      <option value="">Select supplier</option>
+                      <option value="">{ui('Select supplier')}</option>
                       {suppliers.map((supplier) => (
                         <option key={supplier.id} value={supplier.id}>
                           {supplier.name}
@@ -2748,7 +2804,7 @@ export default function ShipmentsPage() {
                   </div>
 
                   <div>
-                    <label style={styles.label}>Delivery Date</label>
+                    <label style={styles.label}>{ui('Delivery Date')}</label>
                     <input
                       style={styles.input}
                       type="date"
@@ -2764,7 +2820,7 @@ export default function ShipmentsPage() {
                   </div>
 
                   <div>
-                    <label style={styles.label}>PO Number</label>
+                    <label style={styles.label}>{ui('PO Number')}</label>
                     <input
                       style={styles.input}
                       type="text"
@@ -2775,14 +2831,14 @@ export default function ShipmentsPage() {
                           po_number: event.target.value
                         }))
                       }
-                      placeholder="Optional purchase order number"
+                      placeholder={ui('Optional purchase order number')}
                       maxLength={100}
                     />
                   </div>
 
                   {purchaseOrdersFeatureReady ? (
                     <div>
-                      <label style={styles.label}>Linked Purchase Order</label>
+                      <label style={styles.label}>{ui('Linked Purchase Order')}</label>
                       <select
                         style={styles.input}
                         value={editShipmentForm.purchase_order_id}
@@ -2797,7 +2853,7 @@ export default function ShipmentsPage() {
                           }));
                         }}
                       >
-                        <option value="">No linked PO</option>
+                        <option value="">{ui('No linked PO')}</option>
                         {editLinkablePurchaseOrders.map((order) => (
                           <option key={order.id} value={order.id}>
                             {order.po_number} · {order.supplier_name || order.supplier_id}
@@ -2813,7 +2869,7 @@ export default function ShipmentsPage() {
                       style={styles.primaryButton}
                       disabled={updateShipmentMutation.isPending}
                     >
-                      {updateShipmentMutation.isPending ? 'Saving...' : 'Save Shipment'}
+                      {updateShipmentMutation.isPending ? ui('Saving...') : ui('Save Shipment')}
                     </button>
                   </div>
                 </form>
@@ -2828,32 +2884,32 @@ export default function ShipmentsPage() {
                 <div style={styles.readinessCard}>
                   <div style={styles.readinessHeaderRow}>
                     <div>
-                      <h4 style={styles.sectionTitle}>Receiving Progress</h4>
+                      <h4 style={styles.sectionTitle}>{ui('Receiving Progress')}</h4>
                       <div style={styles.inlineHint}>
-                        Keep operators oriented while partially receiving the shipment.
+                        {ui('Keep operators oriented while partially receiving the shipment.')}
                       </div>
                     </div>
                     <span style={canFinalizeSelectedShipment ? styles.progressBadgeComplete : styles.progressBadgePending}>
-                      {canFinalizeSelectedShipment ? 'Ready to finalize' : `${Math.round(selectedShipmentProgress)}% received`}
+                      {canFinalizeSelectedShipment ? ui('Ready to finalize') : ui('{percent}% received').replace('{percent}', formatShipmentNumber(Math.round(selectedShipmentProgress), 0))}
                     </span>
                   </div>
 
                   <div style={styles.progressSummaryRow}>
                     <div style={styles.progressMetricBox}>
-                      <strong>Received</strong>
-                      <div>{formatQuantity(selectedShipmentReceivedTotal)}</div>
+                      <strong>{ui('Received')}</strong>
+                      <div>{formatShipmentQuantity(selectedShipmentReceivedTotal)}</div>
                     </div>
                     <div style={styles.progressMetricBox}>
-                      <strong>Ordered</strong>
-                      <div>{formatQuantity(selectedShipmentOrderedTotal)}</div>
+                      <strong>{ui('Ordered')}</strong>
+                      <div>{formatShipmentQuantity(selectedShipmentOrderedTotal)}</div>
                     </div>
                     <div style={styles.progressMetricBox}>
-                      <strong>Remaining</strong>
-                      <div>{formatQuantity(selectedShipmentRemainingTotal)}</div>
+                      <strong>{ui('Remaining')}</strong>
+                      <div>{formatShipmentQuantity(selectedShipmentRemainingTotal)}</div>
                     </div>
                   </div>
 
-                  <div style={styles.progressBarTrack} aria-label="Shipment receive progress">
+                  <div style={styles.progressBarTrack} aria-label={ui('Shipment receive progress')}>
                     <div
                       style={{
                         ...styles.progressBarFill,
@@ -2870,27 +2926,27 @@ export default function ShipmentsPage() {
                 <div style={styles.readinessCard}>
                   <div style={styles.readinessHeaderRow}>
                     <div>
-                      <h4 style={styles.sectionTitle}>Scanner Readiness</h4>
+                      <h4 style={styles.sectionTitle}>{ui('Scanner Readiness')}</h4>
                       <div style={styles.inlineHint}>
-                        Make scan destination explicit before operators open the scanner.
+                        {ui('Make scan destination explicit before operators open the scanner.')}
                       </div>
                     </div>
                     <span style={scannerReceivingReady ? styles.readinessStatusReady : styles.readinessStatusBlocked}>
                       {scannerReceivingReady
-                        ? 'Ready to scan'
+                        ? ui('Ready to scan')
                         : !canReceiveShipments
-                          ? 'Receive permission required'
+                          ? ui('Receive permission required')
                           : selectedShipment?.status === 'received' || !hasRemainingQuantity
-                            ? 'Receiving closed'
+                            ? ui('Receiving closed')
                             : !hasShipmentItems
-                              ? 'Items required'
-                              : 'Location required'}
+                              ? ui('Items required')
+                              : ui('Location required')}
                     </span>
                   </div>
 
                   <label style={styles.label}>
-                    Default receiving location
-                    <div style={styles.inlineHint}>Required for barcode scanning and auto-receive</div>
+                    {ui('Default receiving location')}
+                    <div style={styles.inlineHint}>{ui('Required for barcode scanning and auto-receive')}</div>
                   </label>
 
                   <select
@@ -2898,9 +2954,9 @@ export default function ShipmentsPage() {
                     value={selectedScannerLocationId}
                     onChange={(event) => setSelectedScannerLocationId(event.target.value)}
                     disabled={!canReceiveShipments}
-                    title={!canReceiveShipments ? 'Shipment receive permission is required' : undefined}
+                    title={!canReceiveShipments ? ui('Shipment receive permission is required') : undefined}
                   >
-                    <option value="">Select location</option>
+                    <option value="">{ui('Select location')}</option>
                     {storageLocations.map((location) => (
                       <option key={location.id} value={location.id}>
                         {location.name}
@@ -2910,31 +2966,31 @@ export default function ShipmentsPage() {
 
                   {!canReceiveShipments ? (
                     <div style={styles.scanWarningBanner}>
-                      The current role can review shipments but cannot receive stock. Shipment receive permission is required for barcode receiving.
+                      {ui('The current role can review shipments but cannot receive stock. Shipment receive permission is required for barcode receiving.')}
                     </div>
                   ) : !hasStorageLocations ? (
                     <div style={styles.scanWarningBanner}>
-                      No storage locations are available for this tenant. Create a storage location before scanning or receiving inventory.
+                      {ui('No storage locations are available for this tenant. Create a storage location before scanning or receiving inventory.')}
                     </div>
                   ) : selectedShipment?.status === 'received' ? (
                     <div style={styles.scanWarningBanner}>
-                      This shipment is finalized. Barcode receiving is closed.
+                      {ui('This shipment is finalized. Barcode receiving is closed.')}
                     </div>
                   ) : !hasShipmentItems ? (
                     <div style={styles.scanWarningBanner}>
-                      Add at least one shipment item before barcode receiving.
+                      {ui('Add at least one shipment item before barcode receiving.')}
                     </div>
                   ) : !hasRemainingQuantity ? (
                     <div style={styles.scanReadyBanner}>
-                      All shipment items are already fully received.
+                      {ui('All shipment items are already fully received.')}
                     </div>
                   ) : selectedScannerLocationId ? (
                     <div style={styles.scanReadyBanner}>
-                      Scanning into: <strong>{selectedScannerLocationName}</strong>
+                      {ui('Scanning into:')} <strong>{selectedScannerLocationName}</strong>
                     </div>
                   ) : (
                     <div style={styles.scanWarningBanner}>
-                      Default receiving location required before scanning.
+                      {ui('Default receiving location required before scanning.')}
                     </div>
                   )}
                 </div>
@@ -2942,14 +2998,14 @@ export default function ShipmentsPage() {
 
               <div style={styles.sectionDivider} />
 
-              <h4 style={styles.sectionTitle}>Add Shipment Item</h4>
+              <h4 style={styles.sectionTitle}>{ui('Add Shipment Item')}</h4>
               {!canManageShipmentItems ? (
                 <div style={styles.readOnlyNotice}>
-                  This role can review shipment lines but cannot add or change ordered shipment items.
+                  {ui('This role can review shipment lines but cannot add or change ordered shipment items.')}
                 </div>
               ) : !selectedShipmentIsPending ? (
                 <div style={styles.readOnlyNotice}>
-                  Ordered shipment lines are locked because receiving has already started. Continue with receiving and discrepancy documentation below.
+                  {ui('Ordered shipment lines are locked because receiving has already started. Continue with receiving and discrepancy documentation below.')}
                 </div>
               ) : (
               <form
@@ -2958,7 +3014,7 @@ export default function ShipmentsPage() {
                 data-skip-global-action-feedback="true"
               >
                 <div>
-                  <label style={styles.label}>Product</label>
+                  <label style={styles.label}>{ui('Product')}</label>
                   <select
                     style={styles.input}
                     value={itemForm.product_id}
@@ -2970,7 +3026,7 @@ export default function ShipmentsPage() {
                     }
                     required
                   >
-                    <option value="">Select product</option>
+                    <option value="">{ui('Select product')}</option>
                     {shipmentProductOptions.map((product) => (
                       <option key={product.id} value={product.id}>
                         {product.name}
@@ -2982,14 +3038,14 @@ export default function ShipmentsPage() {
                   {selectedShipment ? (
                     <div style={styles.inlineHint}>
                       {selectedShipment.purchase_order_id
-                        ? 'List is limited to products on the linked Purchase Order that are compatible with this supplier.'
-                        : 'List is limited to products from this shipment supplier, plus products without supplier assignment.'}
+                        ? ui('List is limited to products on the linked Purchase Order that are compatible with this supplier.')
+                        : ui('List is limited to products from this shipment supplier, plus products without supplier assignment.')}
                     </div>
                   ) : null}
                 </div>
 
                 <div>
-                  <label style={styles.label}>Quantity</label>
+                  <label style={styles.label}>{ui('Quantity')}</label>
                   <input
                     style={styles.input}
                     type="number"
@@ -3007,7 +3063,7 @@ export default function ShipmentsPage() {
                 </div>
 
                 <div>
-                  <label style={styles.label}>Unit Cost</label>
+                  <label style={styles.label}>{ui('Unit Cost')}</label>
                   <input
                     style={styles.input}
                     type="number"
@@ -3020,34 +3076,34 @@ export default function ShipmentsPage() {
                         unit_cost: event.target.value
                       }))
                     }
-                    placeholder="Optional cost per unit"
+                    placeholder={ui('Optional cost per unit')}
                   />
                   <div style={styles.inlineHint}>
-                    Used by inventory valuation reports after receiving.
+                    {ui('Used by inventory valuation reports after receiving.')}
                   </div>
                 </div>
 
                 <div>
-                  <label style={styles.label}>Planned Storage Location</label>
+                  <label style={styles.label}>{ui('Planned Storage Location')}</label>
                   <select style={styles.input} value={itemForm.storage_location_id} onChange={(event) => setItemForm((current) => ({ ...current, storage_location_id: event.target.value }))}>
-                    <option value="">Set when receiving</option>
+                    <option value="">{ui('Set when receiving')}</option>
                     {storageLocations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label style={styles.label}>Lot Number</label>
-                  <input style={styles.input} value={itemForm.lot_number} onChange={(event) => setItemForm((current) => ({ ...current, lot_number: event.target.value }))} placeholder="Optional; can be confirmed at receipt" />
+                  <label style={styles.label}>{ui('Lot Number')}</label>
+                  <input style={styles.input} value={itemForm.lot_number} onChange={(event) => setItemForm((current) => ({ ...current, lot_number: event.target.value }))} placeholder={ui('Optional; can be confirmed at receipt')} />
                 </div>
                 <div>
-                  <label style={styles.label}>Batch Number</label>
-                  <input style={styles.input} value={itemForm.batch_number} onChange={(event) => setItemForm((current) => ({ ...current, batch_number: event.target.value }))} placeholder="Optional; can be confirmed at receipt" />
+                  <label style={styles.label}>{ui('Batch Number')}</label>
+                  <input style={styles.input} value={itemForm.batch_number} onChange={(event) => setItemForm((current) => ({ ...current, batch_number: event.target.value }))} placeholder={ui('Optional; can be confirmed at receipt')} />
                 </div>
                 <div>
-                  <label style={styles.label}>Manufactured Date</label>
+                  <label style={styles.label}>{ui('Manufactured Date')}</label>
                   <input style={styles.input} type="date" value={itemForm.manufactured_at} onChange={(event) => setItemForm((current) => ({ ...current, manufactured_at: event.target.value }))} />
                 </div>
                 <div>
-                  <label style={styles.label}>Expiry Date</label>
+                  <label style={styles.label}>{ui('Expiry Date')}</label>
                   <input style={styles.input} type="date" value={itemForm.expiry_date} onChange={(event) => setItemForm((current) => ({ ...current, expiry_date: event.target.value }))} />
                 </div>
 
@@ -3061,16 +3117,16 @@ export default function ShipmentsPage() {
                     disabled={!canSubmitShipmentItem}
                     title={
                       !canManageShipmentItems
-                        ? 'Shipment item write permission required'
+                        ? ui('Shipment item write permission required')
                         : !itemForm.product_id
-                          ? 'Select a product before adding the shipment item'
+                          ? ui('Select a product before adding the shipment item')
                           : undefined
                     }
                   >
-                    {addShipmentItemMutation.isPending ? 'Adding...' : 'Add Shipment Item'}
+                    {addShipmentItemMutation.isPending ? ui('Adding...') : ui('Add Shipment Item')}
                   </button>
                   {!itemForm.product_id ? (
-                    <div style={styles.inlineHint}>Select a product before adding a shipment item.</div>
+                    <div style={styles.inlineHint}>{ui('Select a product before adding a shipment item.')}</div>
                   ) : null}
                 </div>
               </form>
@@ -3086,15 +3142,15 @@ export default function ShipmentsPage() {
                 }}
               >
                 <div style={styles.itemsHeaderContent}>
-                  <h4 style={styles.sectionTitle}>Shipment Items</h4>
+                  <h4 style={styles.sectionTitle}>{ui('Shipment Items')}</h4>
 
                   <div style={styles.defaultLocationSummary}>
-                    <strong>Default receiving location:</strong>{' '}
-                    {selectedScannerLocationId ? selectedScannerLocationName : 'Not selected'}
+                    <strong>{ui('Default receiving location:')}</strong>{' '}
+                    {selectedScannerLocationId ? selectedScannerLocationName : ui('Not selected')}
                     <div style={styles.inlineHint}>
                       {selectedScannerLocationId
-                        ? 'Scanner is ready and will receive matched items into this location.'
-                        : 'Barcode scanning stays disabled until a scan destination is chosen above.'}
+                        ? ui('Scanner is ready and will receive matched items into this location.')
+                        : ui('Barcode scanning stays disabled until a scan destination is chosen above.')}
                     </div>
                   </div>
                 </div>
@@ -3118,9 +3174,9 @@ export default function ShipmentsPage() {
                     onClick={openProductScanner}
                     data-skip-global-action-feedback="true"
                     disabled={!scannerReceivingReady}
-                    title={scannerReceivingBlockedReason || 'Open receiving barcode scanner'}
+                    title={scannerReceivingBlockedReason || ui('Open receiving barcode scanner')}
                   >
-                    Scan Barcode
+                    {ui('Scan Barcode')}
                   </button>
 
                   <div
@@ -3147,21 +3203,21 @@ export default function ShipmentsPage() {
                       }
                       title={
                         !canSendShipments
-                          ? 'Shipments send permission required'
+                          ? ui('Shipments send permission required')
                           : shipmentItems.length === 0
-                            ? 'Add at least one shipment item before emailing the supplier'
-                            : 'Open a supplier email and Purchase Order / Receiving Reference preview. Nothing is sent until you confirm in the preview.'
+                            ? ui('Add at least one shipment item before emailing the supplier')
+                            : ui('Open a supplier email and Purchase Order / Receiving Reference preview. Nothing is sent until you confirm in the preview.')
                       }
                     >
                       {previewShipmentSupplierEmailMutation.isPending
-                        ? 'Preparing Preview...'
+                        ? ui('Preparing Preview...')
                         : selectedShipment.purchase_order_id
-                          ? 'Preview & Send Purchase Order'
-                          : 'Preview & Send Supplier Shipment Request'}
+                          ? ui('Preview & Send Purchase Order')
+                          : ui('Preview & Send Supplier Shipment Request')}
                     </button>
 
                     <div style={styles.emailSupplierHint}>
-                      Opens a confirmation preview first. The PDF includes buyer/supplier details, item prices when recorded, and the Receiving QR used to identify this shipment on arrival.
+                      {ui('Opens a confirmation preview first. The PDF includes buyer/supplier details, item prices when recorded, and the Receiving QR used to identify this shipment on arrival.')}
                     </div>
                   </div>
 
@@ -3179,31 +3235,32 @@ export default function ShipmentsPage() {
                       !canFinalizeShipments ||
                       !canFinalizeSelectedShipment
                     }
-                    title={!canFinalizeShipments ? 'Shipments finalize permission required' : finalizeReadinessMessage}
+                    title={!canFinalizeShipments ? ui('Shipments finalize permission required') : finalizeReadinessMessage}
                   >
-                    {finalizeShipmentMutation.isPending ? 'Finalizing...' : 'Finalize Shipment'}
+                    {finalizeShipmentMutation.isPending ? ui('Finalizing...') : ui('Finalize Shipment')}
                   </button>
                 </div>
               </div>
 
               {incompleteShipmentLinesWithoutReason.length > 0 ? (
                 <div style={styles.finalizeBlockedBanner}>
-                  Finalization blocked: {incompleteShipmentLinesWithoutReason.length} incomplete line(s) do not have a saved discrepancy reason.
+                  {ui('Finalization blocked: {count} incomplete line(s) do not have a saved discrepancy reason.')
+                    .replace('{count}', formatShipmentNumber(incompleteShipmentLinesWithoutReason.length, 0))}
                 </div>
               ) : null}
 
               {!canViewShipmentItems ? (
                 <div style={styles.readOnlyNotice}>
-                  Shipment item details are not available to this role. No line-level data has been loaded.
+                  {ui('Shipment item details are not available to this role. No line-level data has been loaded.')}
                 </div>
               ) : shipmentItemsQuery.isError ? (
                 <div style={styles.errorBox}>
-                  Shipment items could not be loaded. {shipmentItemsQuery.error instanceof ApiError ? shipmentItemsQuery.error.message : 'Refresh the selected shipment and try again.'}
+                  {ui('Shipment items could not be loaded.')} {shipmentItemsQuery.error instanceof ApiError ? shipmentItemsQuery.error.message : ui('Refresh the selected shipment and try again.')}
                 </div>
               ) : shipmentItemsQuery.isLoading ? (
-                <p style={styles.emptyState}>Loading shipment items...</p>
+                <p style={styles.emptyState}>{ui('Loading shipment items...')}</p>
               ) : shipmentItems.length === 0 ? (
-                <p style={styles.emptyState}>No shipment items yet.</p>
+                <p style={styles.emptyState}>{ui('No shipment items yet.')}</p>
               ) : (
                 <div style={styles.mobileItemCardList}>
                   {shipmentItems.map((item) => {
@@ -3236,15 +3293,15 @@ export default function ShipmentsPage() {
                       receiveQuantityIsValid &&
                       !receiveShipmentMutation.isPending;
                     const receiveLineDisabledReason = !canReceiveShipments
-                      ? 'Shipments receive permission required.'
+                      ? ui('Shipments receive permission required.')
                       : remaining <= 0
-                        ? 'This line is already fully received.'
+                        ? ui('This line is already fully received.')
                         : selectedShipment.status === 'received'
-                          ? 'This shipment is already received.'
+                          ? ui('This shipment is already received.')
                           : !effectiveReceiveLocationId
-                            ? 'Select a storage location before receiving this line.'
+                            ? ui('Select a storage location before receiving this line.')
                             : !receiveQuantityIsValid
-                              ? `Enter usable quantity up to ${formatQuantity(remaining)}, or record damaged, rejected, or quarantine quantity.`
+                              ? ui('Enter usable quantity up to {quantity}, or record damaged, rejected, or quarantine quantity.').replace('{quantity}', formatLocalizedNumber(remaining, locale, { maximumFractionDigits: 2 }))
                               : null;
 
                     return (
@@ -3258,11 +3315,11 @@ export default function ShipmentsPage() {
                         <div style={styles.mobileItemCardHeader}>
                           <div style={styles.mobileItemCardTitle}>
                             {item.product_name || item.product_id}
-                            {item.product_retired ? ' (retired)' : ''}
+                            {item.product_retired ? ` (${ui('Retired')})` : ''}
                           </div>
                           <div style={styles.mobileBadgeRow}>
                             {isHighlighted ? (
-                              <span style={styles.mobileScannedBadge}>Scanned Match</span>
+                              <span style={styles.mobileScannedBadge}>{ui('Scanned Match')}</span>
                             ) : null}
 
                             <span
@@ -3270,57 +3327,57 @@ export default function ShipmentsPage() {
                                 remaining <= 0 ? styles.mobileDoneBadge : styles.mobilePendingBadge
                               }
                             >
-                              {remaining <= 0 ? 'Received' : `${formatQuantity(remaining)} remaining`}
+                              {remaining <= 0 ? ui('Received') : ui('{quantity} remaining').replace('{quantity}', formatLocalizedNumber(remaining, locale, { maximumFractionDigits: 2 }))}
                             </span>
 
                             {remaining > 0 && hasSavedShortageReason ? (
-                              <span style={styles.mobileDiscrepancyBadge}>Reason saved</span>
+                              <span style={styles.mobileDiscrepancyBadge}>{ui('Reason saved')}</span>
                             ) : null}
                           </div>
                         </div>
 
                         <div style={styles.mobileItemMetaGrid}>
                           <div>
-                            <strong>Ordered</strong>
-                            <div>{formatQuantity(ordered)}</div>
+                            <strong>{ui('Ordered')}</strong>
+                            <div>{formatShipmentQuantity(ordered)}</div>
                           </div>
                           <div>
-                            <strong>Received</strong>
-                            <div>{formatQuantity(received)}</div>
+                            <strong>{ui('Received')}</strong>
+                            <div>{formatShipmentQuantity(received)}</div>
                           </div>
                           <div>
-                            <strong>Remaining</strong>
-                            <div>{formatQuantity(remaining)}</div>
+                            <strong>{ui('Remaining')}</strong>
+                            <div>{formatLocalizedNumber(remaining, locale, { maximumFractionDigits: 2 })}</div>
                           </div>
                           <div>
-                            <strong>Unit Cost</strong>
-                            <div>{item.unit_cost === null || item.unit_cost === undefined || item.unit_cost === '' ? '-' : formatCurrency(item.unit_cost, item.unit_cost_currency)}</div>
+                            <strong>{ui('Unit Cost')}</strong>
+                            <div>{item.unit_cost === null || item.unit_cost === undefined || item.unit_cost === '' ? '-' : formatShipmentCurrency(item.unit_cost, item.unit_cost_currency)}</div>
                           </div>
                           <div>
-                            <strong>Recorded Location</strong>
+                            <strong>{ui('Recorded Location')}</strong>
                             <div style={{ wordBreak: 'break-word' }}>
                               {item.storage_location_name || item.storage_location_id || '-'}
-                              {item.storage_location_retired ? ' (retired)' : ''}
+                              {item.storage_location_retired ? ` (${ui('Retired')})` : ''}
                             </div>
                           </div>
                           <div>
-                            <strong>Lot / Batch</strong>
-                            <div>{[item.lot_number ? `Lot ${item.lot_number}` : '', item.batch_number ? `Batch ${item.batch_number}` : ''].filter(Boolean).join(' · ') || '-'}</div>
+                            <strong>{ui('Lot / Batch')}</strong>
+                            <div>{[item.lot_number ? `${ui('Lot')} ${item.lot_number}` : '', item.batch_number ? `${ui('Batch')} ${item.batch_number}` : ''].filter(Boolean).join(' · ') || '-'}</div>
                           </div>
                           <div>
-                            <strong>Expiry</strong>
-                            <div>{item.expiry_date ? formatDate(item.expiry_date) : '-'}</div>
+                            <strong>{ui('Expiry')}</strong>
+                            <div>{item.expiry_date ? formatShipmentDate(item.expiry_date) : '-'}</div>
                           </div>
                           <div>
-                            <strong>Receiving Exceptions</strong>
-                            <div>Short {formatQuantity(toNumber(item.shortage_quantity))} · Over {formatQuantity(toNumber(item.overage_quantity))} · Damaged {formatQuantity(toNumber(item.damaged_quantity))} · Rejected {formatQuantity(toNumber(item.rejected_quantity))} · Quarantine {formatQuantity(toNumber(item.quarantine_quantity))}</div>
+                            <strong>{ui('Receiving Exceptions')}</strong>
+                            <div>{ui('Short {shortage} · Over {overage} · Damaged {damaged} · Rejected {rejected} · Quarantine {quarantine}').replace('{shortage}', formatShipmentQuantity(item.shortage_quantity)).replace('{overage}', formatShipmentQuantity(item.overage_quantity)).replace('{damaged}', formatShipmentQuantity(item.damaged_quantity)).replace('{rejected}', formatShipmentQuantity(item.rejected_quantity)).replace('{quarantine}', formatShipmentQuantity(item.quarantine_quantity))}</div>
                           </div>
                         </div>
 
                         {canManageShipmentItems && selectedShipmentIsPending ? (
                           <div style={styles.itemManagementPanel}>
                             <div style={styles.itemManagementInputBlock}>
-                              <label style={styles.label}>Ordered Quantity</label>
+                              <label style={styles.label}>{ui('Ordered Quantity')}</label>
                               <input
                                 style={styles.input}
                                 type="number"
@@ -3337,7 +3394,7 @@ export default function ShipmentsPage() {
                                 onClick={() => handleUpdateShipmentItem(item)}
                                 disabled={updateShipmentItemMutation.isPending}
                               >
-                                {updateShipmentItemMutation.isPending ? 'Saving...' : 'Save Line'}
+                                {updateShipmentItemMutation.isPending ? ui('Saving...') : ui('Save Line')}
                               </button>
                               <button
                                 type="button"
@@ -3345,7 +3402,7 @@ export default function ShipmentsPage() {
                                 onClick={() => handleDeleteShipmentItem(item)}
                                 disabled={deleteShipmentItemMutation.isPending}
                               >
-                                {deleteShipmentItemMutation.isPending ? 'Deleting...' : 'Delete Line'}
+                                {deleteShipmentItemMutation.isPending ? ui('Deleting...') : ui('Delete Line')}
                               </button>
                             </div>
                           </div>
@@ -3353,15 +3410,15 @@ export default function ShipmentsPage() {
 
                         {remaining > 0 && item.discrepancy_reason ? (
                           <div style={styles.savedReasonBox}>
-                            Saved discrepancy reason: {item.discrepancy_reason}
+                            {ui('Saved discrepancy reason:')} {item.discrepancy_reason}
                           </div>
                         ) : null}
 
                         <div style={styles.receiveLinePanel}>
-                          <div style={styles.receiveLinePanelTitle}>Receive this line</div>
+                          <div style={styles.receiveLinePanelTitle}>{ui('Receive this line')}</div>
                           <div style={styles.receiveLineGrid}>
                             <div style={styles.receiveLineField}>
-                              <label style={styles.label}>Storage Location</label>
+                              <label style={styles.label}>{ui('Storage Location')}</label>
                               <select
                                 style={styles.input}
                                 value={draft.storage_location_id}
@@ -3372,7 +3429,7 @@ export default function ShipmentsPage() {
                                   }))
                                 }
                               >
-                                <option value="">Select location</option>
+                                <option value="">{ui('Select location')}</option>
                                 {storageLocations.map((location) => (
                                   <option key={location.id} value={location.id}>
                                     {location.name}
@@ -3382,7 +3439,7 @@ export default function ShipmentsPage() {
                             </div>
 
                             <div style={styles.receiveLineField}>
-                              <label style={styles.label}>Usable Quantity Received</label>
+                              <label style={styles.label}>{ui('Usable Quantity Received')}</label>
                               <input
                                 style={styles.input}
                                 type="number"
@@ -3399,68 +3456,68 @@ export default function ShipmentsPage() {
                             </div>
 
                             <div style={styles.receiveLineField}>
-                              <label style={styles.label}>Unit of Measure</label>
+                              <label style={styles.label}>{ui('Unit of Measure')}</label>
                               <input
                                 style={styles.input}
                                 value={draft.uom_code}
-                                placeholder="Leave blank for base unit; e.g. CASE"
+                                placeholder={ui('Leave blank for base unit; e.g. CASE')}
                                 onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, uom_code: event.target.value }))}
                               />
                             </div>
 
                             <div style={styles.receiveLineField}>
-                              <label style={styles.label}>Serial Numbers</label>
+                              <label style={styles.label}>{ui('Serial Numbers')}</label>
                               <textarea
                                 style={{ ...styles.input, minHeight: 72, resize: 'vertical' }}
                                 value={draft.serial_numbers}
-                                placeholder="One serial per received unit when serial tracking requires it"
+                                placeholder={ui('One serial per received unit when serial tracking requires it')}
                                 onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, serial_numbers: event.target.value }))}
                               />
                             </div>
 
                             <div style={styles.receiveLineField}>
-                              <label style={styles.label}>Lot Number</label>
+                              <label style={styles.label}>{ui('Lot Number')}</label>
                               <input style={styles.input} value={draft.lot_number} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, lot_number: event.target.value }))} />
                             </div>
                             <div style={styles.receiveLineField}>
-                              <label style={styles.label}>Batch Number</label>
+                              <label style={styles.label}>{ui('Batch Number')}</label>
                               <input style={styles.input} value={draft.batch_number} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, batch_number: event.target.value }))} />
                             </div>
                             <div style={styles.receiveLineField}>
-                              <label style={styles.label}>Manufactured Date</label>
+                              <label style={styles.label}>{ui('Manufactured Date')}</label>
                               <input style={styles.input} type="date" value={draft.manufactured_at} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, manufactured_at: event.target.value }))} />
                             </div>
                             <div style={styles.receiveLineField}>
-                              <label style={styles.label}>Expiry Date</label>
+                              <label style={styles.label}>{ui('Expiry Date')}</label>
                               <input style={styles.input} type="date" value={draft.expiry_date} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, expiry_date: event.target.value }))} />
                             </div>
                             <div style={styles.receiveLineField}>
-                              <label style={styles.label}>Shortage Quantity</label>
+                              <label style={styles.label}>{ui('Shortage Quantity')}</label>
                               <input style={styles.input} type="number" min="0" step="0.01" value={draft.shortage_quantity} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, shortage_quantity: event.target.value }))} />
                             </div>
                             <div style={styles.receiveLineField}>
-                              <label style={styles.label}>Overage Quantity</label>
+                              <label style={styles.label}>{ui('Overage Quantity')}</label>
                               <input style={styles.input} type="number" min="0" step="0.01" value={draft.overage_quantity} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, overage_quantity: event.target.value }))} />
                             </div>
                             <div style={styles.receiveLineField}>
-                              <label style={styles.label}>Damaged Quantity</label>
+                              <label style={styles.label}>{ui('Damaged Quantity')}</label>
                               <input style={styles.input} type="number" min="0" step="0.01" value={draft.damaged_quantity} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, damaged_quantity: event.target.value }))} />
                             </div>
                             <div style={styles.receiveLineField}>
-                              <label style={styles.label}>Rejected Quantity</label>
+                              <label style={styles.label}>{ui('Rejected Quantity')}</label>
                               <input style={styles.input} type="number" min="0" step="0.01" value={draft.rejected_quantity} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, rejected_quantity: event.target.value }))} />
                             </div>
                             <div style={styles.receiveLineField}>
-                              <label style={styles.label}>Quarantine Quantity</label>
+                              <label style={styles.label}>{ui('Quarantine Quantity')}</label>
                               <input style={styles.input} type="number" min="0" step="0.01" value={draft.quarantine_quantity} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, quarantine_quantity: event.target.value }))} />
                             </div>
 
                             <div style={styles.receiveLineField}>
-                              <label style={styles.label}>Discrepancy Reason</label>
+                              <label style={styles.label}>{ui('Discrepancy Reason')}</label>
                               <input
                                 style={styles.input}
                                 type="text"
-                                placeholder="Required only if this line remains short"
+                                placeholder={ui('Required only if this line remains short')}
                                 value={draft.discrepancy_reason}
                                 maxLength={1000}
                                 onChange={(event) =>
@@ -3473,11 +3530,11 @@ export default function ShipmentsPage() {
                             </div>
 
                             <div style={styles.receiveLineField}>
-                              <label style={styles.label}>Receiving Note</label>
+                              <label style={styles.label}>{ui('Receiving Note')}</label>
                               <input
                                 style={styles.input}
                                 type="text"
-                                placeholder="Optional receiving note"
+                                placeholder={ui('Optional receiving note')}
                                 value={draft.receiving_note}
                                 maxLength={4000}
                                 onChange={(event) =>
@@ -3499,9 +3556,9 @@ export default function ShipmentsPage() {
                                 }}
                                 onClick={() => handleReceiveLine(item)}
                                 disabled={!canSubmitReceiveLine}
-                                title={receiveLineDisabledReason || 'Receive this shipment line into stock.'}
+                                title={receiveLineDisabledReason || ui('Receive this shipment line into stock.')}
                               >
-                                {receiveShipmentMutation.isPending ? 'Receiving...' : 'Receive Item'}
+                                {receiveShipmentMutation.isPending ? ui('Receiving...') : ui('Receive Item')}
                               </button>
                               {remaining > 0 && selectedShipment.status !== 'received' && canReceiveShipments ? (
                                 <button
@@ -3513,9 +3570,9 @@ export default function ShipmentsPage() {
                                     recordReceivingDiscrepancyMutation.isPending ||
                                     !draft.discrepancy_reason.trim()
                                   }
-                                  title="Save a shortage reason without receiving stock. Use this when the supplier delivered zero or the line will remain short."
+                                  title={ui('Save a shortage reason without receiving stock. Use this when the supplier delivered zero or the line will remain short.')}
                                 >
-                                  {recordReceivingDiscrepancyMutation.isPending ? 'Saving reason...' : 'Save shortage reason'}
+                                  {recordReceivingDiscrepancyMutation.isPending ? ui('Saving reason...') : ui('Save shortage reason')}
                                 </button>
                               ) : null}
                               {receiveLineDisabledReason ? (
@@ -3523,7 +3580,7 @@ export default function ShipmentsPage() {
                               ) : null}
                               {remaining > 0 && canReceiveShipments ? (
                                 <div style={styles.inlineHint}>
-                                  If no units arrived, enter the shortage reason and save it without receiving stock.
+                                  {ui('If no units arrived, enter the shortage reason and save it without receiving stock.')}
                                 </div>
                               ) : null}
                             </div>
@@ -3545,14 +3602,14 @@ export default function ShipmentsPage() {
           <div style={styles.sectionHeaderWrap}>
             <OperationalSectionHeader
               iconPath="/admin-system"
-              title="Advanced shipment controls"
-              description="Less common legacy actions stay separated from the normal receiving workflow."
+              title={ui('Advanced shipment controls')}
+              description={ui('Less common legacy actions stay separated from the normal receiving workflow.')}
             />
           </div>
           <details style={{ ...styles.advancedPanel, marginBottom: 0 }}>
-            <summary style={styles.advancedSummary}>Legacy direct reorder</summary>
+            <summary style={styles.advancedSummary}>{ui('Legacy direct reorder')}</summary>
             <p style={styles.panelSubtitle}>
-              This older shortcut creates pending shipments directly from low-stock rules. Use Procurement Recommendations or Replenishment Planning for normal governed purchasing.
+              {ui('This older shortcut creates pending shipments directly from low-stock rules. Use Procurement Recommendations or Replenishment Planning for normal governed purchasing.')}
             </p>
             <button
               type="button"
@@ -3560,7 +3617,7 @@ export default function ShipmentsPage() {
               onClick={handleAutoReorderShipments}
               disabled={autoReorderShipmentMutation.isPending}
             >
-              {autoReorderShipmentMutation.isPending ? 'Running direct reorder...' : 'Run direct reorder'}
+              {autoReorderShipmentMutation.isPending ? ui('Running direct reorder...') : ui('Run direct reorder')}
             </button>
           </details>
         </section>
@@ -3571,24 +3628,24 @@ export default function ShipmentsPage() {
           <section style={styles.emailPreviewModal} role="dialog" aria-modal="true" aria-labelledby="supplier-email-preview-title">
             <div style={styles.emailPreviewHeader}>
               <div>
-                <h3 id="supplier-email-preview-title" style={styles.emailPreviewTitle}>Supplier Email Preview</h3>
-                <div style={styles.inlineHint}>Review the recipient, message, {supplierEmailPreview.document.document_title}, and Receiving QR. Nothing has been sent yet.</div>
+                <h3 id="supplier-email-preview-title" style={styles.emailPreviewTitle}>{ui('Supplier Email Preview')}</h3>
+                <div style={styles.inlineHint}>{ui('Review the recipient, message, {documentTitle}, and Receiving QR. Nothing has been sent yet.').replace('{documentTitle}', supplierEmailPreview.document.document_title)}</div>
               </div>
-              <button type="button" style={styles.secondaryButton} onClick={closeSupplierEmailPreview} disabled={sendShipmentToSupplierMutation.isPending}>Close</button>
+              <button type="button" style={styles.secondaryButton} onClick={closeSupplierEmailPreview} disabled={sendShipmentToSupplierMutation.isPending}>{ui('Close')}</button>
             </div>
 
             <div style={styles.emailPreviewFields}>
               <label style={styles.field}>
-                <span style={styles.label}>To</span>
+                <span style={styles.label}>{ui('To')}</span>
                 <input type="email" style={styles.input} value={supplierEmailRecipient} onChange={(event) => setSupplierEmailRecipient(event.target.value)} disabled={sendShipmentToSupplierMutation.isPending} />
               </label>
               <label style={styles.field}>
-                <span style={styles.label}>Subject</span>
+                <span style={styles.label}>{ui('Subject')}</span>
                 <input style={{ ...styles.input, background: '#f9fafb' }} value={supplierEmailPreview.subject} readOnly />
               </label>
               <label style={{ ...styles.field, gridColumn: '1 / -1' }}>
-                <span style={styles.label}>Optional email message</span>
-                <textarea style={{ ...styles.input, minHeight: 78, resize: 'vertical' }} value={supplierEmailMessage} onChange={(event) => setSupplierEmailMessage(event.target.value)} maxLength={4000} disabled={sendShipmentToSupplierMutation.isPending} placeholder="Optional message to supplier" />
+                <span style={styles.label}>{ui('Optional email message')}</span>
+                <textarea style={{ ...styles.input, minHeight: 78, resize: 'vertical' }} value={supplierEmailMessage} onChange={(event) => setSupplierEmailMessage(event.target.value)} maxLength={4000} disabled={sendShipmentToSupplierMutation.isPending} placeholder={ui('Optional message to supplier')} />
               </label>
             </div>
 
@@ -3597,48 +3654,48 @@ export default function ShipmentsPage() {
                 <div>
                   <div style={styles.documentTitle}>{supplierEmailPreview.document.document_title}</div>
                   <div style={styles.inlineHint}>
-                    {supplierEmailPreview.document.linked_purchase_order_id ? 'PO / Reference' : 'Shipment reference'}: {supplierEmailPreview.document.po_number || supplierEmailPreview.document.shipment_id}
+                    {supplierEmailPreview.document.linked_purchase_order_id ? ui('PO / Reference') : ui('Shipment reference')}: {supplierEmailPreview.document.po_number || supplierEmailPreview.document.shipment_id}
                   </div>
                 </div>
                 {supplierEmailPreview.qr_image_data_uri ? (
-                  <img src={supplierEmailPreview.qr_image_data_uri} alt="Receiving QR code" style={styles.previewQr} />
+                  <img src={supplierEmailPreview.qr_image_data_uri} alt={ui('Receiving QR code')} style={styles.previewQr} />
                 ) : null}
               </div>
 
               <div style={styles.documentPartyGrid}>
                 <div style={styles.documentPartyCard}>
-                  <strong>Buyer / Delivery To</strong>
+                  <strong>{ui('Buyer / Delivery To')}</strong>
                   <span>{supplierEmailPreview.document.buyer.name}</span>
-                  <span>{supplierEmailPreview.document.buyer.address || 'Business address not recorded'}</span>
-                  <span>{supplierEmailPreview.document.buyer.email || 'Business email not recorded'}</span>
-                  <span>{supplierEmailPreview.document.buyer.phone || 'Business phone not recorded'}</span>
-                  {supplierEmailPreview.document.buyer.tax_id ? <span>Tax / VAT ID: {supplierEmailPreview.document.buyer.tax_id}</span> : null}
+                  <span>{supplierEmailPreview.document.buyer.address || ui('Business address not recorded')}</span>
+                  <span>{supplierEmailPreview.document.buyer.email || ui('Business email not recorded')}</span>
+                  <span>{supplierEmailPreview.document.buyer.phone || ui('Business phone not recorded')}</span>
+                  {supplierEmailPreview.document.buyer.tax_id ? <span>{ui('Tax / VAT ID:')} {supplierEmailPreview.document.buyer.tax_id}</span> : null}
                 </div>
                 <div style={styles.documentPartyCard}>
-                  <strong>Supplier</strong>
+                  <strong>{ui('Supplier')}</strong>
                   <span>{supplierEmailPreview.document.supplier.name}</span>
-                  <span>{supplierEmailPreview.document.supplier.address || 'Supplier address not recorded'}</span>
+                  <span>{supplierEmailPreview.document.supplier.address || ui('Supplier address not recorded')}</span>
                   <span>{supplierEmailPreview.document.supplier.email || supplierEmailRecipient}</span>
-                  <span>{supplierEmailPreview.document.supplier.phone || 'Supplier phone not recorded'}</span>
-                  {supplierEmailPreview.document.supplier.tax_id ? <span>Tax / VAT ID: {supplierEmailPreview.document.supplier.tax_id}</span> : null}
+                  <span>{supplierEmailPreview.document.supplier.phone || ui('Supplier phone not recorded')}</span>
+                  {supplierEmailPreview.document.supplier.tax_id ? <span>{ui('Tax / VAT ID:')} {supplierEmailPreview.document.supplier.tax_id}</span> : null}
                 </div>
               </div>
 
               <div style={styles.documentMetaGrid}>
-                <span><strong>Issue:</strong> {formatDate(supplierEmailPreview.document.issue_date)}</span>
-                <span><strong>Expected delivery:</strong> {formatDate(supplierEmailPreview.document.expected_delivery_date)}</span>
-                <span><strong>Delivery address:</strong> {supplierEmailPreview.document.delivery_address || 'Not specified'}</span>
+                <span><strong>{ui('Issue:')}</strong> {formatShipmentDate(supplierEmailPreview.document.issue_date)}</span>
+                <span><strong>{ui('Expected delivery:')}</strong> {formatShipmentDate(supplierEmailPreview.document.expected_delivery_date)}</span>
+                <span><strong>{ui('Delivery address:')}</strong> {supplierEmailPreview.document.delivery_address || ui('Not specified')}</span>
                 {supplierEmailPreview.document.show_pricing ? (
                   <>
-                    <span><strong>Payment terms:</strong> {supplierEmailPreview.document.payment_terms || 'Not specified'}</span>
-                    <span><strong>Approved by:</strong> {supplierEmailPreview.document.approved_by || 'Not specified'}</span>
-                    <span><strong>Currency:</strong> {supplierEmailPreview.document.currency || 'Not specified'}</span>
+                    <span><strong>{ui('Payment terms:')}</strong> {supplierEmailPreview.document.payment_terms || ui('Not specified')}</span>
+                    <span><strong>{ui('Approved by:')}</strong> {supplierEmailPreview.document.approved_by || ui('Not specified')}</span>
+                    <span><strong>{ui('Currency:')}</strong> {supplierEmailPreview.document.currency || ui('Not specified')}</span>
                   </>
                 ) : null}
               </div>
               {supplierEmailPreview.document.notes ? (
                 <div style={styles.documentNotes}>
-                  <strong>{supplierEmailPreview.document.linked_purchase_order_id ? 'PO notes' : 'Shipment instructions'}:</strong> {supplierEmailPreview.document.notes}
+                  <strong>{supplierEmailPreview.document.linked_purchase_order_id ? ui('PO notes') : ui('Shipment instructions')}:</strong> {supplierEmailPreview.document.notes}
                 </div>
               ) : null}
 
@@ -3646,26 +3703,26 @@ export default function ShipmentsPage() {
                 <table style={styles.table}>
                   <thead>
                     <tr>
-                      <th style={styles.th}>SKU</th>
-                      <th style={styles.th}>Product</th>
-                      <th style={styles.th}>Qty</th>
-                      <th style={styles.th}>UoM</th>
-                      {supplierEmailPreview.document.show_pricing ? <th style={styles.th}>Unit price</th> : null}
-                      {supplierEmailPreview.document.show_pricing ? <th style={styles.th}>Line total</th> : null}
+                      <th style={styles.th}>{ui('SKU')}</th>
+                      <th style={styles.th}>{ui('Product')}</th>
+                      <th style={styles.th}>{ui('Qty')}</th>
+                      <th style={styles.th}>{ui('UoM')}</th>
+                      {supplierEmailPreview.document.show_pricing ? <th style={styles.th}>{ui('Unit price')}</th> : null}
+                      {supplierEmailPreview.document.show_pricing ? <th style={styles.th}>{ui('Line total')}</th> : null}
                     </tr>
                   </thead>
                   <tbody>
                     {supplierEmailPreview.document.items.map((item) => (
                       <tr key={item.product_id}>
-                        <td style={styles.td}>{item.supplier_sku || item.sku || 'Not specified'}</td>
+                        <td style={styles.td}>{item.supplier_sku || item.sku || ui('Not specified')}</td>
                         <td style={styles.td}>{item.product_name}</td>
-                        <td style={styles.td}>{formatQuantity(toNumber(item.quantity))}</td>
-                        <td style={styles.td}>{item.unit || 'Not specified'}</td>
+                        <td style={styles.td}>{formatShipmentQuantity(item.quantity)}</td>
+                        <td style={styles.td}>{item.unit || ui('Not specified')}</td>
                         {supplierEmailPreview.document.show_pricing ? (
-                          <td style={styles.td}>{item.unit_price == null ? 'Not specified' : formatCurrency(item.unit_price, supplierEmailPreview.document.currency)}</td>
+                          <td style={styles.td}>{item.unit_price == null ? ui('Not specified') : formatShipmentCurrency(item.unit_price, supplierEmailPreview.document.currency)}</td>
                         ) : null}
                         {supplierEmailPreview.document.show_pricing ? (
-                          <td style={styles.td}>{item.line_total == null ? 'Not specified' : formatCurrency(item.line_total, supplierEmailPreview.document.currency)}</td>
+                          <td style={styles.td}>{item.line_total == null ? ui('Not specified') : formatShipmentCurrency(item.line_total, supplierEmailPreview.document.currency)}</td>
                         ) : null}
                       </tr>
                     ))}
@@ -3674,27 +3731,27 @@ export default function ShipmentsPage() {
               </div>
               {supplierEmailPreview.document.show_pricing ? (
                 <div style={styles.documentTotal}>
-                  <strong>Order subtotal:</strong> {supplierEmailPreview.document.subtotal == null ? 'Not specified' : formatCurrency(supplierEmailPreview.document.subtotal, supplierEmailPreview.document.currency)}
+                  <strong>{ui('Order subtotal:')}</strong> {supplierEmailPreview.document.subtotal == null ? ui('Not specified') : formatShipmentCurrency(supplierEmailPreview.document.subtotal, supplierEmailPreview.document.currency)}
                 </div>
               ) : null}
               {supplierEmailPreview.document.show_pricing && supplierEmailPreview.document.pricing_complete === false ? (
-                <div style={styles.emailPreviewWarning}>One or more lines do not have a recorded unit price. The document shows “Not specified” rather than inventing a value.</div>
+                <div style={styles.emailPreviewWarning}>{ui('One or more lines do not have a recorded unit price. The document shows “Not specified” rather than inventing a value.')}</div>
               ) : null}
               <div style={styles.qrPurposeBox}>
-                <strong>Receiving QR Code</strong>
+                <strong>{ui('Receiving QR Code')}</strong>
                 <span>{supplierEmailPreview.document.qr_code}</span>
                 <span>{supplierEmailPreview.document.qr_purpose}</span>
               </div>
-              <div style={styles.attachmentLine}>PDF attachment: <strong>{supplierEmailPreview.document.pdf_filename}</strong></div>
+              <div style={styles.attachmentLine}>{ui('PDF attachment:')} <strong>{supplierEmailPreview.document.pdf_filename}</strong></div>
             </div>
 
             <div style={styles.emailConfirmationBox}>
-              This email and attached {supplierEmailPreview.document.document_title} will be sent to <strong>{supplierEmailRecipient || 'the entered recipient'}</strong>.
+              {ui('This email and attached {documentTitle} will be sent to {recipient}.').replace('{documentTitle}', supplierEmailPreview.document.document_title).replace('{recipient}', supplierEmailRecipient || ui('the entered recipient'))}
             </div>
             <div style={styles.emailPreviewActions}>
-              <button type="button" style={styles.secondaryButton} onClick={closeSupplierEmailPreview} disabled={sendShipmentToSupplierMutation.isPending}>Cancel</button>
+              <button type="button" style={styles.secondaryButton} onClick={closeSupplierEmailPreview} disabled={sendShipmentToSupplierMutation.isPending}>{ui('Cancel')}</button>
               <button type="button" style={styles.emailSupplierButton} onClick={handleConfirmSupplierEmailSend} disabled={sendShipmentToSupplierMutation.isPending || !supplierEmailRecipient.trim()}>
-                {sendShipmentToSupplierMutation.isPending ? 'Sending...' : 'Confirm & Send Email'}
+                {sendShipmentToSupplierMutation.isPending ? ui('Sending...') : ui('Confirm & Send Email')}
               </button>
             </div>
           </section>

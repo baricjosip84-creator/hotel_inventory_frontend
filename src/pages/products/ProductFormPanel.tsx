@@ -3,6 +3,7 @@ import type { ProductItem, SupplierItem } from '../../types/inventory';
 import type { ProductFormState } from './productCoreApi';
 import { styles } from './productStyles';
 import { getActiveTenantCurrency } from '../../lib/tenantCurrency';
+import { useAppTranslation } from '../../i18n/I18nContext';
 
 type ProductFormPanelProps = {
   editingProduct: ProductItem | null;
@@ -29,19 +30,20 @@ export function ProductFormPanel({
   onCancelEdit,
   setForm
 }: ProductFormPanelProps) {
+  const { ui } = useAppTranslation();
   const fieldsDisabled = isSubmitting || !canManageProducts;
   const submitDisabled = fieldsDisabled || !form.sku.trim() || !form.name.trim() || !form.unit.trim();
 
   return (
     <section id="product-form-panel" style={styles.panel}>
-      <h3 style={styles.panelTitle}>{editingProduct ? 'Edit Product' : 'Create Product'}</h3>
+      <h3 style={styles.panelTitle}>{editingProduct ? ui('Edit Product') : ui('Create Product')}</h3>
       <p style={styles.panelSubtitle}>
         {canManageProducts
-          ? 'Maintain product master records used across stock, shipments, receiving, alerts, and reporting.'
-          : 'This form is read-only because the current role does not have products.write permission.'}
+          ? ui('Maintain product master records used across stock, shipments, receiving, alerts, and reporting.')
+          : ui('This form is read-only because the current role does not have products.write permission.')}
       </p>
       <p style={styles.panelSubtitle}>
-        Barcode here is the backward-compatible default package barcode. Additional package barcodes are managed from the Product List.
+        {ui("Barcode here is the backward-compatible default package barcode. Additional package barcodes are managed from the Product List.")}
       </p>
 
       {formError ? <div style={styles.errorBox}>{formError}</div> : null}
@@ -55,28 +57,28 @@ export function ProductFormPanel({
             style={styles.input}
             value={form.sku}
             onChange={(event) => setForm((current) => ({ ...current, sku: event.target.value }))}
-            placeholder="Example: BEV-COFFEE-001"
+            placeholder={ui("Example: BEV-COFFEE-001")}
             required
             disabled={fieldsDisabled}
           />
-          <div style={styles.fieldHint}>Required unique product code used by imports, integrations, and searches.</div>
+          <div style={styles.fieldHint}>{ui("Required unique product code used by imports, integrations, and searches.")}</div>
         </div>
 
         <div>
-          <label htmlFor="product-name" style={styles.label}>Product Name</label>
+          <label htmlFor="product-name" style={styles.label}>{ui("Product Name")}</label>
           <input
             id="product-name"
             style={styles.input}
             value={form.name}
             onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-            placeholder="Example: Coffee Beans Premium"
+            placeholder={ui("Example: Coffee Beans Premium")}
             required
             disabled={fieldsDisabled}
           />
         </div>
 
         <div>
-          <label htmlFor="product-category" style={styles.label}>Category</label>
+          <label htmlFor="product-category" style={styles.label}>{ui("Category")}</label>
           <input
             id="product-category"
             style={styles.input}
@@ -84,26 +86,26 @@ export function ProductFormPanel({
             onChange={(event) =>
               setForm((current) => ({ ...current, category: event.target.value }))
             }
-            placeholder="Example: Beverages"
+            placeholder={ui("Example: Beverages")}
             disabled={fieldsDisabled}
           />
         </div>
 
         <div>
-          <label htmlFor="product-unit" style={styles.label}>Unit</label>
+          <label htmlFor="product-unit" style={styles.label}>{ui("Unit")}</label>
           <input
             id="product-unit"
             style={styles.input}
             value={form.unit}
             onChange={(event) => setForm((current) => ({ ...current, unit: event.target.value }))}
-            placeholder="Example: bottle"
+            placeholder={ui("Example: bottle")}
             required
             disabled={fieldsDisabled}
           />
         </div>
 
         <div>
-          <label htmlFor="product-min-stock" style={styles.label}>Minimum Stock</label>
+          <label htmlFor="product-min-stock" style={styles.label}>{ui("Minimum Stock")}</label>
           <input
             id="product-min-stock"
             style={styles.input}
@@ -120,7 +122,7 @@ export function ProductFormPanel({
         </div>
 
         <div>
-          <label htmlFor="product-standard-cost" style={styles.label}>Standard Unit Cost ({getActiveTenantCurrency()})</label>
+          <label htmlFor="product-standard-cost" style={styles.label}>{ui("Standard Unit Cost (")}{getActiveTenantCurrency()})</label>
           <input
             id="product-standard-cost"
             style={styles.input}
@@ -132,14 +134,14 @@ export function ProductFormPanel({
             onChange={(event) =>
               setForm((current) => ({ ...current, standard_unit_cost: event.target.value }))
             }
-            placeholder="Optional fallback cost"
+            placeholder={ui("Optional fallback cost")}
             disabled={fieldsDisabled}
           />
-          <div style={styles.fieldHint}>Tenant-base cost in {getActiveTenantCurrency()}; used only when no compatible received movement cost exists yet.</div>
+          <div style={styles.fieldHint}>{ui("Tenant-base cost in")} {getActiveTenantCurrency()}{ui("; used only when no compatible received movement cost exists yet.")}</div>
         </div>
 
         <div>
-          <label htmlFor="product-supplier" style={styles.label}>Supplier</label>
+          <label htmlFor="product-supplier" style={styles.label}>{ui("Supplier")}</label>
           <select
             id="product-supplier"
             style={styles.input}
@@ -149,7 +151,7 @@ export function ProductFormPanel({
             }
             disabled={fieldsDisabled}
           >
-            <option value="">No supplier assigned</option>
+            <option value="">{ui("No supplier assigned")}</option>
             {suppliers.map((supplier) => (
               <option key={supplier.id} value={supplier.id}>
                 {supplier.name}
@@ -159,7 +161,7 @@ export function ProductFormPanel({
         </div>
 
         <div>
-          <label htmlFor="product-default-barcode" style={styles.label}>Default Barcode</label>
+          <label htmlFor="product-default-barcode" style={styles.label}>{ui("Default Barcode")}</label>
           <input
             id="product-default-barcode"
             style={styles.input}
@@ -167,7 +169,7 @@ export function ProductFormPanel({
             onChange={(event) =>
               setForm((current) => ({ ...current, barcode: event.target.value }))
             }
-            placeholder="Scan or enter default package barcode"
+            placeholder={ui("Scan or enter default package barcode")}
             disabled={fieldsDisabled}
           />
         </div>
@@ -175,13 +177,13 @@ export function ProductFormPanel({
         <div style={{ display: 'grid', gap: 8 }}>
           <label style={{ ...styles.label, display: 'flex', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" checked={form.requires_lot_tracking} onChange={(event) => setForm((current) => ({ ...current, requires_lot_tracking: event.target.checked }))} disabled={fieldsDisabled} />
-            Require lot / batch when stock is added
+            {ui("Require lot / batch when stock is added")}
           </label>
           <label style={{ ...styles.label, display: 'flex', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" checked={form.requires_expiry_date} onChange={(event) => setForm((current) => ({ ...current, requires_expiry_date: event.target.checked }))} disabled={fieldsDisabled} />
-            Require expiry date when stock is added
+            {ui("Require expiry date when stock is added")}
           </label>
-          <div style={styles.fieldHint}>Leave these off for products that do not need this tracking.</div>
+          <div style={styles.fieldHint}>{ui("Leave these off for products that do not need this tracking.")}</div>
         </div>
 
         <div style={styles.formActions}>
@@ -192,16 +194,16 @@ export function ProductFormPanel({
           >
             {isSubmitting
               ? editingProduct
-                ? 'Updating...'
-                : 'Creating...'
+                ? ui('Updating...')
+                : ui('Creating...')
               : editingProduct
-                ? 'Update Product'
-                : 'Create Product'}
+                ? ui('Update Product')
+                : ui('Create Product')}
           </button>
 
           {editingProduct ? (
             <button type="button" style={styles.secondaryButton} onClick={onCancelEdit} disabled={isSubmitting}>
-              Cancel
+              {ui("Cancel")}
             </button>
           ) : null}
         </div>

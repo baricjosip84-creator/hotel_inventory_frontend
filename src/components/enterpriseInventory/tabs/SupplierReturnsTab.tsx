@@ -2,7 +2,10 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../../../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
-import { formatCurrency, formatDate, formatDateTime, formatNumber, normalizeError } from '../EnterpriseInventoryFormat';
+import { getActiveTenantCurrency } from '../../../lib/tenantCurrency';
+import { useAppTranslation } from '../../../i18n/I18nContext';
+import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../../../i18n/formatters';
+import { normalizeError } from '../EnterpriseInventoryFormat';
 import { InputField, SelectField, TextareaField } from '../EnterpriseInventoryShared';
 import { postEnterpriseInventoryRequest, postEnterpriseInventoryVersionedRequest } from '../EnterpriseInventoryRequests';
 import { styles } from '../EnterpriseInventoryStyles';
@@ -84,13 +87,8 @@ type ReturnLifecycleInput = {
   reason?: string;
 };
 
-const labelize = (value: string | null | undefined) =>
-  value ? value.replace(/[_-]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase()) : '-';
-
-const lotIdentity = (lot: Pick<EligibleReturnLot, 'lot_number' | 'batch_number'>) =>
-  lot.lot_number || lot.batch_number || 'Unnumbered lot';
-
 export function SupplierReturnsTab() {
+  const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
   const canRead = hasPermission(TENANT_PERMISSIONS.SUPPLIER_RETURNS_READ);
   const canWrite = hasPermission(TENANT_PERMISSIONS.SUPPLIER_RETURNS_WRITE);
@@ -105,6 +103,32 @@ export function SupplierReturnsTab() {
   const [draftItems, setDraftItems] = useState<DraftReturnItem[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const formatQuantity = (value: number | string | null | undefined) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? formatLocalizedNumber(parsed, locale, { maximumFractionDigits: 4 }) : '—';
+  };
+  const formatMoney = (value: number | string | null | undefined, currency?: string | null) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed)
+      ? formatLocalizedCurrency(parsed, currency || getActiveTenantCurrency(), locale, { maximumFractionDigits: 4 })
+      : '—';
+  };
+  const conditionLabel = (value: string | null | undefined) => {
+    const labels: Record<string, string> = {
+      available: 'Available', hold: 'Hold', quarantine: 'Quarantine', damaged: 'Damaged', rejected: 'Rejected',
+    };
+    return value && labels[value] ? ui(labels[value]) : String(value || '—');
+  };
+  const statusLabel = (value: string | null | undefined) => {
+    const labels: Record<string, string> = {
+      draft: 'Draft', submitted: 'Submitted', pending_approval: 'Pending approval', approved: 'Approved',
+      rejected: 'Rejected', dispatched: 'Dispatched', completed: 'Completed', cancelled: 'Cancelled',
+    };
+    return value && labels[value] ? ui(labels[value]) : String(value || '—');
+  };
+  const lotIdentity = (lot: Pick<EligibleReturnLot, 'lot_number' | 'batch_number'>) =>
+    lot.lot_number || lot.batch_number || ui('Unnumbered lot');
 
   const returnsQuery = useQuery({
     queryKey: ['enterprise-supplier-returns'],
@@ -163,12 +187,12 @@ export function SupplierReturnsTab() {
       setReturnReason('');
       setNotes('');
       setError(null);
-      setMessage(`Supplier return ${created.return_number || ''} created as a draft.`.trim());
+      setMessage(ui('Supplier return {returnNumber} created as a draft.').replace('{returnNumber}', created.return_number || ''));
       await refreshReturnData();
     },
     onError: (mutationError) => {
       setMessage(null);
-      setError(normalizeError(mutationError, 'Failed to create supplier return.'));
+      setError(normalizeError(mutationError, ui('Failed to create supplier return.')));
     },
   });
 
@@ -198,21 +222,21 @@ export function SupplierReturnsTab() {
       );
     },
     onSuccess: async (_result, input) => {
-      const successLabels: Record<ReturnLifecycleAction, string> = {
-        submit: 'submitted',
-        approve: 'approved',
-        reject: 'rejected',
-        dispatch: 'dispatched',
-        complete: 'completed',
-        cancel: 'cancelled',
+      const messages: Record<ReturnLifecycleAction, string> = {
+        submit: 'Supplier return {returnNumber} submitted successfully.',
+        approve: 'Supplier return {returnNumber} approved successfully.',
+        reject: 'Supplier return {returnNumber} rejected successfully.',
+        dispatch: 'Supplier return {returnNumber} dispatched successfully.',
+        complete: 'Supplier return {returnNumber} completed successfully.',
+        cancel: 'Supplier return {returnNumber} cancelled successfully.',
       };
       setError(null);
-      setMessage(`${input.item.return_number} ${successLabels[input.action]} successfully.`);
+      setMessage(ui(messages[input.action]).replace('{returnNumber}', input.item.return_number));
       await refreshReturnData();
     },
     onError: (mutationError) => {
       setMessage(null);
-      setError(normalizeError(mutationError, 'Failed to update supplier return.'));
+      setError(normalizeError(mutationError, ui('Failed to update supplier return.')));
     },
   });
 
@@ -220,17 +244,17 @@ export function SupplierReturnsTab() {
     setMessage(null);
     setError(null);
     if (!selectedLot) {
-      setError('Select a received inventory lot to return.');
+      setError(ui('Select a received inventory lot to return.'));
       return;
     }
     const quantity = Number(lineQuantity);
     const returnable = Number(selectedLot.returnable_quantity ?? 0);
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      setError('Return quantity must be greater than zero.');
+      setError(ui('Return quantity must be greater than zero.'));
       return;
     }
     if (quantity > returnable + 0.0000001) {
-      setError(`Return quantity cannot exceed ${formatNumber(returnable)} for this lot.`);
+      setError(ui('Return quantity cannot exceed {quantity} for this lot.').replace('{quantity}', formatQuantity(returnable)));
       return;
     }
     setDraftItems((current) => [
@@ -245,29 +269,29 @@ export function SupplierReturnsTab() {
   const runLifecycleAction = (item: SupplierReturn, action: ReturnLifecycleAction) => {
     if (lifecycleMutation.isPending) return;
     if (action === 'reject') {
-      const reason = window.prompt(`Reason for rejecting ${item.return_number}:`);
+      const reason = window.prompt(ui('Reason for rejecting {returnNumber}:').replace('{returnNumber}', item.return_number));
       if (reason === null) return;
       lifecycleMutation.mutate({ item, action, reason });
       return;
     }
     if (action === 'cancel') {
-      const reason = window.prompt(`Reason for cancelling ${item.return_number}:`);
+      const reason = window.prompt(ui('Reason for cancelling {returnNumber}:').replace('{returnNumber}', item.return_number));
       if (reason === null) return;
       lifecycleMutation.mutate({ item, action, reason });
       return;
     }
     const prompts: Partial<Record<ReturnLifecycleAction, string>> = {
-      submit: `Submit ${item.return_number}?`,
-      approve: `Approve ${item.return_number}?`,
-      dispatch: `Dispatch ${item.return_number}? This removes the returned quantity from physical inventory.`,
-      complete: `Mark ${item.return_number} completed after the supplier has received it?`,
+      submit: ui('Submit {returnNumber}?').replace('{returnNumber}', item.return_number),
+      approve: ui('Approve {returnNumber}?').replace('{returnNumber}', item.return_number),
+      dispatch: ui('Dispatch {returnNumber}? This removes the returned quantity from physical inventory.').replace('{returnNumber}', item.return_number),
+      complete: ui('Mark {returnNumber} completed after the supplier has received it?').replace('{returnNumber}', item.return_number),
     };
     if (prompts[action] && !window.confirm(prompts[action])) return;
     lifecycleMutation.mutate({ item, action });
   };
 
   if (!canRead) {
-    return <section style={styles.card}><p style={styles.helper}>Supplier returns require {TENANT_PERMISSIONS.SUPPLIER_RETURNS_READ} permission.</p></section>;
+    return <section style={styles.card}><p style={styles.helper}>{ui('Supplier returns require {permission} permission.').replace('{permission}', TENANT_PERMISSIONS.SUPPLIER_RETURNS_READ)}</p></section>;
   }
 
   return (
@@ -277,159 +301,109 @@ export function SupplierReturnsTab() {
 
       <section className="inventory-controls-grid" style={styles.grid}>
         <div style={styles.card}>
-          <h2 style={styles.cardTitle}>Create supplier return</h2>
-          <p style={styles.helper}>Return received stock to its original supplier. Items in one return must belong to the same supplier.</p>
+          <h2 style={styles.cardTitle}>{ui('Create supplier return')}</h2>
+          <p style={styles.helper}>{ui('Return received stock to its original supplier. Items in one return must belong to the same supplier.')}</p>
           <div style={{ marginTop: 14 }}>
             <SelectField
-              label="Received lot"
+              label={ui('Received lot')}
               value={selectedLotId}
               onChange={setSelectedLotId}
               disabled={!canWrite || createReturnMutation.isPending}
               options={availableLotOptions.map((lot) => ({
                 value: lot.inventory_lot_id,
-                label: `${lot.supplier_name} · ${lot.product_name} · ${labelize(lot.condition)} · ${lotIdentity(lot)} · ${formatNumber(lot.returnable_quantity)} available to return`,
+                label: ui('{supplier} · {product} · {condition} · {lot} · {quantity} available to return')
+                  .replace('{supplier}', lot.supplier_name)
+                  .replace('{product}', lot.product_name)
+                  .replace('{condition}', conditionLabel(lot.condition))
+                  .replace('{lot}', lotIdentity(lot))
+                  .replace('{quantity}', formatQuantity(lot.returnable_quantity)),
               }))}
             />
-            <InputField
-              label="Return quantity"
-              type="number"
-              min="0.0001"
-              max={selectedLot ? String(selectedLot.returnable_quantity) : undefined}
-              value={lineQuantity}
-              onChange={setLineQuantity}
-              disabled={!canWrite || createReturnMutation.isPending}
-            />
-            <InputField
-              label="Line reason (optional)"
-              value={lineReason}
-              onChange={setLineReason}
-              disabled={!canWrite || createReturnMutation.isPending}
-            />
+            <InputField label={ui('Return quantity')} type="number" min="0.0001" max={selectedLot ? String(selectedLot.returnable_quantity) : undefined} value={lineQuantity} onChange={setLineQuantity} disabled={!canWrite || createReturnMutation.isPending} />
+            <InputField label={ui('Line reason (optional)')} value={lineReason} onChange={setLineReason} disabled={!canWrite || createReturnMutation.isPending} />
             {selectedLot ? (
               <p style={styles.helper}>
-                {selectedLot.product_name} · {selectedLot.storage_location_name} · {labelize(selectedLot.condition)} · lot {lotIdentity(selectedLot)} · expiry {formatDate(selectedLot.expiry_date)} · returnable {formatNumber(selectedLot.returnable_quantity)}
+                {ui('{product} · {location} · {condition} · lot {lot} · expiry {expiry} · returnable {quantity}')
+                  .replace('{product}', selectedLot.product_name)
+                  .replace('{location}', selectedLot.storage_location_name)
+                  .replace('{condition}', conditionLabel(selectedLot.condition))
+                  .replace('{lot}', lotIdentity(selectedLot))
+                  .replace('{expiry}', selectedLot.expiry_date ? formatLocalizedDate(selectedLot.expiry_date, locale) : '—')
+                  .replace('{quantity}', formatQuantity(selectedLot.returnable_quantity))}
               </p>
             ) : null}
-            <button
-              type="button"
-              onClick={addDraftItem}
-              disabled={!canWrite || !selectedLotId || !lineQuantity || createReturnMutation.isPending}
-              style={!canWrite || !selectedLotId || !lineQuantity || createReturnMutation.isPending ? styles.disabledButton : styles.secondaryButton}
-            >
-              Add return line
+            <button type="button" onClick={addDraftItem} disabled={!canWrite || !selectedLotId || !lineQuantity || createReturnMutation.isPending} style={!canWrite || !selectedLotId || !lineQuantity || createReturnMutation.isPending ? styles.disabledButton : styles.secondaryButton}>
+              {ui('Add return line')}
             </button>
           </div>
         </div>
 
         <div style={styles.card}>
-          <h2 style={styles.cardTitle}>Return draft</h2>
+          <h2 style={styles.cardTitle}>{ui('Return draft')}</h2>
           {draftItems.length ? (
             <div style={styles.stack}>
               <div style={styles.tableWrap}>
                 <table style={styles.table}>
-                  <thead>
-                    <tr>
-                      <th style={styles.th}>Product</th>
-                      <th style={styles.th}>Condition</th>
-                      <th style={styles.th}>Lot / batch</th>
-                      <th style={styles.th}>Quantity</th>
-                      <th style={styles.th}>Reason</th>
-                      <th style={styles.th}>Action</th>
-                    </tr>
-                  </thead>
+                  <thead><tr>{['Product', 'Condition', 'Lot / batch', 'Quantity', 'Reason', 'Action'].map((header) => <th key={header} style={styles.th}>{ui(header)}</th>)}</tr></thead>
                   <tbody>
                     {draftItems.map((item) => (
                       <tr key={item.inventory_lot_id}>
                         <td style={styles.td}>{item.lot.product_name}<div style={styles.helper}>{item.lot.supplier_name}</div></td>
-                        <td style={styles.td}>{labelize(item.lot.condition)}</td>
-                        <td style={styles.td}>{lotIdentity(item.lot)}<div style={styles.helper}>Expiry {formatDate(item.lot.expiry_date)}</div></td>
-                        <td style={styles.td}>{formatNumber(item.quantity)}</td>
-                        <td style={styles.td}>{item.reason || '-'}</td>
-                        <td style={styles.td}>
-                          <button type="button" style={styles.dangerButton} disabled={createReturnMutation.isPending} onClick={() => setDraftItems((current) => current.filter((line) => line.inventory_lot_id !== item.inventory_lot_id))}>Remove</button>
-                        </td>
+                        <td style={styles.td}>{conditionLabel(item.lot.condition)}</td>
+                        <td style={styles.td}>{lotIdentity(item.lot)}<div style={styles.helper}>{ui('Expiry {date}').replace('{date}', item.lot.expiry_date ? formatLocalizedDate(item.lot.expiry_date, locale) : '—')}</div></td>
+                        <td style={styles.td}>{formatQuantity(item.quantity)}</td>
+                        <td style={styles.td}>{item.reason || '—'}</td>
+                        <td style={styles.td}><button type="button" style={styles.dangerButton} disabled={createReturnMutation.isPending} onClick={() => setDraftItems((current) => current.filter((line) => line.inventory_lot_id !== item.inventory_lot_id))}>{ui('Remove')}</button></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <TextareaField label="Return reason" value={returnReason} onChange={setReturnReason} required disabled={!canWrite || createReturnMutation.isPending} />
-              <TextareaField label="Notes" value={notes} onChange={setNotes} disabled={!canWrite || createReturnMutation.isPending} />
-              <p style={styles.helper}>Estimated return value: {formatCurrency(draftTotal)}</p>
-              <button
-                type="button"
-                disabled={!canWrite || !returnReason.trim() || createReturnMutation.isPending}
-                style={!canWrite || !returnReason.trim() || createReturnMutation.isPending ? styles.disabledButton : styles.primaryButton}
-                onClick={() => createReturnMutation.mutate()}
-              >
-                {createReturnMutation.isPending ? 'Creating…' : 'Create return draft'}
+              <TextareaField label={ui('Return reason')} value={returnReason} onChange={setReturnReason} required disabled={!canWrite || createReturnMutation.isPending} />
+              <TextareaField label={ui('Notes')} value={notes} onChange={setNotes} disabled={!canWrite || createReturnMutation.isPending} />
+              <p style={styles.helper}>{ui('Estimated return value: {value}').replace('{value}', formatMoney(draftTotal))}</p>
+              <button type="button" disabled={!canWrite || !returnReason.trim() || createReturnMutation.isPending} style={!canWrite || !returnReason.trim() || createReturnMutation.isPending ? styles.disabledButton : styles.primaryButton} onClick={() => createReturnMutation.mutate()}>
+                {createReturnMutation.isPending ? ui('Creating…') : ui('Create return draft')}
               </button>
             </div>
-          ) : (
-            <p style={styles.helper}>Add one or more received lots from the same supplier.</p>
-          )}
+          ) : <p style={styles.helper}>{ui('Add one or more received lots from the same supplier.')}</p>}
         </div>
       </section>
 
       <section style={styles.card}>
-        <h2 style={styles.cardTitle}>Supplier returns</h2>
-        {returnsQuery.isLoading ? (
-          <p style={styles.helper}>Loading…</p>
-        ) : returnsQuery.isError ? (
-          <p style={styles.error}>{normalizeError(returnsQuery.error, 'Failed to load supplier returns.')}</p>
+        <h2 style={styles.cardTitle}>{ui('Supplier returns')}</h2>
+        {returnsQuery.isLoading ? <p style={styles.helper}>{ui('Loading…')}</p> : returnsQuery.isError ? (
+          <p style={styles.error}>{normalizeError(returnsQuery.error, ui('Failed to load supplier returns.'))}</p>
         ) : (returnsQuery.data ?? []).length ? (
           <div style={styles.tableWrap}>
             <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Return</th>
-                  <th style={styles.th}>Supplier</th>
-                  <th style={styles.th}>Items</th>
-                  <th style={styles.th}>Reason</th>
-                  <th style={styles.th}>Value</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Created</th>
-                  <th style={styles.th}>Actions</th>
-                </tr>
-              </thead>
+              <thead><tr>{['Return', 'Supplier', 'Items', 'Reason', 'Value', 'Status', 'Created', 'Actions'].map((header) => <th key={header} style={styles.th}>{ui(header)}</th>)}</tr></thead>
               <tbody>
                 {(returnsQuery.data ?? []).map((item) => (
                   <tr key={item.id}>
                     <td style={styles.td}><strong>{item.return_number}</strong></td>
                     <td style={styles.td}>{item.supplier_name}</td>
-                    <td style={styles.td}>
-                      {(item.items ?? []).map((line) => (
-                        <div key={line.id} style={{ marginBottom: 6 }}>
-                          <strong>{line.product_name || 'Product'}</strong> · {formatNumber(line.quantity)} · {labelize(line.source_condition)}
-                          <div style={styles.helper}>{line.storage_location_name || '-'} · {line.lot_number || line.batch_number || 'Unnumbered lot'}</div>
-                        </div>
-                      ))}
-                    </td>
+                    <td style={styles.td}>{(item.items ?? []).map((line) => (
+                      <div key={line.id} style={{ marginBottom: 6 }}>
+                        <strong>{line.product_name || ui('Product')}</strong> · {formatQuantity(line.quantity)} · {conditionLabel(line.source_condition)}
+                        <div style={styles.helper}>{line.storage_location_name || '—'} · {line.lot_number || line.batch_number || ui('Unnumbered lot')}</div>
+                      </div>
+                    ))}</td>
                     <td style={styles.td}>{item.reason}</td>
-                    <td style={styles.td}>{formatCurrency(item.total_amount, item.currency)}</td>
-                    <td style={styles.td}>{labelize(item.status)}</td>
-                    <td style={styles.td}>{formatDateTime(item.created_at)}</td>
+                    <td style={styles.td}>{formatMoney(item.total_amount, item.currency)}</td>
+                    <td style={styles.td}>{statusLabel(item.status)}</td>
+                    <td style={styles.td}>{formatLocalizedDateTime(item.created_at, locale)}</td>
                     <td style={styles.td}>
                       <div style={styles.actions}>
-                        {item.status === 'draft' ? (
-                          <button type="button" disabled={!canWrite || lifecycleMutation.isPending} style={canWrite && !lifecycleMutation.isPending ? styles.smallButton : styles.disabledButton} onClick={() => runLifecycleAction(item, 'submit')}>Submit</button>
-                        ) : null}
-                        {item.status === 'pending_approval' ? (
-                          <>
-                            <button type="button" disabled={!canApprove || lifecycleMutation.isPending} style={canApprove && !lifecycleMutation.isPending ? styles.smallButton : styles.disabledButton} title={!canApprove ? `Requires ${TENANT_PERMISSIONS.APPROVALS_EXECUTE} permission.` : undefined} onClick={() => runLifecycleAction(item, 'approve')}>Approve</button>
-                            <button type="button" disabled={!canApprove || lifecycleMutation.isPending} style={canApprove && !lifecycleMutation.isPending ? styles.dangerButton : styles.disabledButton} title={!canApprove ? `Requires ${TENANT_PERMISSIONS.APPROVALS_EXECUTE} permission.` : undefined} onClick={() => runLifecycleAction(item, 'reject')}>Reject</button>
-                          </>
-                        ) : null}
-                        {item.status === 'approved' ? (
-                          <button type="button" disabled={!canDispatch || lifecycleMutation.isPending} style={canDispatch && !lifecycleMutation.isPending ? styles.smallButton : styles.disabledButton} title={!canDispatch ? `Requires ${TENANT_PERMISSIONS.SUPPLIER_RETURNS_DISPATCH} permission.` : undefined} onClick={() => runLifecycleAction(item, 'dispatch')}>Dispatch</button>
-                        ) : null}
-                        {item.status === 'dispatched' ? (
-                          <button type="button" disabled={!canDispatch || lifecycleMutation.isPending} style={canDispatch && !lifecycleMutation.isPending ? styles.smallButton : styles.disabledButton} onClick={() => runLifecycleAction(item, 'complete')}>Complete</button>
-                        ) : null}
-                        {['draft', 'pending_approval', 'approved'].includes(item.status) ? (
-                          <button type="button" disabled={!canWrite || lifecycleMutation.isPending} style={canWrite && !lifecycleMutation.isPending ? styles.dangerButton : styles.disabledButton} onClick={() => runLifecycleAction(item, 'cancel')}>Cancel</button>
-                        ) : null}
-                        {!['draft', 'pending_approval', 'approved', 'dispatched'].includes(item.status) ? <span style={styles.helper}>-</span> : null}
+                        {item.status === 'draft' ? <button type="button" disabled={!canWrite || lifecycleMutation.isPending} style={canWrite && !lifecycleMutation.isPending ? styles.smallButton : styles.disabledButton} onClick={() => runLifecycleAction(item, 'submit')}>{ui('Submit')}</button> : null}
+                        {item.status === 'pending_approval' ? <>
+                          <button type="button" disabled={!canApprove || lifecycleMutation.isPending} style={canApprove && !lifecycleMutation.isPending ? styles.smallButton : styles.disabledButton} title={!canApprove ? ui('Requires {permission} permission.').replace('{permission}', TENANT_PERMISSIONS.APPROVALS_EXECUTE) : undefined} onClick={() => runLifecycleAction(item, 'approve')}>{ui('Approve')}</button>
+                          <button type="button" disabled={!canApprove || lifecycleMutation.isPending} style={canApprove && !lifecycleMutation.isPending ? styles.dangerButton : styles.disabledButton} title={!canApprove ? ui('Requires {permission} permission.').replace('{permission}', TENANT_PERMISSIONS.APPROVALS_EXECUTE) : undefined} onClick={() => runLifecycleAction(item, 'reject')}>{ui('Reject')}</button>
+                        </> : null}
+                        {item.status === 'approved' ? <button type="button" disabled={!canDispatch || lifecycleMutation.isPending} style={canDispatch && !lifecycleMutation.isPending ? styles.smallButton : styles.disabledButton} title={!canDispatch ? ui('Requires {permission} permission.').replace('{permission}', TENANT_PERMISSIONS.SUPPLIER_RETURNS_DISPATCH) : undefined} onClick={() => runLifecycleAction(item, 'dispatch')}>{ui('Dispatch')}</button> : null}
+                        {item.status === 'dispatched' ? <button type="button" disabled={!canDispatch || lifecycleMutation.isPending} style={canDispatch && !lifecycleMutation.isPending ? styles.smallButton : styles.disabledButton} onClick={() => runLifecycleAction(item, 'complete')}>{ui('Complete')}</button> : null}
+                        {['draft', 'pending_approval', 'approved'].includes(item.status) ? <button type="button" disabled={!canWrite || lifecycleMutation.isPending} style={canWrite && !lifecycleMutation.isPending ? styles.dangerButton : styles.disabledButton} onClick={() => runLifecycleAction(item, 'cancel')}>{ui('Cancel')}</button> : null}
+                        {!['draft', 'pending_approval', 'approved', 'dispatched'].includes(item.status) ? <span style={styles.helper}>—</span> : null}
                       </div>
                     </td>
                   </tr>
@@ -437,9 +411,7 @@ export function SupplierReturnsTab() {
               </tbody>
             </table>
           </div>
-        ) : (
-          <p style={styles.helper}>No supplier returns yet.</p>
-        )}
+        ) : <p style={styles.helper}>{ui('No supplier returns yet.')}</p>}
       </section>
     </section>
   );

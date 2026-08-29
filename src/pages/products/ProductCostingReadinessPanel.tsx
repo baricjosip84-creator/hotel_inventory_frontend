@@ -2,6 +2,8 @@ import type { CostingReadiness } from './productDerivedState';
 import { formatMoney } from './productFormatting';
 import { styles } from './productStyles';
 import { StatCard } from './productSummaryComponents';
+import { useAppTranslation } from '../../i18n/I18nContext';
+import { formatLocalizedNumber } from '../../i18n/formatters';
 
 type ProductCostingReadinessPanelProps = {
   costingReadiness: CostingReadiness;
@@ -12,39 +14,40 @@ export function ProductCostingReadinessPanel({
   costingReadiness,
   onCategoryFilterChange
 }: ProductCostingReadinessPanelProps) {
+  const { ui, locale } = useAppTranslation();
   return (
     <section style={styles.panel}>
       <div style={styles.packageHeader}>
         <div>
-          <h3 style={styles.panelTitle}>Costing Readiness</h3>
+          <h3 style={styles.panelTitle}>{ui("Costing Readiness")}</h3>
           <p style={styles.panelSubtitle}>
-            Highlights which stocked products already have cost audit coverage and where estimated inventory value is incomplete.
+            {ui("Highlights which stocked products already have cost audit coverage and where estimated inventory value is incomplete.")}
           </p>
         </div>
       </div>
 
       <div style={styles.costReadinessGrid}>
         <StatCard
-          title="Stocked Products"
+          title={ui("Stocked Products")}
           value={costingReadiness.stockedProductCount}
-          subtitle="Products with current stock above zero"
+          subtitle={ui("Products with current stock above zero")}
         />
         <StatCard
-          title="Costed Stocked"
+          title={ui("Costed Stocked")}
           value={costingReadiness.costedStockedProductCount}
-          subtitle={`Effective cost coverage; ${costingReadiness.standardFallbackStockedProductCount} use standard fallback`}
+          subtitle={`${ui('Effective cost coverage;')} ${formatLocalizedNumber(Number(costingReadiness.standardFallbackStockedProductCount), locale)} ${ui('use standard fallback')}`}
           tone={costingReadiness.uncostedStockedProductCount === 0 ? 'good' : 'default'}
         />
         <StatCard
-          title="Uncosted Stocked"
+          title={ui("Uncosted Stocked")}
           value={costingReadiness.uncostedStockedProductCount}
-          subtitle="Stocked products missing received and standard cost"
+          subtitle={ui("Stocked products missing received and standard cost")}
           tone={costingReadiness.uncostedStockedProductCount > 0 ? 'warn' : 'good'}
         />
         <StatCard
-          title="Uncosted Stock Qty"
-          value={costingReadiness.uncostedStockQuantity.toLocaleString()}
-          subtitle="Quantity excluded from estimated value"
+          title={ui("Uncosted Stock Qty")}
+          value={formatLocalizedNumber(Number(costingReadiness.uncostedStockQuantity), locale)}
+          subtitle={ui("Quantity excluded from estimated value")}
           tone={costingReadiness.uncostedStockQuantity > 0 ? 'warn' : 'good'}
         />
       </div>
@@ -53,19 +56,19 @@ export function ProductCostingReadinessPanel({
         <table style={styles.compactTable}>
           <thead>
             <tr>
-              <th style={styles.th}>Category</th>
-              <th style={styles.th}>Products</th>
-              <th style={styles.th}>Costed</th>
-              <th style={styles.th}>Uncosted Stocked</th>
-              <th style={styles.th}>Stock Qty</th>
-              <th style={styles.th}>Estimated Value</th>
-              <th style={styles.th}>Action</th>
+              <th style={styles.th}>{ui("Category")}</th>
+              <th style={styles.th}>{ui("Products")}</th>
+              <th style={styles.th}>{ui("Costed")}</th>
+              <th style={styles.th}>{ui("Uncosted Stocked")}</th>
+              <th style={styles.th}>{ui("Stock Qty")}</th>
+              <th style={styles.th}>{ui("Estimated Value")}</th>
+              <th style={styles.th}>{ui("Action")}</th>
             </tr>
           </thead>
           <tbody>
             {costingReadiness.categoryBreakdown.length === 0 ? (
               <tr>
-                <td style={styles.emptyCell} colSpan={7}>No product categories found.</td>
+                <td style={styles.emptyCell} colSpan={7}>{ui("No product categories found.")}</td>
               </tr>
             ) : (
               costingReadiness.categoryBreakdown.slice(0, 8).map((row) => (
@@ -74,15 +77,15 @@ export function ProductCostingReadinessPanel({
                   <td style={styles.td}>{row.productCount}</td>
                   <td style={styles.td}>{row.costedCount}</td>
                   <td style={styles.td}>{row.uncostedStockedCount}</td>
-                  <td style={styles.td}>{row.stockQuantity.toLocaleString()}</td>
-                  <td style={styles.td}>{formatMoney(row.estimatedValue)}</td>
+                  <td style={styles.td}>{formatLocalizedNumber(Number(row.stockQuantity), locale)}</td>
+                  <td style={styles.td}>{formatMoney(row.estimatedValue, locale)}</td>
                   <td style={styles.td}>
                     <button
                       type="button"
                       style={styles.secondaryButton}
                       onClick={() => onCategoryFilterChange(row.category === 'Uncategorized' ? '' : row.category)}
                     >
-                      View Category
+                      {ui("View Category")}
                     </button>
                   </td>
                 </tr>

@@ -2,16 +2,21 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import type { CSSProperties } from 'react';
-import { logoutPlatformSession } from '../lib/platformAuth';
+import { fetchCurrentPlatformIdentity, logoutPlatformSession } from '../lib/platformAuth';
 import { PLATFORM_PERMISSIONS, hasPlatformPermission, PLATFORM_PERMISSION_SNAPSHOT_EVENT } from '../lib/platformPermissions';
 import CopyrightNotice from '../components/CopyrightNotice';
 import { InventoryMark } from '../components/brand/InventoryBrand';
+import { LanguageSelector } from '../components/i18n/LanguageSelector';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { DEFAULT_LOCALE, normalizeAppLocale } from '../i18n/config';
+import { formatLocalizedDateTime } from '../i18n/formatters';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { refreshPlatformPermissionSnapshot } from '../lib/permissionPolicies';
 import { fetchPlatformAnnouncementContext, type PlatformAnnouncementContext } from '../lib/platformAnnouncementContext';
 import './PlatformTheme.css';
 
 export default function PlatformLayout() {
+  const { locale, setLocale, t, nav } = useAppTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const mainRef = useRef<HTMLElement | null>(null);
@@ -27,6 +32,19 @@ export default function PlatformLayout() {
   });
   const announcementContext: PlatformAnnouncementContext | null = announcementContextQuery.data ?? null;
   const visibleAnnouncements = useMemo(() => (announcementContext?.announcements || []).filter((announcement) => !dismissedAnnouncementIds.has(announcement.id)), [announcementContext, dismissedAnnouncementIds]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchCurrentPlatformIdentity()
+      .then((identity) => {
+        if (cancelled || !identity) return;
+        setLocale(normalizeAppLocale(identity.locale) ?? DEFAULT_LOCALE);
+      })
+      .catch(() => {
+        // Keep the locally selected/browser locale when identity lookup is unavailable.
+      });
+    return () => { cancelled = true; };
+  }, [setLocale]);
 
   useEffect(() => {
     const onPermissionsChanged = () => setPermissionRevision((value) => value + 1);
@@ -137,7 +155,7 @@ export default function PlatformLayout() {
           <InventoryMark size={36} tone="dark" accent="red" />
           <div style={styles.brandTextWrap}>
             <div style={styles.brandTitle}>Inventory Operations</div>
-            <div style={styles.brandCaption}>PLATFORM ADMINISTRATION</div>
+            <div style={styles.brandCaption}>{t('platformLogin.brandCaption')}</div>
           </div>
         </div>
         <nav style={styles.nav}>
@@ -145,37 +163,37 @@ export default function PlatformLayout() {
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ) ? (
             <NavLink to="/platform/dashboard" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/dashboard" />
-              <span>Dashboard</span>
+              <span>{nav('Dashboard')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ) ? (
             <NavLink to="/platform/commercial-launch-readiness" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/commercial-launch-readiness" />
-              <span>Launch readiness</span>
+              <span>{nav('Launch readiness')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ) ? (
             <NavLink to="/platform/commercial-readiness-verification-program" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/commercial-readiness-verification-program" />
-              <span>Readiness verification</span>
+              <span>{nav('Readiness verification')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/customer-onboarding-checklist" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/customer-onboarding-checklist" />
-              <span>Onboarding checklist</span>
+              <span>{nav('Onboarding checklist')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_PROVISIONING_PRESETS_READ) ? (
             <NavLink to="/platform/tenant-provisioning-hardening" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/tenant-provisioning-hardening" />
-              <span>Provisioning hardening</span>
+              <span>{nav('Provisioning hardening')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/billing-subscription-activation" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/billing-subscription-activation" />
-              <span>Billing activation</span>
+              <span>{nav('Billing activation')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
@@ -184,7 +202,7 @@ export default function PlatformLayout() {
             && hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ) ? (
             <NavLink to="/platform/support-operations-cockpit" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/support-operations-cockpit" />
-              <span>Support cockpit</span>
+              <span>{nav('Support cockpit')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
@@ -193,7 +211,7 @@ export default function PlatformLayout() {
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ) ? (
             <NavLink to="/platform/production-monitoring-readiness" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/production-monitoring-readiness" />
-              <span>Monitoring readiness</span>
+              <span>{nav('Monitoring readiness')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
@@ -201,26 +219,26 @@ export default function PlatformLayout() {
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ) ? (
             <NavLink to="/platform/backup-restore-validation" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/backup-restore-validation" />
-              <span>Backup restore</span>
+              <span>{nav('Backup restore')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ) ? (
             <NavLink to="/platform/deployment-validation" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/deployment-validation" />
-              <span>Deployment validation</span>
+              <span>{nav('Deployment validation')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ) ? (
             <NavLink to="/platform/documentation-completeness" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/documentation-completeness" />
-              <span>Documentation completeness</span>
+              <span>{nav('Documentation completeness')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ)
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ) ? (
             <NavLink to="/platform/pilot-customer-readiness" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/pilot-customer-readiness" />
-              <span>Pilot readiness</span>
+              <span>{nav('Pilot readiness')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -236,7 +254,7 @@ export default function PlatformLayout() {
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/commercial-launch-certificate" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/commercial-launch-certificate" />
-              <span>Launch certificate</span>
+              <span>{nav('Launch certificate')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -252,7 +270,7 @@ export default function PlatformLayout() {
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/commercial-launch-acceptance-packet" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/commercial-launch-acceptance-packet" />
-              <span>Launch acceptance</span>
+              <span>{nav('Launch acceptance')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -268,7 +286,7 @@ export default function PlatformLayout() {
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/commercial-launch-go-no-go-register" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/commercial-launch-go-no-go-register" />
-              <span>Launch go/no-go</span>
+              <span>{nav('Launch go/no-go')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -285,7 +303,7 @@ export default function PlatformLayout() {
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/commercial-launch-smoke-test-checklist" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/commercial-launch-smoke-test-checklist" />
-              <span>Launch smoke test</span>
+              <span>{nav('Launch smoke test')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -302,7 +320,7 @@ export default function PlatformLayout() {
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/commercial-launch-day-command-center" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/commercial-launch-day-command-center" />
-              <span>Launch command center</span>
+              <span>{nav('Launch command center')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -319,7 +337,7 @@ export default function PlatformLayout() {
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/commercial-launch-post-launch-observation" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/commercial-launch-post-launch-observation" />
-              <span>Post-launch observation</span>
+              <span>{nav('Post-launch observation')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -336,7 +354,7 @@ export default function PlatformLayout() {
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/commercial-launch-incident-triage" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/commercial-launch-incident-triage" />
-              <span>Incident triage</span>
+              <span>{nav('Incident triage')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -353,7 +371,7 @@ export default function PlatformLayout() {
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/commercial-launch-incident-closure" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/commercial-launch-incident-closure" />
-              <span>Incident closure</span>
+              <span>{nav('Incident closure')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -370,7 +388,7 @@ export default function PlatformLayout() {
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/commercial-launch-prevention-verification" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/commercial-launch-prevention-verification" />
-              <span>Prevention verification</span>
+              <span>{nav('Prevention verification')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -387,7 +405,7 @@ export default function PlatformLayout() {
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/commercial-launch-rollout-expansion-authorization" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/commercial-launch-rollout-expansion-authorization" />
-              <span>Rollout expansion</span>
+              <span>{nav('Rollout expansion')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -404,7 +422,7 @@ export default function PlatformLayout() {
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/commercial-launch-expansion-health-observation" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/commercial-launch-expansion-health-observation" />
-              <span>Expansion health</span>
+              <span>{nav('Expansion health')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -421,7 +439,7 @@ export default function PlatformLayout() {
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/commercial-launch-additional-growth-authorization" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/commercial-launch-additional-growth-authorization" />
-              <span>Additional growth</span>
+              <span>{nav('Additional growth')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -438,7 +456,7 @@ export default function PlatformLayout() {
             && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/commercial-launch-additional-growth-observation" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/commercial-launch-additional-growth-observation" />
-              <span>Growth observation</span>
+              <span>{nav('Growth observation')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ) ? (
@@ -457,7 +475,7 @@ export default function PlatformLayout() {
                 && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
                 <NavLink to="/platform/commercial-launch-steady-state-transition" style={getPlatformLinkStyle}>
                   <TenantNavIcon path="/platform/commercial-launch-steady-state-transition" />
-                  <span>Steady-state transition</span>
+                  <span>{nav('Steady-state transition')}</span>
                 </NavLink>
               ) : null}
               {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -474,7 +492,7 @@ export default function PlatformLayout() {
                 && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
                 <NavLink to="/platform/commercial-launch-steady-state-operations-cadence" style={getPlatformLinkStyle}>
                   <TenantNavIcon path="/platform/commercial-launch-steady-state-operations-cadence" />
-                  <span>Operations cadence</span>
+                  <span>{nav('Operations cadence')}</span>
                 </NavLink>
               ) : null}
               {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -491,7 +509,7 @@ export default function PlatformLayout() {
                 && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
                 <NavLink to="/platform/commercial-launch-steady-state-exception-review" style={getPlatformLinkStyle}>
                   <TenantNavIcon path="/platform/commercial-launch-steady-state-exception-review" />
-                  <span>Exception review</span>
+                  <span>{nav('Exception review')}</span>
                 </NavLink>
               ) : null}
               {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -508,7 +526,7 @@ export default function PlatformLayout() {
                 && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
                 <NavLink to="/platform/commercial-launch-steady-state-exception-closure" style={getPlatformLinkStyle}>
                   <TenantNavIcon path="/platform/commercial-launch-steady-state-exception-closure" />
-                  <span>Exception closure</span>
+                  <span>{nav('Exception closure')}</span>
                 </NavLink>
               ) : null}
               {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -525,7 +543,7 @@ export default function PlatformLayout() {
                 && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
                 <NavLink to="/platform/commercial-launch-steady-state-recurrence-audit" style={getPlatformLinkStyle}>
                   <TenantNavIcon path="/platform/commercial-launch-steady-state-recurrence-audit" />
-                  <span>Recurrence audit</span>
+                  <span>{nav('Recurrence audit')}</span>
                 </NavLink>
               ) : null}
               {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -542,7 +560,7 @@ export default function PlatformLayout() {
                 && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
                 <NavLink to="/platform/commercial-launch-steady-state-recurrence-resolution" style={getPlatformLinkStyle}>
                   <TenantNavIcon path="/platform/commercial-launch-steady-state-recurrence-resolution" />
-                  <span>Recurrence resolution</span>
+                  <span>{nav('Recurrence resolution')}</span>
                 </NavLink>
               ) : null}
               {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -559,7 +577,7 @@ export default function PlatformLayout() {
                 && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
                 <NavLink to="/platform/commercial-launch-steady-state-resolution-verification" style={getPlatformLinkStyle}>
                   <TenantNavIcon path="/platform/commercial-launch-steady-state-resolution-verification" />
-                  <span>Resolution verification</span>
+                  <span>{nav('Resolution verification')}</span>
                 </NavLink>
               ) : null}
               {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -576,7 +594,7 @@ export default function PlatformLayout() {
                 && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
                 <NavLink to="/platform/commercial-launch-durable-closure-certification" style={getPlatformLinkStyle}>
                   <TenantNavIcon path="/platform/commercial-launch-durable-closure-certification" />
-                  <span>Durable closure</span>
+                  <span>{nav('Durable closure')}</span>
                 </NavLink>
               ) : null}
               {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -593,7 +611,7 @@ export default function PlatformLayout() {
                 && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
                 <NavLink to="/platform/commercial-launch-final-evidence-archive" style={getPlatformLinkStyle}>
                   <TenantNavIcon path="/platform/commercial-launch-final-evidence-archive" />
-                  <span>Final evidence archive</span>
+                  <span>{nav('Final evidence archive')}</span>
                 </NavLink>
               ) : null}
               {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -610,7 +628,7 @@ export default function PlatformLayout() {
                 && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
                 <NavLink to="/platform/commercial-launch-evidence-retention-seal" style={getPlatformLinkStyle}>
                   <TenantNavIcon path="/platform/commercial-launch-evidence-retention-seal" />
-                  <span>Evidence retention seal</span>
+                  <span>{nav('Evidence retention seal')}</span>
                 </NavLink>
               ) : null}
               {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -627,7 +645,7 @@ export default function PlatformLayout() {
                 && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
                 <NavLink to="/platform/commercial-launch-retention-renewal-review" style={getPlatformLinkStyle}>
                   <TenantNavIcon path="/platform/commercial-launch-retention-renewal-review" />
-                  <span>Retention renewal</span>
+                  <span>{nav('Retention renewal')}</span>
                 </NavLink>
               ) : null}
               {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -644,7 +662,7 @@ export default function PlatformLayout() {
                 && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
                 <NavLink to="/platform/commercial-launch-retention-renewal-acceptance-docket" style={getPlatformLinkStyle}>
                   <TenantNavIcon path="/platform/commercial-launch-retention-renewal-acceptance-docket" />
-                  <span>Renewal acceptance</span>
+                  <span>{nav('Renewal acceptance')}</span>
                 </NavLink>
               ) : null}
               {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -661,7 +679,7 @@ export default function PlatformLayout() {
                 && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
                 <NavLink to="/platform/commercial-launch-retention-renewal-certification" style={getPlatformLinkStyle}>
                   <TenantNavIcon path="/platform/commercial-launch-retention-renewal-certification" />
-                  <span>Renewal certification</span>
+                  <span>{nav('Renewal certification')}</span>
                 </NavLink>
               ) : null}
               {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -678,7 +696,7 @@ export default function PlatformLayout() {
                 && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
                 <NavLink to="/platform/commercial-launch-retention-renewal-final-seal" style={getPlatformLinkStyle}>
                   <TenantNavIcon path="/platform/commercial-launch-retention-renewal-final-seal" />
-                  <span>Renewal final seal</span>
+                  <span>{nav('Renewal final seal')}</span>
                 </NavLink>
               ) : null}
               {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -695,7 +713,7 @@ export default function PlatformLayout() {
                 && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
                 <NavLink to="/platform/commercial-launch-retention-renewal-archive-seal" style={getPlatformLinkStyle}>
                   <TenantNavIcon path="/platform/commercial-launch-retention-renewal-archive-seal" />
-                  <span>Renewal archive seal</span>
+                  <span>{nav('Renewal archive seal')}</span>
                 </NavLink>
               ) : null}
               {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DASHBOARD_READ)
@@ -712,7 +730,7 @@ export default function PlatformLayout() {
                 && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
                 <NavLink to="/platform/commercial-launch-retention-renewal-cycle-reset" style={getPlatformLinkStyle}>
                   <TenantNavIcon path="/platform/commercial-launch-retention-renewal-cycle-reset" />
-                  <span>Renewal cycle reset</span>
+                  <span>{nav('Renewal cycle reset')}</span>
                 </NavLink>
               ) : null}
             </>
@@ -720,314 +738,315 @@ export default function PlatformLayout() {
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/tenants" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/tenants" />
-              <span>Tenants</span>
+              <span>{nav('Tenants')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/tenant-contacts" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/tenant-contacts" />
-              <span>Tenant contacts</span>
+              <span>{nav('Tenant contacts')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/tenant-notes" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/tenant-notes" />
-              <span>Tenant notes</span>
+              <span>{nav('Tenant notes')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/tenant-communications" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/tenant-communications" />
-              <span>Communications</span>
+              <span>{nav('Communications')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/tenant-tasks" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/tenant-tasks" />
-              <span>Tenant tasks</span>
+              <span>{nav('Tenant tasks')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/tenant-timeline" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/tenant-timeline" />
-              <span>Tenant timeline</span>
+              <span>{nav('Tenant timeline')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/tenant-health" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/tenant-health" />
-              <span>Tenant health</span>
+              <span>{nav('Tenant health')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/tenant-lifecycle" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/tenant-lifecycle" />
-              <span>Tenant lifecycle</span>
+              <span>{nav('Tenant lifecycle')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SLA_READ) ? (
             <NavLink to="/platform/tenant-sla" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/tenant-sla" />
-              <span>Tenant SLA</span>
+              <span>{nav('Tenant SLA')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RUNBOOKS_READ) ? (
             <NavLink to="/platform/runbooks" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/runbooks" />
-              <span>Runbooks</span>
+              <span>{nav('Runbooks')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_CHANGES_READ) ? (
             <NavLink to="/platform/change-management" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/change-management" />
-              <span>Change management</span>
+              <span>{nav('Change management')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_API_KEYS_READ) ? (
             <NavLink to="/platform/api-keys" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/api-keys" />
-              <span>API keys</span>
+              <span>{nav('API keys')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_API_KEYS_READ) ? (
             <NavLink to="/platform/api-client-governance" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/api-client-governance" />
-              <span>API client governance</span>
+              <span>{nav('API client governance')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ) ? (
             <NavLink to="/platform/integration-monitoring" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/integration-monitoring" />
-              <span>Integration monitoring</span>
+              <span>{nav('Integration monitoring')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_WEBHOOKS_READ) ? (
             <NavLink to="/platform/webhooks" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/webhooks" />
-              <span>Webhooks</span>
+              <span>{nav('Webhooks')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_VENDORS_READ) ? (
             <NavLink to="/platform/vendors" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/vendors" />
-              <span>Vendors</span>
+              <span>{nav('Vendors')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DEPENDENCIES_READ) ? (
             <NavLink to="/platform/service-dependencies" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/service-dependencies" />
-              <span>Service dependencies</span>
+              <span>{nav('Service dependencies')}</span>
             </NavLink>
           ) : null}
 
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RISKS_READ) ? (
             <NavLink to="/platform/risk-register" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/risk-register" />
-              <span>Risk register</span>
+              <span>{nav('Risk register')}</span>
             </NavLink>
           ) : null}
 
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_CAPACITY_READ) ? (
             <NavLink to="/platform/capacity-planning" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/capacity-planning" />
-              <span>Capacity planning</span>
+              <span>{nav('Capacity planning')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_JOBS_READ) ? (
             <NavLink to="/platform/operational-jobs" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/operational-jobs" />
-              <span>Operational jobs</span>
+              <span>{nav('Operational jobs')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_RELEASES_READ) ? (
             <NavLink to="/platform/releases" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/releases" />
-              <span>Releases</span>
+              <span>{nav('Releases')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_ACCESS_REVIEWS_READ) ? (
             <NavLink to="/platform/access-reviews" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/access-reviews" />
-              <span>Access reviews</span>
+              <span>{nav('Access reviews')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_ACCESS_REVIEWS_READ) ? (
             <NavLink to="/platform/permission-audit" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/permission-audit" />
-              <span>Permission audit</span>
+              <span>{nav('Permission audit')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_READ) ? (
             <NavLink to="/platform/compliance-documents" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/compliance-documents" />
-              <span>Compliance docs</span>
+              <span>{nav('Compliance docs')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_READ) ? (
             <NavLink to="/platform/compliance-export" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/compliance-export" />
-              <span>Compliance export</span>
+              <span>{nav('Compliance export')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_COMPLIANCE_READ) ? (
             <NavLink to="/platform/legal-compliance-reporting" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/legal-compliance-reporting" />
-              <span>Legal & compliance reporting</span>
+              <span>{nav('Legal & compliance reporting')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_PRIVACY_READ) ? (
             <NavLink to="/platform/privacy-requests" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/privacy-requests" />
-              <span>Privacy requests</span>
+              <span>{nav('Privacy requests')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/tenant-offboarding" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/tenant-offboarding" />
-              <span>Tenant offboarding</span>
+              <span>{nav('Tenant offboarding')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_PROVISIONING_PRESETS_READ) ? (
             <NavLink to="/platform/provisioning" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/provisioning" />
-              <span>Provisioning</span>
+              <span>{nav('Provisioning')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_PROVISIONING_PRESETS_READ) ? (
             <NavLink to="/platform/provisioning-presets" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/provisioning-presets" />
-              <span>Provisioning presets</span>
+              <span>{nav('Provisioning presets')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_EXPORT) ? (
             <NavLink to="/platform/tenant-exports" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/tenant-exports" />
-              <span>Tenant Exports</span>
+              <span>{nav('Tenant Exports')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_DATA_RETENTION_READ) ? (
             <NavLink to="/platform/data-retention" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/data-retention" />
-              <span>Data retention</span>
+              <span>{nav('Data retention')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_INCIDENTS_READ) ? (
             <NavLink to="/platform/incidents" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/incidents" />
-              <span>Incidents</span>
+              <span>{nav('Incidents')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_MAINTENANCE_READ) ? (
             <NavLink to="/platform/maintenance" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/maintenance" />
-              <span>Maintenance</span>
+              <span>{nav('Maintenance')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_ANNOUNCEMENTS_READ) ? (
             <NavLink to="/platform/announcements" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/announcements" />
-              <span>Announcements</span>
+              <span>{nav('Announcements')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.SYSTEM_HEALTH_READ)
             && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/system-health" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/system-health" />
-              <span>System Health</span>
+              <span>{nav('System Health')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ) ? (
             <NavLink to="/platform/audit" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/audit" />
-              <span>Audit</span>
+              <span>{nav('Audit')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_READ)
             && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/audit-retention" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/audit-retention" />
-              <span>Audit retention</span>
+              <span>{nav('Audit retention')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.SUPPORT_SESSION_READ) ? (
             <NavLink to="/platform/support-sessions" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/support-sessions" />
-              <span>Support Sessions</span>
+              <span>{nav('Support Sessions')}</span>
             </NavLink>
           ) : null}
 
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_USERS_READ) ? (
             <NavLink to="/platform/users" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/users" />
-              <span>Platform Users</span>
+              <span>{nav('Platform Users')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_ROLE_PERMISSIONS_READ) ? (
             <NavLink to="/platform/permissions" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/permissions" />
-              <span>Platform Permissions</span>
+              <span>{nav('Platform Permissions')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SESSIONS_READ) ? (
             <NavLink to="/platform/sessions" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/sessions" />
-              <span>Platform Sessions</span>
+              <span>{nav('Platform Sessions')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/billing" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/billing" />
-              <span>Billing</span>
+              <span>{nav('Billing')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/subscription-readiness" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/subscription-readiness" />
-              <span>Subscription readiness</span>
+              <span>{nav('Subscription readiness')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_BILLING_READ) && hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/license-plan-enforcement" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/license-plan-enforcement" />
-              <span>License enforcement</span>
+              <span>{nav('License enforcement')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.TENANTS_READ) ? (
             <NavLink to="/platform/customer-success-admin" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/customer-success-admin" />
-              <span>Customer success</span>
+              <span>{nav('Customer success')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_SECURITY_READ) ? (
             <NavLink to="/platform/enterprise-identity" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/enterprise-identity" />
-              <span>Enterprise identity</span>
+              <span>{nav('Enterprise identity')}</span>
             </NavLink>
           ) : null}
           {hasPlatformPermission(PLATFORM_PERMISSIONS.PLATFORM_NOTIFICATIONS_READ) ? (
             <NavLink to="/platform/notifications" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/notifications" />
-              <span>Notifications</span>
+              <span>{nav('Notifications')}</span>
             </NavLink>
           ) : null}
           <NavLink to="/platform/security" style={getPlatformLinkStyle}>
               <TenantNavIcon path="/platform/security" />
-              <span>My Security</span>
+              <span>{nav('My Security')}</span>
             </NavLink>
         </nav>
+        <div style={styles.languageSelector}><LanguageSelector scope="platform" compact /></div>
         <button type="button" onClick={logout} style={styles.logoutButton}>
           <TenantNavIcon path="/logout" />
-          <span>Logout</span>
+          <span>{t('common.logout')}</span>
         </button>
       </aside>
       <main key={location.pathname} ref={mainRef} style={styles.main} data-route-scroll-container>
         {visibleAnnouncements.length ? <div style={styles.announcementStack}>
           {visibleAnnouncements.map((announcement) => <div key={announcement.id} style={{ ...styles.announcementBanner, ...(announcement.severity === 'critical' ? styles.announcementCritical : {}), ...(announcement.severity === 'warning' ? styles.announcementWarning : {}) }}>
-            <div style={styles.announcementHeader}><strong>{announcement.title}</strong>{announcement.dismissible ? <button type="button" style={styles.announcementDismiss} onClick={() => setDismissedAnnouncementIds((current) => new Set([...current, announcement.id]))}>Dismiss</button> : null}</div>
+            <div style={styles.announcementHeader}><strong>{announcement.title}</strong>{announcement.dismissible ? <button type="button" style={styles.announcementDismiss} onClick={() => setDismissedAnnouncementIds((current) => new Set([...current, announcement.id]))}>{t('common.dismiss')}</button> : null}</div>
             <div>{announcement.message}</div>
-            <div style={styles.announcementMeta}>Severity: {announcement.severity}{announcement.ends_at ? ` · Visible until: ${new Date(announcement.ends_at).toLocaleString()}` : ''}{!announcement.dismissible ? ' · Required notice' : ''}</div>
+            <div style={styles.announcementMeta}>{t('common.severity')}: {announcement.severity}{announcement.ends_at ? ` · ${t('common.visibleUntil')}: ${formatLocalizedDateTime(announcement.ends_at, locale)}` : ''}{!announcement.dismissible ? ` · ${t('common.requiredNotice')}` : ''}</div>
           </div>)}
-          {announcementContext?.truncated ? <div style={styles.announcementTruncated}>More current Platform announcements exist than this shell returns.</div> : null}
+          {announcementContext?.truncated ? <div style={styles.announcementTruncated}>{t('common.platformAnnouncementsTruncated')}</div> : null}
         </div> : null}
         <Outlet />
         <CopyrightNotice />
@@ -1097,6 +1116,7 @@ const styles: Record<string, CSSProperties> = {
     borderColor: 'rgba(var(--io-primary-light-rgb),.28)',
     boxShadow: 'inset 3px 0 0 var(--io-primary-light)'
   },
+  languageSelector: { marginTop: 'auto', marginBottom: 10 },
   logoutButton: {
     marginTop: 'auto',
     padding: '9px 10px',

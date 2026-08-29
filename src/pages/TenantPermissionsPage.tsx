@@ -21,6 +21,7 @@ import {
   type TenantRolePolicyKey
 } from '../lib/permissionPolicies';
 import type { TenantPermission } from '../lib/permissions';
+import { useAppTranslation } from '../i18n/I18nContext';
 import './TenantPermissionsPage.css';
 
 function roleName(role: TenantRolePermissionPolicy): string {
@@ -32,6 +33,7 @@ function customRoleId(role: TenantRolePermissionPolicy | undefined): string | nu
 }
 
 export default function TenantPermissionsPage() {
+  const { ui } = useAppTranslation();
   const query = useQuery<TenantPermissionPolicyMatrix>({
     queryKey: ['tenant-role-permissions'],
     queryFn: fetchTenantPermissionPolicyMatrix
@@ -98,7 +100,7 @@ export default function TenantPermissionsPage() {
   const save = async () => {
     if (!activeRole?.editable || saving || resetting) return;
     const confirmed = window.confirm(
-      `Save permissions for ${roleName(activeRole)}? Backend authorization changes immediately for every user assigned to this role.`
+      `${ui("Save permissions for")} ${roleName(activeRole)}? ${ui("Backend authorization changes immediately for every user assigned to this role.")}`
     );
     if (!confirmed) return;
 
@@ -119,9 +121,9 @@ export default function TenantPermissionsPage() {
       }
       setDraftByRole((current) => ({ ...current, [selectedRole]: updated.effective_permissions }));
       await reloadAndSelect(updated.role);
-      setSuccessMessage(`${roleName(updated)} permissions saved successfully.`);
+      setSuccessMessage(`${roleName(updated)} ${ui("permissions saved successfully.")}`);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Tenant permissions could not be saved.');
+      setErrorMessage(error instanceof Error ? error.message : ui("Tenant permissions could not be saved."));
     } finally {
       setSaving(false);
     }
@@ -132,8 +134,8 @@ export default function TenantPermissionsPage() {
     const custom = activeRole.role_kind === 'custom';
     const confirmed = window.confirm(
       custom
-        ? `Reset ${roleName(activeRole)} to the permission set captured when the role was created?`
-        : `Reset ${roleName(activeRole)} to the hardcoded default permissions? All tenant-specific overrides for this role will be removed.`
+        ? `${ui("Reset")} ${roleName(activeRole)} ${ui("to the permission set captured when the role was created?")}`
+        : `${ui("Reset")} ${roleName(activeRole)} ${ui("to the hardcoded default permissions? All tenant-specific overrides for this role will be removed.")}`
     );
     if (!confirmed) return;
 
@@ -152,11 +154,11 @@ export default function TenantPermissionsPage() {
       await reloadAndSelect(updated.role);
       setSuccessMessage(
         custom
-          ? `${roleName(updated)} permissions reset to the starting template.`
-          : `${roleName(updated)} permissions reset to defaults.`
+          ? `${roleName(updated)} ${ui("permissions reset to the starting template.")}`
+          : `${roleName(updated)} ${ui("permissions reset to defaults.")}`
       );
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Tenant permissions could not be reset.');
+      setErrorMessage(error instanceof Error ? error.message : ui("Tenant permissions could not be reset."));
     } finally {
       setResetting(false);
     }
@@ -167,7 +169,7 @@ export default function TenantPermissionsPage() {
     if (creating || !createName.trim()) return;
     if (isReservedTenantCustomRoleName(createName)) {
       setSuccessMessage(null);
-      setErrorMessage(RESERVED_TENANT_CUSTOM_ROLE_NAME_MESSAGE);
+      setErrorMessage(ui(RESERVED_TENANT_CUSTOM_ROLE_NAME_MESSAGE));
       return;
     }
     setCreating(true);
@@ -184,9 +186,9 @@ export default function TenantPermissionsPage() {
       setCreateTemplateKey('');
       setDraftByRole((current) => ({ ...current, [created.role]: created.effective_permissions }));
       await reloadAndSelect(created.role);
-      setSuccessMessage(`${roleName(created)} custom role created successfully.`);
+      setSuccessMessage(`${roleName(created)} ${ui("custom role created successfully.")}`);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Custom role could not be created.');
+      setErrorMessage(error instanceof Error ? error.message : ui("Custom role could not be created."));
     } finally {
       setCreating(false);
     }
@@ -197,7 +199,7 @@ export default function TenantPermissionsPage() {
     if (!id || !activeRole || managing || !metadataName.trim()) return;
     if (isReservedTenantCustomRoleName(metadataName)) {
       setSuccessMessage(null);
-      setErrorMessage(RESERVED_TENANT_CUSTOM_ROLE_NAME_MESSAGE);
+      setErrorMessage(ui(RESERVED_TENANT_CUSTOM_ROLE_NAME_MESSAGE));
       return;
     }
     setManaging(true);
@@ -211,9 +213,9 @@ export default function TenantPermissionsPage() {
         description: metadataDescription.trim() || null
       });
       await reloadAndSelect(updated.role);
-      setSuccessMessage(`${roleName(updated)} details updated successfully.`);
+      setSuccessMessage(`${roleName(updated)} ${ui("details updated successfully.")}`);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Custom role details could not be updated.');
+      setErrorMessage(error instanceof Error ? error.message : ui("Custom role details could not be updated."));
     } finally {
       setManaging(false);
     }
@@ -223,16 +225,15 @@ export default function TenantPermissionsPage() {
     const id = customRoleId(activeRole);
     if (!id || !activeRole || managing) return;
     const nextActive = activeRole.is_active === false;
-    const action = nextActive ? 'activate' : 'deactivate';
 
     if (!nextActive && activeRole.can_deactivate === false) {
       setSuccessMessage(null);
-      setErrorMessage('Reassign all users before deactivating this custom role.');
+      setErrorMessage(ui("Reassign all users before deactivating this custom role."));
       return;
     }
     if (nextActive && activeRole.can_activate === false) return;
 
-    if (!window.confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} ${roleName(activeRole)}?`)) return;
+    if (!window.confirm(`${ui(nextActive ? "Activate" : "Deactivate")} ${roleName(activeRole)}?`)) return;
     setManaging(true);
     setSuccessMessage(null);
     setErrorMessage(null);
@@ -241,9 +242,9 @@ export default function TenantPermissionsPage() {
       const updated = await updateTenantCustomRole({ id, version: activeRole.version || 1, is_active: nextActive });
       discardDraftForRole(roleKey);
       await reloadAndSelect(updated.role);
-      setSuccessMessage(`${roleName(updated)} ${nextActive ? 'activated' : 'deactivated'} successfully.`);
+      setSuccessMessage(`${roleName(updated)} ${ui(nextActive ? "activated successfully." : "deactivated successfully.")}`);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : `Custom role could not be ${action}d.`);
+      setErrorMessage(error instanceof Error ? error.message : ui(nextActive ? "Custom role could not be activated." : "Custom role could not be deactivated."));
     } finally {
       setManaging(false);
     }
@@ -252,16 +253,16 @@ export default function TenantPermissionsPage() {
   const duplicateCustomRole = async () => {
     const id = customRoleId(activeRole);
     if (!id || !activeRole || managing) return;
-    const name = window.prompt('Name for the copied custom role:', `${roleName(activeRole)} Copy`);
+    const name = window.prompt(ui('Name for the copied custom role:'), `${roleName(activeRole)} ${ui('Copy')}`);
     if (!name?.trim()) return;
     if (name.trim().length < 2) {
       setSuccessMessage(null);
-      setErrorMessage('Custom role name must contain at least 2 characters.');
+      setErrorMessage(ui("Custom role name must contain at least 2 characters."));
       return;
     }
     if (isReservedTenantCustomRoleName(name)) {
       setSuccessMessage(null);
-      setErrorMessage(RESERVED_TENANT_CUSTOM_ROLE_NAME_MESSAGE);
+      setErrorMessage(ui(RESERVED_TENANT_CUSTOM_ROLE_NAME_MESSAGE));
       return;
     }
     setManaging(true);
@@ -271,9 +272,9 @@ export default function TenantPermissionsPage() {
       const duplicated = await duplicateTenantCustomRole({ id, name: name.trim() });
       setDraftByRole((current) => ({ ...current, [duplicated.role]: duplicated.effective_permissions }));
       await reloadAndSelect(duplicated.role);
-      setSuccessMessage(`${roleName(duplicated)} created from ${roleName(activeRole)}.`);
+      setSuccessMessage(`${roleName(duplicated)} ${ui("created from")} ${roleName(activeRole)}.`);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Custom role could not be duplicated.');
+      setErrorMessage(error instanceof Error ? error.message : ui("Custom role could not be duplicated."));
     } finally {
       setManaging(false);
     }
@@ -285,11 +286,11 @@ export default function TenantPermissionsPage() {
 
     if (activeRole.can_delete === false) {
       setSuccessMessage(null);
-      setErrorMessage('Reassign all users before deleting this custom role.');
+      setErrorMessage(ui("Reassign all users before deleting this custom role."));
       return;
     }
 
-    if (!window.confirm(`Delete ${roleName(activeRole)}? This permanently removes the role definition after all users have been reassigned.`)) return;
+    if (!window.confirm(`${ui("Delete")} ${roleName(activeRole)}? ${ui("This permanently removes the role definition after all users have been reassigned.")}`)) return;
     setManaging(true);
     setSuccessMessage(null);
     setErrorMessage(null);
@@ -300,19 +301,19 @@ export default function TenantPermissionsPage() {
       discardDraftForRole(roleKey);
       setSelectedRole('admin');
       await reloadAndSelect('admin');
-      setSuccessMessage(`${deletedName} deleted successfully.`);
+      setSuccessMessage(`${deletedName} ${ui("deleted successfully.")}`);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Custom role could not be deleted.');
+      setErrorMessage(error instanceof Error ? error.message : ui("Custom role could not be deleted."));
     } finally {
       setManaging(false);
     }
   };
 
-  if (query.isLoading) return <div className="app-loading-state">Loading tenant permission policies…</div>;
+  if (query.isLoading) return <div className="app-loading-state">{ui("Loading tenant permission policies…")}</div>;
   if (query.isError || !query.data) {
     return (
       <div className="app-error-state">
-        Tenant permission settings could not be loaded. Check tenant administrator access and try again.
+        {ui("Tenant permission settings could not be loaded. Check tenant administrator access and try again.")}
       </div>
     );
   }
@@ -322,11 +323,11 @@ export default function TenantPermissionsPage() {
       <section className="app-panel tenant-permissions-panel">
         <OperationalSectionHeader
           iconPath="/users"
-          title="Custom role library"
-          description="Select a tenant-specific role to review its lifecycle, assignment status, and starting template."
+          title={ui("Custom role library")}
+          description={ui("Select a tenant-specific role to review its lifecycle, assignment status, and starting template.")}
         />
         {customRoles.length ? (
-          <div className="tenant-permissions-role-grid" aria-label="Tenant custom roles">
+          <div className="tenant-permissions-role-grid" aria-label={ui("Tenant custom roles")}>
             {customRoles.map((role) => (
               <button
                 key={role.role}
@@ -337,13 +338,13 @@ export default function TenantPermissionsPage() {
               >
                 <span className="tenant-permissions-role-card__topline">
                   <strong>{roleName(role)}</strong>
-                  <em>{role.is_active === false ? 'Inactive' : 'Active'}</em>
+                  <em>{role.is_active === false ? ui("Inactive") : ui("Active")}</em>
                 </span>
-                <span>{role.effective_permissions.length} permissions · {role.user_count || 0} assigned users</span>
+                <span>{role.effective_permissions.length} {ui("permissions ·")} {role.user_count || 0} {ui("assigned users")}</span>
                 <span className="tenant-permissions-role-card__footer">
-                  <small>Starting point: {role.source_template_name || 'Blank role'}</small>
+                  <small>{ui("Starting point:")} {role.source_template_name || ui('Blank role')}</small>
                   <span className="tenant-permissions-role-card__manage">
-                    {role.role === selectedRole ? 'Selected' : 'Manage →'}
+                    {role.role === selectedRole ? ui("Selected") : ui("Manage →")}
                   </span>
                 </span>
               </button>
@@ -351,7 +352,7 @@ export default function TenantPermissionsPage() {
           </div>
         ) : (
           <div className="app-empty-state tenant-permissions-empty-role-state">
-            No tenant custom roles have been created yet.
+            {ui("No tenant custom roles have been created yet.")}
           </div>
         )}
       </section>
@@ -359,27 +360,27 @@ export default function TenantPermissionsPage() {
       <form onSubmit={createCustomRole} data-skip-global-action-feedback="true" className="app-panel tenant-permissions-panel tenant-permissions-create-panel">
         <OperationalSectionHeader
           iconPath="/permissions"
-          title="Create custom role"
-          description="Start blank, copy a protected baseline, or use an operational template. The new role belongs only to this tenant."
-          actions={<span className="tenant-permissions-template-count">{query.data.custom_role_templates.length} templates</span>}
+          title={ui("Create custom role")}
+          description={ui("Start blank, copy a protected baseline, or use an operational template. The new role belongs only to this tenant.")}
+          actions={<span className="tenant-permissions-template-count">{query.data.custom_role_templates.length} {ui("templates")}</span>}
         />
         <div className="tenant-permissions-form-grid">
           <label className="tenant-permissions-field">
-            <span>Role name</span>
-            <input value={createName} onChange={(event) => setCreateName(event.target.value)} maxLength={80} required placeholder="Example: Receiving Clerk" />
+            <span>{ui("Role name")}</span>
+            <input value={createName} onChange={(event) => setCreateName(event.target.value)} maxLength={80} required placeholder={ui("Example: Receiving Clerk")} />
           </label>
           <label className="tenant-permissions-field">
-            <span>Starting template</span>
+            <span>{ui("Starting template")}</span>
             <select value={createTemplateKey} onChange={(event) => setCreateTemplateKey(event.target.value)}>
-              <option value="">Blank role — dashboard only</option>
+              <option value="">{ui("Blank role — dashboard only")}</option>
               {query.data.custom_role_templates.map((template) => (
-                <option key={template.key} value={template.key}>{template.name} · {template.permission_count} permissions</option>
+                <option key={template.key} value={template.key}>{template.name} · {template.permission_count} {ui("permissions")}</option>
               ))}
             </select>
           </label>
           <label className="tenant-permissions-field tenant-permissions-field--wide">
-            <span>Description (optional)</span>
-            <input value={createDescription} onChange={(event) => setCreateDescription(event.target.value)} maxLength={500} placeholder="What this role is responsible for" />
+            <span>{ui("Description (optional)")}</span>
+            <input value={createDescription} onChange={(event) => setCreateDescription(event.target.value)} maxLength={500} placeholder={ui("What this role is responsible for")} />
           </label>
         </div>
         {selectedTemplate ? (
@@ -389,11 +390,11 @@ export default function TenantPermissionsPage() {
           </div>
         ) : null}
         <div className="tenant-permissions-safety-note">
-          Custom roles cannot use the protected Admin, Manager, or Staff names and cannot receive tenant deletion, user administration, or role-permission administration rights. Required Read permissions are added automatically when an operational action depends on them.
+          {ui("Custom roles cannot use the protected Admin, Manager, or Staff names and cannot receive tenant deletion, user administration, or role-permission administration rights. Required Read permissions are added automatically when an operational action depends on them.")}
         </div>
         <div className="tenant-permissions-panel-actions">
           <button type="submit" className="app-button app-button--primary" disabled={creating || !createNameValid}>
-            {creating ? 'Creating…' : 'Create custom role'}
+            {creating ? ui("Creating…") : ui("Create custom role")}
           </button>
         </div>
       </form>
@@ -402,25 +403,25 @@ export default function TenantPermissionsPage() {
         <section data-skip-global-action-feedback="true" className="app-panel tenant-permissions-panel tenant-permissions-manage-panel">
           <OperationalSectionHeader
             iconPath="/permissions"
-            title={`Manage ${roleName(activeRole)}`}
-            description={`${activeRole.user_count || 0} assigned users · ${activeRole.is_active === false ? 'Inactive' : 'Active'} · starting point: ${activeRole.source_template_name || 'Blank role'}`}
+            title={`${ui("Manage")} ${roleName(activeRole)}`}
+            description={`${activeRole.user_count || 0} ${ui("assigned users ·")} ${activeRole.is_active === false ? ui("Inactive") : ui("Active")} · ${ui("starting point:")} ${activeRole.source_template_name || ui("Blank role")}`}
           />
           <div className="tenant-permissions-form-grid tenant-permissions-form-grid--manage">
             <label className="tenant-permissions-field">
-              <span>Name</span>
+              <span>{ui("Name")}</span>
               <input value={metadataName} onChange={(event) => setMetadataName(event.target.value)} maxLength={80} />
             </label>
             <label className="tenant-permissions-field">
-              <span>Description</span>
+              <span>{ui("Description")}</span>
               <input value={metadataDescription} onChange={(event) => setMetadataDescription(event.target.value)} maxLength={500} />
             </label>
           </div>
           <div className="tenant-permissions-lifecycle-note">
             {activeRole.user_count
-              ? `${activeRole.user_count} user${activeRole.user_count === 1 ? '' : 's'} must be reassigned before this role can be deactivated or deleted.`
+              ? `${activeRole.user_count} ${ui(activeRole.user_count === 1 ? "user must be reassigned before this role can be deactivated or deleted." : "users must be reassigned before this role can be deactivated or deleted.")}`
               : activeRole.is_active === false
-                ? 'Inactive roles retain their definition but cannot be assigned or edited until reactivated.'
-                : 'No users are assigned. This role can be safely deactivated if it is no longer needed.'}
+                ? ui("Inactive roles retain their definition but cannot be assigned or edited until reactivated.")
+                : ui("No users are assigned. This role can be safely deactivated if it is no longer needed.")}
           </div>
           <div className="tenant-permissions-panel-actions tenant-permissions-panel-actions--manage">
             <button
@@ -429,35 +430,35 @@ export default function TenantPermissionsPage() {
               disabled={managing || !metadataNameValid || !metadataDirty}
               onClick={() => void updateMetadata()}
             >
-              Save details
+              {ui("Save details")}
             </button>
             <button type="button" className="app-button app-button--secondary" disabled={managing} onClick={() => void duplicateCustomRole()}>
-              Duplicate
+              {ui("Duplicate")}
             </button>
             <button
               type="button"
               className="app-button app-button--secondary"
               disabled={managing || (activeRole.is_active === false ? activeRole.can_activate === false : activeRole.can_deactivate === false)}
               onClick={() => void toggleCustomRoleActive()}
-              title={activeRole.is_active !== false && activeRole.can_deactivate === false ? 'Reassign all users before deactivating this role.' : undefined}
+              title={activeRole.is_active !== false && activeRole.can_deactivate === false ? ui("Reassign all users before deactivating this role.") : undefined}
             >
-              {activeRole.is_active === false ? 'Activate' : 'Deactivate'}
+              {activeRole.is_active === false ? ui("Activate") : ui("Deactivate")}
             </button>
             <button
               type="button"
               className="app-button app-button--danger"
               disabled={managing || activeRole.can_delete === false}
               onClick={() => void removeCustomRole()}
-              title={activeRole.can_delete === false ? 'Reassign all users before deleting this role.' : undefined}
+              title={activeRole.can_delete === false ? ui("Reassign all users before deleting this role.") : undefined}
             >
-              Delete role
+              {ui("Delete role")}
             </button>
           </div>
         </section>
       ) : (
         customRoles.length ? (
           <div className="app-empty-state tenant-permissions-custom-role-prompt">
-            Select a custom role above to manage its name, lifecycle, and assignment safety.
+            {ui("Select a custom role above to manage its name, lifecycle, and assignment safety.")}
           </div>
         ) : null
       )}
@@ -466,10 +467,10 @@ export default function TenantPermissionsPage() {
 
   return (
     <RolePermissionEditor
-      title="Tenant permission management"
-      description="Control built-in role access and tenant-specific custom roles without exposing users to unnecessary technical detail. Protected administration rights and tenant isolation remain enforced by the backend."
-      scopeLabel="Tenant"
-      reservedLabel="Tenant Admin only"
+      title={ui("Tenant permission management")}
+      description={ui("Control built-in role access and tenant-specific custom roles without exposing users to unnecessary technical detail. Protected administration rights and tenant isolation remain enforced by the backend.")}
+      scopeLabel={ui("Tenant")}
+      reservedLabel={ui("Tenant Admin only")}
       operationalWorkspace
       workspaceIconPath="/permissions"
       workspaceEyebrow="People & access"

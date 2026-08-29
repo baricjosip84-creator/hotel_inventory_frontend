@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAppTranslation } from '../i18n/I18nContext';
+import type { AppLocale } from '../i18n/config';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { ApiError, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import {
@@ -93,22 +96,41 @@ async function overrideAdminAlert(input: { id: string; reason: string }): Promis
   });
 }
 
-function readableError(error: unknown): string {
+type UiTranslator = (englishText: string) => string;
+
+const ALERT_TYPE_LABELS: Record<string, string> = {
+  FINALIZED_SHIPMENT_INCOMPLETE_BLOCKING: 'Finalized shipment incomplete',
+  NEGATIVE_STOCK_BLOCKING: 'Negative stock',
+  ORPHANED_SHIPMENT_ITEM_BLOCKING: 'Orphaned shipment item',
+  OVER_RECEIVED_BLOCKING: 'Over-received shipment',
+  PO_OVER_RECEIVED_BLOCKING: 'Purchase order over-received',
+  SHIPMENT_IMMUTABLE_BLOCKING: 'Shipment immutability violation',
+  STOCK_LEDGER_DESYNC_BLOCKING: 'Stock ledger desynchronization',
+  STOCK_LOT_DESYNC_BLOCKING: 'Stock lot desynchronization'
+};
+
+const ALERT_SEVERITY_LABELS: Record<string, string> = {
+  critical: 'Critical',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+  warning: 'Warning'
+};
+
+function readableError(error: unknown, unknownErrorLabel: string): string {
   if (error instanceof ApiError || error instanceof Error) {
     return error.message;
   }
-  return 'Unknown error';
+  return unknownErrorLabel;
 }
 
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return '—';
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleString();
+function formatDateTime(value: string | null | undefined, locale: AppLocale): string {
+  return formatLocalizedDateTime(value, locale);
 }
 
-function formatUpdatedAt(value: number): string {
-  if (!value) return 'Not loaded yet';
-  return formatDateTime(new Date(value).toISOString());
+function formatUpdatedAt(value: number, locale: AppLocale, ui: UiTranslator): string {
+  if (!value) return ui('Not loaded yet');
+  return formatDateTime(new Date(value).toISOString(), locale);
 }
 
 function shortId(value: string | null | undefined): string {
@@ -116,13 +138,14 @@ function shortId(value: string | null | undefined): string {
   return value.length > 12 ? `${value.slice(0, 8)}…` : value;
 }
 
-function formatAlertType(value: string): string {
-  return value
-    .toLowerCase()
-    .split('_')
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+function formatAlertType(value: string, ui: UiTranslator): string {
+  const label = ALERT_TYPE_LABELS[value.toUpperCase()];
+  return label ? ui(label) : value;
+}
+
+function formatAlertSeverity(value: string, ui: UiTranslator): string {
+  const label = ALERT_SEVERITY_LABELS[value.toLowerCase()];
+  return label ? ui(label) : value;
 }
 
 function toCount(value: number | string | null | undefined): number {
@@ -139,6 +162,7 @@ function DiagnosticCount({ children }: { children: React.ReactNode }) {
 }
 
 export default function AdminSystemPage() {
+  const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
   const capabilities = getRoleCapabilities();
   const canViewTenantDiagnostics = capabilities.canViewTenantDiagnostics;
@@ -206,11 +230,11 @@ export default function AdminSystemPage() {
 
     const failedResult = (results as RefreshResult[]).find((result) => result.isError);
     if (failedResult) {
-      setActionError(`Refresh incomplete: ${readableError(failedResult.error)}`);
+      setActionError(`Refresh incomplete: ${readableError(failedResult.error, ui('Unknown error'))}`);
       return;
     }
 
-    setActionMessage('Admin system data refreshed.');
+    setActionMessage(ui('Admin system data refreshed.'));
   };
 
   const refreshAdminAlertData = async () => {
@@ -227,12 +251,12 @@ export default function AdminSystemPage() {
     mutationFn: acknowledgeAdminAlert,
     onSuccess: async (result) => {
       setActionError(null);
-      setActionMessage(result.message || 'Alert acknowledged.');
+      setActionMessage(result.message || ui('Alert acknowledged.'));
       await refreshAdminAlertData();
     },
     onError: (error) => {
       setActionMessage(null);
-      setActionError(readableError(error));
+      setActionError(readableError(error, ui('Unknown error')));
     }
   });
 
@@ -240,7 +264,7 @@ export default function AdminSystemPage() {
     mutationFn: resolveAdminAlert,
     onSuccess: async (result, variables) => {
       setActionError(null);
-      setActionMessage(result.message || 'Alert resolved.');
+      setActionMessage(result.message || ui('Alert resolved.'));
       setResolutionNoteByAlertId((current) => {
         const next = { ...current };
         delete next[variables.id];
@@ -250,7 +274,7 @@ export default function AdminSystemPage() {
     },
     onError: (error) => {
       setActionMessage(null);
-      setActionError(readableError(error));
+      setActionError(readableError(error, ui('Unknown error')));
     }
   });
 
@@ -258,7 +282,7 @@ export default function AdminSystemPage() {
     mutationFn: overrideAdminAlert,
     onSuccess: async (result, variables) => {
       setActionError(null);
-      setActionMessage(result.message || 'Blocking alert overridden.');
+      setActionMessage(result.message || ui('Blocking alert overridden.'));
       setOverrideReasonByAlertId((current) => {
         const next = { ...current };
         delete next[variables.id];
@@ -268,7 +292,7 @@ export default function AdminSystemPage() {
     },
     onError: (error) => {
       setActionMessage(null);
-      setActionError(readableError(error));
+      setActionError(readableError(error, ui('Unknown error')));
     }
   });
 
@@ -287,9 +311,9 @@ export default function AdminSystemPage() {
   const loadedBrokenShipmentCount = brokenShipmentsQuery.data?.length ?? 0;
   const loadedIntegrityIssueCount = loadedStockIssueCount + loadedBrokenShipmentCount;
 
-  const writeStatus = systemStatusQuery.isLoading ? 'Loading…' : statusUnavailable ? 'Unavailable' : effectiveWriteLocked ? 'Locked' : 'Open';
-  const maintenanceStatus = systemStatusQuery.isLoading ? 'Loading…' : statusUnavailable ? 'Unavailable' : maintenanceEnabled ? 'Enabled' : 'Disabled';
-  const blockingStatus = systemStatusQuery.isLoading ? 'Loading…' : statusUnavailable ? 'Unavailable' : String(blockingCount);
+  const writeStatus = systemStatusQuery.isLoading ? ui('Loading…') : statusUnavailable ? ui('Unavailable') : effectiveWriteLocked ? ui('Locked') : ui('Open');
+  const maintenanceStatus = systemStatusQuery.isLoading ? ui('Loading…') : statusUnavailable ? ui('Unavailable') : maintenanceEnabled ? ui('Enabled') : ui('Disabled');
+  const blockingStatus = systemStatusQuery.isLoading ? ui('Loading…') : statusUnavailable ? ui('Unavailable') : formatLocalizedNumber(blockingCount, locale);
   const diagnosticsLoading = canViewTenantDiagnostics && (
     blockingAlertsQuery.isLoading || stockIntegrityQuery.isLoading || brokenShipmentsQuery.isLoading
   );
@@ -298,35 +322,38 @@ export default function AdminSystemPage() {
   );
   const diagnosticIssueCount = blockingCount + loadedIntegrityIssueCount;
   const diagnosticAccessStatus = !canViewTenantDiagnostics
-    ? 'Restricted'
+    ? ui('Restricted')
     : diagnosticsLoading
-      ? 'Loading…'
+      ? ui('Loading…')
       : diagnosticsUnavailable
-        ? 'Unavailable'
+        ? ui('Unavailable')
         : diagnosticIssueCount > 0
-          ? 'Attention'
-          : 'Healthy';
+          ? ui('Attention')
+          : ui('Healthy');
   const diagnosticHelper = !canViewTenantDiagnostics
-    ? 'Tenant Diagnostics · Read permission required'
+    ? ui('Tenant Diagnostics · Read permission required')
     : diagnosticsLoading
-      ? 'Loading blocking, stock, and shipment integrity checks'
+      ? ui('Loading blocking, stock, and shipment integrity checks')
       : diagnosticsUnavailable
-        ? 'One or more tenant diagnostic checks could not be loaded'
+        ? ui('One or more tenant diagnostic checks could not be loaded')
         : diagnosticIssueCount > 0
-          ? `${blockingCount} blocker${blockingCount === 1 ? '' : 's'} · ${loadedIntegrityIssueCount} loaded stock / shipment issue${loadedIntegrityIssueCount === 1 ? '' : 's'}`
-          : 'No blocking, stock, or shipment integrity issues detected';
+          ? ui('{blockerCount} blocking alerts · {issueCount} loaded stock / shipment issues')
+              .replace('{blockerCount}', formatLocalizedNumber(blockingCount, locale))
+              .replace('{issueCount}', formatLocalizedNumber(loadedIntegrityIssueCount, locale))
+          : ui('No blocking, stock, or shipment integrity issues detected');
   const pageHealth = systemStatusQuery.isLoading
-    ? 'Loading…'
+    ? ui('Loading…')
     : statusUnavailable
-      ? 'Unavailable'
+      ? ui('Unavailable')
       : effectiveWriteLocked
-        ? 'Write locked'
+        ? ui('Write locked')
         : maintenanceEnabled
-          ? 'Maintenance'
+          ? ui('Maintenance')
           : blockingCount > 0
-            ? 'Attention'
-            : 'Operational';
-  const pageHealthLabel = `tenant administrative health · refreshed ${formatUpdatedAt(lastUpdatedAt)}`;
+            ? ui('Attention')
+            : ui('Operational');
+  const pageHealthLabel = ui('tenant administrative health · refreshed {time}')
+    .replace('{time}', formatUpdatedAt(lastUpdatedAt, locale, ui));
   const blockingHeaderCount = statusUnavailable ? loadedBlockingCount : blockingCount;
   const alertActionsBlockedByWriteLock = effectiveWriteLocked;
 
@@ -334,15 +361,15 @@ export default function AdminSystemPage() {
     <div className="admin-system-page io-operational-page io-workspace-page" id="admin-system-workspace-top">
       <OperationalWorkspaceHero
         iconPath="/admin-system"
-        eyebrow="Administration & integrity"
-        title="Admin system"
-        description="Review tenant operational posture, write-lock and maintenance signals, blocking alerts, and tenant-scoped integrity diagnostics. Platform controls remain read-only from this tenant page."
+        eyebrow={ui('Administration & integrity')}
+        title={ui('Admin system')}
+        description={ui('Review tenant operational posture, write-lock and maintenance signals, blocking alerts, and tenant-scoped integrity diagnostics. Platform controls remain read-only from this tenant page.')}
         meta={
           <>
-            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Platform signals read-only</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Diagnostics permission-gated</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Alert actions permission-gated</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Platform signals read-only')}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Diagnostics permission-gated')}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Alert actions permission-gated')}</OperationalWorkspaceMetaPill>
           </>
         }
         aside={
@@ -354,39 +381,39 @@ export default function AdminSystemPage() {
               onClick={() => void handleManualRefresh()}
               disabled={isAdminSystemRefreshing}
             >
-              {isAdminSystemRefreshing ? 'Refreshing…' : 'Refresh'}
+              {isAdminSystemRefreshing ? ui('Refreshing…') : ui('Refresh')}
             </button>
           </div>
         }
       />
 
-      <OperationalWorkspaceStats ariaLabel="Admin system overview">
+      <OperationalWorkspaceStats ariaLabel={ui('Admin system overview')}>
         <OperationalWorkspaceStatCard
-          label="Effective write status"
+          label={ui('Effective write status')}
           value={writeStatus}
-          helper="Platform and tenant write locks combined"
+          helper={ui('Platform and tenant write locks combined')}
           tone={!systemStatusQuery.isLoading && !statusUnavailable && effectiveWriteLocked ? 'danger' : 'good'}
           iconPath="/admin-system"
           loading={systemStatusQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Maintenance"
+          label={ui('Maintenance')}
           value={maintenanceStatus}
-          helper="Platform maintenance signal visible to this tenant"
+          helper={ui('Platform maintenance signal visible to this tenant')}
           tone={!systemStatusQuery.isLoading && !statusUnavailable && maintenanceEnabled ? 'warn' : 'neutral'}
           iconPath="/reliability-command"
           loading={systemStatusQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Blocking alerts"
+          label={ui('Blocking alerts')}
           value={blockingStatus}
-          helper="Unresolved tenant blockers affecting protected operations"
+          helper={ui('Unresolved tenant blockers affecting protected operations')}
           tone={!systemStatusQuery.isLoading && !statusUnavailable && blockingCount > 0 ? 'danger' : 'good'}
           iconPath="/alerts"
           loading={systemStatusQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Tenant diagnostics"
+          label={ui('Tenant diagnostics')}
           value={diagnosticAccessStatus}
           helper={diagnosticHelper}
           tone={!canViewTenantDiagnostics || diagnosticsLoading || diagnosticsUnavailable ? 'neutral' : diagnosticIssueCount > 0 ? 'warn' : 'good'}
@@ -400,62 +427,62 @@ export default function AdminSystemPage() {
       <section className="app-panel admin-system-panel">
         <OperationalSectionHeader
           iconPath="/admin-system"
-          title="Operational posture"
-          description="Current tenant write availability and platform maintenance signals. This page reports these controls; it does not change platform or tenant lock settings."
+          title={ui('Operational posture')}
+          description={ui('Current tenant write availability and platform maintenance signals. This page reports these controls; it does not change platform or tenant lock settings.')}
           actions={
             statusUnavailable
-              ? <StatusBadge tone="danger">STATUS UNAVAILABLE</StatusBadge>
+              ? <StatusBadge tone="danger">{ui('STATUS UNAVAILABLE')}</StatusBadge>
               : effectiveWriteLocked
-                ? <StatusBadge tone="danger">WRITES BLOCKED</StatusBadge>
-                : <StatusBadge tone="good">WRITES OPEN</StatusBadge>
+                ? <StatusBadge tone="danger">{ui('WRITES BLOCKED')}</StatusBadge>
+                : <StatusBadge tone="good">{ui('WRITES OPEN')}</StatusBadge>
           }
         />
 
-        {systemStatusQuery.isLoading ? <div className="app-empty-state admin-system-message">Loading system status…</div> : null}
-        {systemStatusQuery.error ? <div className="app-error-state admin-system-message">{readableError(systemStatusQuery.error)}</div> : null}
+        {systemStatusQuery.isLoading ? <div className="app-empty-state admin-system-message">{ui('Loading system status…')}</div> : null}
+        {systemStatusQuery.error ? <div className="app-error-state admin-system-message">{readableError(systemStatusQuery.error, ui('Unknown error'))}</div> : null}
 
         {systemStatusQuery.data ? (
           <div className="admin-system-status-grid">
             <div className="admin-system-status-item admin-system-status-item--tenant">
-              <span>Tenant ID</span>
+              <span>{ui('Tenant ID')}</span>
               <strong className="admin-system-mono">{systemStatusQuery.data.tenant_id ?? '—'}</strong>
             </div>
             <div className="admin-system-status-item">
-              <span>Reported at</span>
-              <strong>{formatDateTime(systemStatusQuery.data.generated_at ?? systemStatusQuery.data.timestamp)}</strong>
+              <span>{ui('Reported at')}</span>
+              <strong>{formatDateTime(systemStatusQuery.data.generated_at ?? systemStatusQuery.data.timestamp, locale)}</strong>
             </div>
             <div className="admin-system-status-item">
-              <span>Platform write lock</span>
-              <strong>{systemWriteLocked ? 'Enabled' : 'Disabled'}</strong>
-              <StatusBadge tone={systemWriteLocked ? 'danger' : 'good'}>{systemWriteLocked ? 'LOCKED' : 'CLEAR'}</StatusBadge>
+              <span>{ui('Platform write lock')}</span>
+              <strong>{systemWriteLocked ? ui('Enabled') : ui('Disabled')}</strong>
+              <StatusBadge tone={systemWriteLocked ? 'danger' : 'good'}>{systemWriteLocked ? ui('LOCKED') : ui('CLEAR')}</StatusBadge>
             </div>
             <div className="admin-system-status-item">
-              <span>Tenant write lock</span>
-              <strong>{tenantWriteLocked ? 'Enabled' : 'Disabled'}</strong>
-              <StatusBadge tone={tenantWriteLocked ? 'danger' : 'good'}>{tenantWriteLocked ? 'LOCKED' : 'CLEAR'}</StatusBadge>
+              <span>{ui('Tenant write lock')}</span>
+              <strong>{tenantWriteLocked ? ui('Enabled') : ui('Disabled')}</strong>
+              <StatusBadge tone={tenantWriteLocked ? 'danger' : 'good'}>{tenantWriteLocked ? ui('LOCKED') : ui('CLEAR')}</StatusBadge>
             </div>
             <div className="admin-system-status-item">
-              <span>Effective write status</span>
-              <strong>{effectiveWriteLocked ? 'Locked' : 'Open'}</strong>
-              <StatusBadge tone={effectiveWriteLocked ? 'danger' : 'good'}>{effectiveWriteLocked ? 'BLOCKED' : 'OPEN'}</StatusBadge>
+              <span>{ui('Effective write status')}</span>
+              <strong>{effectiveWriteLocked ? ui('Locked') : ui('Open')}</strong>
+              <StatusBadge tone={effectiveWriteLocked ? 'danger' : 'good'}>{effectiveWriteLocked ? ui('BLOCKED') : ui('OPEN')}</StatusBadge>
             </div>
             <div className="admin-system-status-item">
-              <span>Maintenance mode</span>
-              <strong>{maintenanceEnabled ? 'Enabled' : 'Disabled'}</strong>
-              <StatusBadge tone={maintenanceEnabled ? 'warn' : 'neutral'}>{maintenanceEnabled ? 'ACTIVE' : 'OFF'}</StatusBadge>
+              <span>{ui('Maintenance mode')}</span>
+              <strong>{maintenanceEnabled ? ui('Enabled') : ui('Disabled')}</strong>
+              <StatusBadge tone={maintenanceEnabled ? 'warn' : 'neutral'}>{maintenanceEnabled ? ui('ACTIVE') : ui('OFF')}</StatusBadge>
             </div>
             <div className="admin-system-status-item">
-              <span>Unresolved blocking alerts</span>
-              <strong>{blockingCount}</strong>
-              <StatusBadge tone={blockingCount > 0 ? 'danger' : 'good'}>{blockingCount > 0 ? 'ATTENTION' : 'CLEAR'}</StatusBadge>
+              <span>{ui('Unresolved blocking alerts')}</span>
+              <strong>{formatLocalizedNumber(blockingCount, locale)}</strong>
+              <StatusBadge tone={blockingCount > 0 ? 'danger' : 'good'}>{blockingCount > 0 ? ui('ATTENTION') : ui('CLEAR')}</StatusBadge>
             </div>
           </div>
         ) : null}
 
         {effectiveWriteLocked ? (
           <div className="app-warning-state admin-system-message">
-            <strong>Protected write operations are currently blocked.</strong>{' '}
-            The active source is {systemWriteLocked && tenantWriteLocked ? 'both the platform and tenant write locks' : systemWriteLocked ? 'the platform write lock' : 'the tenant write lock'}. Alert acknowledge, resolve, and override actions are disabled here until the lock is cleared.
+            <strong>{ui('Protected write operations are currently blocked.')}</strong>{' '}
+            {ui('The active source is {source}. Alert acknowledge, resolve, and override actions are disabled here until the lock is cleared.').replace('{source}', systemWriteLocked && tenantWriteLocked ? ui('both the platform and tenant write locks') : systemWriteLocked ? ui('the platform write lock') : ui('the tenant write lock'))}
           </div>
         ) : null}
       </section>
@@ -463,39 +490,39 @@ export default function AdminSystemPage() {
       <section className="app-panel admin-system-panel">
         <OperationalSectionHeader
           iconPath="/audit"
-          title="Tenant diagnostics"
-          description="Restricted tenant-scoped integrity checks. Each diagnostic list loads up to 100 current rows; the Blocking alerts KPI above remains the authoritative total blocker count."
+          title={ui('Tenant diagnostics')}
+          description={ui('Restricted tenant-scoped integrity checks. Each diagnostic list loads up to 100 current rows; the Blocking alerts KPI above remains the authoritative total blocker count.')}
           actions={
             canViewTenantDiagnostics
-              ? <StatusBadge tone={canManageAlerts || canOverrideAlerts ? 'blue' : 'neutral'}>{canManageAlerts || canOverrideAlerts ? 'DIAGNOSTICS AVAILABLE' : 'READ ONLY'}</StatusBadge>
-              : <StatusBadge tone="neutral">PERMISSION REQUIRED</StatusBadge>
+              ? <StatusBadge tone={canManageAlerts || canOverrideAlerts ? 'blue' : 'neutral'}>{canManageAlerts || canOverrideAlerts ? ui('DIAGNOSTICS AVAILABLE') : ui('READ ONLY')}</StatusBadge>
+              : <StatusBadge tone="neutral">{ui('PERMISSION REQUIRED')}</StatusBadge>
           }
         />
 
         {!canViewTenantDiagnostics ? (
-          <div className="app-warning-state admin-system-message">Diagnostics require Tenant Diagnostics · Read permission.</div>
+          <div className="app-warning-state admin-system-message">{ui('Diagnostics require Tenant Diagnostics · Read permission.')}</div>
         ) : (
           <div className="admin-system-diagnostics">
             {!canManageAlerts && !canOverrideAlerts ? (
-              <div className="app-empty-state admin-system-message">Diagnostics are read-only for your current permission set.</div>
+              <div className="app-empty-state admin-system-message">{ui('Diagnostics are read-only for your current permission set.')}</div>
             ) : null}
             {alertActionsBlockedByWriteLock && (canManageAlerts || canOverrideAlerts) ? (
-              <div className="app-warning-state admin-system-message">Alert actions are disabled while the effective write status is locked.</div>
+              <div className="app-warning-state admin-system-message">{ui('Alert actions are disabled while the effective write status is locked.')}</div>
             ) : null}
 
             <section className="admin-system-diagnostic-group" aria-labelledby="admin-system-blocking-heading">
               <div className="admin-system-diagnostic-heading">
                 <div>
-                  <h4 id="admin-system-blocking-heading">Blocking alerts</h4>
-                  <p>Unresolved blocking alerts that can stop protected tenant operations.</p>
+                  <h4 id="admin-system-blocking-heading">{ui('Blocking alerts')}</h4>
+                  <p>{ui('Unresolved blocking alerts that can stop protected tenant operations.')}</p>
                 </div>
-                <DiagnosticCount>{blockingAlertsQuery.isLoading ? 'Loading…' : blockingHeaderCount}</DiagnosticCount>
+                <DiagnosticCount>{blockingAlertsQuery.isLoading ? ui('Loading…') : formatLocalizedNumber(blockingHeaderCount, locale)}</DiagnosticCount>
               </div>
 
-              {blockingAlertsQuery.error ? <div className="app-error-state admin-system-message">{readableError(blockingAlertsQuery.error)}</div> : null}
-              {blockingAlertsQuery.isLoading ? <div className="app-empty-state admin-system-message">Loading blocking diagnostics…</div> : null}
+              {blockingAlertsQuery.error ? <div className="app-error-state admin-system-message">{readableError(blockingAlertsQuery.error, ui('Unknown error'))}</div> : null}
+              {blockingAlertsQuery.isLoading ? <div className="app-empty-state admin-system-message">{ui('Loading blocking diagnostics…')}</div> : null}
               {blockingAlertsQuery.data?.length ? blockingAlertsQuery.data.map((row) => {
-                const alertTitle = formatAlertType(row.type);
+                const alertTitle = formatAlertType(row.type, ui);
                 const resolutionNote = resolutionNoteByAlertId[row.id] ?? '';
                 const overrideReason = overrideReasonByAlertId[row.id] ?? '';
                 const isAcknowledging = acknowledgeMutation.isPending && acknowledgeMutation.variables === row.id;
@@ -510,27 +537,27 @@ export default function AdminSystemPage() {
                         <strong>{alertTitle}</strong>
                         <p>{row.message}</p>
                       </div>
-                      <StatusBadge tone={row.severity.toLowerCase() === 'critical' || row.severity.toLowerCase() === 'high' ? 'danger' : 'warn'}>{row.severity.toUpperCase()}</StatusBadge>
+                      <StatusBadge tone={row.severity.toLowerCase() === 'critical' || row.severity.toLowerCase() === 'high' ? 'danger' : 'warn'}>{formatAlertSeverity(row.severity, ui)}</StatusBadge>
                     </div>
                     <div className="admin-system-diagnostic-meta">
-                      <span>{formatDateTime(row.created_at)}</span>
+                      <span>{formatDateTime(row.created_at, locale)}</span>
                       {row.product_name ? <span>{row.product_name}</span> : null}
-                      <span>{row.acknowledged ? 'Acknowledged' : 'Not acknowledged'}</span>
+                      <span>{row.acknowledged ? ui('Acknowledged') : ui('Not acknowledged')}</span>
                     </div>
 
                     {canManageAlerts ? (
                       <div className="admin-system-action-block">
                         <label className="admin-system-field">
-                          <span>Resolution note</span>
+                          <span>{ui('Resolution note')}</span>
                           <textarea
                             value={resolutionNote}
                             onChange={(event) => setResolutionNoteByAlertId((current) => ({ ...current, [row.id]: event.target.value }))}
-                            placeholder="Explain what was checked and why this blocker can be closed."
+                            placeholder={ui('Explain what was checked and why this blocker can be closed.')}
                             rows={2}
                             maxLength={2000}
                             disabled={isBusy}
                           />
-                          <small>At least 3 characters are required before Resolve is enabled.</small>
+                          <small>{ui('At least 3 characters are required before Resolve is enabled.')}</small>
                         </label>
                         <div className="admin-system-actions">
                           {!row.acknowledged ? (
@@ -540,7 +567,7 @@ export default function AdminSystemPage() {
                               onClick={() => acknowledgeMutation.mutate(row.id)}
                               disabled={isBusy}
                             >
-                              {isAcknowledging ? 'Acknowledging…' : 'Acknowledge'}
+                              {isAcknowledging ? ui('Acknowledging…') : ui('Acknowledge')}
                             </button>
                           ) : null}
                           <button
@@ -549,7 +576,7 @@ export default function AdminSystemPage() {
                             onClick={() => resolveMutation.mutate({ id: row.id, resolutionNote: resolutionNote.trim() })}
                             disabled={isBusy || resolutionNote.trim().length < 3}
                           >
-                            {isResolving ? 'Resolving…' : 'Resolve'}
+                            {isResolving ? ui('Resolving…') : ui('Resolve')}
                           </button>
                         </div>
                       </div>
@@ -558,15 +585,15 @@ export default function AdminSystemPage() {
                     {canOverrideAlerts ? (
                       <div className="admin-system-override-box">
                         <div>
-                          <strong>Emergency blocking-alert override</strong>
-                          <p>Use only after the underlying issue has been independently checked and normal resolution is not appropriate.</p>
+                          <strong>{ui('Emergency blocking-alert override')}</strong>
+                          <p>{ui('Use only after the underlying issue has been independently checked and normal resolution is not appropriate.')}</p>
                         </div>
                         <label className="admin-system-field">
-                          <span>Mandatory override reason</span>
+                          <span>{ui('Mandatory override reason')}</span>
                           <textarea
                             value={overrideReason}
                             onChange={(event) => setOverrideReasonByAlertId((current) => ({ ...current, [row.id]: event.target.value }))}
-                            placeholder="Why is an emergency override justified?"
+                            placeholder={ui('Why is an emergency override justified?')}
                             rows={2}
                             maxLength={1000}
                             disabled={isBusy}
@@ -579,16 +606,16 @@ export default function AdminSystemPage() {
                             const cleanReason = overrideReason.trim();
                             if (cleanReason.length < 3) {
                               setActionMessage(null);
-                              setActionError('Override reason must contain at least 3 characters.');
+                              setActionError(ui('Override reason must contain at least 3 characters.'));
                               return;
                             }
-                            if (window.confirm(`Override and close ${alertTitle}? This is an emergency administrative action.`)) {
+                            if (window.confirm(ui('Override and close {alert}? This is an emergency administrative action.').replace('{alert}', alertTitle))) {
                               overrideMutation.mutate({ id: row.id, reason: cleanReason });
                             }
                           }}
                           disabled={isBusy || overrideReason.trim().length < 3}
                         >
-                          {isOverriding ? 'Overriding…' : 'Override and close blocking alert'}
+                          {isOverriding ? ui('Overriding…') : ui('Override and close blocking alert')}
                         </button>
                       </div>
                     ) : null}
@@ -596,8 +623,8 @@ export default function AdminSystemPage() {
                 );
               }) : !blockingAlertsQuery.isLoading && !blockingAlertsQuery.error ? (
                 <div className="admin-system-empty-good">
-                  <strong>No unresolved blocking diagnostics.</strong>
-                  <span>No tenant blocker rows were returned in the current diagnostic scope.</span>
+                  <strong>{ui('No unresolved blocking diagnostics.')}</strong>
+                  <span>{ui('No tenant blocker rows were returned in the current diagnostic scope.')}</span>
                 </div>
               ) : null}
             </section>
@@ -605,32 +632,32 @@ export default function AdminSystemPage() {
             <section className="admin-system-diagnostic-group" aria-labelledby="admin-system-stock-heading">
               <div className="admin-system-diagnostic-heading">
                 <div>
-                  <h4 id="admin-system-stock-heading">Stock integrity</h4>
-                  <p>Negative stock balances that require operational investigation.</p>
+                  <h4 id="admin-system-stock-heading">{ui('Stock integrity')}</h4>
+                  <p>{ui('Negative stock balances that require operational investigation.')}</p>
                 </div>
-                <DiagnosticCount>{stockIntegrityQuery.isLoading ? 'Loading…' : `${loadedStockIssueCount} ${loadedStockIssueCount === 1 ? 'issue' : 'issues'}`}</DiagnosticCount>
+                <DiagnosticCount>{stockIntegrityQuery.isLoading ? ui('Loading…') : (loadedStockIssueCount === 1 ? ui('{count} issue') : ui('{count} issues')).replace('{count}', formatLocalizedNumber(loadedStockIssueCount, locale))}</DiagnosticCount>
               </div>
 
-              {stockIntegrityQuery.error ? <div className="app-error-state admin-system-message">{readableError(stockIntegrityQuery.error)}</div> : null}
-              {stockIntegrityQuery.isLoading ? <div className="app-empty-state admin-system-message">Loading stock integrity issues…</div> : null}
+              {stockIntegrityQuery.error ? <div className="app-error-state admin-system-message">{readableError(stockIntegrityQuery.error, ui('Unknown error'))}</div> : null}
+              {stockIntegrityQuery.isLoading ? <div className="app-empty-state admin-system-message">{ui('Loading stock integrity issues…')}</div> : null}
               {stockIntegrityQuery.data?.length ? stockIntegrityQuery.data.map((row) => (
                 <article key={row.id} className="admin-system-diagnostic-card">
                   <div className="admin-system-diagnostic-card__topline">
                     <div>
-                      <strong>{row.product_name || `Product ${shortId(row.product_id)}`}</strong>
-                      <p>Negative stock at {row.storage_location_name || `location ${shortId(row.storage_location_id)}`}.</p>
+                      <strong>{row.product_name || ui('Product {id}').replace('{id}', shortId(row.product_id))}</strong>
+                      <p>{ui('Negative stock at {location}.').replace('{location}', row.storage_location_name || ui('location {id}').replace('{id}', shortId(row.storage_location_id)))}</p>
                     </div>
-                    <StatusBadge tone="danger">NEGATIVE STOCK</StatusBadge>
+                    <StatusBadge tone="danger">{ui('NEGATIVE STOCK')}</StatusBadge>
                   </div>
                   <div className="admin-system-diagnostic-meta">
-                    <span>Quantity {row.quantity}{row.product_unit ? ` ${row.product_unit}` : ''}</span>
-                    <span>Updated {formatDateTime(row.updated_at)}</span>
+                    <span>{ui('Quantity {quantity}').replace('{quantity}', `${formatLocalizedNumber(toCount(row.quantity), locale)}${row.product_unit ? ` ${row.product_unit}` : ''}`)}</span>
+                    <span>{ui('Updated {time}').replace('{time}', formatDateTime(row.updated_at, locale))}</span>
                   </div>
                 </article>
               )) : !stockIntegrityQuery.isLoading && !stockIntegrityQuery.error ? (
                 <div className="admin-system-empty-good">
-                  <strong>No negative stock integrity issues.</strong>
-                  <span>All loaded tenant stock balances are non-negative.</span>
+                  <strong>{ui('No negative stock integrity issues.')}</strong>
+                  <span>{ui('All loaded tenant stock balances are non-negative.')}</span>
                 </div>
               ) : null}
             </section>
@@ -638,34 +665,34 @@ export default function AdminSystemPage() {
             <section className="admin-system-diagnostic-group" aria-labelledby="admin-system-shipments-heading">
               <div className="admin-system-diagnostic-heading">
                 <div>
-                  <h4 id="admin-system-shipments-heading">Shipment integrity</h4>
-                  <p>Finalized receiving records with undocumented shortages.</p>
+                  <h4 id="admin-system-shipments-heading">{ui('Shipment integrity')}</h4>
+                  <p>{ui('Finalized receiving records with undocumented shortages.')}</p>
                 </div>
-                <DiagnosticCount>{brokenShipmentsQuery.isLoading ? 'Loading…' : `${loadedBrokenShipmentCount} ${loadedBrokenShipmentCount === 1 ? 'issue' : 'issues'}`}</DiagnosticCount>
+                <DiagnosticCount>{brokenShipmentsQuery.isLoading ? ui('Loading…') : (loadedBrokenShipmentCount === 1 ? ui('{count} issue') : ui('{count} issues')).replace('{count}', formatLocalizedNumber(loadedBrokenShipmentCount, locale))}</DiagnosticCount>
               </div>
 
-              {brokenShipmentsQuery.error ? <div className="app-error-state admin-system-message">{readableError(brokenShipmentsQuery.error)}</div> : null}
-              {brokenShipmentsQuery.isLoading ? <div className="app-empty-state admin-system-message">Loading shipment integrity issues…</div> : null}
+              {brokenShipmentsQuery.error ? <div className="app-error-state admin-system-message">{readableError(brokenShipmentsQuery.error, ui('Unknown error'))}</div> : null}
+              {brokenShipmentsQuery.isLoading ? <div className="app-empty-state admin-system-message">{ui('Loading shipment integrity issues…')}</div> : null}
               {brokenShipmentsQuery.data?.length ? brokenShipmentsQuery.data.map((row) => (
                 <article key={row.id} className="admin-system-diagnostic-card">
                   <div className="admin-system-diagnostic-card__topline">
                     <div>
-                      <strong>{row.po_number ? `PO ${row.po_number}` : `Shipment ${shortId(row.id)}`}</strong>
-                      <p>{row.supplier_name ? `${row.supplier_name} · ` : ''}Finalized shipment contains an undocumented receiving shortage.</p>
+                      <strong>{row.po_number ? ui('PO {number}').replace('{number}', row.po_number) : ui('Shipment {id}').replace('{id}', shortId(row.id))}</strong>
+                      <p>{`${row.supplier_name ? `${row.supplier_name} · ` : ''}${ui('Finalized shipment contains an undocumented receiving shortage.')}`}</p>
                     </div>
-                    <StatusBadge tone="danger">UNDOCUMENTED SHORTAGE</StatusBadge>
+                    <StatusBadge tone="danger">{ui('UNDOCUMENTED SHORTAGE')}</StatusBadge>
                   </div>
                   <div className="admin-system-diagnostic-meta">
-                    <span>Ordered {row.total_ordered_quantity}</span>
-                    <span>Received {row.total_received_quantity}</span>
-                    <span>Undocumented shortage lines {toCount(row.undocumented_shortage_line_count)}</span>
-                    <span>Shipment {shortId(row.id)}</span>
+                    <span>{ui('Ordered {quantity}').replace('{quantity}', formatLocalizedNumber(toCount(row.total_ordered_quantity), locale))}</span>
+                    <span>{ui('Received {quantity}').replace('{quantity}', formatLocalizedNumber(toCount(row.total_received_quantity), locale))}</span>
+                    <span>{ui('Undocumented shortage lines {count}').replace('{count}', formatLocalizedNumber(toCount(row.undocumented_shortage_line_count), locale))}</span>
+                    <span>{ui('Shipment {id}').replace('{id}', shortId(row.id))}</span>
                   </div>
                 </article>
               )) : !brokenShipmentsQuery.isLoading && !brokenShipmentsQuery.error ? (
                 <div className="admin-system-empty-good">
-                  <strong>No invalid finalized shipments.</strong>
-                  <span>Documented receiving shortages are allowed by the current finalization workflow.</span>
+                  <strong>{ui('No invalid finalized shipments.')}</strong>
+                  <span>{ui('Documented receiving shortages are allowed by the current finalization workflow.')}</span>
                 </div>
               ) : null}
             </section>

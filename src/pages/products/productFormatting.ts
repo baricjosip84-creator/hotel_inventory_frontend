@@ -1,12 +1,14 @@
-import { formatCurrencyAmount } from '../../lib/tenantCurrency';
+import { getActiveTenantCurrency } from '../../lib/tenantCurrency';
+import { DEFAULT_LOCALE, type AppLocale } from '../../i18n/config';
+import { formatLocalizedCurrency, formatLocalizedDateTime, formatLocalizedNumber } from '../../i18n/formatters';
 
-export function formatDateTime(dateString: string | null | undefined): string {
+export function formatDateTime(dateString: string | null | undefined, locale: AppLocale = DEFAULT_LOCALE): string {
   if (!dateString) return '-';
 
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) return dateString;
 
-  return date.toLocaleString();
+  return formatLocalizedDateTime(date, locale);
 }
 
 export function toNumber(value: number | string | null | undefined): number {
@@ -15,18 +17,32 @@ export function toNumber(value: number | string | null | undefined): number {
   return 0;
 }
 
-export function formatMoney(value: number | string | null | undefined): string {
-  return formatCurrencyAmount(value);
+export function formatNumber(
+  value: number | string | null | undefined,
+  locale: AppLocale = DEFAULT_LOCALE,
+  options: Intl.NumberFormatOptions = {}
+): string {
+  if (value === null || value === undefined || value === '') return '-';
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return String(value);
+  return formatLocalizedNumber(amount, locale, options);
+}
+
+export function formatMoney(value: number | string | null | undefined, locale: AppLocale = DEFAULT_LOCALE): string {
+  if (value === null || value === undefined || value === '') return '-';
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return String(value);
+  return formatLocalizedCurrency(amount, getActiveTenantCurrency(), locale);
 }
 
 
-export function formatPercent(value: number | string | null | undefined): string {
+export function formatPercent(value: number | string | null | undefined, locale: AppLocale = DEFAULT_LOCALE, fractionDigits = 1): string {
   if (value === null || value === undefined || value === '') return '-';
 
   const amount = Number(value);
   if (!Number.isFinite(amount)) return String(value);
 
-  return `${amount.toFixed(1)}%`;
+  return `${formatLocalizedNumber(amount, locale, { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits })}%`;
 }
 
 export function formatPriorityBand(priorityBand?: string | null): string {
@@ -263,7 +279,8 @@ export function getProductStatusTone(value: string | null | undefined): ProductS
 
 export function formatGovernanceValue(
   value: number | string | boolean | null | undefined,
-  fallbackStatus?: string | null
+  fallbackStatus?: string | null,
+  locale: AppLocale = DEFAULT_LOCALE
 ): string {
   if (value === null || value === undefined || value === '') {
     return formatStatusLabel(fallbackStatus);
@@ -274,7 +291,7 @@ export function formatGovernanceValue(
   }
 
   if (typeof value === 'number') {
-    return value.toLocaleString();
+    return formatLocalizedNumber(value, locale);
   }
 
   const normalized = value.trim();
@@ -282,7 +299,7 @@ export function formatGovernanceValue(
 
   const parsedDate = new Date(normalized);
   if (/^\d{4}-\d{2}-\d{2}T/.test(normalized) && !Number.isNaN(parsedDate.getTime())) {
-    return parsedDate.toLocaleString();
+    return formatLocalizedDateTime(parsedDate, locale);
   }
 
   if (/^[a-z0-9]+(?:_[a-z0-9]+)+$/i.test(normalized)) {

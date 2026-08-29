@@ -1,5 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import type { Dispatch, SetStateAction } from "react";
+import type { AppLocale } from "../../i18n/config";
+import { formatLocalizedNumber } from "../../i18n/formatters";
 import type { createEnterpriseInventoryBoundMutationFeedback } from "./EnterpriseInventoryMutationFeedback";
 import {
   buildAlertEscalationPayload,
@@ -75,6 +77,8 @@ type AttachmentUploadInput = {
 
 type UseEnterpriseInventoryWorkflowMutationsOptions = {
   mutationFeedback: EnterpriseInventoryMutationFeedback;
+  ui: (englishText: string) => string;
+  locale: AppLocale;
   resetApprovalRuleForm: () => void;
   resetSupplierCatalogForm: () => void;
   resetSupplierInvoiceForm: () => void;
@@ -87,6 +91,8 @@ type UseEnterpriseInventoryWorkflowMutationsOptions = {
 
 export function useEnterpriseInventoryWorkflowMutations({
   mutationFeedback,
+  ui,
+  locale,
   resetApprovalRuleForm,
   resetSupplierCatalogForm,
   resetSupplierInvoiceForm,
@@ -117,11 +123,11 @@ export function useEnterpriseInventoryWorkflowMutations({
         buildApprovalRulePayload(input),
       ),
     onSuccess: mutationFeedback.resetting(
-      "Approval rule saved.",
+      ui("Approval rule saved."),
       ["enterprise-approval-rules"],
       resetApprovalRuleForm,
     ),
-    onError: mutationFeedback.error("Failed to save approval rule."),
+    onError: mutationFeedback.error(ui("Failed to save approval rule.")),
   });
 
   const executeApprovalMutation = useMutation({
@@ -132,8 +138,8 @@ export function useEnterpriseInventoryWorkflowMutations({
       ),
     onSuccess: mutationFeedback.variable<ApprovalExecutionInput>(
       (input) => input.action === "approved"
-        ? "Item approved successfully."
-        : "Item rejected successfully.",
+        ? ui("Item approved successfully.")
+        : ui("Item rejected successfully."),
       [
         "enterprise-requisitions",
         "enterprise-cycle-counts",
@@ -143,7 +149,7 @@ export function useEnterpriseInventoryWorkflowMutations({
         "enterprise-notifications",
       ],
     ),
-    onError: mutationFeedback.error("Failed to execute approval."),
+    onError: mutationFeedback.error(ui("Failed to execute approval.")),
   });
 
   const createSupplierCatalogMutation = useMutation({
@@ -153,11 +159,11 @@ export function useEnterpriseInventoryWorkflowMutations({
         buildSupplierCatalogPayload(input),
       ),
     onSuccess: mutationFeedback.resetting(
-      "Supplier catalog item saved successfully.",
+      ui("Supplier catalog item saved successfully."),
       ["enterprise-supplier-catalog"],
       resetSupplierCatalogForm,
     ),
-    onError: mutationFeedback.error("Failed to save supplier catalog item."),
+    onError: mutationFeedback.error(ui("Failed to save supplier catalog item.")),
   });
 
   const deactivateSupplierCatalogMutation = useMutation({
@@ -167,10 +173,10 @@ export function useEnterpriseInventoryWorkflowMutations({
         item.version ?? 1,
       ),
     onSuccess: mutationFeedback.invalidating(
-      "Supplier catalog item deactivated successfully.",
+      ui("Supplier catalog item deactivated successfully."),
       ["enterprise-supplier-catalog", "enterprise-reorder-recommendations"],
     ),
-    onError: mutationFeedback.error("Failed to deactivate supplier catalog item."),
+    onError: mutationFeedback.error(ui("Failed to deactivate supplier catalog item.")),
   });
 
   const createSupplierInvoiceMutation = useMutation({
@@ -180,11 +186,11 @@ export function useEnterpriseInventoryWorkflowMutations({
         buildSupplierInvoicePayload(input),
       ),
     onSuccess: mutationFeedback.resetting(
-      "Supplier invoice draft created successfully.",
+      ui("Supplier invoice draft created successfully."),
       ["enterprise-invoices", "enterprise-notifications"],
       resetSupplierInvoiceForm,
     ),
-    onError: mutationFeedback.error("Failed to create supplier invoice."),
+    onError: mutationFeedback.error(ui("Failed to create supplier invoice.")),
   });
 
   const updateSupplierInvoiceMutation = useMutation({
@@ -195,14 +201,14 @@ export function useEnterpriseInventoryWorkflowMutations({
         invoice.version,
       ),
     onSuccess: mutationFeedback.custom<SupplierInvoice, SupplierInvoiceUpdateInput>(
-      "Supplier invoice draft updated successfully.",
+      ui("Supplier invoice draft updated successfully."),
       ["enterprise-invoices"],
       (_result, input) => {
         resetSupplierInvoiceForm();
         input.afterSuccess?.();
       },
     ),
-    onError: mutationFeedback.error("Failed to update supplier invoice."),
+    onError: mutationFeedback.error(ui("Failed to update supplier invoice.")),
   });
 
   const supplierInvoiceLifecycleMutation = useMutation({
@@ -220,15 +226,15 @@ export function useEnterpriseInventoryWorkflowMutations({
     },
     onSuccess: mutationFeedback.variable<SupplierInvoiceLifecycleInput>(
       (input) => {
-        if (input.action === "submit") return "Supplier invoice submitted successfully.";
-        if (input.action === "match") return "Supplier invoice marked matched.";
-        if (input.action === "pay") return "Supplier invoice marked paid.";
-        if (input.action === "cancel") return "Supplier invoice cancelled.";
-        return "Supplier invoice returned to draft for revision.";
+        if (input.action === "submit") return ui("Supplier invoice submitted successfully.");
+        if (input.action === "match") return ui("Supplier invoice marked matched.");
+        if (input.action === "pay") return ui("Supplier invoice marked paid.");
+        if (input.action === "cancel") return ui("Supplier invoice cancelled.");
+        return ui("Supplier invoice returned to draft for revision.");
       },
       ["enterprise-invoices", "enterprise-notifications", "enterprise-approval-rules"],
     ),
-    onError: mutationFeedback.error("Failed to update supplier invoice lifecycle."),
+    onError: mutationFeedback.error(ui("Failed to update supplier invoice lifecycle.")),
   });
 
   const createBarcodeLabelMutation = useMutation({
@@ -241,14 +247,14 @@ export function useEnterpriseInventoryWorkflowMutations({
       await resetBarcodeLabelForm();
       await mutationFeedback.variable<BarcodeLabelForm>(
         (variables) => {
-          if (variables.barcode_type === "QR") return "QR code label created successfully.";
-          if (variables.barcode_type === "EAN13") return "EAN-13 label created successfully.";
-          return "Code 128 label created successfully.";
+          if (variables.barcode_type === "QR") return ui("QR code label created successfully.");
+          if (variables.barcode_type === "EAN13") return ui("EAN-13 label created successfully.");
+          return ui("Code 128 label created successfully.");
         },
         ["enterprise-barcode-labels"],
       )(result, input);
     },
-    onError: mutationFeedback.error("Failed to create barcode label."),
+    onError: mutationFeedback.error(ui("Failed to create barcode label.")),
   });
 
 
@@ -259,11 +265,15 @@ export function useEnterpriseInventoryWorkflowMutations({
         { label_ids: labelIds },
       ),
     onSuccess: mutationFeedback.result(
-      (result: { print_request_count: number }) =>
-        `Print dialog opened for ${result.print_request_count} barcode label${result.print_request_count === 1 ? "" : "s"}.`,
+      (result: { print_request_count: number }) => {
+        const count = formatLocalizedNumber(result.print_request_count, locale);
+        return result.print_request_count === 1
+          ? ui("Print dialog opened for {count} barcode label.").replace("{count}", count)
+          : ui("Print dialog opened for {count} barcode labels.").replace("{count}", count);
+      },
       ["enterprise-barcode-labels", "enterprise-audit"],
     ),
-    onError: mutationFeedback.error("Failed to record the barcode label print request."),
+    onError: mutationFeedback.error(ui("Failed to record the barcode label print request.")),
   });
 
   const deleteBarcodeLabelMutation = useMutation({
@@ -272,10 +282,10 @@ export function useEnterpriseInventoryWorkflowMutations({
         `/enterprise-inventory/barcode-labels/${encodeURIComponent(labelId)}`,
       ),
     onSuccess: mutationFeedback.invalidating(
-      "Barcode label retired successfully.",
+      ui("Barcode label retired successfully."),
       ["enterprise-barcode-labels", "enterprise-audit"],
     ),
-    onError: mutationFeedback.error("Failed to retire barcode label."),
+    onError: mutationFeedback.error(ui("Failed to retire barcode label.")),
   });
 
   const queueNotificationDeliveryMutation = useMutation({
@@ -285,11 +295,11 @@ export function useEnterpriseInventoryWorkflowMutations({
         buildNotificationDeliveryPayload(input),
       ),
     onSuccess: mutationFeedback.resetting(
-      "Notification delivery queued.",
+      ui("Notification delivery queued."),
       ["enterprise-notifications", "enterprise-notification-deliveries"],
       resetNotificationDeliveryForm,
     ),
-    onError: mutationFeedback.error("Failed to queue notification delivery."),
+    onError: mutationFeedback.error(ui("Failed to queue notification delivery.")),
   });
 
   const processNotificationDeliveriesMutation = useMutation({
@@ -298,12 +308,16 @@ export function useEnterpriseInventoryWorkflowMutations({
         "/enterprise-inventory/notifications/deliveries/process",
       ),
     onSuccess: mutationFeedback.result(
-      (result: { processed: number }) =>
-        `${result.processed} notification deliver${result.processed === 1 ? "y" : "ies"} processed.`,
+      (result: { processed: number }) => {
+        const count = formatLocalizedNumber(result.processed, locale);
+        return result.processed === 1
+          ? ui("{count} notification delivery processed.").replace("{count}", count)
+          : ui("{count} notification deliveries processed.").replace("{count}", count);
+      },
       ["enterprise-notifications", "enterprise-notification-deliveries"],
     ),
     onError: mutationFeedback.error(
-      "Failed to process notification deliveries.",
+      ui("Failed to process notification deliveries."),
     ),
   });
 
@@ -380,7 +394,7 @@ export function useEnterpriseInventoryWorkflowMutations({
       );
     },
     onSuccess: mutationFeedback.custom<EntityAttachment, AttachmentUploadInput>(
-      "File uploaded and attached successfully.",
+      ui("File uploaded and attached successfully."),
       ["enterprise-attachments", "enterprise-notifications"],
       (attachment, input) => {
         setAttachmentForm((current) => ({
@@ -391,7 +405,7 @@ export function useEnterpriseInventoryWorkflowMutations({
         input.afterSuccess?.();
       },
     ),
-    onError: mutationFeedback.error("Failed to upload attachment."),
+    onError: mutationFeedback.error(ui("Failed to upload attachment.")),
   });
 
   const deleteAttachmentMutation = useMutation({
@@ -400,10 +414,10 @@ export function useEnterpriseInventoryWorkflowMutations({
         `/enterprise-inventory/attachments/${attachmentId}`,
       ),
     onSuccess: mutationFeedback.invalidating(
-      "Attachment deleted successfully.",
+      ui("Attachment deleted successfully."),
       ["enterprise-attachments"],
     ),
-    onError: mutationFeedback.error("Failed to delete attachment."),
+    onError: mutationFeedback.error(ui("Failed to delete attachment.")),
   });
 
   return {

@@ -4,9 +4,10 @@ import type {
   ProductCostOperationsReadinessSummaryResponse,
   ProductCostOperationsRunbookSummaryResponse
 } from '../../types/inventory';
-import { formatStatusLabel, toNumber } from './productFormatting';
+import { formatPercent, formatStatusLabel, toNumber } from './productFormatting';
 import { styles } from './productStyles';
 import { StatCard, StatusBadge } from './productSummaryComponents';
+import { useAppTranslation } from '../../i18n/I18nContext';
 
 type CostOperationsQueryState = {
   isLoading: boolean;
@@ -35,29 +36,30 @@ export function ProductCostOperationsSummaryPanel({
   costOperationsEvidenceSummary,
   costOperationsReadinessSummary
 }: ProductCostOperationsSummaryPanelProps) {
+  const { ui } = useAppTranslation();
   return (
     <>
             <div style={styles.riskListCard}>
               <div style={styles.packageHeader}>
                 <div>
-                  <h4 style={styles.sectionTitle}>Cost operations runbook</h4>
-                  <p style={styles.panelSubtitle}>Daily, weekly, and monthly operating guidance after costing governance handoff. Derived and read-only.</p>
+                  <h4 style={styles.sectionTitle}>{ui("Cost operations runbook")}</h4>
+                  <p style={styles.panelSubtitle}>{ui("Daily, weekly, and monthly operating guidance after costing governance handoff. Derived and read-only.")}</p>
                 </div>
                 <button type="button" style={styles.secondaryButton} onClick={() => costOperationsRunbookQuery.refetch()}>
-                  Refresh Runbook
+                  {ui("Refresh Runbook")}
                 </button>
               </div>
               {costOperationsRunbookQuery.isLoading ? (
-                <div style={styles.rowSubtle}>Loading cost operations runbook...</div>
+                <div style={styles.rowSubtle}>{ui("Loading cost operations runbook...")}</div>
               ) : costOperationsRunbookQuery.isError ? (
-                <div style={styles.errorText}>Unable to load cost operations runbook.</div>
+                <div style={styles.errorText}>{ui("Unable to load cost operations runbook.")}</div>
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Runbook Status" value={formatStatusLabel(costOperationsRunbookSummary?.runbook_status)} subtitle={costOperationsRunbookSummary?.can_handoff ? 'Handoff-capable' : 'Review required'} tone={costOperationsRunbookSummary?.runbook_status === 'steady_state' ? 'good' : 'warn'} />
-                    <StatCard title="Hardening Issues" value={toNumber(costOperationsRunbookSummary?.totals.hardening_issues)} subtitle="Must stay visible" tone={toNumber(costOperationsRunbookSummary?.totals.hardening_issues) > 0 ? 'bad' : 'good'} />
-                    <StatCard title="Flagged Products" value={toNumber(costOperationsRunbookSummary?.totals.flagged_products)} subtitle="Dashboard follow-up" tone={toNumber(costOperationsRunbookSummary?.totals.flagged_products) > 0 ? 'warn' : 'good'} />
-                    <StatCard title="Runbook Rows" value={toNumber(costOperationsRunbookSummary?.totals.runbook_rows)} subtitle="Export-ready evidence" />
+                    <StatCard title={ui("Runbook Status")} value={ui(formatStatusLabel(costOperationsRunbookSummary?.runbook_status))} subtitle={costOperationsRunbookSummary?.can_handoff ? ui('Handoff-capable') : ui('Review required')} tone={costOperationsRunbookSummary?.runbook_status === 'steady_state' ? 'good' : 'warn'} />
+                    <StatCard title={ui("Hardening Issues")} value={toNumber(costOperationsRunbookSummary?.totals.hardening_issues)} subtitle={ui("Must stay visible")} tone={toNumber(costOperationsRunbookSummary?.totals.hardening_issues) > 0 ? 'bad' : 'good'} />
+                    <StatCard title={ui("Flagged Products")} value={toNumber(costOperationsRunbookSummary?.totals.flagged_products)} subtitle={ui("Dashboard follow-up")} tone={toNumber(costOperationsRunbookSummary?.totals.flagged_products) > 0 ? 'warn' : 'good'} />
+                    <StatCard title={ui("Runbook Rows")} value={toNumber(costOperationsRunbookSummary?.totals.runbook_rows)} subtitle={ui("Export-ready evidence")} />
                   </div>
 
                   <div style={styles.riskGrid}>
@@ -101,24 +103,24 @@ export function ProductCostOperationsSummaryPanel({
             <div style={styles.riskListCard}>
               <div style={styles.packageHeader}>
                 <div>
-                  <h4 style={styles.sectionTitle}>Cost operations controls</h4>
-                  <p style={styles.panelSubtitle}>Compact operating-control panel for completed costing governance. Derived from runbook, governance, dashboard, and hardening outputs.</p>
+                  <h4 style={styles.sectionTitle}>{ui("Cost operations controls")}</h4>
+                  <p style={styles.panelSubtitle}>{ui("Compact operating-control panel for completed costing governance. Derived from runbook, governance, dashboard, and hardening outputs.")}</p>
                 </div>
                 <button type="button" style={styles.secondaryButton} onClick={() => costOperationsControlQuery.refetch()}>
-                  Refresh Controls
+                  {ui("Refresh Controls")}
                 </button>
               </div>
               {costOperationsControlQuery.isLoading ? (
-                <div style={styles.rowSubtle}>Loading cost operations controls...</div>
+                <div style={styles.rowSubtle}>{ui("Loading cost operations controls...")}</div>
               ) : costOperationsControlQuery.isError ? (
-                <div style={styles.errorText}>Unable to load cost operations controls.</div>
+                <div style={styles.errorText}>{ui("Unable to load cost operations controls.")}</div>
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Control Status" value={formatStatusLabel(costOperationsControlSummary?.control_status)} subtitle={formatStatusLabel(costOperationsControlSummary?.runbook_status)} tone={costOperationsControlSummary?.control_status === 'controlled' ? 'good' : costOperationsControlSummary?.control_status === 'control_review' ? 'bad' : 'warn'} />
-                    <StatCard title="Passed Checks" value={toNumber(costOperationsControlSummary?.totals.passed_checks)} subtitle={`${toNumber(costOperationsControlSummary?.totals.checks)} total checks`} tone="good" />
-                    <StatCard title="Watch Checks" value={toNumber(costOperationsControlSummary?.totals.watch_checks)} subtitle="Keep visible" tone={toNumber(costOperationsControlSummary?.totals.watch_checks) > 0 ? 'warn' : 'good'} />
-                    <StatCard title="Review Checks" value={toNumber(costOperationsControlSummary?.totals.review_checks)} subtitle="Requires follow-up" tone={toNumber(costOperationsControlSummary?.totals.review_checks) > 0 ? 'bad' : 'good'} />
+                    <StatCard title={ui("Control Status")} value={ui(formatStatusLabel(costOperationsControlSummary?.control_status))} subtitle={ui(formatStatusLabel(costOperationsControlSummary?.runbook_status))} tone={costOperationsControlSummary?.control_status === 'controlled' ? 'good' : costOperationsControlSummary?.control_status === 'control_review' ? 'bad' : 'warn'} />
+                    <StatCard title={ui("Passed Checks")} value={toNumber(costOperationsControlSummary?.totals.passed_checks)} subtitle={`${formatLocalizedNumber(Number(toNumber(costOperationsControlSummary?.totals.checks)), locale)} ${ui('total checks')}`} tone="good" />
+                    <StatCard title={ui("Watch Checks")} value={toNumber(costOperationsControlSummary?.totals.watch_checks)} subtitle={ui("Keep visible")} tone={toNumber(costOperationsControlSummary?.totals.watch_checks) > 0 ? 'warn' : 'good'} />
+                    <StatCard title={ui("Review Checks")} value={toNumber(costOperationsControlSummary?.totals.review_checks)} subtitle={ui("Requires follow-up")} tone={toNumber(costOperationsControlSummary?.totals.review_checks) > 0 ? 'bad' : 'good'} />
                   </div>
 
                   <div style={styles.riskList}>
@@ -147,24 +149,24 @@ export function ProductCostOperationsSummaryPanel({
             <div style={styles.riskListCard}>
               <div style={styles.packageHeader}>
                 <div>
-                  <h4 style={styles.sectionTitle}>Cost operations evidence</h4>
-                  <p style={styles.panelSubtitle}>One derived evidence pack across audit rows, report rows, runbook rows, and control checks.</p>
+                  <h4 style={styles.sectionTitle}>{ui("Cost operations evidence")}</h4>
+                  <p style={styles.panelSubtitle}>{ui("One derived evidence pack across audit rows, report rows, runbook rows, and control checks.")}</p>
                 </div>
                 <button type="button" style={styles.secondaryButton} onClick={() => costOperationsEvidenceQuery.refetch()}>
-                  Refresh Evidence
+                  {ui("Refresh Evidence")}
                 </button>
               </div>
               {costOperationsEvidenceQuery.isLoading ? (
-                <div style={styles.rowSubtle}>Loading cost operations evidence...</div>
+                <div style={styles.rowSubtle}>{ui("Loading cost operations evidence...")}</div>
               ) : costOperationsEvidenceQuery.isError ? (
-                <div style={styles.errorText}>Unable to load cost operations evidence.</div>
+                <div style={styles.errorText}>{ui("Unable to load cost operations evidence.")}</div>
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Evidence Status" value={formatStatusLabel(costOperationsEvidenceSummary?.evidence_status)} subtitle={formatStatusLabel(costOperationsEvidenceSummary?.control_status)} tone={costOperationsEvidenceSummary?.evidence_status === 'evidence_ready' ? 'good' : costOperationsEvidenceSummary?.evidence_status === 'evidence_review' ? 'bad' : 'warn'} />
-                    <StatCard title="Ready Sections" value={toNumber(costOperationsEvidenceSummary?.totals.ready_sections)} subtitle={`${toNumber(costOperationsEvidenceSummary?.totals.evidence_sections)} sections`} tone="good" />
-                    <StatCard title="Review Sections" value={toNumber(costOperationsEvidenceSummary?.totals.review_sections)} subtitle="Needs follow-up" tone={toNumber(costOperationsEvidenceSummary?.totals.review_sections) > 0 ? 'bad' : 'good'} />
-                    <StatCard title="Evidence Rows" value={toNumber(costOperationsEvidenceSummary?.totals.evidence_rows)} subtitle="Pack rows" />
+                    <StatCard title={ui("Evidence Status")} value={ui(formatStatusLabel(costOperationsEvidenceSummary?.evidence_status))} subtitle={ui(formatStatusLabel(costOperationsEvidenceSummary?.control_status))} tone={costOperationsEvidenceSummary?.evidence_status === 'evidence_ready' ? 'good' : costOperationsEvidenceSummary?.evidence_status === 'evidence_review' ? 'bad' : 'warn'} />
+                    <StatCard title={ui("Ready Sections")} value={toNumber(costOperationsEvidenceSummary?.totals.ready_sections)} subtitle={`${formatLocalizedNumber(Number(toNumber(costOperationsEvidenceSummary?.totals.evidence_sections)), locale)} ${ui('sections')}`} tone="good" />
+                    <StatCard title={ui("Review Sections")} value={toNumber(costOperationsEvidenceSummary?.totals.review_sections)} subtitle={ui("Needs follow-up")} tone={toNumber(costOperationsEvidenceSummary?.totals.review_sections) > 0 ? 'bad' : 'good'} />
+                    <StatCard title={ui("Evidence Rows")} value={toNumber(costOperationsEvidenceSummary?.totals.evidence_rows)} subtitle={ui("Pack rows")} />
                   </div>
 
                   <div style={styles.riskList}>
@@ -194,24 +196,24 @@ export function ProductCostOperationsSummaryPanel({
             <div style={styles.riskListCard}>
               <div style={styles.packageHeader}>
                 <div>
-                  <h4 style={styles.sectionTitle}>Cost operations readiness</h4>
-                  <p style={styles.panelSubtitle}>Final read-only readiness check over evidence, controls, runbook, and governance handoff.</p>
+                  <h4 style={styles.sectionTitle}>{ui("Cost operations readiness")}</h4>
+                  <p style={styles.panelSubtitle}>{ui("Final read-only readiness check over evidence, controls, runbook, and governance handoff.")}</p>
                 </div>
                 <button type="button" style={styles.secondaryButton} onClick={() => costOperationsReadinessQuery.refetch()}>
-                  Refresh Readiness
+                  {ui("Refresh Readiness")}
                 </button>
               </div>
               {costOperationsReadinessQuery.isLoading ? (
-                <div style={styles.rowSubtle}>Loading cost operations readiness...</div>
+                <div style={styles.rowSubtle}>{ui("Loading cost operations readiness...")}</div>
               ) : costOperationsReadinessQuery.isError ? (
-                <div style={styles.errorText}>Unable to load cost operations readiness.</div>
+                <div style={styles.errorText}>{ui("Unable to load cost operations readiness.")}</div>
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Readiness Status" value={formatStatusLabel(costOperationsReadinessSummary?.readiness_status)} subtitle={costOperationsReadinessSummary?.can_handoff ? 'Handoff capable' : 'Review required'} tone={costOperationsReadinessSummary?.readiness_status === 'operationally_ready' ? 'good' : costOperationsReadinessSummary?.readiness_status === 'readiness_review' ? 'bad' : 'warn'} />
-                    <StatCard title="Readiness Score" value={`${toNumber(costOperationsReadinessSummary?.readiness_score).toFixed(0)}%`} subtitle="Derived go/no-go score" tone={toNumber(costOperationsReadinessSummary?.readiness_score) >= 90 ? 'good' : toNumber(costOperationsReadinessSummary?.readiness_score) >= 70 ? 'warn' : 'bad'} />
-                    <StatCard title="Review Checks" value={toNumber(costOperationsReadinessSummary?.totals.review_checks)} subtitle={`${toNumber(costOperationsReadinessSummary?.totals.checks)} checks`} tone={toNumber(costOperationsReadinessSummary?.totals.review_checks) > 0 ? 'bad' : 'good'} />
-                    <StatCard title="Watch Checks" value={toNumber(costOperationsReadinessSummary?.totals.watch_checks)} subtitle="Carry forward" tone={toNumber(costOperationsReadinessSummary?.totals.watch_checks) > 0 ? 'warn' : 'good'} />
+                    <StatCard title={ui("Readiness Status")} value={ui(formatStatusLabel(costOperationsReadinessSummary?.readiness_status))} subtitle={costOperationsReadinessSummary?.can_handoff ? ui('Handoff capable') : ui('Review required')} tone={costOperationsReadinessSummary?.readiness_status === 'operationally_ready' ? 'good' : costOperationsReadinessSummary?.readiness_status === 'readiness_review' ? 'bad' : 'warn'} />
+                    <StatCard title={ui("Readiness Score")} value={formatPercent(costOperationsReadinessSummary?.readiness_score, locale, 0)} subtitle={ui("Derived go/no-go score")} tone={toNumber(costOperationsReadinessSummary?.readiness_score) >= 90 ? 'good' : toNumber(costOperationsReadinessSummary?.readiness_score) >= 70 ? 'warn' : 'bad'} />
+                    <StatCard title={ui("Review Checks")} value={toNumber(costOperationsReadinessSummary?.totals.review_checks)} subtitle={`${formatLocalizedNumber(Number(toNumber(costOperationsReadinessSummary?.totals.checks)), locale)} ${ui('checks')}`} tone={toNumber(costOperationsReadinessSummary?.totals.review_checks) > 0 ? 'bad' : 'good'} />
+                    <StatCard title={ui("Watch Checks")} value={toNumber(costOperationsReadinessSummary?.totals.watch_checks)} subtitle={ui("Carry forward")} tone={toNumber(costOperationsReadinessSummary?.totals.watch_checks) > 0 ? 'warn' : 'good'} />
                   </div>
 
                   <div style={styles.riskList}>

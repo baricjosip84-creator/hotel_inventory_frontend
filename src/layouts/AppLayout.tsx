@@ -19,6 +19,10 @@ import { getTenantModuleForPathname, getTenantPageMeta, tenantNavigationSections
 import type { TenantNavigationItem } from '../app/navigationRegistry';
 import CopyrightNotice from '../components/CopyrightNotice';
 import { InventoryBrand } from '../components/brand/InventoryBrand';
+import { LanguageSelector } from '../components/i18n/LanguageSelector';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { normalizeAppLocale } from '../i18n/config';
+import { formatLocalizedDateTime } from '../i18n/formatters';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { fetchTenantCurrencyContext, setActiveTenantCurrency, DEFAULT_INVENTORY_CURRENCY } from '../lib/tenantCurrency';
 
@@ -37,6 +41,7 @@ function useIsMobile(breakpoint = 960): boolean {
 }
 
 export default function AppLayout() {
+  const { locale, setLocale, t, nav } = useAppTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -77,6 +82,22 @@ export default function AppLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const mainAreaRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (supportSession.isSupportSession || !tenantAccess.hasTenantContext) return () => { cancelled = true; };
+
+    void apiRequest<{ effective_locale?: string | null }>('/auth/preferences/locale')
+      .then((preference) => {
+        const nextLocale = normalizeAppLocale(preference.effective_locale);
+        if (!cancelled && nextLocale) setLocale(nextLocale);
+      })
+      .catch(() => {
+        // Keep the locally selected/browser locale if preference lookup is unavailable.
+      });
+
+    return () => { cancelled = true; };
+  }, [setLocale, supportSession.isSupportSession, tenantAccess.hasTenantContext, tenantAccess.tenantId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -404,15 +425,15 @@ export default function AppLayout() {
       >
         <div style={styles.brandBlock}>
           <InventoryBrand compact tone="dark" />
-          <div style={styles.brandWorkspace}><div style={styles.brandWorkspaceLabel}>Workspace</div><div style={styles.brandSubtitle}>{tenantSubscriptionAccess?.tenant.name || 'Company workspace'}</div></div>
-          {supportSession.isSupportSession ? <div style={styles.supportPill}>SUPPORT MODE</div> : null}
+          <div style={styles.brandWorkspace}><div style={styles.brandWorkspaceLabel}>{t('common.workspace')}</div><div style={styles.brandSubtitle}>{tenantSubscriptionAccess?.tenant.name || t('common.companyWorkspace')}</div></div>
+          {supportSession.isSupportSession ? <div style={styles.supportPill}>{t('common.supportMode')}</div> : null}
         </div>
 
         <div style={styles.navScrollArea}>
           <nav style={styles.nav}>
             {visibleNavSections.map((section) => (
               <div key={section.id} style={styles.navSection}>
-                <div style={styles.navSectionTitle}>{section.label}</div>
+                <div style={styles.navSectionTitle}>{nav(section.label)}</div>
                 {section.items.map((item) => (
                   <NavLink
                     key={item.to}
@@ -426,13 +447,13 @@ export default function AppLayout() {
                   >
                     <span style={styles.navItemIcon}><TenantNavIcon path={item.to} /></span>
                     <span style={styles.navItemLabelGroup}>
-                      <span style={styles.navItemLabel}>{item.label}</span>
+                      <span style={styles.navItemLabel}>{nav(item.label)}</span>
                     </span>
                     {item.to === '/alerts' && hasOpenAlerts ? (
                       <span
                         style={styles.alertIndicatorDot}
-                        aria-label="Open alerts require attention"
-                        title="Open alerts require attention"
+                        aria-label={t('common.openAlertsAttention')}
+                        title={t('common.openAlertsAttention')}
                       />
                     ) : null}
                   </NavLink>
@@ -443,8 +464,9 @@ export default function AppLayout() {
         </div>
 
         <div style={styles.sidebarFooter}>
-          <div style={styles.sidebarIdentity}><div style={styles.sidebarAvatar}>{(accessRoleLabel || 'U').trim().charAt(0).toUpperCase()}</div><div style={styles.sidebarIdentityText}><div style={styles.sidebarIdentityName}>{tenantSubscriptionAccess?.tenant.name || 'Tenant workspace'}</div><div style={styles.sidebarIdentityRole}>{accessRoleLabel || 'Tenant user'}</div></div></div>
-          <button type="button" style={styles.logoutButton} onClick={handleLogout} disabled={isLoggingOut}><TenantNavIcon path="/logout" size={17}/><span>{isLoggingOut ? 'Logging out…' : supportSession.isSupportSession ? 'Exit support mode' : 'Log out'}</span></button>
+          <LanguageSelector scope="tenant" compact />
+          <div style={styles.sidebarIdentity}><div style={styles.sidebarAvatar}>{(accessRoleLabel || 'U').trim().charAt(0).toUpperCase()}</div><div style={styles.sidebarIdentityText}><div style={styles.sidebarIdentityName}>{tenantSubscriptionAccess?.tenant.name || t('common.tenantWorkspace')}</div><div style={styles.sidebarIdentityRole}>{accessRoleLabel || t('common.tenantUser')}</div></div></div>
+          <button type="button" style={styles.logoutButton} onClick={handleLogout} disabled={isLoggingOut}><TenantNavIcon path="/logout" size={17}/><span>{isLoggingOut ? t('common.loggingOut') : supportSession.isSupportSession ? t('common.exitSupportMode') : t('common.logout')}</span></button>
         </div>
       </aside>
 
@@ -464,7 +486,7 @@ export default function AppLayout() {
             {isMobile ? (
               <button
                 type="button"
-                aria-label="Open navigation menu"
+                aria-label={t('common.openNavigation')}
                 style={styles.menuButton}
                 onClick={() => setMobileNavOpen((current) => !current)}
               >
@@ -479,7 +501,7 @@ export default function AppLayout() {
                   ...(isMobile ? styles.breadcrumbMobile : {})
                 }}
               >
-                Operations / {currentModule?.moduleGroupLabel || 'Workspace'} / {pageMeta.title}
+                {t('common.operations')} / {nav(currentModule?.moduleGroupLabel || 'Workspace')} / {nav(pageMeta.title)}
               </div>
               <h1
                 style={{
@@ -487,7 +509,7 @@ export default function AppLayout() {
                   ...(isMobile ? styles.headerTitleMobile : {})
                 }}
               >
-                {pageMeta.title}
+                {nav(pageMeta.title)}
               </h1>
               <p
                 style={{
@@ -499,49 +521,49 @@ export default function AppLayout() {
               </p>
             </div>
           </div>
-          {!isMobile ? <div style={styles.headerContext}><div style={styles.headerContextAvatar}>{(accessRoleLabel || 'U').trim().charAt(0).toUpperCase()}</div><div style={styles.headerContextText}><div style={styles.headerContextRole}>{accessRoleLabel || 'Tenant user'}</div><div style={styles.headerContextTenant}>{tenantSubscriptionAccess?.tenant.name || 'Tenant workspace'}</div></div></div> : null}
+          {!isMobile ? <div style={styles.headerContext}><div style={styles.headerContextAvatar}>{(accessRoleLabel || 'U').trim().charAt(0).toUpperCase()}</div><div style={styles.headerContextText}><div style={styles.headerContextRole}>{accessRoleLabel || t('common.tenantUser')}</div><div style={styles.headerContextTenant}>{tenantSubscriptionAccess?.tenant.name || t('common.tenantWorkspace')}</div></div></div> : null}
         </header>
 
 
         {!tenantAccess.hasTenantContext ? (
           <div style={styles.tenantAccessBanner}>
-            <strong>Company context unavailable.</strong> Please sign in again before continuing inventory work.
+            <strong>{t('common.companyContextUnavailable')}</strong> {t('common.companyContextUnavailableBody')}
           </div>
         ) : null}
 
 
         {tenantSubscriptionAccess && !tenantSubscriptionAccess.write_access.allowed ? (
           <div style={styles.subscriptionBlockedBanner}>
-            <strong>Subscription writes blocked.</strong>{' '}
-            {tenantSubscriptionAccess.write_access.blocker?.message || 'This tenant cannot perform operational changes until subscription access is restored.'}
+            <strong>{t('common.subscriptionWritesBlocked')}</strong>{' '}
+            {tenantSubscriptionAccess.write_access.blocker?.message || t('common.subscriptionBlockerFallback')}
             <div style={styles.subscriptionBlockedMeta}>
-              Tenant status: {tenantSubscriptionAccess.tenant.status || '-'} · Billing: {tenantSubscriptionAccess.tenant.billing_status || '-'} · Plan: {tenantSubscriptionAccess.tenant.plan_code || '-'}
+              {t('common.tenantStatus')}: {tenantSubscriptionAccess.tenant.status || '-'} · {t('common.billing')}: {tenantSubscriptionAccess.tenant.billing_status || '-'} · {t('common.plan')}: {tenantSubscriptionAccess.tenant.plan_code || '-'}
             </div>
           </div>
         ) : tenantSubscriptionAccess?.plan_limit_blocked_resources.length ? (
           <div style={styles.subscriptionLimitBanner}>
-            <strong>Plan limit reached.</strong> New records are blocked for: {tenantSubscriptionAccess.plan_limit_blocked_resources.join(', ')}.
+            <strong>{t('common.planLimitReached')}</strong> {t('common.newRecordsBlockedFor')}: {tenantSubscriptionAccess.plan_limit_blocked_resources.join(', ')}.
           </div>
         ) : tenantSubscriptionAccess?.feature_blocked_resources?.length ? (
           <div style={styles.subscriptionLimitBanner}>
-            <strong>Plan feature locked.</strong> Disabled modules: {tenantSubscriptionAccess.feature_blocked_resources.join(', ')}.
+            <strong>{t('common.planFeatureLocked')}</strong> {t('common.disabledModules')}: {tenantSubscriptionAccess.feature_blocked_resources.join(', ')}.
           </div>
         ) : null}
 
         {supportSession.isSupportSession ? (
           <div style={styles.supportBanner}>
             <div style={styles.supportBannerText}>
-              <strong>Support session active.</strong>{' '}
+              <strong>{t('common.supportSessionActive')}</strong>{' '}
               {supportContext?.platform_user_name || supportContext?.platform_user_email
-                ? `${supportContext.platform_user_name || supportContext.platform_user_email} is accessing this tenant through HLA support.`
-                : 'You are accessing this tenant through HLA support.'}
+                ? `${supportContext.platform_user_name || supportContext.platform_user_email} ${t('common.isAccessingTenantThroughSupport')}`
+                : t('common.youAccessingTenantThroughSupport')}
               <div style={styles.supportBannerMeta}>
-                Tenant: {supportContext?.tenant_name || supportSession.tenantId || '-'} · Role: {supportContext?.effective_role || supportSession.role || '-'} · Reason: {supportContext?.reason || '-'}
-                {supportContext?.expires_at ? ` · Expires: ${new Date(supportContext.expires_at).toLocaleString()}` : ''}
+                {t('common.tenant')}: {supportContext?.tenant_name || supportSession.tenantId || '-'} · {t('common.role')}: {supportContext?.effective_role || supportSession.role || '-'} · {t('common.reason')}: {supportContext?.reason || '-'}
+                {supportContext?.expires_at ? ` · ${t('common.expires')}: ${formatLocalizedDateTime(supportContext.expires_at, locale)}` : ''}
               </div>
             </div>
             <button type="button" style={styles.supportExitButton} onClick={handleLogout} disabled={isLoggingOut}>
-              Exit support mode
+              {t('common.exitSupportMode')}
             </button>
           </div>
         ) : null}
@@ -553,25 +575,25 @@ export default function AppLayout() {
             ...(incidentContext.incidents[0].severity === 'critical' ? styles.incidentCritical : {}),
             ...(incidentContext.incidents[0].severity === 'major' ? styles.incidentMajor : {})
           }}>
-            <strong>Service incident:</strong> {incidentContext.incidents[0].title}
+            <strong>{t('common.serviceIncident')}</strong> {incidentContext.incidents[0].title}
             {incidentContext.incidents[0].public_message ? ` — ${incidentContext.incidents[0].public_message}` : ''}
             <div style={styles.incidentMeta}>
-              Status: {incidentContext.incidents[0].status} · Severity: {incidentContext.incidents[0].severity} · Impact: {incidentContext.incidents[0].impact}
+              {t('common.status')}: {incidentContext.incidents[0].status} · {t('common.severity')}: {incidentContext.incidents[0].severity} · {t('common.impact')}: {incidentContext.incidents[0].impact}
             </div>
           </div>
         ) : null}
 
         {maintenanceContext?.active?.length ? (
           <div style={styles.maintenanceBanner}>
-            <strong>Maintenance active:</strong> {maintenanceContext.active[0].title}
+            <strong>{t('common.maintenanceActive')}</strong> {maintenanceContext.active[0].title}
             {maintenanceContext.active[0].message ? ` — ${maintenanceContext.active[0].message}` : ''}
             <div style={styles.maintenanceBannerMeta}>
-              Ends: {new Date(maintenanceContext.active[0].ends_at).toLocaleString()} · Scope: {maintenanceContext.active[0].scope} · Write lock: {maintenanceContext.active[0].lock_writes ? 'yes' : 'no'}
+              {t('common.ends')}: {formatLocalizedDateTime(maintenanceContext.active[0].ends_at, locale)} · {t('common.scope')}: {maintenanceContext.active[0].scope} · {t('common.writeLock')}: {maintenanceContext.active[0].lock_writes ? t('common.yes') : t('common.no')}
             </div>
           </div>
         ) : maintenanceContext?.upcoming?.length ? (
           <div style={styles.maintenanceNotice}>
-            <strong>Upcoming maintenance:</strong> {maintenanceContext.upcoming[0].title} · Starts {new Date(maintenanceContext.upcoming[0].starts_at).toLocaleString()}
+            <strong>{t('common.upcomingMaintenance')}</strong> {maintenanceContext.upcoming[0].title} · {t('common.starts')} {formatLocalizedDateTime(maintenanceContext.upcoming[0].starts_at, locale)}
           </div>
         ) : null}
 
@@ -585,17 +607,17 @@ export default function AppLayout() {
               }}>
                 <div style={styles.announcementHeader}>
                   <strong>{announcement.title}</strong>
-                  {announcement.dismissible ? <button type="button" style={styles.announcementDismiss} onClick={() => setDismissedAnnouncementIds((current) => new Set([...current, announcement.id]))}>Dismiss</button> : null}
+                  {announcement.dismissible ? <button type="button" style={styles.announcementDismiss} onClick={() => setDismissedAnnouncementIds((current) => new Set([...current, announcement.id]))}>{t('common.dismiss')}</button> : null}
                 </div>
                 <div>{announcement.message}</div>
                 <div style={styles.announcementMeta}>
-                  Severity: {announcement.severity}
-                  {announcement.ends_at ? ` · Visible until: ${new Date(announcement.ends_at).toLocaleString()}` : ''}
-                  {!announcement.dismissible ? ' · Required notice' : ''}
+                  {t('common.severity')}: {announcement.severity}
+                  {announcement.ends_at ? ` · ${t('common.visibleUntil')}: ${formatLocalizedDateTime(announcement.ends_at, locale)}` : ''}
+                  {!announcement.dismissible ? ` · ${t('common.requiredNotice')}` : ''}
                 </div>
               </div>
             ))}
-            {announcementContext?.truncated ? <div style={styles.announcementTruncated}>More current announcements exist than this shell returns. Review Platform communications if you need the complete current set.</div> : null}
+            {announcementContext?.truncated ? <div style={styles.announcementTruncated}>{t('common.tenantAnnouncementsTruncated')}</div> : null}
           </div>
         ) : null}
 

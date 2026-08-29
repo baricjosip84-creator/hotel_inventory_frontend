@@ -11,6 +11,8 @@ import { ProductSummaryStatsPanel } from './ProductSummaryStatsPanel';
 import { ProductManagementSectionsPanel } from './ProductManagementSectionsPanel';
 import { ProductDetailSectionsPanel } from './ProductDetailSectionsPanel';
 import './ProductsPage.css';
+import { useAppTranslation } from '../../i18n/I18nContext';
+import { formatLocalizedNumber } from '../../i18n/formatters';
 
 type ProductPageContentProps = ReturnType<typeof useProductPageViewModel>;
 
@@ -22,34 +24,35 @@ const tabs = [
 ];
 
 export function ProductPageContent(props: ProductPageContentProps) {
+  const { ui, locale } = useAppTranslation();
   const activeTab = tabs.find((tab) => tab.view === props.workspaceView) ?? tabs[0];
 
   return (
     <div className="io-operational-page io-products-page io-workspace-page products-workspace-page">
       <OperationalWorkspaceHero
         iconPath="/products"
-        eyebrow="Product operations"
-        title="Product workspace"
-        description="Keep the tenant product catalog accurate, then move into costing only when you need valuation or review evidence. Technical record identifiers and version counters stay out of the normal catalog view."
+        eyebrow={ui("Product operations")}
+        title={ui("Product workspace")}
+        description={ui("Keep the tenant product catalog accurate, then move into costing only when you need valuation or review evidence. Technical record identifiers and version counters stay out of the normal catalog view.")}
         meta={<>
-          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{props.canManageProducts ? 'Catalog write access' : 'Catalog read-only'}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>Cost intelligence is read-only</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{props.canManageProducts ? ui('Catalog write access') : ui('Catalog read-only')}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Cost intelligence is read-only")}</OperationalWorkspaceMetaPill>
         </>}
-        aside={<OperationalWorkspaceStatus value={props.totalProductsCount.toLocaleString()} label="products in the current catalog scope" />}
+        aside={<OperationalWorkspaceStatus value={formatLocalizedNumber(Number(props.totalProductsCount), locale)} label={ui("products in the current catalog scope")} />}
       />
 
       <ProductSummaryStatsPanel summary={props.summary} />
 
-      <OperationalWorkspaceTabs ariaLabel="Product workspace views" hint={activeTab.hint}>
+      <OperationalWorkspaceTabs ariaLabel={ui("Product workspace views")} hint={ui(activeTab.hint)}>
         {tabs.map((tab) => (
           <OperationalWorkspaceTab
             key={tab.view}
             active={props.workspaceView === tab.view}
             iconPath={tab.icon}
-            label={tab.label}
+            label={ui(tab.label)}
             onClick={() => props.setWorkspaceView(tab.view)}
-            title={tab.hint}
+            title={ui(tab.hint)}
           />
         ))}
       </OperationalWorkspaceTabs>

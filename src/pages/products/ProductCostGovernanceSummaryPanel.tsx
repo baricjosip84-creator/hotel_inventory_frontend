@@ -15,7 +15,7 @@ import type {
   ProductCostPerformanceSummaryResponse,
   ProductCostSecurityAuditSummaryResponse
 } from '../../types/inventory';
-import { formatMoney, formatStatusLabel, toNumber } from './productFormatting';
+import { formatMoney, formatPercent, formatStatusLabel, toNumber } from './productFormatting';
 import { ProductCostGovernanceDetailsPanel } from './ProductCostGovernanceDetailsPanel';
 import { ProductCostOperationsSummaryPanel } from './ProductCostOperationsSummaryPanel';
 import { ProductCostGovernanceReviewPanel } from './ProductCostGovernanceReviewPanel';
@@ -23,6 +23,7 @@ import { ProductCostGovernanceHandoffPanel } from './ProductCostGovernanceHandof
 import { ProductCostGovernanceFinalizationPanel } from './ProductCostGovernanceFinalizationPanel';
 import { styles } from './productStyles';
 import { StatCard, StatusBadge } from './productSummaryComponents';
+import { useAppTranslation } from '../../i18n/I18nContext';
 
 type CostGovernanceQueryState = {
   isLoading: boolean;
@@ -109,56 +110,57 @@ export function ProductCostGovernanceSummaryPanel({
   handlePrintCostGovernanceAudit,
   handleOpenCostHistory
 }: ProductCostGovernanceSummaryPanelProps) {
+  const { ui, locale } = useAppTranslation();
   return (
       <section style={styles.panel}>
         <div style={styles.packageHeader}>
           <div>
-            <h3 style={styles.panelTitle}>Cost Governance Summary</h3>
+            <h3 style={styles.panelTitle}>{ui("Cost Governance Summary")}</h3>
             <p style={styles.panelSubtitle}>
-              Final read-only readiness check for the costing intelligence module, built from dashboard, report, and hardening outputs.
+              {ui("Final read-only readiness check for the costing intelligence module, built from dashboard, report, and hardening outputs.")}
             </p>
           </div>
           <button type="button" style={styles.secondaryButton} onClick={() => { costGovernanceQuery.refetch(); costGovernanceDetailsQuery.refetch(); costGovernanceAuditQuery.refetch(); costGovernanceSignoffQuery.refetch(); costGovernanceReviewQueueQuery.refetch(); costGovernanceReviewPackQuery.refetch(); costGovernanceFinalQuery.refetch(); costPerformanceQuery.refetch(); costSecurityAuditQuery.refetch(); }}>
-            Refresh Governance
+            {ui("Refresh Governance")}
           </button>
         </div>
 
         {costGovernanceQuery.isLoading ? (
-          <div style={styles.emptyCell}>Loading cost governance...</div>
+          <div style={styles.emptyCell}>{ui("Loading cost governance...")}</div>
         ) : costGovernanceQuery.isError ? (
-          <div style={styles.errorBox}>Unable to load cost governance summary.</div>
+          <div style={styles.errorBox}>{ui("Unable to load cost governance summary.")}</div>
         ) : (
           <>
             <div style={styles.costReadinessGrid}>
               <StatCard
-                title="Readiness Score"
-                value={`${toNumber(costGovernanceSummary?.readiness_score).toFixed(0)}%`}
-                subtitle={formatStatusLabel(costGovernanceSummary?.governance_status)}
+                title={ui("Readiness Score")}
+                value={formatPercent(costGovernanceSummary?.readiness_score, locale, 0)}
+                subtitle={ui(formatStatusLabel(costGovernanceSummary?.governance_status))}
                 tone={toNumber(costGovernanceSummary?.readiness_score) >= 90 ? 'good' : toNumber(costGovernanceSummary?.readiness_score) >= 70 ? 'warn' : 'bad'}
               />
               <StatCard
-                title="Coverage"
-                value={`${toNumber(costGovernanceSummary?.totals.stocked_cost_coverage_percent).toFixed(1)}%`}
-                subtitle="Stocked products with cost basis"
+                title={ui("Coverage")}
+                value={formatPercent(costGovernanceSummary?.totals.stocked_cost_coverage_percent, locale)}
+                subtitle={ui("Stocked products with cost basis")}
                 tone={toNumber(costGovernanceSummary?.totals.stocked_cost_coverage_percent) >= 95 ? 'good' : 'warn'}
               />
               <StatCard
-                title="Alerts"
+                title={ui("Alerts")}
                 value={toNumber(costGovernanceSummary?.totals.total_alerts)}
-                subtitle="Open derived signals"
+                subtitle={ui("Open derived signals")}
                 tone={toNumber(costGovernanceSummary?.totals.total_alerts) > 0 ? 'warn' : 'good'}
               />
               <StatCard
-                title="Review Exposure"
-                value={formatMoney(costGovernanceSummary?.totals.review_estimated_value)}
-                subtitle="Value needing review"
+                title={ui("Review Exposure")}
+                value={formatMoney(costGovernanceSummary?.totals.review_estimated_value, locale)}
+                subtitle={ui("Value needing review")}
                 tone={toNumber(costGovernanceSummary?.totals.review_estimated_value) > 0 ? 'warn' : 'good'}
               />
             </div>
 
             <div style={styles.riskGrid}>
               <div style={styles.riskListCard}>
-                <h4 style={styles.sectionTitle}>Governance checklist</h4>
+                <h4 style={styles.sectionTitle}>{ui("Governance checklist")}</h4>
                 {(costGovernanceSummary?.checklist ?? []).map((item) => (
                   <div key={item.key} style={styles.riskListItem}>
                     <div>
@@ -171,15 +173,15 @@ export function ProductCostGovernanceSummaryPanel({
               </div>
 
               <div style={styles.riskListCard}>
-                <h4 style={styles.sectionTitle}>Next actions</h4>
+                <h4 style={styles.sectionTitle}>{ui("Next actions")}</h4>
                 {(costGovernanceSummary?.next_actions ?? []).length === 0 ? (
-                  <div style={styles.rowSubtle}>No governance actions required.</div>
+                  <div style={styles.rowSubtle}>{ui("No governance actions required.")}</div>
                 ) : (
                   (costGovernanceSummary?.next_actions ?? []).map((action) => (
                     <div key={action} style={styles.riskListItem}>
                       <div>
                         <div style={styles.rowTitle}>{action}</div>
-                        <div style={styles.rowSubtle}>Use existing costing review workflows; no automatic changes are made.</div>
+                        <div style={styles.rowSubtle}>{ui("Use existing costing review workflows; no automatic changes are made.")}</div>
                       </div>
                     </div>
                   ))

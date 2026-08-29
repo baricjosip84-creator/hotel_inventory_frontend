@@ -32,6 +32,7 @@ type ProductActionHandlerParams = {
   setPackageForm: Dispatch<SetStateAction<PackageFormState>>;
   setPackageMessage: Dispatch<SetStateAction<string | null>>;
   setPackageError: Dispatch<SetStateAction<string | null>>;
+  ui: (englishText: string) => string;
 };
 
 export function buildProductActionHandlers({
@@ -56,7 +57,8 @@ export function buildProductActionHandlers({
   setEditingPackage,
   setPackageForm,
   setPackageMessage,
-  setPackageError
+  setPackageError,
+  ui
 }: ProductActionHandlerParams) {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -65,36 +67,36 @@ export function buildProductActionHandlers({
 
     if (!canManageProducts) {
       setFormError(
-        'Your current role is read-only for product master data because it does not have products.write permission.'
+        ui('Your current role is read-only for product master data because it does not have products.write permission.')
       );
       return;
     }
 
     if (!form.sku.trim()) {
-      setFormError('SKU is required.');
+      setFormError(ui('SKU is required.'));
       return;
     }
 
     if (!form.name.trim()) {
-      setFormError('Product name is required.');
+      setFormError(ui('Product name is required.'));
       return;
     }
 
     if (!form.unit.trim()) {
-      setFormError('Unit is required.');
+      setFormError(ui('Unit is required.'));
       return;
     }
 
     const parsedMinStock = Number(form.min_stock);
     if (!Number.isFinite(parsedMinStock) || parsedMinStock < 0) {
-      setFormError('Minimum stock must be a valid number greater than or equal to zero.');
+      setFormError(ui('Minimum stock must be a valid number greater than or equal to zero.'));
       return;
     }
 
     if (form.standard_unit_cost.trim() !== '') {
       const parsedStandardCost = Number(form.standard_unit_cost);
       if (!Number.isFinite(parsedStandardCost) || parsedStandardCost < 0) {
-        setFormError('Standard unit cost must be a valid number greater than or equal to zero.');
+        setFormError(ui('Standard unit cost must be a valid number greater than or equal to zero.'));
         return;
       }
     }
@@ -116,28 +118,28 @@ export function buildProductActionHandlers({
     setPackageMessage(null);
 
     if (!selectedPackageProduct) {
-      setPackageError('Select a product before managing packages.');
+      setPackageError(ui('Select a product before managing packages.'));
       return;
     }
 
     if (!canManageProductPackages) {
-      setPackageError('Your current role cannot manage product packages.');
+      setPackageError(ui('Your current role cannot manage product packages.'));
       return;
     }
 
     if (!packageForm.package_name.trim()) {
-      setPackageError('Package name is required.');
+      setPackageError(ui('Package name is required.'));
       return;
     }
 
     if (!packageForm.barcode.trim()) {
-      setPackageError('Barcode is required.');
+      setPackageError(ui('Barcode is required.'));
       return;
     }
 
     const parsedUnits = Number(packageForm.units_per_package);
     if (!Number.isFinite(parsedUnits) || parsedUnits <= 0) {
-      setPackageError('Units per package must be a valid number greater than zero.');
+      setPackageError(ui('Units per package must be a valid number greater than zero.'));
       return;
     }
 
@@ -158,7 +160,7 @@ export function buildProductActionHandlers({
 
   const handleStartEdit = (product: ProductItem) => {
     if (!canManageProducts) {
-      setFormError('Your current role cannot edit products.');
+      setFormError(ui('Your current role cannot edit products.'));
       setFormMessage(null);
       return;
     }
@@ -193,12 +195,12 @@ export function buildProductActionHandlers({
 
   const handleDelete = (product: ProductItem) => {
     if (!canManageProducts) {
-      setFormError('Your current role cannot delete products.');
+      setFormError(ui('Your current role cannot delete products.'));
       setFormMessage(null);
       return;
     }
 
-    const confirmed = window.confirm(`Delete product "${product.name}"?`);
+    const confirmed = window.confirm(`${ui('Delete product')} "${product.name}"?`);
     if (!confirmed) {
       return;
     }
@@ -227,7 +229,7 @@ export function buildProductActionHandlers({
 
   const handleStartEditPackage = (packageItem: ProductPackageItem) => {
     if (!canManageProductPackages) {
-      setPackageError('Your current role cannot edit product packages.');
+      setPackageError(ui('Your current role cannot edit product packages.'));
       setPackageMessage(null);
       return;
     }
@@ -252,19 +254,19 @@ export function buildProductActionHandlers({
 
   const handleDeletePackage = (packageItem: ProductPackageItem) => {
     if (!selectedPackageProduct) {
-      setPackageError('Select a product before deleting packages.');
+      setPackageError(ui('Select a product before deleting packages.'));
       setPackageMessage(null);
       return;
     }
 
     if (!canManageProductPackages) {
-      setPackageError('Your current role cannot delete product packages.');
+      setPackageError(ui('Your current role cannot delete product packages.'));
       setPackageMessage(null);
       return;
     }
 
     const confirmed = window.confirm(
-      `Delete package "${packageItem.package_name}" for "${selectedPackageProduct.name}"?`
+      `${ui('Delete package')} "${packageItem.package_name}" ${ui('for')} "${selectedPackageProduct.name}"?`
     );
 
     if (!confirmed) {

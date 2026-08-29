@@ -5,6 +5,7 @@ import type { TenantPermission, UserRole } from '../lib/permissions';
 import { hasAllPermissions, hasAnyPermission, hasAnyRole, TENANT_PERMISSION_SNAPSHOT_EVENT } from '../lib/permissions';
 import { refreshTenantPermissionSnapshot } from '../lib/permissionPolicies';
 import { restoreTenantSession } from '../lib/api';
+import { useAppTranslation } from '../i18n/I18nContext';
 
 type ProtectedRouteProps = PropsWithChildren<{
   allowedRoles?: UserRole[];
@@ -13,6 +14,7 @@ type ProtectedRouteProps = PropsWithChildren<{
 }>;
 
 export function ProtectedRoute({ children, allowedRoles, requiredPermissions, requiredAnyPermissions }: ProtectedRouteProps) {
+  const { ui } = useAppTranslation();
   const location = useLocation();
   const [, setPermissionRevision] = useState(0);
   const [status, setStatus] = useState<'checking' | 'allowed' | 'denied'>('checking');
@@ -48,7 +50,7 @@ export function ProtectedRoute({ children, allowedRoles, requiredPermissions, re
   }, []);
 
   if (status === 'checking') {
-    return <div style={{ padding: '24px' }}>Checking session…</div>;
+    return <div style={{ padding: '24px' }}>{ui('Checking session…')}</div>;
   }
 
   if (status === 'denied') {

@@ -48,6 +48,7 @@ type EnterpriseInventorySubmitHandlerParams = {
   setStatusMessage: Dispatch<SetStateAction<string | null>>;
   setProductPackageForm: Dispatch<SetStateAction<ProductPackageForm>>;
   setEditingProductPackageId: Dispatch<SetStateAction<string | null>>;
+  ui: (englishText: string) => string;
   createParLevelMutation: MutateOnly<ParLevelForm>;
   createCycleCountMutation: MutateOnly<CycleCountForm>;
   adjustStockMutation: MutateOnly<StockAdjustmentForm>;
@@ -79,6 +80,7 @@ export function createEnterpriseInventorySubmitHandlers({
   setStatusMessage,
   setProductPackageForm,
   setEditingProductPackageId,
+  ui,
   createParLevelMutation,
   createCycleCountMutation,
   adjustStockMutation,
@@ -95,7 +97,7 @@ export function createEnterpriseInventorySubmitHandlers({
   const canRun = (permission: TenantPermission): boolean => {
     if (hasPermission(permission)) return true;
     setStatusMessage(null);
-    setErrorMessage(`Requires ${permission} permission.`);
+    setErrorMessage(ui("Requires {permission} permission.").replace("{permission}", permission));
     return false;
   };
 

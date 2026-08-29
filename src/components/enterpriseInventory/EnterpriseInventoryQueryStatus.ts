@@ -35,7 +35,8 @@ export function getEnterpriseInventoryActiveTabLastUpdatedAt(
 
 export function getEnterpriseInventoryActiveTabQueryError(
   activeTab: string,
-  queries: EnterpriseInventoryQueryRecord
+  queries: EnterpriseInventoryQueryRecord,
+  ui: (englishText: string) => string = (value) => value,
 ): string | null {
   const queryNames = TAB_QUERY_MAP[activeTab] ?? [];
   const failedQueryName = queryNames.find((name) => queries[name]?.isError);
@@ -44,6 +45,29 @@ export function getEnterpriseInventoryActiveTabQueryError(
     return null;
   }
 
-  const label = failedQueryName.replace(/Query$/, '').replace(/([A-Z])/g, ' $1').trim().toLowerCase();
-  return `Could not load ${label}: ${normalizeError(queries[failedQueryName]?.error, 'Request failed')}`;
+  const knownLabels: Record<string, string> = {
+    tenantSubscriptionAccessQuery: 'tenant subscription access',
+    productsQuery: 'products',
+    suppliersQuery: 'suppliers',
+    purchaseOrdersQuery: 'purchase orders',
+    shipmentsQuery: 'shipments',
+    requisitionsQuery: 'requisitions',
+    storageLocationsQuery: 'storage locations',
+    parLevelsQuery: 'par levels',
+    cycleCountsQuery: 'cycle counts',
+    approvalRulesQuery: 'approval rules',
+    supplierCatalogQuery: 'supplier catalog',
+    invoicesQuery: 'invoices',
+    supplierReturnsQuery: 'supplier returns',
+    barcodeLabelsQuery: 'barcode labels',
+    attachmentsQuery: 'attachments',
+    notificationsQuery: 'notifications',
+    notificationDeliveriesQuery: 'notification deliveries',
+  };
+  const label = knownLabels[failedQueryName]
+    ? ui(knownLabels[failedQueryName])
+    : failedQueryName.replace(/Query$/, '').replace(/([A-Z])/g, ' $1').trim().toLowerCase();
+  return ui('Could not load {section}: {error}')
+    .replace('{section}', label)
+    .replace('{error}', normalizeError(queries[failedQueryName]?.error, ui('Request failed')));
 }

@@ -15,6 +15,7 @@ import {
   OperationalWorkspaceStats,
   OperationalWorkspaceStatus
 } from '../components/ui/OperationalWorkspace';
+import { useAppTranslation } from '../i18n/I18nContext';
 import './SessionsPage.css';
 
 type SessionStatusFilter = 'active' | 'revoked' | 'expired' | 'all';
@@ -89,28 +90,28 @@ async function revokeAllSessions(): Promise<RevokeAllResponse> {
   });
 }
 
-function formatDateTime(value: string | null | undefined): string {
+function formatDateTime(value: string | null | undefined, locale: string): string {
   if (!value) return '—';
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  return date.toLocaleString(locale);
 }
 
-function describeNetwork(value: string | null | undefined): { label: string; detail?: string } {
+function describeNetwork(value: string | null | undefined, ui: (text: string) => string): { label: string; detail?: string } {
   const ip = value?.trim();
-  if (!ip) return { label: 'Unknown network' };
+  if (!ip) return { label: ui('Unknown network') };
 
   if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') {
-    return { label: 'Proxy / local', detail: ip };
+    return { label: ui('Proxy / local'), detail: ip };
   }
 
   return { label: ip };
 }
 
-function formatSessionType(value: string | null | undefined): string {
-  if (value === 'support_session') return 'Support session';
-  if (!value) return 'Tenant session';
+function formatSessionType(value: string | null | undefined, ui: (text: string) => string): string {
+  if (value === 'support_session') return ui('Support session');
+  if (!value) return ui('Tenant session');
 
   return value
     .split('_')
@@ -119,8 +120,8 @@ function formatSessionType(value: string | null | undefined): string {
     .join(' ');
 }
 
-function describeDevice(value: string | null | undefined): string {
-  if (!value?.trim()) return 'Unknown device';
+function describeDevice(value: string | null | undefined, ui: (text: string) => string): string {
+  if (!value?.trim()) return ui('Unknown device');
   const ua = value;
 
   const os = /Windows NT/i.test(ua)
@@ -133,31 +134,31 @@ function describeDevice(value: string | null | undefined): string {
           ? 'macOS'
           : /Linux|Ubuntu/i.test(ua)
             ? 'Linux'
-            : 'Unknown OS';
+            : ui('Unknown OS');
 
   const version = (pattern: RegExp) => ua.match(pattern)?.[1]?.replace(/_/g, '.');
   const playwrightVersion = version(/Playwright\/([\d.]+)/i);
-  if (playwrightVersion) return `Playwright ${playwrightVersion} automation on ${os}`;
+  if (playwrightVersion) return `Playwright ${playwrightVersion} · ${ui('automation on')} ${os}`;
 
   const operaVersion = version(/OPR\/([\d.]+)/i);
-  if (operaVersion) return `Opera ${operaVersion} on ${os}`;
+  if (operaVersion) return `Opera ${operaVersion} · ${ui('Browser on')} ${os}`;
 
   const headlessChromeVersion = version(/HeadlessChrome\/([\d.]+)/i);
-  if (headlessChromeVersion) return `Headless Chrome ${headlessChromeVersion} on ${os}`;
+  if (headlessChromeVersion) return `Headless Chrome ${headlessChromeVersion} · ${ui('Browser on')} ${os}`;
 
   const edgeVersion = version(/Edg\/([\d.]+)/i);
-  if (edgeVersion) return `Edge ${edgeVersion} on ${os}`;
+  if (edgeVersion) return `Edge ${edgeVersion} · ${ui('Browser on')} ${os}`;
 
   const chromeVersion = version(/Chrome\/([\d.]+)/i);
-  if (chromeVersion) return `Chrome ${chromeVersion} on ${os}`;
+  if (chromeVersion) return `Chrome ${chromeVersion} · ${ui('Browser on')} ${os}`;
 
   const firefoxVersion = version(/Firefox\/([\d.]+)/i);
-  if (firefoxVersion) return `Firefox ${firefoxVersion} on ${os}`;
+  if (firefoxVersion) return `Firefox ${firefoxVersion} · ${ui('Browser on')} ${os}`;
 
   const safariVersion = version(/Version\/([\d.]+).*Safari/i);
-  if (safariVersion) return `Safari ${safariVersion} on ${os}`;
+  if (safariVersion) return `Safari ${safariVersion} · ${ui('Browser on')} ${os}`;
 
-  return `Browser on ${os}`;
+  return `${ui('Browser on')} ${os}`;
 }
 
 function shortenId(value: string): string {
@@ -165,15 +166,17 @@ function shortenId(value: string): string {
   return `${value.slice(0, 8)}…${value.slice(-8)}`;
 }
 
-function formatLastRefreshed(timestamp: number): string {
-  if (!timestamp) return 'Not refreshed yet';
-  return new Date(timestamp).toLocaleString();
+function formatLastRefreshed(timestamp: number, locale: string, ui: (text: string) => string): string {
+  if (!timestamp) return ui('Not refreshed yet');
+  return new Date(timestamp).toLocaleString(locale);
 }
 
-function sessionStatusLabel(status: SessionStatusFilter, summary: SessionSummary): string {
-  if (status === 'active' && summary.active === 0) return 'NO ACTIVE SESSIONS';
-  if (status === 'all') return 'ALL SESSIONS';
-  return `${status.toUpperCase()} SESSIONS`;
+function sessionStatusLabel(status: SessionStatusFilter, summary: SessionSummary, ui: (text: string) => string): string {
+  if (status === 'active' && summary.active === 0) return ui('NO ACTIVE SESSIONS');
+  if (status === 'all') return ui('ALL SESSIONS');
+  if (status === 'revoked') return ui('REVOKED SESSIONS');
+  if (status === 'expired') return ui('EXPIRED SESSIONS');
+  return ui('ACTIVE SESSIONS');
 }
 
 function StatusBadge({
@@ -187,6 +190,7 @@ function StatusBadge({
 }
 
 export default function SessionsPage() {
+  const { locale, ui } = useAppTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const supportSession = isSupportSessionAccess();
@@ -220,11 +224,11 @@ export default function SessionsPage() {
     mutationFn: revokeSession,
     onSuccess: async (result) => {
       setPageError(null);
-      setPageMessage(result.revoked === false ? 'Session was already inactive or unavailable.' : 'Session revoked.');
+      setPageMessage(result.revoked === false ? ui("Session was already inactive or unavailable.") : ui("Session revoked."));
       await queryClient.invalidateQueries({ queryKey: ['auth-sessions'] });
     },
     onError: (error) => {
-      setPageError(error instanceof ApiError ? error.message : 'Failed to revoke session.');
+      setPageError(error instanceof ApiError ? error.message : ui("Failed to revoke session."));
       setPageMessage(null);
     },
     onSettled: () => setRevokingSessionId(null)
@@ -244,17 +248,17 @@ export default function SessionsPage() {
       navigate('/login', { replace: true });
     },
     onError: (error) => {
-      setPageError(error instanceof ApiError ? error.message : 'Failed to revoke all sessions.');
+      setPageError(error instanceof ApiError ? error.message : ui("Failed to revoke all sessions."));
       setPageMessage(null);
     }
   });
 
   const rangeLabel = useMemo(() => {
-    if (!sessions.length) return 'No sessions on this page';
+    if (!sessions.length) return ui('No sessions on this page');
     const start = (page - 1) * pageSize + 1;
     const end = start + sessions.length - 1;
-    return `Showing ${start}–${end}`;
-  }, [page, pageSize, sessions.length]);
+    return `${ui("Showing")} ${start}–${end}`;
+  }, [page, pageSize, sessions.length, ui]);
 
   const handleRefresh = async () => {
     setPageError(null);
@@ -263,12 +267,12 @@ export default function SessionsPage() {
     try {
       const result = await sessionsQuery.refetch();
       if (result.error) {
-        setPageError(result.error instanceof ApiError ? result.error.message : 'Failed to refresh sessions.');
+        setPageError(result.error instanceof ApiError ? result.error.message : ui("Failed to refresh sessions."));
         return;
       }
-      setPageMessage('Sessions refreshed.');
+      setPageMessage(ui("Sessions refreshed."));
     } catch (error) {
-      setPageError(error instanceof ApiError ? error.message : 'Failed to refresh sessions.');
+      setPageError(error instanceof ApiError ? error.message : ui("Failed to refresh sessions."));
     }
   };
 
@@ -281,7 +285,7 @@ export default function SessionsPage() {
 
   const handleRevokeAll = () => {
     const confirmed = window.confirm(
-      'This will revoke every active session for your account, including this browser, and return you to login. Continue?'
+      ui("This will revoke every active session for your account, including this browser, and return you to login. Continue?")
     );
     if (!confirmed) return;
 
@@ -305,22 +309,22 @@ export default function SessionsPage() {
   };
 
   if (sessionsQuery.isLoading) {
-    return <div className="app-loading-state sessions-state-panel">Loading sessions…</div>;
+    return <div className="app-loading-state sessions-state-panel">{ui("Loading sessions…")}</div>;
   }
 
   if (sessionsQuery.isError) {
     return (
       <div className="sessions-page io-operational-page io-workspace-page">
         <div className="app-error-state sessions-state-panel">
-          <strong>Failed to load sessions.</strong>
-          <p>{(sessionsQuery.error as Error).message || 'Unknown error'}</p>
+          <strong>{ui("Failed to load sessions.")}</strong>
+          <p>{(sessionsQuery.error as Error).message || ui('Unknown error')}</p>
           <button
             type="button"
             className="app-button app-button--secondary"
             onClick={() => void handleRefresh()}
             disabled={sessionsQuery.isFetching}
           >
-            {sessionsQuery.isFetching ? 'Retrying…' : 'Retry'}
+            {sessionsQuery.isFetching ? ui("Retrying…") : ui("Retry")}
           </button>
         </div>
       </div>
@@ -328,29 +332,29 @@ export default function SessionsPage() {
   }
 
   const heroStatus = supportSession
-    ? 'Platform managed'
+    ? ui("Platform managed")
     : currentBrowserTrackingUnavailable
-      ? 'Attention'
-      : `${summary.active} active`;
+      ? ui("Attention")
+      : `${summary.active} ${ui("active")}`;
   const heroStatusLabel = supportSession
-    ? `support-session access · refreshed ${formatLastRefreshed(sessionsQuery.dataUpdatedAt)}`
+    ? `${ui("support-session access · refreshed")} ${formatLastRefreshed(sessionsQuery.dataUpdatedAt, locale, ui)}`
     : currentBrowserTrackingUnavailable
-      ? 'current browser is not represented by an active tracked session'
-      : `account session posture · refreshed ${formatLastRefreshed(sessionsQuery.dataUpdatedAt)}`;
+      ? ui("current browser is not represented by an active tracked session")
+      : `${ui("account session posture · refreshed")} ${formatLastRefreshed(sessionsQuery.dataUpdatedAt, locale, ui)}`;
 
   return (
     <div className="sessions-page io-operational-page io-workspace-page" id="sessions-workspace-top">
       <OperationalWorkspaceHero
         iconPath="/sessions"
-        eyebrow="Account access & security"
-        title="Sessions"
-        description="Review browser sessions for your account, identify the current browser, and revoke stale access without affecting other tenant users."
+        eyebrow={ui("Account access & security")}
+        title={ui("Sessions")}
+        description={ui("Review browser sessions for your account, identify the current browser, and revoke stale access without affecting other tenant users.")}
         meta={
           <>
-            <OperationalWorkspaceMetaPill>Account-scoped</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Current browser protected</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{supportSession ? 'Platform-managed support access' : 'Revoke actions audited'}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Historical records retained</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Account-scoped")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Current browser protected")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{supportSession ? ui("Platform-managed support access") : ui("Revoke actions audited")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Historical records retained")}</OperationalWorkspaceMetaPill>
           </>
         }
         aside={
@@ -362,7 +366,7 @@ export default function SessionsPage() {
               onClick={() => void handleRefresh()}
               disabled={sessionsQuery.isFetching || revokeAllMutation.isPending}
             >
-              {sessionsQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+              {sessionsQuery.isFetching ? ui("Refreshing…") : ui("Refresh")}
             </button>
             {!supportSession ? (
               <button
@@ -370,41 +374,41 @@ export default function SessionsPage() {
                 className="app-button app-button--danger"
                 onClick={handleRevokeAll}
                 disabled={revokeAllMutation.isPending || summary.active === 0}
-                title="Revokes every active account session, including this browser."
+                title={ui("Revokes every active account session, including this browser.")}
               >
-                {revokeAllMutation.isPending ? 'Revoking…' : 'Revoke all sessions'}
+                {revokeAllMutation.isPending ? ui("Revoking…") : ui("Revoke all sessions")}
               </button>
             ) : null}
           </div>
         }
       />
 
-      <OperationalWorkspaceStats ariaLabel="Account session overview">
+      <OperationalWorkspaceStats ariaLabel={ui("Account session overview")}>
         <OperationalWorkspaceStatCard
-          label="Total sessions"
+          label={ui("Total sessions")}
           value={summary.total}
-          helper="Historical session records retained for this account"
+          helper={ui("Historical session records retained for this account")}
           tone="neutral"
           iconPath="/sessions"
         />
         <OperationalWorkspaceStatCard
-          label="Active sessions"
+          label={ui("Active sessions")}
           value={summary.active}
-          helper="Currently usable refresh sessions"
+          helper={ui("Currently usable refresh sessions")}
           tone={summary.active > 0 ? 'blue' : 'neutral'}
           iconPath="/admin-system"
         />
         <OperationalWorkspaceStatCard
-          label="Revoked sessions"
+          label={ui("Revoked sessions")}
           value={summary.revoked}
-          helper="Sessions explicitly disabled before expiry"
+          helper={ui("Sessions explicitly disabled before expiry")}
           tone="neutral"
           iconPath="/audit"
         />
         <OperationalWorkspaceStatCard
-          label="Expired sessions"
+          label={ui("Expired sessions")}
           value={summary.expired}
-          helper="Sessions that ended naturally without revocation"
+          helper={ui("Sessions that ended naturally without revocation")}
           tone="neutral"
           iconPath="/reliability-command"
         />
@@ -415,62 +419,62 @@ export default function SessionsPage() {
 
       {supportSession ? (
         <div className="app-info-state sessions-guidance" role="status">
-          <strong>Platform support access is read-only here.</strong>
-          <span>This support session must be ended from the platform Support Sessions page.</span>
+          <strong>{ui("Platform support access is read-only here.")}</strong>
+          <span>{ui("This support session must be ended from the platform Support Sessions page.")}</span>
         </div>
       ) : currentBrowserTrackingUnavailable ? (
         <div className="app-info-state sessions-guidance" role="status">
-          <strong>Current browser is not yet tracked.</strong>
-          <span>This signed-in browser is not represented by an active tracked session. Sign out and sign back in once to create a tracked session and bring this browser under Sessions management.</span>
+          <strong>{ui("Current browser is not yet tracked.")}</strong>
+          <span>{ui("This signed-in browser is not represented by an active tracked session. Sign out and sign back in once to create a tracked session and bring this browser under Sessions management.")}</span>
         </div>
       ) : (
         <div className="app-warning-state sessions-guidance">
-          <strong>Sign out everywhere.</strong>
-          <span>Revoke all sessions disables every currently active session, including this browser, and returns you to login. Revoked and expired history is preserved.</span>
+          <strong>{ui("Sign out everywhere.")}</strong>
+          <span>{ui("Revoke all sessions disables every currently active session, including this browser, and returns you to login. Revoked and expired history is preserved.")}</span>
         </div>
       )}
 
       <section className="app-panel sessions-panel">
         <OperationalSectionHeader
           iconPath="/sessions"
-          title="Session inventory"
-          description="Active sessions are shown by default. The current browser is pinned first when it matches the selected status."
-          actions={<StatusBadge tone={statusFilter === 'active' && summary.active === 0 ? 'neutral' : 'blue'}>{sessionStatusLabel(statusFilter, summary)}</StatusBadge>}
+          title={ui("Session inventory")}
+          description={ui("Active sessions are shown by default. The current browser is pinned first when it matches the selected status.")}
+          actions={<StatusBadge tone={statusFilter === 'active' && summary.active === 0 ? 'neutral' : 'blue'}>{sessionStatusLabel(statusFilter, summary, ui)}</StatusBadge>}
         />
 
         <div className="sessions-toolbar">
-          <div className="sessions-filters" aria-label="Session inventory filters">
+          <div className="sessions-filters" aria-label={ui("Session inventory filters")}>
             <label className="sessions-filter-field">
-              <span>Status</span>
+              <span>{ui("Status")}</span>
               <select
                 value={statusFilter}
                 onChange={(event) => changeStatus(event.target.value as SessionStatusFilter)}
                 disabled={sessionsQuery.isFetching}
               >
-                <option value="active">Active ({summary.active})</option>
-                <option value="revoked">Revoked ({summary.revoked})</option>
-                <option value="expired">Expired ({summary.expired})</option>
-                <option value="all">All ({summary.total})</option>
+                <option value="active">{ui("Active (")}{summary.active})</option>
+                <option value="revoked">{ui("Revoked (")}{summary.revoked})</option>
+                <option value="expired">{ui("Expired (")}{summary.expired})</option>
+                <option value="all">{ui("All (")}{summary.total})</option>
               </select>
             </label>
 
             <label className="sessions-filter-field">
-              <span>Rows</span>
+              <span>{ui("Rows")}</span>
               <select
                 value={pageSize}
                 onChange={(event) => changePageSize(Number(event.target.value))}
                 disabled={sessionsQuery.isFetching}
               >
-                <option value={25}>25 / page</option>
-                <option value={50}>50 / page</option>
-                <option value={100}>100 / page</option>
+                <option value={25}>{ui("25 / page")}</option>
+                <option value={50}>{ui("50 / page")}</option>
+                <option value={100}>{ui("100 / page")}</option>
               </select>
             </label>
           </div>
 
           <div className="sessions-list-meta" aria-live="polite">
             <span>{rangeLabel}</span>
-            <span>Page {page}</span>
+            <span>{ui("Page")} {page}</span>
           </div>
         </div>
 
@@ -478,21 +482,21 @@ export default function SessionsPage() {
           <table className="sessions-table">
             <thead>
               <tr>
-                <th className="sessions-col-status">Status</th>
-                <th className="sessions-col-network">Network</th>
-                <th>Device</th>
-                <th className="sessions-col-date">Created</th>
-                <th className="sessions-col-date">Last used</th>
-                <th className="sessions-col-date">Expires</th>
-                <th className="sessions-col-action">Action</th>
+                <th className="sessions-col-status">{ui("Status")}</th>
+                <th className="sessions-col-network">{ui("Network")}</th>
+                <th>{ui("Device")}</th>
+                <th className="sessions-col-date">{ui("Created")}</th>
+                <th className="sessions-col-date">{ui("Last used")}</th>
+                <th className="sessions-col-date">{ui("Expires")}</th>
+                <th className="sessions-col-action">{ui("Action")}</th>
               </tr>
             </thead>
             <tbody>
               {sessions.length === 0 ? (
                 <tr>
                   <td className="sessions-empty-cell" colSpan={7}>
-                    <strong>No {statusFilter === 'all' ? '' : `${statusFilter} `}sessions found.</strong>
-                    <span>{statusFilter === 'active' ? 'There are no tracked active sessions for this account in the current view.' : 'Choose another status to review the retained session history.'}</span>
+                    <strong>{ui("No")} {statusFilter === 'all' ? '' : `${statusFilter} `}{ui("sessions found.")}</strong>
+                    <span>{statusFilter === 'active' ? ui("There are no tracked active sessions for this account in the current view.") : ui("Choose another status to review the retained session history.")}</span>
                   </td>
                 </tr>
               ) : (
@@ -501,19 +505,19 @@ export default function SessionsPage() {
                     ? !session.revoked && !session.is_active
                     : !session.revoked && new Date(session.expires_at).getTime() <= Date.now();
                   const isCurrent = Boolean(session.is_current);
-                  const network = describeNetwork(session.ip_address);
+                  const network = describeNetwork(session.ip_address, ui);
                   const canRevoke = !supportSession && !session.revoked && !isExpired && !isCurrent;
                   const isRowPending = revokingSessionId === session.id && revokeOneMutation.isPending;
                   const revokeDisabled = !canRevoke || revokeOneMutation.isPending || revokeAllMutation.isPending;
                   const revokeTitle = supportSession
-                    ? 'Support sessions must be ended from the platform Support Sessions page.'
+                    ? ui("Support sessions must be ended from the platform Support Sessions page.")
                     : isCurrent
-                      ? 'Current session cannot be revoked individually. Use Revoke all sessions to sign out everywhere.'
+                      ? ui("Current session cannot be revoked individually. Use Revoke all sessions to sign out everywhere.")
                       : session.revoked
-                        ? 'Session is already revoked.'
+                        ? ui("Session is already revoked.")
                         : isExpired
-                          ? 'Expired sessions no longer need revocation.'
-                          : 'Revoke this active session.';
+                          ? ui("Expired sessions no longer need revocation.")
+                          : ui("Revoke this active session.");
 
                   return (
                     <tr key={session.id} className={isCurrent ? 'sessions-row sessions-row--current' : 'sessions-row'}>
@@ -522,28 +526,28 @@ export default function SessionsPage() {
                           <StatusBadge tone={session.revoked ? 'neutral' : isExpired ? 'warn' : 'good'}>
                             {session.revoked ? 'REVOKED' : isExpired ? 'EXPIRED' : 'ACTIVE'}
                           </StatusBadge>
-                          {isCurrent ? <StatusBadge tone="blue">CURRENT</StatusBadge> : null}
-                          {session.session_type ? <StatusBadge tone="neutral">{formatSessionType(session.session_type)}</StatusBadge> : null}
+                          {isCurrent ? <StatusBadge tone="blue">{ui("CURRENT")}</StatusBadge> : null}
+                          {session.session_type ? <StatusBadge tone="neutral">{formatSessionType(session.session_type, ui)}</StatusBadge> : null}
                         </div>
                       </td>
 
                       <td className="sessions-col-network">
                         <div className="sessions-row-title" title={network.detail}>{network.label}</div>
-                        {network.detail ? <div className="sessions-row-subtle">Reported {network.detail}</div> : null}
-                        <div className="sessions-row-subtle" title={session.id}>Session {shortenId(session.id)}</div>
+                        {network.detail ? <div className="sessions-row-subtle">{ui("Reported")} {network.detail}</div> : null}
+                        <div className="sessions-row-subtle" title={session.id}>{ui("Session")} {shortenId(session.id)}</div>
                       </td>
 
                       <td className="sessions-device-cell" title={session.user_agent || undefined}>
-                        <div className="sessions-row-title">{describeDevice(session.user_agent)}</div>
-                        <div className="sessions-row-subtle">Hover for full browser signature</div>
+                        <div className="sessions-row-title">{describeDevice(session.user_agent, ui)}</div>
+                        <div className="sessions-row-subtle">{ui("Hover for full browser signature")}</div>
                       </td>
-                      <td className="sessions-col-date">{formatDateTime(session.created_at)}</td>
-                      <td className="sessions-col-date">{formatDateTime(session.last_used_at)}</td>
-                      <td className="sessions-col-date">{formatDateTime(session.expires_at)}</td>
+                      <td className="sessions-col-date">{formatDateTime(session.created_at, locale)}</td>
+                      <td className="sessions-col-date">{formatDateTime(session.last_used_at, locale)}</td>
+                      <td className="sessions-col-date">{formatDateTime(session.expires_at, locale)}</td>
 
                       <td className="sessions-col-action">
                         {supportSession ? (
-                          <span className="sessions-managed-text">Platform managed</span>
+                          <span className="sessions-managed-text">{ui("Platform managed")}</span>
                         ) : (
                           <button
                             type="button"
@@ -552,7 +556,7 @@ export default function SessionsPage() {
                             disabled={revokeDisabled}
                             title={revokeTitle}
                           >
-                            {isRowPending ? 'Revoking…' : 'Revoke'}
+                            {isRowPending ? ui("Revoking…") : ui("Revoke")}
                           </button>
                         )}
                       </td>
@@ -571,16 +575,16 @@ export default function SessionsPage() {
             onClick={() => setPage((current) => Math.max(1, current - 1))}
             disabled={page <= 1 || sessionsQuery.isFetching}
           >
-            Previous
+            {ui("Previous")}
           </button>
-          <span>Page {page}</span>
+          <span>{ui("Page")} {page}</span>
           <button
             type="button"
             className="app-button app-button--secondary"
             onClick={() => setPage((current) => current + 1)}
             disabled={!hasNext || sessionsQuery.isFetching}
           >
-            Next
+            {ui("Next")}
           </button>
         </div>
       </section>

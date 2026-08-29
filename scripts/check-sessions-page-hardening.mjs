@@ -19,7 +19,7 @@ const requiredPageAnchors = [
   'Revoke all sessions disables every currently active session',
   'Support sessions must be ended from the platform Support Sessions page.',
   "queryClient.removeQueries({ queryKey: ['auth-sessions'] })",
-  'describeDevice(session.user_agent)',
+  'describeDevice(session.user_agent, ui)',
   'getCurrentTenantSessionId()',
   'Current browser is not yet tracked.',
   'current browser is not represented by an active tracked session',

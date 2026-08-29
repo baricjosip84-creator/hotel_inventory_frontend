@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedNumber } from '../i18n/formatters';
+import { formatLocalizedCurrency, formatLocalizedDateTime } from '../i18n/formatters';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
-import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
+import { getActiveTenantCurrency } from '../lib/tenantCurrency';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
@@ -1528,24 +1531,6 @@ function formatLabel(value: unknown): string {
   return String(value).replace(/_/g, ' ');
 }
 
-function formatMoneyBreakdown(rows?: Array<{ currency_code: string; amount: number }>, amount?: number | null, currency?: string | null): string {
-  if (rows && rows.length > 0) {
-    return rows.map((row) => formatCurrencyAmount(row.amount, row.currency_code, 2)).join(' · ');
-  }
-  if (amount !== null && amount !== undefined && currency) return formatCurrencyAmount(amount, currency, 2);
-  return '—';
-}
-
-function formatTimestamp(value: unknown): string {
-  if (!value) return 'not refreshed yet';
-  const timestamp = typeof value === 'number' ? value : Date.parse(String(value));
-  if (!Number.isFinite(timestamp)) return 'unknown';
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  }).format(new Date(timestamp));
-}
-
 function buildPayload(mode: FeedbackMode, form: FeedbackFormState): Record<string, unknown> {
   const reference = safeJsonObject(form.reference);
   const expected = safeJsonObject(form.expected);
@@ -1672,15 +1657,15 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState): Record<strin
 }
 
 
-function validateNumberRange(value: string, label: string, min: number, max: number): string | null {
+function validateNumberRange(value: string, label: string, min: number, max: number, ui: (value: string) => string): string | null {
   if (!value.trim()) return null;
   const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return `${label} must be a number.`;
-  if (numeric < min || numeric > max) return `${label} must be between ${min} and ${max}.`;
+  if (!Number.isFinite(numeric)) return `${ui(label)} ${ui('must be a number.')}`;
+  if (numeric < min || numeric > max) return `${ui(label)} ${ui('must be between')} ${min} ${ui('and')} ${max}.`;
   return null;
 }
 
-function validateFeedbackForm(mode: FeedbackMode, form: FeedbackFormState): string | null {
+function validateFeedbackForm(mode: FeedbackMode, form: FeedbackFormState, ui: (value: string) => string): string | null {
   const scoreFields: Array<[string, string, number, number]> = [
     [form.score, 'Score', -1, 1],
     [form.businessValueScore, 'Business value', -1, 1],
@@ -1694,86 +1679,91 @@ function validateFeedbackForm(mode: FeedbackMode, form: FeedbackFormState): stri
   ];
 
   for (const [value, label, min, max] of scoreFields) {
-    const error = validateNumberRange(value, label, min, max);
+    const error = validateNumberRange(value, label, min, max, ui);
     if (error) return error;
   }
 
   if (form.financialImpactCurrency.trim() && !/^[A-Za-z]{3}$/.test(form.financialImpactCurrency.trim())) {
-    return 'Currency must use a three-letter code such as EUR.';
+    return ui('Currency must use a three-letter code such as EUR.');
   }
 
   if (mode === 'forecast-accuracy') {
     if (!form.expected.trim() || !form.observed.trim()) {
-      return 'Enter both the predicted value and the observed value.';
+      return ui('Enter both the predicted value and the observed value.');
     }
     if (!Number.isFinite(Number(form.expected)) || !Number.isFinite(Number(form.observed))) {
-      return 'Predicted and observed values must be numbers.';
+      return ui('Predicted and observed values must be numbers.');
     }
     return null;
   }
 
   if (mode === 'learning-outcomes') {
     if (!form.recommendationKey.trim() && !form.reference.trim()) {
-      return 'Add a recommendation key or a reference so this outcome can be traced.';
+      return ui('Add a recommendation key or a reference so this outcome can be traced.');
     }
   } else if (!form.reference.trim()) {
-    return 'Add a reference for the policy or optimization result being reviewed.';
+    return ui('Add a reference for the policy or optimization result being reviewed.');
   }
 
   if (!form.observed.trim()) {
-    return 'Describe the observed result before recording feedback.';
+    return ui('Describe the observed result before recording feedback.');
   }
 
   return null;
 }
 
-function StatCard({ label, value, iconPath, tone = 'blue' }: { label: string; value: unknown; iconPath?: string; tone?: 'blue' | 'green' | 'amber' | 'violet' | 'slate' }) {
-  return <OperationalWorkspaceStatCard label={label} value={formatLabel(value)} iconPath={iconPath} tone={tone === 'violet' ? 'blue' : tone} />;
+function LocalizedLearningStatCard({ label, value, iconPath, tone = 'blue' }: { label: string; value: unknown; iconPath?: string; tone?: 'blue' | 'green' | 'amber' | 'violet' | 'slate' }) {
+  const { locale, ui } = useAppTranslation();
+  const displayValue = typeof value === 'number'
+    ? formatLocalizedNumber(value, locale, { maximumFractionDigits: 4 })
+    : ui(formatLabel(value));
+  return <OperationalWorkspaceStatCard label={ui(label)} value={displayValue} iconPath={iconPath} tone={tone === 'violet' ? 'blue' : tone} />;
 }
 
 
 function FeedbackActionPlan({ plan }: { plan: ContinuousLearningSummary['feedback_action_plan'] }) {
+  const { locale, ui } = useAppTranslation();
   const actions = plan?.recommended_actions || [];
 
   return (
     <section className={'card learning-feedback-section learning-feedback-action-plan'}>
       <div className="card__header">
         <div>
-          <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/action-center" size={18} /></span>Feedback action plan</h2>
+          <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/action-center" size={18} /></span>{ui('Feedback action plan')}</h2>
           <p className="card__subtext">
-            Suggested follow-up work based on the feedback records already captured. People still decide whether to take any action, who owns it, and when it is complete.
+            {ui('Suggested follow-up work based on the feedback records already captured. People still decide whether to take any action, who owns it, and when it is complete.')}
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Actions" value={plan?.action_count ?? 0} iconPath="/action-center" tone="blue" />
-        <StatCard label="High priority" value={plan?.high_priority_action_count ?? 0} iconPath="/alerts" tone="amber" />
-        <StatCard label="Medium priority" value={plan?.medium_priority_action_count ?? 0} iconPath="/workflow-composer" tone="violet" />
-        <StatCard label="Next review focus" value={plan?.next_review_focus || 'routine_learning_monitoring'} iconPath="/decision-learning-feedback" tone="green" />
+        <LocalizedLearningStatCard label="Actions" value={plan?.action_count ?? 0} iconPath="/action-center" tone="blue" />
+        <LocalizedLearningStatCard label="High priority" value={plan?.high_priority_action_count ?? 0} iconPath="/alerts" tone="amber" />
+        <LocalizedLearningStatCard label="Medium priority" value={plan?.medium_priority_action_count ?? 0} iconPath="/workflow-composer" tone="violet" />
+        <LocalizedLearningStatCard label="Next review focus" value={plan?.next_review_focus || 'routine_learning_monitoring'} iconPath="/decision-learning-feedback" tone="green" />
       </div>
       {!actions.length ? (
-        <p className="card__subtext">No recommended learning actions available yet.</p>
+        <p className="card__subtext">{ui('No recommended learning actions available yet.')}</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Action</th>
-                <th>Priority</th>
-                <th>Evidence</th>
-                <th>Owner</th>
-                <th>Mode</th>
-                <th>Rationale</th>
+                <th>{ui('Action')}</th>
+                <th>{ui('Priority')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Owner')}</th>
+                <th>{ui('Mode')}</th>
+                <th>{ui('Rationale')}</th>
               </tr>
             </thead>
             <tbody>
               {actions.map((action, index) => (
                 <tr key={action.action_key || index}>
-                  <td>{formatLabel(action.action_key)}</td>
-                  <td>{formatLabel(action.priority)}</td>
-                  <td>{formatLabel(action.evidence_count)}</td>
-                  <td>{formatLabel(action.recommended_owner)}</td>
-                  <td>{formatLabel(action.execution_mode)}</td>
+                  <td>{ui(formatLabel(action.action_key))}</td>
+                  <td>{ui(formatLabel(action.priority))}</td>
+                  <td>{formatLocalizedNumber(action.evidence_count ?? 0, locale)}</td>
+                  <td>{ui(formatLabel(action.recommended_owner))}</td>
+                  <td>{ui(formatLabel(action.execution_mode))}</td>
                   <td>{action.rationale || '—'}</td>
                 </tr>
               ))}
@@ -1788,108 +1778,110 @@ function FeedbackActionPlan({ plan }: { plan: ContinuousLearningSummary['feedbac
 
 
 function LearningImpactAssessment({ assessment }: { assessment: ContinuousLearningSummary['learning_impact_assessment'] }) {
+  const { locale, ui } = useAppTranslation();
   const domains = assessment?.domain_impact_summary || [];
 
   return (
     <section className={'card learning-feedback-section learning-feedback-impact'}>
       <div className="card__header">
         <div>
-          <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/insights" size={18} /></span>Learning impact assessment</h2>
+          <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/insights" size={18} /></span>{ui('Learning impact assessment')}</h2>
           <p className="card__subtext">
-            A read-only comparison of positive results, signs that results are changing, and evidence that still needs human review.
+            {ui('A read-only comparison of positive results, signs that results are changing, and evidence that still needs human review.')}
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Impact posture" value={assessment?.impact_posture || 'no_learning_evidence_yet'} iconPath="/decision-learning-feedback" tone="blue" />
-        <StatCard label="Learning signal" value={assessment?.learning_signal_score ?? 100} iconPath="/insights" tone="green" />
-        <StatCard label="Drift pressure" value={assessment?.drift_pressure_score ?? 0} iconPath="/alerts" tone="amber" />
-        <StatCard label="Total evidence" value={assessment?.total_evidence_count ?? 0} iconPath="/audit" tone="violet" />
-        <StatCard label="Open review" value={assessment?.open_review_evidence_count ?? 0} iconPath="/intelligence-review" tone="slate" />
+        <LocalizedLearningStatCard label="Impact posture" value={assessment?.impact_posture || 'no_learning_evidence_yet'} iconPath="/decision-learning-feedback" tone="blue" />
+        <LocalizedLearningStatCard label="Learning signal" value={assessment?.learning_signal_score ?? 100} iconPath="/insights" tone="green" />
+        <LocalizedLearningStatCard label="Drift pressure" value={assessment?.drift_pressure_score ?? 0} iconPath="/alerts" tone="amber" />
+        <LocalizedLearningStatCard label="Total evidence" value={assessment?.total_evidence_count ?? 0} iconPath="/audit" tone="violet" />
+        <LocalizedLearningStatCard label="Open review" value={assessment?.open_review_evidence_count ?? 0} iconPath="/intelligence-review" tone="slate" />
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Avg outcome score" value={assessment?.average_outcome_score ?? '—'} />
-        <StatCard label="Avg forecast error" value={assessment?.average_forecast_percentage_error ?? '—'} />
-        <StatCard label="Avg policy score" value={assessment?.average_policy_effectiveness_score ?? '—'} />
-        <StatCard label="Avg optimization value" value={assessment?.average_optimization_value_score ?? '—'} />
+        <LocalizedLearningStatCard label="Avg outcome score" value={assessment?.average_outcome_score ?? '—'} />
+        <LocalizedLearningStatCard label="Avg forecast error" value={assessment?.average_forecast_percentage_error ?? '—'} />
+        <LocalizedLearningStatCard label="Avg policy score" value={assessment?.average_policy_effectiveness_score ?? '—'} />
+        <LocalizedLearningStatCard label="Avg optimization value" value={assessment?.average_optimization_value_score ?? '—'} />
       </div>
       {domains.length > 0 ? (
         <div style={{ overflowX: 'auto' }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Domain</th>
-                <th>Evidence</th>
-                <th>Review pressure</th>
-                <th>Impact posture</th>
+                <th>{ui('Domain')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Review pressure')}</th>
+                <th>{ui('Impact posture')}</th>
               </tr>
             </thead>
             <tbody>
               {domains.map((domain, index) => (
                 <tr key={domain.domain || index}>
                   <td>{formatLabel(domain.domain)}</td>
-                  <td>{formatLabel(domain.evidence_count)}</td>
-                  <td>{formatLabel(domain.review_pressure)}</td>
-                  <td>{formatLabel(domain.impact_posture)}</td>
+                  <td>{formatLocalizedNumber(domain.evidence_count ?? 0, locale)}</td>
+                  <td>{formatLocalizedNumber(domain.review_pressure ?? 0, locale)}</td>
+                  <td>{ui(formatLabel(domain.impact_posture))}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No domain impact evidence available yet.</p>}
+      ) : <p className="card__subtext">{ui('No domain impact evidence available yet.')}</p>}
     </section>
   );
 }
 
 
 function LearningCoverageMatrix({ matrix }: { matrix: ContinuousLearningSummary['learning_coverage_matrix'] }) {
+  const { locale, ui } = useAppTranslation();
   const rows = matrix?.coverage_rows || [];
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Learning coverage matrix</h2>
+          <h2>{ui('Learning coverage matrix')}</h2>
           <p className="card__subtext">
-            Backend-generated domain coverage view showing where feedback evidence exists and which evidence types are still missing. This is gap visibility only; it does not train models or update policies.
+            {ui('Backend-generated domain coverage view showing where feedback evidence exists and which evidence types are still missing. This is gap visibility only; it does not train models or update policies.')}
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Coverage posture" value={matrix?.coverage_posture || 'no_feedback_coverage_yet'} />
-        <StatCard label="Average coverage" value={matrix?.average_coverage_score ?? 0} />
-        <StatCard label="Covered domains" value={matrix?.covered_domain_count ?? 0} />
-        <StatCard label="Full coverage" value={matrix?.full_coverage_domain_count ?? 0} />
-        <StatCard label="Review pressure" value={matrix?.review_pressure_domain_count ?? 0} />
+        <LocalizedLearningStatCard label="Coverage posture" value={matrix?.coverage_posture || 'no_feedback_coverage_yet'} />
+        <LocalizedLearningStatCard label="Average coverage" value={matrix?.average_coverage_score ?? 0} />
+        <LocalizedLearningStatCard label="Covered domains" value={matrix?.covered_domain_count ?? 0} />
+        <LocalizedLearningStatCard label="Full coverage" value={matrix?.full_coverage_domain_count ?? 0} />
+        <LocalizedLearningStatCard label="Review pressure" value={matrix?.review_pressure_domain_count ?? 0} />
       </div>
       {rows.length > 0 ? (
         <div style={{ overflowX: 'auto' }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Domain</th>
-                <th>Coverage</th>
-                <th>Total evidence</th>
-                <th>Outcome</th>
-                <th>Forecast</th>
-                <th>Policy</th>
-                <th>Optimization</th>
-                <th>Review pressure</th>
-                <th>Next capture</th>
-                <th>Missing</th>
+                <th>{ui('Domain')}</th>
+                <th>{ui('Coverage')}</th>
+                <th>{ui('Total evidence')}</th>
+                <th>{ui('Outcome')}</th>
+                <th>{ui('Forecast')}</th>
+                <th>{ui('Policy')}</th>
+                <th>{ui('Optimization')}</th>
+                <th>{ui('Review pressure')}</th>
+                <th>{ui('Next capture')}</th>
+                <th>{ui('Missing')}</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row, index) => (
                 <tr key={row.domain || index}>
                   <td>{formatLabel(row.domain)}</td>
-                  <td>{formatLabel(row.coverage_score)}</td>
-                  <td>{formatLabel(row.total_evidence_count)}</td>
-                  <td>{formatLabel(row.learning_outcome_count)}</td>
-                  <td>{formatLabel(row.forecast_accuracy_count)}</td>
-                  <td>{formatLabel(row.policy_effectiveness_count)}</td>
-                  <td>{formatLabel(row.optimization_result_count)}</td>
-                  <td>{formatLabel(row.review_pressure_count)}</td>
+                  <td>{formatLocalizedNumber(row.coverage_score ?? 0, locale)}</td>
+                  <td>{formatLocalizedNumber(row.total_evidence_count ?? 0, locale)}</td>
+                  <td>{formatLocalizedNumber(row.learning_outcome_count ?? 0, locale)}</td>
+                  <td>{formatLocalizedNumber(row.forecast_accuracy_count ?? 0, locale)}</td>
+                  <td>{formatLocalizedNumber(row.policy_effectiveness_count ?? 0, locale)}</td>
+                  <td>{formatLocalizedNumber(row.optimization_result_count ?? 0, locale)}</td>
+                  <td>{formatLocalizedNumber(row.review_pressure_count ?? 0, locale)}</td>
                   <td>{formatLabel(row.recommended_next_capture)}</td>
                   <td>{(row.missing_evidence_types || []).map(formatLabel).join(', ') || '—'}</td>
                 </tr>
@@ -1897,62 +1889,63 @@ function LearningCoverageMatrix({ matrix }: { matrix: ContinuousLearningSummary[
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No coverage rows available yet.</p>}
+      ) : <p className="card__subtext">{ui('No coverage rows available yet.')}</p>}
     </section>
   );
 }
 
 
 function LearningMaturityRoadmap({ roadmap }: { roadmap: ContinuousLearningSummary['learning_maturity_roadmap'] }) {
+  const { locale, ui } = useAppTranslation();
   const phases = roadmap?.phases || [];
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Learning maturity roadmap</h2>
+          <h2>{ui('Learning maturity roadmap')}</h2>
           <p className="card__subtext">
-            Manual closed-loop readiness view generated by the backend. It shows what must mature before learning evidence can safely inform future tuning; it does not train models, update policies, or execute changes.
+            {ui('Manual closed-loop readiness view generated by the backend. It shows what must mature before learning evidence can safely inform future tuning; it does not train models, update policies, or execute changes.')}
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Roadmap posture" value={roadmap?.roadmap_posture || 'no_roadmap_loaded'} />
-        <StatCard label="Readiness score" value={roadmap?.roadmap_readiness_score ?? 0} />
-        <StatCard label="Blockers" value={roadmap?.blocker_count ?? 0} />
-        <StatCard label="Next maturity focus" value={roadmap?.next_maturity_focus || 'maintain_manual_closed_loop_readiness_review'} />
+        <LocalizedLearningStatCard label="Roadmap posture" value={roadmap?.roadmap_posture || 'no_roadmap_loaded'} />
+        <LocalizedLearningStatCard label="Readiness score" value={roadmap?.roadmap_readiness_score ?? 0} />
+        <LocalizedLearningStatCard label="Blockers" value={roadmap?.blocker_count ?? 0} />
+        <OperationalWorkspaceStatCard label={ui('Next maturity focus')} value={formatLabel(roadmap?.next_maturity_focus || 'maintain_manual_closed_loop_readiness_review')} />
       </div>
       {(roadmap?.blockers || []).length > 0 ? (
-        <p className="card__subtext">Blockers: {(roadmap?.blockers || []).map(formatLabel).join(', ')}</p>
+        <p className="card__subtext">{ui('Blockers:')} {(roadmap?.blockers || []).map(formatLabel).join(', ')}</p>
       ) : (
-        <p className="card__subtext">No roadmap blockers reported by the backend.</p>
+        <p className="card__subtext">{ui('No roadmap blockers reported by the backend.')}</p>
       )}
       {phases.length > 0 ? (
         <div style={{ overflowX: 'auto', marginTop: 12 }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Phase</th>
-                <th>Layer</th>
-                <th>Readiness</th>
-                <th>Status</th>
-                <th>Recommended next step</th>
+                <th>{ui('Phase')}</th>
+                <th>{ui('Layer')}</th>
+                <th>{ui('Readiness')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Recommended next step')}</th>
               </tr>
             </thead>
             <tbody>
               {phases.map((phase, index) => (
                 <tr key={phase.phase_key || index}>
-                  <td>{formatLabel(phase.phase_key)}</td>
-                  <td>{formatLabel(phase.maturity_layer)}</td>
-                  <td>{formatLabel(phase.readiness_score)}</td>
-                  <td>{formatLabel(phase.status)}</td>
+                  <td>{ui(formatLabel(phase.phase_key))}</td>
+                  <td>{ui(formatLabel(phase.maturity_layer))}</td>
+                  <td>{formatLocalizedNumber(phase.readiness_score ?? 0, locale)}</td>
+                  <td>{ui(formatLabel(phase.status))}</td>
                   <td>{formatLabel(phase.recommended_next_step)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No maturity phases available yet.</p>}
+      ) : <p className="card__subtext">{ui('No maturity phases available yet.')}</p>}
     </section>
   );
 }
@@ -1960,24 +1953,25 @@ function LearningMaturityRoadmap({ roadmap }: { roadmap: ContinuousLearningSumma
 
 
 function ClosedLoopExceptionRegister({ register }: { register: ContinuousLearningSummary['closed_loop_exception_register'] }) {
+  const { locale, ui } = useAppTranslation();
   const exceptions = register?.exceptions || [];
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop exception register</h2>
+          <h2>{ui('Closed-loop exception register')}</h2>
           <p className="card__subtext">
-            Backend-generated manual exception register for production surveillance and monitoring blockers. It does not train models, update policies, execute recommendations, or mutate operational state.
+            {ui('Backend-generated manual exception register for production surveillance and monitoring blockers. It does not train models, update policies, execute recommendations, or mutate operational state.')}
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Register decision" value={register?.register_decision || 'manual_exception_resolution_required'} />
-        <StatCard label="Open exceptions" value={register?.exception_count ?? 0} />
-        <StatCard label="High severity" value={register?.high_severity_count ?? 0} />
-        <StatCard label="Medium severity" value={register?.medium_severity_count ?? 0} />
-        <StatCard label="Owner" value={register?.recommended_exception_owner || 'decision_governance_owner'} />
+        <LocalizedLearningStatCard label="Register decision" value={register?.register_decision || 'manual_exception_resolution_required'} />
+        <LocalizedLearningStatCard label="Open exceptions" value={register?.exception_count ?? 0} />
+        <LocalizedLearningStatCard label="High severity" value={register?.high_severity_count ?? 0} />
+        <LocalizedLearningStatCard label="Medium severity" value={register?.medium_severity_count ?? 0} />
+        <LocalizedLearningStatCard label="Owner" value={register?.recommended_exception_owner || 'decision_governance_owner'} />
       </div>
       {register?.exception_note ? <p className="card__subtext">{register.exception_note}</p> : null}
       {exceptions.length > 0 ? (
@@ -1985,13 +1979,13 @@ function ClosedLoopExceptionRegister({ register }: { register: ContinuousLearnin
           <table className="table">
             <thead>
               <tr>
-                <th>Exception</th>
-                <th>Source</th>
-                <th>Severity</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Manual resolution</th>
+                <th>{ui('Exception')}</th>
+                <th>{ui('Source')}</th>
+                <th>{ui('Severity')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Manual resolution')}</th>
               </tr>
             </thead>
             <tbody>
@@ -1999,41 +1993,42 @@ function ClosedLoopExceptionRegister({ register }: { register: ContinuousLearnin
                 <tr key={item.exception_key || index}>
                   <td>{formatLabel(item.exception_key)}</td>
                   <td>{formatLabel(item.exception_source)}</td>
-                  <td>{formatLabel(item.severity)}</td>
-                  <td>{formatLabel(item.exception_status)}</td>
-                  <td>{formatLabel(item.current_value)}</td>
-                  <td>{formatLabel(item.required_value)}</td>
+                  <td>{ui(formatLabel(item.severity))}</td>
+                  <td>{ui(formatLabel(item.exception_status))}</td>
+                  <td>{typeof item.current_value === 'number' ? formatLocalizedNumber(item.current_value, locale) : formatLabel(item.current_value)}</td>
+                  <td>{typeof item.required_value === 'number' ? formatLocalizedNumber(item.required_value, locale) : formatLabel(item.required_value)}</td>
                   <td>{formatLabel(item.manual_resolution || item.exception_reason)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No closed-loop exceptions are currently open.</p>}
+      ) : <p className="card__subtext">{ui('No closed-loop exceptions are currently open.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopResolutionPlan({ plan }: { plan: ContinuousLearningSummary['closed_loop_resolution_plan'] }) {
+  const { locale, ui } = useAppTranslation();
   const steps = plan?.resolution_steps || [];
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop resolution plan</h2>
+          <h2>{ui('Closed-loop resolution plan')}</h2>
           <p className="card__subtext">
-            Backend-generated manual sequencing plan for resolving closed-loop exceptions. It is planning-only and does not train models, update policies, execute recommendations, or mutate operational state.
+            {ui('Backend-generated manual sequencing plan for resolving closed-loop exceptions. It is planning-only and does not train models, update policies, execute recommendations, or mutate operational state.')}
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Resolution decision" value={plan?.resolution_decision || 'no_manual_resolution_plan_required'} />
-        <StatCard label="Plan score" value={plan?.resolution_plan_score ?? 100} />
-        <StatCard label="Steps" value={plan?.resolution_step_count ?? 0} />
-        <StatCard label="High severity" value={plan?.unresolved_high_severity_count ?? 0} />
-        <StatCard label="Owner" value={plan?.recommended_resolution_owner || 'platform_admin_or_authorized_business_owner'} />
+        <LocalizedLearningStatCard label="Resolution decision" value={plan?.resolution_decision || 'no_manual_resolution_plan_required'} />
+        <LocalizedLearningStatCard label="Plan score" value={plan?.resolution_plan_score ?? 100} />
+        <LocalizedLearningStatCard label="Steps" value={plan?.resolution_step_count ?? 0} />
+        <LocalizedLearningStatCard label="High severity" value={plan?.unresolved_high_severity_count ?? 0} />
+        <LocalizedLearningStatCard label="Owner" value={plan?.recommended_resolution_owner || 'platform_admin_or_authorized_business_owner'} />
       </div>
       {plan?.resolution_note ? <p className="card__subtext">{plan.resolution_note}</p> : null}
       {steps.length > 0 ? (
@@ -2042,21 +2037,21 @@ function ClosedLoopResolutionPlan({ plan }: { plan: ContinuousLearningSummary['c
             <thead>
               <tr>
                 <th>#</th>
-                <th>Exception</th>
-                <th>Severity</th>
-                <th>Status</th>
-                <th>Manual task</th>
-                <th>Evidence to capture</th>
-                <th>Expected result</th>
+                <th>{ui('Exception')}</th>
+                <th>{ui('Severity')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Manual task')}</th>
+                <th>{ui('Evidence to capture')}</th>
+                <th>{ui('Expected result')}</th>
               </tr>
             </thead>
             <tbody>
               {steps.map((item, index) => (
                 <tr key={item.resolution_key || index}>
-                  <td>{formatLabel(item.step_number ?? index + 1)}</td>
+                  <td>{formatLocalizedNumber(item.step_number ?? index + 1, locale)}</td>
                   <td>{formatLabel(item.exception_key)}</td>
-                  <td>{formatLabel(item.severity)}</td>
-                  <td>{formatLabel(item.resolution_status)}</td>
+                  <td>{ui(formatLabel(item.severity))}</td>
+                  <td>{ui(formatLabel(item.resolution_status))}</td>
                   <td>{formatLabel(item.manual_resolution_task)}</td>
                   <td>{formatLabel(item.evidence_to_capture)}</td>
                   <td>{formatLabel(item.expected_resolution_result)}</td>
@@ -2065,31 +2060,32 @@ function ClosedLoopResolutionPlan({ plan }: { plan: ContinuousLearningSummary['c
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No closed-loop resolution steps are currently required.</p>}
+      ) : <p className="card__subtext">{ui('No closed-loop resolution steps are currently required.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopClosureReport({ report }: { report: ContinuousLearningSummary['closed_loop_closure_report'] }) {
+  const { ui } = useAppTranslation();
   const items = report?.closure_items || [];
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop closure report</h2>
+          <h2>{ui('Closed-loop closure report')}</h2>
           <p className="card__subtext">
-            Backend-generated manual closure report for confirming exception resolution evidence. It is reporting-only and does not train models, update policies, execute recommendations, or mutate operational state.
+            {ui('Backend-generated manual closure report for confirming exception resolution evidence. It is reporting-only and does not train models, update policies, execute recommendations, or mutate operational state.')}
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Closure decision" value={report?.closure_decision || 'manual_closure_evidence_required'} />
-        <StatCard label="Closure score" value={report?.closure_score ?? 0} />
-        <StatCard label="Closure items" value={report?.closure_item_count ?? 0} />
-        <StatCard label="Unresolved" value={report?.unresolved_closure_count ?? 0} />
-        <StatCard label="Owner" value={report?.recommended_closure_owner || 'platform_admin_or_authorized_business_owner'} />
+        <LocalizedLearningStatCard label="Closure decision" value={report?.closure_decision || 'manual_closure_evidence_required'} />
+        <LocalizedLearningStatCard label="Closure score" value={report?.closure_score ?? 0} />
+        <LocalizedLearningStatCard label="Closure items" value={report?.closure_item_count ?? 0} />
+        <LocalizedLearningStatCard label="Unresolved" value={report?.unresolved_closure_count ?? 0} />
+        <OperationalWorkspaceStatCard label={ui('Owner')} value={formatLabel(report?.recommended_closure_owner || 'platform_admin_or_authorized_business_owner')} />
       </div>
       {report?.closure_note ? <p className="card__subtext">{report.closure_note}</p> : null}
       {items.length > 0 ? (
@@ -2097,12 +2093,12 @@ function ClosedLoopClosureReport({ report }: { report: ContinuousLearningSummary
           <table className="table">
             <thead>
               <tr>
-                <th>Closure item</th>
-                <th>Exception</th>
-                <th>Severity</th>
-                <th>Status</th>
-                <th>Evidence required</th>
-                <th>Validation task</th>
+                <th>{ui('Closure item')}</th>
+                <th>{ui('Exception')}</th>
+                <th>{ui('Severity')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Evidence required')}</th>
+                <th>{ui('Validation task')}</th>
               </tr>
             </thead>
             <tbody>
@@ -2110,8 +2106,8 @@ function ClosedLoopClosureReport({ report }: { report: ContinuousLearningSummary
                 <tr key={item.closure_key || index}>
                   <td>{formatLabel(item.closure_key)}</td>
                   <td>{formatLabel(item.exception_key)}</td>
-                  <td>{formatLabel(item.severity)}</td>
-                  <td>{formatLabel(item.closure_status)}</td>
+                  <td>{ui(formatLabel(item.severity))}</td>
+                  <td>{ui(formatLabel(item.closure_status))}</td>
                   <td>{formatLabel(item.closure_evidence_required)}</td>
                   <td>{formatLabel(item.closure_validation_task)}</td>
                 </tr>
@@ -2119,12 +2115,13 @@ function ClosedLoopClosureReport({ report }: { report: ContinuousLearningSummary
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No closure items are currently reported.</p>}
+      ) : <p className="card__subtext">{ui('No closure items are currently reported.')}</p>}
     </section>
   );
 }
 
 function ClosedLoopAuditLedger({ ledger }: { ledger: ContinuousLearningSummary['closed_loop_audit_ledger'] }) {
+  const { locale, ui } = useAppTranslation();
   const entries = ledger?.ledger_entries || [];
   const blockers = ledger?.audit_blockers || [];
 
@@ -2132,19 +2129,19 @@ function ClosedLoopAuditLedger({ ledger }: { ledger: ContinuousLearningSummary['
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop audit ledger</h2>
-          <p className="card__subtext">Manual audit-retention ledger for feedback evidence, coverage, impact, exceptions, and certification traceability.</p>
+          <h2>{ui('Closed-loop audit ledger')}</h2>
+          <p className="card__subtext">{ui('Manual audit-retention ledger for feedback evidence, coverage, impact, exceptions, and certification traceability.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Audit decision" value={ledger?.audit_ledger_decision || 'manual_audit_evidence_required'} />
-        <StatCard label="Audit score" value={ledger?.audit_ledger_score ?? 0} />
-        <StatCard label="Ready entries" value={ledger?.ready_entry_count ?? 0} />
-        <StatCard label="Blocked entries" value={ledger?.blocked_entry_count ?? 0} />
+        <LocalizedLearningStatCard label="Audit decision" value={ledger?.audit_ledger_decision || 'manual_audit_evidence_required'} />
+        <LocalizedLearningStatCard label="Audit score" value={ledger?.audit_ledger_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready entries" value={ledger?.ready_entry_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked entries" value={ledger?.blocked_entry_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Owner: {ledger?.recommended_audit_owner || 'decision_governance_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(ledger?.next_audit_focus || 'retain_closed_loop_certification_audit_record')}</p>
-      <p className="card__subtext">{ledger?.audit_ledger_note || 'Manual audit ledger remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Owner:')} {formatLabel(ledger?.recommended_audit_owner || 'decision_governance_owner')}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(ledger?.next_audit_focus || 'retain_closed_loop_certification_audit_record')}</p>
+      <p className="card__subtext">{ledger?.audit_ledger_note || ui('Manual audit ledger remains advisory only.')}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
@@ -2155,21 +2152,21 @@ function ClosedLoopAuditLedger({ ledger }: { ledger: ContinuousLearningSummary['
           <table className="data-table">
             <thead>
               <tr>
-                <th>Stage</th>
-                <th>Status</th>
-                <th>Evidence</th>
-                <th>Count</th>
-                <th>Retention</th>
-                <th>Manual audit task</th>
+                <th>{ui('Stage')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Count')}</th>
+                <th>{ui('Retention')}</th>
+                <th>{ui('Manual audit task')}</th>
               </tr>
             </thead>
             <tbody>
               {entries.map((entry, index) => (
                 <tr key={entry.ledger_key || index}>
                   <td>{formatLabel(entry.ledger_stage || entry.ledger_key)}</td>
-                  <td>{formatLabel(entry.ledger_status)}</td>
+                  <td>{ui(formatLabel(entry.ledger_status))}</td>
                   <td>{formatLabel(entry.evidence_reference)}</td>
-                  <td>{entry.evidence_count ?? 0}</td>
+                  <td>{formatLocalizedNumber(entry.evidence_count ?? 0, locale)}</td>
                   <td>{formatLabel(entry.retention_requirement)}</td>
                   <td>{formatLabel(entry.manual_audit_task)}</td>
                 </tr>
@@ -2177,13 +2174,14 @@ function ClosedLoopAuditLedger({ ledger }: { ledger: ContinuousLearningSummary['
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No audit ledger entries are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No audit ledger entries are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopComplianceAttestation({ attestation }: { attestation: ContinuousLearningSummary['closed_loop_compliance_attestation'] }) {
+  const { ui } = useAppTranslation();
   const checks = attestation?.attestation_checks || [];
   const blockers = attestation?.attestation_blockers || [];
 
@@ -2191,19 +2189,19 @@ function ClosedLoopComplianceAttestation({ attestation }: { attestation: Continu
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop compliance attestation</h2>
-          <p className="card__subtext">Manual compliance attestation for audit retention, certification, release/monitoring controls, and the non-autonomous safety contract.</p>
+          <h2>{ui('Closed-loop compliance attestation')}</h2>
+          <p className="card__subtext">{ui('Manual compliance attestation for audit retention, certification, release/monitoring controls, and the non-autonomous safety contract.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Attestation decision" value={attestation?.attestation_decision || 'manual_compliance_attestation_blocked'} />
-        <StatCard label="Attestation score" value={attestation?.attestation_score ?? 0} />
-        <StatCard label="Attestable checks" value={attestation?.attestable_check_count ?? 0} />
-        <StatCard label="Blocked checks" value={attestation?.blocked_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Attestation decision" value={attestation?.attestation_decision || 'manual_compliance_attestation_blocked'} />
+        <LocalizedLearningStatCard label="Attestation score" value={attestation?.attestation_score ?? 0} />
+        <LocalizedLearningStatCard label="Attestable checks" value={attestation?.attestable_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={attestation?.blocked_check_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Owner: {attestation?.recommended_attestation_owner || 'platform_governance_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(attestation?.next_attestation_focus || 'record_manual_closed_loop_compliance_attestation')}</p>
-      <p className="card__subtext">{attestation?.attestation_note || 'Manual compliance attestation remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Owner:')} {formatLabel(attestation?.recommended_attestation_owner || 'platform_governance_owner')}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(attestation?.next_attestation_focus || 'record_manual_closed_loop_compliance_attestation')}</p>
+      <p className="card__subtext">{attestation?.attestation_note || ui('Manual compliance attestation remains advisory only.')}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
@@ -2214,19 +2212,19 @@ function ClosedLoopComplianceAttestation({ attestation }: { attestation: Continu
           <table className="data-table">
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check, index) => (
                 <tr key={check.check_key || index}>
                   <td>{formatLabel(check.check_label || check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
                   <td>{formatLabel(check.current_value)}</td>
                   <td>{formatLabel(check.required_value)}</td>
                   <td>{formatLabel(check.attestation_evidence)}</td>
@@ -2236,33 +2234,38 @@ function ClosedLoopComplianceAttestation({ attestation }: { attestation: Continu
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No compliance attestation checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No compliance attestation checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopCommercialReadinessPacket({ packet }: { packet: ContinuousLearningSummary['closed_loop_commercial_readiness_packet'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = packet?.readiness_checks || [];
   const blockers = packet?.commercial_readiness_blockers || [];
+  const formatCommercialDecisionValue = (value: unknown): string => {
+    if (typeof value === 'number') return formatLocalizedNumber(value, locale);
+    return ui(formatLabel(value));
+  };
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop commercial readiness packet</h2>
-          <p className="card__subtext">Final manual commercial-readiness packet tying together compliance attestation, audit ledger, certification, governance gate, and production surveillance. It stays advisory and non-autonomous.</p>
+          <h2>{ui('Closed-loop commercial readiness packet')}</h2>
+          <p className="card__subtext">{ui('Final manual commercial-readiness packet tying together compliance attestation, audit ledger, certification, governance gate, and production surveillance. It stays advisory and non-autonomous.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Commercial decision" value={packet?.commercial_readiness_decision || 'manual_commercial_readiness_blocked'} />
-        <StatCard label="Readiness score" value={packet?.commercial_readiness_score ?? 0} />
-        <StatCard label="Ready checks" value={packet?.ready_check_count ?? 0} />
-        <StatCard label="Blocked checks" value={packet?.blocked_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Commercial decision" value={packet?.commercial_readiness_decision || 'manual_commercial_readiness_blocked'} />
+        <LocalizedLearningStatCard label="Readiness score" value={packet?.commercial_readiness_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready checks" value={packet?.ready_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={packet?.blocked_check_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Executive owner: {packet?.recommended_executive_owner || 'platform_governance_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(packet?.next_commercial_readiness_focus || 'record_manual_commercial_readiness_decision')}</p>
-      <p className="card__subtext">{packet?.commercial_readiness_note || 'Manual commercial readiness remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Executive owner:')} {formatLabel(packet?.recommended_executive_owner || 'platform_governance_owner')}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(packet?.next_commercial_readiness_focus || 'record_manual_commercial_readiness_decision')}</p>
+      <p className="card__subtext">{packet?.commercial_readiness_note || ui('Manual commercial readiness remains advisory only.')}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
@@ -2273,21 +2276,21 @@ function ClosedLoopCommercialReadinessPacket({ packet }: { packet: ContinuousLea
           <table className="data-table">
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check, index) => (
                 <tr key={check.check_key || index}>
                   <td>{formatLabel(check.check_label || check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatCommercialDecisionValue(check.current_value)}</td>
+                  <td>{formatCommercialDecisionValue(check.required_value)}</td>
                   <td>{formatLabel(check.packet_evidence)}</td>
                   <td>{formatLabel(check.manual_readiness_task)}</td>
                 </tr>
@@ -2295,173 +2298,184 @@ function ClosedLoopCommercialReadinessPacket({ packet }: { packet: ContinuousLea
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No commercial readiness checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No commercial readiness checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopGovernanceGate({ gate }: { gate: ContinuousLearningSummary['closed_loop_governance_gate'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = gate?.gate_checks || [];
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop governance gate</h2>
+          <h2>{ui('Closed-loop governance gate')}</h2>
           <p className="card__subtext">
-            Backend-generated go/no-go gate for manual closed-loop escalation. It blocks escalation when evidence coverage, review pressure, drift pressure, high-priority actions, or roadmap readiness are not acceptable. It does not train models, update policies, execute recommendations, or mutate operational state.
+            {ui('Backend-generated go/no-go gate for manual closed-loop escalation. It blocks escalation when evidence coverage, review pressure, drift pressure, high-priority actions, or roadmap readiness are not acceptable. It does not train models, update policies, execute recommendations, or mutate operational state.')}
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Gate decision" value={gate?.gate_decision || 'not_loaded'} />
-        <StatCard label="Gate score" value={gate?.gate_score ?? 0} />
-        <StatCard label="Passed checks" value={gate?.passed_check_count ?? 0} />
-        <StatCard label="Blocked checks" value={gate?.blocked_check_count ?? 0} />
-        <StatCard label="Next gate focus" value={gate?.next_gate_focus || 'prepare_manual_governance_signoff'} />
+        <LocalizedLearningStatCard label="Gate decision" value={gate?.gate_decision || 'not_loaded'} />
+        <LocalizedLearningStatCard label="Gate score" value={gate?.gate_score ?? 0} />
+        <LocalizedLearningStatCard label="Passed checks" value={gate?.passed_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={gate?.blocked_check_count ?? 0} />
+        <OperationalWorkspaceStatCard label={ui('Next gate focus')} value={formatLabel(gate?.next_gate_focus || 'prepare_manual_governance_signoff')} tone="green" />
       </div>
       {(gate?.required_manual_resolution || []).length > 0 ? (
-        <p className="card__subtext">Manual resolution required: {(gate?.required_manual_resolution || []).map(formatLabel).join(', ')}</p>
+        <p className="card__subtext">{ui('Manual resolution required:')} {(gate?.required_manual_resolution || []).map(formatLabel).join(', ')}</p>
       ) : (
-        <p className="card__subtext">No manual gate blockers reported by the backend.</p>
+        <p className="card__subtext">{ui('No manual gate blockers reported by the backend.')}</p>
       )}
       {checks.length > 0 ? (
         <div style={{ overflowX: 'auto', marginTop: 12 }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Threshold</th>
-                <th>Manual remediation</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Threshold')}</th>
+                <th>{ui('Manual remediation')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check, index) => (
                 <tr key={check.check_key || index}>
                   <td>{formatLabel(check.check_label || check.check_key)}</td>
-                  <td>{formatLabel(check.status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.threshold)}</td>
+                  <td>{ui(formatLabel(check.status))}</td>
+                  <td>{typeof check.current_value === 'number' ? formatLocalizedNumber(check.current_value, locale) : formatLabel(check.current_value)}</td>
+                  <td>{typeof check.threshold === 'number' ? formatLocalizedNumber(check.threshold, locale) : formatLabel(check.threshold)}</td>
                   <td>{formatLabel(check.remediation)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No governance gate checks available yet.</p>}
+      ) : <p className="card__subtext">{ui('No governance gate checks available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopSignoffPacket({ packet }: { packet: ContinuousLearningSummary['closed_loop_signoff_packet'] }) {
+  const { locale, ui } = useAppTranslation();
   const sections = packet?.signoff_sections || [];
+  const formatSignoffValue = (value: unknown): string => {
+    if (typeof value === 'number') return formatLocalizedNumber(value, locale);
+    return formatLabel(value);
+  };
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop signoff packet</h2>
+          <h2>{ui('Closed-loop signoff packet')}</h2>
           <p className="card__subtext">
-            Backend-generated manual signoff packet for evidence-based release review. It packages coverage, review, drift, and gate readiness into a human go/no-go surface. It does not approve, train, execute, update policies, or mutate operational state.
+            {ui('Backend-generated manual signoff packet for evidence-based release review. It packages coverage, review, drift, and gate readiness into a human go/no-go surface. It does not approve, train, execute, update policies, or mutate operational state.')}
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Signoff decision" value={packet?.signoff_decision || 'not_loaded'} />
-        <StatCard label="Signoff score" value={packet?.signoff_score ?? 0} />
-        <StatCard label="Required signoffs" value={packet?.required_signoff_count ?? 0} />
-        <StatCard label="Unresolved sections" value={packet?.unresolved_section_count ?? 0} />
-        <StatCard label="Recommended owner" value={packet?.recommended_signoff_owner || 'decision_governance_owner'} />
+        <LocalizedLearningStatCard label="Signoff decision" value={packet?.signoff_decision || 'not_loaded'} />
+        <LocalizedLearningStatCard label="Signoff score" value={packet?.signoff_score ?? 0} />
+        <LocalizedLearningStatCard label="Required signoffs" value={packet?.required_signoff_count ?? 0} />
+        <LocalizedLearningStatCard label="Unresolved sections" value={packet?.unresolved_section_count ?? 0} />
+        <OperationalWorkspaceStatCard label={ui('Recommended owner')} value={formatLabel(packet?.recommended_signoff_owner || 'decision_governance_owner')} tone="green" />
       </div>
-      <p className="card__subtext">Next signoff focus: {formatLabel(packet?.next_signoff_focus || 'complete_manual_governance_go_no_go_signoff')}</p>
-      <p className="card__subtext">{packet?.release_note || 'No signoff packet release note available yet.'}</p>
+      <p className="card__subtext">{ui('Next signoff focus:')} {formatLabel(packet?.next_signoff_focus || 'complete_manual_governance_go_no_go_signoff')}</p>
+      <p className="card__subtext">{packet?.release_note || ui('No signoff packet release note available yet.')}</p>
       {sections.length > 0 ? (
         <div style={{ overflowX: 'auto', marginTop: 12 }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Section</th>
-                <th>Readiness</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual signoff</th>
-                <th>Instruction</th>
+                <th>{ui('Section')}</th>
+                <th>{ui('Readiness')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual signoff')}</th>
+                <th>{ui('Instruction')}</th>
               </tr>
             </thead>
             <tbody>
               {sections.map((section, index) => (
                 <tr key={section.section_key || index}>
                   <td>{formatLabel(section.section_label || section.section_key)}</td>
-                  <td>{formatLabel(section.readiness_status)}</td>
-                  <td>{formatLabel(section.current_value)}</td>
-                  <td>{formatLabel(section.required_value)}</td>
-                  <td>{formatLabel(section.evidence_count)}</td>
-                  <td>{section.manual_signoff_required ? 'yes' : 'no'}</td>
+                  <td>{ui(formatLabel(section.readiness_status))}</td>
+                  <td>{formatSignoffValue(section.current_value)}</td>
+                  <td>{formatSignoffValue(section.required_value)}</td>
+                  <td>{typeof section.evidence_count === 'number' ? formatLocalizedNumber(section.evidence_count, locale) : formatLabel(section.evidence_count)}</td>
+                  <td>{ui(section.manual_signoff_required ? 'yes' : 'no')}</td>
                   <td>{formatLabel(section.signoff_instruction)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No signoff sections available yet.</p>}
+      ) : <p className="card__subtext">{ui('No signoff sections available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopReleaseReadinessSnapshot({ snapshot }: { snapshot: ContinuousLearningSummary['closed_loop_release_readiness_snapshot'] }) {
+  const { locale, ui } = useAppTranslation();
   const lanes = snapshot?.release_lane_checks || [];
+  const formatReleaseValue = (value: unknown): string => {
+    if (typeof value === 'number') return formatLocalizedNumber(value, locale);
+    return formatLabel(value);
+  };
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop release readiness</h2>
+          <h2>{ui('Closed-loop release readiness')}</h2>
           <p className="card__subtext">
-            Backend-generated release readiness snapshot for the manual go/no-go decision. It packages evidence, review, drift, governance, and action lanes without approving, training, executing, updating policies, or mutating operational state.
+            {ui('Backend-generated release readiness snapshot for the manual go/no-go decision. It packages evidence, review, drift, governance, and action lanes without approving, training, executing, updating policies, or mutating operational state.')}
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Release decision" value={snapshot?.release_decision || 'not_loaded'} />
-        <StatCard label="Readiness score" value={snapshot?.release_readiness_score ?? 0} />
-        <StatCard label="Ready lanes" value={snapshot?.ready_lane_count ?? 0} />
-        <StatCard label="Blocked lanes" value={snapshot?.blocked_lane_count ?? 0} />
-        <StatCard label="Evidence" value={snapshot?.total_evidence_count ?? 0} />
-        <StatCard label="Owner" value={snapshot?.recommended_release_owner || 'decision_governance_owner'} />
+        <LocalizedLearningStatCard label="Release decision" value={snapshot?.release_decision || 'not_loaded'} />
+        <LocalizedLearningStatCard label="Readiness score" value={snapshot?.release_readiness_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready lanes" value={snapshot?.ready_lane_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked lanes" value={snapshot?.blocked_lane_count ?? 0} />
+        <LocalizedLearningStatCard label="Evidence" value={snapshot?.total_evidence_count ?? 0} />
+        <OperationalWorkspaceStatCard label={ui('Owner')} value={formatLabel(snapshot?.recommended_release_owner || 'decision_governance_owner')} tone="green" />
       </div>
-      <p className="card__subtext">Next release focus: {formatLabel(snapshot?.next_release_focus || 'complete_manual_release_go_no_go_decision')}</p>
-      <p className="card__subtext">{snapshot?.release_note || 'No release readiness note available yet.'}</p>
+      <p className="card__subtext">{ui('Next release focus:')} {formatLabel(snapshot?.next_release_focus || 'complete_manual_release_go_no_go_decision')}</p>
+      <p className="card__subtext">{snapshot?.release_note || ui('No release readiness note available yet.')}</p>
       {(snapshot?.release_blockers || []).length > 0 ? (
-        <p className="card__subtext">Release blockers: {(snapshot?.release_blockers || []).map(formatLabel).join(', ')}</p>
+        <p className="card__subtext">{ui('Release blockers:')} {(snapshot?.release_blockers || []).map(formatLabel).join(', ')}</p>
       ) : (
-        <p className="card__subtext">No release blockers reported by the backend.</p>
+        <p className="card__subtext">{ui('No release blockers reported by the backend.')}</p>
       )}
       {lanes.length > 0 ? (
         <div style={{ overflowX: 'auto', marginTop: 12 }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Lane</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Blocker</th>
-                <th>Manual action</th>
+                <th>{ui('Lane')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Blocker')}</th>
+                <th>{ui('Manual action')}</th>
               </tr>
             </thead>
             <tbody>
               {lanes.map((lane, index) => (
                 <tr key={lane.lane_key || index}>
                   <td>{formatLabel(lane.lane_label || lane.lane_key)}</td>
-                  <td>{formatLabel(lane.lane_status)}</td>
-                  <td>{formatLabel(lane.current_value)}</td>
-                  <td>{formatLabel(lane.required_value)}</td>
+                  <td>{ui(formatLabel(lane.lane_status))}</td>
+                  <td>{formatReleaseValue(lane.current_value)}</td>
+                  <td>{formatReleaseValue(lane.required_value)}</td>
                   <td>{formatLabel(lane.blocking_reason)}</td>
                   <td>{formatLabel(lane.manual_action)}</td>
                 </tr>
@@ -2469,44 +2483,45 @@ function ClosedLoopReleaseReadinessSnapshot({ snapshot }: { snapshot: Continuous
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No release readiness lanes available yet.</p>}
+      ) : <p className="card__subtext">{ui('No release readiness lanes available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopOperationalHandoff({ handoff }: { handoff: ContinuousLearningSummary['closed_loop_operational_handoff'] }) {
+  const { ui } = useAppTranslation();
   const items = handoff?.handoff_items || [];
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop operational handoff</h2>
+          <h2>{ui('Closed-loop operational handoff')}</h2>
           <p className="card__subtext">
-            Backend-generated owner handoff for the manual operational acceptance step after release readiness. It assigns manual owners and next tasks without training, approving, executing, updating policies, or mutating operational state.
+            {ui('Backend-generated owner handoff for the manual operational acceptance step after release readiness. It assigns manual owners and next tasks without training, approving, executing, updating policies, or mutating operational state.')}
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Handoff decision" value={handoff?.handoff_decision || 'not_loaded'} />
-        <StatCard label="Handoff score" value={handoff?.handoff_score ?? 0} />
-        <StatCard label="Ready items" value={handoff?.ready_handoff_count ?? 0} />
-        <StatCard label="Blocked items" value={handoff?.blocked_handoff_count ?? 0} />
-        <StatCard label="Owner" value={handoff?.recommended_handoff_owner || 'decision_governance_owner'} />
+        <LocalizedLearningStatCard label="Handoff decision" value={handoff?.handoff_decision || 'not_loaded'} />
+        <LocalizedLearningStatCard label="Handoff score" value={handoff?.handoff_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready items" value={handoff?.ready_handoff_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked items" value={handoff?.blocked_handoff_count ?? 0} />
+        <OperationalWorkspaceStatCard label={ui('Owner')} value={formatLabel(handoff?.recommended_handoff_owner || 'decision_governance_owner')} tone="green" />
       </div>
-      <p className="card__subtext">Next handoff focus: {formatLabel(handoff?.next_handoff_focus || 'complete_manual_operational_acceptance')}</p>
-      <p className="card__subtext">{handoff?.handoff_note || 'No operational handoff note available yet.'}</p>
+      <p className="card__subtext">{ui('Next handoff focus:')} {formatLabel(handoff?.next_handoff_focus || 'complete_manual_operational_acceptance')}</p>
+      <p className="card__subtext">{handoff?.handoff_note || ui('No operational handoff note available yet.')}</p>
       {items.length > 0 ? (
         <div style={{ overflowX: 'auto', marginTop: 12 }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Source lane</th>
-                <th>Owner</th>
-                <th>Status</th>
-                <th>Manual task</th>
-                <th>Blocker</th>
+                <th>{ui('Source lane')}</th>
+                <th>{ui('Owner')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Manual task')}</th>
+                <th>{ui('Blocker')}</th>
               </tr>
             </thead>
             <tbody>
@@ -2514,7 +2529,7 @@ function ClosedLoopOperationalHandoff({ handoff }: { handoff: ContinuousLearning
                 <tr key={item.handoff_key || index}>
                   <td>{formatLabel(item.source_lane)}</td>
                   <td>{formatLabel(item.owner_role)}</td>
-                  <td>{formatLabel(item.handoff_status)}</td>
+                  <td>{ui(formatLabel(item.handoff_status))}</td>
                   <td>{formatLabel(item.manual_task)}</td>
                   <td>{formatLabel(item.blocking_reason)}</td>
                 </tr>
@@ -2522,54 +2537,59 @@ function ClosedLoopOperationalHandoff({ handoff }: { handoff: ContinuousLearning
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No operational handoff items available yet.</p>}
+      ) : <p className="card__subtext">{ui('No operational handoff items available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopOperationalAcceptance({ acceptance }: { acceptance: ContinuousLearningSummary['closed_loop_operational_acceptance'] }) {
+  const { locale, ui } = useAppTranslation();
   const criteria = acceptance?.acceptance_criteria || [];
+  const formatAcceptanceValue = (value: unknown): string => {
+    if (typeof value === 'number') return formatLocalizedNumber(value, locale);
+    return formatLabel(value);
+  };
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop operational acceptance</h2>
+          <h2>{ui('Closed-loop operational acceptance')}</h2>
           <p className="card__subtext">
-            Backend-generated manual acceptance criteria after operational handoff. This gives the business owner a clear accept/block decision surface without training models, updating policies, executing recommendations, or mutating operational state.
+            {ui('Backend-generated manual acceptance criteria after operational handoff. This gives the business owner a clear accept/block decision surface without training models, updating policies, executing recommendations, or mutating operational state.')}
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Acceptance decision" value={acceptance?.acceptance_decision || 'not_loaded'} />
-        <StatCard label="Acceptance score" value={acceptance?.acceptance_score ?? 0} />
-        <StatCard label="Accepted criteria" value={acceptance?.accepted_criteria_count ?? 0} />
-        <StatCard label="Blocked criteria" value={acceptance?.blocked_criteria_count ?? 0} />
-        <StatCard label="Owner" value={acceptance?.recommended_acceptance_owner || 'decision_governance_owner'} />
+        <LocalizedLearningStatCard label="Acceptance decision" value={acceptance?.acceptance_decision || 'not_loaded'} />
+        <LocalizedLearningStatCard label="Acceptance score" value={acceptance?.acceptance_score ?? 0} />
+        <LocalizedLearningStatCard label="Accepted criteria" value={acceptance?.accepted_criteria_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked criteria" value={acceptance?.blocked_criteria_count ?? 0} />
+        <OperationalWorkspaceStatCard label={ui('Owner')} value={formatLabel(acceptance?.recommended_acceptance_owner || 'decision_governance_owner')} tone="green" />
       </div>
-      <p className="card__subtext">Next acceptance focus: {formatLabel(acceptance?.next_acceptance_focus || 'record_manual_operational_acceptance')}</p>
-      <p className="card__subtext">{acceptance?.acceptance_note || 'No operational acceptance note available yet.'}</p>
+      <p className="card__subtext">{ui('Next acceptance focus:')} {formatLabel(acceptance?.next_acceptance_focus || 'record_manual_operational_acceptance')}</p>
+      <p className="card__subtext">{acceptance?.acceptance_note || ui('No operational acceptance note available yet.')}</p>
       {criteria.length > 0 ? (
         <div style={{ overflowX: 'auto', marginTop: 12 }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Criterion</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Manual acceptance task</th>
-                <th>Blocker</th>
+                <th>{ui('Criterion')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Manual acceptance task')}</th>
+                <th>{ui('Blocker')}</th>
               </tr>
             </thead>
             <tbody>
               {criteria.map((criterion, index) => (
                 <tr key={criterion.criterion_key || index}>
                   <td>{formatLabel(criterion.criterion_label || criterion.criterion_key)}</td>
-                  <td>{formatLabel(criterion.criterion_status)}</td>
-                  <td>{formatLabel(criterion.current_value)}</td>
-                  <td>{formatLabel(criterion.required_value)}</td>
+                  <td>{ui(formatLabel(criterion.criterion_status))}</td>
+                  <td>{formatAcceptanceValue(criterion.current_value)}</td>
+                  <td>{formatAcceptanceValue(criterion.required_value)}</td>
                   <td>{formatLabel(criterion.manual_acceptance_task)}</td>
                   <td>{formatLabel(criterion.blocking_reason)}</td>
                 </tr>
@@ -2577,38 +2597,43 @@ function ClosedLoopOperationalAcceptance({ acceptance }: { acceptance: Continuou
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No operational acceptance criteria available yet.</p>}
+      ) : <p className="card__subtext">{ui('No operational acceptance criteria available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopMonitoringReadiness({ readiness }: { readiness: ContinuousLearningSummary['closed_loop_monitoring_readiness'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = readiness?.monitoring_checks || [];
+  const formatMonitoringValue = (value: unknown): string => {
+    if (typeof value === 'number') return formatLocalizedNumber(value, locale);
+    return formatLabel(value);
+  };
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop monitoring readiness</h2>
+          <h2>{ui('Closed-loop monitoring readiness')}</h2>
           <p className="card__subtext">
-            Manual post-acceptance monitoring controls generated from acceptance, review-board, drift, and coverage evidence. This is visibility only; it does not train models, update policies, execute recommendations, or mutate operational state.
+            {ui('Manual post-acceptance monitoring controls generated from acceptance, review-board, drift, and coverage evidence. This is visibility only; it does not train models, update policies, execute recommendations, or mutate operational state.')}
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Monitoring decision" value={readiness?.monitoring_decision || 'monitoring_readiness_not_loaded'} />
-        <StatCard label="Readiness score" value={readiness?.monitoring_readiness_score ?? 0} />
-        <StatCard label="Ready checks" value={readiness?.ready_check_count ?? 0} />
-        <StatCard label="Blocked checks" value={readiness?.blocked_check_count ?? 0} />
-        <StatCard label="Cadence" value={readiness?.suggested_monitoring_cadence || 'manual_review_required'} />
+        <LocalizedLearningStatCard label="Monitoring decision" value={readiness?.monitoring_decision || 'monitoring_readiness_not_loaded'} />
+        <LocalizedLearningStatCard label="Readiness score" value={readiness?.monitoring_readiness_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready checks" value={readiness?.ready_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={readiness?.blocked_check_count ?? 0} />
+        <OperationalWorkspaceStatCard label={ui('Cadence')} value={formatLabel(readiness?.suggested_monitoring_cadence || 'manual_review_required')} />
       </div>
-      <p className="card__subtext">Owner: {formatLabel(readiness?.recommended_monitoring_owner || 'decision_governance_owner')}</p>
-      <p className="card__subtext">Next monitoring focus: {formatLabel(readiness?.next_monitoring_focus || 'complete_manual_monitoring_readiness_review')}</p>
+      <p className="card__subtext">{ui('Owner:')} {formatLabel(readiness?.recommended_monitoring_owner || 'decision_governance_owner')}</p>
+      <p className="card__subtext">{ui('Next monitoring focus:')} {formatLabel(readiness?.next_monitoring_focus || 'complete_manual_monitoring_readiness_review')}</p>
       {(readiness?.monitoring_blockers || []).length > 0 ? (
-        <p className="card__subtext">Blockers: {(readiness?.monitoring_blockers || []).map(formatLabel).join(', ')}</p>
+        <p className="card__subtext">{ui('Blockers:')} {(readiness?.monitoring_blockers || []).map(formatLabel).join(', ')}</p>
       ) : (
-        <p className="card__subtext">No monitoring blockers reported by the backend.</p>
+        <p className="card__subtext">{ui('No monitoring blockers reported by the backend.')}</p>
       )}
       {readiness?.monitoring_note ? <p className="card__subtext">{readiness.monitoring_note}</p> : null}
       {checks.length > 0 ? (
@@ -2616,21 +2641,21 @@ function ClosedLoopMonitoringReadiness({ readiness }: { readiness: ContinuousLea
           <table className="table">
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Manual control</th>
-                <th>Blocking reason</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Manual control')}</th>
+                <th>{ui('Blocking reason')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check, index) => (
                 <tr key={check.check_key || index}>
                   <td>{formatLabel(check.check_label || check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatMonitoringValue(check.current_value)}</td>
+                  <td>{formatMonitoringValue(check.required_value)}</td>
                   <td>{formatLabel(check.recommended_monitoring_control)}</td>
                   <td>{formatLabel(check.blocking_reason)}</td>
                 </tr>
@@ -2638,31 +2663,36 @@ function ClosedLoopMonitoringReadiness({ readiness }: { readiness: ContinuousLea
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No monitoring checks available yet.</p>}
+      ) : <p className="card__subtext">{ui('No monitoring checks available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopProductionSurveillance({ surveillance }: { surveillance: ContinuousLearningSummary['closed_loop_production_surveillance'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = surveillance?.surveillance_checks || [];
+  const formatSurveillanceValue = (value: unknown): string => {
+    if (typeof value === 'number') return formatLocalizedNumber(value, locale);
+    return formatLabel(value);
+  };
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop production surveillance</h2>
+          <h2>{ui('Closed-loop production surveillance')}</h2>
           <p className="card__subtext">
-            Backend-generated manual production watch layer after monitoring readiness. It does not train models, update policies, execute recommendations, or mutate operational state.
+            {ui('Backend-generated manual production watch layer after monitoring readiness. It does not train models, update policies, execute recommendations, or mutate operational state.')}
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Surveillance decision" value={surveillance?.surveillance_decision || 'production_surveillance_blocked'} />
-        <StatCard label="Surveillance score" value={surveillance?.surveillance_score ?? 0} />
-        <StatCard label="Ready checks" value={surveillance?.ready_check_count ?? 0} />
-        <StatCard label="Blocked checks" value={surveillance?.blocked_check_count ?? 0} />
-        <StatCard label="Cadence" value={surveillance?.suggested_surveillance_cadence || 'daily_manual_blocker_resolution_until_surveillance_ready'} />
+        <LocalizedLearningStatCard label="Surveillance decision" value={surveillance?.surveillance_decision || 'production_surveillance_blocked'} />
+        <LocalizedLearningStatCard label="Surveillance score" value={surveillance?.surveillance_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready checks" value={surveillance?.ready_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={surveillance?.blocked_check_count ?? 0} />
+        <OperationalWorkspaceStatCard label={ui('Cadence')} value={formatLabel(surveillance?.suggested_surveillance_cadence || 'daily_manual_blocker_resolution_until_surveillance_ready')} />
       </div>
       {surveillance?.surveillance_note ? <p className="card__subtext">{surveillance.surveillance_note}</p> : null}
       {checks.length > 0 ? (
@@ -2670,21 +2700,21 @@ function ClosedLoopProductionSurveillance({ surveillance }: { surveillance: Cont
           <table className="table">
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Control</th>
-                <th>Blocker</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Control')}</th>
+                <th>{ui('Blocker')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check, index) => (
                 <tr key={check.check_key || index}>
                   <td>{formatLabel(check.check_label || check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatSurveillanceValue(check.current_value)}</td>
+                  <td>{formatSurveillanceValue(check.required_value)}</td>
                   <td>{formatLabel(check.recommended_surveillance_control)}</td>
                   <td>{formatLabel(check.blocking_reason)}</td>
                 </tr>
@@ -2692,33 +2722,39 @@ function ClosedLoopProductionSurveillance({ surveillance }: { surveillance: Cont
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No production surveillance checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No production surveillance checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopCertificationDossier({ dossier }: { dossier: ContinuousLearningSummary['closed_loop_certification_dossier'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = dossier?.certification_checks || [];
   const blockers = dossier?.certification_blockers || [];
+  const formatCertificationValue = (value: number | string | null | undefined) => {
+    if (typeof value === 'number') return formatLocalizedNumber(value, locale);
+    if (value === undefined || value === null || value === '') return '—';
+    return ui(formatLabel(value));
+  };
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop certification dossier</h2>
-          <p className="card__subtext">Manual certification packet for closure, signoff, release, monitoring, coverage, and exception evidence.</p>
+          <h2>{ui('Closed-loop certification dossier')}</h2>
+          <p className="card__subtext">{ui('Manual certification packet for closure, signoff, release, monitoring, coverage, and exception evidence.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Certification decision" value={dossier?.certification_decision || 'manual_certification_blocked'} />
-        <StatCard label="Certification score" value={dossier?.certification_score ?? 0} />
-        <StatCard label="Ready checks" value={dossier?.ready_check_count ?? 0} />
-        <StatCard label="Blocked checks" value={dossier?.blocked_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Certification decision" value={dossier?.certification_decision || 'manual_certification_blocked'} />
+        <LocalizedLearningStatCard label="Certification score" value={dossier?.certification_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready checks" value={dossier?.ready_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={dossier?.blocked_check_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Owner: {dossier?.recommended_certification_owner || 'decision_governance_owner'}</p>
-      <p className="card__subtext">Next focus: {dossier?.next_certification_focus || 'prepare_manual_closed_loop_certification_record'}</p>
-      <p className="card__subtext">{dossier?.certification_note || 'Manual certification dossier remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Owner')}: {formatLabel(dossier?.recommended_certification_owner || 'decision_governance_owner')}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(dossier?.next_certification_focus || 'prepare_manual_closed_loop_certification_record')}</p>
+      <p className="card__subtext">{dossier?.certification_note || ui('Manual certification dossier remains advisory only.')}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
@@ -2729,20 +2765,20 @@ function ClosedLoopCertificationDossier({ dossier }: { dossier: ContinuousLearni
           <table className="data-table">
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check) => (
                 <tr key={check.check_key || check.check_label}>
                   <td>{formatLabel(check.check_label || check.check_key || 'check')}</td>
-                  <td>{formatLabel(check.check_status || 'blocked')}</td>
-                  <td>{String(check.current_value ?? '-')}</td>
-                  <td>{String(check.required_value ?? '-')}</td>
+                  <td>{ui(formatLabel(check.check_status || 'blocked'))}</td>
+                  <td>{formatCertificationValue(check.current_value)}</td>
+                  <td>{formatCertificationValue(check.required_value)}</td>
                   <td>{formatLabel(check.manual_certification_task || 'manual_certification_review_required')}</td>
                 </tr>
               ))}
@@ -2756,26 +2792,31 @@ function ClosedLoopCertificationDossier({ dossier }: { dossier: ContinuousLearni
 
 
 function ClosedLoopCustomerPilotReadiness({ pilot }: { pilot: ContinuousLearningSummary['closed_loop_customer_pilot_readiness'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = pilot?.pilot_checks || [];
   const blockers = pilot?.pilot_blockers || [];
+  const formatPilotValue = (value: unknown): string => {
+    if (typeof value === 'number') return formatLocalizedNumber(value, locale);
+    return ui(formatLabel(value));
+  };
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop customer pilot readiness</h2>
-          <p className="card__subtext">Manual customer pilot readiness layer that connects commercial readiness, operational handoff, acceptance, monitoring, and exception control. It remains advisory and non-autonomous.</p>
+          <h2>{ui('Closed-loop customer pilot readiness')}</h2>
+          <p className="card__subtext">{ui('Manual customer pilot readiness layer that connects commercial readiness, operational handoff, acceptance, monitoring, and exception control. It remains advisory and non-autonomous.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Pilot decision" value={pilot?.pilot_decision || 'manual_customer_pilot_blocked'} />
-        <StatCard label="Pilot score" value={pilot?.pilot_readiness_score ?? 0} />
-        <StatCard label="Ready checks" value={pilot?.ready_check_count ?? 0} />
-        <StatCard label="Blocked checks" value={pilot?.blocked_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Pilot decision" value={pilot?.pilot_decision || 'manual_customer_pilot_blocked'} />
+        <LocalizedLearningStatCard label="Pilot score" value={pilot?.pilot_readiness_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready checks" value={pilot?.ready_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={pilot?.blocked_check_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Pilot owner: {pilot?.recommended_pilot_owner || 'customer_success_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(pilot?.next_pilot_focus || 'record_manual_customer_pilot_go_no_go_decision')}</p>
-      <p className="card__subtext">{pilot?.pilot_readiness_note || 'Manual customer pilot readiness remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Pilot owner:')} {formatLabel(pilot?.recommended_pilot_owner || 'customer_success_owner')}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(pilot?.next_pilot_focus || 'record_manual_customer_pilot_go_no_go_decision')}</p>
+      <p className="card__subtext">{pilot?.pilot_readiness_note || ui('Manual customer pilot readiness remains advisory only.')}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
@@ -2786,21 +2827,21 @@ function ClosedLoopCustomerPilotReadiness({ pilot }: { pilot: ContinuousLearning
           <table className="data-table">
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check, index) => (
                 <tr key={check.check_key || index}>
                   <td>{formatLabel(check.check_label || check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatPilotValue(check.current_value)}</td>
+                  <td>{formatPilotValue(check.required_value)}</td>
                   <td>{formatLabel(check.pilot_evidence)}</td>
                   <td>{formatLabel(check.manual_pilot_task)}</td>
                 </tr>
@@ -2808,33 +2849,38 @@ function ClosedLoopCustomerPilotReadiness({ pilot }: { pilot: ContinuousLearning
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No customer pilot readiness checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No customer pilot readiness checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopCustomerPilotLaunchControl({ launch }: { launch: ContinuousLearningSummary['closed_loop_customer_pilot_launch_control'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = launch?.launch_checks || [];
   const blockers = launch?.launch_blockers || [];
+  const formatLaunchValue = (value: unknown): string => {
+    if (typeof value === 'number') return formatLocalizedNumber(value, locale);
+    return ui(formatLabel(value));
+  };
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop customer pilot launch control</h2>
-          <p className="card__subtext">Manual launch-control layer for customer pilots. It joins pilot readiness, surveillance, resolution, closure, and audit traceability before a human go/no-go decision. It does not launch pilots or execute changes automatically.</p>
+          <h2>{ui('Closed-loop customer pilot launch control')}</h2>
+          <p className="card__subtext">{ui('Manual launch-control layer for customer pilots. It joins pilot readiness, surveillance, resolution, closure, and audit traceability before a human go/no-go decision. It does not launch pilots or execute changes automatically.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Launch decision" value={launch?.launch_decision || 'manual_customer_pilot_launch_blocked'} />
-        <StatCard label="Launch score" value={launch?.launch_control_score ?? 0} />
-        <StatCard label="Ready checks" value={launch?.ready_check_count ?? 0} />
-        <StatCard label="Blocked checks" value={launch?.blocked_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Launch decision" value={launch?.launch_decision || 'manual_customer_pilot_launch_blocked'} />
+        <LocalizedLearningStatCard label="Launch score" value={launch?.launch_control_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready checks" value={launch?.ready_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={launch?.blocked_check_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Launch owner: {launch?.recommended_launch_owner || 'customer_success_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(launch?.next_launch_focus || 'record_manual_customer_pilot_launch_go_no_go_decision')}</p>
-      <p className="card__subtext">{launch?.launch_control_note || 'Manual customer pilot launch control remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Launch owner:')} {formatLabel(launch?.recommended_launch_owner || 'customer_success_owner')}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(launch?.next_launch_focus || 'record_manual_customer_pilot_launch_go_no_go_decision')}</p>
+      <p className="card__subtext">{launch?.launch_control_note || ui('Manual customer pilot launch control remains advisory only.')}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
@@ -2845,21 +2891,21 @@ function ClosedLoopCustomerPilotLaunchControl({ launch }: { launch: ContinuousLe
           <table className="data-table">
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check, index) => (
                 <tr key={check.check_key || index}>
                   <td>{formatLabel(check.check_label || check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatLaunchValue(check.current_value)}</td>
+                  <td>{formatLaunchValue(check.required_value)}</td>
                   <td>{formatLabel(check.launch_evidence)}</td>
                   <td>{formatLabel(check.manual_launch_task)}</td>
                 </tr>
@@ -2867,63 +2913,67 @@ function ClosedLoopCustomerPilotLaunchControl({ launch }: { launch: ContinuousLe
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No customer pilot launch-control checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No customer pilot launch-control checks are available yet.')}</p>}
     </section>
   );
 }
 
 
-
 function ClosedLoopCustomerPilotSuccessCriteria({ success }: { success: ContinuousLearningSummary['closed_loop_customer_pilot_success_criteria'] }) {
+  const { locale, ui } = useAppTranslation();
   const criteria = success?.success_criteria || [];
   const blockers = success?.pilot_success_blockers || [];
   const exitRequirements = success?.success_exit_requirements || [];
+  const formatSuccessValue = (value: unknown): string => {
+    if (typeof value === 'number') return formatLocalizedNumber(value, locale);
+    return ui(formatLabel(value));
+  };
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop customer pilot success criteria</h2>
-          <p className="card__subtext">Manual success-tracking layer for customer pilots. It defines pilot baselines, exit requirements, and owner focus without launching pilots, training models, or mutating operational state.</p>
+          <h2>{ui('Closed-loop customer pilot success criteria')}</h2>
+          <p className="card__subtext">{ui('Manual success-tracking layer for customer pilots. It defines pilot baselines, exit requirements, and owner focus without launching pilots, training models, or mutating operational state.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Tracking decision" value={success?.success_tracking_decision || 'manual_customer_pilot_success_tracking_blocked'} />
-        <StatCard label="Criteria score" value={success?.success_criteria_score ?? 0} />
-        <StatCard label="Ready criteria" value={success?.ready_criterion_count ?? 0} />
-        <StatCard label="Blocked criteria" value={success?.blocked_criterion_count ?? 0} />
+        <LocalizedLearningStatCard label="Tracking decision" value={success?.success_tracking_decision || 'manual_customer_pilot_success_tracking_blocked'} />
+        <LocalizedLearningStatCard label="Criteria score" value={success?.success_criteria_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready criteria" value={success?.ready_criterion_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked criteria" value={success?.blocked_criterion_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Success owner: {success?.recommended_success_owner || 'customer_success_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(success?.next_success_focus || 'track_customer_pilot_outcomes_against_manual_success_criteria')}</p>
-      <p className="card__subtext">{success?.success_criteria_note || 'Manual customer pilot success criteria remain advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Success owner:')} {formatLabel(success?.recommended_success_owner || 'customer_success_owner')}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(success?.next_success_focus || 'track_customer_pilot_outcomes_against_manual_success_criteria')}</p>
+      <p className="card__subtext">{success?.success_criteria_note || ui('Manual customer pilot success criteria remain advisory only.')}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
         </ul>
       ) : null}
       {exitRequirements.length > 0 ? (
-        <p className="card__subtext">Exit requirements: {exitRequirements.map(formatLabel).join(' · ')}</p>
+        <p className="card__subtext">{ui('Exit requirements:')} {exitRequirements.map(formatLabel).join(' · ')}</p>
       ) : null}
       {criteria.length > 0 ? (
         <div className="table-wrap" style={{ marginTop: 12 }}>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Criterion</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Criterion')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {criteria.map((criterion, index) => (
                 <tr key={criterion.criterion_key || index}>
                   <td>{formatLabel(criterion.criterion_label || criterion.criterion_key)}</td>
-                  <td>{formatLabel(criterion.criterion_status)}</td>
-                  <td>{formatLabel(criterion.current_value)}</td>
-                  <td>{formatLabel(criterion.required_value)}</td>
+                  <td>{ui(formatLabel(criterion.criterion_status))}</td>
+                  <td>{formatSuccessValue(criterion.current_value)}</td>
+                  <td>{formatSuccessValue(criterion.required_value)}</td>
                   <td>{formatLabel(criterion.pilot_success_evidence)}</td>
                   <td>{formatLabel(criterion.manual_success_task)}</td>
                 </tr>
@@ -2931,62 +2981,67 @@ function ClosedLoopCustomerPilotSuccessCriteria({ success }: { success: Continuo
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No customer pilot success criteria are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No customer pilot success criteria are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopCustomerPilotOutcomeReview({ review }: { review: ContinuousLearningSummary['closed_loop_customer_pilot_outcome_review'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = review?.outcome_review_checks || [];
   const blockers = review?.outcome_review_blockers || [];
   const exitOptions = review?.review_exit_decision_options || [];
+  const formatOutcomeValue = (value: unknown): string => {
+    if (typeof value === 'number') return formatLocalizedNumber(value, locale);
+    return ui(formatLabel(value));
+  };
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop customer pilot outcome review</h2>
-          <p className="card__subtext">Manual pilot outcome-review layer. It compares captured pilot evidence against baselines and prepares an exit recommendation without expanding customers, training models, updating policies, or mutating operational state.</p>
+          <h2>{ui('Closed-loop customer pilot outcome review')}</h2>
+          <p className="card__subtext">{ui('Manual pilot outcome-review layer. It compares captured pilot evidence against baselines and prepares an exit recommendation without expanding customers, training models, updating policies, or mutating operational state.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Review decision" value={review?.outcome_review_decision || 'manual_customer_pilot_outcome_review_blocked'} />
-        <StatCard label="Outcome score" value={review?.pilot_outcome_score ?? 0} />
-        <StatCard label="Validated outcomes" value={review?.validated_outcome_count ?? 0} />
-        <StatCard label="Open pressure" value={review?.open_review_pressure_count ?? 0} />
+        <LocalizedLearningStatCard label="Review decision" value={review?.outcome_review_decision || 'manual_customer_pilot_outcome_review_blocked'} />
+        <LocalizedLearningStatCard label="Outcome score" value={review?.pilot_outcome_score ?? 0} />
+        <LocalizedLearningStatCard label="Validated outcomes" value={review?.validated_outcome_count ?? 0} />
+        <LocalizedLearningStatCard label="Open pressure" value={review?.open_review_pressure_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Outcome review owner: {review?.recommended_outcome_review_owner || 'customer_success_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(review?.next_outcome_review_focus || 'conduct_manual_customer_pilot_outcome_review_and_exit_recommendation')}</p>
-      <p className="card__subtext">{review?.outcome_review_note || 'Manual customer pilot outcome review remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Outcome review owner:')} {formatLabel(review?.recommended_outcome_review_owner || 'customer_success_owner')}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(review?.next_outcome_review_focus || 'conduct_manual_customer_pilot_outcome_review_and_exit_recommendation')}</p>
+      <p className="card__subtext">{review?.outcome_review_note || ui('Manual customer pilot outcome review remains advisory only.')}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
         </ul>
       ) : null}
       {exitOptions.length > 0 ? (
-        <p className="card__subtext">Manual exit options: {exitOptions.map(formatLabel).join(' · ')}</p>
+        <p className="card__subtext">{ui('Manual exit options:')} {exitOptions.map(formatLabel).join(' · ')}</p>
       ) : null}
       {checks.length > 0 ? (
         <div className="table-wrap" style={{ marginTop: 12 }}>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check, index) => (
                 <tr key={check.check_key || index}>
                   <td>{formatLabel(check.check_label || check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatOutcomeValue(check.current_value)}</td>
+                  <td>{formatOutcomeValue(check.required_value)}</td>
                   <td>{formatLabel(check.review_evidence)}</td>
                   <td>{formatLabel(check.manual_review_task)}</td>
                 </tr>
@@ -2994,62 +3049,66 @@ function ClosedLoopCustomerPilotOutcomeReview({ review }: { review: ContinuousLe
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No customer pilot outcome-review checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No customer pilot outcome-review checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopCustomerPilotExpansionReadiness({ expansion }: { expansion: ContinuousLearningSummary['closed_loop_customer_pilot_expansion_readiness'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = expansion?.expansion_checks || [];
   const blockers = expansion?.expansion_blockers || [];
   const options = expansion?.expansion_decision_options || [];
+  const formatExpansionValue = (value: unknown) => typeof value === 'number'
+    ? formatLocalizedNumber(value, locale)
+    : formatLabel(value);
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop customer pilot expansion readiness</h2>
-          <p className="card__subtext">Manual controlled-expansion readiness layer. It checks pilot outcome review, commercial readiness, validated positive outcomes, and drift pressure without expanding customers, training models, updating policies, or mutating operational state.</p>
+          <h2>{ui('Closed-loop customer pilot expansion readiness')}</h2>
+          <p className="card__subtext">{ui('Manual controlled-expansion readiness layer. It checks pilot outcome review, commercial readiness, validated positive outcomes, and drift pressure without expanding customers, training models, updating policies, or mutating operational state.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Expansion decision" value={expansion?.expansion_decision || 'manual_controlled_customer_expansion_blocked'} />
-        <StatCard label="Expansion score" value={expansion?.expansion_readiness_score ?? 0} />
-        <StatCard label="Positive validated" value={expansion?.positive_validated_outcome_count ?? 0} />
-        <StatCard label="Drift pressure" value={expansion?.expansion_drift_pressure_count ?? 0} />
+        <LocalizedLearningStatCard label="Expansion decision" value={expansion?.expansion_decision || 'manual_controlled_customer_expansion_blocked'} />
+        <LocalizedLearningStatCard label="Expansion score" value={expansion?.expansion_readiness_score ?? 0} />
+        <LocalizedLearningStatCard label="Positive validated" value={expansion?.positive_validated_outcome_count ?? 0} />
+        <LocalizedLearningStatCard label="Drift pressure" value={expansion?.expansion_drift_pressure_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Expansion owner: {expansion?.recommended_expansion_owner || 'customer_success_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(expansion?.next_expansion_focus || 'prepare_manual_controlled_customer_expansion_review')}</p>
-      <p className="card__subtext">{expansion?.expansion_readiness_note || 'Manual customer pilot expansion readiness remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Expansion owner:')} {formatLabel(expansion?.recommended_expansion_owner || 'customer_success_owner')}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(expansion?.next_expansion_focus || 'prepare_manual_controlled_customer_expansion_review')}</p>
+      <p className="card__subtext">{expansion?.expansion_readiness_note || ui('Manual customer pilot expansion readiness remains advisory only.')}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
         </ul>
       ) : null}
       {options.length > 0 ? (
-        <p className="card__subtext">Manual expansion options: {options.map(formatLabel).join(' · ')}</p>
+        <p className="card__subtext">{ui('Manual expansion options:')} {options.map(formatLabel).join(' · ')}</p>
       ) : null}
       {checks.length > 0 ? (
         <div className="table-wrap" style={{ marginTop: 12 }}>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check, index) => (
                 <tr key={check.check_key || index}>
                   <td>{formatLabel(check.check_label || check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatExpansionValue(check.current_value)}</td>
+                  <td>{formatExpansionValue(check.required_value)}</td>
                   <td>{formatLabel(check.expansion_evidence)}</td>
                   <td>{formatLabel(check.manual_expansion_task)}</td>
                 </tr>
@@ -3057,60 +3116,64 @@ function ClosedLoopCustomerPilotExpansionReadiness({ expansion }: { expansion: C
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No customer pilot expansion-readiness checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No customer pilot expansion-readiness checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopEnterpriseRolloutReadiness({ rollout }: { rollout: ContinuousLearningSummary['closed_loop_enterprise_rollout_readiness'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = rollout?.rollout_checks || [];
   const blockers = rollout?.rollout_blockers || [];
   const options = rollout?.rollout_decision_options || [];
+  const formatRolloutValue = (value: unknown) => typeof value === 'number'
+    ? formatLocalizedNumber(value, locale)
+    : formatLabel(value);
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop enterprise rollout readiness</h2>
-          <p className="card__subtext">Manual enterprise rollout layer. It checks pilot expansion readiness, multi-domain learning coverage, audit traceability, compliance attestation, and open review pressure without provisioning tenants, training models, updating policies, executing recommendations, or mutating operational state.</p>
+          <h2>{ui('Closed-loop enterprise rollout readiness')}</h2>
+          <p className="card__subtext">{ui('Manual enterprise rollout layer. It checks pilot expansion readiness, multi-domain learning coverage, audit traceability, compliance attestation, and open review pressure without provisioning tenants, training models, updating policies, executing recommendations, or mutating operational state.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Rollout decision" value={rollout?.rollout_decision || 'manual_enterprise_rollout_blocked'} />
-        <StatCard label="Rollout score" value={rollout?.rollout_readiness_score ?? 0} />
-        <StatCard label="Covered domains" value={rollout?.covered_domain_count ?? 0} />
-        <StatCard label="Open review pressure" value={rollout?.open_review_pressure_count ?? 0} />
+        <LocalizedLearningStatCard label="Rollout decision" value={rollout?.rollout_decision || 'manual_enterprise_rollout_blocked'} />
+        <LocalizedLearningStatCard label="Rollout score" value={rollout?.rollout_readiness_score ?? 0} />
+        <LocalizedLearningStatCard label="Covered domains" value={rollout?.covered_domain_count ?? 0} />
+        <LocalizedLearningStatCard label="Open review pressure" value={rollout?.open_review_pressure_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Rollout owner: {rollout?.recommended_rollout_owner || 'enterprise_rollout_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(rollout?.next_rollout_focus || 'prepare_manual_enterprise_rollout_review')}</p>
-      <p className="card__subtext">{rollout?.rollout_readiness_note || 'Manual enterprise rollout readiness remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Rollout owner:')} {formatLabel(rollout?.recommended_rollout_owner || 'enterprise_rollout_owner')}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(rollout?.next_rollout_focus || 'prepare_manual_enterprise_rollout_review')}</p>
+      <p className="card__subtext">{rollout?.rollout_readiness_note || ui('Manual enterprise rollout readiness remains advisory only.')}</p>
       {blockers.length > 0 ? (
-        <p className="card__subtext">Blockers: {blockers.map(formatLabel).join(' · ')}</p>
-      ) : <p className="card__subtext">No enterprise rollout blockers are currently reported.</p>}
+        <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
+      ) : <p className="card__subtext">{ui('No enterprise rollout blockers are currently reported.')}</p>}
       {options.length > 0 ? (
-        <p className="card__subtext">Manual rollout options: {options.map(formatLabel).join(' · ')}</p>
+        <p className="card__subtext">{ui('Manual rollout options:')} {options.map(formatLabel).join(' · ')}</p>
       ) : null}
       {checks.length > 0 ? (
         <div className="table-wrap" style={{ marginTop: 12 }}>
           <table>
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check) => (
                 <tr key={check.check_key}>
                   <td>{check.check_label || formatLabel(check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatRolloutValue(check.current_value)}</td>
+                  <td>{formatRolloutValue(check.required_value)}</td>
                   <td>{formatLabel(check.rollout_evidence)}</td>
                   <td>{formatLabel(check.manual_rollout_task)}</td>
                 </tr>
@@ -3118,60 +3181,64 @@ function ClosedLoopEnterpriseRolloutReadiness({ rollout }: { rollout: Continuous
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No enterprise rollout checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No enterprise rollout checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopEnterpriseRolloutGovernance({ governance }: { governance: ContinuousLearningSummary['closed_loop_enterprise_rollout_governance'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = governance?.governance_checks || [];
   const blockers = governance?.governance_blockers || [];
   const options = governance?.governance_decision_options || [];
+  const formatGovernanceValue = (value: unknown) => typeof value === 'number'
+    ? formatLocalizedNumber(value, locale)
+    : formatLabel(value);
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop enterprise rollout governance</h2>
-          <p className="card__subtext">Manual governance approval layer for enterprise rollout. It combines rollout readiness, the closed-loop governance gate, release readiness, production surveillance, and learning review pressure without provisioning tenants, training models, changing policies, executing recommendations, or mutating operational state.</p>
+          <h2>{ui('Closed-loop enterprise rollout governance')}</h2>
+          <p className="card__subtext">{ui('Manual governance approval layer for enterprise rollout. It combines rollout readiness, the closed-loop governance gate, release readiness, production surveillance, and learning review pressure without provisioning tenants, training models, changing policies, executing recommendations, or mutating operational state.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Governance decision" value={governance?.governance_decision || 'manual_enterprise_rollout_governance_blocked'} />
-        <StatCard label="Governance score" value={governance?.rollout_governance_score ?? 0} />
-        <StatCard label="Blocked checks" value={governance?.blocked_check_count ?? 0} />
-        <StatCard label="Open review pressure" value={governance?.open_review_pressure_count ?? 0} />
+        <LocalizedLearningStatCard label="Governance decision" value={governance?.governance_decision || 'manual_enterprise_rollout_governance_blocked'} />
+        <LocalizedLearningStatCard label="Governance score" value={governance?.rollout_governance_score ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={governance?.blocked_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Open review pressure" value={governance?.open_review_pressure_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Governance owner: {governance?.recommended_governance_owner || 'enterprise_rollout_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(governance?.next_governance_focus || 'prepare_manual_enterprise_rollout_governance_approval')}</p>
-      <p className="card__subtext">{governance?.governance_note || 'Manual enterprise rollout governance remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Governance owner:')} {governance?.recommended_governance_owner || 'enterprise_rollout_owner'}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(governance?.next_governance_focus || 'prepare_manual_enterprise_rollout_governance_approval')}</p>
+      <p className="card__subtext">{governance?.governance_note || ui('Manual enterprise rollout governance remains advisory only.')}</p>
       {blockers.length > 0 ? (
-        <p className="card__subtext">Blockers: {blockers.map(formatLabel).join(' · ')}</p>
-      ) : <p className="card__subtext">No enterprise rollout governance blockers are currently reported.</p>}
+        <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
+      ) : <p className="card__subtext">{ui('No enterprise rollout governance blockers are currently reported.')}</p>}
       {options.length > 0 ? (
-        <p className="card__subtext">Manual governance options: {options.map(formatLabel).join(' · ')}</p>
+        <p className="card__subtext">{ui('Manual governance options:')} {options.map(formatLabel).join(' · ')}</p>
       ) : null}
       {checks.length > 0 ? (
         <div className="table-wrap" style={{ marginTop: 12 }}>
           <table>
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check) => (
                 <tr key={check.check_key}>
                   <td>{check.check_label || formatLabel(check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatGovernanceValue(check.current_value)}</td>
+                  <td>{formatGovernanceValue(check.required_value)}</td>
                   <td>{formatLabel(check.governance_evidence)}</td>
                   <td>{formatLabel(check.manual_governance_task)}</td>
                 </tr>
@@ -3179,63 +3246,67 @@ function ClosedLoopEnterpriseRolloutGovernance({ governance }: { governance: Con
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No enterprise rollout governance checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No enterprise rollout governance checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopMultiTenantRolloutControls({ controls }: { controls: ContinuousLearningSummary['closed_loop_multi_tenant_rollout_controls'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = controls?.rollout_control_checks || [];
   const blockers = controls?.rollout_control_blockers || [];
   const options = controls?.rollout_control_decision_options || [];
   const policy = controls?.tenant_wave_policy || {};
+  const formatControlValue = (value: unknown) => typeof value === 'number'
+    ? formatLocalizedNumber(value, locale)
+    : formatLabel(value);
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop multi-tenant rollout controls</h2>
-          <p className="card__subtext">Manual control layer for tenant rollout waves. It checks enterprise governance, rollout readiness, audit traceability, monitoring, compliance attestation, and learning review pressure before any controlled tenant wave is manually approved. It does not provision tenants, enable tenants, train models, change policies, execute recommendations, or mutate operational state.</p>
+          <h2>{ui('Closed-loop multi-tenant rollout controls')}</h2>
+          <p className="card__subtext">{ui('Manual control layer for tenant rollout waves. It checks enterprise governance, rollout readiness, audit traceability, monitoring, compliance attestation, and learning review pressure before any controlled tenant wave is manually approved. It does not provision tenants, enable tenants, train models, change policies, execute recommendations, or mutate operational state.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Control decision" value={controls?.rollout_control_decision || 'manual_multi_tenant_rollout_controls_blocked'} />
-        <StatCard label="Control score" value={controls?.rollout_control_score ?? 0} />
-        <StatCard label="Blocked checks" value={controls?.blocked_check_count ?? 0} />
-        <StatCard label="Open review pressure" value={controls?.open_review_pressure_count ?? 0} />
+        <LocalizedLearningStatCard label="Control decision" value={controls?.rollout_control_decision || 'manual_multi_tenant_rollout_controls_blocked'} />
+        <LocalizedLearningStatCard label="Control score" value={controls?.rollout_control_score ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={controls?.blocked_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Open review pressure" value={controls?.open_review_pressure_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Control owner: {controls?.recommended_rollout_control_owner || 'enterprise_rollout_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(controls?.next_rollout_control_focus || 'prepare_manual_controlled_tenant_wave_approval')}</p>
-      <p className="card__subtext">Recommended wave mode: {formatLabel(policy.recommended_wave_mode || 'pause_multi_tenant_rollout_for_manual_remediation')}</p>
-      <p className="card__subtext">Default wave size: {formatLabel(policy.default_wave_size || 'no_new_tenant_wave_until_manual_resolution')}</p>
-      <p className="card__subtext">{controls?.rollout_control_note || 'Manual multi-tenant rollout controls remain advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Control owner:')} {controls?.recommended_rollout_control_owner || 'enterprise_rollout_owner'}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(controls?.next_rollout_control_focus || 'prepare_manual_controlled_tenant_wave_approval')}</p>
+      <p className="card__subtext">{ui('Recommended wave mode:')} {formatLabel(policy.recommended_wave_mode || 'pause_multi_tenant_rollout_for_manual_remediation')}</p>
+      <p className="card__subtext">{ui('Default wave size:')} {formatLabel(policy.default_wave_size || 'no_new_tenant_wave_until_manual_resolution')}</p>
+      <p className="card__subtext">{controls?.rollout_control_note || ui('Manual multi-tenant rollout controls remain advisory only.')}</p>
       {blockers.length > 0 ? (
-        <p className="card__subtext">Blockers: {blockers.map(formatLabel).join(' · ')}</p>
-      ) : <p className="card__subtext">No multi-tenant rollout control blockers are currently reported.</p>}
+        <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
+      ) : <p className="card__subtext">{ui('No multi-tenant rollout control blockers are currently reported.')}</p>}
       {options.length > 0 ? (
-        <p className="card__subtext">Manual control options: {options.map(formatLabel).join(' · ')}</p>
+        <p className="card__subtext">{ui('Manual control options:')} {options.map(formatLabel).join(' · ')}</p>
       ) : null}
       {checks.length > 0 ? (
         <div className="table-wrap" style={{ marginTop: 12 }}>
           <table>
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check) => (
                 <tr key={check.check_key}>
                   <td>{check.check_label || formatLabel(check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatControlValue(check.current_value)}</td>
+                  <td>{formatControlValue(check.required_value)}</td>
                   <td>{formatLabel(check.control_evidence)}</td>
                   <td>{formatLabel(check.manual_control_task)}</td>
                 </tr>
@@ -3243,63 +3314,67 @@ function ClosedLoopMultiTenantRolloutControls({ controls }: { controls: Continuo
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No multi-tenant rollout control checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No multi-tenant rollout control checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopEnterpriseAdoptionReadiness({ readiness }: { readiness: ContinuousLearningSummary['closed_loop_enterprise_adoption_readiness'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = readiness?.adoption_checks || [];
   const blockers = readiness?.adoption_blockers || [];
   const options = readiness?.adoption_decision_options || [];
   const policy = readiness?.adoption_policy || {};
+  const formatAdoptionValue = (value: unknown) => typeof value === 'number'
+    ? formatLocalizedNumber(value, locale)
+    : formatLabel(value);
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop enterprise adoption readiness</h2>
-          <p className="card__subtext">Manual executive adoption-readiness layer for enterprise expansion. It checks tenant rollout controls, enterprise governance, commercial readiness, pilot outcomes, and learning coverage before adoption review. It does not enable customers, provision tenants, train models, change policies, execute recommendations, or mutate operational state.</p>
+          <h2>{ui('Closed-loop enterprise adoption readiness')}</h2>
+          <p className="card__subtext">{ui('Manual executive adoption-readiness layer for enterprise expansion. It checks tenant rollout controls, enterprise governance, commercial readiness, pilot outcomes, and learning coverage before adoption review. It does not enable customers, provision tenants, train models, change policies, execute recommendations, or mutate operational state.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Adoption decision" value={readiness?.adoption_decision || 'enterprise_adoption_readiness_blocked'} />
-        <StatCard label="Adoption score" value={readiness?.adoption_readiness_score ?? 0} />
-        <StatCard label="Blocked checks" value={readiness?.blocked_check_count ?? 0} />
-        <StatCard label="Coverage gaps" value={readiness?.coverage_gap_count ?? 0} />
+        <LocalizedLearningStatCard label="Adoption decision" value={readiness?.adoption_decision || 'enterprise_adoption_readiness_blocked'} />
+        <LocalizedLearningStatCard label="Adoption score" value={readiness?.adoption_readiness_score ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={readiness?.blocked_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Coverage gaps" value={readiness?.coverage_gap_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Adoption owner: {readiness?.recommended_adoption_owner || 'enterprise_adoption_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(readiness?.next_adoption_focus || 'prepare_manual_enterprise_adoption_signoff')}</p>
-      <p className="card__subtext">Recommended adoption mode: {formatLabel(policy.recommended_adoption_mode || 'pause_enterprise_adoption_until_manual_remediation')}</p>
-      <p className="card__subtext">Validated pilot outcomes: {readiness?.validated_pilot_outcome_count ?? 0} · Covered domains: {readiness?.covered_domain_count ?? 0}</p>
-      <p className="card__subtext">{readiness?.adoption_note || 'Manual enterprise adoption readiness remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Adoption owner:')} {readiness?.recommended_adoption_owner || 'enterprise_adoption_owner'}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(readiness?.next_adoption_focus || 'prepare_manual_enterprise_adoption_signoff')}</p>
+      <p className="card__subtext">{ui('Recommended adoption mode:')} {formatLabel(policy.recommended_adoption_mode || 'pause_enterprise_adoption_until_manual_remediation')}</p>
+      <p className="card__subtext">{ui('Validated pilot outcomes:')} {formatLocalizedNumber(readiness?.validated_pilot_outcome_count ?? 0, locale)} · {ui('Covered domains:')} {formatLocalizedNumber(readiness?.covered_domain_count ?? 0, locale)}</p>
+      <p className="card__subtext">{readiness?.adoption_note || ui('Manual enterprise adoption readiness remains advisory only.')}</p>
       {blockers.length > 0 ? (
-        <p className="card__subtext">Blockers: {blockers.map(formatLabel).join(' · ')}</p>
-      ) : <p className="card__subtext">No enterprise adoption blockers are currently reported.</p>}
+        <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
+      ) : <p className="card__subtext">{ui('No enterprise adoption blockers are currently reported.')}</p>}
       {options.length > 0 ? (
-        <p className="card__subtext">Manual adoption options: {options.map(formatLabel).join(' · ')}</p>
+        <p className="card__subtext">{ui('Manual adoption options:')} {options.map(formatLabel).join(' · ')}</p>
       ) : null}
       {checks.length > 0 ? (
         <div className="table-wrap" style={{ marginTop: 12 }}>
           <table>
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check) => (
                 <tr key={check.check_key}>
                   <td>{check.check_label || formatLabel(check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatAdoptionValue(check.current_value)}</td>
+                  <td>{formatAdoptionValue(check.required_value)}</td>
                   <td>{formatLabel(check.adoption_evidence)}</td>
                   <td>{formatLabel(check.manual_adoption_task)}</td>
                 </tr>
@@ -3307,65 +3382,69 @@ function ClosedLoopEnterpriseAdoptionReadiness({ readiness }: { readiness: Conti
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No enterprise adoption readiness checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No enterprise adoption readiness checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopEnterpriseActivationPlan({ plan }: { plan: ContinuousLearningSummary['closed_loop_enterprise_activation_plan'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = plan?.activation_checks || [];
   const blockers = plan?.activation_blockers || [];
   const options = plan?.activation_decision_options || [];
   const policy = plan?.activation_policy || {};
+  const formatActivationValue = (value: unknown) => typeof value === 'number'
+    ? formatLocalizedNumber(value, locale)
+    : formatLabel(value);
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop enterprise activation plan</h2>
-          <p className="card__subtext">Manual activation planning layer for enterprise adoption. It checks adoption readiness, monitoring readiness, resolution status, learning signal stability, and domain coverage before customer activation planning. It does not enable customers, provision tenants, train models, change policies, execute recommendations, or mutate operational state.</p>
+          <h2>{ui('Closed-loop enterprise activation plan')}</h2>
+          <p className="card__subtext">{ui('Manual activation planning layer for enterprise adoption. It checks adoption readiness, monitoring readiness, resolution status, learning signal stability, and domain coverage before customer activation planning. It does not enable customers, provision tenants, train models, change policies, execute recommendations, or mutate operational state.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Activation decision" value={plan?.activation_decision || 'enterprise_activation_plan_blocked'} />
-        <StatCard label="Activation score" value={plan?.activation_score ?? 0} />
-        <StatCard label="Blocked checks" value={plan?.blocked_check_count ?? 0} />
-        <StatCard label="Learning signal" value={plan?.learning_signal_score ?? 0} />
-        <StatCard label="Drift pressure" value={plan?.drift_pressure_score ?? 0} />
-        <StatCard label="Covered domains" value={plan?.covered_domain_count ?? 0} />
+        <LocalizedLearningStatCard label="Activation decision" value={plan?.activation_decision || 'enterprise_activation_plan_blocked'} />
+        <LocalizedLearningStatCard label="Activation score" value={plan?.activation_score ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={plan?.blocked_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Learning signal" value={plan?.learning_signal_score ?? 0} />
+        <LocalizedLearningStatCard label="Drift pressure" value={plan?.drift_pressure_score ?? 0} />
+        <LocalizedLearningStatCard label="Covered domains" value={plan?.covered_domain_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Activation owner: {plan?.recommended_activation_owner || 'enterprise_activation_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(plan?.next_activation_focus || 'prepare_manual_enterprise_activation_runbook')}</p>
-      <p className="card__subtext">Recommended activation mode: {formatLabel(policy.recommended_activation_mode || 'pause_enterprise_activation_until_manual_remediation')}</p>
-      <p className="card__subtext">Monitoring owner: {formatLabel(policy.monitoring_owner || 'operations_owner')} · Rollback owner: {formatLabel(policy.rollback_owner || 'enterprise_rollout_owner')}</p>
-      <p className="card__subtext">{plan?.activation_note || 'Manual enterprise activation planning remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Activation owner:')} {plan?.recommended_activation_owner || 'enterprise_activation_owner'}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(plan?.next_activation_focus || 'prepare_manual_enterprise_activation_runbook')}</p>
+      <p className="card__subtext">{ui('Recommended activation mode:')} {formatLabel(policy.recommended_activation_mode || 'pause_enterprise_activation_until_manual_remediation')}</p>
+      <p className="card__subtext">{ui('Monitoring owner:')} {formatLabel(policy.monitoring_owner || 'operations_owner')} · {ui('Rollback owner:')} {formatLabel(policy.rollback_owner || 'enterprise_rollout_owner')}</p>
+      <p className="card__subtext">{plan?.activation_note || ui('Manual enterprise activation planning remains advisory only.')}</p>
       {blockers.length > 0 ? (
-        <p className="card__subtext">Blockers: {blockers.map(formatLabel).join(' · ')}</p>
-      ) : <p className="card__subtext">No enterprise activation blockers are currently reported.</p>}
+        <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
+      ) : <p className="card__subtext">{ui('No enterprise activation blockers are currently reported.')}</p>}
       {options.length > 0 ? (
-        <p className="card__subtext">Manual activation options: {options.map(formatLabel).join(' · ')}</p>
+        <p className="card__subtext">{ui('Manual activation options:')} {options.map(formatLabel).join(' · ')}</p>
       ) : null}
       {checks.length > 0 ? (
         <div className="table-wrap" style={{ marginTop: 12 }}>
           <table>
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check) => (
                 <tr key={check.check_key}>
                   <td>{check.check_label || formatLabel(check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatActivationValue(check.current_value)}</td>
+                  <td>{formatActivationValue(check.required_value)}</td>
                   <td>{formatLabel(check.activation_evidence)}</td>
                   <td>{formatLabel(check.manual_activation_task)}</td>
                 </tr>
@@ -3373,63 +3452,67 @@ function ClosedLoopEnterpriseActivationPlan({ plan }: { plan: ContinuousLearning
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No enterprise activation checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No enterprise activation checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopEnterpriseActivationRunbook({ runbook }: { runbook: ContinuousLearningSummary['closed_loop_enterprise_activation_runbook'] }) {
+  const { locale, ui } = useAppTranslation();
   const steps = runbook?.runbook_steps || [];
   const blockers = runbook?.runbook_blockers || [];
   const options = runbook?.runbook_decision_options || [];
   const policy = runbook?.runbook_policy || {};
+  const formatRunbookValue = (value: unknown) => typeof value === 'number'
+    ? formatLocalizedNumber(value, locale)
+    : formatLabel(value);
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop enterprise activation runbook</h2>
-          <p className="card__subtext">Manual activation runbook layer for final enterprise activation readiness. It ties activation planning, tenant wave controls, surveillance, audit traceability, and compliance attestation into one human signoff surface. It does not enable customers, provision tenants, train models, change policies, execute recommendations, or mutate operational state.</p>
+          <h2>{ui('Closed-loop enterprise activation runbook')}</h2>
+          <p className="card__subtext">{ui('Manual activation runbook layer for final enterprise activation readiness. It ties activation planning, tenant wave controls, surveillance, audit traceability, and compliance attestation into one human signoff surface. It does not enable customers, provision tenants, train models, change policies, execute recommendations, or mutate operational state.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Runbook decision" value={runbook?.runbook_decision || 'enterprise_activation_runbook_blocked'} />
-        <StatCard label="Runbook score" value={runbook?.runbook_score ?? 0} />
-        <StatCard label="Ready steps" value={runbook?.ready_step_count ?? 0} />
-        <StatCard label="Blocked steps" value={runbook?.blocked_step_count ?? 0} />
+        <LocalizedLearningStatCard label="Runbook decision" value={runbook?.runbook_decision || 'enterprise_activation_runbook_blocked'} />
+        <LocalizedLearningStatCard label="Runbook score" value={runbook?.runbook_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready steps" value={runbook?.ready_step_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked steps" value={runbook?.blocked_step_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Runbook owner: {runbook?.recommended_runbook_owner || 'enterprise_activation_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(runbook?.next_runbook_focus || 'perform_manual_activation_runbook_signoff')}</p>
-      <p className="card__subtext">Recommended runbook mode: {formatLabel(policy.recommended_runbook_mode || 'pause_activation_runbook_until_manual_remediation')}</p>
-      <p className="card__subtext">Operations owner: {formatLabel(policy.operations_owner || 'operations_owner')} · Compliance owner: {formatLabel(policy.compliance_owner || 'compliance_owner')} · Rollback owner: {formatLabel(policy.rollback_owner || 'enterprise_rollout_owner')}</p>
-      <p className="card__subtext">{runbook?.runbook_note || 'Manual enterprise activation runbook remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Runbook owner:')} {runbook?.recommended_runbook_owner || 'enterprise_activation_owner'}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(runbook?.next_runbook_focus || 'perform_manual_activation_runbook_signoff')}</p>
+      <p className="card__subtext">{ui('Recommended runbook mode:')} {formatLabel(policy.recommended_runbook_mode || 'pause_activation_runbook_until_manual_remediation')}</p>
+      <p className="card__subtext">{ui('Operations owner:')} {formatLabel(policy.operations_owner || 'operations_owner')} · {ui('Compliance owner:')} {formatLabel(policy.compliance_owner || 'compliance_owner')} · {ui('Rollback owner:')} {formatLabel(policy.rollback_owner || 'enterprise_rollout_owner')}</p>
+      <p className="card__subtext">{runbook?.runbook_note || ui('Manual enterprise activation runbook remains advisory only.')}</p>
       {blockers.length > 0 ? (
-        <p className="card__subtext">Blockers: {blockers.map(formatLabel).join(' · ')}</p>
-      ) : <p className="card__subtext">No enterprise activation runbook blockers are currently reported.</p>}
+        <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
+      ) : <p className="card__subtext">{ui('No enterprise activation runbook blockers are currently reported.')}</p>}
       {options.length > 0 ? (
-        <p className="card__subtext">Manual runbook options: {options.map(formatLabel).join(' · ')}</p>
+        <p className="card__subtext">{ui('Manual runbook options:')} {options.map(formatLabel).join(' · ')}</p>
       ) : null}
       {steps.length > 0 ? (
         <div className="table-wrap" style={{ marginTop: 12 }}>
           <table>
             <thead>
               <tr>
-                <th>Step</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Step')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {steps.map((step) => (
                 <tr key={step.step_key}>
                   <td>{step.step_label || formatLabel(step.step_key)}</td>
-                  <td>{formatLabel(step.step_status)}</td>
-                  <td>{formatLabel(step.current_value)}</td>
-                  <td>{formatLabel(step.required_value)}</td>
+                  <td>{ui(formatLabel(step.step_status))}</td>
+                  <td>{formatRunbookValue(step.current_value)}</td>
+                  <td>{formatRunbookValue(step.required_value)}</td>
                   <td>{formatLabel(step.runbook_evidence)}</td>
                   <td>{formatLabel(step.manual_runbook_task)}</td>
                 </tr>
@@ -3437,63 +3520,67 @@ function ClosedLoopEnterpriseActivationRunbook({ runbook }: { runbook: Continuou
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No enterprise activation runbook steps are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No enterprise activation runbook steps are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopEnterpriseActivationRollbackPlan({ plan }: { plan: ContinuousLearningSummary['closed_loop_enterprise_activation_rollback_plan'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = plan?.rollback_checks || [];
   const blockers = plan?.rollback_blockers || [];
   const options = plan?.rollback_decision_options || [];
   const policy = plan?.rollback_policy || {};
+  const formatRollbackValue = (value: unknown) => typeof value === 'number'
+    ? formatLocalizedNumber(value, locale)
+    : formatLabel(value);
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop enterprise activation rollback plan</h2>
-          <p className="card__subtext">Manual rollback readiness layer for enterprise activation. It confirms activation runbook clearance, tenant wave rollback ownership, exception closure, resolution readiness, and surveillance triggers before any activation signoff. It does not disable customers, roll back tenants, train models, change policies, execute recommendations, or mutate operational state.</p>
+          <h2>{ui('Closed-loop enterprise activation rollback plan')}</h2>
+          <p className="card__subtext">{ui('Manual rollback readiness layer for enterprise activation. It confirms activation runbook clearance, tenant wave rollback ownership, exception closure, resolution readiness, and surveillance triggers before any activation signoff. It does not disable customers, roll back tenants, train models, change policies, execute recommendations, or mutate operational state.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Rollback decision" value={plan?.rollback_decision || 'enterprise_activation_rollback_plan_blocked'} />
-        <StatCard label="Rollback score" value={plan?.rollback_score ?? 0} />
-        <StatCard label="Ready checks" value={plan?.ready_check_count ?? 0} />
-        <StatCard label="Blocked checks" value={plan?.blocked_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Rollback decision" value={plan?.rollback_decision || 'enterprise_activation_rollback_plan_blocked'} />
+        <LocalizedLearningStatCard label="Rollback score" value={plan?.rollback_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready checks" value={plan?.ready_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={plan?.blocked_check_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Rollback owner: {plan?.recommended_rollback_owner || 'enterprise_rollout_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(plan?.next_rollback_focus || 'perform_manual_activation_rollback_signoff')}</p>
-      <p className="card__subtext">Recommended rollback mode: {formatLabel(policy.recommended_rollback_mode || 'pause_activation_until_manual_rollback_path_is_ready')}</p>
-      <p className="card__subtext">Activation owner: {formatLabel(policy.activation_owner || 'enterprise_activation_owner')} · Operations owner: {formatLabel(policy.operations_owner || 'operations_owner')} · Governance owner: {formatLabel(policy.governance_owner || 'governance_owner')}</p>
-      <p className="card__subtext">{plan?.rollback_note || 'Manual activation rollback plan remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Rollback owner:')} {plan?.recommended_rollback_owner || 'enterprise_rollout_owner'}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(plan?.next_rollback_focus || 'perform_manual_activation_rollback_signoff')}</p>
+      <p className="card__subtext">{ui('Recommended rollback mode:')} {formatLabel(policy.recommended_rollback_mode || 'pause_activation_until_manual_rollback_path_is_ready')}</p>
+      <p className="card__subtext">{ui('Activation owner:')} {formatLabel(policy.activation_owner || 'enterprise_activation_owner')} · {ui('Operations owner:')} {formatLabel(policy.operations_owner || 'operations_owner')} · {ui('Governance owner:')} {formatLabel(policy.governance_owner || 'governance_owner')}</p>
+      <p className="card__subtext">{plan?.rollback_note || ui('Manual activation rollback plan remains advisory only.')}</p>
       {blockers.length > 0 ? (
-        <p className="card__subtext">Blockers: {blockers.map(formatLabel).join(' · ')}</p>
-      ) : <p className="card__subtext">No enterprise activation rollback blockers are currently reported.</p>}
+        <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
+      ) : <p className="card__subtext">{ui('No enterprise activation rollback blockers are currently reported.')}</p>}
       {options.length > 0 ? (
-        <p className="card__subtext">Manual rollback options: {options.map(formatLabel).join(' · ')}</p>
+        <p className="card__subtext">{ui('Manual rollback options:')} {options.map(formatLabel).join(' · ')}</p>
       ) : null}
       {checks.length > 0 ? (
         <div className="table-wrap" style={{ marginTop: 12 }}>
           <table>
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check) => (
                 <tr key={check.check_key}>
                   <td>{check.check_label || formatLabel(check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatRollbackValue(check.current_value)}</td>
+                  <td>{formatRollbackValue(check.required_value)}</td>
                   <td>{formatLabel(check.rollback_evidence)}</td>
                   <td>{formatLabel(check.manual_rollback_task)}</td>
                 </tr>
@@ -3501,63 +3588,67 @@ function ClosedLoopEnterpriseActivationRollbackPlan({ plan }: { plan: Continuous
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No enterprise activation rollback checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No enterprise activation rollback checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopEnterpriseActivationCutoverReadiness({ readiness }: { readiness: ContinuousLearningSummary['closed_loop_enterprise_activation_cutover_readiness'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = readiness?.cutover_checks || [];
   const blockers = readiness?.cutover_blockers || [];
   const options = readiness?.cutover_decision_options || [];
   const policy = readiness?.cutover_policy || {};
+  const formatCutoverValue = (value: unknown) => typeof value === 'number'
+    ? formatLocalizedNumber(value, locale)
+    : formatLabel(value);
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop enterprise activation cutover readiness</h2>
-          <p className="card__subtext">Manual cutover readiness layer for enterprise activation. It ties activation plan, runbook, rollback path, monitoring readiness, audit traceability, and compliance attestation into one cutover signoff surface. It does not enable customers, provision tenants, train models, change policies, execute recommendations, or mutate operational state.</p>
+          <h2>{ui('Closed-loop enterprise activation cutover readiness')}</h2>
+          <p className="card__subtext">{ui('Manual cutover readiness layer for enterprise activation. It ties activation plan, runbook, rollback path, monitoring readiness, audit traceability, and compliance attestation into one cutover signoff surface. It does not enable customers, provision tenants, train models, change policies, execute recommendations, or mutate operational state.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Cutover decision" value={readiness?.cutover_decision || 'enterprise_activation_cutover_blocked'} />
-        <StatCard label="Cutover score" value={readiness?.cutover_score ?? 0} />
-        <StatCard label="Ready checks" value={readiness?.ready_check_count ?? 0} />
-        <StatCard label="Blocked checks" value={readiness?.blocked_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Cutover decision" value={readiness?.cutover_decision || 'enterprise_activation_cutover_blocked'} />
+        <LocalizedLearningStatCard label="Cutover score" value={readiness?.cutover_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready checks" value={readiness?.ready_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={readiness?.blocked_check_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Cutover owner: {readiness?.recommended_cutover_owner || 'enterprise_activation_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(readiness?.next_cutover_focus || 'perform_manual_enterprise_activation_cutover_signoff')}</p>
-      <p className="card__subtext">Recommended cutover mode: {formatLabel(policy.recommended_cutover_mode || 'pause_cutover_until_manual_readiness_blockers_are_resolved')}</p>
-      <p className="card__subtext">Activation owner: {formatLabel(policy.activation_owner || 'enterprise_activation_owner')} · Operations owner: {formatLabel(policy.operations_owner || 'operations_owner')} · Governance owner: {formatLabel(policy.governance_owner || 'governance_owner')}</p>
-      <p className="card__subtext">{readiness?.cutover_note || 'Manual enterprise activation cutover readiness remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Cutover owner:')} {readiness?.recommended_cutover_owner || 'enterprise_activation_owner'}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(readiness?.next_cutover_focus || 'perform_manual_enterprise_activation_cutover_signoff')}</p>
+      <p className="card__subtext">{ui('Recommended cutover mode:')} {formatLabel(policy.recommended_cutover_mode || 'pause_cutover_until_manual_readiness_blockers_are_resolved')}</p>
+      <p className="card__subtext">{ui('Activation owner:')} {formatLabel(policy.activation_owner || 'enterprise_activation_owner')} · {ui('Operations owner:')} {formatLabel(policy.operations_owner || 'operations_owner')} · {ui('Governance owner:')} {formatLabel(policy.governance_owner || 'governance_owner')}</p>
+      <p className="card__subtext">{readiness?.cutover_note || ui('Manual enterprise activation cutover readiness remains advisory only.')}</p>
       {blockers.length > 0 ? (
-        <p className="card__subtext">Blockers: {blockers.map(formatLabel).join(' · ')}</p>
-      ) : <p className="card__subtext">No enterprise activation cutover blockers are currently reported.</p>}
+        <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
+      ) : <p className="card__subtext">{ui('No enterprise activation cutover blockers are currently reported.')}</p>}
       {options.length > 0 ? (
-        <p className="card__subtext">Manual cutover options: {options.map(formatLabel).join(' · ')}</p>
+        <p className="card__subtext">{ui('Manual cutover options:')} {options.map(formatLabel).join(' · ')}</p>
       ) : null}
       {checks.length > 0 ? (
         <div className="table-wrap" style={{ marginTop: 12 }}>
           <table>
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check) => (
                 <tr key={check.check_key}>
                   <td>{check.check_label || formatLabel(check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatCutoverValue(check.current_value)}</td>
+                  <td>{formatCutoverValue(check.required_value)}</td>
                   <td>{formatLabel(check.cutover_evidence)}</td>
                   <td>{formatLabel(check.manual_cutover_task)}</td>
                 </tr>
@@ -3565,64 +3656,68 @@ function ClosedLoopEnterpriseActivationCutoverReadiness({ readiness }: { readine
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No enterprise activation cutover checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No enterprise activation cutover checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopEnterpriseActivationStabilizationPlan({ plan }: { plan: ContinuousLearningSummary['closed_loop_enterprise_activation_stabilization_plan'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = plan?.stabilization_checks || [];
   const blockers = plan?.stabilization_blockers || [];
   const options = plan?.stabilization_decision_options || [];
   const policy = plan?.stabilization_policy || {};
+  const formatStabilizationValue = (value: unknown) => typeof value === 'number'
+    ? formatLocalizedNumber(value, locale)
+    : formatLabel(value);
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop enterprise activation stabilization plan</h2>
-          <p className="card__subtext">Manual post-cutover stabilization layer for enterprise activation. It ties cutover readiness, monitoring, surveillance, exception handling, and closure evidence into one stabilization signoff surface. It does not enable customers, provision tenants, train models, change policies, execute recommendations, or mutate operational state.</p>
+          <h2>{ui('Closed-loop enterprise activation stabilization plan')}</h2>
+          <p className="card__subtext">{ui('Manual post-cutover stabilization layer for enterprise activation. It ties cutover readiness, monitoring, surveillance, exception handling, and closure evidence into one stabilization signoff surface. It does not enable customers, provision tenants, train models, change policies, execute recommendations, or mutate operational state.')}</p>
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-        <StatCard label="Stabilization decision" value={plan?.stabilization_decision || 'enterprise_activation_stabilization_blocked'} />
-        <StatCard label="Stabilization score" value={plan?.stabilization_score ?? 0} />
-        <StatCard label="Ready checks" value={plan?.ready_check_count ?? 0} />
-        <StatCard label="Blocked checks" value={plan?.blocked_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Stabilization decision" value={plan?.stabilization_decision || 'enterprise_activation_stabilization_blocked'} />
+        <LocalizedLearningStatCard label="Stabilization score" value={plan?.stabilization_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready checks" value={plan?.ready_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={plan?.blocked_check_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Stabilization owner: {plan?.recommended_stabilization_owner || 'enterprise_activation_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(plan?.next_stabilization_focus || 'perform_manual_post_cutover_stabilization_signoff')}</p>
-      <p className="card__subtext">Recommended stabilization mode: {formatLabel(policy.recommended_stabilization_mode || 'pause_stabilization_acceptance_until_manual_blockers_are_resolved')}</p>
-      <p className="card__subtext">Cadence: {formatLabel(policy.recommended_review_cadence || 'daily_until_blockers_are_resolved')}</p>
-      <p className="card__subtext">Operations owner: {formatLabel(policy.operations_owner || 'operations_owner')} · Governance owner: {formatLabel(policy.governance_owner || 'governance_owner')} · Customer success owner: {formatLabel(policy.customer_success_owner || 'customer_success_owner')}</p>
-      <p className="card__subtext">{plan?.stabilization_note || 'Manual enterprise activation stabilization remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Stabilization owner:')} {plan?.recommended_stabilization_owner || 'enterprise_activation_owner'}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(plan?.next_stabilization_focus || 'perform_manual_post_cutover_stabilization_signoff')}</p>
+      <p className="card__subtext">{ui('Recommended stabilization mode:')} {formatLabel(policy.recommended_stabilization_mode || 'pause_stabilization_acceptance_until_manual_blockers_are_resolved')}</p>
+      <p className="card__subtext">{ui('Cadence:')} {formatLabel(policy.recommended_review_cadence || 'daily_until_blockers_are_resolved')}</p>
+      <p className="card__subtext">{ui('Operations owner:')} {formatLabel(policy.operations_owner || 'operations_owner')} · {ui('Governance owner:')} {formatLabel(policy.governance_owner || 'governance_owner')} · {ui('Customer success owner:')} {formatLabel(policy.customer_success_owner || 'customer_success_owner')}</p>
+      <p className="card__subtext">{plan?.stabilization_note || ui('Manual enterprise activation stabilization remains advisory only.')}</p>
       {blockers.length > 0 ? (
-        <p className="card__subtext">Blockers: {blockers.map(formatLabel).join(' · ')}</p>
-      ) : <p className="card__subtext">No enterprise activation stabilization blockers are currently reported.</p>}
+        <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
+      ) : <p className="card__subtext">{ui('No enterprise activation stabilization blockers are currently reported.')}</p>}
       {options.length > 0 ? (
-        <p className="card__subtext">Manual stabilization options: {options.map(formatLabel).join(' · ')}</p>
+        <p className="card__subtext">{ui('Manual stabilization options:')} {options.map(formatLabel).join(' · ')}</p>
       ) : null}
       {checks.length > 0 ? (
         <div className="table-wrap" style={{ marginTop: 12 }}>
           <table>
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check) => (
                 <tr key={check.check_key}>
                   <td>{check.check_label || formatLabel(check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatStabilizationValue(check.current_value)}</td>
+                  <td>{formatStabilizationValue(check.required_value)}</td>
                   <td>{formatLabel(check.stabilization_evidence)}</td>
                   <td>{formatLabel(check.manual_stabilization_task)}</td>
                 </tr>
@@ -3630,12 +3725,13 @@ function ClosedLoopEnterpriseActivationStabilizationPlan({ plan }: { plan: Conti
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No enterprise activation stabilization checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No enterprise activation stabilization checks are available yet.')}</p>}
     </section>
   );
 }
 
 function FeedbackReviewBoard({ board }: { board: ContinuousLearningSummary['feedback_review_board'] }) {
+  const { locale, ui } = useAppTranslation();
   const domains = board?.domain_review_summary || [];
   const items = board?.review_items || [];
 
@@ -3643,55 +3739,55 @@ function FeedbackReviewBoard({ board }: { board: ContinuousLearningSummary['feed
     <section className={'card learning-feedback-section learning-feedback-review-board'}>
       <div className="card__header">
         <div>
-          <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/intelligence-review" size={18} /></span>Feedback review board</h2>
+          <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/intelligence-review" size={18} /></span>{ui('Feedback review board')}</h2>
           <p className="card__subtext">
-            Feedback records that still need a person to check, accept, correct, or close. This page only helps organize the review; it does not carry out recommendations.
+            {ui('Feedback records that still need a person to check, accept, correct, or close. This page only helps organize the review; it does not carry out recommendations.')}
           </p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Review posture" value={board?.review_posture || 'no_review_items_open'} iconPath="/intelligence-review" tone="blue" />
-        <StatCard label="Open review items" value={board?.review_item_count ?? 0} iconPath="/alerts" tone="amber" />
-        <StatCard label="Domains" value={board?.domain_count ?? 0} iconPath="/enterprise-inventory" tone="violet" />
-        <StatCard label="Readiness score" value={board?.review_readiness_score ?? 100} iconPath="/reliability-command" tone="green" />
+        <LocalizedLearningStatCard label="Review posture" value={board?.review_posture || 'no_review_items_open'} iconPath="/intelligence-review" tone="blue" />
+        <LocalizedLearningStatCard label="Open review items" value={board?.review_item_count ?? 0} iconPath="/alerts" tone="amber" />
+        <LocalizedLearningStatCard label="Domains" value={board?.domain_count ?? 0} iconPath="/enterprise-inventory" tone="violet" />
+        <LocalizedLearningStatCard label="Readiness score" value={board?.review_readiness_score ?? 100} iconPath="/reliability-command" tone="green" />
       </div>
       {domains.length > 0 ? (
         <div style={{ overflowX: 'auto', marginBottom: 12 }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Domain</th>
-                <th>Priority</th>
-                <th>Items</th>
-                <th>Evidence types</th>
-                <th>Statuses</th>
+                <th>{ui('Domain')}</th>
+                <th>{ui('Priority')}</th>
+                <th>{ui('Items')}</th>
+                <th>{ui('Evidence types')}</th>
+                <th>{ui('Statuses')}</th>
               </tr>
             </thead>
             <tbody>
               {domains.map((domain, index) => (
                 <tr key={domain.domain || index}>
                   <td>{formatLabel(domain.domain)}</td>
-                  <td>{formatLabel(domain.priority)}</td>
-                  <td>{formatLabel(domain.review_item_count)}</td>
+                  <td>{ui(formatLabel(domain.priority))}</td>
+                  <td>{formatLocalizedNumber(domain.review_item_count ?? 0, locale)}</td>
                   <td>{(domain.evidence_types || []).map(formatLabel).join(', ') || '—'}</td>
-                  <td>{(domain.statuses || []).map(formatLabel).join(', ') || '—'}</td>
+                  <td>{(domain.statuses || []).map((status) => ui(formatLabel(status))).join(', ') || '—'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No domains currently have open learning review items.</p>}
+      ) : <p className="card__subtext">{ui('No domains currently have open learning review items.')}</p>}
 
       {items.length > 0 ? (
         <div style={{ overflowX: 'auto' }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Evidence</th>
-                <th>Domain</th>
-                <th>Status</th>
-                <th>Recommended resolution</th>
-                <th>Reason</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Domain')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Recommended resolution')}</th>
+                <th>{ui('Reason')}</th>
               </tr>
             </thead>
             <tbody>
@@ -3699,7 +3795,7 @@ function FeedbackReviewBoard({ board }: { board: ContinuousLearningSummary['feed
                 <tr key={`${item.evidence_type || 'evidence'}-${item.evidence_key || index}`}>
                   <td>{formatLabel(item.evidence_type)} / {formatLabel(item.evidence_key)}</td>
                   <td>{formatLabel(item.domain)}</td>
-                  <td>{formatLabel(item.status)}</td>
+                  <td>{ui(formatLabel(item.status))}</td>
                   <td>{formatLabel(item.recommended_resolution)}</td>
                   <td>{item.review_reason || '—'}</td>
                 </tr>
@@ -3712,58 +3808,61 @@ function FeedbackReviewBoard({ board }: { board: ContinuousLearningSummary['feed
   );
 }
 
-
 function ClosedLoopEnterpriseActivationSupportReadiness({ readiness }: { readiness: ContinuousLearningSummary['closed_loop_enterprise_activation_support_readiness'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = readiness?.support_readiness_checks || [];
   const blockers = readiness?.support_readiness_blockers || [];
   const options = readiness?.support_readiness_decision_options || [];
   const policy = readiness?.support_readiness_policy || {};
+  const formatSupportValue = (value: unknown) => typeof value === 'number'
+    ? formatLocalizedNumber(value, locale)
+    : formatLabel(value);
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop enterprise activation support readiness</h2>
-          <p className="card__subtext">Manual support-transition layer for enterprise activation. It ties stabilization, monitoring, surveillance, exception handling, resolution planning, and operational handoff into one support readiness surface. It does not enable customers, provision tenants, train models, change policies, execute recommendations, or mutate operational state.</p>
+          <h2>{ui('Closed-loop enterprise activation support readiness')}</h2>
+          <p className="card__subtext">{ui('Manual support-transition layer for enterprise activation. It ties stabilization, monitoring, surveillance, exception handling, resolution planning, and operational handoff into one support readiness surface. It does not enable customers, provision tenants, train models, change policies, execute recommendations, or mutate operational state.')}</p>
         </div>
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-        <StatCard label="Support decision" value={readiness?.support_readiness_decision || 'enterprise_activation_support_transition_blocked'} />
-        <StatCard label="Support score" value={readiness?.support_readiness_score ?? 0} />
-        <StatCard label="Ready checks" value={readiness?.ready_check_count ?? 0} />
-        <StatCard label="Blocked checks" value={readiness?.blocked_check_count ?? 0} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+        <LocalizedLearningStatCard label="Support decision" value={readiness?.support_readiness_decision || 'enterprise_activation_support_transition_blocked'} />
+        <LocalizedLearningStatCard label="Support score" value={readiness?.support_readiness_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready checks" value={readiness?.ready_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={readiness?.blocked_check_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Support owner: {readiness?.recommended_support_owner || 'support_operations_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(readiness?.next_support_focus || 'perform_manual_support_transition_signoff')}</p>
-      <p className="card__subtext">Recommended support mode: {formatLabel(policy.recommended_support_mode || 'pause_support_transition_until_manual_blockers_are_resolved')}</p>
-      <p className="card__subtext">Review cadence: {formatLabel(policy.recommended_support_cadence || 'daily_support_blocker_review_until_transition_ready')}</p>
-      <p className="card__subtext">{readiness?.support_readiness_note || 'Manual enterprise activation support readiness remains advisory only.'}</p>
-      {blockers.length ? (
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Support owner:')} {readiness?.recommended_support_owner || 'support_operations_owner'}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(readiness?.next_support_focus || 'perform_manual_support_transition_signoff')}</p>
+      <p className="card__subtext">{ui('Recommended support mode:')} {formatLabel(policy.recommended_support_mode || 'pause_support_transition_until_manual_blockers_are_resolved')}</p>
+      <p className="card__subtext">{ui('Review cadence:')} {formatLabel(policy.recommended_support_cadence || 'daily_support_blocker_review_until_transition_ready')}</p>
+      <p className="card__subtext">{readiness?.support_readiness_note || ui('Manual enterprise activation support readiness remains advisory only.')}</p>
+      {blockers.length > 0 ? (
         <ul>{blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}</ul>
-      ) : <p className="card__subtext">No enterprise activation support transition blockers are currently reported.</p>}
-      {options.length ? (
-        <p className="card__subtext">Manual support transition options: {options.map(formatLabel).join(' · ')}</p>
+      ) : <p className="card__subtext">{ui('No enterprise activation support transition blockers are currently reported.')}</p>}
+      {options.length > 0 ? (
+        <p className="card__subtext">{ui('Manual support transition options:')} {options.map(formatLabel).join(' · ')}</p>
       ) : null}
-      {checks.length ? (
-        <div style={{ overflowX: 'auto', marginTop: 12 }}>
-          <table className="table">
+      {checks.length > 0 ? (
+        <div className="table-wrap" style={{ marginTop: 12 }}>
+          <table>
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check) => (
                 <tr key={check.check_key}>
-                  <td>{formatLabel(check.check_label || check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{check.check_label || formatLabel(check.check_key)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatSupportValue(check.current_value)}</td>
+                  <td>{formatSupportValue(check.required_value)}</td>
                   <td>{formatLabel(check.support_evidence)}</td>
                   <td>{formatLabel(check.manual_support_task)}</td>
                 </tr>
@@ -3771,63 +3870,67 @@ function ClosedLoopEnterpriseActivationSupportReadiness({ readiness }: { readine
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No enterprise activation support readiness checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No enterprise activation support readiness checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopEnterpriseActivationValueAssurance({ assurance }: { assurance: ContinuousLearningSummary['closed_loop_enterprise_activation_value_assurance'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = assurance?.value_assurance_checks || [];
   const blockers = assurance?.value_assurance_blockers || [];
   const options = assurance?.value_assurance_decision_options || [];
   const policy = assurance?.value_assurance_policy || {};
+  const formatValueAssuranceValue = (value: unknown) => typeof value === 'number'
+    ? formatLocalizedNumber(value, locale)
+    : formatLabel(value);
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop enterprise activation value assurance</h2>
-          <p className="card__subtext">Manual value-assurance layer for enterprise activation. It checks support transition, evidence coverage, outcome quality, forecast calibration, policy effectiveness, and optimization value before any enterprise value claims are made. It does not publish claims, enable customers, provision tenants, train models, change policies, execute recommendations, or mutate operational state.</p>
+          <h2>{ui('Closed-loop enterprise activation value assurance')}</h2>
+          <p className="card__subtext">{ui('Manual value-assurance layer for enterprise activation. It checks support transition, evidence coverage, outcome quality, forecast calibration, policy effectiveness, and optimization value before any enterprise value claims are made. It does not publish claims, enable customers, provision tenants, train models, change policies, execute recommendations, or mutate operational state.')}</p>
         </div>
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-        <StatCard label="Value decision" value={assurance?.value_assurance_decision || 'enterprise_activation_value_assurance_blocked'} />
-        <StatCard label="Value score" value={assurance?.value_assurance_score ?? 0} />
-        <StatCard label="Positive outcomes" value={assurance?.positive_outcome_count ?? 0} />
-        <StatCard label="Negative outcomes" value={assurance?.negative_outcome_count ?? 0} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+        <LocalizedLearningStatCard label="Value decision" value={assurance?.value_assurance_decision || 'enterprise_activation_value_assurance_blocked'} />
+        <LocalizedLearningStatCard label="Value score" value={assurance?.value_assurance_score ?? 0} />
+        <LocalizedLearningStatCard label="Positive outcomes" value={assurance?.positive_outcome_count ?? 0} />
+        <LocalizedLearningStatCard label="Negative outcomes" value={assurance?.negative_outcome_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Value assurance owner: {assurance?.recommended_value_assurance_owner || 'enterprise_activation_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(assurance?.next_value_assurance_focus || 'perform_manual_enterprise_value_assurance_signoff')}</p>
-      <p className="card__subtext">Recommended value claim mode: {formatLabel(policy.recommended_value_claim_mode || 'pause_enterprise_value_claims_until_manual_assurance_blockers_are_resolved')}</p>
-      <p className="card__subtext">Review cadence: {formatLabel(policy.recommended_value_review_cadence || 'daily_value_assurance_blocker_review_until_ready')}</p>
-      <p className="card__subtext">{assurance?.value_assurance_note || 'Manual enterprise activation value assurance remains advisory only.'}</p>
-      {blockers.length ? (
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Value assurance owner:')} {assurance?.recommended_value_assurance_owner || 'enterprise_activation_owner'}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(assurance?.next_value_assurance_focus || 'perform_manual_enterprise_value_assurance_signoff')}</p>
+      <p className="card__subtext">{ui('Recommended value claim mode:')} {formatLabel(policy.recommended_value_claim_mode || 'pause_enterprise_value_claims_until_manual_assurance_blockers_are_resolved')}</p>
+      <p className="card__subtext">{ui('Review cadence:')} {formatLabel(policy.recommended_value_review_cadence || 'daily_value_assurance_blocker_review_until_ready')}</p>
+      <p className="card__subtext">{assurance?.value_assurance_note || ui('Manual enterprise activation value assurance remains advisory only.')}</p>
+      {blockers.length > 0 ? (
         <ul>{blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}</ul>
-      ) : <p className="card__subtext">No enterprise activation value assurance blockers are currently reported.</p>}
-      {options.length ? (
-        <p className="card__subtext">Manual value assurance options: {options.map(formatLabel).join(' · ')}</p>
+      ) : <p className="card__subtext">{ui('No enterprise activation value assurance blockers are currently reported.')}</p>}
+      {options.length > 0 ? (
+        <p className="card__subtext">{ui('Manual value assurance options:')} {options.map(formatLabel).join(' · ')}</p>
       ) : null}
-      {checks.length ? (
-        <div style={{ overflowX: 'auto', marginTop: 12 }}>
-          <table className="table">
+      {checks.length > 0 ? (
+        <div className="table-wrap" style={{ marginTop: 12 }}>
+          <table>
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check) => (
                 <tr key={check.check_key}>
-                  <td>{formatLabel(check.check_label || check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{check.check_label || formatLabel(check.check_key)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatValueAssuranceValue(check.current_value)}</td>
+                  <td>{formatValueAssuranceValue(check.required_value)}</td>
                   <td>{formatLabel(check.value_assurance_evidence)}</td>
                   <td>{formatLabel(check.manual_value_assurance_task)}</td>
                 </tr>
@@ -3835,64 +3938,68 @@ function ClosedLoopEnterpriseActivationValueAssurance({ assurance }: { assurance
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No enterprise activation value assurance checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No enterprise activation value assurance checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopEnterpriseActivationValueRealizationReview({ review }: { review: ContinuousLearningSummary['closed_loop_enterprise_activation_value_realization_review'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = review?.value_realization_checks || [];
   const blockers = review?.value_realization_blockers || [];
   const options = review?.value_realization_decision_options || [];
   const policy = review?.value_realization_policy || {};
+  const formatRealizationValue = (value: unknown) => typeof value === 'number'
+    ? formatLocalizedNumber(value, locale)
+    : formatLabel(value);
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop enterprise activation value realization review</h2>
-          <p className="card__subtext">Manual value-realization review for enterprise activation. It verifies value assurance, validated outcomes, closure status, cross-domain evidence, and coverage before any value realization signoff. It does not publish value claims, trigger billing, enable tenants, train models, change policies, execute recommendations, or mutate operational state.</p>
+          <h2>{ui('Closed-loop enterprise activation value realization review')}</h2>
+          <p className="card__subtext">{ui('Manual value-realization review for enterprise activation. It verifies value assurance, validated outcomes, closure status, cross-domain evidence, and coverage before any value realization signoff. It does not publish value claims, trigger billing, enable tenants, train models, change policies, execute recommendations, or mutate operational state.')}</p>
         </div>
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-        <StatCard label="Realization decision" value={review?.value_realization_decision || 'enterprise_value_realization_review_blocked'} />
-        <StatCard label="Realization score" value={review?.value_realization_score ?? 0} />
-        <StatCard label="Validated outcomes" value={review?.validated_outcome_count ?? 0} />
-        <StatCard label="Open/rejected outcomes" value={review?.open_or_rejected_outcome_count ?? 0} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+        <LocalizedLearningStatCard label="Realization decision" value={review?.value_realization_decision || 'enterprise_value_realization_review_blocked'} />
+        <LocalizedLearningStatCard label="Realization score" value={review?.value_realization_score ?? 0} />
+        <LocalizedLearningStatCard label="Validated outcomes" value={review?.validated_outcome_count ?? 0} />
+        <LocalizedLearningStatCard label="Open/rejected outcomes" value={review?.open_or_rejected_outcome_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Realization owner: {review?.recommended_value_realization_owner || 'enterprise_value_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(review?.next_value_realization_focus || 'perform_manual_enterprise_value_realization_signoff')}</p>
-      <p className="card__subtext">Recommended realization mode: {formatLabel(policy.recommended_value_realization_mode || 'pause_value_realization_claims_until_manual_blockers_are_resolved')}</p>
-      <p className="card__subtext">Review cadence: {formatLabel(policy.recommended_realization_review_cadence || 'daily_value_realization_blocker_review_until_ready')}</p>
-      <p className="card__subtext">Positive score total: {review?.positive_outcome_score_total ?? 0} · Negative score total: {review?.negative_outcome_score_total ?? 0}</p>
-      <p className="card__subtext">{review?.value_realization_note || 'Manual enterprise activation value realization review remains advisory only.'}</p>
-      {blockers.length ? (
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Realization owner:')} {review?.recommended_value_realization_owner || 'enterprise_value_owner'}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(review?.next_value_realization_focus || 'perform_manual_enterprise_value_realization_signoff')}</p>
+      <p className="card__subtext">{ui('Recommended realization mode:')} {formatLabel(policy.recommended_value_realization_mode || 'pause_value_realization_claims_until_manual_blockers_are_resolved')}</p>
+      <p className="card__subtext">{ui('Review cadence:')} {formatLabel(policy.recommended_realization_review_cadence || 'daily_value_realization_blocker_review_until_ready')}</p>
+      <p className="card__subtext">{ui('Positive score total:')} {formatLocalizedNumber(review?.positive_outcome_score_total ?? 0, locale)} · {ui('Negative score total:')} {formatLocalizedNumber(review?.negative_outcome_score_total ?? 0, locale)}</p>
+      <p className="card__subtext">{review?.value_realization_note || ui('Manual enterprise activation value realization review remains advisory only.')}</p>
+      {blockers.length > 0 ? (
         <ul>{blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}</ul>
-      ) : <p className="card__subtext">No enterprise activation value realization blockers are currently reported.</p>}
-      {options.length ? (
-        <p className="card__subtext">Manual realization options: {options.map(formatLabel).join(' · ')}</p>
+      ) : <p className="card__subtext">{ui('No enterprise activation value realization blockers are currently reported.')}</p>}
+      {options.length > 0 ? (
+        <p className="card__subtext">{ui('Manual realization options:')} {options.map(formatLabel).join(' · ')}</p>
       ) : null}
-      {checks.length ? (
-        <div style={{ overflowX: 'auto', marginTop: 12 }}>
-          <table className="table">
+      {checks.length > 0 ? (
+        <div className="table-wrap" style={{ marginTop: 12 }}>
+          <table>
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check) => (
                 <tr key={check.check_key}>
-                  <td>{formatLabel(check.check_label || check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{check.check_label || formatLabel(check.check_key)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatRealizationValue(check.current_value)}</td>
+                  <td>{formatRealizationValue(check.required_value)}</td>
                   <td>{formatLabel(check.realization_evidence)}</td>
                   <td>{formatLabel(check.manual_realization_task)}</td>
                 </tr>
@@ -3900,64 +4007,68 @@ function ClosedLoopEnterpriseActivationValueRealizationReview({ review }: { revi
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No enterprise activation value realization checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No enterprise activation value realization checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopEnterpriseValueExpansionDecision({ decision }: { decision: ContinuousLearningSummary['closed_loop_enterprise_value_expansion_decision'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = decision?.expansion_checks || [];
   const blockers = decision?.expansion_blockers || [];
   const options = decision?.expansion_decision_options || [];
   const policy = decision?.expansion_policy || {};
+  const formatExpansionValue = (value: unknown) => typeof value === 'number'
+    ? formatLocalizedNumber(value, locale)
+    : formatLabel(value);
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop enterprise value expansion decision</h2>
-          <p className="card__subtext">Manual enterprise expansion decision control. It combines value realization, rollout governance, tenant-wave controls, adoption readiness, and cross-domain learning evidence before expanding to additional tenants or teams. It does not enable tenants, trigger billing, publish claims, train models, execute recommendations, or mutate operational state.</p>
+          <h2>{ui('Closed-loop enterprise value expansion decision')}</h2>
+          <p className="card__subtext">{ui('Manual enterprise expansion decision control. It combines value realization, rollout governance, tenant-wave controls, adoption readiness, and cross-domain learning evidence before expanding to additional tenants or teams. It does not enable tenants, trigger billing, publish claims, train models, execute recommendations, or mutate operational state.')}</p>
         </div>
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-        <StatCard label="Expansion decision" value={decision?.expansion_decision || 'enterprise_value_expansion_blocked'} />
-        <StatCard label="Expansion score" value={decision?.expansion_score ?? 0} />
-        <StatCard label="Ready checks" value={decision?.ready_check_count ?? 0} />
-        <StatCard label="Blocked checks" value={decision?.blocked_check_count ?? 0} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+        <LocalizedLearningStatCard label="Expansion decision" value={decision?.expansion_decision || 'enterprise_value_expansion_blocked'} />
+        <LocalizedLearningStatCard label="Expansion score" value={decision?.expansion_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready checks" value={decision?.ready_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={decision?.blocked_check_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Expansion owner: {decision?.recommended_expansion_owner || 'enterprise_value_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(decision?.next_expansion_focus || 'perform_manual_enterprise_value_expansion_approval')}</p>
-      <p className="card__subtext">Recommended expansion mode: {formatLabel(policy.recommended_expansion_mode || 'pause_enterprise_expansion_until_manual_blockers_are_resolved')}</p>
-      <p className="card__subtext">Tenant-wave policy: {formatLabel(policy.tenant_wave_policy || 'expand_only_by_named_manual_wave_after_rollout_control_review')}</p>
-      <p className="card__subtext">Validated outcomes: {decision?.validated_outcome_count ?? 0} · Negative outcomes: {decision?.negative_outcome_count ?? 0}</p>
-      <p className="card__subtext">{decision?.expansion_note || 'Manual enterprise value expansion decision remains advisory only.'}</p>
-      {blockers.length ? (
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Expansion owner:')} {decision?.recommended_expansion_owner || 'enterprise_value_owner'}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(decision?.next_expansion_focus || 'perform_manual_enterprise_value_expansion_approval')}</p>
+      <p className="card__subtext">{ui('Recommended expansion mode:')} {formatLabel(policy.recommended_expansion_mode || 'pause_enterprise_expansion_until_manual_blockers_are_resolved')}</p>
+      <p className="card__subtext">{ui('Tenant-wave policy:')} {formatLabel(policy.tenant_wave_policy || 'expand_only_by_named_manual_wave_after_rollout_control_review')}</p>
+      <p className="card__subtext">{ui('Validated outcomes:')} {formatLocalizedNumber(decision?.validated_outcome_count ?? 0, locale)} · {ui('Negative outcomes:')} {formatLocalizedNumber(decision?.negative_outcome_count ?? 0, locale)}</p>
+      <p className="card__subtext">{decision?.expansion_note || ui('Manual enterprise value expansion decision remains advisory only.')}</p>
+      {blockers.length > 0 ? (
         <ul>{blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}</ul>
-      ) : <p className="card__subtext">No enterprise value expansion blockers are currently reported.</p>}
-      {options.length ? (
-        <p className="card__subtext">Manual expansion options: {options.map(formatLabel).join(' · ')}</p>
+      ) : <p className="card__subtext">{ui('No enterprise value expansion blockers are currently reported.')}</p>}
+      {options.length > 0 ? (
+        <p className="card__subtext">{ui('Manual expansion options:')} {options.map(formatLabel).join(' · ')}</p>
       ) : null}
-      {checks.length ? (
-        <div style={{ overflowX: 'auto', marginTop: 12 }}>
-          <table className="table">
+      {checks.length > 0 ? (
+        <div className="table-wrap" style={{ marginTop: 12 }}>
+          <table>
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check) => (
                 <tr key={check.check_key}>
-                  <td>{formatLabel(check.check_label || check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{check.check_label || formatLabel(check.check_key)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatExpansionValue(check.current_value)}</td>
+                  <td>{formatExpansionValue(check.required_value)}</td>
                   <td>{formatLabel(check.expansion_evidence)}</td>
                   <td>{formatLabel(check.manual_expansion_task)}</td>
                 </tr>
@@ -3965,64 +4076,68 @@ function ClosedLoopEnterpriseValueExpansionDecision({ decision }: { decision: Co
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No enterprise value expansion checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No enterprise value expansion checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopEnterpriseValueExpansionOperatingModel({ model }: { model: ContinuousLearningSummary['closed_loop_enterprise_value_expansion_operating_model'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = model?.operating_model_checks || [];
   const blockers = model?.operating_model_blockers || [];
   const options = model?.operating_model_decision_options || [];
   const policy = model?.operating_model_policy || {};
+  const formatOperatingModelValue = (value: unknown) => typeof value === 'number'
+    ? formatLocalizedNumber(value, locale)
+    : formatLabel(value);
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop enterprise value expansion operating model</h2>
-          <p className="card__subtext">Manual operating-model handoff control for enterprise expansion. It combines expansion approval, tenant-wave controls, support readiness, production surveillance, cross-domain coverage, and unresolved review pressure before scaling the operating model. It does not enable tenants, trigger billing, publish claims, train models, execute recommendations, or mutate operational state.</p>
+          <h2>{ui('Closed-loop enterprise value expansion operating model')}</h2>
+          <p className="card__subtext">{ui('Manual operating-model handoff control for enterprise expansion. It combines expansion approval, tenant-wave controls, support readiness, production surveillance, cross-domain coverage, and unresolved review pressure before scaling the operating model. It does not enable tenants, trigger billing, publish claims, train models, execute recommendations, or mutate operational state.')}</p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-        <StatCard label="Operating model decision" value={model?.operating_model_decision || 'enterprise_operating_model_handoff_blocked'} />
-        <StatCard label="Operating model score" value={model?.operating_model_score ?? 0} />
-        <StatCard label="Ready checks" value={model?.ready_check_count ?? 0} />
-        <StatCard label="Blocked checks" value={model?.blocked_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Operating model decision" value={model?.operating_model_decision || 'enterprise_operating_model_handoff_blocked'} />
+        <LocalizedLearningStatCard label="Operating model score" value={model?.operating_model_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready checks" value={model?.ready_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={model?.blocked_check_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Operating-model owner: {model?.recommended_operating_model_owner || 'enterprise_value_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(model?.next_operating_model_focus || 'perform_manual_enterprise_operating_model_handoff')}</p>
-      <p className="card__subtext">Recommended mode: {formatLabel(policy.recommended_operating_model_mode || 'pause_operating_model_handoff_until_manual_blockers_are_resolved')}</p>
-      <p className="card__subtext">Ownership policy: {formatLabel(policy.ownership_policy || 'assign_named_rollout_support_operations_and_value_owners_before_scaled_enterprise_expansion')}</p>
-      <p className="card__subtext">Covered domains: {model?.covered_domain_count ?? 0} · Unresolved review pressure: {model?.unresolved_review_pressure_count ?? 0}</p>
-      <p className="card__subtext">{model?.operating_model_note || 'Manual enterprise operating-model handoff remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Operating-model owner:')} {model?.recommended_operating_model_owner || 'enterprise_value_owner'}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(model?.next_operating_model_focus || 'perform_manual_enterprise_operating_model_handoff')}</p>
+      <p className="card__subtext">{ui('Recommended mode:')} {formatLabel(policy.recommended_operating_model_mode || 'pause_operating_model_handoff_until_manual_blockers_are_resolved')}</p>
+      <p className="card__subtext">{ui('Ownership policy:')} {formatLabel(policy.ownership_policy || 'assign_named_rollout_support_operations_and_value_owners_before_scaled_enterprise_expansion')}</p>
+      <p className="card__subtext">{ui('Covered domains:')} {formatLocalizedNumber(model?.covered_domain_count ?? 0, locale)} · {ui('Unresolved review pressure:')} {formatLocalizedNumber(model?.unresolved_review_pressure_count ?? 0, locale)}</p>
+      <p className="card__subtext">{model?.operating_model_note || ui('Manual enterprise operating-model handoff remains advisory only.')}</p>
       {blockers.length ? (
         <ul>{blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}</ul>
-      ) : <p className="card__subtext">No enterprise operating-model blockers are currently reported.</p>}
+      ) : <p className="card__subtext">{ui('No enterprise operating-model blockers are currently reported.')}</p>}
       {options.length ? (
-        <p className="card__subtext">Manual operating-model options: {options.map(formatLabel).join(' · ')}</p>
+        <p className="card__subtext">{ui('Manual operating-model options:')} {options.map(formatLabel).join(' · ')}</p>
       ) : null}
       {checks.length ? (
         <div style={{ overflowX: 'auto', marginTop: 12 }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check) => (
                 <tr key={check.check_key}>
-                  <td>{formatLabel(check.check_label || check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{check.check_label || formatLabel(check.check_key)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatOperatingModelValue(check.current_value)}</td>
+                  <td>{formatOperatingModelValue(check.required_value)}</td>
                   <td>{formatLabel(check.operating_model_evidence)}</td>
                   <td>{formatLabel(check.manual_operating_model_task)}</td>
                 </tr>
@@ -4030,64 +4145,68 @@ function ClosedLoopEnterpriseValueExpansionOperatingModel({ model }: { model: Co
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No enterprise operating-model checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No enterprise operating-model checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function ClosedLoopEnterpriseExpansionGovernanceCadence({ cadence }: { cadence: ContinuousLearningSummary['closed_loop_enterprise_expansion_governance_cadence'] }) {
+  const { locale, ui } = useAppTranslation();
   const checks = cadence?.cadence_checks || [];
   const blockers = cadence?.cadence_blockers || [];
   const options = cadence?.cadence_decision_options || [];
   const policy = cadence?.cadence_policy || {};
+  const formatCadenceValue = (value: unknown) => typeof value === 'number'
+    ? formatLocalizedNumber(value, locale)
+    : formatLabel(value);
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <h2>Closed-loop enterprise expansion governance cadence</h2>
-          <p className="card__subtext">Manual recurring governance cadence for enterprise expansion. It combines operating-model readiness, rollout governance, audit traceability, compliance attestation, and unresolved review pressure. It does not enable tenants, trigger billing, publish value claims, train models, execute recommendations, or mutate operational state.</p>
+          <h2>{ui('Closed-loop enterprise expansion governance cadence')}</h2>
+          <p className="card__subtext">{ui('Manual recurring governance cadence for enterprise expansion. It combines operating-model readiness, rollout governance, audit traceability, compliance attestation, and unresolved review pressure. It does not enable tenants, trigger billing, publish value claims, train models, execute recommendations, or mutate operational state.')}</p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-        <StatCard label="Cadence decision" value={cadence?.cadence_decision || 'enterprise_expansion_governance_cadence_blocked'} />
-        <StatCard label="Cadence score" value={cadence?.cadence_score ?? 0} />
-        <StatCard label="Ready checks" value={cadence?.ready_check_count ?? 0} />
-        <StatCard label="Blocked checks" value={cadence?.blocked_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Cadence decision" value={cadence?.cadence_decision || 'enterprise_expansion_governance_cadence_blocked'} />
+        <LocalizedLearningStatCard label="Cadence score" value={cadence?.cadence_score ?? 0} />
+        <LocalizedLearningStatCard label="Ready checks" value={cadence?.ready_check_count ?? 0} />
+        <LocalizedLearningStatCard label="Blocked checks" value={cadence?.blocked_check_count ?? 0} />
       </div>
-      <p className="card__subtext" style={{ marginTop: 12 }}>Cadence owner: {cadence?.recommended_cadence_owner || 'enterprise_governance_owner'}</p>
-      <p className="card__subtext">Next focus: {formatLabel(cadence?.next_cadence_focus || 'start_manual_enterprise_expansion_governance_cadence')}</p>
-      <p className="card__subtext">Recommended cadence mode: {formatLabel(policy.recommended_cadence_mode || 'pause_expansion_governance_cadence_until_manual_blockers_are_resolved')}</p>
-      <p className="card__subtext">Minimum review cadence: {formatLabel(policy.minimum_review_cadence || 'daily_until_ready')}</p>
-      <p className="card__subtext">Unresolved review pressure: {cadence?.unresolved_review_pressure_count ?? 0}</p>
-      <p className="card__subtext">{cadence?.cadence_note || 'Manual enterprise expansion governance cadence remains advisory only.'}</p>
+      <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Cadence owner:')} {cadence?.recommended_cadence_owner || 'enterprise_governance_owner'}</p>
+      <p className="card__subtext">{ui('Next focus:')} {formatLabel(cadence?.next_cadence_focus || 'start_manual_enterprise_expansion_governance_cadence')}</p>
+      <p className="card__subtext">{ui('Recommended cadence mode:')} {formatLabel(policy.recommended_cadence_mode || 'pause_expansion_governance_cadence_until_manual_blockers_are_resolved')}</p>
+      <p className="card__subtext">{ui('Minimum review cadence:')} {formatLabel(policy.minimum_review_cadence || 'daily_until_ready')}</p>
+      <p className="card__subtext">{ui('Unresolved review pressure:')} {formatLocalizedNumber(cadence?.unresolved_review_pressure_count ?? 0, locale)}</p>
+      <p className="card__subtext">{cadence?.cadence_note || ui('Manual enterprise expansion governance cadence remains advisory only.')}</p>
       {blockers.length ? (
         <ul>{blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}</ul>
-      ) : <p className="card__subtext">No enterprise expansion governance cadence blockers are currently reported.</p>}
+      ) : <p className="card__subtext">{ui('No enterprise expansion governance cadence blockers are currently reported.')}</p>}
       {options.length ? (
-        <p className="card__subtext">Manual cadence options: {options.map(formatLabel).join(' · ')}</p>
+        <p className="card__subtext">{ui('Manual cadence options:')} {options.map(formatLabel).join(' · ')}</p>
       ) : null}
       {checks.length ? (
         <div style={{ overflowX: 'auto', marginTop: 12 }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Evidence</th>
-                <th>Manual task</th>
+                <th>{ui('Check')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Evidence')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {checks.map((check) => (
                 <tr key={check.check_key}>
-                  <td>{formatLabel(check.check_label || check.check_key)}</td>
-                  <td>{formatLabel(check.check_status)}</td>
-                  <td>{formatLabel(check.current_value)}</td>
-                  <td>{formatLabel(check.required_value)}</td>
+                  <td>{check.check_label || formatLabel(check.check_key)}</td>
+                  <td>{ui(formatLabel(check.check_status))}</td>
+                  <td>{formatCadenceValue(check.current_value)}</td>
+                  <td>{formatCadenceValue(check.required_value)}</td>
                   <td>{formatLabel(check.cadence_evidence)}</td>
                   <td>{formatLabel(check.manual_cadence_task)}</td>
                 </tr>
@@ -4095,175 +4214,189 @@ function ClosedLoopEnterpriseExpansionGovernanceCadence({ cadence }: { cadence: 
             </tbody>
           </table>
         </div>
-      ) : <p className="card__subtext">No enterprise expansion governance cadence checks are available yet.</p>}
+      ) : <p className="card__subtext">{ui('No enterprise expansion governance cadence checks are available yet.')}</p>}
     </section>
   );
 }
 
 
 function RecommendationOutcomeFoundation({ foundation }: { foundation?: ContinuousLearningSummary['recommendation_outcome_foundation'] }) {
+  const { locale, ui } = useAppTranslation();
   if (!foundation) return null;
+  const formatFoundationNumber = (value: number | null | undefined) => formatLocalizedNumber(value ?? null, locale, { maximumFractionDigits: 4 });
+  const formatFoundationPercent = (value: number | null | undefined) => `${formatFoundationNumber(value)}%`;
+  const formatFoundationValue = (value: unknown): string => typeof value === 'number' ? formatLocalizedNumber(value, locale, { maximumFractionDigits: 4 }) : formatLabel(value);
+  const formatFoundationMoney = (rows?: Array<{ currency_code: string; amount: number }>, amount?: number | null, currency?: string | null): string => {
+    if (rows && rows.length > 0) return rows.map((row) => formatLocalizedCurrency(row.amount, row.currency_code, locale, { maximumFractionDigits: 2 })).join(' · ');
+    if (amount !== null && amount !== undefined && currency) return formatLocalizedCurrency(amount, currency, locale, { maximumFractionDigits: 2 });
+    return '—';
+  };
+  const formatFoundationDateTime = (value: unknown): string => {
+    if (!value) return '—';
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime()) ? formatLabel(value) : formatLocalizedDateTime(date, locale);
+  };
 
   return (
     <section className="card">
       <div className="card__header">
         <div>
-          <p className="eyebrow">Phase A · Step A18</p>
-          <h2>Recommendation Outcome Foundation</h2>
-          <p className="card__subtext">{foundation.completion_definition || 'Trace recommendations to measured business outcomes.'}</p>
+          <p className="eyebrow">{ui('Phase A · Step A18')}</p>
+          <h2>{ui('Recommendation Outcome Foundation')}</h2>
+          <p className="card__subtext">{foundation.completion_definition || ui('Trace recommendations to measured business outcomes.')}</p>
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <StatCard label="Posture" value={foundation.posture || 'unknown'} />
-        <StatCard label="Recommendation outcomes" value={foundation.recommendation_outcome_count ?? 0} />
-        <StatCard label="Linked outcomes" value={foundation.linked_recommendation_outcome_count ?? 0} />
-        <StatCard label="Measured outcomes" value={foundation.measured_recommendation_outcome_count ?? 0} />
-        <StatCard label="Full lifecycle traces" value={foundation.full_lifecycle_trace_count ?? 0} />
-        <StatCard label="Execution linked" value={foundation.execution_linked_recommendation_outcome_count ?? 0} />
-        <StatCard label="Business value measured" value={foundation.business_value_measured_count ?? 0} />
-        <StatCard label="Impact measured" value={foundation.impact_measured_count ?? 0} />
-        <StatCard label="Classified outcomes" value={foundation.recommendation_outcome_classified_count ?? 0} />
-        <StatCard label="Review required" value={foundation.recommendation_outcome_review_required_count ?? 0} />
-        <StatCard label="Financial impact measured" value={foundation.financial_impact_measured_count ?? 0} />
-        <StatCard label="Business impact evidence" value={foundation.business_impact_evidence_count ?? 0} />
-        <StatCard label="Target evidence" value={foundation.target_evidence_count ?? 0} />
-        <StatCard label="Target met" value={foundation.target_met_count ?? 0} />
-        <StatCard label="Target missed" value={foundation.target_missed_count ?? 0} />
-        <StatCard label="Measurement quality evidence" value={foundation.measurement_quality_evidence_count ?? 0} />
-        <StatCard label="Low measurement quality" value={foundation.low_measurement_quality_count ?? 0} />
-        <StatCard label="Attribution evidence" value={foundation.attribution_evidence_count ?? 0} />
-        <StatCard label="Low attribution confidence" value={foundation.low_attribution_confidence_count ?? 0} />
-        <StatCard label="Counterfactual references" value={foundation.counterfactual_reference_count ?? 0} />
-        <StatCard label="Open reviews" value={foundation.recommendation_review_open_count ?? 0} />
-        <StatCard label="Resolved reviews" value={foundation.recommendation_review_resolved_count ?? 0} />
-        <StatCard label="Review evidence" value={foundation.recommendation_review_evidence_count ?? 0} />
-        <StatCard label="Evaluation scheduled" value={foundation.recommendation_evaluation_scheduled_count ?? 0} />
-        <StatCard label="Evaluation overdue" value={foundation.recommendation_evaluation_overdue_count ?? 0} />
-        <StatCard label="Evaluation completed" value={foundation.recommendation_evaluation_completed_count ?? 0} />
-        <StatCard label="Audit packets" value={foundation.recommendation_outcome_audit_packet_count ?? 0} />
-        <StatCard label="Fingerprinted outcomes" value={foundation.recommendation_outcome_fingerprinted_count ?? 0} />
-        <StatCard label="Duplicate fingerprints" value={foundation.recommendation_outcome_duplicate_fingerprint_count ?? 0} />
-        <StatCard label="Commercial gate" value={foundation.recommendation_outcome_commercial_readiness_gate_status || 'phase_a_closure_blocked'} />
-        <StatCard label="Commercially ready" value={foundation.commercially_ready_recommendation_outcome_count ?? 0} />
-        <StatCard label="Acceptance integrity ready" value={foundation.recommendation_outcome_acceptance_integrity_ready_count ?? 0} />
-        <StatCard label="Acceptance integrity blocked" value={foundation.recommendation_outcome_acceptance_integrity_blocked_count ?? 0} />
-        <StatCard label="Corrective actions required" value={foundation.recommendation_outcome_corrective_action_required_count ?? 0} />
-        <StatCard label="Corrective actions resolved" value={foundation.recommendation_outcome_corrective_action_resolved_count ?? 0} />
-        <StatCard label="Corrective actions open" value={foundation.recommendation_outcome_corrective_action_open_count ?? 0} />
-        <StatCard label="Corrective actions overdue" value={foundation.recommendation_outcome_corrective_action_overdue_count ?? 0} />
-        <StatCard label="Corrective evidence" value={foundation.recommendation_outcome_corrective_action_evidence_count ?? 0} />
-        <StatCard label="Recommendation portfolios" value={foundation.recommendation_outcome_portfolio_count ?? 0} />
-        <StatCard label="Supported portfolios" value={foundation.recommendation_outcome_commercially_supported_portfolio_count ?? 0} />
-        <StatCard label="Portfolios needing review" value={foundation.recommendation_outcome_portfolio_review_required_count ?? 0} />
-        <StatCard label="Learning actions assigned" value={foundation.recommendation_outcome_learning_action_assigned_count ?? 0} />
-        <StatCard label="Learning actions complete" value={foundation.recommendation_outcome_learning_action_completed_count ?? 0} />
-        <StatCard label="Learning actions overdue" value={foundation.recommendation_outcome_learning_action_overdue_count ?? 0} />
-        <StatCard label="Learning actions blocked" value={foundation.recommendation_outcome_learning_action_blocked_count ?? 0} />
-        <StatCard label="Learning action escalations" value={foundation.recommendation_outcome_learning_action_escalation_required_count ?? 0} />
-        <StatCard label="Commercially blocked" value={foundation.commercially_blocked_recommendation_outcome_count ?? 0} />
-        <StatCard label="Readiness blockers" value={foundation.recommendation_outcome_commercial_readiness_blocker_count ?? 0} />
-        <StatCard label="Stockouts prevented" value={foundation.stockout_prevented_count ?? 0} />
-        <StatCard label="Overstock prevented" value={foundation.overstock_prevented_count ?? 0} />
+        <LocalizedLearningStatCard label="Posture" value={foundation.posture || 'unknown'} />
+        <LocalizedLearningStatCard label="Recommendation outcomes" value={foundation.recommendation_outcome_count ?? 0} />
+        <LocalizedLearningStatCard label="Linked outcomes" value={foundation.linked_recommendation_outcome_count ?? 0} />
+        <LocalizedLearningStatCard label="Measured outcomes" value={foundation.measured_recommendation_outcome_count ?? 0} />
+        <LocalizedLearningStatCard label="Full lifecycle traces" value={foundation.full_lifecycle_trace_count ?? 0} />
+        <LocalizedLearningStatCard label="Execution linked" value={foundation.execution_linked_recommendation_outcome_count ?? 0} />
+        <LocalizedLearningStatCard label="Business value measured" value={foundation.business_value_measured_count ?? 0} />
+        <LocalizedLearningStatCard label="Impact measured" value={foundation.impact_measured_count ?? 0} />
+        <LocalizedLearningStatCard label="Classified outcomes" value={foundation.recommendation_outcome_classified_count ?? 0} />
+        <LocalizedLearningStatCard label="Review required" value={foundation.recommendation_outcome_review_required_count ?? 0} />
+        <LocalizedLearningStatCard label="Financial impact measured" value={foundation.financial_impact_measured_count ?? 0} />
+        <LocalizedLearningStatCard label="Business impact evidence" value={foundation.business_impact_evidence_count ?? 0} />
+        <LocalizedLearningStatCard label="Target evidence" value={foundation.target_evidence_count ?? 0} />
+        <LocalizedLearningStatCard label="Target met" value={foundation.target_met_count ?? 0} />
+        <LocalizedLearningStatCard label="Target missed" value={foundation.target_missed_count ?? 0} />
+        <LocalizedLearningStatCard label="Measurement quality evidence" value={foundation.measurement_quality_evidence_count ?? 0} />
+        <LocalizedLearningStatCard label="Low measurement quality" value={foundation.low_measurement_quality_count ?? 0} />
+        <LocalizedLearningStatCard label="Attribution evidence" value={foundation.attribution_evidence_count ?? 0} />
+        <LocalizedLearningStatCard label="Low attribution confidence" value={foundation.low_attribution_confidence_count ?? 0} />
+        <LocalizedLearningStatCard label="Counterfactual references" value={foundation.counterfactual_reference_count ?? 0} />
+        <LocalizedLearningStatCard label="Open reviews" value={foundation.recommendation_review_open_count ?? 0} />
+        <LocalizedLearningStatCard label="Resolved reviews" value={foundation.recommendation_review_resolved_count ?? 0} />
+        <LocalizedLearningStatCard label="Review evidence" value={foundation.recommendation_review_evidence_count ?? 0} />
+        <LocalizedLearningStatCard label="Evaluation scheduled" value={foundation.recommendation_evaluation_scheduled_count ?? 0} />
+        <LocalizedLearningStatCard label="Evaluation overdue" value={foundation.recommendation_evaluation_overdue_count ?? 0} />
+        <LocalizedLearningStatCard label="Evaluation completed" value={foundation.recommendation_evaluation_completed_count ?? 0} />
+        <LocalizedLearningStatCard label="Audit packets" value={foundation.recommendation_outcome_audit_packet_count ?? 0} />
+        <LocalizedLearningStatCard label="Fingerprinted outcomes" value={foundation.recommendation_outcome_fingerprinted_count ?? 0} />
+        <LocalizedLearningStatCard label="Duplicate fingerprints" value={foundation.recommendation_outcome_duplicate_fingerprint_count ?? 0} />
+        <LocalizedLearningStatCard label="Commercial gate" value={foundation.recommendation_outcome_commercial_readiness_gate_status || 'phase_a_closure_blocked'} />
+        <LocalizedLearningStatCard label="Commercially ready" value={foundation.commercially_ready_recommendation_outcome_count ?? 0} />
+        <LocalizedLearningStatCard label="Acceptance integrity ready" value={foundation.recommendation_outcome_acceptance_integrity_ready_count ?? 0} />
+        <LocalizedLearningStatCard label="Acceptance integrity blocked" value={foundation.recommendation_outcome_acceptance_integrity_blocked_count ?? 0} />
+        <LocalizedLearningStatCard label="Corrective actions required" value={foundation.recommendation_outcome_corrective_action_required_count ?? 0} />
+        <LocalizedLearningStatCard label="Corrective actions resolved" value={foundation.recommendation_outcome_corrective_action_resolved_count ?? 0} />
+        <LocalizedLearningStatCard label="Corrective actions open" value={foundation.recommendation_outcome_corrective_action_open_count ?? 0} />
+        <LocalizedLearningStatCard label="Corrective actions overdue" value={foundation.recommendation_outcome_corrective_action_overdue_count ?? 0} />
+        <LocalizedLearningStatCard label="Corrective evidence" value={foundation.recommendation_outcome_corrective_action_evidence_count ?? 0} />
+        <LocalizedLearningStatCard label="Recommendation portfolios" value={foundation.recommendation_outcome_portfolio_count ?? 0} />
+        <LocalizedLearningStatCard label="Supported portfolios" value={foundation.recommendation_outcome_commercially_supported_portfolio_count ?? 0} />
+        <LocalizedLearningStatCard label="Portfolios needing review" value={foundation.recommendation_outcome_portfolio_review_required_count ?? 0} />
+        <LocalizedLearningStatCard label="Learning actions assigned" value={foundation.recommendation_outcome_learning_action_assigned_count ?? 0} />
+        <LocalizedLearningStatCard label="Learning actions complete" value={foundation.recommendation_outcome_learning_action_completed_count ?? 0} />
+        <LocalizedLearningStatCard label="Learning actions overdue" value={foundation.recommendation_outcome_learning_action_overdue_count ?? 0} />
+        <LocalizedLearningStatCard label="Learning actions blocked" value={foundation.recommendation_outcome_learning_action_blocked_count ?? 0} />
+        <LocalizedLearningStatCard label="Learning action escalations" value={foundation.recommendation_outcome_learning_action_escalation_required_count ?? 0} />
+        <LocalizedLearningStatCard label="Commercially blocked" value={foundation.commercially_blocked_recommendation_outcome_count ?? 0} />
+        <LocalizedLearningStatCard label="Readiness blockers" value={foundation.recommendation_outcome_commercial_readiness_blocker_count ?? 0} />
+        <LocalizedLearningStatCard label="Stockouts prevented" value={foundation.stockout_prevented_count ?? 0} />
+        <LocalizedLearningStatCard label="Overstock prevented" value={foundation.overstock_prevented_count ?? 0} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-        <p className="card__subtext">Link coverage: {formatLabel(foundation.outcome_link_coverage_percent)}%</p>
-        <p className="card__subtext">Measurement coverage: {formatLabel(foundation.outcome_measurement_coverage_percent)}%</p>
-        <p className="card__subtext">Full lifecycle coverage: {formatLabel(foundation.full_lifecycle_trace_coverage_percent)}%</p>
-        <p className="card__subtext">Impact coverage: {formatLabel(foundation.impact_measurement_coverage_percent)}%</p>
-        <p className="card__subtext">Classification coverage: {formatLabel(foundation.outcome_classification_coverage_percent)}%</p>
-        <p className="card__subtext">Business impact coverage: {formatLabel(foundation.business_impact_evidence_coverage_percent)}%</p>
-        <p className="card__subtext">Financial impact coverage: {formatLabel(foundation.financial_impact_coverage_percent)}%</p>
-        <p className="card__subtext">Target evidence coverage: {formatLabel(foundation.target_evidence_coverage_percent)}%</p>
-        <p className="card__subtext">Target attainment rate: {formatLabel(foundation.target_attainment_rate_percent)}%</p>
-        <p className="card__subtext">Baseline/target outcomes: {formatLabel(foundation.baseline_target_outcome_count)}</p>
-        <p className="card__subtext">Actual measured targets: {formatLabel(foundation.actual_target_outcome_count)}</p>
-        <p className="card__subtext">Measurement quality coverage: {formatLabel(foundation.measurement_quality_evidence_coverage_percent)}%</p>
-        <p className="card__subtext">Measurement method coverage: {formatLabel(foundation.measurement_method_coverage_percent)}%</p>
-        <p className="card__subtext">Measurement source coverage: {formatLabel(foundation.measurement_source_coverage_percent)}%</p>
-        <p className="card__subtext">Measurement owner coverage: {formatLabel(foundation.measurement_owner_coverage_percent)}%</p>
-        <p className="card__subtext">Avg measurement data quality: {formatLabel(foundation.average_measurement_data_quality_score)}</p>
-        <p className="card__subtext">Attribution evidence coverage: {formatLabel(foundation.attribution_evidence_coverage_percent)}%</p>
-        <p className="card__subtext">Attribution method coverage: {formatLabel(foundation.attribution_method_coverage_percent)}%</p>
-        <p className="card__subtext">Counterfactual coverage: {formatLabel(foundation.counterfactual_reference_coverage_percent)}%</p>
-        <p className="card__subtext">Review resolution coverage: {formatLabel(foundation.recommendation_review_resolution_coverage_percent)}%</p>
-        <p className="card__subtext">Review evidence coverage: {formatLabel(foundation.recommendation_review_evidence_coverage_percent)}%</p>
-        <p className="card__subtext">Evaluation schedule coverage: {formatLabel(foundation.recommendation_evaluation_schedule_coverage_percent)}%</p>
-        <p className="card__subtext">Evaluation completion coverage: {formatLabel(foundation.recommendation_evaluation_completion_coverage_percent)}%</p>
-        <p className="card__subtext">Evaluation evidence coverage: {formatLabel(foundation.recommendation_evaluation_evidence_coverage_percent)}%</p>
-        <p className="card__subtext">Audit packet coverage: {formatLabel(foundation.recommendation_outcome_audit_packet_coverage_percent)}%</p>
-        <p className="card__subtext">Fingerprint coverage: {formatLabel(foundation.recommendation_outcome_fingerprint_coverage_percent)}%</p>
-        <p className="card__subtext">Commercial readiness score: {formatLabel(foundation.recommendation_outcome_commercial_readiness_score_percent)}%</p>
-        <p className="card__subtext">Commercial readiness coverage: {formatLabel(foundation.recommendation_outcome_commercial_readiness_coverage_percent)}%</p>
-        <p className="card__subtext">Acceptance coverage: {formatLabel(foundation.recommendation_outcome_acceptance_coverage_percent)}%</p>
-        <p className="card__subtext">Acceptance evidence coverage: {formatLabel(foundation.recommendation_outcome_acceptance_evidence_coverage_percent)}%</p>
-        <p className="card__subtext">Acceptance integrity coverage: {formatLabel(foundation.recommendation_outcome_acceptance_integrity_coverage_percent)}%</p>
-        <p className="card__subtext">Acceptance integrity evidence coverage: {formatLabel(foundation.recommendation_outcome_acceptance_integrity_evidence_coverage_percent)}%</p>
-        <p className="card__subtext">Corrective action resolution coverage: {formatLabel(foundation.recommendation_outcome_corrective_action_resolution_coverage_percent)}%</p>
-        <p className="card__subtext">Corrective action evidence coverage: {formatLabel(foundation.recommendation_outcome_corrective_action_evidence_coverage_percent)}%</p>
-        <p className="card__subtext">Corrective action owners: {formatLabel(foundation.recommendation_outcome_corrective_action_owner_count)}</p>
-        <p className="card__subtext">Corrective action blockers: {formatLabel(foundation.recommendation_outcome_corrective_action_blocked_count)}</p>
-        <p className="card__subtext">Portfolio support coverage: {formatLabel(foundation.recommendation_outcome_portfolio_commercial_support_coverage_percent)}%</p>
-        <p className="card__subtext">Portfolio posture: {formatLabel(foundation.recommendation_outcome_portfolio_evidence?.portfolio_posture)}</p>
-        <p className="card__subtext">Learning action completion: {formatLabel(foundation.recommendation_outcome_learning_action_completion_percent)}%</p>
-        <p className="card__subtext">Learning action evidence coverage: {formatLabel(foundation.recommendation_outcome_learning_action_evidence_coverage_percent)}%</p>
-        <p className="card__subtext">Learning action escalation clear: {formatLabel(foundation.recommendation_outcome_learning_action_escalation_clear_percent)}%</p>
-        <p className="card__subtext">Learning action escalation posture: {formatLabel(foundation.recommendation_outcome_learning_action_escalation_evidence?.escalation_posture)}</p>
-        <p className="card__subtext">Learning action owners: {formatLabel(foundation.recommendation_outcome_learning_action_owner_count)}</p>
-        <p className="card__subtext">Accepted outcomes: {formatLabel(foundation.recommendation_outcome_acceptance_accepted_count)}</p>
-        <p className="card__subtext">Pending acceptance: {formatLabel(foundation.recommendation_outcome_acceptance_pending_count)}</p>
-        <p className="card__subtext">Rejected acceptance: {formatLabel(foundation.recommendation_outcome_acceptance_rejected_count)}</p>
-        <p className="card__subtext">Deferred acceptance: {formatLabel(foundation.recommendation_outcome_acceptance_deferred_count)}</p>
-        <p className="card__subtext">Acceptance owners: {formatLabel(foundation.recommendation_outcome_acceptance_owner_count)}</p>
-        <p className="card__subtext">Acceptance timestamps: {formatLabel(foundation.recommendation_outcome_acceptance_timestamp_count)}</p>
-        <p className="card__subtext">Rejected reviews: {formatLabel(foundation.recommendation_review_rejected_count)}</p>
-        <p className="card__subtext">Deferred reviews: {formatLabel(foundation.recommendation_review_deferred_count)}</p>
-        <p className="card__subtext">Reviewed outcomes: {formatLabel(foundation.recommendation_reviewed_count)}</p>
-        <p className="card__subtext">Avg attribution confidence: {formatLabel(foundation.average_attribution_confidence_score)}</p>
-        <p className="card__subtext">Success rate: {formatLabel(foundation.recommendation_outcome_success_rate_percent)}%</p>
-        <p className="card__subtext">Failure rate: {formatLabel(foundation.recommendation_outcome_failure_rate_percent)}%</p>
-        <p className="card__subtext">Successful: {formatLabel(foundation.successful_recommendation_outcome_count)}</p>
-        <p className="card__subtext">Partially successful: {formatLabel(foundation.partially_successful_recommendation_outcome_count)}</p>
-        <p className="card__subtext">Neutral: {formatLabel(foundation.neutral_recommendation_outcome_count)}</p>
-        <p className="card__subtext">Failed: {formatLabel(foundation.failed_recommendation_outcome_count)}</p>
-        <p className="card__subtext">Inconclusive: {formatLabel(foundation.inconclusive_recommendation_outcome_count)}</p>
-        <p className="card__subtext">Unclassified: {formatLabel(foundation.unclassified_recommendation_outcome_count)}</p>
-        <p className="card__subtext">Positive financial impact: {formatLabel(foundation.positive_financial_impact_count)}</p>
-        <p className="card__subtext">Negative financial impact: {formatLabel(foundation.negative_financial_impact_count)}</p>
-        <p className="card__subtext">Waste reduction outcomes: {formatLabel(foundation.waste_reduction_outcome_count)}</p>
-        <p className="card__subtext">Service level improved: {formatLabel(foundation.service_level_improved_outcome_count)}</p>
-        <p className="card__subtext">Total financial impact: {formatMoneyBreakdown(foundation.total_financial_impact_by_currency, foundation.total_financial_impact_amount, foundation.financial_impact_currency)}</p>
-        <p className="card__subtext">Total waste reduced: {formatLabel(foundation.total_waste_reduced_quantity)}</p>
-        <p className="card__subtext">Avg service delta %: {formatLabel(foundation.average_service_level_delta_percent)}</p>
-        <p className="card__subtext">Generated: {formatLabel(foundation.lifecycle_generated_count)}</p>
-        <p className="card__subtext">Approved: {formatLabel(foundation.lifecycle_approved_count)}</p>
-        <p className="card__subtext">Executed: {formatLabel(foundation.lifecycle_executed_count)}</p>
-        <p className="card__subtext">Measured: {formatLabel(foundation.lifecycle_measured_count)}</p>
-        <p className="card__subtext">Scored: {formatLabel(foundation.lifecycle_scored_count)}</p>
-        <p className="card__subtext">Validated outcomes: {formatLabel(foundation.validated_recommendation_outcome_count)}</p>
-        <p className="card__subtext">Negative outcomes: {formatLabel(foundation.negative_recommendation_outcome_count)}</p>
-        <p className="card__subtext">Needs review: {formatLabel(foundation.needs_review_recommendation_outcome_count)}</p>
-        <p className="card__subtext">Avg outcome score: {formatLabel(foundation.average_outcome_score)}</p>
-        <p className="card__subtext">Avg business value score: {formatLabel(foundation.average_business_value_score)}</p>
-        <p className="card__subtext">Avg stock impact: {formatLabel(foundation.average_stock_impact_score)}</p>
-        <p className="card__subtext">Avg financial impact: {formatLabel(foundation.average_financial_impact_score)}</p>
-        <p className="card__subtext">Avg waste impact: {formatLabel(foundation.average_waste_impact_score)}</p>
-        <p className="card__subtext">Avg service impact: {formatLabel(foundation.average_service_level_impact_score)}</p>
+        <p className="card__subtext">{ui('Link coverage:')} {formatFoundationPercent(foundation.outcome_link_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Measurement coverage:')} {formatFoundationPercent(foundation.outcome_measurement_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Full lifecycle coverage:')} {formatFoundationPercent(foundation.full_lifecycle_trace_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Impact coverage:')} {formatFoundationPercent(foundation.impact_measurement_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Classification coverage:')} {formatFoundationPercent(foundation.outcome_classification_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Business impact coverage:')} {formatFoundationPercent(foundation.business_impact_evidence_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Financial impact coverage:')} {formatFoundationPercent(foundation.financial_impact_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Target evidence coverage:')} {formatFoundationPercent(foundation.target_evidence_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Target attainment rate:')} {formatFoundationPercent(foundation.target_attainment_rate_percent)}</p>
+        <p className="card__subtext">{ui('Baseline/target outcomes:')} {formatFoundationNumber(foundation.baseline_target_outcome_count)}</p>
+        <p className="card__subtext">{ui('Actual measured targets:')} {formatFoundationNumber(foundation.actual_target_outcome_count)}</p>
+        <p className="card__subtext">{ui('Measurement quality coverage:')} {formatFoundationPercent(foundation.measurement_quality_evidence_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Measurement method coverage:')} {formatFoundationPercent(foundation.measurement_method_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Measurement source coverage:')} {formatFoundationPercent(foundation.measurement_source_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Measurement owner coverage:')} {formatFoundationPercent(foundation.measurement_owner_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Avg measurement data quality:')} {formatFoundationNumber(foundation.average_measurement_data_quality_score)}</p>
+        <p className="card__subtext">{ui('Attribution evidence coverage:')} {formatFoundationPercent(foundation.attribution_evidence_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Attribution method coverage:')} {formatFoundationPercent(foundation.attribution_method_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Counterfactual coverage:')} {formatFoundationPercent(foundation.counterfactual_reference_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Review resolution coverage:')} {formatFoundationPercent(foundation.recommendation_review_resolution_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Review evidence coverage:')} {formatFoundationPercent(foundation.recommendation_review_evidence_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Evaluation schedule coverage:')} {formatFoundationPercent(foundation.recommendation_evaluation_schedule_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Evaluation completion coverage:')} {formatFoundationPercent(foundation.recommendation_evaluation_completion_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Evaluation evidence coverage:')} {formatFoundationPercent(foundation.recommendation_evaluation_evidence_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Audit packet coverage:')} {formatFoundationPercent(foundation.recommendation_outcome_audit_packet_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Fingerprint coverage:')} {formatFoundationPercent(foundation.recommendation_outcome_fingerprint_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Commercial readiness score:')} {formatFoundationPercent(foundation.recommendation_outcome_commercial_readiness_score_percent)}</p>
+        <p className="card__subtext">{ui('Commercial readiness coverage:')} {formatFoundationPercent(foundation.recommendation_outcome_commercial_readiness_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Acceptance coverage:')} {formatFoundationPercent(foundation.recommendation_outcome_acceptance_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Acceptance evidence coverage:')} {formatFoundationPercent(foundation.recommendation_outcome_acceptance_evidence_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Acceptance integrity coverage:')} {formatFoundationPercent(foundation.recommendation_outcome_acceptance_integrity_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Acceptance integrity evidence coverage:')} {formatFoundationPercent(foundation.recommendation_outcome_acceptance_integrity_evidence_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Corrective action resolution coverage:')} {formatFoundationPercent(foundation.recommendation_outcome_corrective_action_resolution_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Corrective action evidence coverage:')} {formatFoundationPercent(foundation.recommendation_outcome_corrective_action_evidence_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Corrective action owners:')} {formatFoundationNumber(foundation.recommendation_outcome_corrective_action_owner_count)}</p>
+        <p className="card__subtext">{ui('Corrective action blockers:')} {formatFoundationNumber(foundation.recommendation_outcome_corrective_action_blocked_count)}</p>
+        <p className="card__subtext">{ui('Portfolio support coverage:')} {formatFoundationPercent(foundation.recommendation_outcome_portfolio_commercial_support_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Portfolio posture:')} {ui(formatLabel(foundation.recommendation_outcome_portfolio_evidence?.portfolio_posture))}</p>
+        <p className="card__subtext">{ui('Learning action completion:')} {formatFoundationPercent(foundation.recommendation_outcome_learning_action_completion_percent)}</p>
+        <p className="card__subtext">{ui('Learning action evidence coverage:')} {formatFoundationPercent(foundation.recommendation_outcome_learning_action_evidence_coverage_percent)}</p>
+        <p className="card__subtext">{ui('Learning action escalation clear:')} {formatFoundationPercent(foundation.recommendation_outcome_learning_action_escalation_clear_percent)}</p>
+        <p className="card__subtext">{ui('Learning action escalation posture:')} {ui(formatLabel(foundation.recommendation_outcome_learning_action_escalation_evidence?.escalation_posture))}</p>
+        <p className="card__subtext">{ui('Learning action owners:')} {formatFoundationNumber(foundation.recommendation_outcome_learning_action_owner_count)}</p>
+        <p className="card__subtext">{ui('Accepted outcomes:')} {formatFoundationNumber(foundation.recommendation_outcome_acceptance_accepted_count)}</p>
+        <p className="card__subtext">{ui('Pending acceptance:')} {formatFoundationNumber(foundation.recommendation_outcome_acceptance_pending_count)}</p>
+        <p className="card__subtext">{ui('Rejected acceptance:')} {formatFoundationNumber(foundation.recommendation_outcome_acceptance_rejected_count)}</p>
+        <p className="card__subtext">{ui('Deferred acceptance:')} {formatFoundationNumber(foundation.recommendation_outcome_acceptance_deferred_count)}</p>
+        <p className="card__subtext">{ui('Acceptance owners:')} {formatFoundationNumber(foundation.recommendation_outcome_acceptance_owner_count)}</p>
+        <p className="card__subtext">{ui('Acceptance timestamps:')} {formatFoundationNumber(foundation.recommendation_outcome_acceptance_timestamp_count)}</p>
+        <p className="card__subtext">{ui('Rejected reviews:')} {formatFoundationNumber(foundation.recommendation_review_rejected_count)}</p>
+        <p className="card__subtext">{ui('Deferred reviews:')} {formatFoundationNumber(foundation.recommendation_review_deferred_count)}</p>
+        <p className="card__subtext">{ui('Reviewed outcomes:')} {formatFoundationNumber(foundation.recommendation_reviewed_count)}</p>
+        <p className="card__subtext">{ui('Avg attribution confidence:')} {formatFoundationNumber(foundation.average_attribution_confidence_score)}</p>
+        <p className="card__subtext">{ui('Success rate:')} {formatFoundationPercent(foundation.recommendation_outcome_success_rate_percent)}</p>
+        <p className="card__subtext">{ui('Failure rate:')} {formatFoundationPercent(foundation.recommendation_outcome_failure_rate_percent)}</p>
+        <p className="card__subtext">{ui('Successful:')} {formatFoundationNumber(foundation.successful_recommendation_outcome_count)}</p>
+        <p className="card__subtext">{ui('Partially successful:')} {formatFoundationNumber(foundation.partially_successful_recommendation_outcome_count)}</p>
+        <p className="card__subtext">{ui('Neutral:')} {formatFoundationNumber(foundation.neutral_recommendation_outcome_count)}</p>
+        <p className="card__subtext">{ui('Failed:')} {formatFoundationNumber(foundation.failed_recommendation_outcome_count)}</p>
+        <p className="card__subtext">{ui('Inconclusive:')} {formatFoundationNumber(foundation.inconclusive_recommendation_outcome_count)}</p>
+        <p className="card__subtext">{ui('Unclassified:')} {formatFoundationNumber(foundation.unclassified_recommendation_outcome_count)}</p>
+        <p className="card__subtext">{ui('Positive financial impact:')} {formatFoundationNumber(foundation.positive_financial_impact_count)}</p>
+        <p className="card__subtext">{ui('Negative financial impact:')} {formatFoundationNumber(foundation.negative_financial_impact_count)}</p>
+        <p className="card__subtext">{ui('Waste reduction outcomes:')} {formatFoundationNumber(foundation.waste_reduction_outcome_count)}</p>
+        <p className="card__subtext">{ui('Service level improved:')} {formatFoundationNumber(foundation.service_level_improved_outcome_count)}</p>
+        <p className="card__subtext">{ui('Total financial impact:')} {formatFoundationMoney(foundation.total_financial_impact_by_currency, foundation.total_financial_impact_amount, foundation.financial_impact_currency)}</p>
+        <p className="card__subtext">{ui('Total waste reduced:')} {formatFoundationNumber(foundation.total_waste_reduced_quantity)}</p>
+        <p className="card__subtext">{ui('Avg service delta %:')} {formatFoundationNumber(foundation.average_service_level_delta_percent)}</p>
+        <p className="card__subtext">{ui('Generated:')} {formatFoundationNumber(foundation.lifecycle_generated_count)}</p>
+        <p className="card__subtext">{ui('Approved:')} {formatFoundationNumber(foundation.lifecycle_approved_count)}</p>
+        <p className="card__subtext">{ui('Executed:')} {formatFoundationNumber(foundation.lifecycle_executed_count)}</p>
+        <p className="card__subtext">{ui('Measured:')} {formatFoundationNumber(foundation.lifecycle_measured_count)}</p>
+        <p className="card__subtext">{ui('Scored:')} {formatFoundationNumber(foundation.lifecycle_scored_count)}</p>
+        <p className="card__subtext">{ui('Validated outcomes:')} {formatFoundationNumber(foundation.validated_recommendation_outcome_count)}</p>
+        <p className="card__subtext">{ui('Negative outcomes:')} {formatFoundationNumber(foundation.negative_recommendation_outcome_count)}</p>
+        <p className="card__subtext">{ui('Needs review:')} {formatFoundationNumber(foundation.needs_review_recommendation_outcome_count)}</p>
+        <p className="card__subtext">{ui('Avg outcome score:')} {formatFoundationNumber(foundation.average_outcome_score)}</p>
+        <p className="card__subtext">{ui('Avg business value score:')} {formatFoundationNumber(foundation.average_business_value_score)}</p>
+        <p className="card__subtext">{ui('Avg stock impact:')} {formatFoundationNumber(foundation.average_stock_impact_score)}</p>
+        <p className="card__subtext">{ui('Avg financial impact:')} {formatFoundationNumber(foundation.average_financial_impact_score)}</p>
+        <p className="card__subtext">{ui('Avg waste impact:')} {formatFoundationNumber(foundation.average_waste_impact_score)}</p>
+        <p className="card__subtext">{ui('Avg service impact:')} {formatFoundationNumber(foundation.average_service_level_impact_score)}</p>
       </div>
 
       {(foundation.recommendation_outcome_portfolio_evidence?.portfolio_evidence_items || []).length > 0 ? (
         <div style={{ marginTop: 12 }}>
-          <h3>Recommendation portfolio commercial value evidence</h3>
+          <h3>{ui('Recommendation portfolio commercial value evidence')}</h3>
           <table className="table">
             <thead>
               <tr>
-                <th>Portfolio</th>
-                <th>Domain</th>
-                <th>Outcomes</th>
-                <th>Success %</th>
-                <th>Accepted %</th>
-                <th>Financial impact</th>
-                <th>Corrective closure %</th>
-                <th>Posture</th>
+                <th>{ui('Portfolio')}</th>
+                <th>{ui('Domain')}</th>
+                <th>{ui('Outcomes')}</th>
+                <th>{ui('Success %')}</th>
+                <th>{ui('Accepted %')}</th>
+                <th>{ui('Financial impact')}</th>
+                <th>{ui('Corrective closure %')}</th>
+                <th>{ui('Posture')}</th>
               </tr>
             </thead>
             <tbody>
@@ -4271,34 +4404,34 @@ function RecommendationOutcomeFoundation({ foundation }: { foundation?: Continuo
                 <tr key={item.recommendation_portfolio_key || item.learning_domain || 'portfolio'}>
                   <td>{formatLabel(item.recommendation_portfolio_key)}</td>
                   <td>{formatLabel(item.learning_domain)}</td>
-                  <td>{formatLabel(item.outcome_count)}</td>
-                  <td>{formatLabel(item.success_rate_percent)}</td>
-                  <td>{formatLabel(item.acceptance_rate_percent)}</td>
-                  <td>{formatMoneyBreakdown(item.financial_impact_by_currency, item.total_financial_impact_amount, item.financial_impact_currency)}</td>
-                  <td>{formatLabel(item.corrective_action_closure_rate_percent)}</td>
-                  <td>{formatLabel(item.portfolio_posture)}</td>
+                  <td>{formatFoundationNumber(item.outcome_count)}</td>
+                  <td>{formatFoundationPercent(item.success_rate_percent)}</td>
+                  <td>{formatFoundationPercent(item.acceptance_rate_percent)}</td>
+                  <td>{formatFoundationMoney(item.financial_impact_by_currency, item.total_financial_impact_amount, item.financial_impact_currency)}</td>
+                  <td>{formatFoundationPercent(item.corrective_action_closure_rate_percent)}</td>
+                  <td>{ui(formatLabel(item.portfolio_posture))}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       ) : (
-        <p className="card__subtext" style={{ marginTop: 12 }}>No recommendation portfolio evidence has been recorded yet.</p>
+        <p className="card__subtext" style={{ marginTop: 12 }}>{ui('No recommendation portfolio evidence has been recorded yet.')}</p>
       )}
 
       {(foundation.recommendation_outcome_learning_action_escalation_evidence?.escalation_items || []).length > 0 ? (
         <div style={{ marginTop: 12 }}>
-          <h3>Learning action escalation evidence</h3>
+          <h3>{ui('Learning action escalation evidence')}</h3>
           <table className="table">
             <thead>
               <tr>
-                <th>Outcome</th>
-                <th>Recommendation</th>
-                <th>Signal</th>
-                <th>Status</th>
-                <th>Owner</th>
-                <th>Due</th>
-                <th>Reason</th>
+                <th>{ui('Outcome')}</th>
+                <th>{ui('Recommendation')}</th>
+                <th>{ui('Signal')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Owner')}</th>
+                <th>{ui('Due')}</th>
+                <th>{ui('Reason')}</th>
               </tr>
             </thead>
             <tbody>
@@ -4307,9 +4440,9 @@ function RecommendationOutcomeFoundation({ foundation }: { foundation?: Continuo
                   <td>{formatLabel(item.outcome_key)}</td>
                   <td>{formatLabel(item.recommendation_key || item.recommendation_id)}</td>
                   <td>{formatLabel(item.learning_signal)}</td>
-                  <td>{formatLabel(item.learning_action_status)}</td>
+                  <td>{ui(formatLabel(item.learning_action_status))}</td>
                   <td>{formatLabel(item.learning_action_owner)}</td>
-                  <td>{formatLabel(item.learning_action_due_at)}</td>
+                  <td>{formatFoundationDateTime(item.learning_action_due_at)}</td>
                   <td>{formatLabel(item.escalation_reason)}</td>
                 </tr>
               ))}
@@ -4317,56 +4450,57 @@ function RecommendationOutcomeFoundation({ foundation }: { foundation?: Continuo
           </table>
         </div>
       ) : (
-        <p className="card__subtext" style={{ marginTop: 12 }}>No blocked or overdue learning actions require escalation.</p>
+        <p className="card__subtext" style={{ marginTop: 12 }}>{ui('No blocked or overdue learning actions require escalation.')}</p>
       )}
 
       {foundation.recommendation_outcome_phase_a_closure_evidence ? (
         <div className="card" style={{ marginTop: 16 }}>
-          <h4>Phase A closure evidence</h4>
-          <p className="card__subtext">Closure status: {formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.closure_status)}</p>
-          <p className="card__subtext">Capability status: {formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.implemented_capability_status)}</p>
-          <p className="card__subtext">Runtime data status: {formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.runtime_data_status)}</p>
-          <p className="card__subtext">Readiness: {formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.readiness_score_percent)}%</p>
-          <p className="card__subtext">Next phase: {formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.next_phase)}</p>
-          <p className="card__subtext">Implemented capabilities: {(foundation.recommendation_outcome_phase_a_closure_evidence.implemented_capabilities || []).map(formatLabel).join(', ')}</p>
+          <h4>{ui('Phase A closure evidence')}</h4>
+          <p className="card__subtext">{ui('Closure status:')} {ui(formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.closure_status))}</p>
+          <p className="card__subtext">{ui('Capability status:')} {ui(formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.implemented_capability_status))}</p>
+          <p className="card__subtext">{ui('Runtime data status:')} {ui(formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.runtime_data_status))}</p>
+          <p className="card__subtext">{ui('Readiness:')} {formatFoundationPercent(foundation.recommendation_outcome_phase_a_closure_evidence.readiness_score_percent)}</p>
+          <p className="card__subtext">{ui('Next phase:')} {formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.next_phase)}</p>
+          <p className="card__subtext">{ui('Implemented capabilities:')} {(foundation.recommendation_outcome_phase_a_closure_evidence.implemented_capabilities || []).map(formatLabel).join(', ')}</p>
         </div>
       ) : null}
 
       {(foundation.recommendation_outcome_commercial_readiness_blockers || []).length > 0 ? (
         <div style={{ marginTop: 12 }}>
-          <h3>Phase A commercial-readiness blockers</h3>
+          <h3>{ui('Phase A commercial-readiness blockers')}</h3>
           <table className="table">
             <thead>
               <tr>
-                <th>Blocker</th>
-                <th>Current</th>
-                <th>Required</th>
-                <th>Manual task</th>
+                <th>{ui('Blocker')}</th>
+                <th>{ui('Current')}</th>
+                <th>{ui('Required')}</th>
+                <th>{ui('Manual task')}</th>
               </tr>
             </thead>
             <tbody>
               {(foundation.recommendation_outcome_commercial_readiness_blockers || []).map((blocker) => (
                 <tr key={blocker.blocker_key || blocker.blocker_label}>
                   <td>{formatLabel(blocker.blocker_label || blocker.blocker_key || 'blocker')}</td>
-                  <td>{formatLabel(blocker.current_value)}</td>
-                  <td>{formatLabel(blocker.required_value)}</td>
-                  <td>{blocker.manual_resolution_task || 'Resolve evidence gap before Phase A closure.'}</td>
+                  <td>{formatFoundationValue(blocker.current_value)}</td>
+                  <td>{formatFoundationValue(blocker.required_value)}</td>
+                  <td>{blocker.manual_resolution_task || ui('Resolve evidence gap before Phase A closure.')}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       ) : (
-        <p className="card__subtext" style={{ marginTop: 12 }}>Phase A commercial-readiness gate has no blockers for the currently loaded outcome evidence.</p>
+        <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Phase A commercial-readiness gate has no blockers for the currently loaded outcome evidence.')}</p>
       )}
       <p className="card__subtext" style={{ marginTop: 12 }}>
-        Safety: evidence-only learning, tamper-evident outcome fingerprinting, no autonomous model update, no autonomous recommendation execution, no operational mutation.
+        {ui('Safety: evidence-only learning, tamper-evident outcome fingerprinting, no autonomous model update, no autonomous recommendation execution, no operational mutation.')}
       </p>
     </section>
   );
 }
 
 function EvidenceTable({ title, rows }: { title: string; rows: Array<Record<string, unknown>> }) {
+  const { locale, ui } = useAppTranslation();
   const previewRows = rows.slice(0, 8);
   const iconPath = title === 'Forecast accuracy'
     ? '/probabilistic-forecasting'
@@ -4380,24 +4514,27 @@ function EvidenceTable({ title, rows }: { title: string; rows: Array<Record<stri
     <section className={'card learning-feedback-section learning-feedback-evidence-table'}>
       <div className="card__header">
         <div>
-          <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path={iconPath} size={18} /></span>{title}</h2>
+          <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path={iconPath} size={18} /></span>{ui(title)}</h2>
           <p className="card__subtext">
-            The latest saved records in this category. {rows.length > previewRows.length ? `Showing ${previewRows.length} of ${rows.length}.` : `${rows.length} record${rows.length === 1 ? '' : 's'} shown.`}
+            {ui('The latest saved records in this category.')} {' '}
+            {rows.length > previewRows.length
+              ? `${ui('Showing')} ${formatLocalizedNumber(previewRows.length, locale)} ${ui('of')} ${formatLocalizedNumber(rows.length, locale)}.`
+              : `${formatLocalizedNumber(rows.length, locale)} ${ui(rows.length === 1 ? 'record shown.' : 'records shown.')}`}
           </p>
         </div>
       </div>
       {!previewRows.length ? (
-        <p className="card__subtext">No feedback evidence has been recorded in this category yet.</p>
+        <p className="card__subtext">{ui('No feedback evidence has been recorded in this category yet.')}</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table className="table">
             <thead>
               <tr>
-                <th>Record</th>
-                <th>Area</th>
-                <th>Status</th>
-                <th>Score / Error</th>
-                <th>Observed</th>
+                <th>{ui('Record')}</th>
+                <th>{ui('Area')}</th>
+                <th>{ui('Status')}</th>
+                <th>{ui('Score / Error')}</th>
+                <th>{ui('Observed')}</th>
               </tr>
             </thead>
             <tbody>
@@ -4406,11 +4543,11 @@ function EvidenceTable({ title, rows }: { title: string; rows: Array<Record<stri
                 const score = row.outcome_score ?? row.absolute_error ?? row.effectiveness_score ?? row.realized_value_score;
                 return (
                   <tr key={String(row.id ?? businessKey ?? index)}>
-                    <td>{businessKey ? formatLabel(businessKey) : `Recorded item ${index + 1}`}</td>
+                    <td>{businessKey ? formatLabel(businessKey) : `${ui('Recorded item')} ${formatLocalizedNumber(index + 1, locale)}`}</td>
                     <td>{formatLabel(row.learning_domain ?? row.forecast_domain ?? row.policy_domain ?? row.result_domain)}</td>
-                    <td>{formatLabel(row.outcome_status ?? row.calibration_status ?? row.effectiveness_status ?? row.result_status)}</td>
-                    <td>{formatLabel(score)}</td>
-                    <td>{formatTimestamp(row.observed_at)}</td>
+                    <td>{ui(formatLabel(row.outcome_status ?? row.calibration_status ?? row.effectiveness_status ?? row.result_status))}</td>
+                    <td>{typeof score === 'number' ? formatLocalizedNumber(score, locale, { maximumFractionDigits: 4 }) : formatLabel(score)}</td>
+                    <td>{row.observed_at ? formatLocalizedDateTime(String(row.observed_at), locale) : '—'}</td>
                   </tr>
                 );
               })}
@@ -4423,6 +4560,7 @@ function EvidenceTable({ title, rows }: { title: string; rows: Array<Record<stri
 }
 
 export default function DecisionLearningFeedbackPage() {
+  const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
   const canGovern = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
@@ -4443,12 +4581,12 @@ export default function DecisionLearningFeedbackPage() {
       skipMutationFeedback: true
     }),
     onSuccess: async () => {
-      setMessage(`${modeLabels[mode]} recorded. The backend stores this as learning evidence only.`);
+      setMessage(ui('Feedback evidence recorded. The backend stores this as learning evidence only.'));
       setForm({ ...defaultForm, financialImpactCurrency: getActiveTenantCurrency() });
       await queryClient.invalidateQueries({ queryKey: ['decision-learning-summary'] });
     },
     onError: (error) => {
-      setMessage(error instanceof Error ? error.message : 'Unable to record feedback evidence.');
+      setMessage(error instanceof Error ? error.message : ui('Unable to record feedback evidence.'));
     }
   });
 
@@ -4469,19 +4607,19 @@ export default function DecisionLearningFeedbackPage() {
     setMessage(null);
     const result = await summaryQuery.refetch();
     if (result.error) {
-      setMessage(result.error instanceof Error ? result.error.message : 'Unable to refresh the learning feedback summary.');
+      setMessage(result.error instanceof Error ? result.error.message : ui('Unable to refresh the learning feedback summary.'));
       return;
     }
-    setMessage('Learning feedback summary refreshed.');
+    setMessage(ui('Learning feedback summary refreshed.'));
   };
 
   const submitFeedback = () => {
     setMessage(null);
     if (!canGovern) {
-      setMessage('You have read-only access. Decision Intelligence governance permission is required to record feedback.');
+      setMessage(ui('You have read-only access. Decision Intelligence governance permission is required to record feedback.'));
       return;
     }
-    const validationError = validateFeedbackForm(mode, form);
+    const validationError = validateFeedbackForm(mode, form, ui);
     if (validationError) {
       setMessage(validationError);
       return;
@@ -4494,72 +4632,72 @@ export default function DecisionLearningFeedbackPage() {
       <div className={'learning-feedback-page'}>
       <OperationalWorkspaceHero
         iconPath="/decision-learning-feedback"
-        eyebrow="Decision intelligence & learning"
-        title="Learning Feedback"
-        description="Record what actually happened after a recommendation, forecast, policy, or optimization result so people can review whether it helped. This page does not change stock, execute work, or train an AI model."
-        meta={<><OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>Audited feedback</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>Human-recorded outcomes</OperationalWorkspaceMetaPill></>}
-        aside={<><OperationalWorkspaceStatus value={governance?.continuous_learning_posture ? formatLabel(governance.continuous_learning_posture) : summaryQuery.isLoading ? 'Loading' : 'Unknown'} label={`continuous learning posture · refreshed ${formatTimestamp(summaryQuery.dataUpdatedAt)}`} /><button className="button button--secondary" type="button" onClick={refreshSummary} disabled={summaryQuery.isFetching}><TenantNavIcon path="/decision-learning-feedback" size={16} />{summaryQuery.isFetching ? 'Refreshing…' : 'Refresh summary'}</button></>}
+        eyebrow={ui('Decision intelligence & learning')}
+        title={ui('Learning Feedback')}
+        description={ui('Record what actually happened after a recommendation, forecast, policy, or optimization result so people can review whether it helped. This page does not change stock, execute work, or train an AI model.')}
+        meta={<><OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{ui('Audited feedback')}</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{ui('Human-recorded outcomes')}</OperationalWorkspaceMetaPill></>}
+        aside={<><OperationalWorkspaceStatus value={governance?.continuous_learning_posture ? ui(formatLabel(governance.continuous_learning_posture)) : summaryQuery.isLoading ? ui('Loading') : ui('Unknown')} label={`${ui('continuous learning posture')} · ${ui('refreshed')} ${summaryQuery.dataUpdatedAt ? formatLocalizedDateTime(summaryQuery.dataUpdatedAt, locale) : ui('not refreshed yet')}`} /><button className="button button--secondary" type="button" onClick={refreshSummary} disabled={summaryQuery.isFetching}><TenantNavIcon path="/decision-learning-feedback" size={16} />{summaryQuery.isFetching ? ui('Refreshing…') : ui('Refresh summary')}</button></>}
       />
 
       {summaryQuery.isError ? (
         <section className="card card--danger">
-          <h2>Learning feedback summary unavailable</h2>
+          <h2>{ui('Learning feedback summary unavailable')}</h2>
           <p className="card__subtext">
-            {summaryQuery.error instanceof Error ? summaryQuery.error.message : 'Unable to load the learning feedback summary.'}
+            {summaryQuery.error instanceof Error ? summaryQuery.error.message : ui('Unable to load the learning feedback summary.')}
           </p>
           <button className="button" type="button" onClick={refreshSummary} disabled={summaryQuery.isFetching}>
-            {summaryQuery.isFetching ? 'Retrying…' : 'Retry'}
+            {summaryQuery.isFetching ? ui('Retrying…') : ui('Retry')}
           </button>
         </section>
       ) : null}
 
-      <OperationalWorkspaceStats ariaLabel="Learning feedback summary">
-        <StatCard label="Posture" value={governance?.continuous_learning_posture || (summaryQuery.isLoading ? 'loading' : 'unknown')} iconPath="/decision-learning-feedback" tone="blue" />
-        <StatCard label="Outcomes" value={governance?.outcome_count ?? 0} iconPath="/intelligence-review" tone="green" />
-        <StatCard label="Forecast evidence" value={governance?.forecast_accuracy_count ?? 0} iconPath="/probabilistic-forecasting" tone="violet" />
-        <StatCard label="Policy evidence" value={governance?.policy_effectiveness_count ?? 0} iconPath="/adaptive-policy-engine" tone="amber" />
-        <StatCard label="Optimization evidence" value={governance?.optimization_result_count ?? 0} iconPath="/cross-domain-optimization" tone="slate" />
+      <OperationalWorkspaceStats ariaLabel={ui('Learning feedback summary')}>
+        <LocalizedLearningStatCard label="Posture" value={governance?.continuous_learning_posture || (summaryQuery.isLoading ? 'loading' : 'unknown')} iconPath="/decision-learning-feedback" tone="blue" />
+        <LocalizedLearningStatCard label="Outcomes" value={governance?.outcome_count ?? 0} iconPath="/intelligence-review" tone="green" />
+        <LocalizedLearningStatCard label="Forecast evidence" value={governance?.forecast_accuracy_count ?? 0} iconPath="/probabilistic-forecasting" tone="violet" />
+        <LocalizedLearningStatCard label="Policy evidence" value={governance?.policy_effectiveness_count ?? 0} iconPath="/adaptive-policy-engine" tone="amber" />
+        <LocalizedLearningStatCard label="Optimization evidence" value={governance?.optimization_result_count ?? 0} iconPath="/cross-domain-optimization" tone="slate" />
       </OperationalWorkspaceStats>
 
-      <OperationalWorkspaceTabs ariaLabel="Learning Feedback view">
-        <OperationalWorkspaceTab active={view === 'feedback'} iconPath="/decision-learning-feedback" label="Feedback records" onClick={() => setView('feedback')} />
-        {canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label="Readiness checks" onClick={() => setView('readiness')} /> : null}
+      <OperationalWorkspaceTabs ariaLabel={ui('Learning Feedback view')}>
+        <OperationalWorkspaceTab active={view === 'feedback'} iconPath="/decision-learning-feedback" label={ui('Feedback records')} onClick={() => setView('feedback')} />
+        {canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label={ui('Readiness checks')} onClick={() => setView('readiness')} /> : null}
       </OperationalWorkspaceTabs>
 
       {view === 'feedback' ? (canGovern ? (
       <section className={'card learning-feedback-form-card'}>
         <div className="card__header">
           <div>
-            <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/decision-learning-feedback" size={18} /></span>Record feedback evidence</h2>
-            <p className="card__subtext">Choose what was reviewed, identify the source, and describe the expected and actual result. The saved record is added to the audit trail and the summary is refreshed.</p>
-            <p className="card__subtext">Advanced fields are optional. Leave a field blank when the answer is not known; the system will not turn a blank field into a measured result, decision, or assigned action.</p>
+            <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/decision-learning-feedback" size={18} /></span>{ui('Record feedback evidence')}</h2>
+            <p className="card__subtext">{ui('Choose what was reviewed, identify the source, and describe the expected and actual result. The saved record is added to the audit trail and the summary is refreshed.')}</p>
+            <p className="card__subtext">{ui('Advanced fields are optional. Leave a field blank when the answer is not known; the system will not turn a blank field into a measured result, decision, or assigned action.')}</p>
           </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
           <label>
-            <span className="form-label">Feedback type</span>
+            <span className="form-label">{ui('Feedback type')}</span>
             <select className="input" value={mode} onChange={(event) => handleModeChange(event.target.value as FeedbackMode)}>
-              {(Object.keys(modeLabels) as FeedbackMode[]).map((item) => <option key={item} value={item}>{modeLabels[item]}</option>)}
+              {(Object.keys(modeLabels) as FeedbackMode[]).map((item) => <option key={item} value={item}>{ui(modeLabels[item])}</option>)}
             </select>
           </label>
           <label>
-            <span className="form-label">Domain</span>
+            <span className="form-label">{ui('Domain')}</span>
             <input className="input" value={form.domain} onChange={(event) => updateForm('domain', event.target.value)} placeholder="multi_domain" />
           </label>
           <label>
-            <span className="form-label">Status</span>
+            <span className="form-label">{ui('Status')}</span>
             <select className="input" value={form.status} onChange={(event) => updateForm('status', event.target.value)}>
-              {activeStatusOptions.map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+              {activeStatusOptions.map((status) => <option key={status} value={status}>{ui(formatLabel(status))}</option>)}
             </select>
           </label>
           <label>
-            <span className="form-label">Score (-1 to 1)</span>
+            <span className="form-label">{ui('Score (-1 to 1)')}</span>
             <input className="input" value={form.score} onChange={(event) => updateForm('score', event.target.value)} placeholder="0" />
           </label>
           {mode === 'learning-outcomes' ? (
             <label>
-              <span className="form-label">Recommendation key</span>
+              <span className="form-label">{ui('Recommendation key')}</span>
               <input className="input" value={form.recommendationKey} onChange={(event) => updateForm('recommendationKey', event.target.value)} placeholder="recommendation-key" />
             </label>
           ) : null}
@@ -4567,53 +4705,53 @@ export default function DecisionLearningFeedbackPage() {
 
         {mode === 'learning-outcomes' ? (
           <details className="learning-feedback-advanced">
-            <summary>Additional recommendation outcome details</summary>
+            <summary>{ui('Additional recommendation outcome details')}</summary>
             <div className="learning-feedback-advanced__body">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
-              <span className="form-label">Business value</span>
+              <span className="form-label">{ui('Business value')}</span>
               <input className="input" value={form.businessValueScore} onChange={(event) => updateForm('businessValueScore', event.target.value)} placeholder="-1 to 1" />
             </label>
             <label>
-              <span className="form-label">Stock impact</span>
+              <span className="form-label">{ui('Stock impact')}</span>
               <input className="input" value={form.stockImpactScore} onChange={(event) => updateForm('stockImpactScore', event.target.value)} placeholder="-1 to 1" />
             </label>
             <label>
-              <span className="form-label">Financial impact</span>
+              <span className="form-label">{ui('Financial impact')}</span>
               <input className="input" value={form.financialImpactScore} onChange={(event) => updateForm('financialImpactScore', event.target.value)} placeholder="-1 to 1" />
             </label>
             <label>
-              <span className="form-label">Waste impact</span>
+              <span className="form-label">{ui('Waste impact')}</span>
               <input className="input" value={form.wasteImpactScore} onChange={(event) => updateForm('wasteImpactScore', event.target.value)} placeholder="-1 to 1" />
             </label>
             <label>
-              <span className="form-label">Service impact</span>
+              <span className="form-label">{ui('Service impact')}</span>
               <input className="input" value={form.serviceLevelImpactScore} onChange={(event) => updateForm('serviceLevelImpactScore', event.target.value)} placeholder="-1 to 1" />
             </label>
             <label>
-              <span className="form-label">Outcome confidence</span>
+              <span className="form-label">{ui('Outcome confidence')}</span>
               <input className="input" value={form.outcomeConfidenceScore} onChange={(event) => updateForm('outcomeConfidenceScore', event.target.value)} placeholder="0 to 1" />
             </label>
             <label>
-              <span className="form-label">Outcome classification</span>
+              <span className="form-label">{ui('Outcome classification')}</span>
               <select className="input" value={form.outcomeClassification} onChange={(event) => updateForm('outcomeClassification', event.target.value)}>
-                <option value="">Decide from status and scores</option>
-                {['successful', 'partially_successful', 'neutral', 'failed', 'inconclusive', 'unclassified'].map((classification) => <option key={classification} value={classification}>{formatLabel(classification)}</option>)}
+                <option value="">{ui('Decide from status and scores')}</option>
+                {['successful', 'partially_successful', 'neutral', 'failed', 'inconclusive', 'unclassified'].map((classification) => <option key={classification} value={classification}>{ui(formatLabel(classification))}</option>)}
               </select>
             </label>
             <label>
-              <span className="form-label">Review required</span>
+              <span className="form-label">{ui('Review required')}</span>
               <select className="input" value={form.outcomeReviewRequired} onChange={(event) => updateForm('outcomeReviewRequired', event.target.value)}>
-                <option value="">Decide from the evidence</option>
-                <option value="false">No</option>
-                <option value="true">Yes</option>
+                <option value="">{ui('Decide from the evidence')}</option>
+                <option value="false">{ui('No')}</option>
+                <option value="true">{ui('Yes')}</option>
               </select>
             </label>
           </div>
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">Outcome review reason JSON</span>
+              <span className="form-label">{ui('Outcome review reason JSON')}</span>
               <textarea className="input" value={form.outcomeReviewReason} onChange={(event) => updateForm('outcomeReviewReason', event.target.value)} placeholder='{"reason":"negative stock impact"}' rows={2} />
             </label>
           </div>
@@ -4621,42 +4759,42 @@ export default function DecisionLearningFeedbackPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
-              <span className="form-label">Financial impact amount</span>
+              <span className="form-label">{ui('Financial impact amount')}</span>
               <input className="input" value={form.financialImpactAmount} onChange={(event) => updateForm('financialImpactAmount', event.target.value)} placeholder="1250.00" />
             </label>
             <label>
-              <span className="form-label">Currency</span>
+              <span className="form-label">{ui('Currency')}</span>
               <input className="input" value={form.financialImpactCurrency} onChange={(event) => updateForm('financialImpactCurrency', event.target.value)} placeholder={getActiveTenantCurrency()} maxLength={3} />
             </label>
             <label>
-              <span className="form-label">Stockout prevented</span>
+              <span className="form-label">{ui('Stockout prevented')}</span>
               <select className="input" value={form.stockoutPrevented} onChange={(event) => updateForm('stockoutPrevented', event.target.value)}>
-                <option value="">Not known</option>
-                <option value="false">No</option>
-                <option value="true">Yes</option>
+                <option value="">{ui('Not known')}</option>
+                <option value="false">{ui('No')}</option>
+                <option value="true">{ui('Yes')}</option>
               </select>
             </label>
             <label>
-              <span className="form-label">Overstock prevented</span>
+              <span className="form-label">{ui('Overstock prevented')}</span>
               <select className="input" value={form.overstockPrevented} onChange={(event) => updateForm('overstockPrevented', event.target.value)}>
-                <option value="">Not known</option>
-                <option value="false">No</option>
-                <option value="true">Yes</option>
+                <option value="">{ui('Not known')}</option>
+                <option value="false">{ui('No')}</option>
+                <option value="true">{ui('Yes')}</option>
               </select>
             </label>
             <label>
-              <span className="form-label">Waste reduced quantity</span>
+              <span className="form-label">{ui('Waste reduced quantity')}</span>
               <input className="input" value={form.wasteReducedQuantity} onChange={(event) => updateForm('wasteReducedQuantity', event.target.value)} placeholder="12" />
             </label>
             <label>
-              <span className="form-label">Service delta %</span>
+              <span className="form-label">{ui('Service delta %')}</span>
               <input className="input" value={form.serviceLevelDeltaPercent} onChange={(event) => updateForm('serviceLevelDeltaPercent', event.target.value)} placeholder="3.5" />
             </label>
           </div>
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">Business impact evidence JSON</span>
+              <span className="form-label">{ui('Business impact evidence JSON')}</span>
               <textarea className="input" value={form.businessImpactEvidence} onChange={(event) => updateForm('businessImpactEvidence', event.target.value)} placeholder='{"evidence":"stockout avoided after reorder recommendation"}' rows={2} />
             </label>
           </div>
@@ -4664,307 +4802,307 @@ export default function DecisionLearningFeedbackPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
-              <span className="form-label">Baseline metric value</span>
+              <span className="form-label">{ui('Baseline metric value')}</span>
               <input className="input" value={form.baselineMetricValue} onChange={(event) => updateForm('baselineMetricValue', event.target.value)} placeholder="10" />
             </label>
             <label>
-              <span className="form-label">Target metric value</span>
+              <span className="form-label">{ui('Target metric value')}</span>
               <input className="input" value={form.targetMetricValue} onChange={(event) => updateForm('targetMetricValue', event.target.value)} placeholder="15" />
             </label>
             <label>
-              <span className="form-label">Actual metric value</span>
+              <span className="form-label">{ui('Actual metric value')}</span>
               <input className="input" value={form.actualMetricValue} onChange={(event) => updateForm('actualMetricValue', event.target.value)} placeholder="16" />
             </label>
             <label>
-              <span className="form-label">Metric unit</span>
-              <input className="input" value={form.metricUnit} onChange={(event) => updateForm('metricUnit', event.target.value)} placeholder="units" />
+              <span className="form-label">{ui('Metric unit')}</span>
+              <input className="input" value={form.metricUnit} onChange={(event) => updateForm('metricUnit', event.target.value)} placeholder={ui('units')} />
             </label>
             <label>
-              <span className="form-label">Target direction</span>
+              <span className="form-label">{ui('Target direction')}</span>
               <select className="input" value={form.targetDirection} onChange={(event) => updateForm('targetDirection', event.target.value)}>
-                <option value="">Not specified</option>
-                <option value="increase">Increase</option>
-                <option value="decrease">Decrease</option>
-                <option value="maintain">Maintain</option>
+                <option value="">{ui('Not specified')}</option>
+                <option value="increase">{ui('Increase')}</option>
+                <option value="decrease">{ui('Decrease')}</option>
+                <option value="maintain">{ui('Maintain')}</option>
               </select>
             </label>
             <label>
-              <span className="form-label">Target tolerance %</span>
+              <span className="form-label">{ui('Target tolerance %')}</span>
               <input className="input" value={form.targetTolerancePercent} onChange={(event) => updateForm('targetTolerancePercent', event.target.value)} placeholder="5" />
             </label>
             <label>
-              <span className="form-label">Target met</span>
+              <span className="form-label">{ui('Target met')}</span>
               <select className="input" value={form.targetMet} onChange={(event) => updateForm('targetMet', event.target.value)}>
-                <option value="">Infer from values</option>
-                <option value="true">Yes</option>
-                <option value="false">No</option>
+                <option value="">{ui('Infer from values')}</option>
+                <option value="true">{ui('Yes')}</option>
+                <option value="false">{ui('No')}</option>
               </select>
             </label>
           </div>
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">Target evidence JSON</span>
+              <span className="form-label">{ui('Target evidence JSON')}</span>
               <textarea className="input" value={form.targetEvidence} onChange={(event) => updateForm('targetEvidence', event.target.value)} placeholder='{"metric":"stockout days","baseline":3,"target":0,"actual":0}' rows={2} />
             </label>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
-              <span className="form-label">Attribution method</span>
+              <span className="form-label">{ui('Attribution method')}</span>
               <select className="input" value={form.attributionMethod} onChange={(event) => updateForm('attributionMethod', event.target.value)}>
-                <option value="">Not specified</option>
-                {['direct_measurement', 'before_after', 'control_group', 'counterfactual', 'manual_assessment', 'inferred'].map((method) => <option key={method} value={method}>{formatLabel(method)}</option>)}
+                <option value="">{ui('Not specified')}</option>
+                {['direct_measurement', 'before_after', 'control_group', 'counterfactual', 'manual_assessment', 'inferred'].map((method) => <option key={method} value={method}>{ui(formatLabel(method))}</option>)}
               </select>
             </label>
             <label>
-              <span className="form-label">Attribution confidence</span>
+              <span className="form-label">{ui('Attribution confidence')}</span>
               <input className="input" value={form.attributionConfidenceScore} onChange={(event) => updateForm('attributionConfidenceScore', event.target.value)} placeholder="0 to 1" />
             </label>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
-              <span className="form-label">Counterfactual reference JSON</span>
+              <span className="form-label">{ui('Counterfactual reference JSON')}</span>
               <textarea className="input" value={form.counterfactualReference} onChange={(event) => updateForm('counterfactualReference', event.target.value)} placeholder='{"baseline_period":"previous 30 days","comparison":"similar item"}' rows={2} />
             </label>
             <label>
-              <span className="form-label">Attribution evidence JSON</span>
+              <span className="form-label">{ui('Attribution evidence JSON')}</span>
               <textarea className="input" value={form.attributionEvidence} onChange={(event) => updateForm('attributionEvidence', event.target.value)} placeholder='{"why_attributed":"stockout rate dropped after approved min-stock change"}' rows={2} />
             </label>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
-              <span className="form-label">Measurement method</span>
-              <input className="input" value={form.measurementMethod} onChange={(event) => updateForm('measurementMethod', event.target.value)} placeholder="manual review / report / sensor" />
+              <span className="form-label">{ui('Measurement method')}</span>
+              <input className="input" value={form.measurementMethod} onChange={(event) => updateForm('measurementMethod', event.target.value)} placeholder={ui('manual review / report / sensor')} />
             </label>
             <label>
-              <span className="form-label">Measurement source</span>
-              <input className="input" value={form.measurementSource} onChange={(event) => updateForm('measurementSource', event.target.value)} placeholder="stock report / supplier KPI" />
+              <span className="form-label">{ui('Measurement source')}</span>
+              <input className="input" value={form.measurementSource} onChange={(event) => updateForm('measurementSource', event.target.value)} placeholder={ui('stock report / supplier KPI')} />
             </label>
             <label>
-              <span className="form-label">Measurement owner</span>
-              <input className="input" value={form.measurementOwner} onChange={(event) => updateForm('measurementOwner', event.target.value)} placeholder="operations manager" />
+              <span className="form-label">{ui('Measurement owner')}</span>
+              <input className="input" value={form.measurementOwner} onChange={(event) => updateForm('measurementOwner', event.target.value)} placeholder={ui('operations manager')} />
             </label>
             <label>
-              <span className="form-label">Measurement sample size</span>
+              <span className="form-label">{ui('Measurement sample size')}</span>
               <input className="input" value={form.measurementSampleSize} onChange={(event) => updateForm('measurementSampleSize', event.target.value)} placeholder="30" />
             </label>
             <label>
-              <span className="form-label">Data quality score</span>
+              <span className="form-label">{ui('Data quality score')}</span>
               <input className="input" value={form.measurementDataQualityScore} onChange={(event) => updateForm('measurementDataQualityScore', event.target.value)} placeholder="0 to 1" />
             </label>
           </div>
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">Measurement quality evidence JSON</span>
+              <span className="form-label">{ui('Measurement quality evidence JSON')}</span>
               <textarea className="input" value={form.measurementQualityEvidence} onChange={(event) => updateForm('measurementQualityEvidence', event.target.value)} placeholder='{"source":"stock movement report","reviewed_by":"manager"}' rows={2} />
             </label>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
-              <span className="form-label">Review status</span>
+              <span className="form-label">{ui('Review status')}</span>
               <select className="input" value={form.reviewStatus} onChange={(event) => updateForm('reviewStatus', event.target.value)}>
-                <option value="">Decide from the evidence</option>
-                {['not_required', 'open', 'in_review', 'resolved', 'rejected', 'deferred'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+                <option value="">{ui('Decide from the evidence')}</option>
+                {['not_required', 'open', 'in_review', 'resolved', 'rejected', 'deferred'].map((status) => <option key={status} value={status}>{ui(formatLabel(status))}</option>)}
               </select>
             </label>
             <label>
-              <span className="form-label">Review owner</span>
-              <input className="input" value={form.reviewOwner} onChange={(event) => updateForm('reviewOwner', event.target.value)} placeholder="decision governance reviewer" />
+              <span className="form-label">{ui('Review owner')}</span>
+              <input className="input" value={form.reviewOwner} onChange={(event) => updateForm('reviewOwner', event.target.value)} placeholder={ui('decision governance reviewer')} />
             </label>
             <label>
-              <span className="form-label">Reviewed at</span>
-              <input className="input" value={form.reviewedAt} onChange={(event) => updateForm('reviewedAt', event.target.value)} placeholder="ISO timestamp" />
+              <span className="form-label">{ui('Reviewed at')}</span>
+              <input className="input" value={form.reviewedAt} onChange={(event) => updateForm('reviewedAt', event.target.value)} placeholder={ui('ISO timestamp')} />
             </label>
             <label>
-              <span className="form-label">Review resolution</span>
+              <span className="form-label">{ui('Review resolution')}</span>
               <select className="input" value={form.reviewResolution} onChange={(event) => updateForm('reviewResolution', event.target.value)}>
-                <option value="">No resolution yet</option>
-                {['accepted', 'corrected', 'overridden', 'invalidated', 'deferred', 'not_actionable'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+                <option value="">{ui('No resolution yet')}</option>
+                {['accepted', 'corrected', 'overridden', 'invalidated', 'deferred', 'not_actionable'].map((status) => <option key={status} value={status}>{ui(formatLabel(status))}</option>)}
               </select>
             </label>
           </div>
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">Review resolution evidence JSON</span>
+              <span className="form-label">{ui('Review resolution evidence JSON')}</span>
               <textarea className="input" value={form.reviewEvidence} onChange={(event) => updateForm('reviewEvidence', event.target.value)} placeholder='{"resolution_reason":"reviewed against stockout and cost evidence"}' rows={2} />
             </label>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
-              <span className="form-label">Evaluation due at</span>
-              <input className="input" value={form.evaluationDueAt} onChange={(event) => updateForm('evaluationDueAt', event.target.value)} placeholder="ISO timestamp" />
+              <span className="form-label">{ui('Evaluation due at')}</span>
+              <input className="input" value={form.evaluationDueAt} onChange={(event) => updateForm('evaluationDueAt', event.target.value)} placeholder={ui('ISO timestamp')} />
             </label>
             <label>
-              <span className="form-label">Evaluation status</span>
+              <span className="form-label">{ui('Evaluation status')}</span>
               <select className="input" value={form.evaluationStatus} onChange={(event) => updateForm('evaluationStatus', event.target.value)}>
-                <option value="">Decide from due date</option>
-                {['not_scheduled', 'scheduled', 'due', 'overdue', 'completed', 'waived'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+                <option value="">{ui('Decide from due date')}</option>
+                {['not_scheduled', 'scheduled', 'due', 'overdue', 'completed', 'waived'].map((status) => <option key={status} value={status}>{ui(formatLabel(status))}</option>)}
               </select>
             </label>
             <label>
-              <span className="form-label">Evaluation owner</span>
-              <input className="input" value={form.evaluationOwner} onChange={(event) => updateForm('evaluationOwner', event.target.value)} placeholder="outcome evaluator" />
+              <span className="form-label">{ui('Evaluation owner')}</span>
+              <input className="input" value={form.evaluationOwner} onChange={(event) => updateForm('evaluationOwner', event.target.value)} placeholder={ui('outcome evaluator')} />
             </label>
           </div>
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">Evaluation SLA evidence JSON</span>
+              <span className="form-label">{ui('Evaluation SLA evidence JSON')}</span>
               <textarea className="input" value={form.evaluationEvidence} onChange={(event) => updateForm('evaluationEvidence', event.target.value)} placeholder='{"measurement_due_policy":"30 days after execution"}' rows={2} />
             </label>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
-              <span className="form-label">Outcome acceptance status</span>
+              <span className="form-label">{ui('Outcome acceptance status')}</span>
               <select className="input" value={form.acceptanceStatus} onChange={(event) => updateForm('acceptanceStatus', event.target.value)}>
-                <option value="">Not decided</option>
-                {['pending', 'accepted', 'rejected', 'deferred'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+                <option value="">{ui('Not decided')}</option>
+                {['pending', 'accepted', 'rejected', 'deferred'].map((status) => <option key={status} value={status}>{ui(formatLabel(status))}</option>)}
               </select>
             </label>
             <label>
-              <span className="form-label">Acceptance owner</span>
-              <input className="input" value={form.acceptanceOwner} onChange={(event) => updateForm('acceptanceOwner', event.target.value)} placeholder="commercial outcome approver" />
+              <span className="form-label">{ui('Acceptance owner')}</span>
+              <input className="input" value={form.acceptanceOwner} onChange={(event) => updateForm('acceptanceOwner', event.target.value)} placeholder={ui('commercial outcome approver')} />
             </label>
             <label>
-              <span className="form-label">Accepted at</span>
-              <input className="input" value={form.acceptedAt} onChange={(event) => updateForm('acceptedAt', event.target.value)} placeholder="ISO timestamp" />
+              <span className="form-label">{ui('Accepted at')}</span>
+              <input className="input" value={form.acceptedAt} onChange={(event) => updateForm('acceptedAt', event.target.value)} placeholder={ui('ISO timestamp')} />
             </label>
           </div>
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">Outcome acceptance evidence JSON</span>
+              <span className="form-label">{ui('Outcome acceptance evidence JSON')}</span>
               <textarea className="input" value={form.acceptanceEvidence} onChange={(event) => updateForm('acceptanceEvidence', event.target.value)} placeholder='{"accepted_by":"commercial owner","reason":"complete lifecycle and measured impact evidence reviewed"}' rows={2} />
             </label>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
-              <span className="form-label">Corrective action status</span>
+              <span className="form-label">{ui('Corrective action status')}</span>
               <select className="input" value={form.correctiveActionStatus} onChange={(event) => updateForm('correctiveActionStatus', event.target.value)}>
-                <option value="">Decide from the outcome</option>
-                {['not_required', 'open', 'in_progress', 'resolved', 'waived'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+                <option value="">{ui('Decide from the outcome')}</option>
+                {['not_required', 'open', 'in_progress', 'resolved', 'waived'].map((status) => <option key={status} value={status}>{ui(formatLabel(status))}</option>)}
               </select>
             </label>
             <label>
-              <span className="form-label">Corrective action owner</span>
-              <input className="input" value={form.correctiveActionOwner} onChange={(event) => updateForm('correctiveActionOwner', event.target.value)} placeholder="remediation owner" />
+              <span className="form-label">{ui('Corrective action owner')}</span>
+              <input className="input" value={form.correctiveActionOwner} onChange={(event) => updateForm('correctiveActionOwner', event.target.value)} placeholder={ui('remediation owner')} />
             </label>
             <label>
-              <span className="form-label">Corrective due at</span>
-              <input className="input" value={form.correctiveActionDueAt} onChange={(event) => updateForm('correctiveActionDueAt', event.target.value)} placeholder="ISO timestamp" />
+              <span className="form-label">{ui('Corrective due at')}</span>
+              <input className="input" value={form.correctiveActionDueAt} onChange={(event) => updateForm('correctiveActionDueAt', event.target.value)} placeholder={ui('ISO timestamp')} />
             </label>
             <label>
-              <span className="form-label">Corrective resolved at</span>
-              <input className="input" value={form.correctiveActionResolvedAt} onChange={(event) => updateForm('correctiveActionResolvedAt', event.target.value)} placeholder="ISO timestamp" />
+              <span className="form-label">{ui('Corrective resolved at')}</span>
+              <input className="input" value={form.correctiveActionResolvedAt} onChange={(event) => updateForm('correctiveActionResolvedAt', event.target.value)} placeholder={ui('ISO timestamp')} />
             </label>
           </div>
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">Corrective action evidence JSON</span>
+              <span className="form-label">{ui('Corrective action evidence JSON')}</span>
               <textarea className="input" value={form.correctiveActionEvidence} onChange={(event) => updateForm('correctiveActionEvidence', event.target.value)} placeholder='{"corrective_action":"supplier threshold adjusted after missed target","resolution":"reviewed and waived/resolved"}' rows={2} />
             </label>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
-              <span className="form-label">Learning signal</span>
+              <span className="form-label">{ui('Learning signal')}</span>
               <select className="input" value={form.learningSignal} onChange={(event) => updateForm('learningSignal', event.target.value)}>
-                <option value="">Decide from the evidence</option>
-                {['reinforce', 'tune', 'suppress', 'review', 'unclassified'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+                <option value="">{ui('Decide from the evidence')}</option>
+                {['reinforce', 'tune', 'suppress', 'review', 'unclassified'].map((status) => <option key={status} value={status}>{ui(formatLabel(status))}</option>)}
               </select>
             </label>
             <label>
-              <span className="form-label">Learning signal reason</span>
-              <input className="input" value={form.learningSignalReason} onChange={(event) => updateForm('learningSignalReason', event.target.value)} placeholder="why this outcome should reinforce/tune/suppress/review future guidance" />
+              <span className="form-label">{ui('Learning signal reason')}</span>
+              <input className="input" value={form.learningSignalReason} onChange={(event) => updateForm('learningSignalReason', event.target.value)} placeholder={ui('why this outcome should reinforce/tune/suppress/review future guidance')} />
             </label>
             <label>
-              <span className="form-label">Recommended next action</span>
-              <input className="input" value={form.learningSignalNextAction} onChange={(event) => updateForm('learningSignalNextAction', event.target.value)} placeholder="manual next governance action for this recommendation pattern" />
+              <span className="form-label">{ui('Recommended next action')}</span>
+              <input className="input" value={form.learningSignalNextAction} onChange={(event) => updateForm('learningSignalNextAction', event.target.value)} placeholder={ui('manual next governance action for this recommendation pattern')} />
             </label>
           </div>
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">Learning signal evidence JSON</span>
+              <span className="form-label">{ui('Learning signal evidence JSON')}</span>
               <textarea className="input" value={form.learningSignalEvidence} onChange={(event) => updateForm('learningSignalEvidence', event.target.value)} placeholder='{"signal_basis":"measured outcome converted into future manual recommendation guidance"}' rows={2} />
             </label>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
-              <span className="form-label">Learning action status</span>
+              <span className="form-label">{ui('Learning action status')}</span>
               <select className="input" value={form.learningActionStatus} onChange={(event) => updateForm('learningActionStatus', event.target.value)}>
-                <option value="">Decide from the learning signal</option>
-                {['pending', 'assigned', 'completed', 'blocked', 'waived'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+                <option value="">{ui('Decide from the learning signal')}</option>
+                {['pending', 'assigned', 'completed', 'blocked', 'waived'].map((status) => <option key={status} value={status}>{ui(formatLabel(status))}</option>)}
               </select>
             </label>
             <label>
-              <span className="form-label">Learning action owner</span>
-              <input className="input" value={form.learningActionOwner} onChange={(event) => updateForm('learningActionOwner', event.target.value)} placeholder="manual follow-up owner" />
+              <span className="form-label">{ui('Learning action owner')}</span>
+              <input className="input" value={form.learningActionOwner} onChange={(event) => updateForm('learningActionOwner', event.target.value)} placeholder={ui('manual follow-up owner')} />
             </label>
             <label>
-              <span className="form-label">Learning action due at</span>
-              <input className="input" value={form.learningActionDueAt} onChange={(event) => updateForm('learningActionDueAt', event.target.value)} placeholder="ISO timestamp" />
+              <span className="form-label">{ui('Learning action due at')}</span>
+              <input className="input" value={form.learningActionDueAt} onChange={(event) => updateForm('learningActionDueAt', event.target.value)} placeholder={ui('ISO timestamp')} />
             </label>
             <label>
-              <span className="form-label">Learning action completed at</span>
-              <input className="input" value={form.learningActionCompletedAt} onChange={(event) => updateForm('learningActionCompletedAt', event.target.value)} placeholder="ISO timestamp" />
+              <span className="form-label">{ui('Learning action completed at')}</span>
+              <input className="input" value={form.learningActionCompletedAt} onChange={(event) => updateForm('learningActionCompletedAt', event.target.value)} placeholder={ui('ISO timestamp')} />
             </label>
           </div>
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">Learning action evidence JSON</span>
+              <span className="form-label">{ui('Learning action evidence JSON')}</span>
               <textarea className="input" value={form.learningActionEvidence} onChange={(event) => updateForm('learningActionEvidence', event.target.value)} placeholder='{"manual_follow_up":"threshold review completed or waived with owner evidence"}' rows={2} />
             </label>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
-              <span className="form-label">Lifecycle status</span>
+              <span className="form-label">{ui('Lifecycle status')}</span>
               <select className="input" value={form.lifecycleStatus} onChange={(event) => updateForm('lifecycleStatus', event.target.value)}>
-                <option value="">Decide from timestamps and status</option>
-                {['generated', 'approved', 'executed', 'measured', 'scored', 'validated', 'needs_review', 'dismissed'].map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+                <option value="">{ui('Decide from timestamps and status')}</option>
+                {['generated', 'approved', 'executed', 'measured', 'scored', 'validated', 'needs_review', 'dismissed'].map((status) => <option key={status} value={status}>{ui(formatLabel(status))}</option>)}
               </select>
             </label>
             <label>
-              <span className="form-label">Generated at</span>
-              <input className="input" value={form.generatedAt} onChange={(event) => updateForm('generatedAt', event.target.value)} placeholder="ISO timestamp" />
+              <span className="form-label">{ui('Generated at')}</span>
+              <input className="input" value={form.generatedAt} onChange={(event) => updateForm('generatedAt', event.target.value)} placeholder={ui('ISO timestamp')} />
             </label>
             <label>
-              <span className="form-label">Approved at</span>
-              <input className="input" value={form.approvedAt} onChange={(event) => updateForm('approvedAt', event.target.value)} placeholder="ISO timestamp" />
+              <span className="form-label">{ui('Approved at')}</span>
+              <input className="input" value={form.approvedAt} onChange={(event) => updateForm('approvedAt', event.target.value)} placeholder={ui('ISO timestamp')} />
             </label>
             <label>
-              <span className="form-label">Executed at</span>
-              <input className="input" value={form.executedAt} onChange={(event) => updateForm('executedAt', event.target.value)} placeholder="ISO timestamp" />
+              <span className="form-label">{ui('Executed at')}</span>
+              <input className="input" value={form.executedAt} onChange={(event) => updateForm('executedAt', event.target.value)} placeholder={ui('ISO timestamp')} />
             </label>
             <label>
-              <span className="form-label">Measured at</span>
-              <input className="input" value={form.measuredAt} onChange={(event) => updateForm('measuredAt', event.target.value)} placeholder="ISO timestamp" />
+              <span className="form-label">{ui('Measured at')}</span>
+              <input className="input" value={form.measuredAt} onChange={(event) => updateForm('measuredAt', event.target.value)} placeholder={ui('ISO timestamp')} />
             </label>
             <label>
-              <span className="form-label">Scored at</span>
-              <input className="input" value={form.scoredAt} onChange={(event) => updateForm('scoredAt', event.target.value)} placeholder="ISO timestamp" />
+              <span className="form-label">{ui('Scored at')}</span>
+              <input className="input" value={form.scoredAt} onChange={(event) => updateForm('scoredAt', event.target.value)} placeholder={ui('ISO timestamp')} />
             </label>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
-              <span className="form-label">Execution reference JSON or note</span>
+              <span className="form-label">{ui('Execution reference JSON or note')}</span>
               <textarea className="input" rows={3} value={form.executionReference} onChange={(event) => updateForm('executionReference', event.target.value)} placeholder='{"execution_request_id":"..."}' />
             </label>
             <label>
-              <span className="form-label">Lifecycle evidence JSON or note</span>
+              <span className="form-label">{ui('Lifecycle evidence JSON or note')}</span>
               <textarea className="input" rows={3} value={form.lifecycleEvidence} onChange={(event) => updateForm('lifecycleEvidence', event.target.value)} placeholder='{"reviewer":"manager","evidence":"approved and executed"}' />
             </label>
           </div>
@@ -4974,15 +5112,15 @@ export default function DecisionLearningFeedbackPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 12 }}>
           <label>
-            <span className="form-label">Reference JSON or note</span>
+            <span className="form-label">{ui('Reference JSON or note')}</span>
             <textarea className="input" rows={4} value={form.reference} onChange={(event) => updateForm('reference', event.target.value)} placeholder='{"source":"recommendation-review"}' />
           </label>
           <label>
-            <span className="form-label">Expected result / predicted value</span>
+            <span className="form-label">{ui('Expected result / predicted value')}</span>
             <textarea className="input" rows={4} value={form.expected} onChange={(event) => updateForm('expected', event.target.value)} placeholder='{"expected":"lower stockout risk"}' />
           </label>
           <label>
-            <span className="form-label">Observed result / observed value</span>
+            <span className="form-label">{ui('Observed result / observed value')}</span>
             <textarea className="input" rows={4} value={form.observed} onChange={(event) => updateForm('observed', event.target.value)} placeholder='{"observed":"risk reduced after review"}' />
           </label>
         </div>
@@ -4990,15 +5128,15 @@ export default function DecisionLearningFeedbackPage() {
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
           <button className="button" type="button" disabled={mutation.isPending} onClick={submitFeedback}>
             <TenantNavIcon path="/decision-learning-feedback" size={16} />
-            {mutation.isPending ? 'Recording…' : 'Record feedback evidence'}
+            {mutation.isPending ? ui('Recording…') : ui('Record feedback evidence')}
           </button>
           {message ? <span className="card__subtext" role="status">{message}</span> : null}
         </div>
       </section>
       ) : (
         <section className="card learning-feedback-read-only">
-          <h2>Feedback records are read-only for your role</h2>
-          <p className="card__subtext">You can review the summary and recorded evidence, but recording new feedback requires the Decision Intelligence governance permission.</p>
+          <h2>{ui('Feedback records are read-only for your role')}</h2>
+          <p className="card__subtext">{ui('You can review the summary and recorded evidence, but recording new feedback requires the Decision Intelligence governance permission.')}</p>
         </section>
       )) : null}
 
@@ -5009,26 +5147,26 @@ export default function DecisionLearningFeedbackPage() {
           <FeedbackReviewBoard board={summaryQuery.data?.feedback_review_board} />
 
           <section className={'card learning-feedback-section learning-feedback-safety-card'}>
-            <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/permissions" size={18} /></span>What this page can change</h2>
+            <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/permissions" size={18} /></span>{ui('What this page can change')}</h2>
             <p className="card__subtext">
-              It can save feedback evidence for later review. It cannot train an external model, change an AI model or policy by itself, execute a recommendation, or change stock and other operational records.
+              {ui('It can save feedback evidence for later review. It cannot train an external model, change an AI model or policy by itself, execute a recommendation, or change stock and other operational records.')}
             </p>
             <p className="card__subtext">
-              Business areas represented in the current records: {(governance?.observed_domains || []).map(formatLabel).join(', ') || 'none yet'}.
+              {ui('Business areas represented in the current records:')} {(governance?.observed_domains || []).map(formatLabel).join(', ') || ui('none yet')}.
             </p>
           </section>
 
-          <EvidenceTable title="Learning outcomes" rows={summaryQuery.data?.outcomes || []} />
-          <EvidenceTable title="Forecast accuracy" rows={summaryQuery.data?.forecast_accuracy || []} />
-          <EvidenceTable title="Policy effectiveness" rows={summaryQuery.data?.policy_effectiveness || []} />
-          <EvidenceTable title="Optimization results" rows={summaryQuery.data?.optimization_results || []} />
+          <EvidenceTable title={ui('Learning outcomes')} rows={summaryQuery.data?.outcomes || []} />
+          <EvidenceTable title={ui('Forecast accuracy')} rows={summaryQuery.data?.forecast_accuracy || []} />
+          <EvidenceTable title={ui('Policy effectiveness')} rows={summaryQuery.data?.policy_effectiveness || []} />
+          <EvidenceTable title={ui('Optimization results')} rows={summaryQuery.data?.optimization_results || []} />
         </>
       ) : canViewDiagnostics ? (
         <>
           <section className={'card learning-feedback-section learning-feedback-readiness-intro'}>
-            <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/reliability-command" size={18} /></span>Readiness checks</h2>
+            <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/reliability-command" size={18} /></span>{ui('Readiness checks')}</h2>
             <p className="card__subtext">
-              These technical checks support internal release, monitoring, audit, and rollout reviews. They do not prove that an AI model was used and they do not carry out operational work.
+              {ui('These technical checks support internal release, monitoring, audit, and rollout reviews. They do not prove that an AI model was used and they do not carry out operational work.')}
             </p>
           </section>
           <RecommendationOutcomeFoundation foundation={summaryQuery.data?.recommendation_outcome_foundation} />

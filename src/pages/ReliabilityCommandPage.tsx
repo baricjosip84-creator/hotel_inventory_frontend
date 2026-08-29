@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { useRouteQueryState } from '../lib/useRouteQueryState';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
@@ -106,6 +108,49 @@ const SOURCE_LABELS: Record<string, string> = {
   '/reliability-command': 'Reliability Command'
 };
 
+const CANONICAL_STATUS_LABELS: Record<string, string> = {
+  ready: 'Ready',
+  watch: 'Watch',
+  degraded: 'Degraded',
+  critical: 'Critical',
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  not_ready: 'Not ready',
+  defer: 'Defer',
+  conditional_ready: 'Conditionally ready',
+  ready_after_manual_confirmation: 'Ready after manual confirmation',
+  block_until_reliability_review_complete: 'Block until reliability review is complete',
+  defer_until_evidence_and_owner_confirmation_complete: 'Defer until evidence and owner confirmation are complete',
+  accept_with_monitoring_after_manual_review: 'Accept with monitoring after manual review',
+  accept_after_manual_reviewer_confirmation: 'Accept after manual reviewer confirmation',
+  monitoring_blocked_until_manual_review: 'Monitoring blocked until manual review',
+  monitoring_deferred_until_owner_confirmation: 'Monitoring deferred until owner confirmation',
+  enhanced_monitoring_required: 'Enhanced monitoring required',
+  standard_monitoring_after_manual_confirmation: 'Standard monitoring after manual confirmation',
+  manual_incident_review_required_before_release: 'Manual incident review required before release',
+  manual_incident_handoff_ready_if_observations_degrade: 'Manual incident handoff ready if observations degrade',
+  manual_handoff_watch_required: 'Manual handoff watch required',
+  standard_manual_handoff_reference: 'Standard manual handoff reference',
+  blocked_pending_manual_incident_review: 'Blocked pending manual incident review',
+  conditional_pending_owner_confirmation: 'Conditional pending owner confirmation',
+  watch_pending_post_release_review: 'Watch pending post-release review',
+  ready_for_manual_closure_review: 'Ready for manual closure review'
+};
+
+const SAFETY_LABELS: Record<string, string> = {
+  read_only: 'Read only',
+  source_workflows_remain_authoritative: 'Source workflows remain authoritative',
+  creates_incident: 'Creates incident',
+  executes_runbook: 'Executes runbook',
+  sends_notification: 'Sends notification',
+  records_signoff: 'Records signoff',
+  records_decision: 'Records decision',
+  changes_release_state: 'Changes release state',
+  closes_risk: 'Closes risk',
+  mutates_source_workflow: 'Mutates source workflow'
+};
+
 function formatIdentifier(value?: string | number | null, fallback = 'Not reported'): string {
   if (value === undefined || value === null || value === '') return fallback;
   return String(value)
@@ -116,20 +161,30 @@ function formatIdentifier(value?: string | number | null, fallback = 'Not report
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function formatNumber(value?: number | null): string {
-  if (typeof value !== 'number' || Number.isNaN(value)) return 'Not assessed';
-  return new Intl.NumberFormat().format(value);
+function formatNumber(value: number | null | undefined, locale: Parameters<typeof formatLocalizedNumber>[1], ui: (englishText: string) => string): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) return ui('Not assessed');
+  return formatLocalizedNumber(value, locale);
 }
 
-function formatScore(value?: number | null): string {
-  if (typeof value !== 'number' || Number.isNaN(value)) return 'Not assessed';
-  return `${Number(value.toFixed(2))}%`;
+function formatScore(value: number | null | undefined, locale: Parameters<typeof formatLocalizedNumber>[1], ui: (englishText: string) => string): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) return ui('Not assessed');
+  return `${formatLocalizedNumber(Number(value.toFixed(2)), locale, { maximumFractionDigits: 2 })}%`;
 }
 
-function formatDateTime(value?: string | null): string {
-  if (!value) return 'Not reported';
+function formatDateTime(value: string | null | undefined, locale: Parameters<typeof formatLocalizedDateTime>[1], ui: (englishText: string) => string): string {
+  if (!value) return ui('Not reported');
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? value : formatLocalizedDateTime(date, locale);
+}
+
+function canonicalStatusLabel(value: string | null | undefined, ui: (englishText: string) => string, fallback = 'Not assessed'): string {
+  const normalized = String(value || '').trim();
+  if (!normalized) return ui(fallback);
+  return CANONICAL_STATUS_LABELS[normalized] ? ui(CANONICAL_STATUS_LABELS[normalized]) : formatIdentifier(normalized, ui(fallback));
+}
+
+function safetyLabel(value: string, ui: (englishText: string) => string): string {
+  return SAFETY_LABELS[value] ? ui(SAFETY_LABELS[value]) : formatIdentifier(value);
 }
 
 function toneClass(value?: string | null): string {
@@ -148,12 +203,12 @@ function formatSentence(value?: string | null, fallback = 'Not reported'): strin
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function formatEvidence(value: string): string {
+function formatEvidence(value: string, ui: (englishText: string) => string): string {
   const separatorIndex = value.indexOf(':');
   if (separatorIndex < 0) return formatSentence(value);
   const key = value.slice(0, separatorIndex);
   const raw = value.slice(separatorIndex + 1);
-  const normalizedValue = raw.trim() === 'true' ? 'Yes' : raw.trim() === 'false' ? 'No' : formatSentence(raw, raw.trim() || 'Not reported');
+  const normalizedValue = raw.trim() === 'true' ? ui('Yes') : raw.trim() === 'false' ? ui('No') : formatSentence(raw, raw.trim() || ui('Not reported'));
   return `${formatIdentifier(key)}: ${normalizedValue}`;
 }
 
@@ -185,23 +240,25 @@ function ReliabilitySummaryCard({
   tone?: 'blue' | 'slate' | 'amber' | 'green';
   status?: string | null;
 }) {
+  const { ui } = useAppTranslation();
   return (
     <OperationalWorkspaceStatCard
-      label={label}
+      label={ui(label)}
       value={value}
-      helper={copy}
+      helper={ui(copy)}
       tone={tone}
       iconPath={iconPath}
-      badge={status ? <span className={`reliability-badge ${toneClass(status)}`}>{formatIdentifier(status, 'Not assessed')}</span> : null}
+      badge={status ? <span className={`reliability-badge ${toneClass(status)}`}>{canonicalStatusLabel(status, ui)}</span> : null}
     />
   );
 }
 
 function ReliabilityNavLink({ path, label }: { path: string; label?: string }) {
+  const { ui } = useAppTranslation();
   return (
     <Link className="button button--secondary reliability-link-button" to={path}>
       <TenantNavIcon path={path} size={16} />
-      <span>{label || SOURCE_LABELS[path] || 'Open source page'}</span>
+      <span>{ui(label || SOURCE_LABELS[path] || 'Open source page')}</span>
     </Link>
   );
 }
@@ -230,6 +287,7 @@ async function fetchReliabilityCommand(filters: {
 }
 
 export default function ReliabilityCommandPage() {
+  const { locale, ui } = useAppTranslation();
   const [view, setView] = useState<ReliabilityView>('posture');
   const [readiness, setReadiness] = useRouteQueryState<ReadinessFilter>({
     paramName: 'readiness',
@@ -259,8 +317,8 @@ export default function ReliabilityCommandPage() {
         <section className="card reliability-state reliability-state--loading" aria-live="polite">
           <span className="reliability-state-icon"><TenantNavIcon path="/reliability-command" size={22} /></span>
           <div>
-            <h2>Loading the reliability review</h2>
-            <p>Combining permitted operational pressure, safeguards, and manual follow-up guidance.</p>
+            <h2>{ui('Loading the reliability review')}</h2>
+            <p>{ui('Combining permitted operational pressure, safeguards, and manual follow-up guidance.')}</p>
           </div>
         </section>
       </div>
@@ -273,9 +331,9 @@ export default function ReliabilityCommandPage() {
         <section className="card reliability-state reliability-state--error">
           <span className="reliability-state-icon reliability-state-icon--error"><TenantNavIcon path="/alerts" size={22} /></span>
           <div>
-            <h2>Reliability review could not be loaded</h2>
-            <p>{commandQuery.error instanceof ApiError ? commandQuery.error.message : 'The Reliability Command summary is temporarily unavailable.'}</p>
-            <button className="button button--secondary" type="button" onClick={() => commandQuery.refetch()}>Retry</button>
+            <h2>{ui('Reliability review could not be loaded')}</h2>
+            <p>{commandQuery.error instanceof ApiError ? commandQuery.error.message : ui('The Reliability Command summary is temporarily unavailable.')}</p>
+            <button className="button button--secondary" type="button" onClick={() => commandQuery.refetch()}>{ui('Retry')}</button>
           </div>
         </section>
       </div>
@@ -300,18 +358,18 @@ export default function ReliabilityCommandPage() {
     <div className="io-operational-page io-workspace-page reliability-page" data-reliability-refined="true">
       <OperationalWorkspaceHero
         iconPath="/reliability-command"
-        eyebrow="Read-only operational reliability review"
-        title="Review current pressure, safety checks, and the manual follow-up path"
-        description="Reliability Command combines permitted operational context into advisory guidance only. It never closes a risk, records approval, starts monitoring, opens an incident, sends a notification, or changes a source workflow."
+        eyebrow={ui('Read-only operational reliability review')}
+        title={ui('Review current pressure, safety checks, and the manual follow-up path')}
+        description={ui('Reliability Command combines permitted operational context into advisory guidance only. It never closes a risk, records approval, starts monitoring, opens an incident, sends a notification, or changes a source workflow.')}
         meta={<>
-          <OperationalWorkspaceMetaPill>Read-only guidance</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>Manual follow-up</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>Source workflows authoritative</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui('Read-only guidance')}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui('Manual follow-up')}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui('Source workflows authoritative')}</OperationalWorkspaceMetaPill>
         </>}
         aside={<div style={{ display: 'grid', gap: 8 }}>
-          <OperationalWorkspaceStatus value={risks.length} label={`review risk${risks.length === 1 ? '' : 's'} · refreshed ${formatDateTime(response?.generated_at)}`} />
+          <OperationalWorkspaceStatus value={formatLocalizedNumber(risks.length, locale)} label={ui(risks.length === 1 ? '{count} review risk · refreshed {time}' : '{count} review risks · refreshed {time}').replace('{count}', formatLocalizedNumber(risks.length, locale)).replace('{time}', formatDateTime(response?.generated_at, locale, ui))} />
           <button className="app-button app-button--secondary" type="button" onClick={() => commandQuery.refetch()} disabled={commandQuery.isFetching}>
-            {commandQuery.isFetching ? 'Refreshing…' : 'Refresh review'}
+            {commandQuery.isFetching ? ui('Refreshing…') : ui('Refresh review')}
           </button>
         </div>}
       />
@@ -321,52 +379,52 @@ export default function ReliabilityCommandPage() {
           <div className="reliability-section-title">
             <span className="reliability-heading-icon"><TenantNavIcon path="/reliability-command" size={18} /></span>
             <div>
-              <h2 id="reliability-filter-title">Filter the risk and review guidance</h2>
-              <p className="card__subtext">The filters change which non-ready dimensions become review items. All nine reliability dimensions remain visible in the posture view.</p>
+              <h2 id="reliability-filter-title">{ui('Filter the risk and review guidance')}</h2>
+              <p className="card__subtext">{ui('The filters change which non-ready dimensions become review items. All nine reliability dimensions remain visible in the posture view.')}</p>
             </div>
           </div>
-          {activeFilterCount > 0 ? <button className="button button--secondary reliability-link-button" type="button" onClick={clearFilters}><TenantNavIcon path="/reliability-command" size={16} /><span>Clear filters</span></button> : null}
+          {activeFilterCount > 0 ? <button className="button button--secondary reliability-link-button" type="button" onClick={clearFilters}><TenantNavIcon path="/reliability-command" size={16} /><span>{ui('Clear filters')}</span></button> : null}
         </div>
         <div className="reliability-filter-grid">
           <label>
-            <span>Risk readiness threshold</span>
+            <span>{ui('Risk readiness threshold')}</span>
             <select value={readiness} onChange={(event) => setReadiness(event.target.value as ReadinessFilter)}>
-              {READINESS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {READINESS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
             </select>
           </label>
           <label>
-            <span>Risk severity threshold</span>
+            <span>{ui('Risk severity threshold')}</span>
             <select value={severity} onChange={(event) => setSeverity(event.target.value as SeverityFilter)}>
-              {SEVERITY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {SEVERITY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
             </select>
           </label>
           <label>
-            <span>Maximum review items</span>
+            <span>{ui('Maximum review items')}</span>
             <select value={limit} onChange={(event) => setLimit(event.target.value as ResultLimit)}>
               {LIMIT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
             </select>
           </label>
         </div>
         <div className="reliability-filter-summary">
-          <span>Readiness: <strong>{READINESS_OPTIONS.find((option) => option.value === readiness)?.label}</strong></span>
-          <span>Severity: <strong>{SEVERITY_OPTIONS.find((option) => option.value === severity)?.label}</strong></span>
-          <span>Up to <strong>{response?.filters?.limit || limit}</strong> items per review stage</span>
+          <span>{ui('Readiness')}: <strong>{ui(READINESS_OPTIONS.find((option) => option.value === readiness)?.label || 'Watch or worse')}</strong></span>
+          <span>{ui('Severity')}: <strong>{ui(SEVERITY_OPTIONS.find((option) => option.value === severity)?.label || 'All severities')}</strong></span>
+          <span>{ui('Up to {count} items per review stage').replace('{count}', formatLocalizedNumber(Number(response?.filters?.limit || limit), locale))}</span>
         </div>
       </section>
 
-      <section className="reliability-summary-grid io-workspace-stats" aria-label="Reliability summary">
-        <ReliabilitySummaryCard iconPath="/reliability-command" label="Advisory reliability score" value={formatScore(overview.reliability_score)} copy="Average of current operational pressure and read-only safety checks—not an uptime percentage." tone="blue" />
-        <ReliabilitySummaryCard iconPath="/action-center" label="Overall posture" value={formatIdentifier(overview.readiness, 'Not assessed')} copy="Current advisory posture across the nine reliability dimensions." tone="green" status={overview.readiness} />
-        <ReliabilitySummaryCard iconPath="/alerts" label="Review risks" value={formatNumber(overview.risk_count ?? risks.length)} copy="Non-ready dimensions matching the selected thresholds." tone="amber" />
-        <ReliabilitySummaryCard iconPath="/workflow-composer" label="Manual closure guides" value={formatNumber(overview.closure_review_count)} copy="Generated guidance only. No risk is closed and no signoff is recorded." tone="slate" />
+      <section className="reliability-summary-grid io-workspace-stats" aria-label={ui('Reliability summary')}>
+        <ReliabilitySummaryCard iconPath="/reliability-command" label="Advisory reliability score" value={formatScore(overview.reliability_score, locale, ui)} copy="Average of current operational pressure and read-only safety checks—not an uptime percentage." tone="blue" />
+        <ReliabilitySummaryCard iconPath="/action-center" label="Overall posture" value={canonicalStatusLabel(overview.readiness, ui)} copy="Current advisory posture across the nine reliability dimensions." tone="green" status={overview.readiness} />
+        <ReliabilitySummaryCard iconPath="/alerts" label="Review risks" value={formatNumber(overview.risk_count ?? risks.length, locale, ui)} copy="Non-ready dimensions matching the selected thresholds." tone="amber" />
+        <ReliabilitySummaryCard iconPath="/workflow-composer" label="Manual closure guides" value={formatNumber(overview.closure_review_count, locale, ui)} copy="Generated guidance only. No risk is closed and no signoff is recorded." tone="slate" />
       </section>
 
       <div className="reliability-scoring-note"><TenantNavIcon path="/reliability-command" size={18} /><span>{overview.scoring_note}</span></div>
 
-      <OperationalWorkspaceTabs ariaLabel="Reliability Command views">
-        <OperationalWorkspaceTab active={view === 'posture'} iconPath="/reliability-command" label="Posture and risks" onClick={() => setView('posture')} />
-        <OperationalWorkspaceTab active={view === 'review-path'} iconPath="/workflow-composer" label="Manual review path" onClick={() => setView('review-path')} />
-        <OperationalWorkspaceTab active={view === 'limits'} iconPath="/reliability-command" label="Safety and limits" onClick={() => setView('limits')} />
+      <OperationalWorkspaceTabs ariaLabel={ui('Reliability Command views')}>
+        <OperationalWorkspaceTab active={view === 'posture'} iconPath="/reliability-command" label={ui('Posture and risks')} onClick={() => setView('posture')} />
+        <OperationalWorkspaceTab active={view === 'review-path'} iconPath="/workflow-composer" label={ui('Manual review path')} onClick={() => setView('review-path')} />
+        <OperationalWorkspaceTab active={view === 'limits'} iconPath="/reliability-command" label={ui('Safety and limits')} onClick={() => setView('limits')} />
       </OperationalWorkspaceTabs>
 
       {view === 'posture' ? (
@@ -375,8 +433,8 @@ export default function ReliabilityCommandPage() {
             <div className="reliability-section-title">
               <span className="reliability-heading-icon"><TenantNavIcon path="/reliability-command" size={18} /></span>
               <div>
-                <h2 id="reliability-posture-title">Reliability posture</h2>
-                <p className="card__subtext">Review the nine dimensions first, then open the source workflow for any dimension that needs attention.</p>
+                <h2 id="reliability-posture-title">{ui('Reliability posture')}</h2>
+                <p className="card__subtext">{ui('Review the nine dimensions first, then open the source workflow for any dimension that needs attention.')}</p>
               </div>
             </div>
             <div className="reliability-shortcuts">
@@ -385,7 +443,7 @@ export default function ReliabilityCommandPage() {
             </div>
           </div>
 
-          <section className="reliability-dimension-grid" aria-label="Reliability dimensions">
+          <section className="reliability-dimension-grid" aria-label={ui('Reliability dimensions')}>
             {dimensions.map((dimension) => {
               const sourcePath = dimension.source_path || null;
               return (
@@ -394,17 +452,17 @@ export default function ReliabilityCommandPage() {
                     <div className="reliability-card-title">
                       <span className="reliability-card-icon"><TenantNavIcon path={sourcePath || '/reliability-command'} size={17} /></span>
                       <div>
-                        <div className="card__label">{formatIdentifier(dimension.key, 'Reliability dimension')}</div>
-                        <h3>{dimension.label || 'Reliability dimension'}</h3>
+                        <div className="card__label">{formatIdentifier(dimension.key, ui('Reliability dimension'))}</div>
+                        <h3>{dimension.label || ui('Reliability dimension')}</h3>
                       </div>
                     </div>
-                    <span className={`reliability-badge ${toneClass(dimension.readiness)}`}>{formatIdentifier(dimension.readiness, 'Not assessed')}</span>
+                    <span className={`reliability-badge ${toneClass(dimension.readiness)}`}>{canonicalStatusLabel(dimension.readiness, ui)}</span>
                   </div>
-                  <div className="reliability-score-line"><strong>{formatScore(dimension.score)}</strong><span>Dimension score</span></div>
-                  <p className="card__subtext">{dimension.recommendation || 'No recommendation was reported.'}</p>
+                  <div className="reliability-score-line"><strong>{formatScore(dimension.score, locale, ui)}</strong><span>{ui('Dimension score')}</span></div>
+                  <p className="card__subtext">{dimension.recommendation || ui('No recommendation was reported.')}</p>
                   {dimension.evidence?.length ? (
                     <ul className="reliability-evidence-list">
-                      {dimension.evidence.map((item) => <li key={item}>{formatEvidence(item)}</li>)}
+                      {dimension.evidence.map((item) => <li key={item}>{formatEvidence(item, ui)}</li>)}
                     </ul>
                   ) : null}
                   {sourcePath && sourcePermissionAllows(sourcePath) ? (
@@ -420,11 +478,11 @@ export default function ReliabilityCommandPage() {
               <div className="reliability-section-title">
                 <span className="reliability-heading-icon reliability-heading-icon--amber"><TenantNavIcon path="/alerts" size={18} /></span>
                 <div>
-                  <h2 id="reliability-risk-title">Risk triage guidance</h2>
-                  <p className="card__subtext">These are generated review recommendations for dimensions that match the filters. They are not saved incidents or assigned tasks.</p>
+                  <h2 id="reliability-risk-title">{ui('Risk triage guidance')}</h2>
+                  <p className="card__subtext">{ui('These are generated review recommendations for dimensions that match the filters. They are not saved incidents or assigned tasks.')}</p>
                 </div>
               </div>
-              <span className="reliability-returned-badge">{risks.length} returned</span>
+              <span className="reliability-returned-badge">{ui('{count} returned').replace('{count}', formatLocalizedNumber(risks.length, locale))}</span>
             </div>
             {risks.length ? (
               <div className="reliability-risk-grid">
@@ -436,20 +494,20 @@ export default function ReliabilityCommandPage() {
                         <div className="reliability-card-title">
                           <span className="reliability-card-icon reliability-card-icon--amber"><TenantNavIcon path={sourcePath || '/alerts'} size={17} /></span>
                           <div>
-                            <h3>{risk.label || 'Reliability review item'}</h3>
+                            <h3>{risk.label || ui('Reliability review item')}</h3>
                             <p>{formatIdentifier(risk.dimension)}</p>
                           </div>
                         </div>
                         <div className="reliability-badge-row">
-                          <span className={`reliability-badge ${toneClass(risk.severity)}`}>{formatIdentifier(risk.severity)}</span>
-                          <span className={`reliability-badge ${toneClass(risk.readiness)}`}>{formatIdentifier(risk.readiness)}</span>
+                          <span className={`reliability-badge ${toneClass(risk.severity)}`}>{canonicalStatusLabel(risk.severity, ui)}</span>
+                          <span className={`reliability-badge ${toneClass(risk.readiness)}`}>{canonicalStatusLabel(risk.readiness, ui)}</span>
                         </div>
                       </div>
-                      <p>{risk.recommended_next_action || 'Review the source workflow and capture the human decision there.'}</p>
+                      <p>{risk.recommended_next_action || ui('Review the source workflow and capture the human decision there.')}</p>
                       <dl className="reliability-facts">
-                        <div><dt>Score</dt><dd>{formatScore(risk.score)}</dd></div>
-                        <div><dt>Suggested owner</dt><dd>{formatIdentifier(risk.recommended_owner)}</dd></div>
-                        <div><dt>Suggested runbook</dt><dd>{formatIdentifier(risk.recommended_runbook)}</dd></div>
+                        <div><dt>{ui('Score')}</dt><dd>{formatScore(risk.score, locale, ui)}</dd></div>
+                        <div><dt>{ui('Suggested owner')}</dt><dd>{formatIdentifier(risk.recommended_owner)}</dd></div>
+                        <div><dt>{ui('Suggested runbook')}</dt><dd>{formatIdentifier(risk.recommended_runbook)}</dd></div>
                       </dl>
                       {sourcePath && sourcePermissionAllows(sourcePath) ? (
                         <div className="reliability-card-actions"><ReliabilityNavLink path={sourcePath} /></div>
@@ -460,8 +518,8 @@ export default function ReliabilityCommandPage() {
               </div>
             ) : (
               <div className="reliability-inline-empty">
-                <h3>No non-ready risks match the current thresholds</h3>
-                <p>All current dimensions are Ready or excluded by the selected threshold. This is not a release approval, uptime guarantee, or proof that every operational issue is closed.</p>
+                <h3>{ui('No non-ready risks match the current thresholds')}</h3>
+                <p>{ui('All current dimensions are Ready or excluded by the selected threshold. This is not a release approval, uptime guarantee, or proof that every operational issue is closed.')}</p>
               </div>
             )}
           </section>
@@ -473,8 +531,8 @@ export default function ReliabilityCommandPage() {
           <div className="card reliability-review-note">
             <span className="reliability-hero-icon reliability-hero-icon--slate"><TenantNavIcon path="/workflow-composer" size={22} /></span>
             <div>
-              <h2 id="reliability-review-path-title">Generated manual review path</h2>
-              <p className="card__subtext">The stages below translate each matching reliability risk into suggested investigation, evidence, review, release, monitoring, handoff, and closure guidance. They do not create records, upload evidence, record decisions, approve releases, start monitoring, open incidents, or close risks.</p>
+              <h2 id="reliability-review-path-title">{ui('Generated manual review path')}</h2>
+              <p className="card__subtext">{ui('The stages below translate each matching reliability risk into suggested investigation, evidence, review, release, monitoring, handoff, and closure guidance. They do not create records, upload evidence, record decisions, approve releases, start monitoring, open incidents, or close risks.')}</p>
             </div>
           </div>
           <div className="reliability-stage-list">
@@ -484,11 +542,11 @@ export default function ReliabilityCommandPage() {
                   <div className="reliability-stage-summary-title">
                     <span className="reliability-card-icon"><TenantNavIcon path={reviewStageIconPath(stage.key)} size={17} /></span>
                     <div>
-                      <h3>{stage.label || 'Manual review stage'}</h3>
+                      <h3>{stage.label || ui('Manual review stage')}</h3>
                       <p>{stage.description}</p>
                     </div>
                   </div>
-                  <span>{formatNumber(stage.item_count ?? stage.items?.length ?? 0)} items</span>
+                  <span>{ui('{count} items').replace('{count}', formatNumber(stage.item_count ?? stage.items?.length ?? 0, locale, ui))}</span>
                 </summary>
                 {stage.items?.length ? (
                   <div className="reliability-stage-items">
@@ -498,17 +556,17 @@ export default function ReliabilityCommandPage() {
                         <article className="reliability-stage-item" key={item.item_key || `${stage.key}-${item.label}`}>
                           <div className="reliability-card-heading">
                             <div>
-                              <h4>{item.label || 'Reliability review item'}</h4>
+                              <h4>{item.label || ui('Reliability review item')}</h4>
                               <p>{formatIdentifier(item.dimension)}</p>
                             </div>
                             <div className="reliability-badge-row">
-                              <span className={`reliability-badge ${toneClass(item.severity)}`}>{formatIdentifier(item.severity)}</span>
-                              <span className={`reliability-badge ${toneClass(item.stage_status)}`}>{formatIdentifier(item.stage_status)}</span>
+                              <span className={`reliability-badge ${toneClass(item.severity)}`}>{canonicalStatusLabel(item.severity, ui)}</span>
+                              <span className={`reliability-badge ${toneClass(item.stage_status)}`}>{canonicalStatusLabel(item.stage_status, ui)}</span>
                             </div>
                           </div>
                           <dl className="reliability-facts">
-                            <div><dt>Suggested owner</dt><dd>{formatIdentifier(item.owner)}</dd></div>
-                            <div><dt>Suggested reviewer</dt><dd>{formatIdentifier(item.reviewer)}</dd></div>
+                            <div><dt>{ui('Suggested owner')}</dt><dd>{formatIdentifier(item.owner)}</dd></div>
+                            <div><dt>{ui('Suggested reviewer')}</dt><dd>{formatIdentifier(item.reviewer)}</dd></div>
                           </dl>
                           {item.instructions?.length ? (
                             <ol className="reliability-instruction-list">
@@ -523,7 +581,7 @@ export default function ReliabilityCommandPage() {
                     })}
                   </div>
                 ) : (
-                  <div className="reliability-inline-empty">No matching risk generated guidance for this stage.</div>
+                  <div className="reliability-inline-empty">{ui('No matching risk generated guidance for this stage.')}</div>
                 )}
               </details>
             ))}
@@ -537,21 +595,21 @@ export default function ReliabilityCommandPage() {
             <div className="reliability-section-title">
               <span className="reliability-heading-icon"><TenantNavIcon path="/reliability-command" size={18} /></span>
               <div>
-                <h2 id="reliability-limits-title">Safety and interpretation limits</h2>
-                <p className="card__subtext">These rules apply to every score, risk, and review-stage item on the page.</p>
+                <h2 id="reliability-limits-title">{ui('Safety and interpretation limits')}</h2>
+                <p className="card__subtext">{ui('These rules apply to every score, risk, and review-stage item on the page.')}</p>
               </div>
             </div>
           </div>
-          <article className="card reliability-limit-card"><span className="reliability-limit-icon"><TenantNavIcon path="/reliability-command" size={18} /></span><div><h3>Advisory score only</h3><p className="card__subtext">The score combines operational pressure and safety-contract checks. It is not uptime, service availability, deployment approval, or a legal assurance.</p></div></article>
-          <article className="card reliability-limit-card"><span className="reliability-limit-icon"><TenantNavIcon path="/workflow-composer" size={18} /></span><div><h3>No automatic remediation</h3><p className="card__subtext">The page does not run a runbook, change stock, alter a workflow, call an integration, or execute a recommendation.</p></div></article>
-          <article className="card reliability-limit-card"><span className="reliability-limit-icon"><TenantNavIcon path="/intelligence-review" size={18} /></span><div><h3>No approval or signoff</h3><p className="card__subtext">A Ready result does not record approval, signoff, release acceptance, or a decision.</p></div></article>
-          <article className="card reliability-limit-card"><span className="reliability-limit-icon"><TenantNavIcon path="/alerts" size={18} /></span><div><h3>No incident or notification</h3><p className="card__subtext">The page does not open an incident, page a team, send a message, or notify an external party.</p></div></article>
-          <article className="card reliability-limit-card"><span className="reliability-limit-icon"><TenantNavIcon path="/real-time-operations-feed" size={18} /></span><div><h3>No monitoring activation</h3><p className="card__subtext">Monitoring windows and cadence are guidance. Nothing is scheduled or activated here.</p></div></article>
-          <article className="card reliability-limit-card"><span className="reliability-limit-icon"><TenantNavIcon path="/action-center" size={18} /></span><div><h3>Source workflows stay authoritative</h3><p className="card__subtext">Evidence, owners, decisions, approvals, remediation, and closure must be handled in the linked source workflow.</p></div></article>
+          <article className="card reliability-limit-card"><span className="reliability-limit-icon"><TenantNavIcon path="/reliability-command" size={18} /></span><div><h3>{ui('Advisory score only')}</h3><p className="card__subtext">{ui('The score combines operational pressure and safety-contract checks. It is not uptime, service availability, deployment approval, or a legal assurance.')}</p></div></article>
+          <article className="card reliability-limit-card"><span className="reliability-limit-icon"><TenantNavIcon path="/workflow-composer" size={18} /></span><div><h3>{ui('No automatic remediation')}</h3><p className="card__subtext">{ui('The page does not run a runbook, change stock, alter a workflow, call an integration, or execute a recommendation.')}</p></div></article>
+          <article className="card reliability-limit-card"><span className="reliability-limit-icon"><TenantNavIcon path="/intelligence-review" size={18} /></span><div><h3>{ui('No approval or signoff')}</h3><p className="card__subtext">{ui('A Ready result does not record approval, signoff, release acceptance, or a decision.')}</p></div></article>
+          <article className="card reliability-limit-card"><span className="reliability-limit-icon"><TenantNavIcon path="/alerts" size={18} /></span><div><h3>{ui('No incident or notification')}</h3><p className="card__subtext">{ui('The page does not open an incident, page a team, send a message, or notify an external party.')}</p></div></article>
+          <article className="card reliability-limit-card"><span className="reliability-limit-icon"><TenantNavIcon path="/real-time-operations-feed" size={18} /></span><div><h3>{ui('No monitoring activation')}</h3><p className="card__subtext">{ui('Monitoring windows and cadence are guidance. Nothing is scheduled or activated here.')}</p></div></article>
+          <article className="card reliability-limit-card"><span className="reliability-limit-icon"><TenantNavIcon path="/action-center" size={18} /></span><div><h3>{ui('Source workflows stay authoritative')}</h3><p className="card__subtext">{ui('Evidence, owners, decisions, approvals, remediation, and closure must be handled in the linked source workflow.')}</p></div></article>
           <article className="card reliability-safety-summary">
-            <div className="reliability-section-title"><span className="reliability-heading-icon reliability-heading-icon--slate"><TenantNavIcon path="/reliability-command" size={18} /></span><div><h3>Backend safety confirmation</h3><p className="card__subtext">The API confirms the same non-mutating guardrails shown above.</p></div></div>
+            <div className="reliability-section-title"><span className="reliability-heading-icon reliability-heading-icon--slate"><TenantNavIcon path="/reliability-command" size={18} /></span><div><h3>{ui('Backend safety confirmation')}</h3><p className="card__subtext">{ui('The API confirms the same non-mutating guardrails shown above.')}</p></div></div>
             <dl className="reliability-facts reliability-safety-facts">
-              {Object.entries(safety).map(([key, value]) => <div key={key}><dt>{formatIdentifier(key)}</dt><dd><span className={`reliability-safety-value ${value ? 'is-safe' : 'is-blocked'}`}>{value ? 'Yes' : 'No'}</span></dd></div>)}
+              {Object.entries(safety).map(([key, value]) => <div key={key}><dt>{safetyLabel(key, ui)}</dt><dd><span className={`reliability-safety-value ${value ? 'is-safe' : 'is-blocked'}`}>{value ? ui('Yes') : ui('No')}</span></dd></div>)}
             </dl>
           </article>
         </section>

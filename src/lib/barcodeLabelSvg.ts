@@ -3,6 +3,18 @@ import qrCodeSvg from './qrCodeSvg';
 export type BarcodeSymbology = 'CODE128' | 'EAN13' | 'QR';
 export type BarcodeLabelTemplate = 'default' | 'compact' | 'shelf';
 
+export type BarcodeLabelPresentation = {
+  ariaLabel?: string;
+  inventoryProduct?: string;
+  lotLabel?: string;
+  batchLabel?: string;
+  expiryLabel?: string;
+  locale?: string;
+  code128AriaLabel?: string;
+  ean13AriaLabel?: string;
+  qrAriaLabel?: string;
+};
+
 export type PrintableBarcodeLabel = {
   id?: string;
   product_name?: string | null;
@@ -96,7 +108,7 @@ export function normalizeBarcodeValue(value: string, type: BarcodeSymbology): st
   return cleaned;
 }
 
-function createCode128SvgMarkup(value: string): string {
+function createCode128SvgMarkup(value: string, ariaLabel = 'Code 128 barcode'): string {
   if (!/^[\x20-\x7E]+$/.test(value)) throw new Error('Code 128 supports printable ASCII characters only.');
   const startCode = 104;
   const dataCodes = [...value].map((character) => character.charCodeAt(0) - 32);
@@ -123,10 +135,10 @@ function createCode128SvgMarkup(value: string): string {
   }
 
   const totalWidth = (moduleOffset + quietZone) * moduleWidth;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalWidth} 98" role="img" aria-label="Code 128 barcode"><rect width="100%" height="100%" fill="#fff"/><g fill="#000">${rectangles.join('')}</g><text x="${totalWidth / 2}" y="92" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#111">${escapeXml(value)}</text></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalWidth} 98" role="img" aria-label="${escapeXml(ariaLabel)}"><rect width="100%" height="100%" fill="#fff"/><g fill="#000">${rectangles.join('')}</g><text x="${totalWidth / 2}" y="92" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="#111">${escapeXml(value)}</text></svg>`;
 }
 
-function createEan13SvgMarkup(rawValue: string): string {
+function createEan13SvgMarkup(rawValue: string, ariaLabel = 'EAN-13 barcode'): string {
   const value = normalizeEan13(rawValue);
   const firstDigit = Number(value[0]);
   const parity = EAN_PARITY[firstDigit];
@@ -150,20 +162,20 @@ function createEan13SvgMarkup(rawValue: string): string {
     rectangles.push(`<rect x="${(quietZone + index) * moduleWidth}" y="0" width="${moduleWidth}" height="${isGuard ? guardHeight : normalHeight}"/>`);
   }
   const totalWidth = (quietZone * 2 + 95) * moduleWidth;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalWidth} 108" role="img" aria-label="EAN-13 barcode"><rect width="100%" height="100%" fill="#fff"/><g fill="#000">${rectangles.join('')}</g><text x="${totalWidth / 2}" y="103" font-family="Arial, sans-serif" font-size="17" letter-spacing="3" text-anchor="middle" fill="#111">${escapeXml(value)}</text></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalWidth} 108" role="img" aria-label="${escapeXml(ariaLabel)}"><rect width="100%" height="100%" fill="#fff"/><g fill="#000">${rectangles.join('')}</g><text x="${totalWidth / 2}" y="103" font-family="Arial, sans-serif" font-size="17" letter-spacing="3" text-anchor="middle" fill="#111">${escapeXml(value)}</text></svg>`;
 }
 
-function createQrBarcodeSvgMarkup(value: string): string {
+function createQrBarcodeSvgMarkup(value: string, ariaLabel = 'QR barcode'): string {
   return qrCodeSvg
     .createQrSvgMarkup(value, 5, 4)
-    .replaceAll('Authenticator setup QR code', 'QR barcode');
+    .replaceAll('Authenticator setup QR code', ariaLabel);
 }
 
-export function createBarcodeGraphicSvgMarkup(value: string, type: BarcodeSymbology): string {
+export function createBarcodeGraphicSvgMarkup(value: string, type: BarcodeSymbology, presentation: BarcodeLabelPresentation = {}): string {
   const normalized = normalizeBarcodeValue(value, type);
-  if (type === 'EAN13') return createEan13SvgMarkup(normalized);
-  if (type === 'QR') return createQrBarcodeSvgMarkup(normalized);
-  return createCode128SvgMarkup(normalized);
+  if (type === 'EAN13') return createEan13SvgMarkup(normalized, presentation.ean13AriaLabel);
+  if (type === 'QR') return createQrBarcodeSvgMarkup(normalized, presentation.qrAriaLabel);
+  return createCode128SvgMarkup(normalized, presentation.code128AriaLabel);
 }
 
 export function svgMarkupToDataUri(markup: string): string {
@@ -216,17 +228,17 @@ function embedBarcodeGraphicSvg(
   );
 }
 
-function formatExpiry(value?: string | null): string {
+function formatExpiry(value?: string | null, locale?: string): string {
   if (!value) return '';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(locale);
 }
 
-export function createBarcodeLabelSvgMarkup(label: PrintableBarcodeLabel): string {
+export function createBarcodeLabelSvgMarkup(label: PrintableBarcodeLabel, presentation: BarcodeLabelPresentation = {}): string {
   const type = (label.barcode_type || 'CODE128') as BarcodeSymbology;
   const template = label.label_template || 'default';
   const dimensions = labelTemplateDimensions(template, type, label.barcode_value);
-  const graphic = createBarcodeGraphicSvgMarkup(label.barcode_value, type);
+  const graphic = createBarcodeGraphicSvgMarkup(label.barcode_value, type, presentation);
   const embeddedGraphic = embedBarcodeGraphicSvg(
     graphic,
     dimensions.graphicX,
@@ -235,15 +247,15 @@ export function createBarcodeLabelSvgMarkup(label: PrintableBarcodeLabel): strin
     dimensions.graphicHeight
   );
   const metadata = [
-    label.lot_number ? `Lot: ${label.lot_number}` : '',
-    label.batch_number ? `Batch: ${label.batch_number}` : '',
-    label.expiry_date ? `Expiry: ${formatExpiry(label.expiry_date)}` : ''
+    label.lot_number ? `${presentation.lotLabel || 'Lot'}: ${label.lot_number}` : '',
+    label.batch_number ? `${presentation.batchLabel || 'Batch'}: ${label.batch_number}` : '',
+    label.expiry_date ? `${presentation.expiryLabel || 'Expiry'}: ${formatExpiry(label.expiry_date, presentation.locale)}` : ''
   ].filter(Boolean);
 
   if (template === 'shelf') {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dimensions.width} ${dimensions.height}" width="${dimensions.width}" height="${dimensions.height}" role="img" aria-label="Printable inventory barcode label"><rect x="1" y="1" width="${dimensions.width - 2}" height="${dimensions.height - 2}" rx="12" fill="#fff" stroke="#111" stroke-width="2"/><text x="22" y="42" font-family="Arial, sans-serif" font-size="${dimensions.fontSize}" font-weight="700" fill="#111">${escapeXml(label.product_name || 'Inventory product')}</text><text x="22" y="72" font-family="Arial, sans-serif" font-size="15" fill="#333">${escapeXml(label.product_unit || '')}</text><text x="22" y="112" font-family="Arial, sans-serif" font-size="14" fill="#111">${escapeXml(metadata[0] || '')}</text><text x="22" y="137" font-family="Arial, sans-serif" font-size="14" fill="#111">${escapeXml(metadata[1] || '')}</text><text x="22" y="162" font-family="Arial, sans-serif" font-size="14" fill="#111">${escapeXml(metadata[2] || '')}</text><text x="22" y="205" font-family="Arial, sans-serif" font-size="12" fill="#555">${escapeXml(label.barcode_value)}</text>${embeddedGraphic}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dimensions.width} ${dimensions.height}" width="${dimensions.width}" height="${dimensions.height}" role="img" aria-label="${escapeXml(presentation.ariaLabel || 'Printable inventory barcode label')}"><rect x="1" y="1" width="${dimensions.width - 2}" height="${dimensions.height - 2}" rx="12" fill="#fff" stroke="#111" stroke-width="2"/><text x="22" y="42" font-family="Arial, sans-serif" font-size="${dimensions.fontSize}" font-weight="700" fill="#111">${escapeXml(label.product_name || presentation.inventoryProduct || 'Inventory product')}</text><text x="22" y="72" font-family="Arial, sans-serif" font-size="15" fill="#333">${escapeXml(label.product_unit || '')}</text><text x="22" y="112" font-family="Arial, sans-serif" font-size="14" fill="#111">${escapeXml(metadata[0] || '')}</text><text x="22" y="137" font-family="Arial, sans-serif" font-size="14" fill="#111">${escapeXml(metadata[1] || '')}</text><text x="22" y="162" font-family="Arial, sans-serif" font-size="14" fill="#111">${escapeXml(metadata[2] || '')}</text><text x="22" y="205" font-family="Arial, sans-serif" font-size="12" fill="#555">${escapeXml(label.barcode_value)}</text>${embeddedGraphic}</svg>`;
   }
 
   const metadataText = metadata.join(' · ');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dimensions.width} ${dimensions.height}" width="${dimensions.width}" height="${dimensions.height}" role="img" aria-label="Printable inventory barcode label"><rect x="1" y="1" width="${dimensions.width - 2}" height="${dimensions.height - 2}" rx="12" fill="#fff" stroke="#111" stroke-width="2"/><text x="${dimensions.width / 2}" y="32" font-family="Arial, sans-serif" font-size="${dimensions.fontSize}" font-weight="700" text-anchor="middle" fill="#111">${escapeXml(label.product_name || 'Inventory product')}</text><text x="${dimensions.width / 2}" y="52" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#444">${escapeXml(metadataText)}</text>${embeddedGraphic}<text x="${dimensions.width / 2}" y="${dimensions.height - 16}" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#555">${escapeXml(label.barcode_value)}</text></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${dimensions.width} ${dimensions.height}" width="${dimensions.width}" height="${dimensions.height}" role="img" aria-label="${escapeXml(presentation.ariaLabel || 'Printable inventory barcode label')}"><rect x="1" y="1" width="${dimensions.width - 2}" height="${dimensions.height - 2}" rx="12" fill="#fff" stroke="#111" stroke-width="2"/><text x="${dimensions.width / 2}" y="32" font-family="Arial, sans-serif" font-size="${dimensions.fontSize}" font-weight="700" text-anchor="middle" fill="#111">${escapeXml(label.product_name || presentation.inventoryProduct || 'Inventory product')}</text><text x="${dimensions.width / 2}" y="52" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#444">${escapeXml(metadataText)}</text>${embeddedGraphic}<text x="${dimensions.width / 2}" y="${dimensions.height - 16}" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#555">${escapeXml(label.barcode_value)}</text></svg>`;
 }

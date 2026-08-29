@@ -30,6 +30,7 @@ type ProductMutationParams = {
   setFormError: Dispatch<SetStateAction<string | null>>;
   setPackageMessage: Dispatch<SetStateAction<string | null>>;
   setPackageError: Dispatch<SetStateAction<string | null>>;
+  ui: (englishText: string) => string;
 };
 
 const invalidateProductReadModels = async (queryClient: QueryClient) => {
@@ -64,7 +65,8 @@ export function useProductMutations({
   setFormMessage,
   setFormError,
   setPackageMessage,
-  setPackageError
+  setPackageError,
+  ui
 }: ProductMutationParams) {
   const createMutation = useMutation({
     mutationFn: createProduct,
@@ -72,14 +74,14 @@ export function useProductMutations({
       setEditingProduct(null);
       setForm(emptyProductForm());
       setFormError(null);
-      setFormMessage('Product created successfully.');
+      setFormMessage(ui('Product created successfully.'));
       await invalidateProductReadModels(queryClient);
     },
     onError: (error) => {
       if (error instanceof ApiError) {
         setFormError(error.message);
       } else {
-        setFormError('Failed to create product.');
+        setFormError(ui('Failed to create product.'));
       }
       setFormMessage(null);
     }
@@ -91,7 +93,7 @@ export function useProductMutations({
       setEditingProduct(null);
       setForm(emptyProductForm());
       setFormError(null);
-      setFormMessage('Product updated successfully.');
+      setFormMessage(ui('Product updated successfully.'));
       await invalidateProductReadModels(queryClient);
       if (selectedPackageProduct?.id) {
         await queryClient.invalidateQueries({
@@ -103,7 +105,7 @@ export function useProductMutations({
       if (error instanceof ApiError) {
         setFormError(error.message);
       } else {
-        setFormError('Failed to update product.');
+        setFormError(ui('Failed to update product.'));
       }
       setFormMessage(null);
     }
@@ -120,14 +122,14 @@ export function useProductMutations({
       setPackageForm(emptyPackageForm());
       setFormError(null);
       setPackageError(null);
-      setFormMessage('Product deleted successfully.');
+      setFormMessage(ui('Product deleted successfully.'));
       await invalidateProductReadModels(queryClient);
     },
     onError: (error) => {
       if (error instanceof ApiError) {
         setFormError(error.message);
       } else {
-        setFormError('Failed to delete product.');
+        setFormError(ui('Failed to delete product.'));
       }
       setFormMessage(null);
     }
@@ -139,14 +141,14 @@ export function useProductMutations({
       setEditingPackage(null);
       setPackageForm(emptyPackageForm());
       setPackageError(null);
-      setPackageMessage('Package created successfully.');
+      setPackageMessage(ui('Package created successfully.'));
       await invalidatePackages(queryClient, selectedPackageProduct);
     },
     onError: (error) => {
       if (error instanceof ApiError) {
         setPackageError(error.message);
       } else {
-        setPackageError('Failed to create package.');
+        setPackageError(ui('Failed to create package.'));
       }
       setPackageMessage(null);
     }
@@ -158,14 +160,14 @@ export function useProductMutations({
       setEditingPackage(null);
       setPackageForm(emptyPackageForm());
       setPackageError(null);
-      setPackageMessage('Package updated successfully.');
+      setPackageMessage(ui('Package updated successfully.'));
       await invalidatePackages(queryClient, selectedPackageProduct);
     },
     onError: (error) => {
       if (error instanceof ApiError) {
         setPackageError(error.message);
       } else {
-        setPackageError('Failed to update package.');
+        setPackageError(ui('Failed to update package.'));
       }
       setPackageMessage(null);
     }
@@ -177,14 +179,14 @@ export function useProductMutations({
       setEditingPackage(null);
       setPackageForm(emptyPackageForm());
       setPackageError(null);
-      setPackageMessage('Package deleted successfully.');
+      setPackageMessage(ui('Package deleted successfully.'));
       await invalidatePackages(queryClient, selectedPackageProduct);
     },
     onError: (error) => {
       if (error instanceof ApiError) {
         setPackageError(error.message);
       } else {
-        setPackageError('Failed to delete package.');
+        setPackageError(ui('Failed to delete package.'));
       }
       setPackageMessage(null);
     }

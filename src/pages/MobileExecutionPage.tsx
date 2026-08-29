@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
+import type { AppLocale } from '../i18n/config';
 import { getAccessToken, getSupportSessionInfo, getTenantObservabilityIdentity } from '../lib/auth';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
@@ -127,6 +130,59 @@ const SOURCE_FILTERS: Array<{ value: 'all' | ExecutionTaskSourceType; label: str
 ];
 
 
+const ACTION_LABELS: Record<MobileAction, string> = {
+  start: 'Start',
+  complete: 'Complete',
+  block: 'Block',
+  unblock: 'Unblock'
+};
+
+const CANONICAL_LABELS: Record<string, string> = {
+  unknown: 'Unknown',
+  ready: 'Ready',
+  assigned: 'Assigned',
+  in_progress: 'In progress',
+  blocked: 'Blocked',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  pending: 'Pending',
+  open: 'Open',
+  critical: 'Critical',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+  execution_request: 'Execution request',
+  manual: 'Manual',
+  reservation: 'Reservation',
+  requisition: 'Requisition',
+  purchase_order: 'Purchase order',
+  shipment: 'Shipment',
+  transfer: 'Transfer',
+  cycle_count: 'Cycle count',
+  replenishment: 'Replenishment',
+  offline_capable_task_lifecycle_execution: 'Offline-capable task execution'
+};
+
+const SAFETY_LABELS: Record<string, string> = {
+  tenant_isolated: 'Tenant isolated',
+  permission_gated: 'Permission gated',
+  audit_traceable_source: 'Audit-traceable source',
+  human_action_only: 'Human action only',
+  approval_gated_when_required: 'Approval gated when required',
+  no_inventory_mutation: 'No direct inventory mutation',
+  no_procurement_mutation: 'No direct procurement mutation',
+  no_execution_mutation: 'No direct execution mutation',
+  no_financial_mutation: 'No direct financial mutation',
+  no_erp_writeback: 'No ERP writeback',
+  no_accounting_writeback: 'No accounting writeback',
+  no_supplier_execution: 'No supplier execution',
+  no_carrier_execution: 'No carrier execution',
+  no_external_workflow_execution: 'No external workflow execution',
+  no_external_ai_callout: 'No external AI callout',
+  execution_task_lifecycle_mutation_only: 'Execution-task lifecycle changes only'
+};
+
+
 function numberValue(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -136,10 +192,23 @@ function formatLabel(value?: string | null): string {
   return String(value || 'unknown').replace(/_/g, ' ');
 }
 
-function formatDateTime(value?: string | null): string {
-  if (!value) return 'Not reported';
+function canonicalLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  const raw = String(value || 'unknown');
+  return ui(CANONICAL_LABELS[raw] || formatLabel(raw).replace(/^./, (character) => character.toUpperCase()));
+}
+
+function safetyLabel(value: string, ui: (englishText: string) => string): string {
+  return ui(SAFETY_LABELS[value] || formatLabel(value).replace(/^./, (character) => character.toUpperCase()));
+}
+
+function formatDateTime(value: string | null | undefined, locale: AppLocale, ui: (englishText: string) => string): string {
+  if (!value) return ui('Not reported');
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? value : formatLocalizedDateTime(date, locale);
+}
+
+function countLabel(count: number, singular: string, plural: string, locale: AppLocale, ui: (englishText: string) => string): string {
+  return `${formatLocalizedNumber(count, locale)} ${ui(count === 1 ? singular : plural)}`;
 }
 
 function makeId(prefix: string): string {
@@ -222,6 +291,7 @@ async function fetchMobileExecutionSummary(urgency: 'all' | ActionUrgency, sourc
 }
 
 export default function MobileExecutionPage() {
+  const { locale, ui } = useAppTranslation();
   const storageKeys = useMemo(() => getMobileStorageKeys(), []);
   const [urgency, setUrgency] = useState<'all' | ActionUrgency>('all');
   const [sourceType, setSourceType] = useState<'all' | ExecutionTaskSourceType>('all');
@@ -289,9 +359,9 @@ export default function MobileExecutionPage() {
       persistPending(remaining);
       const failed = (result.results || []).filter((row) => row.status === 'failed');
       if (failed.length) {
-        setActionError(`${failed.length} queued action${failed.length === 1 ? '' : 's'} could not be applied. ${failed[0]?.error || ''}`.trim());
+        setActionError(`${formatLocalizedNumber(failed.length, locale)} ${ui(failed.length === 1 ? 'queued action could not be applied.' : 'queued actions could not be applied.')} ${failed[0]?.error || ''}`.trim());
       } else {
-        setMessage(`${applied.size} offline action${applied.size === 1 ? '' : 's'} synchronized.`);
+        setMessage(countLabel(applied.size, 'offline action synchronized.', 'offline actions synchronized.', locale, ui));
       }
       await mobileExecutionQuery.refetch();
     } catch (error) {
@@ -320,7 +390,7 @@ export default function MobileExecutionPage() {
 
     if (!navigator.onLine) {
       persistPending([...pending, operation]);
-      setMessage(`${formatLabel(action)} queued on this device. It will synchronize when online.`);
+      setMessage(ui('Task action queued on this device. It will synchronize when online.'));
       return;
     }
 
@@ -331,16 +401,16 @@ export default function MobileExecutionPage() {
         body: JSON.stringify({ device_id: getDeviceId(), request_id: makeId('sync'), operations: [operation] })
       });
       const first = result.results?.[0];
-      if (first?.status === 'failed') throw new Error(first.error || 'The task action could not be applied.');
-      setMessage(`${formatLabel(action)} applied successfully.`);
+      if (first?.status === 'failed') throw new Error(first.error || ui('The task action could not be applied.'));
+      setMessage(ui('Task action applied successfully.'));
       await mobileExecutionQuery.refetch();
     } catch (error) {
       if (!navigator.onLine) {
         persistPending([...pending, operation]);
         setOnline(false);
-        setMessage(`${formatLabel(action)} queued because the device lost its connection.`);
+        setMessage(ui('Task action queued because the device lost its connection.'));
       } else {
-        setActionError(error instanceof ApiError ? error.message : error instanceof Error ? error.message : 'Unable to update the task.');
+        setActionError(error instanceof ApiError ? error.message : error instanceof Error ? error.message : ui('Unable to update the task.'));
       }
     } finally {
       setBusyTaskId(null);
@@ -354,45 +424,45 @@ export default function MobileExecutionPage() {
     <div className="mobile-execution-page mobile-execution-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
       <OperationalWorkspaceHero
         iconPath="/mobile-execution"
-        eyebrow="Mobile & warehouse execution"
-        title="Mobile Execution"
-        description="Touch-first execution queue for permitted warehouse work, with safe offline queuing and audited synchronization when connectivity returns."
+        eyebrow={ui("Mobile & warehouse execution")}
+        title={ui("Mobile Execution")}
+        description={ui("Touch-first execution queue for permitted warehouse work, with safe offline queuing and audited synchronization when connectivity returns.")}
         meta={
           <>
-            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Touch-first</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Offline queue protected</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Touch-first")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Offline queue protected")}</OperationalWorkspaceMetaPill>
           </>
         }
-        aside={<OperationalWorkspaceStatus value={online ? 'Online' : 'Offline'} label={`${pending.length} queued action${pending.length === 1 ? '' : 's'} awaiting synchronization`} />}
+        aside={<OperationalWorkspaceStatus value={ui(online ? 'Online' : 'Offline')} label={countLabel(pending.length, 'queued action awaiting synchronization', 'queued actions awaiting synchronization', locale, ui)} />}
       />
 
-      <OperationalWorkspaceStats ariaLabel="Mobile execution overview">
+      <OperationalWorkspaceStats ariaLabel={ui("Mobile execution overview")}>
         <OperationalWorkspaceStatCard
-          label="Mobile queue"
-          value={numberValue(summary.total_mobile_tasks ?? mobileTasks.length)}
-          helper="Execution tasks prepared for touch-first warehouse work"
+          label={ui("Mobile queue")}
+          value={formatLocalizedNumber(numberValue(summary.total_mobile_tasks ?? mobileTasks.length), locale)}
+          helper={ui("Execution tasks prepared for touch-first warehouse work")}
           iconPath="/mobile-execution"
           tone="blue"
         />
         <OperationalWorkspaceStatCard
-          label="Critical tasks"
-          value={numberValue(summary.critical_mobile_tasks)}
-          helper="Highest urgency items requiring operator attention"
+          label={ui("Critical tasks")}
+          value={formatLocalizedNumber(numberValue(summary.critical_mobile_tasks), locale)}
+          helper={ui("Highest urgency items requiring operator attention")}
           iconPath="/alerts"
           tone={numberValue(summary.critical_mobile_tasks) > 0 ? 'danger' : 'good'}
         />
         <OperationalWorkspaceStatCard
-          label="Connection"
-          value={online ? 'Online' : 'Offline'}
-          helper={`${pending.length} action${pending.length === 1 ? '' : 's'} waiting to synchronize`}
+          label={ui("Connection")}
+          value={ui(online ? 'Online' : 'Offline')}
+          helper={countLabel(pending.length, 'action waiting to synchronize', 'actions waiting to synchronize', locale, ui)}
           iconPath="/real-time-operations-feed"
           tone={online ? 'good' : 'warn'}
         />
         <OperationalWorkspaceStatCard
-          label="Execution mode"
-          value={formatLabel(response?.definition?.execution_mode)}
-          helper="Only execution-task lifecycle changes are allowed from this surface"
+          label={ui("Execution mode")}
+          value={canonicalLabel(response?.definition?.execution_mode, ui)}
+          helper={ui("Only execution-task lifecycle changes are allowed from this surface")}
           iconPath="/execution-tasks"
           tone="neutral"
         />
@@ -401,27 +471,27 @@ export default function MobileExecutionPage() {
       <section className="section mobile-execution-section">
         <div className="section__title mobile-execution-section-title">
           <span className="mobile-execution-section-icon"><TenantNavIcon path="/mobile-execution" size={16} /></span>
-          Mobile execution controls
+          {ui("Mobile execution controls")}
         </div>
         <div className="card mobile-execution-controls-shell">
           <div className="mobile-execution-toolbar">
-            <select aria-label="Filter mobile tasks by urgency" className="mobile-execution-select" value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>{URGENCY_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
-            <select aria-label="Filter mobile tasks by source" className="mobile-execution-select" value={sourceType} onChange={(event) => setSourceType(event.target.value as 'all' | ExecutionTaskSourceType)}>{SOURCE_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+            <select aria-label={ui("Filter mobile tasks by urgency")} className="mobile-execution-select" value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>{URGENCY_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}</select>
+            <select aria-label={ui("Filter mobile tasks by source")} className="mobile-execution-select" value={sourceType} onChange={(event) => setSourceType(event.target.value as 'all' | ExecutionTaskSourceType)}>{SOURCE_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}</select>
             <button className="button button--secondary mobile-execution-control-button" type="button" onClick={() => mobileExecutionQuery.refetch()} disabled={mobileExecutionQuery.isFetching || !online}>
               <TenantNavIcon path="/real-time-operations-feed" size={15} />
-              {mobileExecutionQuery.isFetching ? 'Refreshing…' : 'Refresh mobile queue'}
+              {mobileExecutionQuery.isFetching ? ui('Refreshing…') : ui('Refresh mobile queue')}
             </button>
             <button className="button button--secondary mobile-execution-control-button" type="button" onClick={() => void replayPending()} disabled={!online || syncing || pending.length === 0 || !canUpdateTasks}>
               <TenantNavIcon path="/mobile-execution" size={15} />
-              {syncing ? 'Synchronizing…' : `Sync pending (${pending.length})`}
+              {syncing ? ui('Synchronizing…') : `${ui('Sync pending')} (${formatLocalizedNumber(pending.length, locale)})`}
             </button>
-            <Link className="button button--secondary mobile-execution-control-button" to="/scanner"><TenantNavIcon path="/scanner" size={15} />Open scanner</Link>
-            <Link className="button button--secondary mobile-execution-control-button" to="/execution-tasks"><TenantNavIcon path="/execution-tasks" size={15} />Open execution tasks</Link>
+            <Link className="button button--secondary mobile-execution-control-button" to="/scanner"><TenantNavIcon path="/scanner" size={15} />{ui("Open scanner")}</Link>
+            <Link className="button button--secondary mobile-execution-control-button" to="/execution-tasks"><TenantNavIcon path="/execution-tasks" size={15} />{ui("Open execution tasks")}</Link>
           </div>
 
-          {mobileExecutionQuery.isLoading && !cachedResponse ? <p className="card__subtext">Loading mobile execution queue…</p> : null}
-          {mobileExecutionQuery.error && !hasUsableResponse ? <p className="form-error">{mobileExecutionQuery.error instanceof ApiError ? mobileExecutionQuery.error.message : 'Unable to load the mobile execution queue.'}</p> : null}
-          {usingOfflineSnapshot ? <p className="card__subtext"><strong>Offline snapshot:</strong> showing the last successfully downloaded queue.</p> : null}
+          {mobileExecutionQuery.isLoading && !cachedResponse ? <p className="card__subtext">{ui("Loading mobile execution queue…")}</p> : null}
+          {mobileExecutionQuery.error && !hasUsableResponse ? <p className="form-error">{mobileExecutionQuery.error instanceof ApiError ? mobileExecutionQuery.error.message : ui('Unable to load the mobile execution queue.')}</p> : null}
+          {usingOfflineSnapshot ? <p className="card__subtext"><strong>{ui("Offline snapshot:")}</strong> {ui("showing the last successfully downloaded queue.")}</p> : null}
           {message ? <p className="form-success">{message}</p> : null}
           {actionError ? <p className="form-error">{actionError}</p> : null}
           {hasUsableResponse ? (
@@ -429,9 +499,9 @@ export default function MobileExecutionPage() {
               <div className="mobile-execution-connection-row">
                 <span className={`mobile-execution-state-pill ${online ? 'mobile-execution-state-pill--online' : 'mobile-execution-state-pill--offline'}`}>
                   <span className="mobile-execution-state-dot" />
-                  {online ? 'Server-connected queue' : 'Local offline snapshot'}
+                  {ui(online ? 'Server-connected queue' : 'Local offline snapshot')}
                 </span>
-                {pending.length > 0 ? <span className="mobile-execution-pending-pill">{pending.length} queued</span> : null}
+                {pending.length > 0 ? <span className="mobile-execution-pending-pill">{countLabel(pending.length, "queued action", "queued actions", locale, ui)}</span> : null}
               </div>
               <div className="mobile-execution-guidance-grid">
                 <div className="mobile-execution-guidance-item"><span className="mobile-execution-guidance-icon"><TenantNavIcon path="/mobile-execution" size={15} /></span><p>{guidance.offline_guidance}</p></div>
@@ -445,10 +515,10 @@ export default function MobileExecutionPage() {
       <section className="section mobile-execution-section">
         <div className="section__title mobile-execution-section-title">
           <span className="mobile-execution-section-icon"><TenantNavIcon path="/execution-tasks" size={16} /></span>
-          Touch-first task queue
-          {mobileTasks.length > 0 ? <span className="mobile-execution-section-count">{mobileTasks.length}</span> : null}
+          {ui("Touch-first task queue")}
+          {mobileTasks.length > 0 ? <span className="mobile-execution-section-count">{formatLocalizedNumber(mobileTasks.length, locale)}</span> : null}
         </div>
-        {mobileTasks.length === 0 && !mobileExecutionQuery.isLoading ? <div className="card mobile-execution-empty-card"><span className="mobile-execution-icon mobile-execution-icon--blue"><TenantNavIcon path="/execution-tasks" size={18} /></span><div><div className="mobile-execution-empty-title">No matching mobile tasks</div><p className="card__subtext">No mobile execution tasks matched the selected filters.</p></div></div> : (
+        {mobileTasks.length === 0 && !mobileExecutionQuery.isLoading ? <div className="card mobile-execution-empty-card"><span className="mobile-execution-icon mobile-execution-icon--blue"><TenantNavIcon path="/execution-tasks" size={18} /></span><div><div className="mobile-execution-empty-title">{ui("No matching mobile tasks")}</div><p className="card__subtext">{ui("No mobile execution tasks matched the selected filters.")}</p></div></div> : (
           <div className="mobile-execution-queue-grid">
             {mobileTasks.map((task) => {
               const sourcePath = sourceSurfaceToAppPath(task.source_surface);
@@ -461,35 +531,35 @@ export default function MobileExecutionPage() {
                     <div className="mobile-execution-task-lead">
                       <span className={`mobile-execution-icon mobile-execution-icon--${urgencyClass}`}><TenantNavIcon path={sourcePath || '/execution-tasks'} size={17} /></span>
                       <div className="mobile-execution-task-heading">
-                        <div className="card__label">{formatLabel(task.execution_task_status || task.queue_status)}</div>
-                        <h3>{task.title || 'Untitled mobile task'}</h3>
+                        <div className="card__label">{canonicalLabel(task.execution_task_status || task.queue_status, ui)}</div>
+                        <h3>{task.title || ui('Untitled mobile task')}</h3>
                       </div>
                     </div>
-                    <span className={`mobile-execution-urgency-pill mobile-execution-urgency-pill--${urgencyClass}`}>{formatLabel(task.urgency)}</span>
+                    <span className={`mobile-execution-urgency-pill mobile-execution-urgency-pill--${urgencyClass}`}>{canonicalLabel(task.urgency, ui)}</span>
                   </div>
 
-                  <p className="card__subtext mobile-execution-task-summary">{task.summary || 'No task summary was provided.'}</p>
+                  <p className="card__subtext mobile-execution-task-summary">{task.summary || ui('No task summary was provided.')}</p>
 
                   <div className="mobile-execution-task-badges">
-                    {task.barcode_ready ? <span className="mobile-execution-meta-pill"><TenantNavIcon path="/scanner" size={13} />Scan-ready</span> : null}
-                    {task.offline_safe_snapshot ? <span className="mobile-execution-meta-pill"><TenantNavIcon path="/mobile-execution" size={13} />Offline snapshot</span> : null}
-                    {queuedCount ? <span className="mobile-execution-meta-pill mobile-execution-meta-pill--pending">{queuedCount} pending</span> : null}
-                    {task.execution_task_source_type ? <span className="mobile-execution-meta-pill"><TenantNavIcon path={sourcePath || '/execution-tasks'} size={13} />Source {formatLabel(task.execution_task_source_type)}</span> : null}
+                    {task.barcode_ready ? <span className="mobile-execution-meta-pill"><TenantNavIcon path="/scanner" size={13} />{ui("Scan-ready")}</span> : null}
+                    {task.offline_safe_snapshot ? <span className="mobile-execution-meta-pill"><TenantNavIcon path="/mobile-execution" size={13} />{ui("Offline snapshot")}</span> : null}
+                    {queuedCount ? <span className="mobile-execution-meta-pill mobile-execution-meta-pill--pending">{countLabel(queuedCount, "pending action", "pending actions", locale, ui)}</span> : null}
+                    {task.execution_task_source_type ? <span className="mobile-execution-meta-pill"><TenantNavIcon path={sourcePath || '/execution-tasks'} size={13} />{ui("Source")} {canonicalLabel(task.execution_task_source_type, ui)}</span> : null}
                   </div>
 
                   <div className="mobile-execution-task-detail">
-                    <div className="card__label">Recommended next step</div>
-                    <p className="card__subtext">{task.recommended_mobile_next_step}</p>
+                    <div className="card__label">{ui("Recommended next step")}</div>
+                    <p className="card__subtext">{task.recommended_mobile_next_step || ui("No recommended next step was provided.")}</p>
                   </div>
                   <div className="mobile-execution-task-detail mobile-execution-task-detail--time">
-                    <div className="card__label">Last updated</div>
-                    <p className="card__subtext">{formatDateTime(task.updated_at || task.created_at)}</p>
+                    <div className="card__label">{ui("Last updated")}</div>
+                    <p className="card__subtext">{formatDateTime(task.updated_at || task.created_at, locale, ui)}</p>
                   </div>
 
                   <div className="mobile-execution-task-actions">
-                    {canUpdateTasks && task.task_source_id ? actions.map((action) => <button key={action} className={actionButtonClass(action)} type="button" disabled={busyTaskId === task.task_source_id} onClick={() => void runAction(task, action)}>{formatLabel(action)}</button>) : null}
-                    {sourcePath ? <Link className="button button--secondary mobile-execution-source-button" to={sourcePath}><TenantNavIcon path={sourcePath} size={14} />Open source workflow</Link> : null}
-                    {task.barcode_ready ? <Link className="button button--secondary mobile-execution-source-button" to="/scanner"><TenantNavIcon path="/scanner" size={14} />Scan/verify</Link> : null}
+                    {canUpdateTasks && task.task_source_id ? actions.map((action) => <button key={action} className={actionButtonClass(action)} type="button" disabled={busyTaskId === task.task_source_id} onClick={() => void runAction(task, action)}>{ui(ACTION_LABELS[action])}</button>) : null}
+                    {sourcePath ? <Link className="button button--secondary mobile-execution-source-button" to={sourcePath}><TenantNavIcon path={sourcePath} size={14} />{ui("Open source workflow")}</Link> : null}
+                    {task.barcode_ready ? <Link className="button button--secondary mobile-execution-source-button" to="/scanner"><TenantNavIcon path="/scanner" size={14} />{ui("Scan/verify")}</Link> : null}
                   </div>
                 </article>
               );
@@ -501,10 +571,10 @@ export default function MobileExecutionPage() {
       <section className="section mobile-execution-section">
         <div className="section__title mobile-execution-section-title">
           <span className="mobile-execution-section-icon"><TenantNavIcon path="/permissions" size={16} /></span>
-          Mobile safety contract
+          {ui("Mobile safety contract")}
         </div>
         <div className="mobile-execution-safety-grid">
-          {safetyEntries.length === 0 ? <div className="card mobile-execution-empty-card"><p className="card__subtext">Safety contract details were not returned by the backend.</p></div> : safetyEntries.map(([key]) => <div className="card mobile-execution-safety-card" key={key}><span className="mobile-execution-icon mobile-execution-icon--green"><TenantNavIcon path="/permissions" size={16} /></span><div><div className="card__label">Enabled guardrail</div><div className="mobile-execution-safety-title">{formatLabel(key)}</div></div></div>)}
+          {safetyEntries.length === 0 ? <div className="card mobile-execution-empty-card"><p className="card__subtext">{ui("Safety contract details were not returned by the backend.")}</p></div> : safetyEntries.map(([key]) => <div className="card mobile-execution-safety-card" key={key}><span className="mobile-execution-icon mobile-execution-icon--green"><TenantNavIcon path="/permissions" size={16} /></span><div><div className="card__label">{ui("Enabled guardrail")}</div><div className="mobile-execution-safety-title">{safetyLabel(key, ui)}</div></div></div>)}
         </div>
       </section>
     </div>

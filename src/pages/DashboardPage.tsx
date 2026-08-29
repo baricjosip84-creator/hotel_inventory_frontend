@@ -7,6 +7,8 @@ import { getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/p
 import { fetchTenantSubscriptionAccess, isTenantFeatureAllowed } from '../lib/tenantSubscriptionAccess';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 
 /**
  * ============================================================================
@@ -291,19 +293,6 @@ function toNumber(value: number | string | null | undefined): number {
   return 0;
 }
 
-function formatDate(dateString: string | null | undefined): string {
-  if (!dateString) return '-';
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return dateString;
-  return date.toLocaleDateString();
-}
-
-function formatDateTime(dateString: string | null | undefined): string {
-  if (!dateString) return '-';
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return dateString;
-  return date.toLocaleString();
-}
 
 function healthBadgeStyle(tier: string): CSSProperties {
   if (tier === 'excellent') {
@@ -361,18 +350,32 @@ function changeBadgeStyle(value: number): CSSProperties {
   return { ...styles.badgeBase, background: '#e2e8f0', color: '#334155' };
 }
 
-function changeDisplay(value: number): string {
-  return value > 0 ? `+${value}` : String(value);
+function changeDisplay(value: number, locale: Parameters<typeof formatLocalizedNumber>[1]): string {
+  const formatted = formatLocalizedNumber(Math.abs(value), locale, { maximumFractionDigits: 2 });
+  if (value > 0) return `+${formatted}`;
+  if (value < 0) return `-${formatted}`;
+  return formatted;
 }
 
-function healthTierLabel(tier: string): string {
-  if (tier === 'excellent') return 'Excellent';
-  if (tier === 'good') return 'Good';
-  if (tier === 'watch') return 'Needs attention';
-  return 'Critical';
+type UiTranslator = (englishText: string) => string;
+
+function enumDisplayLabel(value: string, ui: UiTranslator): string {
+  const englishLabel = value
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+  return ui(englishLabel);
 }
 
-function formatActivityReason(reason: string): string {
+function healthTierLabel(tier: string, ui: UiTranslator): string {
+  if (tier === 'excellent') return ui('Excellent');
+  if (tier === 'good') return ui('Good');
+  if (tier === 'watch') return ui('Needs attention');
+  return ui('Critical');
+}
+
+function formatActivityReason(reason: string, ui: UiTranslator): string {
   const formatPart = (value: string) =>
     value
       .split('_')
@@ -381,8 +384,8 @@ function formatActivityReason(reason: string): string {
       .join(' ');
 
   const [action, detail] = reason.split(':', 2);
-  const actionLabel = formatPart(action || reason);
-  return detail ? `${actionLabel} — ${formatPart(detail)}` : actionLabel;
+  const actionLabel = ui(formatPart(action || reason));
+  return detail ? `${actionLabel} — ${ui(formatPart(detail))}` : actionLabel;
 }
 
 function dashboardIconToneStyle(tone: 'default' | 'good' | 'warn' | 'danger' = 'default'): CSSProperties {
@@ -494,6 +497,11 @@ function StatCard(props: {
  */
 
 export default function DashboardPage() {
+  const { locale, ui } = useAppTranslation();
+  const formatDate = (value: string | null | undefined) => formatLocalizedDate(value, locale);
+  const formatDateTime = (value: string | null | undefined) => formatLocalizedDateTime(value, locale);
+  const formatNumber = (value: number | string | null | undefined) =>
+    formatLocalizedNumber(toNumber(value), locale, { maximumFractionDigits: 2 });
   const { canViewReports, canViewInsights, canManageProducts } = getRoleCapabilities();
   const canViewStock = hasPermission(TENANT_PERMISSIONS.STOCK_READ);
   const canViewShipments = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ);
@@ -607,7 +615,7 @@ export default function DashboardPage() {
   if (summaryQuery.isLoading) {
     return (
       <div className="io-operational-page io-dashboard-page io-workspace-page" style={styles.page}>
-        <div className="app-panel app-panel--padded">Loading dashboard...</div>
+        <div className="app-panel app-panel--padded">{ui('Loading dashboard...')}</div>
       </div>
     );
   }
@@ -616,7 +624,7 @@ export default function DashboardPage() {
     return (
       <div className="io-operational-page io-dashboard-page io-workspace-page" style={styles.page}>
         <SectionError
-          message={`Failed to load dashboard summary: ${(summaryQuery.error as Error)?.message || 'Unknown error'}`}
+          message={`${ui('Failed to load dashboard summary:')} ${(summaryQuery.error as Error)?.message || ui('Unknown error')}`}
         />
       </div>
     );
@@ -626,86 +634,86 @@ export default function DashboardPage() {
     <div className="io-operational-page io-dashboard-page io-workspace-page" style={styles.page}>
       <OperationalWorkspaceHero
         iconPath="/dashboard"
-        eyebrow="Operations overview"
-        title="Operations workspace"
-        description="Monitor stock, shipments, alerts, outbound work, supplier pressure, and operational health from one tenant-level overview."
+        eyebrow={ui('Operations overview')}
+        title={ui('Operations workspace')}
+        description={ui('Monitor stock, shipments, alerts, outbound work, supplier pressure, and operational health from one tenant-level overview.')}
         meta={<>
-          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>Permission-aware</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>Live operational summary</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui('Permission-aware')}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui('Live operational summary')}</OperationalWorkspaceMetaPill>
         </>}
       />
 
       <div className="app-grid-stats io-workspace-stats" style={styles.kpiGrid}>
         <StatCard
-          title="Products"
+          title={ui('Products')}
           iconPath="/products"
-          value={summary.master_data.total_products}
-          subtitle="Active products"
+          value={formatNumber(summary.master_data.total_products)}
+          subtitle={ui('Active products')}
         />
         <StatCard
-          title="Suppliers"
+          title={ui('Suppliers')}
           iconPath="/suppliers"
-          value={summary.master_data.total_suppliers}
-          subtitle="Active suppliers"
+          value={formatNumber(summary.master_data.total_suppliers)}
+          subtitle={ui('Active suppliers')}
         />
         <StatCard
-          title="Storage Locations"
+          title={ui('Storage Locations')}
           iconPath="/storage-locations"
-          value={summary.master_data.total_storage_locations}
-          subtitle="Configured locations"
+          value={formatNumber(summary.master_data.total_storage_locations)}
+          subtitle={ui('Configured locations')}
         />
         <StatCard
-          title="Pending Shipments"
+          title={ui('Pending Shipments')}
           iconPath="/shipments"
-          value={summary.shipments.pending_shipments}
-          subtitle="Not yet received"
+          value={formatNumber(summary.shipments.pending_shipments)}
+          subtitle={ui('Not yet received')}
           tone={summary.shipments.pending_shipments > 0 ? 'warn' : 'good'}
         />
         <StatCard
-          title="Partial Shipments"
+          title={ui('Partial Shipments')}
           iconPath="/shipments"
-          value={summary.shipments.partial_shipments}
-          subtitle="Partially received"
+          value={formatNumber(summary.shipments.partial_shipments)}
+          subtitle={ui('Partially received')}
           tone={summary.shipments.partial_shipments > 0 ? 'warn' : 'default'}
         />
         {canViewOutbound ? (
           <StatCard
-            title="Open Outbound Orders"
+            title={ui('Open Outbound Orders')}
             iconPath="/outbound"
-            value={outboundSummaryQuery.data?.open_orders ?? 0}
-            subtitle={`${outboundSummaryQuery.data?.units_waiting ?? 0} unit(s) still waiting`}
+            value={formatNumber(outboundSummaryQuery.data?.open_orders ?? 0)}
+            subtitle={`${ui('Units still waiting')}: ${formatNumber(outboundSummaryQuery.data?.units_waiting ?? 0)}`}
             tone={(outboundSummaryQuery.data?.packed_orders ?? 0) > 0 ? 'warn' : 'default'}
           />
         ) : null}
         {canViewOutbound && (outboundSummaryQuery.data?.partially_dispatched_orders ?? 0) > 0 ? (
           <StatCard
-            title="Partial Customer Shipments"
+            title={ui('Partial Customer Shipments')}
             iconPath="/outbound"
-            value={outboundSummaryQuery.data?.partially_dispatched_orders ?? 0}
-            subtitle="Orders with a remainder still reserved"
+            value={formatNumber(outboundSummaryQuery.data?.partially_dispatched_orders ?? 0)}
+            subtitle={ui('Orders with a remainder still reserved')}
             tone="warn"
           />
         ) : null}
         <StatCard
-          title="Low Stock Rows"
+          title={ui('Low Stock Rows')}
           iconPath="/stock"
-          value={summary.stock.low_stock_rows}
-          subtitle="Below configured minimum"
+          value={formatNumber(summary.stock.low_stock_rows)}
+          subtitle={ui('Below configured minimum')}
           tone={summary.stock.low_stock_rows > 0 ? 'danger' : 'good'}
         />
         <StatCard
-          title="Unresolved Alerts"
+          title={ui('Unresolved Alerts')}
           iconPath="/alerts"
-          value={summary.alerts.unresolved_alerts}
-          subtitle="Still requiring attention"
+          value={formatNumber(summary.alerts.unresolved_alerts)}
+          subtitle={ui('Still requiring attention')}
           tone={summary.alerts.unresolved_alerts > 0 ? 'danger' : 'good'}
         />
         <StatCard
-          title="Critical Alerts"
+          title={ui('Critical Alerts')}
           iconPath="/alerts"
-          value={summary.alerts.critical_unresolved_alerts}
-          subtitle="Highest priority"
+          value={formatNumber(summary.alerts.critical_unresolved_alerts)}
+          subtitle={ui('Highest priority')}
           tone={summary.alerts.critical_unresolved_alerts > 0 ? 'danger' : 'good'}
         />
       </div>
@@ -713,26 +721,26 @@ export default function DashboardPage() {
       {setupChecklistQuery.data && !setupChecklistQuery.data.complete ? (
         <section className="app-panel app-panel--padded" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <div><strong>Getting started</strong><div style={{ marginTop: 4, opacity: 0.75 }}>Complete these basics first. {setupChecklistQuery.data.completed_steps}/{setupChecklistQuery.data.total_steps} done.</div></div>
+            <div><strong>{ui('Getting started')}</strong><div style={{ marginTop: 4, opacity: 0.75 }}>{ui('Complete these basics first.')} {setupChecklistQuery.data.completed_steps}/{setupChecklistQuery.data.total_steps} {ui('done')}.</div></div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-            {setupChecklistQuery.data.steps.map((step) => <Link key={step.key} to={step.path} style={{ padding: '8px 10px', borderRadius: 8, textDecoration: 'none', border: '1px solid #cbd5e1', color: 'inherit', opacity: step.done ? 0.6 : 1 }}>{step.done ? '✓' : '○'} {step.label}</Link>)}
+            {setupChecklistQuery.data.steps.map((step) => <Link key={step.key} to={step.path} style={{ padding: '8px 10px', borderRadius: 8, textDecoration: 'none', border: '1px solid #cbd5e1', color: 'inherit', opacity: step.done ? 0.6 : 1 }}>{step.done ? '✓' : '○'} {ui(step.label)}</Link>)}
           </div>
         </section>
       ) : null}
 
       <div style={styles.quickActionRow}>
-        {canViewStock ? <ActionLink to="/stock" label="Open Stock" iconPath="/stock" /> : null}
-        {canViewShipments ? <ActionLink to="/shipments" label="Open Shipments" iconPath="/shipments" /> : null}
-        {canViewAlerts ? <ActionLink to="/alerts?resolved=false" label="Review Alerts" iconPath="/alerts" /> : null}
+        {canViewStock ? <ActionLink to="/stock" label={ui('Open Stock')} iconPath="/stock" /> : null}
+        {canViewShipments ? <ActionLink to="/shipments" label={ui('Open Shipments')} iconPath="/shipments" /> : null}
+        {canViewAlerts ? <ActionLink to="/alerts?resolved=false" label={ui('Review Alerts')} iconPath="/alerts" /> : null}
         {canViewProducts ? (
-          <ActionLink to="/products" label={canManageProducts ? 'Manage Products' : 'Open Products'} iconPath="/products" />
+          <ActionLink to="/products" label={canManageProducts ? ui('Manage Products') : ui('Open Products')} iconPath="/products" />
         ) : null}
-        {canViewSuppliers ? <ActionLink to="/suppliers" label="Open Suppliers" iconPath="/suppliers" /> : null}
-        {canViewLocations ? <ActionLink to="/storage-locations" label="Open Locations" iconPath="/storage-locations" /> : null}
-        {canViewOutbound ? <ActionLink to="/outbound" label="Open Outbound" iconPath="/outbound" /> : null}
-        {canOpenReports ? <ActionLink to="/reports" label="Open Reports" iconPath="/reports" /> : null}
-        {canViewInsights ? <ActionLink to="/insights" label="Open Insights" iconPath="/insights" /> : null}
+        {canViewSuppliers ? <ActionLink to="/suppliers" label={ui('Open Suppliers')} iconPath="/suppliers" /> : null}
+        {canViewLocations ? <ActionLink to="/storage-locations" label={ui('Open Locations')} iconPath="/storage-locations" /> : null}
+        {canViewOutbound ? <ActionLink to="/outbound" label={ui('Open Outbound')} iconPath="/outbound" /> : null}
+        {canOpenReports ? <ActionLink to="/reports" label={ui('Open Reports')} iconPath="/reports" /> : null}
+        {canViewInsights ? <ActionLink to="/insights" label={ui('Open Insights')} iconPath="/insights" /> : null}
       </div>
 
       <div className="app-grid-stats" style={styles.kpiGrid}>
@@ -741,36 +749,36 @@ export default function DashboardPage() {
             <div style={styles.healthHeaderLead}>
               <DashboardIconBadge path="/insights" size={19} />
               <div style={styles.healthHeaderText}>
-                <div style={styles.healthTitle}>Operational Health</div>
+                <div style={styles.healthTitle}>{ui('Operational Health')}</div>
                 <div style={styles.healthSubtitle}>
-                  Tenant-level health based on alerts, overdue shipments, low stock, and discrepancy pressure.
+                  {ui('Tenant-level health based on alerts, overdue shipments, low stock, and discrepancy pressure.')}
                 </div>
               </div>
             </div>
 
             {health ? (
               <span style={healthBadgeStyle(health.health_tier)}>
-                {healthTierLabel(health.health_tier)}
+                {healthTierLabel(health.health_tier, ui)}
               </span>
             ) : null}
           </div>
 
           {!canViewInsights ? (
-            <SectionError message="Your role can view the operational dashboard but not management insights." />
+            <SectionError message={ui('Your role can view the operational dashboard but not management insights.')} />
           ) : operationalHealthQuery.isLoading ? (
-            <p>Loading health score...</p>
+            <p>{ui('Loading health score...')}</p>
           ) : operationalHealthQuery.isError || !health ? (
             <SectionError
               message={
                 (operationalHealthQuery.error as Error)?.message ||
-                'Unable to load operational health.'
+                ui('Unable to load operational health.')
               }
             />
           ) : (
             <div style={styles.healthBody}>
               <div style={styles.healthScoreBlock}>
                 <div style={styles.healthScore}>
-                  <span>{toNumber(health.health_score)}</span>
+                  <span>{formatNumber(health.health_score)}</span>
                   <span style={styles.healthScoreScale}> / 100</span>
                 </div>
                 <div style={styles.healthProgressTrack} aria-hidden="true">
@@ -787,9 +795,9 @@ export default function DashboardPage() {
                 <div style={styles.healthMetric}>
                   <DashboardIconBadge path="/stock" tone="danger" size={18} />
                   <div style={styles.healthMetricText}>
-                    <div style={styles.healthMetricLabel}>Low Stock Rate</div>
+                    <div style={styles.healthMetricLabel}>{ui('Low Stock Rate')}</div>
                     <div style={styles.healthMetricValue}>
-                      {toNumber(health.metrics.low_stock_rate_pct)}%
+                      {formatLocalizedNumber(toNumber(health.metrics.low_stock_rate_pct) / 100, locale, { style: 'percent', maximumFractionDigits: 2 })}
                     </div>
                   </div>
                 </div>
@@ -797,9 +805,9 @@ export default function DashboardPage() {
                 <div style={styles.healthMetric}>
                   <DashboardIconBadge path="/stock-movements" tone="warn" size={18} />
                   <div style={styles.healthMetricText}>
-                    <div style={styles.healthMetricLabel}>Discrepancy Rate</div>
+                    <div style={styles.healthMetricLabel}>{ui('Discrepancy Rate')}</div>
                     <div style={styles.healthMetricValue}>
-                      {toNumber(health.metrics.discrepancy_rate_pct)}%
+                      {formatLocalizedNumber(toNumber(health.metrics.discrepancy_rate_pct) / 100, locale, { style: 'percent', maximumFractionDigits: 2 })}
                     </div>
                   </div>
                 </div>
@@ -807,9 +815,9 @@ export default function DashboardPage() {
                 <div style={styles.healthMetric}>
                   <DashboardIconBadge path="/shipments" tone="warn" size={18} />
                   <div style={styles.healthMetricText}>
-                    <div style={styles.healthMetricLabel}>Overdue Shipments</div>
+                    <div style={styles.healthMetricLabel}>{ui('Overdue Shipments')}</div>
                     <div style={styles.healthMetricValue}>
-                      {health.metrics.overdue_shipments}
+                      {formatNumber(health.metrics.overdue_shipments)}
                     </div>
                   </div>
                 </div>
@@ -817,9 +825,9 @@ export default function DashboardPage() {
                 <div style={styles.healthMetric}>
                   <DashboardIconBadge path="/alerts" tone="danger" size={18} />
                   <div style={styles.healthMetricText}>
-                    <div style={styles.healthMetricLabel}>Unresolved Alerts</div>
+                    <div style={styles.healthMetricLabel}>{ui('Unresolved Alerts')}</div>
                     <div style={styles.healthMetricValue}>
-                      {health.metrics.unresolved_alerts}
+                      {formatNumber(health.metrics.unresolved_alerts)}
                     </div>
                   </div>
                 </div>
@@ -831,31 +839,31 @@ export default function DashboardPage() {
 
       <div style={styles.twoColumnGrid}>
         <Section
-          title="Depletion Risk"
+          title={ui('Depletion Risk')}
           iconPath="/insights"
           iconTone="warn"
-          subtitle="Products and stock rows most at risk of running out soon."
-          actionHint="Top risk candidates"
+          subtitle={ui('Products and stock rows most at risk of running out soon.')}
+          actionHint={ui('Top risk candidates')}
         >
           {!canViewInsights ? (
-            <SectionError message="Your role can view dashboard operations but not depletion-risk insights." />
+            <SectionError message={ui('Your role can view dashboard operations but not depletion-risk insights.')} />
           ) : depletionRiskQuery.isLoading ? (
-            <p>Loading depletion risk...</p>
+            <p>{ui('Loading depletion risk...')}</p>
           ) : depletionRiskQuery.isError ? (
             <SectionError
               message={
                 (depletionRiskQuery.error as Error)?.message ||
-                'Unable to load depletion risk.'
+                ui('Unable to load depletion risk.')
               }
             />
           ) : (
             <div style={styles.list}>
               {topDepletionRows.length === 0 ? (
                 <PremiumEmptyState
-                  title="No active depletion risk"
-                  message="Current stock positions look stable for the evaluated time window."
+                  title={ui('No active depletion risk')}
+                  message={ui('Current stock positions look stable for the evaluated time window.')}
                   tone="good"
-                  meta="Lookback window: 30 days"
+                  meta={`${ui('Lookback window')}: 30 ${ui('days')}`}
                 />
               ) : (
                 topDepletionRows.map((row) => (
@@ -867,26 +875,26 @@ export default function DashboardPage() {
                           {row.storage_location_name} · {row.product_unit || '-'}
                         </div>
                       </div>
-                      <span style={urgencyBadgeStyle(row.risk_tier)}>{row.risk_tier}</span>
+                      <span style={urgencyBadgeStyle(row.risk_tier)}>{enumDisplayLabel(row.risk_tier, ui)}</span>
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>Current Qty</span>
-                      <strong>{toNumber(row.current_quantity)}</strong>
+                      <span>{ui('Current Qty')}</span>
+                      <strong>{formatNumber(row.current_quantity)}</strong>
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>Configured Min</span>
-                      <strong>{toNumber(row.configured_min_quantity)}</strong>
+                      <span>{ui('Configured Min')}</span>
+                      <strong>{formatNumber(row.configured_min_quantity)}</strong>
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>Recent Outbound</span>
-                      <strong>{toNumber(row.recent_outbound_quantity)}</strong>
+                      <span>{ui('Recent Outbound')}</span>
+                      <strong>{formatNumber(row.recent_outbound_quantity)}</strong>
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>Coverage Days</span>
+                      <span>{ui('Coverage Days')}</span>
                       <strong>
                         {row.estimated_days_of_coverage === null
                           ? '-'
@@ -895,8 +903,8 @@ export default function DashboardPage() {
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>Risk Score</span>
-                      <strong>{toNumber(row.risk_score)}</strong>
+                      <span>{ui('Risk Score')}</span>
+                      <strong>{formatNumber(row.risk_score)}</strong>
                     </div>
                   </div>
                 ))
@@ -906,31 +914,31 @@ export default function DashboardPage() {
         </Section>
 
         <Section
-          title="Reorder Recommendations"
+          title={ui('Reorder Recommendations')}
           iconPath="/insights"
           iconTone="default"
-          subtitle="Explainable reorder signals based on current stock and recent usage."
-          actionHint="Action queue"
+          subtitle={ui('Explainable reorder signals based on current stock and recent usage.')}
+          actionHint={ui('Action queue')}
         >
           {!canViewInsights ? (
-            <SectionError message="Your role can view dashboard operations but not reorder insights." />
+            <SectionError message={ui('Your role can view dashboard operations but not reorder insights.')} />
           ) : reorderRecommendationsQuery.isLoading ? (
-            <p>Loading reorder recommendations...</p>
+            <p>{ui('Loading reorder recommendations...')}</p>
           ) : reorderRecommendationsQuery.isError ? (
             <SectionError
               message={
                 (reorderRecommendationsQuery.error as Error)?.message ||
-                'Unable to load reorder recommendations.'
+                ui('Unable to load reorder recommendations.')
               }
             />
           ) : (
             <div style={styles.list}>
               {topReorderRows.length === 0 ? (
                 <PremiumEmptyState
-                  title="No reorder action required"
-                  message="Inventory is currently above the system's reorder thresholds for the evaluated products."
+                  title={ui('No reorder action required')}
+                  message={ui("Inventory is currently above the system's reorder thresholds for the evaluated products.")}
                   tone="good"
-                  meta={`Products evaluated: ${(summary.master_data.total_products ?? 0).toString()} · Lookback window: 30 days`}
+                  meta={`${ui('Products evaluated')}: ${formatNumber(summary.master_data.total_products ?? 0)} · ${ui('Lookback window')}: 30 ${ui('days')}`}
                 />
               ) : (
                 topReorderRows.map((row) => (
@@ -940,26 +948,26 @@ export default function DashboardPage() {
                         <div style={styles.listCardTitle}>{row.product_name}</div>
                         <div style={styles.listCardMeta}>{row.unit}</div>
                       </div>
-                      <span style={urgencyBadgeStyle(row.urgency)}>{row.urgency}</span>
+                      <span style={urgencyBadgeStyle(row.urgency)}>{enumDisplayLabel(row.urgency, ui)}</span>
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>Current Quantity</span>
-                      <strong>{toNumber(row.current_quantity)}</strong>
+                      <span>{ui('Current Quantity')}</span>
+                      <strong>{formatNumber(row.current_quantity)}</strong>
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>Min Stock</span>
-                      <strong>{toNumber(row.min_stock)}</strong>
+                      <span>{ui('Min Stock')}</span>
+                      <strong>{formatNumber(row.min_stock)}</strong>
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>Daily Usage</span>
-                      <strong>{toNumber(row.average_daily_usage)}</strong>
+                      <span>{ui('Daily Usage')}</span>
+                      <strong>{formatNumber(row.average_daily_usage)}</strong>
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>Coverage Days</span>
+                      <span>{ui('Coverage Days')}</span>
                       <strong>
                         {row.estimated_days_of_coverage === null
                           ? '-'
@@ -968,8 +976,8 @@ export default function DashboardPage() {
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>Recommended Reorder</span>
-                      <strong>{toNumber(row.recommended_reorder_quantity)}</strong>
+                      <span>{ui('Recommended Reorder')}</span>
+                      <strong>{formatNumber(row.recommended_reorder_quantity)}</strong>
                     </div>
                   </div>
                 ))
@@ -981,34 +989,34 @@ export default function DashboardPage() {
 
       <div style={styles.threeColumnGrid}>
         <Section
-          title="Low Stock"
+          title={ui('Low Stock')}
           iconPath="/stock"
           iconTone="danger"
-          subtitle="Most urgent low-stock rows requiring action."
+          subtitle={ui('Most urgent low-stock rows requiring action.')}
         >
           {lowStockQuery.isLoading ? (
-            <p>Loading low-stock rows...</p>
+            <p>{ui('Loading low-stock rows...')}</p>
           ) : lowStockQuery.isError ? (
             <SectionError
-              message={(lowStockQuery.error as Error)?.message || 'Unable to load low-stock rows.'}
+              message={(lowStockQuery.error as Error)?.message || ui('Unable to load low-stock rows.')}
             />
           ) : (
             <div style={styles.tableWrapper}>
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>Product</th>
-                    <th style={styles.th}>Location</th>
-                    <th style={styles.th}>Qty</th>
-                    <th style={styles.th}>Min</th>
-                    <th style={styles.th}>Shortage</th>
+                    <th style={styles.th}>{ui('Product')}</th>
+                    <th style={styles.th}>{ui('Location')}</th>
+                    <th style={styles.th}>{ui('Qty')}</th>
+                    <th style={styles.th}>{ui('Min')}</th>
+                    <th style={styles.th}>{ui('Shortage')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(lowStockQuery.data ?? []).length === 0 ? (
                     <tr>
                       <td style={styles.emptyCell} colSpan={5}>
-                        No low-stock rows.
+                        {ui('No low-stock rows.')}
                       </td>
                     </tr>
                   ) : (
@@ -1016,9 +1024,9 @@ export default function DashboardPage() {
                       <tr key={row.id}>
                         <td style={styles.td}>{row.product_name}</td>
                         <td style={styles.td}>{row.storage_location_name}</td>
-                        <td style={styles.td}>{toNumber(row.quantity)}</td>
-                        <td style={styles.td}>{toNumber(row.min_stock)}</td>
-                        <td style={styles.td}>{toNumber(row.shortage)}</td>
+                        <td style={styles.td}>{formatNumber(row.quantity)}</td>
+                        <td style={styles.td}>{formatNumber(row.min_stock)}</td>
+                        <td style={styles.td}>{formatNumber(row.shortage)}</td>
                       </tr>
                     ))
                   )}
@@ -1029,18 +1037,18 @@ export default function DashboardPage() {
         </Section>
 
         <Section
-          title="Overdue Shipments"
+          title={ui('Overdue Shipments')}
           iconPath="/shipments"
           iconTone="warn"
-          subtitle="Shipments past their delivery date and not fully received."
+          subtitle={ui('Shipments past their delivery date and not fully received.')}
         >
           {overdueShipmentsQuery.isLoading ? (
-            <p>Loading overdue shipments...</p>
+            <p>{ui('Loading overdue shipments...')}</p>
           ) : overdueShipmentsQuery.isError ? (
             <SectionError
               message={
                 (overdueShipmentsQuery.error as Error)?.message ||
-                'Unable to load overdue shipments.'
+                ui('Unable to load overdue shipments.')
               }
             />
           ) : (
@@ -1048,18 +1056,18 @@ export default function DashboardPage() {
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>PO Number</th>
-                    <th style={styles.th}>Supplier</th>
-                    <th style={styles.th}>Delivery Date</th>
-                    <th style={styles.th}>Status</th>
-                    <th style={styles.th}>Ordered / Received</th>
+                    <th style={styles.th}>{ui('PO Number')}</th>
+                    <th style={styles.th}>{ui('Supplier')}</th>
+                    <th style={styles.th}>{ui('Delivery Date')}</th>
+                    <th style={styles.th}>{ui('Status')}</th>
+                    <th style={styles.th}>{ui('Ordered / Received')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(overdueShipmentsQuery.data ?? []).length === 0 ? (
                     <tr>
                       <td style={styles.emptyCell} colSpan={5}>
-                        No overdue shipments.
+                        {ui('No overdue shipments.')}
                       </td>
                     </tr>
                   ) : (
@@ -1070,7 +1078,7 @@ export default function DashboardPage() {
                           {canViewShipments ? (
                             <ActionLink
                               to={`/shipments?shipmentId=${encodeURIComponent(row.id)}`}
-                              label="Open Shipment"
+                              label={ui('Open Shipment')}
                               iconPath="/shipments"
                             />
                           ) : null}
@@ -1080,17 +1088,17 @@ export default function DashboardPage() {
                           {canViewSuppliers ? (
                             <ActionLink
                               to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`}
-                              label="Open Supplier"
+                              label={ui('Open Supplier')}
                               iconPath="/suppliers"
                             />
                           ) : null}
                         </td>
                         <td style={styles.td}>{formatDate(row.delivery_date)}</td>
                         <td style={styles.td}>
-                          <span style={urgencyBadgeStyle(row.status)}>{row.status}</span>
+                          <span style={urgencyBadgeStyle(row.status)}>{enumDisplayLabel(row.status, ui)}</span>
                         </td>
                         <td style={styles.td}>
-                          {toNumber(row.total_ordered_quantity)} / {toNumber(row.total_received_quantity)}
+                          {formatNumber(row.total_ordered_quantity)} / {formatNumber(row.total_received_quantity)}
                         </td>
                       </tr>
                     ))
@@ -1102,26 +1110,26 @@ export default function DashboardPage() {
         </Section>
 
         <Section
-          title="Unresolved Alerts"
+          title={ui('Unresolved Alerts')}
           iconPath="/alerts"
           iconTone="danger"
-          subtitle="Highest-priority unresolved alerts requiring review."
+          subtitle={ui('Highest-priority unresolved alerts requiring review.')}
         >
           {unresolvedAlertsQuery.isLoading ? (
-            <p>Loading unresolved alerts...</p>
+            <p>{ui('Loading unresolved alerts...')}</p>
           ) : unresolvedAlertsQuery.isError ? (
             <SectionError
               message={
                 (unresolvedAlertsQuery.error as Error)?.message ||
-                'Unable to load unresolved alerts.'
+                ui('Unable to load unresolved alerts.')
               }
             />
           ) : (
             <div style={styles.list}>
               {(unresolvedAlertsQuery.data ?? []).length === 0 ? (
                 <PremiumEmptyState
-                  title="No unresolved alerts"
-                  message="Current alert state is clean for the active tenant."
+                  title={ui('No unresolved alerts')}
+                  message={ui('Current alert state is clean for the active tenant.')}
                   tone="good"
                 />
               ) : (
@@ -1129,31 +1137,31 @@ export default function DashboardPage() {
                   <div style={styles.listCard} key={alert.id}>
                     <div style={styles.listCardHeader}>
                       <div style={styles.listCardHeaderText}>
-                        <div style={styles.listCardTitle}>{alert.type}</div>
+                        <div style={styles.listCardTitle}>{enumDisplayLabel(alert.type, ui)}</div>
                         <div style={styles.listCardMeta}>
-                          {alert.product_name || 'No product linked'} · {formatDateTime(alert.created_at)}
+                          {alert.product_name || ui('No product linked')} · {formatDateTime(alert.created_at)}
                         </div>
                       </div>
-                      <span style={alertSeverityBadgeStyle(alert.severity)}>{alert.severity}</span>
+                      <span style={alertSeverityBadgeStyle(alert.severity)}>{enumDisplayLabel(alert.severity, ui)}</span>
                     </div>
 
                     <div style={styles.cardText}>{alert.message}</div>
                     {canViewAlerts ? (
                       <ActionLink
                         to={`/alerts?search=${encodeURIComponent(alert.product_name || alert.type)}`}
-                        label="Open in Alerts"
+                        label={ui('Open in Alerts')}
                         iconPath="/alerts"
                       />
                     ) : null}
 
                     <div style={styles.metricRow}>
-                      <span>Escalation Level</span>
+                      <span>{ui('Escalation Level')}</span>
                       <strong>{alert.escalation_level}</strong>
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>Acknowledged</span>
-                      <strong>{alert.acknowledged ? 'Yes' : 'No'}</strong>
+                      <span>{ui('Acknowledged')}</span>
+                      <strong>{alert.acknowledged ? ui('Yes') : ui('No')}</strong>
                     </div>
                   </div>
                 ))
@@ -1165,25 +1173,25 @@ export default function DashboardPage() {
 
       <div style={styles.threeColumnGrid}>
         <Section
-          title="Inventory Anomalies"
+          title={ui('Inventory Anomalies')}
           iconPath="/insights"
           iconTone="good"
-          subtitle="Products with unusually high outbound activity compared to their own baseline."
+          subtitle={ui('Products with unusually high outbound activity compared to their own baseline.')}
         >
           {!canViewInsights ? (
-            <SectionError message="Your role can view dashboard operations but not anomaly insights." />
+            <SectionError message={ui('Your role can view dashboard operations but not anomaly insights.')} />
           ) : anomaliesQuery.isLoading ? (
-            <p>Loading anomalies...</p>
+            <p>{ui('Loading anomalies...')}</p>
           ) : anomaliesQuery.isError ? (
             <SectionError
-              message={(anomaliesQuery.error as Error)?.message || 'Unable to load anomalies.'}
+              message={(anomaliesQuery.error as Error)?.message || ui('Unable to load anomalies.')}
             />
           ) : (
             <div style={styles.list}>
               {topAnomalies.length === 0 ? (
                 <PremiumEmptyState
-                  title="No abnormal consumption patterns"
-                  message="No significant usage spikes were detected against the current baseline window."
+                  title={ui('No abnormal consumption patterns')}
+                  message={ui('No significant usage spikes were detected against the current baseline window.')}
                   tone="good"
                 />
               ) : (
@@ -1196,27 +1204,27 @@ export default function DashboardPage() {
                           {row.product_category || '-'} · {row.product_unit || '-'}
                         </div>
                       </div>
-                      <span style={urgencyBadgeStyle(row.anomaly_tier)}>{row.anomaly_tier}</span>
+                      <span style={urgencyBadgeStyle(row.anomaly_tier)}>{enumDisplayLabel(row.anomaly_tier, ui)}</span>
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>Recent Daily Outbound</span>
-                      <strong>{toNumber(row.recent_daily_outbound)}</strong>
+                      <span>{ui('Recent Daily Outbound')}</span>
+                      <strong>{formatNumber(row.recent_daily_outbound)}</strong>
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>Baseline Daily Outbound</span>
-                      <strong>{toNumber(row.baseline_daily_outbound)}</strong>
+                      <span>{ui('Baseline Daily Outbound')}</span>
+                      <strong>{formatNumber(row.baseline_daily_outbound)}</strong>
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>Spike Ratio</span>
-                      <strong>{toNumber(row.spike_ratio)}</strong>
+                      <span>{ui('Spike Ratio')}</span>
+                      <strong>{formatNumber(row.spike_ratio)}</strong>
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>Anomaly Score</span>
-                      <strong>{toNumber(row.anomaly_score)}</strong>
+                      <span>{ui('Anomaly Score')}</span>
+                      <strong>{formatNumber(row.anomaly_score)}</strong>
                     </div>
                   </div>
                 ))
@@ -1226,18 +1234,18 @@ export default function DashboardPage() {
         </Section>
 
         <Section
-          title="Recent Activity"
+          title={ui('Recent Activity')}
           iconPath="/stock-movements"
           iconTone="default"
-          subtitle="Latest stock movement activity visible to operators and managers."
+          subtitle={ui('Latest stock movement activity visible to operators and managers.')}
         >
           {recentActivityQuery.isLoading ? (
-            <p>Loading recent activity...</p>
+            <p>{ui('Loading recent activity...')}</p>
           ) : recentActivityQuery.isError ? (
             <SectionError
               message={
                 (recentActivityQuery.error as Error)?.message ||
-                'Unable to load recent activity.'
+                ui('Unable to load recent activity.')
               }
             />
           ) : (
@@ -1245,18 +1253,18 @@ export default function DashboardPage() {
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>Created</th>
-                    <th style={styles.th}>Product</th>
-                    <th style={styles.th}>Change</th>
-                    <th style={styles.th}>Reason</th>
-                    <th style={styles.th}>User</th>
+                    <th style={styles.th}>{ui('Created')}</th>
+                    <th style={styles.th}>{ui('Product')}</th>
+                    <th style={styles.th}>{ui('Change')}</th>
+                    <th style={styles.th}>{ui('Reason')}</th>
+                    <th style={styles.th}>{ui('User')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(recentActivityQuery.data ?? []).length === 0 ? (
                     <tr>
                       <td style={styles.emptyCell} colSpan={5}>
-                        No recent activity.
+                        {ui('No recent activity.')}
                       </td>
                     </tr>
                   ) : (
@@ -1271,11 +1279,11 @@ export default function DashboardPage() {
                             <div style={styles.rowSubtle}>{row.product_unit}</div>
                           </td>
                           <td style={styles.td}>
-                            <span style={changeBadgeStyle(amount)}>{changeDisplay(amount)}</span>
+                            <span style={changeBadgeStyle(amount)}>{changeDisplay(amount, locale)}</span>
                           </td>
-                          <td style={styles.td}>{formatActivityReason(row.reason)}</td>
+                          <td style={styles.td}>{formatActivityReason(row.reason, ui)}</td>
                           <td style={styles.td}>
-                            {row.user_name || (row.user_id ? 'User name unavailable' : 'System')}
+                            {row.user_name || (row.user_id ? ui('User name unavailable') : ui('System'))}
                           </td>
                         </tr>
                       );
@@ -1288,18 +1296,18 @@ export default function DashboardPage() {
         </Section>
 
         <Section
-          title="Supplier Performance"
+          title={ui('Supplier Performance')}
           iconPath="/suppliers"
           iconTone="default"
-          subtitle="Shipment execution summary by supplier."
+          subtitle={ui('Shipment execution summary by supplier.')}
         >
           {supplierPerformanceQuery.isLoading ? (
-            <p>Loading supplier performance...</p>
+            <p>{ui('Loading supplier performance...')}</p>
           ) : supplierPerformanceQuery.isError ? (
             <SectionError
               message={
                 (supplierPerformanceQuery.error as Error)?.message ||
-                'Unable to load supplier performance.'
+                ui('Unable to load supplier performance.')
               }
             />
           ) : (
@@ -1307,19 +1315,19 @@ export default function DashboardPage() {
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>Supplier</th>
-                    <th style={styles.th}>Total</th>
-                    <th style={styles.th}>Pending</th>
-                    <th style={styles.th}>Partial</th>
-                    <th style={styles.th}>Received</th>
-                    <th style={styles.th}>Overdue</th>
+                    <th style={styles.th}>{ui('Supplier')}</th>
+                    <th style={styles.th}>{ui('Total')}</th>
+                    <th style={styles.th}>{ui('Pending')}</th>
+                    <th style={styles.th}>{ui('Partial')}</th>
+                    <th style={styles.th}>{ui('Received')}</th>
+                    <th style={styles.th}>{ui('Overdue')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(supplierPerformanceQuery.data ?? []).length === 0 ? (
                     <tr>
                       <td style={styles.emptyCell} colSpan={6}>
-                        No supplier performance rows found.
+                        {ui('No supplier performance rows found.')}
                       </td>
                     </tr>
                   ) : (
@@ -1330,16 +1338,16 @@ export default function DashboardPage() {
                           {canViewSuppliers ? (
                             <ActionLink
                               to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`}
-                              label="Open Supplier"
+                              label={ui('Open Supplier')}
                               iconPath="/suppliers"
                             />
                           ) : null}
                         </td>
-                        <td style={styles.td}>{row.total_shipments}</td>
-                        <td style={styles.td}>{row.pending_shipments}</td>
-                        <td style={styles.td}>{row.partial_shipments}</td>
-                        <td style={styles.td}>{row.received_shipments}</td>
-                        <td style={styles.td}>{row.overdue_shipments}</td>
+                        <td style={styles.td}>{formatNumber(row.total_shipments)}</td>
+                        <td style={styles.td}>{formatNumber(row.pending_shipments)}</td>
+                        <td style={styles.td}>{formatNumber(row.partial_shipments)}</td>
+                        <td style={styles.td}>{formatNumber(row.received_shipments)}</td>
+                        <td style={styles.td}>{formatNumber(row.overdue_shipments)}</td>
                       </tr>
                     ))
                   )}

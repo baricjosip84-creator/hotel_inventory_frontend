@@ -11,6 +11,7 @@ import {
   StatusMessages,
 } from "./EnterpriseInventoryShared";
 import { styles } from "./EnterpriseInventoryStyles";
+import { useAppTranslation } from '../../i18n/I18nContext';
 import { EnterpriseInventoryTabs } from "./EnterpriseInventoryTabs";
 import {
   enterpriseInventoryPrimaryWritePermissions,
@@ -45,6 +46,7 @@ export function EnterpriseInventoryPageLayout({
   canEvaluateParLevels,
   children,
 }: EnterpriseInventoryPageLayoutProps) {
+  const { ui } = useAppTranslation();
   const visibleTabs = enterpriseInventoryTabs.filter(([key, , permission]) => {
     if (!hasPermission(permission)) return false;
     const feature = enterpriseInventoryTabFeatures[key];
@@ -53,7 +55,7 @@ export function EnterpriseInventoryPageLayout({
   });
   const activeConfig = visibleTabs.find(([key]) => key === activeTab);
   const activeKey = activeConfig?.[0] as EnterpriseInventoryTabKey | undefined;
-  const activeLabel = activeConfig?.[1] ?? 'None';
+  const activeLabel = ui(activeConfig?.[1] ?? 'None');
   const activeWritePermission = activeKey ? enterpriseInventoryPrimaryWritePermissions[activeKey] : undefined;
   const canWriteActiveArea = activeWritePermission ? hasPermission(activeWritePermission) : false;
 
@@ -71,26 +73,26 @@ export function EnterpriseInventoryPageLayout({
         errorMessage={errorMessage}
       />
 
-      <OperationalWorkspaceStats ariaLabel="Inventory controls summary">
+      <OperationalWorkspaceStats ariaLabel={ui('Inventory controls summary')}>
         <OperationalWorkspaceStatCard
-          label="Available controls"
+          label={ui('Available controls')}
           value={visibleTabs.length}
-          helper="Visible with your current tenant permissions"
+          helper={ui('Visible with your current tenant permissions')}
           tone="blue"
           iconPath="/enterprise-inventory"
         />
         <OperationalWorkspaceStatCard
-          label="Current workspace"
+          label={ui('Current workspace')}
           value={activeLabel}
-          helper="Selected specialized inventory control"
+          helper={ui('Selected specialized inventory control')}
           tone="neutral"
           iconPath={activeKey ? enterpriseInventoryTabIconPaths[activeKey] : '/enterprise-inventory'}
           className="inventory-controls-stat--text"
         />
         <OperationalWorkspaceStatCard
-          label="Action access"
-          value={canWriteActiveArea ? 'Write enabled' : 'Read only'}
-          helper={canWriteActiveArea ? 'Primary actions are available in this area' : 'This area is available for review only'}
+          label={ui('Action access')}
+          value={canWriteActiveArea ? ui('Write enabled') : ui('Read only')}
+          helper={canWriteActiveArea ? ui('Primary actions are available in this area') : ui('This area is available for review only')}
           tone={canWriteActiveArea ? 'good' : 'neutral'}
           iconPath="/permissions"
           className="inventory-controls-stat--text"
@@ -105,9 +107,9 @@ export function EnterpriseInventoryPageLayout({
 
       {!activeTab ? (
         <section style={styles.card}>
-          <h2 style={styles.cardTitle}>No inventory controls available</h2>
+          <h2 style={styles.cardTitle}>{ui('No inventory controls available')}</h2>
           <p style={styles.helper}>
-            Your current permissions do not include any of these specialized inventory controls.
+            {ui('Your current permissions do not include any of these specialized inventory controls.')}
           </p>
         </section>
       ) : children}

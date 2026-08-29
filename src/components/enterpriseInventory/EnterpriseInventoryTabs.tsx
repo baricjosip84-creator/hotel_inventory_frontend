@@ -4,6 +4,7 @@ import {
   OperationalWorkspaceTab,
   OperationalWorkspaceTabs,
 } from '../ui/OperationalWorkspace';
+import { useAppTranslation } from '../../i18n/I18nContext';
 import {
   enterpriseInventoryTabFeatures,
   enterpriseInventoryTabIconPaths,
@@ -18,6 +19,7 @@ type EnterpriseInventoryTabsProps = {
 };
 
 export function EnterpriseInventoryTabs({ activeTab, onChange, subscriptionAccess }: EnterpriseInventoryTabsProps) {
+  const { ui } = useAppTranslation();
   const visibleTabs = enterpriseInventoryTabs.filter(([key, , permission]) => {
     if (!hasPermission(permission)) return false;
     const feature = enterpriseInventoryTabFeatures[key];
@@ -27,16 +29,16 @@ export function EnterpriseInventoryTabs({ activeTab, onChange, subscriptionAcces
 
   return (
     <OperationalWorkspaceTabs
-      ariaLabel="Inventory control work areas"
+      ariaLabel={ui('Inventory control work areas')}
     >
       {visibleTabs.map(([key, label]) => (
         <OperationalWorkspaceTab
           key={key}
           active={activeTab === key}
           iconPath={enterpriseInventoryTabIconPaths[key]}
-          label={label}
+          label={ui(label)}
           onClick={() => onChange(key)}
-          title={label}
+          title={ui(label)}
           data-skip-global-action-feedback="true"
         />
       ))}

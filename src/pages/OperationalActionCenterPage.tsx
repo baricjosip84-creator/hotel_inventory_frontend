@@ -3,6 +3,9 @@ import type { CSSProperties } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
+import type { AppLocale } from '../i18n/config';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { useRouteQueryState } from '../lib/useRouteQueryState';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
@@ -322,28 +325,41 @@ function numberValue(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatDateTime(value?: string | null): string {
-  if (!value) {
-    return 'Not reported';
-  }
+function formatPercent(value: unknown, locale: AppLocale): string {
+  return formatLocalizedNumber(numberValue(value) / 100, locale, { style: 'percent', maximumFractionDigits: 2 });
+}
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString();
+function formatDateTime(value: string | null | undefined, locale: AppLocale, ui: (englishText: string) => string): string {
+  return value ? formatLocalizedDateTime(value, locale) : ui('Not reported');
 }
 
 function formatLabel(value?: string | null): string {
   return String(value || 'unknown').replace(/_/g, ' ');
 }
 
-function executionModeLabel(value?: string | null): string {
+function canonicalLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  const raw = String(value || 'unknown');
+  const specialLabels: Record<string, string> = {
+    ai_governance: 'AI governance',
+    control_tower: 'Control tower',
+    decision_intelligence: 'Decision intelligence',
+    multi_domain: 'Multi-domain',
+    read_only: 'Read-only',
+    tenant_isolated: 'Tenant isolated',
+    permission_gated: 'Permission gated',
+    human_action_only: 'Human action only',
+    approval_gated_when_required: 'Approval gated when required',
+    no_inventory_mutation: 'No inventory mutation'
+  };
+  const humanized = specialLabels[raw] || formatLabel(raw).replace(/^./, (character) => character.toUpperCase());
+  return ui(humanized);
+}
+
+function executionModeLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
   if (value === 'read_only_action_aggregation_human_operated') {
-    return 'Read-only, human-operated';
+    return ui('Read-only, human-operated');
   }
-  return formatLabel(value);
+  return canonicalLabel(value, ui);
 }
 
 function actionTitleLabel(action: OperationalAction): string {
@@ -429,6 +445,7 @@ async function fetchActionCenter(domain: ActionDomain, urgency: 'all' | ActionUr
 }
 
 export default function OperationalActionCenterPage() {
+  const { locale, ui } = useAppTranslation();
   const [searchParams] = useSearchParams();
   const sourceActionId = searchParams.get('source_action_id');
   const [domain, setDomain] = useRouteQueryState<ActionDomain>({
@@ -499,8 +516,8 @@ export default function OperationalActionCenterPage() {
   if (actionCenterQuery.isLoading) {
     return (
       <div className="card">
-        <div style={{ fontWeight: 800 }}>Loading Action Center</div>
-        <p className="card__subtext">Collecting the actions that are visible to your role.</p>
+        <div style={{ fontWeight: 800 }}>{ui("Loading Action Center")}</div>
+        <p className="card__subtext">{ui("Collecting the actions that are visible to your role.")}</p>
       </div>
     );
   }
@@ -508,14 +525,14 @@ export default function OperationalActionCenterPage() {
   if (actionCenterQuery.error) {
     return (
       <div className="card">
-        <div style={{ fontWeight: 800 }}>Action Center could not be loaded</div>
+        <div style={{ fontWeight: 800 }}>{ui("Action Center could not be loaded")}</div>
         <p className="form-error">
           {actionCenterQuery.error instanceof ApiError
             ? actionCenterQuery.error.message
-            : 'Unable to load the action center.'}
+            : ui('Unable to load the action center.')}
         </p>
         <button className="button button--secondary" type="button" onClick={() => actionCenterQuery.refetch()}>
-          Try again
+          {ui("Try again")}
         </button>
       </div>
     );
@@ -525,45 +542,45 @@ export default function OperationalActionCenterPage() {
     <div className="operational-action-center-page io-operational-page io-workspace-page io-workspace-legacy-normalized">
       <OperationalWorkspaceHero
         iconPath="/action-center"
-        eyebrow="Command & prioritization"
-        title="Action Center"
-        description="Prioritized, tenant-scoped operational work gathered from authoritative source workflows. Review what needs attention here, then complete the real work on its source page."
+        eyebrow={ui("Command & prioritization")}
+        title={ui("Action Center")}
+        description={ui("Prioritized, tenant-scoped operational work gathered from authoritative source workflows. Review what needs attention here, then complete the real work on its source page.")}
         meta={
           <>
-            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Read-only guidance</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Source workflows authoritative</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Read-only guidance")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Source workflows authoritative")}</OperationalWorkspaceMetaPill>
           </>
         }
-        aside={<OperationalWorkspaceStatus value="Read-only" label="prioritization and routing workspace" />}
+        aside={<OperationalWorkspaceStatus value={ui("Read-only")} label={ui("prioritization and routing workspace")} />}
       />
 
-      <OperationalWorkspaceStats ariaLabel="Action Center overview">
+      <OperationalWorkspaceStats ariaLabel={ui("Action Center overview")}>
         <OperationalWorkspaceStatCard
-          label="Open actions shown"
-          value={numberValue(summary.total_actions ?? actions.length)}
-          helper="Highest-priority actions currently returned for your access"
+          label={ui("Open actions shown")}
+          value={formatLocalizedNumber(numberValue(summary.total_actions ?? actions.length), locale)}
+          helper={ui("Highest-priority actions currently returned for your access")}
           iconPath="/action-center"
           tone="blue"
         />
         <OperationalWorkspaceStatCard
-          label="Highest urgency"
-          value={summary.highest_urgency ? formatLabel(summary.highest_urgency) : 'None'}
-          helper="Most urgent level among the actions shown"
+          label={ui("Highest urgency")}
+          value={summary.highest_urgency ? canonicalLabel(summary.highest_urgency, ui) : ui('None')}
+          helper={ui("Most urgent level among the actions shown")}
           iconPath="/alerts"
           tone={['critical'].includes(String(summary.highest_urgency || '').toLowerCase()) ? 'danger' : ['high', 'medium'].includes(String(summary.highest_urgency || '').toLowerCase()) ? 'warn' : 'good'}
         />
         <OperationalWorkspaceStatCard
-          label="Approval gated"
-          value={numberValue(summary.approval_required_count)}
-          helper="Items requiring human governance review"
+          label={ui("Approval gated")}
+          value={formatLocalizedNumber(numberValue(summary.approval_required_count), locale)}
+          helper={ui("Items requiring human governance review")}
           iconPath="/intelligence-review"
           tone={numberValue(summary.approval_required_count) > 0 ? 'warn' : 'neutral'}
         />
         <OperationalWorkspaceStatCard
-          label="Execution mode"
-          value={executionModeLabel(response?.definition?.execution_mode)}
-          helper="Guidance only; this page does not change source records"
+          label={ui("Execution mode")}
+          value={executionModeLabel(response?.definition?.execution_mode, ui)}
+          helper={ui("Guidance only; this page does not change source records")}
           iconPath="/execution-tasks"
           tone="neutral"
         />
@@ -572,9 +589,9 @@ export default function OperationalActionCenterPage() {
       <div className="card action-center-info-card">
         <span className="action-center-icon action-center-icon--blue"><TenantNavIcon path="/action-center" size={18} /></span>
         <div>
-          <div className="action-center-info-title">How this page works</div>
+          <div className="action-center-info-title">{ui("How this page works")}</div>
           <p className="card__subtext">
-            The Action Center combines work from several parts of the tenant account. It is advisory and read-only: use the source-workflow button on an item to review or complete the real work.
+            {ui("The Action Center combines work from several parts of the tenant account. It is advisory and read-only: use the source-workflow button on an item to review or complete the real work.")}
           </p>
         </div>
       </div>
@@ -582,41 +599,41 @@ export default function OperationalActionCenterPage() {
       <section className="section action-center-inbox-section">
         <div className="section__title action-center-section-title">
           <span className="action-center-section-icon"><TenantNavIcon path="/action-center" size={17} /></span>
-          <span>Action inbox</span>
+          <span>{ui("Action inbox")}</span>
         </div>
         <div className="card action-center-inbox-shell">
           <div style={toolbarStyle} className="action-center-toolbar">
             <label className="action-center-filter-field">
-              <span>Domain</span>
-              <select aria-label="Filter by action domain" style={selectStyle} value={domain} onChange={(event) => setDomain(event.target.value as ActionDomain)}>
+              <span>{ui("Domain")}</span>
+              <select aria-label={ui("Filter by action domain")} style={selectStyle} value={domain} onChange={(event) => setDomain(event.target.value as ActionDomain)}>
                 {availableDomains.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+                  <option key={option.value} value={option.value}>{ui(option.label)}</option>
                 ))}
               </select>
             </label>
             <label className="action-center-filter-field">
-              <span>Urgency</span>
-              <select aria-label="Filter by urgency" style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>
+              <span>{ui("Urgency")}</span>
+              <select aria-label={ui("Filter by urgency")} style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>
                 {URGENCY_FILTERS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+                  <option key={option.value} value={option.value}>{ui(option.label)}</option>
                 ))}
               </select>
             </label>
             <button className="button button--secondary action-center-refresh" type="button" onClick={() => actionCenterQuery.refetch()} disabled={actionCenterQuery.isFetching}>
-              {actionCenterQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+              {actionCenterQuery.isFetching ? ui('Refreshing…') : ui('Refresh')}
             </button>
           </div>
 
           {sourceActionId && !actionCenterQuery.isLoading && !actionCenterQuery.error ? (
             <p className={selectedSourceAction ? 'card__subtext' : 'form-error'}>
               {selectedSourceAction
-                ? 'The requested action is highlighted below.'
-                : 'The requested action was not returned by the current filters or is no longer pending.'}
+                ? ui('The requested action is highlighted below.')
+                : ui('The requested action was not returned by the current filters or is no longer pending.')}
             </p>
           ) : null}
 
           {actions.length === 0 ? (
-            <p className="card__subtext">No action-center items matched the selected filters.</p>
+            <p className="card__subtext">{ui("No action-center items matched the selected filters.")}</p>
           ) : (
             <div style={actionListStyle}>
               {actions.map((action) => {
@@ -637,38 +654,38 @@ export default function OperationalActionCenterPage() {
                         <span className={`action-center-icon ${urgencyToneClass(action.urgency)}`}><TenantNavIcon path={actionDomainIconPath(action.action_domain)} size={17} /></span>
                         <div className="action-center-action-title-copy">
                           <div className="action-center-action-title">{actionTitleLabel(action)}</div>
-                          <div className="card__subtext">{action.summary || 'No summary provided.'}</div>
+                          <div className="card__subtext">{action.summary || ui('No summary provided.')}</div>
                         </div>
                       </div>
                       <div className="action-center-badge-row">
-                        <span style={urgencyBadgeStyle(action.urgency)}>{formatLabel(action.urgency)}</span>
-                        <span style={badgeStyle}>{formatLabel(action.action_domain)}</span>
-                        <span style={badgeStyle}>{formatLabel(action.action_status)}</span>
+                        <span style={urgencyBadgeStyle(action.urgency)}>{canonicalLabel(action.urgency, ui)}</span>
+                        <span style={badgeStyle}>{canonicalLabel(action.action_domain, ui)}</span>
+                        <span style={badgeStyle}>{canonicalLabel(action.action_status, ui)}</span>
                       </div>
                     </div>
 
                     <div className="action-center-action-guidance">
-                      <span className="action-center-action-guidance-label">Recommended next step</span>
-                      <span>{action.recommended_next_step || 'Review source workflow before acting.'}</span>
+                      <span className="action-center-action-guidance-label">{ui("Recommended next step")}</span>
+                      <span>{action.recommended_next_step || ui('Review source workflow before acting.')}</span>
                     </div>
                     <div className="action-center-action-footer">
-                      <span className="card__subtext">Updated: {formatDateTime(action.updated_at || action.created_at)}</span>
+                      <span className="card__subtext">{ui("Updated:")} {formatDateTime(action.updated_at || action.created_at, locale, ui)}</span>
                       {sourceLink ? (
                         <Link className="button button--secondary action-center-source-button" to={sourceLink.to}>
                           <TenantNavIcon path={sourceLink.to.split('?')[0]} size={15} />
-                          <span>{sourceLink.label}</span>
+                          <span>{ui(sourceLink.label)}</span>
                         </Link>
                       ) : null}
                     </div>
                     <details style={actionMetadataStyle} className="action-center-technical-details">
-                      <summary style={{ cursor: 'pointer', fontWeight: 700 }}>Technical details</summary>
-                      <div className="card__subtext">Priority score: {numberValue(action.priority_score)}</div>
+                      <summary style={{ cursor: 'pointer', fontWeight: 700 }}>{ui("Technical details")}</summary>
+                      <div className="card__subtext">{ui("Priority score:")} {formatLocalizedNumber(numberValue(action.priority_score), locale)}</div>
                       <div className="card__subtext">
-                        Action: {action.action_id}{action.source_id ? ` · Source: ${action.source_id}` : ''}
+                        {ui("Action:")} {action.action_id}{action.source_id ? ` · ${ui('Source:')} ${action.source_id}` : ''}
                       </div>
                       {action.explainability?.primary_factors?.length ? (
                         <div className="card__subtext">
-                          Evidence: {action.explainability.primary_factors.map((factor) => formatLabel(factor)).join(' · ')}
+                          {ui("Evidence:")} {action.explainability.primary_factors.map((factor) => canonicalLabel(factor, ui)).join(' · ')}
                         </div>
                       ) : null}
                     </details>
@@ -683,144 +700,144 @@ export default function OperationalActionCenterPage() {
 
       {canViewGovernanceReadiness ? (
       <details style={{ ...detailsStyle, marginTop: 16 }} className="action-center-details">
-        <summary style={detailsSummaryStyle}>Governance readiness details</summary>
+        <summary style={detailsSummaryStyle}>{ui("Governance readiness details")}</summary>
         <p className="card__subtext">
-          Advanced read-only checks showing whether related actions have enough ownership, evidence, review, escalation, and closure information. These scores describe workflow readiness, not the tenant's overall operational health.
+          {ui("Advanced read-only checks showing whether related actions have enough ownership, evidence, review, escalation, and closure information. These scores describe workflow readiness, not the tenant's overall operational health.")}
         </p>
 
         <section className="section" style={{ marginTop: 12 }}>
-        <div className="section__title">Control Tower orchestration traceability</div>
+        <div className="section__title">{ui("Control Tower orchestration traceability")}</div>
         <div className="card-grid" style={cardGridStyle}>
           <div className="card">
-            <div className="card__label">Traceability score</div>
-            <div className="card__value">{numberValue(traceability.traceability_score)}</div>
-            <div className="card__subtext">Manual orchestration readiness across control-tower, execution, and governance actions.</div>
+            <div className="card__label">{ui("Traceability score")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(traceability.traceability_score), locale)}</div>
+            <div className="card__subtext">{ui("Manual orchestration readiness across control-tower, execution, and governance actions.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Posture</div>
-            <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(traceability.traceability_posture)}</div>
-            <div className="card__subtext">Read-only; source workflows remain authoritative.</div>
+            <div className="card__label">{ui("Posture")}</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{canonicalLabel(traceability.traceability_posture, ui)}</div>
+            <div className="card__subtext">{ui("Read-only; source workflows remain authoritative.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Control tower actions</div>
-            <div className="card__value">{numberValue(traceability.control_tower_action_count)}</div>
-            <div className="card__subtext">Signals available for manual coordination trace.</div>
+            <div className="card__label">{ui("Control tower actions")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(traceability.control_tower_action_count), locale)}</div>
+            <div className="card__subtext">{ui("Signals available for manual coordination trace.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Execution / governance links</div>
-            <div className="card__value">{numberValue(traceability.execution_action_count) + numberValue(traceability.governance_action_count)}</div>
-            <div className="card__subtext">Related operational and decision-review actions in the same inbox.</div>
+            <div className="card__label">{ui("Execution / governance links")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(traceability.execution_action_count) + numberValue(traceability.governance_action_count), locale)}</div>
+            <div className="card__subtext">{ui("Related operational and decision-review actions in the same inbox.")}</div>
           </div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Traceability blockers</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>{ui("Traceability blockers")}</div>
           {traceability.blockers?.length ? (
             <ul>
-              {traceability.blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
+              {traceability.blockers.map((blocker) => <li key={blocker}>{canonicalLabel(blocker, ui)}</li>)}
             </ul>
           ) : (
-            <p className="card__subtext">No traceability blockers reported by the backend.</p>
+            <p className="card__subtext">{ui("No traceability blockers reported by the backend.")}</p>
           )}
         </div>
       </section>
 
 
       <section className="section">
-        <div className="section__title">Control Tower remediation feedback loop</div>
+        <div className="section__title">{ui("Control Tower remediation feedback loop")}</div>
         <div className="card-grid" style={cardGridStyle}>
           <div className="card">
-            <div className="card__label">Feedback score</div>
-            <div className="card__value">{numberValue(remediationFeedback.feedback_score)}</div>
-            <div className="card__subtext">Read-only maturity score for remediation outcome evidence.</div>
+            <div className="card__label">{ui("Feedback score")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(remediationFeedback.feedback_score), locale)}</div>
+            <div className="card__subtext">{ui("Read-only maturity score for remediation outcome evidence.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Feedback posture</div>
-            <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(remediationFeedback.feedback_posture)}</div>
-            <div className="card__subtext">Human review remains required before closure.</div>
+            <div className="card__label">{ui("Feedback posture")}</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{canonicalLabel(remediationFeedback.feedback_posture, ui)}</div>
+            <div className="card__subtext">{ui("Human review remains required before closure.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Remediation actions</div>
-            <div className="card__value">{numberValue(remediationFeedback.remediation_action_count)}</div>
-            <div className="card__subtext">Open remediation workflows available for feedback review.</div>
+            <div className="card__label">{ui("Remediation actions")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(remediationFeedback.remediation_action_count), locale)}</div>
+            <div className="card__subtext">{ui("Open remediation workflows available for feedback review.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Evidence coverage</div>
-            <div className="card__value">{numberValue(remediationFeedback.source_evidence_coverage_score)}%</div>
-            <div className="card__subtext">Actions with source workflow traceability.</div>
+            <div className="card__label">{ui("Evidence coverage")}</div>
+            <div className="card__value">{formatPercent(remediationFeedback.source_evidence_coverage_score, locale)}</div>
+            <div className="card__subtext">{ui("Actions with source workflow traceability.")}</div>
           </div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Feedback blockers</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>{ui("Feedback blockers")}</div>
           {remediationFeedback.blockers?.length ? (
             <ul>
-              {remediationFeedback.blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
+              {remediationFeedback.blockers.map((blocker) => <li key={blocker}>{canonicalLabel(blocker, ui)}</li>)}
             </ul>
           ) : (
-            <p className="card__subtext">No remediation feedback blockers reported by the backend.</p>
+            <p className="card__subtext">{ui("No remediation feedback blockers reported by the backend.")}</p>
           )}
-          <div className="card__subtext">Recommended next step: {remediationFeedback.recommended_next_step || 'Review source workflows before closing remediation feedback.'}</div>
+          <div className="card__subtext">{ui("Recommended next step:")} {remediationFeedback.recommended_next_step || ui('Review source workflows before closing remediation feedback.')}</div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Required manual evidence</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>{ui("Required manual evidence")}</div>
           {remediationFeedback.required_manual_evidence?.length ? (
             <ul>
-              {remediationFeedback.required_manual_evidence.map((item) => <li key={item}>{formatLabel(item)}</li>)}
+              {remediationFeedback.required_manual_evidence.map((item) => <li key={item}>{canonicalLabel(item, ui)}</li>)}
             </ul>
           ) : (
-            <p className="card__subtext">No manual evidence requirements reported.</p>
+            <p className="card__subtext">{ui("No manual evidence requirements reported.")}</p>
           )}
         </div>
       </section>
 
 
       <section className="section">
-        <div className="section__title">Control Tower remediation effectiveness review</div>
+        <div className="section__title">{ui("Control Tower remediation effectiveness review")}</div>
         <div className="card-grid" style={cardGridStyle}>
           <div className="card">
-            <div className="card__label">Effectiveness score</div>
-            <div className="card__value">{numberValue(effectivenessReview.effectiveness_score)}</div>
-            <div className="card__subtext">Manual before/after review readiness for remediation outcomes.</div>
+            <div className="card__label">{ui("Effectiveness score")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(effectivenessReview.effectiveness_score), locale)}</div>
+            <div className="card__subtext">{ui("Manual before/after review readiness for remediation outcomes.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Effectiveness posture</div>
-            <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(effectivenessReview.effectiveness_posture)}</div>
-            <div className="card__subtext">No remediation is executed from this page.</div>
+            <div className="card__label">{ui("Effectiveness posture")}</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{canonicalLabel(effectivenessReview.effectiveness_posture, ui)}</div>
+            <div className="card__subtext">{ui("No remediation is executed from this page.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Review-ready actions</div>
-            <div className="card__value">{numberValue(effectivenessReview.review_ready_action_count)}</div>
-            <div className="card__subtext">Remediation items available for human effectiveness review.</div>
+            <div className="card__label">{ui("Review-ready actions")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(effectivenessReview.review_ready_action_count), locale)}</div>
+            <div className="card__subtext">{ui("Remediation items available for human effectiveness review.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Governance coverage</div>
-            <div className="card__value">{numberValue(effectivenessReview.governance_coverage_score)}%</div>
-            <div className="card__subtext">High-risk remediation actions with governance gate context.</div>
+            <div className="card__label">{ui("Governance coverage")}</div>
+            <div className="card__value">{formatPercent(effectivenessReview.governance_coverage_score, locale)}</div>
+            <div className="card__subtext">{ui("High-risk remediation actions with governance gate context.")}</div>
           </div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Effectiveness blockers</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>{ui("Effectiveness blockers")}</div>
           {effectivenessReview.blockers?.length ? (
             <ul>
-              {effectivenessReview.blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
+              {effectivenessReview.blockers.map((blocker) => <li key={blocker}>{canonicalLabel(blocker, ui)}</li>)}
             </ul>
           ) : (
-            <p className="card__subtext">No effectiveness blockers reported by the backend.</p>
+            <p className="card__subtext">{ui("No effectiveness blockers reported by the backend.")}</p>
           )}
-          <div className="card__subtext">Recommended next step: {effectivenessReview.recommended_next_step || 'Complete before/after evidence review before closing remediation.'}</div>
+          <div className="card__subtext">{ui("Recommended next step:")} {effectivenessReview.recommended_next_step || ui('Complete before/after evidence review before closing remediation.')}</div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Effectiveness review contract</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>{ui("Effectiveness review contract")}</div>
           {effectivenessReview.effectiveness_review_contract?.length ? (
             <ul>
-              {effectivenessReview.effectiveness_review_contract.map((item) => <li key={item}>{formatLabel(item)}</li>)}
+              {effectivenessReview.effectiveness_review_contract.map((item) => <li key={item}>{canonicalLabel(item, ui)}</li>)}
             </ul>
           ) : (
-            <p className="card__subtext">No effectiveness review contract reported.</p>
+            <p className="card__subtext">{ui("No effectiveness review contract reported.")}</p>
           )}
         </div>
       </section>
@@ -828,100 +845,100 @@ export default function OperationalActionCenterPage() {
 
 
       <section className="section">
-        <div className="section__title">Control Tower remediation escalation governance</div>
+        <div className="section__title">{ui("Control Tower remediation escalation governance")}</div>
         <div className="card-grid" style={cardGridStyle}>
           <div className="card">
-            <div className="card__label">Escalation score</div>
-            <div className="card__value">{numberValue(escalationGovernance.escalation_score)}</div>
-            <div className="card__subtext">Manual governance readiness for blocked or high-risk remediation items.</div>
+            <div className="card__label">{ui("Escalation score")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(escalationGovernance.escalation_score), locale)}</div>
+            <div className="card__subtext">{ui("Manual governance readiness for blocked or high-risk remediation items.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Escalation posture</div>
-            <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(escalationGovernance.escalation_posture)}</div>
-            <div className="card__subtext">Closure remains blocked until human escalation decisions are recorded.</div>
+            <div className="card__label">{ui("Escalation posture")}</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{canonicalLabel(escalationGovernance.escalation_posture, ui)}</div>
+            <div className="card__subtext">{ui("Closure remains blocked until human escalation decisions are recorded.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Escalation candidates</div>
-            <div className="card__value">{numberValue(escalationGovernance.escalation_candidate_count)}</div>
-            <div className="card__subtext">Blocked, escalated, or high-risk remediation actions requiring review.</div>
+            <div className="card__label">{ui("Escalation candidates")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(escalationGovernance.escalation_candidate_count), locale)}</div>
+            <div className="card__subtext">{ui("Blocked, escalated, or high-risk remediation actions requiring review.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Governance gate score</div>
-            <div className="card__value">{numberValue(escalationGovernance.governance_gate_score)}%</div>
-            <div className="card__subtext">High-risk remediation actions covered by approval context.</div>
+            <div className="card__label">{ui("Governance gate score")}</div>
+            <div className="card__value">{formatPercent(escalationGovernance.governance_gate_score, locale)}</div>
+            <div className="card__subtext">{ui("High-risk remediation actions covered by approval context.")}</div>
           </div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Escalation blockers</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>{ui("Escalation blockers")}</div>
           {escalationGovernance.blockers?.length ? (
             <ul>
-              {escalationGovernance.blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
+              {escalationGovernance.blockers.map((blocker) => <li key={blocker}>{canonicalLabel(blocker, ui)}</li>)}
             </ul>
           ) : (
-            <p className="card__subtext">No escalation governance blockers reported by the backend.</p>
+            <p className="card__subtext">{ui("No escalation governance blockers reported by the backend.")}</p>
           )}
-          <div className="card__subtext">Recommended next step: {escalationGovernance.recommended_next_step || 'Run manual escalation review before closing blocked remediation outcomes.'}</div>
+          <div className="card__subtext">{ui("Recommended next step:")} {escalationGovernance.recommended_next_step || ui('Run manual escalation review before closing blocked remediation outcomes.')}</div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Escalation contract</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>{ui("Escalation contract")}</div>
           {escalationGovernance.escalation_contract?.length ? (
             <ul>
-              {escalationGovernance.escalation_contract.map((item) => <li key={item}>{formatLabel(item)}</li>)}
+              {escalationGovernance.escalation_contract.map((item) => <li key={item}>{canonicalLabel(item, ui)}</li>)}
             </ul>
           ) : (
-            <p className="card__subtext">No escalation contract reported.</p>
+            <p className="card__subtext">{ui("No escalation contract reported.")}</p>
           )}
         </div>
       </section>
 
 
       <section className="section">
-        <div className="section__title">Control Tower remediation closure verification gate</div>
+        <div className="section__title">{ui("Control Tower remediation closure verification gate")}</div>
         <div className="card-grid" style={cardGridStyle}>
           <div className="card">
-            <div className="card__label">Closure score</div>
-            <div className="card__value">{numberValue(closureGate.closure_score)}</div>
-            <div className="card__subtext">Read-only gate score before remediation can be treated as closed.</div>
+            <div className="card__label">{ui("Closure score")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(closureGate.closure_score), locale)}</div>
+            <div className="card__subtext">{ui("Read-only gate score before remediation can be treated as closed.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Closure posture</div>
-            <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(closureGate.closure_posture)}</div>
-            <div className="card__subtext">Closure decisions must still be recorded in the source workflow.</div>
+            <div className="card__label">{ui("Closure posture")}</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{canonicalLabel(closureGate.closure_posture, ui)}</div>
+            <div className="card__subtext">{ui("Closure decisions must still be recorded in the source workflow.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Closure candidates</div>
-            <div className="card__value">{numberValue(closureGate.closure_candidate_count)}</div>
-            <div className="card__subtext">Remediation actions available for manual closure verification.</div>
+            <div className="card__label">{ui("Closure candidates")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(closureGate.closure_candidate_count), locale)}</div>
+            <div className="card__subtext">{ui("Remediation actions available for manual closure verification.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Escalation clearance</div>
-            <div className="card__value">{numberValue(closureGate.escalation_clearance_score)}%</div>
-            <div className="card__subtext">Blocked or escalated remediation must clear before closure.</div>
+            <div className="card__label">{ui("Escalation clearance")}</div>
+            <div className="card__value">{formatPercent(closureGate.escalation_clearance_score, locale)}</div>
+            <div className="card__subtext">{ui("Blocked or escalated remediation must clear before closure.")}</div>
           </div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Closure blockers</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>{ui("Closure blockers")}</div>
           {closureGate.blockers?.length ? (
             <ul>
-              {closureGate.blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
+              {closureGate.blockers.map((blocker) => <li key={blocker}>{canonicalLabel(blocker, ui)}</li>)}
             </ul>
           ) : (
-            <p className="card__subtext">No closure verification blockers reported by the backend.</p>
+            <p className="card__subtext">{ui("No closure verification blockers reported by the backend.")}</p>
           )}
-          <div className="card__subtext">Recommended next step: {closureGate.recommended_next_step || 'Run manual closure verification before closing remediation outcomes.'}</div>
+          <div className="card__subtext">{ui("Recommended next step:")} {closureGate.recommended_next_step || ui('Run manual closure verification before closing remediation outcomes.')}</div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Closure verification contract</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>{ui("Closure verification contract")}</div>
           {closureGate.closure_verification_contract?.length ? (
             <ul>
-              {closureGate.closure_verification_contract.map((item) => <li key={item}>{formatLabel(item)}</li>)}
+              {closureGate.closure_verification_contract.map((item) => <li key={item}>{canonicalLabel(item, ui)}</li>)}
             </ul>
           ) : (
-            <p className="card__subtext">No closure verification contract reported.</p>
+            <p className="card__subtext">{ui("No closure verification contract reported.")}</p>
           )}
         </div>
       </section>
@@ -930,121 +947,121 @@ export default function OperationalActionCenterPage() {
 
       {canViewTenantDiagnostics ? (
         <details style={{ ...detailsStyle, marginTop: 16 }} className="action-center-details">
-          <summary style={detailsSummaryStyle}>Technical contract diagnostics</summary>
+          <summary style={detailsSummaryStyle}>{ui("Technical contract diagnostics")}</summary>
           <p className="card__subtext">
-            Advanced checks shown only to users with tenant diagnostics access, confirming that the page and backend still agree about the information this screen requires.
+            {ui("Advanced checks shown only to users with tenant diagnostics access, confirming that the page and backend still agree about the information this screen requires.")}
           </p>
 
       <section className="section" style={{ marginTop: 12 }}>
-        <div className="section__title">Control Tower remediation response contract audit</div>
+        <div className="section__title">{ui("Control Tower remediation response contract audit")}</div>
         <div className="card-grid" style={cardGridStyle}>
           <div className="card">
-            <div className="card__label">Contract audit score</div>
-            <div className="card__value">{numberValue(contractAudit.audit_score)}</div>
-            <div className="card__subtext">Backend response completeness for every remediation panel rendered here.</div>
+            <div className="card__label">{ui("Contract audit score")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(contractAudit.audit_score), locale)}</div>
+            <div className="card__subtext">{ui("Backend response completeness for every remediation panel rendered here.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Audit posture</div>
-            <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(contractAudit.audit_posture)}</div>
-            <div className="card__subtext">Prevents frontend/backend contract drift.</div>
+            <div className="card__label">{ui("Audit posture")}</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{canonicalLabel(contractAudit.audit_posture, ui)}</div>
+            <div className="card__subtext">{ui("Prevents frontend/backend contract drift.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Coverage</div>
-            <div className="card__value">{numberValue(contractAudit.contract_coverage_score)}%</div>
-            <div className="card__subtext">Expected response objects currently populated.</div>
+            <div className="card__label">{ui("Coverage")}</div>
+            <div className="card__value">{formatPercent(contractAudit.contract_coverage_score, locale)}</div>
+            <div className="card__subtext">{ui("Expected response objects currently populated.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Open blockers</div>
-            <div className="card__value">{numberValue(contractAudit.total_blocker_count)}</div>
-            <div className="card__subtext">Combined blockers reported by remediation response objects.</div>
+            <div className="card__label">{ui("Open blockers")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(contractAudit.total_blocker_count), locale)}</div>
+            <div className="card__subtext">{ui("Combined blockers reported by remediation response objects.")}</div>
           </div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Missing contract keys</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>{ui("Missing contract keys")}</div>
           {contractAudit.missing_contract_keys?.length ? (
             <ul>
-              {contractAudit.missing_contract_keys.map((item) => <li key={item}>{formatLabel(item)}</li>)}
+              {contractAudit.missing_contract_keys.map((item) => <li key={item}>{canonicalLabel(item, ui)}</li>)}
             </ul>
           ) : (
-            <p className="card__subtext">No missing Control Tower remediation response objects reported.</p>
+            <p className="card__subtext">{ui("No missing Control Tower remediation response objects reported.")}</p>
           )}
-          <div className="card__subtext">Recommended next step: {contractAudit.recommended_next_step || 'Keep response-contract checks in place before adding more Control Tower panels.'}</div>
+          <div className="card__subtext">{ui("Recommended next step:")} {contractAudit.recommended_next_step || ui('Keep response-contract checks in place before adding more Control Tower panels.')}</div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Audit contract</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>{ui("Audit contract")}</div>
           {contractAudit.audit_contract?.length ? (
             <ul>
-              {contractAudit.audit_contract.map((item) => <li key={item}>{formatLabel(item)}</li>)}
+              {contractAudit.audit_contract.map((item) => <li key={item}>{canonicalLabel(item, ui)}</li>)}
             </ul>
           ) : (
-            <p className="card__subtext">No response-contract audit requirements reported.</p>
+            <p className="card__subtext">{ui("No response-contract audit requirements reported.")}</p>
           )}
         </div>
       </section>
 
 
       <section className="section">
-        <div className="section__title">Control Tower route exposure audit</div>
+        <div className="section__title">{ui("Control Tower route exposure audit")}</div>
         <div className="card-grid" style={cardGridStyle}>
           <div className="card">
-            <div className="card__label">Route exposure score</div>
-            <div className="card__value">{numberValue(routeExposureAudit.route_exposure_score)}</div>
-            <div className="card__subtext">Backend route contract coverage for the frontend Control Tower panels.</div>
+            <div className="card__label">{ui("Route exposure score")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(routeExposureAudit.route_exposure_score), locale)}</div>
+            <div className="card__subtext">{ui("Backend route contract coverage for the frontend Control Tower panels.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Route posture</div>
-            <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(routeExposureAudit.route_exposure_posture)}</div>
-            <div className="card__subtext">Detects summary endpoint / frontend panel drift.</div>
+            <div className="card__label">{ui("Route posture")}</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{canonicalLabel(routeExposureAudit.route_exposure_posture, ui)}</div>
+            <div className="card__subtext">{ui("Detects summary endpoint / frontend panel drift.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Endpoint</div>
+            <div className="card__label">{ui("Endpoint")}</div>
             <div className="card__value" style={{ fontSize: 18 }}>{routeExposureAudit.http_method || 'GET'} {routeExposureAudit.route_path || '/operational-action-center/summary'}</div>
-            <div className="card__subtext">Frontend summary endpoint expected by this page.</div>
+            <div className="card__subtext">{ui("Frontend summary endpoint expected by this page.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Required permission</div>
-            <div className="card__value" style={{ fontSize: 18 }}>{formatLabel(routeExposureAudit.required_permission)}</div>
-            <div className="card__subtext">Backend permission gate expected for the route.</div>
+            <div className="card__label">{ui("Required permission")}</div>
+            <div className="card__value" style={{ fontSize: 18 }}>{routeExposureAudit.required_permission || '—'}</div>
+            <div className="card__subtext">{ui("Backend permission gate expected for the route.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Rendered panels</div>
-            <div className="card__value">{numberValue(routeExposureAudit.frontend_rendered_panels?.length)}</div>
-            <div className="card__subtext">Includes this route exposure audit panel to prevent self-audit drift.</div>
+            <div className="card__label">{ui("Rendered panels")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(routeExposureAudit.frontend_rendered_panels?.length), locale)}</div>
+            <div className="card__subtext">{ui("Includes this route exposure audit panel to prevent self-audit drift.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Missing panels</div>
-            <div className="card__value">{numberValue(routeExposureAudit.missing_frontend_panels?.length)}</div>
-            <div className="card__subtext">Backend response objects missing for panels rendered by this page.</div>
+            <div className="card__label">{ui("Missing panels")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(routeExposureAudit.missing_frontend_panels?.length), locale)}</div>
+            <div className="card__subtext">{ui("Backend response objects missing for panels rendered by this page.")}</div>
           </div>
           <div className="card">
-            <div className="card__label">Frontend drift count</div>
-            <div className="card__value">{numberValue(frontendPanelContractDriftCount)}</div>
-            <div className="card__subtext">Local rendered-panel contract entries not acknowledged by backend audit.</div>
+            <div className="card__label">{ui("Frontend drift count")}</div>
+            <div className="card__value">{formatLocalizedNumber(numberValue(frontendPanelContractDriftCount), locale)}</div>
+            <div className="card__subtext">{ui("Local rendered-panel contract entries not acknowledged by backend audit.")}</div>
           </div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Route exposure blockers</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>{ui("Route exposure blockers")}</div>
           {routeExposureAudit.blockers?.length ? (
             <ul>
-              {routeExposureAudit.blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)}
+              {routeExposureAudit.blockers.map((blocker) => <li key={blocker}>{canonicalLabel(blocker, ui)}</li>)}
             </ul>
           ) : (
-            <p className="card__subtext">No route exposure blockers reported by the backend.</p>
+            <p className="card__subtext">{ui("No route exposure blockers reported by the backend.")}</p>
           )}
-          <div className="card__subtext">Recommended next step: {routeExposureAudit.recommended_next_step || 'Keep route exposure regression checks in place before adding more Control Tower panels.'}</div>
+          <div className="card__subtext">{ui("Recommended next step:")} {routeExposureAudit.recommended_next_step || ui('Keep route exposure regression checks in place before adding more Control Tower panels.')}</div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Route audit contract</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>{ui("Route audit contract")}</div>
           {routeExposureAudit.audit_contract?.length ? (
             <ul>
-              {routeExposureAudit.audit_contract.map((item) => <li key={item}>{formatLabel(item)}</li>)}
+              {routeExposureAudit.audit_contract.map((item) => <li key={item}>{canonicalLabel(item, ui)}</li>)}
             </ul>
           ) : (
-            <p className="card__subtext">No route exposure audit requirements reported.</p>
+            <p className="card__subtext">{ui("No route exposure audit requirements reported.")}</p>
           )}
         </div>
       </section>
@@ -1052,16 +1069,16 @@ export default function OperationalActionCenterPage() {
       ) : null}
 
       <section className="section">
-        <div className="section__title action-center-section-title"><span className="action-center-section-icon"><TenantNavIcon path="/action-center" size={17} /></span><span>Read-only safety guarantees</span></div>
+        <div className="section__title action-center-section-title"><span className="action-center-section-icon"><TenantNavIcon path="/action-center" size={17} /></span><span>{ui("Read-only safety guarantees")}</span></div>
         <div className="card-grid" style={cardGridStyle}>
           {safetyEntries.filter(([key]) => USER_FACING_SAFETY_KEYS.has(key)).map(([key]) => (
             <div className="card" key={key}>
-              <div className="card__label">Guaranteed</div>
-              <div style={{ fontWeight: 800 }}>{formatLabel(key)}</div>
+              <div className="card__label">{ui("Guaranteed")}</div>
+              <div style={{ fontWeight: 800 }}>{canonicalLabel(key, ui)}</div>
             </div>
           ))}
         </div>
-        <p className="card__subtext">Generated at: {formatDateTime(response?.generated_at)}</p>
+        <p className="card__subtext">{ui("Generated at:")} {formatDateTime(response?.generated_at, locale, ui)}</p>
       </section>
     </div>
   );

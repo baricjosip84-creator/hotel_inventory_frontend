@@ -1,6 +1,8 @@
 import type { ProductCostRiskItem, ProductCostValuationItem } from '../../types/inventory';
 import { formatMoney, formatStatusLabel, formatValuationBasis, getProductStatusTone, toNumber } from './productFormatting';
 import { styles } from './productStyles';
+import { useAppTranslation } from '../../i18n/I18nContext';
+import { formatLocalizedNumber } from '../../i18n/formatters';
 
 export function StatCard(props: {
   title: string;
@@ -47,7 +49,7 @@ export function StatusBadge(props: {
 
   return (
     <span style={{ ...styles.badge, ...toneStyle }}>
-      {formatStatusLabel(props.status)}{detail}
+      {ui(formatStatusLabel(props.status))}{detail}
     </span>
   );
 }
@@ -62,6 +64,7 @@ type CostRiskListProps = {
 };
 
 export function CostRiskList(props: CostRiskListProps) {
+  const { ui } = useAppTranslation();
   return (
     <div style={styles.riskCard}>
       <h4 style={styles.sectionTitle}>{props.title}</h4>
@@ -80,7 +83,7 @@ export function CostRiskList(props: CostRiskListProps) {
                 style={styles.secondaryButton}
                 onClick={() => props.onOpenHistory(row)}
               >
-                Cost History
+                {ui("Cost History")}
               </button>
             </div>
           ))}
@@ -99,6 +102,7 @@ type CostValuationListProps = {
 };
 
 export function CostValuationList(props: CostValuationListProps) {
+  const { ui, locale } = useAppTranslation();
   return (
     <div style={styles.riskCard}>
       <h4 style={styles.sectionTitle}>{props.title}</h4>
@@ -111,7 +115,7 @@ export function CostValuationList(props: CostValuationListProps) {
               <div>
                 <div style={styles.rowTitle}>{row.name}</div>
                 <div style={styles.rowSubtle}>
-                  {formatMoney(row.estimated_inventory_value)} • {toNumber(row.current_stock_quantity).toLocaleString()} {row.unit} • {formatValuationBasis(row.valuation_basis)}
+                  {formatMoney(row.estimated_inventory_value, locale)} • {formatLocalizedNumber(Number(toNumber(row.current_stock_quantity)), locale)} {row.unit} • {ui(formatValuationBasis(row.valuation_basis))}
                 </div>
               </div>
               <button
@@ -119,7 +123,7 @@ export function CostValuationList(props: CostValuationListProps) {
                 style={styles.secondaryButton}
                 onClick={() => props.onOpenHistory(row)}
               >
-                Cost History
+                {ui("Cost History")}
               </button>
             </div>
           ))}

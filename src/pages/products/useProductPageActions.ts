@@ -4,6 +4,7 @@ import type { useProductPageState } from './useProductPageState';
 import { buildProductActionHandlers } from './productActionHandlers';
 import { buildProductCostHistoryHandlers } from './productCostHistoryHandlers';
 import { useProductMutations } from './productMutations';
+import { useAppTranslation } from '../../i18n/I18nContext';
 
 type UseProductPageActionsParams = {
   queryClient: QueryClient;
@@ -20,6 +21,7 @@ export function useProductPageActions({
   canManageProducts,
   canManageProductPackages
 }: UseProductPageActionsParams) {
+  const { ui } = useAppTranslation();
   const {
     createMutation,
     updateMutation,
@@ -39,7 +41,8 @@ export function useProductPageActions({
     setFormMessage: productPageState.setFormMessage,
     setFormError: productPageState.setFormError,
     setPackageMessage: productPageState.setPackageMessage,
-    setPackageError: productPageState.setPackageError
+    setPackageError: productPageState.setPackageError,
+    ui
   });
 
   const productActionHandlers = buildProductActionHandlers({
@@ -51,7 +54,8 @@ export function useProductPageActions({
     deleteMutation,
     createPackageMutation,
     updatePackageMutation,
-    deletePackageMutation
+    deletePackageMutation,
+    ui
   });
 
   const costHistoryHandlers = buildProductCostHistoryHandlers({
@@ -68,7 +72,8 @@ export function useProductPageActions({
     costActionDetails: productPageData.costActionDetails,
     costRiskDetails: productPageData.costRiskDetails,
     setSelectedCostProduct: productPageState.setSelectedCostProduct,
-    setCostHistoryFilters: productPageState.setCostHistoryFilters
+    setCostHistoryFilters: productPageState.setCostHistoryFilters,
+    ui
   });
 
   return {

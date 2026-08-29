@@ -5,6 +5,7 @@ import { styles } from './productStyles';
 import { ProductFormPanel } from './ProductFormPanel';
 import { ProductListPanel } from './ProductListPanel';
 import { InventoryCsvImportPanel } from '../../components/imports/InventoryCsvImportPanel';
+import { useAppTranslation } from '../../i18n/I18nContext';
 
 type ProductManagementSectionsPanelProps = ReturnType<typeof useProductPageViewModel>;
 
@@ -44,24 +45,25 @@ export function ProductManagementSectionsPanel({
   handleStartEdit,
   handleDelete
 }: ProductManagementSectionsPanelProps) {
+  const { ui } = useAppTranslation();
   const queryClient = useQueryClient();
 
   return (
     <>
       {!canManageProducts ? (
         <div style={styles.warningBox}>
-          Current access role: {getCurrentAccessRoleLabel() || role}. Products are read-only because this role does not have products.write permission.
+          {ui("Current access role:")} {ui(getCurrentAccessRoleLabel() || role)}{ui(". Products are read-only because this role does not have products.write permission.")}
         </div>
       ) : null}
 
       <InventoryCsvImportPanel
         importType="products"
-        title="Bulk Product Import"
-        description="Validate a CSV first, then commit all rows atomically. Existing records are never silently overwritten."
+        title={ui("Bulk Product Import")}
+        description={ui("Validate a CSV first, then commit all rows atomically. Existing records are never silently overwritten.")}
         templateColumns={['sku', 'name', 'category', 'unit', 'min_stock', 'standard_unit_cost', 'supplier_name', 'barcode', 'requires_lot_tracking', 'requires_expiry_date']}
         templateExample={{ sku: 'BEV-COFFEE-001', name: 'Coffee Beans Premium', category: 'Beverages', unit: 'kg', min_stock: '10', standard_unit_cost: '18.50', supplier_name: '', barcode: '', requires_lot_tracking: 'false', requires_expiry_date: 'false' }}
         canImport={canManageProducts}
-        disabledReason="Products write permission is required for bulk product import."
+        disabledReason={ui("Products write permission is required for bulk product import.")}
         onCommitted={async () => {
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ['products'] }),

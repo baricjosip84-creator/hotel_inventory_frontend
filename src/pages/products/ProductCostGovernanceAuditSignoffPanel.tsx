@@ -5,6 +5,7 @@ import type {
 import { toNumber } from './productFormatting';
 import { styles } from './productStyles';
 import { StatCard, StatusBadge } from './productSummaryComponents';
+import { useAppTranslation } from '../../i18n/I18nContext';
 
 type CostGovernanceQueryState = {
   isLoading: boolean;
@@ -29,52 +30,53 @@ export function ProductCostGovernanceAuditSignoffPanel({
   handleExportCostGovernanceAuditCsv,
   handlePrintCostGovernanceAudit
 }: ProductCostGovernanceAuditSignoffPanelProps) {
+  const { ui } = useAppTranslation();
   return (
     <>
             <div style={styles.riskListCard}>
               <div style={styles.packageHeader}>
                 <div>
-                  <h4 style={styles.sectionTitle}>Governance audit pack</h4>
-                  <div style={styles.rowSubtle}>Exportable read-only evidence for finance review and costing sign-off.</div>
+                  <h4 style={styles.sectionTitle}>{ui("Governance audit pack")}</h4>
+                  <div style={styles.rowSubtle}>{ui("Exportable read-only evidence for finance review and costing sign-off.")}</div>
                 </div>
                 <div style={styles.actionRow}>
                   <button type="button" style={styles.secondaryButton} onClick={handleExportCostGovernanceAuditCsv} disabled={!costGovernanceAuditPack?.audit_rows?.length}>
-                    Export Audit CSV
+                    {ui("Export Audit CSV")}
                   </button>
                   <button type="button" style={styles.secondaryButton} onClick={handlePrintCostGovernanceAudit} disabled={!costGovernanceAuditPack}>
-                    Print Audit Pack
+                    {ui("Print Audit Pack")}
                   </button>
                 </div>
               </div>
 
               {costGovernanceAuditQuery.isLoading ? (
-                <div style={styles.rowSubtle}>Loading governance audit pack...</div>
+                <div style={styles.rowSubtle}>{ui("Loading governance audit pack...")}</div>
               ) : costGovernanceAuditQuery.isError ? (
-                <div style={styles.errorBox}>Unable to load governance audit pack.</div>
+                <div style={styles.errorBox}>{ui("Unable to load governance audit pack.")}</div>
               ) : (
                 <>
                   <div style={styles.costReadinessGrid}>
                     <StatCard
-                      title="Checklist Evidence"
+                      title={ui("Checklist Evidence")}
                       value={toNumber(costGovernanceAuditPack?.evidence_summary.checklist_items)}
-                      subtitle="Governance controls"
+                      subtitle={ui("Governance controls")}
                     />
                     <StatCard
-                      title="Remediation Items"
+                      title={ui("Remediation Items")}
                       value={toNumber(costGovernanceAuditPack?.evidence_summary.remediation_items)}
-                      subtitle="Open action trail"
+                      subtitle={ui("Open action trail")}
                       tone={toNumber(costGovernanceAuditPack?.evidence_summary.remediation_items) > 0 ? 'warn' : 'good'}
                     />
                     <StatCard
-                      title="Hardening Issues"
+                      title={ui("Hardening Issues")}
                       value={toNumber(costGovernanceAuditPack?.evidence_summary.hardening_issue_count)}
-                      subtitle="Final review signals"
+                      subtitle={ui("Final review signals")}
                       tone={toNumber(costGovernanceAuditPack?.evidence_summary.hardening_issue_count) > 0 ? 'warn' : 'good'}
                     />
                     <StatCard
-                      title="Audit Rows"
+                      title={ui("Audit Rows")}
                       value={toNumber(costGovernanceAuditPack?.audit_rows.length)}
-                      subtitle="CSV-ready rows"
+                      subtitle={ui("CSV-ready rows")}
                     />
                   </div>
 
@@ -90,47 +92,47 @@ export function ProductCostGovernanceAuditSignoffPanel({
             <div style={styles.riskListCard}>
               <div style={styles.packageHeader}>
                 <div>
-                  <h4 style={styles.sectionTitle}>Governance sign-off readiness</h4>
-                  <div style={styles.rowSubtle}>Derived human-review readiness layer; no approvals or records are created automatically.</div>
+                  <h4 style={styles.sectionTitle}>{ui("Governance sign-off readiness")}</h4>
+                  <div style={styles.rowSubtle}>{ui("Derived human-review readiness layer; no approvals or records are created automatically.")}</div>
                 </div>
                 <StatusBadge status={costGovernanceSignoff?.signoff_status} />
               </div>
 
               {costGovernanceSignoffQuery.isLoading ? (
-                <div style={styles.rowSubtle}>Loading sign-off readiness...</div>
+                <div style={styles.rowSubtle}>{ui("Loading sign-off readiness...")}</div>
               ) : costGovernanceSignoffQuery.isError ? (
-                <div style={styles.errorBox}>Unable to load governance sign-off readiness.</div>
+                <div style={styles.errorBox}>{ui("Unable to load governance sign-off readiness.")}</div>
               ) : (
                 <>
                   <div style={styles.costReadinessGrid}>
                     <StatCard
-                      title="Can Sign Off"
-                      value={costGovernanceSignoff?.can_sign_off ? 'Yes' : 'No'}
-                      subtitle={costGovernanceSignoff?.approval_recommendation || 'Pending review'}
+                      title={ui("Can Sign Off")}
+                      value={costGovernanceSignoff?.can_sign_off ? ui('Yes') : ui('No')}
+                      subtitle={costGovernanceSignoff?.approval_recommendation ? ui(formatStatusLabel(costGovernanceSignoff.approval_recommendation)) : ui('Pending review')}
                       tone={costGovernanceSignoff?.can_sign_off ? 'good' : 'warn'}
                     />
                     <StatCard
-                      title="Blockers"
+                      title={ui("Blockers")}
                       value={toNumber(costGovernanceSignoff?.blockers.length)}
-                      subtitle="Must resolve before sign-off"
+                      subtitle={ui("Must resolve before sign-off")}
                       tone={toNumber(costGovernanceSignoff?.blockers.length) > 0 ? 'bad' : 'good'}
                     />
                     <StatCard
-                      title="Warnings"
+                      title={ui("Warnings")}
                       value={toNumber(costGovernanceSignoff?.warnings.length)}
-                      subtitle="Conditional review items"
+                      subtitle={ui("Conditional review items")}
                       tone={toNumber(costGovernanceSignoff?.warnings.length) > 0 ? 'warn' : 'good'}
                     />
                     <StatCard
-                      title="Evidence Rows"
+                      title={ui("Evidence Rows")}
                       value={toNumber(costGovernanceSignoff?.evidence_summary.checklist_items)}
-                      subtitle="Audit support available"
+                      subtitle={ui("Audit support available")}
                     />
                   </div>
 
                   <div style={styles.riskGrid}>
                     <div style={styles.riskListCard}>
-                      <h4 style={styles.sectionTitle}>Sign-off checklist</h4>
+                      <h4 style={styles.sectionTitle}>{ui("Sign-off checklist")}</h4>
                       {(costGovernanceSignoff?.signoff_checklist ?? []).map((item) => (
                         <div key={item.key} style={styles.riskListItem}>
                           <div>
@@ -143,9 +145,9 @@ export function ProductCostGovernanceAuditSignoffPanel({
                     </div>
 
                     <div style={styles.riskListCard}>
-                      <h4 style={styles.sectionTitle}>Blockers & warnings</h4>
+                      <h4 style={styles.sectionTitle}>{ui("Blockers & warnings")}</h4>
                       {[...(costGovernanceSignoff?.blockers ?? []), ...(costGovernanceSignoff?.warnings ?? [])].length === 0 ? (
-                        <div style={styles.rowSubtle}>No sign-off blockers or warnings found.</div>
+                        <div style={styles.rowSubtle}>{ui("No sign-off blockers or warnings found.")}</div>
                       ) : (
                         [...(costGovernanceSignoff?.blockers ?? []), ...(costGovernanceSignoff?.warnings ?? [])].map((item) => (
                           <div key={`${item.severity}-${item.key}`} style={styles.riskListItem}>

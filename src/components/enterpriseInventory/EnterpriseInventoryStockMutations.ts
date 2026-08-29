@@ -1,4 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
+import { useAppTranslation } from "../../i18n/I18nContext";
+import { formatLocalizedNumber } from "../../i18n/formatters";
 import type { createEnterpriseInventoryBoundMutationFeedback } from "./EnterpriseInventoryMutationFeedback";
 import {
   buildCycleCountPayload,
@@ -42,6 +44,8 @@ export function useEnterpriseInventoryStockMutations(
   setStockAdjustmentForm: SetForm<StockAdjustmentForm>,
   setStockTransferForm: SetForm<StockTransferForm>,
 ) {
+  const { locale, ui } = useAppTranslation();
+
   const createParLevelMutation = useMutation({
     mutationFn: (input: ParLevelForm) =>
       postEnterpriseInventoryRequest<ParLevel>(
@@ -49,11 +53,11 @@ export function useEnterpriseInventoryStockMutations(
         buildParLevelPayload(input),
       ),
     onSuccess: mutationFeedback.resetting(
-      "Par level saved.",
+      ui("Par level saved."),
       ["enterprise-par-levels"],
       () => setParLevelForm(emptyParLevelForm),
     ),
-    onError: mutationFeedback.error("Failed to save par level."),
+    onError: mutationFeedback.error(ui("Failed to save par level.")),
   });
 
   const evaluateParLevelsMutation = useMutation({
@@ -62,11 +66,12 @@ export function useEnterpriseInventoryStockMutations(
         "/enterprise-inventory/par-levels/evaluate",
       ),
     onSuccess: mutationFeedback.result(
-      (items: ParLevel[]) =>
-        `${items.length} low-stock par level signal(s) generated.`,
+      (items: ParLevel[]) => items.length === 1
+        ? ui("1 low-stock par level signal generated.")
+        : ui("{count} low-stock par level signals generated.").replace("{count}", formatLocalizedNumber(items.length, locale)),
       ["enterprise-notifications", "enterprise-par-levels"],
     ),
-    onError: mutationFeedback.error("Failed to evaluate par levels."),
+    onError: mutationFeedback.error(ui("Failed to evaluate par levels.")),
   });
 
   const createRequisitionMutation = useMutation({
@@ -90,11 +95,11 @@ export function useEnterpriseInventoryStockMutations(
         buildCycleCountPayload(input),
       ),
     onSuccess: mutationFeedback.resetting(
-      "Cycle count created.",
+      ui("Cycle count created."),
       ["enterprise-cycle-counts"],
       () => setCycleCountForm(emptyCycleCountForm),
     ),
-    onError: mutationFeedback.error("Failed to create cycle count."),
+    onError: mutationFeedback.error(ui("Failed to create cycle count.")),
   });
 
   const submitRequisitionMutation = useMutation({
@@ -115,10 +120,10 @@ export function useEnterpriseInventoryStockMutations(
         `/enterprise-inventory/cycle-counts/${id}/submit`,
       ),
     onSuccess: mutationFeedback.invalidating(
-      "Cycle count submitted successfully.",
+      ui("Cycle count submitted successfully."),
       ["enterprise-cycle-counts", "enterprise-notifications"],
     ),
-    onError: mutationFeedback.error("Failed to submit cycle count."),
+    onError: mutationFeedback.error(ui("Failed to submit cycle count.")),
   });
 
   const reconcileCycleCountMutation = useMutation({
@@ -127,7 +132,7 @@ export function useEnterpriseInventoryStockMutations(
         `/enterprise-inventory/cycle-counts/${id}/reconcile`,
       ),
     onSuccess: mutationFeedback.invalidating(
-      "Cycle count reconciled and stock movements posted.",
+      ui("Cycle count reconciled and stock movements posted."),
       [
         "enterprise-cycle-counts",
         "enterprise-low-stock",
@@ -135,7 +140,7 @@ export function useEnterpriseInventoryStockMutations(
         "enterprise-notifications",
       ],
     ),
-    onError: mutationFeedback.error("Failed to reconcile cycle count."),
+    onError: mutationFeedback.error(ui("Failed to reconcile cycle count.")),
   });
 
   const adjustStockMutation = useMutation({

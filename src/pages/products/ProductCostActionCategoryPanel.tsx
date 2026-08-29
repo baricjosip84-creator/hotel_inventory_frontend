@@ -2,6 +2,8 @@ import type { ProductCostActionCategorySummaryResponse } from '../../types/inven
 import { formatMoney, toNumber } from './productFormatting';
 import { styles } from './productStyles';
 import { StatCard } from './productSummaryComponents';
+import { useAppTranslation } from '../../i18n/I18nContext';
+import { formatLocalizedNumber } from '../../i18n/formatters';
 
 type CostActionCategoryQueryState = {
   isLoading: boolean;
@@ -18,13 +20,14 @@ export function ProductCostActionCategoryPanel({
   costActionCategoryQuery,
   costActionCategorySummary
 }: ProductCostActionCategoryPanelProps) {
+  const { ui, locale } = useAppTranslation();
   return (
     <section style={styles.panel}>
       <div style={styles.packageHeader}>
         <div>
-          <h3 style={styles.panelTitle}>Cost Action Categories</h3>
+          <h3 style={styles.panelTitle}>{ui("Cost Action Categories")}</h3>
           <p style={styles.panelSubtitle}>
-            Category-level focus view for costing follow-up. Read-only grouping from the action plan, with no stock or movement changes.
+            {ui("Category-level focus view for costing follow-up. Read-only grouping from the action plan, with no stock or movement changes.")}
           </p>
         </div>
         <button
@@ -32,33 +35,33 @@ export function ProductCostActionCategoryPanel({
           style={styles.secondaryButton}
           onClick={() => costActionCategoryQuery.refetch()}
         >
-          Refresh Categories
+          {ui("Refresh Categories")}
         </button>
       </div>
 
       {costActionCategoryQuery.isLoading ? (
-        <div style={styles.emptyCell}>Loading cost action categories...</div>
+        <div style={styles.emptyCell}>{ui("Loading cost action categories...")}</div>
       ) : costActionCategoryQuery.isError ? (
-        <div style={styles.errorBox}>Unable to load cost action categories.</div>
+        <div style={styles.errorBox}>{ui("Unable to load cost action categories.")}</div>
       ) : (
         <>
           <div style={styles.costReadinessGrid}>
             <StatCard
-              title="Action Categories"
+              title={ui("Action Categories")}
               value={toNumber(costActionCategorySummary?.totals.actionable_categories)}
-              subtitle="Categories with costing actions"
+              subtitle={ui("Categories with costing actions")}
               tone={toNumber(costActionCategorySummary?.totals.actionable_categories) > 0 ? 'warn' : 'good'}
             />
             <StatCard
-              title="Category Products"
+              title={ui("Category Products")}
               value={toNumber(costActionCategorySummary?.totals.total_actionable_products)}
-              subtitle="Actionable products included"
+              subtitle={ui("Actionable products included")}
               tone={toNumber(costActionCategorySummary?.totals.total_actionable_products) > 0 ? 'warn' : 'good'}
             />
             <StatCard
-              title="Category Value"
-              value={formatMoney(costActionCategorySummary?.totals.total_actionable_estimated_value)}
-              subtitle="Estimated value under category review"
+              title={ui("Category Value")}
+              value={formatMoney(costActionCategorySummary?.totals.total_actionable_estimated_value, locale)}
+              subtitle={ui("Estimated value under category review")}
               tone={toNumber(costActionCategorySummary?.totals.total_actionable_estimated_value) > 0 ? 'warn' : 'good'}
             />
           </div>
@@ -67,31 +70,31 @@ export function ProductCostActionCategoryPanel({
             <table style={styles.compactTable}>
               <thead>
                 <tr>
-                  <th style={styles.th}>Category</th>
-                  <th style={styles.th}>Focus</th>
-                  <th style={styles.th}>Products</th>
-                  <th style={styles.th}>Priority Mix</th>
-                  <th style={styles.th}>Value</th>
+                  <th style={styles.th}>{ui("Category")}</th>
+                  <th style={styles.th}>{ui("Focus")}</th>
+                  <th style={styles.th}>{ui("Products")}</th>
+                  <th style={styles.th}>{ui("Priority Mix")}</th>
+                  <th style={styles.th}>{ui("Value")}</th>
                 </tr>
               </thead>
               <tbody>
                 {(costActionCategorySummary?.categories ?? []).length === 0 ? (
                   <tr>
-                    <td style={styles.emptyCell} colSpan={5}>No actionable cost categories found.</td>
+                    <td style={styles.emptyCell} colSpan={5}>{ui("No actionable cost categories found.")}</td>
                   </tr>
                 ) : (
                   (costActionCategorySummary?.categories ?? []).map((row) => (
                     <tr key={row.category}>
                       <td style={styles.td}>
                         <strong>{row.category}</strong>
-                        <div style={styles.rowSubtle}>{toNumber(row.stock_quantity).toLocaleString()} units</div>
+                        <div style={styles.rowSubtle}>{formatLocalizedNumber(Number(toNumber(row.stock_quantity)), locale)} {ui("units")}</div>
                       </td>
                       <td style={styles.td}>{row.recommended_focus}</td>
                       <td style={styles.td}>{toNumber(row.product_count)}</td>
                       <td style={styles.td}>
-                        C {toNumber(row.critical_products)} • H {toNumber(row.high_products)} • W {toNumber(row.watch_products)}
+                        {ui("C")} {toNumber(row.critical_products)} {ui("• H")} {toNumber(row.high_products)} {ui("• W")} {toNumber(row.watch_products)}
                       </td>
-                      <td style={styles.td}>{formatMoney(row.estimated_inventory_value)}</td>
+                      <td style={styles.td}>{formatMoney(row.estimated_inventory_value, locale)}</td>
                     </tr>
                   ))
                 )}

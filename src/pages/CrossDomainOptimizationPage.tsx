@@ -1,6 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
@@ -211,6 +213,60 @@ const DECISION_LABELS: Record<string, string> = {
   blocked_until_scaling_evidence_is_complete: 'Blocked until scaling evidence is complete'
 };
 
+
+const CANONICAL_LABELS: Record<string, string> = {
+  inventory: 'Inventory',
+  procurement: 'Procurement',
+  reservation: 'Reservation',
+  execution: 'Execution',
+  optimization: 'Optimization',
+  control_tower: 'Control tower',
+  financial: 'Financial',
+  integration: 'Integration',
+  multi_domain: 'Multi-domain',
+  system: 'System',
+  draft: 'Draft',
+  candidate_generated: 'Candidate generated',
+  tradeoff_review: 'Tradeoff review',
+  governance_review_required: 'Governance review required',
+  approved_for_manual_planning: 'Approved for manual planning',
+  rejected: 'Rejected',
+  archived: 'Archived',
+  sla_risk: 'SLA risk',
+  profitability: 'Profitability',
+  labor_cost: 'Labor cost',
+  carrying_cost: 'Carrying cost',
+  supplier_reliability: 'Supplier reliability',
+  working_capital: 'Working capital',
+  facility_load: 'Facility load',
+  integration_resilience: 'Integration resilience',
+  general: 'General',
+  minimize: 'Minimize',
+  maximize: 'Maximize',
+  balance: 'Balance',
+  stabilize: 'Stabilize',
+  generated: 'Generated',
+  ranked: 'Ranked',
+  superseded: 'Superseded',
+  positive: 'Positive',
+  negative: 'Negative',
+  neutral: 'Neutral',
+  mixed: 'Mixed',
+  observed: 'Observed',
+  value_confirmed: 'Value confirmed',
+  value_missed: 'Value missed',
+  tradeoff_drift_detected: 'Tradeoff drift detected',
+  passed: 'Passed',
+  blocked: 'Blocked',
+  ready: 'Ready',
+  monitor: 'Monitor',
+  review_required: 'Review required',
+  critical: 'Critical',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low'
+};
+
 const REVIEW_SECTIONS: ReviewConfig[] = [
   {
     key: 'execution_feedback_loop',
@@ -324,42 +380,53 @@ const REVIEW_SECTIONS: ReviewConfig[] = [
 function formatLabel(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   const raw = String(value);
-  if (DECISION_LABELS[raw]) return DECISION_LABELS[raw];
   if (raw.includes(' ') || /[.!?]/.test(raw)) return raw;
   return raw.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function formatNumber(value: unknown, maximumFractionDigits = 2): string {
-  if (value === null || value === undefined || value === '') return '—';
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return String(value);
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(numeric);
+function formatCanonicalLabel(value: unknown, ui: (englishText: string) => string): string {
+  if (value === null || value === undefined || value === '') return ui('Not reported');
+  const raw = String(value);
+  const canonical = DECISION_LABELS[raw] ?? CANONICAL_LABELS[raw];
+  return canonical ? ui(canonical) : formatLabel(value);
 }
 
-function formatPercentage(value: unknown): string {
+function formatNumber(value: unknown, locale: Parameters<typeof formatLocalizedNumber>[1], maximumFractionDigits = 2): string {
+  if (value === null || value === undefined || value === '') return '—';
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? formatLocalizedNumber(numeric, locale, { maximumFractionDigits }) : String(value);
+}
+
+function formatPercentage(value: unknown, locale: Parameters<typeof formatLocalizedNumber>[1]): string {
   if (value === null || value === undefined || value === '') return '—';
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return String(value);
   const percentage = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
-  return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(percentage)}%`;
+  return `${formatLocalizedNumber(percentage, locale, { maximumFractionDigits: 1 })}%`;
 }
 
-function formatDate(value: unknown): string {
+function formatDate(value: unknown, locale: Parameters<typeof formatLocalizedDateTime>[1]): string {
   if (!value) return '—';
-  const date = new Date(String(value));
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
+  return formatLocalizedDateTime(String(value), locale);
 }
 
-function formatBoolean(value: unknown): string {
-  if (value === true) return 'Yes';
-  if (value === false) return 'No';
+function formatBoolean(value: unknown, ui: (englishText: string) => string): string {
+  if (value === true) return ui('Yes');
+  if (value === false) return ui('No');
   return '—';
 }
 
-function formatMetric(value: unknown, format: ReviewConfig['metrics'][number]['format'] = 'number'): string {
-  if (format === 'percent') return formatPercentage(value);
-  if (format === 'boolean') return formatBoolean(value);
-  return formatNumber(value, 2);
+function formatMetric(value: unknown, format: ReviewConfig['metrics'][number]['format'], locale: Parameters<typeof formatLocalizedNumber>[1], ui: (englishText: string) => string): string {
+  if (format === 'percent') return formatPercentage(value, locale);
+  if (format === 'boolean') return formatBoolean(value, ui);
+  return formatNumber(value, locale, 2);
+}
+
+function formatObservedValue(value: unknown, locale: Parameters<typeof formatLocalizedNumber>[1]): string {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'number') return formatLocalizedNumber(value, locale, { maximumFractionDigits: 4 });
+  const numeric = typeof value === 'string' && value.trim() !== '' ? Number(value) : Number.NaN;
+  return Number.isFinite(numeric) ? formatLocalizedNumber(numeric, locale, { maximumFractionDigits: 4 }) : String(value);
 }
 
 function badgeTone(value: unknown): 'neutral' | 'good' | 'warning' | 'danger' {
@@ -371,8 +438,9 @@ function badgeTone(value: unknown): 'neutral' | 'good' | 'warning' | 'danger' {
 }
 
 function StatusBadge({ value, tone }: { value: unknown; tone?: ReturnType<typeof badgeTone> }) {
+  const { ui } = useAppTranslation();
   const resolvedTone = tone || badgeTone(value);
-  return <span className={`forecast-badge forecast-badge--${resolvedTone}`}>{formatLabel(value)}</span>;
+  return <span className={`forecast-badge forecast-badge--${resolvedTone}`}>{formatCanonicalLabel(value, ui)}</span>;
 }
 
 function MetricCard({
@@ -388,7 +456,8 @@ function MetricCard({
   iconPath?: string;
   tone?: 'blue' | 'green' | 'amber' | 'violet' | 'slate';
 }) {
-  return <OperationalWorkspaceStatCard label={label} value={formatMetric(value, format)} iconPath={iconPath} tone={tone === 'violet' ? 'blue' : tone} />;
+  const { locale, ui } = useAppTranslation();
+  return <OperationalWorkspaceStatCard label={ui(label)} value={formatMetric(value, format, locale, ui)} iconPath={iconPath} tone={tone === 'violet' ? 'blue' : tone} />;
 }
 
 function EvidenceSection({
@@ -406,24 +475,25 @@ function EvidenceSection({
   headers: string[];
   renderRow: (row: Record<string, unknown>, index: number) => ReactNode;
 }) {
+  const { locale, ui } = useAppTranslation();
   return (
     <section className="card forecast-evidence-section">
       <div className="card__header">
         <div className="forecast-section-heading">
           <span className="forecast-heading-icon"><TenantNavIcon path={iconPath} size={17} /></span>
           <div>
-            <h2>{title}</h2>
-            <p className="card__subtext">{description}</p>
+            <h2>{ui(title)}</h2>
+            <p className="card__subtext">{ui(description)}</p>
           </div>
         </div>
-        <StatusBadge value={`${rows.length} returned`} />
+        <StatusBadge value={ui('{count} returned').replace('{count}', formatLocalizedNumber(rows.length, locale))} />
       </div>
       {!rows.length ? (
-        <p className="forecast-muted">No matching records were returned.</p>
+        <p className="forecast-muted">{ui('No matching records were returned.')}</p>
       ) : (
         <div className="table-wrap">
           <table className="data-table forecast-table">
-            <thead><tr>{headers.map((header) => <th key={header}>{header}</th>)}</tr></thead>
+            <thead><tr>{headers.map((header) => <th key={header}>{ui(header)}</th>)}</tr></thead>
             <tbody>{rows.map(renderRow)}</tbody>
           </table>
         </div>
@@ -433,28 +503,29 @@ function EvidenceSection({
 }
 
 function CheckColumn({ title, items }: { title: string; items: Array<Record<string, unknown>> }) {
+  const { locale, ui } = useAppTranslation();
   return (
     <section className="forecast-check-card">
-      <h3><span className={`forecast-heading-icon forecast-heading-icon--small ${title === 'Items needing attention' ? 'forecast-heading-icon--warning' : ''}`}><TenantNavIcon path={title === 'Items needing attention' ? '/alerts' : '/permissions'} size={15} /></span>{title}</h3>
+      <h3><span className={`forecast-heading-icon forecast-heading-icon--small ${title === 'Items needing attention' ? 'forecast-heading-icon--warning' : ''}`}><TenantNavIcon path={title === 'Items needing attention' ? '/alerts' : '/permissions'} size={15} /></span>{ui(title)}</h3>
       {!items.length ? (
-        <p className="forecast-muted">No items were returned for this section.</p>
+        <p className="forecast-muted">{ui('No items were returned for this section.')}</p>
       ) : (
         <div className="forecast-check-list">
           {items.map((item, index) => {
             const status = item.check_status ?? item.severity;
-            const heading = item.check_label ?? item.blocker_label ?? `Item ${index + 1}`;
+            const heading = item.check_label ?? item.blocker_label ?? ui('Item {number}').replace('{number}', formatLocalizedNumber(index + 1, locale));
             const resolution = item.manual_resolution;
             const observed = item.current_value;
             const required = item.required_value;
             return (
               <article className="forecast-check-item" key={`${String(heading)}-${index}`}>
                 <div className="forecast-check-item__heading">
-                  <strong>{formatLabel(heading)}</strong>
+                  <strong>{String(heading)}</strong>
                   {status !== undefined ? <StatusBadge value={status} /> : null}
                 </div>
-                {resolution ? <p>{formatLabel(resolution)}</p> : null}
+                {resolution ? <p>{String(resolution)}</p> : null}
                 {observed !== undefined && observed !== null ? (
-                  <span className="forecast-observed">Observed: {formatLabel(observed)}{required !== undefined && required !== null ? ` · Needed: ${formatLabel(required)}` : ''}</span>
+                  <span className="forecast-observed">{ui('Observed: {value}').replace('{value}', formatObservedValue(observed, locale))}{required !== undefined && required !== null ? ` · ${ui('Needed: {value}').replace('{value}', formatObservedValue(required, locale))}` : ''}</span>
                 ) : null}
               </article>
             );
@@ -466,6 +537,7 @@ function CheckColumn({ title, items }: { title: string; items: Array<Record<stri
 }
 
 function ReviewCard({ config, section }: { config: ReviewConfig; section?: OptimizationReviewSection }) {
+  const { ui } = useAppTranslation();
   const available = section?.assessment_available !== false;
   const checks = (section?.[config.checksKey] || []) as Array<Record<string, unknown>>;
   const blockers = (section?.[config.blockersKey] || []) as Array<Record<string, unknown>>;
@@ -476,13 +548,13 @@ function ReviewCard({ config, section }: { config: ReviewConfig; section?: Optim
         <div className="forecast-section-heading">
           <span className="forecast-heading-icon"><TenantNavIcon path="/reliability-command" size={17} /></span>
           <div>
-            <h2>{config.title}</h2>
-            <p className="card__subtext">{config.description}</p>
+            <h2>{ui(config.title)}</h2>
+            <p className="card__subtext">{ui(config.description)}</p>
           </div>
         </div>
         <div className="forecast-decision">
-          <span>Current result</span>
-          <strong>{available ? formatLabel(section?.[config.decisionKey]) : 'Not assessed — no matching evidence'}</strong>
+          <span>{ui('Current result')}</span>
+          <strong>{available ? formatCanonicalLabel(section?.[config.decisionKey], ui) : ui('Not assessed — no matching evidence')}</strong>
         </div>
       </div>
 
@@ -495,13 +567,13 @@ function ReviewCard({ config, section }: { config: ReviewConfig; section?: Optim
             ))}
           </div>
           <div className="forecast-check-grid">
-            <CheckColumn title="Checks" items={checks} />
-            <CheckColumn title="Items needing attention" items={blockers} />
+            <CheckColumn title={ui('Checks')} items={checks} />
+            <CheckColumn title={ui('Items needing attention')} items={blockers} />
           </div>
         </>
       ) : (
         <div className="forecast-not-assessed">
-          This review is not calculated until matching optimization planning evidence or an actual optimization outcome exists.
+          {ui('This review is not calculated until matching optimization planning evidence or an actual optimization outcome exists.')}
         </div>
       )}
     </section>
@@ -509,6 +581,7 @@ function ReviewCard({ config, section }: { config: ReviewConfig; section?: Optim
 }
 
 export default function CrossDomainOptimizationPage() {
+  const { locale, ui } = useAppTranslation();
   const [view, setView] = useState<OptimizationView>('evidence');
   const [filters, setFilters] = useState<OptimizationFilterState>(DEFAULT_FILTERS);
 
@@ -537,12 +610,12 @@ export default function CrossDomainOptimizationPage() {
   const evidenceCount = runCount + objectiveCount + optionCount + tradeoffCount + resultCount;
   const hasEvidence = data?.governance?.evidence_available ?? evidenceCount > 0;
   const hasActiveFilters = JSON.stringify(filters) !== JSON.stringify(DEFAULT_FILTERS);
-  const lastRefreshed = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleString() : 'Not refreshed yet';
+  const lastRefreshed = dataUpdatedAt ? formatLocalizedDateTime(dataUpdatedAt, locale) : ui('Not refreshed yet');
 
   if (isLoading) {
     return (
       <main className="decision-intelligence-page io-operational-page io-workspace-page io-workspace-legacy-normalized" data-cross-domain-optimization-refined="true">
-        <section className="card forecast-state-card"><span className="forecast-state-icon"><TenantNavIcon path="/cross-domain-optimization" size={18} /></span><p>Loading cross-area optimization evidence…</p></section>
+        <section className="card forecast-state-card"><span className="forecast-state-icon"><TenantNavIcon path="/cross-domain-optimization" size={18} /></span><p>{ui('Loading cross-area optimization evidence…')}</p></section>
       </main>
     );
   }
@@ -553,9 +626,9 @@ export default function CrossDomainOptimizationPage() {
         <section className="card card--danger forecast-state-card forecast-state-card--error">
           <span className="forecast-state-icon forecast-state-icon--danger"><TenantNavIcon path="/alerts" size={18} /></span>
           <div>
-            <h2>Cross-area optimization evidence could not be loaded</h2>
-            <p>Check your Decision Intelligence access and try the read-only request again.</p>
-            <button className="button" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/cross-domain-optimization" size={14} />Retry</button>
+            <h2>{ui('Cross-area optimization evidence could not be loaded')}</h2>
+            <p>{ui('Check your Decision Intelligence access and try the read-only request again.')}</p>
+            <button className="button" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/cross-domain-optimization" size={14} />{ui('Retry')}</button>
           </div>
         </section>
       </main>
@@ -566,14 +639,14 @@ export default function CrossDomainOptimizationPage() {
     <main className="decision-intelligence-page io-operational-page io-workspace-page io-workspace-legacy-normalized" data-cross-domain-optimization-refined="true">
       <OperationalWorkspaceHero
         iconPath="/cross-domain-optimization"
-        eyebrow="Decision intelligence & planning"
-        title="Cross-Domain Optimization"
-        description="Compare stored planning runs, business objectives, proposed options, tradeoffs, and recorded outcomes across business areas. This workspace supports human planning review only and cannot approve, apply, or scale a plan automatically."
-        meta={<><OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>Human-governed planning</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>No automatic plan execution</OperationalWorkspaceMetaPill></>}
-        aside={<><OperationalWorkspaceStatus value={formatLabel(data?.governance?.cross_domain_optimization_posture)} label={`planning review posture · refreshed ${lastRefreshed}`} /><button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/cross-domain-optimization" size={14} />{isFetching ? 'Refreshing…' : 'Refresh evidence'}</button></>}
+        eyebrow={ui('Decision intelligence & planning')}
+        title={ui('Cross-Domain Optimization')}
+        description={ui('Compare stored planning runs, business objectives, proposed options, tradeoffs, and recorded outcomes across business areas. This workspace supports human planning review only and cannot approve, apply, or scale a plan automatically.')}
+        meta={<><OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{ui('Human-governed planning')}</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{ui('No automatic plan execution')}</OperationalWorkspaceMetaPill></>}
+        aside={<><OperationalWorkspaceStatus value={formatCanonicalLabel(data?.governance?.cross_domain_optimization_posture, ui)} label={ui('Planning review posture · refreshed {time}').replace('{time}', lastRefreshed)} /><button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/cross-domain-optimization" size={14} />{isFetching ? ui('Refreshing…') : ui('Refresh evidence')}</button></>}
       />
 
-<OperationalWorkspaceStats ariaLabel="Cross-domain optimization evidence summary">
+<OperationalWorkspaceStats ariaLabel={ui('Cross-domain optimization evidence summary')}>
         <MetricCard label="Runs" value={runCount} iconPath="/cross-domain-optimization" tone="blue" />
         <MetricCard label="Objectives" value={objectiveCount} iconPath="/system-context" tone="violet" />
         <MetricCard label="Options" value={optionCount} iconPath="/workflow-composer" tone="blue" />
@@ -581,70 +654,70 @@ export default function CrossDomainOptimizationPage() {
         <MetricCard label="Recorded outcomes" value={resultCount} iconPath="/decision-learning-feedback" tone="slate" />
         <MetricCard label="Confirmed outcomes" value={data?.governance?.confirmed_result_count} iconPath="/reliability-command" tone="green" />
         <MetricCard label="Adverse outcomes" value={data?.governance?.adverse_result_count} iconPath="/alerts" tone="amber" />
-        <OperationalWorkspaceStatCard label="Current posture" value={formatLabel(data?.governance?.cross_domain_optimization_posture)} helper="Current evidence and governance posture" iconPath="/reliability-command" tone="slate" />
+        <OperationalWorkspaceStatCard label={ui('Current posture')} value={formatCanonicalLabel(data?.governance?.cross_domain_optimization_posture, ui)} helper={ui('Current evidence and governance posture')} iconPath="/reliability-command" tone="slate" />
       </OperationalWorkspaceStats>
 
-<OperationalWorkspaceTabs ariaLabel="Cross-domain optimization page views">
-        <OperationalWorkspaceTab active={view === 'evidence'} iconPath="/cross-domain-optimization" label="Optimization evidence" onClick={() => setView('evidence')} />
-        <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label="Review checks" onClick={() => setView('readiness')} />
+<OperationalWorkspaceTabs ariaLabel={ui('Cross-domain optimization page views')}>
+        <OperationalWorkspaceTab active={view === 'evidence'} iconPath="/cross-domain-optimization" label={ui('Optimization evidence')} onClick={() => setView('evidence')} />
+        <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label={ui('Review checks')} onClick={() => setView('readiness')} />
       </OperationalWorkspaceTabs>
 
-      <section className="card forecast-filters" aria-label="Cross-domain optimization filters">
+      <section className="card forecast-filters" aria-label={ui('Cross-domain optimization filters')}>
         <div className="card__header">
           <div className="forecast-section-heading">
             <span className="forecast-heading-icon"><TenantNavIcon path="/system-context" size={17} /></span>
             <div>
-              <h2>Filter the evidence</h2>
-              <p className="card__subtext">Planning filters apply consistently to runs and their related objectives, options, and tradeoffs. Outcome status filters the recorded Learning Feedback results.</p>
+              <h2>{ui('Filter the evidence')}</h2>
+              <p className="card__subtext">{ui('Planning filters apply consistently to runs and their related objectives, options, and tradeoffs. Outcome status filters the recorded Learning Feedback results.')}</p>
             </div>
           </div>
-          <button className="button button--secondary" type="button" onClick={() => setFilters(DEFAULT_FILTERS)} disabled={!hasActiveFilters}><TenantNavIcon path="/system-context" size={14} />Clear filters</button>
+          <button className="button button--secondary" type="button" onClick={() => setFilters(DEFAULT_FILTERS)} disabled={!hasActiveFilters}><TenantNavIcon path="/system-context" size={14} />{ui('Clear filters')}</button>
         </div>
         <div className="forecast-filter-grid">
           <label>
-            <span className="form-label">Business area</span>
+            <span className="form-label">{ui('Business area')}</span>
             <select className="input" value={filters.optimization_domain} onChange={(event) => updateFilter('optimization_domain', event.target.value)}>
-              <option value="">All areas</option>
-              {OPTIMIZATION_DOMAIN_OPTIONS.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
+              <option value="">{ui('All areas')}</option>
+              {OPTIMIZATION_DOMAIN_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
             </select>
           </label>
           <label>
-            <span className="form-label">Run status</span>
+            <span className="form-label">{ui('Run status')}</span>
             <select className="input" value={filters.optimization_status} onChange={(event) => updateFilter('optimization_status', event.target.value)}>
-              <option value="">All run statuses</option>
-              {OPTIMIZATION_STATUS_OPTIONS.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
+              <option value="">{ui('All run statuses')}</option>
+              {OPTIMIZATION_STATUS_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
             </select>
           </label>
           <label>
-            <span className="form-label">Objective type</span>
+            <span className="form-label">{ui('Objective type')}</span>
             <select className="input" value={filters.objective_type} onChange={(event) => updateFilter('objective_type', event.target.value)}>
-              <option value="">All objective types</option>
-              {OBJECTIVE_TYPE_OPTIONS.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
+              <option value="">{ui('All objective types')}</option>
+              {OBJECTIVE_TYPE_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
             </select>
           </label>
           <label>
-            <span className="form-label">Option status</span>
+            <span className="form-label">{ui('Option status')}</span>
             <select className="input" value={filters.option_status} onChange={(event) => updateFilter('option_status', event.target.value)}>
-              <option value="">All option statuses</option>
-              {OPTION_STATUS_OPTIONS.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
+              <option value="">{ui('All option statuses')}</option>
+              {OPTION_STATUS_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
             </select>
           </label>
           <label>
-            <span className="form-label">Tradeoff direction</span>
+            <span className="form-label">{ui('Tradeoff direction')}</span>
             <select className="input" value={filters.impact_direction} onChange={(event) => updateFilter('impact_direction', event.target.value)}>
-              <option value="">All directions</option>
-              {IMPACT_DIRECTION_OPTIONS.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
+              <option value="">{ui('All directions')}</option>
+              {IMPACT_DIRECTION_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
             </select>
           </label>
           <label>
-            <span className="form-label">Recorded outcome status</span>
+            <span className="form-label">{ui('Recorded outcome status')}</span>
             <select className="input" value={filters.result_status} onChange={(event) => updateFilter('result_status', event.target.value)}>
-              <option value="">All outcome statuses</option>
-              {RESULT_STATUS_OPTIONS.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
+              <option value="">{ui('All outcome statuses')}</option>
+              {RESULT_STATUS_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
             </select>
           </label>
           <label>
-            <span className="form-label">Maximum records per evidence list</span>
+            <span className="form-label">{ui('Maximum records per evidence list')}</span>
             <select className="input" value={filters.limit} onChange={(event) => updateFilter('limit', event.target.value)}>
               {['25', '50', '100', '200'].map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
@@ -661,9 +734,9 @@ export default function CrossDomainOptimizationPage() {
           <div className="forecast-section-heading">
             <span className="forecast-heading-icon forecast-heading-icon--slate"><TenantNavIcon path="/cross-domain-optimization" size={17} /></span>
             <div>
-              <h2>No cross-area optimization evidence is available for this tenant and filter set</h2>
-              <p>Review scores are not assessed when no run, objective, option, tradeoff, or recorded outcome exists. Zero records do not mean that a plan is safe, valuable, approved, ready to scale, or free from tradeoffs.</p>
-              <p>This page has no plan-creation or outcome-recording action. Planning evidence must come from the supported optimization data process, and actual outcomes must be recorded through Learning Feedback.</p>
+              <h2>{ui('No cross-area optimization evidence is available for this tenant and filter set')}</h2>
+              <p>{ui('Review scores are not assessed when no run, objective, option, tradeoff, or recorded outcome exists. Zero records do not mean that a plan is safe, valuable, approved, ready to scale, or free from tradeoffs.')}</p>
+              <p>{ui('This page has no plan-creation or outcome-recording action. Planning evidence must come from the supported optimization data process, and actual outcomes must be recorded through Learning Feedback.')}</p>
             </div>
           </div>
         </section>
@@ -671,9 +744,9 @@ export default function CrossDomainOptimizationPage() {
 
       {view === 'evidence' ? (
         <>
-          <p className="forecast-limit-note"><TenantNavIcon path="/system-context" size={14} />Each list shows up to {filters.limit} matching records. Review checks use the same filtered evidence.</p>
+          <p className="forecast-limit-note"><TenantNavIcon path="/system-context" size={14} />{ui('Each list shows up to {limit} matching records. Review checks use the same filtered evidence.').replace('{limit}', formatLocalizedNumber(Number(filters.limit), locale))}</p>
           <EvidenceSection
-            title="Optimization runs"
+            title={ui('Optimization runs')}
             iconPath="/cross-domain-optimization"
             description="Stored cross-area planning exercises and their current human-review status."
             rows={(data?.optimization_runs || []) as Array<Record<string, unknown>>}
@@ -682,17 +755,17 @@ export default function CrossDomainOptimizationPage() {
               const run = row as OptimizationRun;
               return (
                 <tr key={`run-${index}`}>
-                  <td><strong>{run.optimization_label || run.title || `Planning run ${index + 1}`}</strong>{run.summary ? <span className="forecast-table__subtext">{run.summary}</span> : null}</td>
-                  <td>{formatLabel(run.optimization_domain)}</td>
+                  <td><strong>{run.optimization_label || run.title || ui('Planning run {number}').replace('{number}', formatLocalizedNumber(index + 1, locale))}</strong>{run.summary ? <span className="forecast-table__subtext">{run.summary}</span> : null}</td>
+                  <td>{formatCanonicalLabel(run.optimization_domain, ui)}</td>
                   <td><StatusBadge value={run.optimization_status} /></td>
-                  <td>{formatPercentage(run.confidence_score)}</td>
-                  <td>{formatDate(run.updated_at || run.created_at)}</td>
+                  <td>{formatPercentage(run.confidence_score, locale)}</td>
+                  <td>{formatDate(run.updated_at || run.created_at, locale)}</td>
                 </tr>
               );
             }}
           />
           <EvidenceSection
-            title="Business objectives"
+            title={ui('Business objectives')}
             iconPath="/system-context"
             description="The goals and relative weights used to compare options, such as service risk, working capital, labor cost, or supplier reliability."
             rows={(data?.objectives || []) as Array<Record<string, unknown>>}
@@ -701,19 +774,19 @@ export default function CrossDomainOptimizationPage() {
               const objective = row as OptimizationObjective;
               return (
                 <tr key={`objective-${index}`}>
-                  <td>{objective.optimization_label || 'Linked planning run'}</td>
-                  <td><strong>{formatLabel(objective.objective_type)}</strong></td>
-                  <td>{formatLabel(objective.objective_domain)}</td>
-                  <td>{formatLabel(objective.target_direction)}</td>
-                  <td>{formatNumber(objective.weight, 4)}</td>
-                  <td>{formatPercentage(objective.confidence_score)}</td>
-                  <td>{formatDate(objective.created_at)}</td>
+                  <td>{objective.optimization_label || ui('Linked planning run')}</td>
+                  <td><strong>{formatCanonicalLabel(objective.objective_type, ui)}</strong></td>
+                  <td>{formatCanonicalLabel(objective.objective_domain, ui)}</td>
+                  <td>{formatCanonicalLabel(objective.target_direction, ui)}</td>
+                  <td>{formatNumber(objective.weight, locale, 4)}</td>
+                  <td>{formatPercentage(objective.confidence_score, locale)}</td>
+                  <td>{formatDate(objective.created_at, locale)}</td>
                 </tr>
               );
             }}
           />
           <EvidenceSection
-            title="Planning options"
+            title={ui('Planning options')}
             iconPath="/workflow-composer"
             description="Proposed choices created for comparison. Projected scores are planning estimates, not proof of actual business value."
             rows={(data?.options || []) as Array<Record<string, unknown>>}
@@ -722,18 +795,18 @@ export default function CrossDomainOptimizationPage() {
               const option = row as OptimizationOption;
               return (
                 <tr key={`option-${index}`}>
-                  <td>{option.optimization_label || 'Linked planning run'}</td>
-                  <td><strong>{option.option_label || option.title || `Planning option ${index + 1}`}</strong>{option.summary ? <span className="forecast-table__subtext">{option.summary}</span> : null}</td>
+                  <td>{option.optimization_label || ui('Linked planning run')}</td>
+                  <td><strong>{option.option_label || option.title || ui('Planning option {number}').replace('{number}', formatLocalizedNumber(index + 1, locale))}</strong>{option.summary ? <span className="forecast-table__subtext">{option.summary}</span> : null}</td>
                   <td><StatusBadge value={option.option_status} /></td>
-                  <td>{formatPercentage(option.aggregate_score)}</td>
-                  <td>{formatPercentage(option.confidence_score)}</td>
-                  <td>{formatDate(option.created_at)}</td>
+                  <td>{formatPercentage(option.aggregate_score, locale)}</td>
+                  <td>{formatPercentage(option.confidence_score, locale)}</td>
+                  <td>{formatDate(option.created_at, locale)}</td>
                 </tr>
               );
             }}
           />
           <EvidenceSection
-            title="Tradeoffs"
+            title={ui('Tradeoffs')}
             iconPath="/alerts"
             description="Expected positive, negative, neutral, or mixed effects attached to a planning option."
             rows={(data?.tradeoffs || []) as Array<Record<string, unknown>>}
@@ -742,19 +815,19 @@ export default function CrossDomainOptimizationPage() {
               const tradeoff = row as OptimizationTradeoff;
               return (
                 <tr key={`tradeoff-${index}`}>
-                  <td>{tradeoff.option_label || 'Linked planning option'}</td>
-                  <td><strong>{formatLabel(tradeoff.objective_type)}</strong></td>
-                  <td>{formatLabel(tradeoff.tradeoff_domain)}</td>
+                  <td>{tradeoff.option_label || ui('Linked planning option')}</td>
+                  <td><strong>{formatCanonicalLabel(tradeoff.objective_type, ui)}</strong></td>
+                  <td>{formatCanonicalLabel(tradeoff.tradeoff_domain, ui)}</td>
                   <td><StatusBadge value={tradeoff.impact_direction} /></td>
-                  <td>{formatPercentage(tradeoff.impact_score)}</td>
-                  <td>{formatPercentage(tradeoff.confidence_score)}</td>
-                  <td>{formatDate(tradeoff.created_at)}</td>
+                  <td>{formatPercentage(tradeoff.impact_score, locale)}</td>
+                  <td>{formatPercentage(tradeoff.confidence_score, locale)}</td>
+                  <td>{formatDate(tradeoff.created_at, locale)}</td>
                 </tr>
               );
             }}
           />
           <EvidenceSection
-            title="Actual optimization outcomes"
+            title={ui('Actual optimization outcomes')}
             iconPath="/decision-learning-feedback"
             description="Observed results recorded through Learning Feedback. These records provide the actual evidence used for trial reconciliation, drift, lifecycle, and scaling checks."
             rows={(data?.optimization_results || []) as Array<Record<string, unknown>>}
@@ -763,12 +836,12 @@ export default function CrossDomainOptimizationPage() {
               const result = row as OptimizationResult;
               return (
                 <tr key={`result-${index}`}>
-                  <td>{result.optimization_label || 'Linked planning run'}</td>
-                  <td>{result.option_label || 'No option reference'}</td>
+                  <td>{result.optimization_label || ui('Linked planning run')}</td>
+                  <td>{result.option_label || ui('No option reference')}</td>
                   <td><StatusBadge value={result.result_status} /></td>
-                  <td>{formatLabel(result.result_domain)}</td>
-                  <td>{formatPercentage(result.realized_value_score)}</td>
-                  <td>{formatDate(result.observed_at)}</td>
+                  <td>{formatCanonicalLabel(result.result_domain, ui)}</td>
+                  <td>{formatPercentage(result.realized_value_score, locale)}</td>
+                  <td>{formatDate(result.observed_at, locale)}</td>
                 </tr>
               );
             }}
@@ -783,8 +856,8 @@ export default function CrossDomainOptimizationPage() {
               <div className="forecast-section-heading">
                 <span className="forecast-heading-icon forecast-heading-icon--amber"><TenantNavIcon path="/reliability-command" size={17} /></span>
                 <div>
-                  <h2>These are advisory checks, not approvals or automated actions</h2>
-                  <p className="card__subtext">A passing check only means that the returned records satisfy that specific calculation. It does not approve a plan, apply an option, change objective weights, promote a pattern, start monitoring, retire anything, or scale a plan to another business area.</p>
+                  <h2>{ui('These are advisory checks, not approvals or automated actions')}</h2>
+                  <p className="card__subtext">{ui('A passing check only means that the returned records satisfy that specific calculation. It does not approve a plan, apply an option, change objective weights, promote a pattern, start monitoring, retire anything, or scale a plan to another business area.')}</p>
                 </div>
               </div>
             </section>
@@ -797,8 +870,8 @@ export default function CrossDomainOptimizationPage() {
             <div className="forecast-section-heading">
               <span className="forecast-heading-icon forecast-heading-icon--slate"><TenantNavIcon path="/reliability-command" size={17} /></span>
               <div>
-                <h2>Review checks are not assessed</h2>
-                <p>At least one matching optimization planning record or actual outcome is required before these calculations can produce a meaningful result.</p>
+                <h2>{ui('Review checks are not assessed')}</h2>
+                <p>{ui('At least one matching optimization planning record or actual outcome is required before these calculations can produce a meaningful result.')}</p>
               </div>
             </div>
           </section>

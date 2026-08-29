@@ -98,6 +98,16 @@ requireText(pkg.scripts?.['check:ci'] || '', 'check:deployment-readiness-gate', 
   'inputs.expected_backend_commit || inputs.environment || github.run_id'
 ].forEach((expected) => requireText(workflow, expected, 'deployment-readiness workflow'));
 
+const deploymentWaitCount = (workflow.match(/npm run wait:production-deployment/g) || []).length;
+if (deploymentWaitCount < 2) {
+  errors.push('deployment-readiness workflow must reconfirm deployed services immediately before the Playwright runtime gate.');
+}
+requireText(
+  workflow,
+  'Reconfirm deployed services immediately before runtime gate',
+  'deployment-readiness workflow'
+);
+
 const frontendValidationWorkflow = read('.github/workflows/frontend-validation.yml');
 [
   'Lint complete frontend repository',

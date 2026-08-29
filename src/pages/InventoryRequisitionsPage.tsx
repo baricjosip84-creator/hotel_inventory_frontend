@@ -1,7 +1,10 @@
-import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
+import { getActiveTenantCurrency } from '../lib/tenantCurrency';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
+import type { AppLocale } from '../i18n/config';
 import { ApiError, apiMutationRequest, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import { getCurrentTenantUserId } from '../lib/auth';
@@ -1076,48 +1079,37 @@ const emptyForm = (): RequisitionFormState => ({
   items: [{ product_id: '', requested_quantity: '', uom_code: '', notes: '' }]
 });
 
-function formatDateTime(value: string | null | undefined): string {
+type UiFn = (englishText: string) => string;
+
+function localizedCodeLabel(value: string | null | undefined, ui: UiFn): string {
   if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
-
-function formatDate(value: string | null | undefined): string {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString();
-}
-
-function formatNumber(value: number | string | null | undefined): string {
-  if (value === null || value === undefined || value === '') return '0';
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return String(value);
-  return parsed.toLocaleString(undefined, { maximumFractionDigits: 4 });
-}
-
-function formatMoney(value: number | string | null | undefined): string {
-  return formatCurrencyAmount(value);
-}
-
-function humanizeCode(value: string | null | undefined): string {
-  if (!value) return '-';
-  const normalized = String(value).replace(/_/g, ' ').trim();
+  const labels: Record<string, string> = {
+    low: 'Low', normal: 'Normal', high: 'High', urgent: 'Urgent',
+    draft: 'Draft', submitted: 'Submitted', approved: 'Approved', rejected: 'Rejected',
+    partially_fulfilled: 'Partially fulfilled', fulfilled: 'Fulfilled', cancelled: 'Cancelled',
+    open: 'Open', overdue: 'Overdue', due_soon: 'Due soon',
+    unfulfilled: 'Unfulfilled', partial: 'Partial', stale_partial: 'Stale partial', complete: 'Complete',
+    approval_breached: 'Approval SLA breached', fulfillment_breached: 'Fulfillment SLA breached',
+    due_breached: 'Past needed-by date', urgent_stale: 'Urgent stale',
+    under_24h: 'Open under 24h', one_to_three_days: 'Open 1-3 days', three_to_seven_days: 'Open 3-7 days', over_seven_days: 'Open over 7 days',
+    standard: 'Standard', elevated: 'Elevated', executive_value: 'Executive value',
+    high_value: 'High value', high_priority: 'High priority',
+    near_high_value: 'Near high-value threshold', near_executive_value: 'Near executive threshold', any_near_threshold: 'Any near-threshold',
+    complete_notes: 'Threshold notes complete', incomplete_notes: 'Threshold notes incomplete',
+    ready: 'Ready', blocked: 'Blocked', warning: 'Warning', updated: 'Updated', tracked: 'Tracked', governed: 'Governed'
+  };
+  const key = String(value);
+  if (labels[key]) return ui(labels[key]);
+  const normalized = key.replace(/_/g, ' ').trim();
   return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : '-';
 }
 
-function requisitionStatusLabel(status: RequisitionStatus): string {
+function requisitionStatusDisplay(status: RequisitionStatus, ui: UiFn): string {
   const labels: Record<string, string> = {
-    draft: 'Draft',
-    submitted: 'Submitted',
-    approved: 'Approved',
-    rejected: 'Rejected',
-    partially_fulfilled: 'Partially fulfilled',
-    fulfilled: 'Fulfilled',
-    cancelled: 'Cancelled'
+    draft: 'Draft', submitted: 'Submitted', approved: 'Approved', rejected: 'Rejected',
+    partially_fulfilled: 'Partially fulfilled', fulfilled: 'Fulfilled', cancelled: 'Cancelled'
   };
-  return labels[String(status)] || humanizeCode(String(status));
+  return labels[String(status)] ? ui(labels[String(status)]) : localizedCodeLabel(String(status), ui);
 }
 
 function rangeError(
@@ -1156,68 +1148,57 @@ function downloadCsv(filename: string, rows: Array<Array<unknown>>) {
   URL.revokeObjectURL(url);
 }
 
-function errorMessage(error: unknown): string {
+function errorMessage(error: unknown, ui?: UiFn): string {
   if (error instanceof ApiError || error instanceof Error) return error.message;
-  return 'Request failed.';
+  return ui ? ui('Request failed.') : 'Request failed.';
 }
 
-function slaStateLabel(state?: string | null): string {
-  switch (state) {
-    case 'approval_breached':
-      return 'Approval SLA breached';
-    case 'fulfillment_breached':
-      return 'Fulfillment SLA breached';
-    case 'due_breached':
-      return 'Past needed-by date';
-    case 'urgent_stale':
-      return 'Urgent stale';
-    default:
-      return '';
-  }
+function slaStateDisplay(state: string | null | undefined, ui: UiFn): string {
+  const labels: Record<string, string> = {
+    approval_breached: 'Approval SLA breached',
+    fulfillment_breached: 'Fulfillment SLA breached',
+    due_breached: 'Past needed-by date',
+    urgent_stale: 'Urgent stale'
+  };
+  return labels[String(state || '')] ? ui(labels[String(state || '')]) : '';
 }
 
-function slaStateDetail(item: InventoryRequisition): string {
+function slaStateDetailDisplay(item: InventoryRequisition, ui: UiFn, locale: AppLocale): string {
+  const number = (value: number | string | null | undefined) => {
+    const parsed = Number(value ?? 0);
+    return Number.isFinite(parsed) ? formatLocalizedNumber(parsed, locale, { maximumFractionDigits: 4 }) : String(value ?? '0');
+  };
   if (item.sla_state === 'approval_breached' && item.approval_age_days !== null && item.approval_age_days !== undefined) {
-    return `${formatNumber(item.approval_age_days)}d pending approval`;
+    return `${number(item.approval_age_days)} ${ui('days pending approval')}`;
   }
   if (item.sla_state === 'fulfillment_breached' && item.fulfillment_age_days !== null && item.fulfillment_age_days !== undefined) {
-    return `${formatNumber(item.fulfillment_age_days)}d awaiting fulfillment`;
+    return `${number(item.fulfillment_age_days)} ${ui('days awaiting fulfillment')}`;
   }
   if (item.sla_state === 'due_breached') {
-    return `${formatNumber(item.needed_by_overdue_days || 0)}d past needed-by`;
+    return `${number(item.needed_by_overdue_days || 0)} ${ui('days past needed-by')}`;
   }
   if (item.sla_state === 'urgent_stale' && item.urgent_age_hours !== null && item.urgent_age_hours !== undefined) {
-    return `${formatNumber(item.urgent_age_hours)}h since update`;
+    return `${number(item.urgent_age_hours)} ${ui('hours since update')}`;
   }
   return '';
 }
 
-function approvalThresholdLabel(level?: string | null): string {
-  switch (level) {
-    case 'executive_value':
-      return 'Executive approval threshold';
-    case 'elevated':
-      return 'Elevated approval threshold';
-    case 'standard':
-      return 'Standard approval threshold';
-    default:
-      return '';
-  }
+function approvalThresholdDisplay(level: string | null | undefined, ui: UiFn): string {
+  const labels: Record<string, string> = {
+    executive_value: 'Executive approval threshold',
+    elevated: 'Elevated approval threshold',
+    standard: 'Standard approval threshold'
+  };
+  return labels[String(level || '')] ? ui(labels[String(level || '')]) : '';
 }
 
-function approvalThresholdReasonLabel(reason?: string | null): string {
-  switch (reason) {
-    case 'executive_value':
-      return 'Executive value threshold';
-    case 'high_value':
-      return 'High value threshold';
-    case 'high_priority':
-      return 'High priority threshold';
-    case 'standard':
-      return 'Standard approval';
-    default:
-      return reason ? reason.replace(/_/g, ' ') : '';
-  }
+function approvalThresholdReasonDisplay(reason: string | null | undefined, ui: UiFn): string {
+  const labels: Record<string, string> = {
+    executive_value: 'Executive value threshold', high_value: 'High value threshold',
+    high_priority: 'High priority threshold', standard: 'Standard approval'
+  };
+  if (labels[String(reason || '')]) return ui(labels[String(reason || '')]);
+  return reason ? reason.replace(/_/g, ' ') : '';
 }
 
 const APPROVAL_THRESHOLD_NOTE_MIN_LENGTH = 12;
@@ -1240,18 +1221,18 @@ function getApprovalThresholdNoteMinLength(requisition?: InventoryRequisition | 
     : APPROVAL_THRESHOLD_NOTE_MIN_LENGTH;
 }
 
-function formatApprovalThresholdLineNoteDepth(item: RequisitionItem): string {
+function formatApprovalThresholdLineNoteDepth(item: RequisitionItem, ui: UiFn, locale: AppLocale): string {
   const rawMinLength = item.approval_threshold_line_note_min_length;
   const parsedMinLength = typeof rawMinLength === 'number' ? rawMinLength : Number(rawMinLength);
   if (!Number.isFinite(parsedMinLength) || parsedMinLength <= 0) return '';
   const rawLength = item.approval_threshold_line_note_length;
   const parsedLength = typeof rawLength === 'number' ? rawLength : Number(rawLength);
   const noteLength = Number.isFinite(parsedLength) && parsedLength >= 0 ? parsedLength : 0;
-  const status = item.approval_threshold_line_note_meets_minimum ? 'meets minimum' : 'below minimum';
-  return `${noteLength}/${parsedMinLength} chars · ${status}`;
+  const status = item.approval_threshold_line_note_meets_minimum ? ui('meets minimum') : ui('below minimum');
+  return `${formatLocalizedNumber(noteLength, locale)}/${formatLocalizedNumber(parsedMinLength, locale)} ${ui('characters')} · ${status}`;
 }
 
-function formatApprovalThresholdQueueNoteDepth(requisition: InventoryRequisition): string {
+function formatApprovalThresholdQueueNoteDepth(requisition: InventoryRequisition, ui: UiFn, locale: AppLocale): string {
   const rawMinLength = requisition.approval_threshold_note_min_length;
   const parsedMinLength = typeof rawMinLength === 'number' ? rawMinLength : Number(rawMinLength);
   if (!Number.isFinite(parsedMinLength) || parsedMinLength <= 0) return '';
@@ -1265,11 +1246,13 @@ function formatApprovalThresholdQueueNoteDepth(requisition: InventoryRequisition
   const rawBelowMinimumCount = requisition.approval_threshold_line_note_below_minimum_count;
   const parsedBelowMinimumCount = typeof rawBelowMinimumCount === 'number' ? rawBelowMinimumCount : Number(rawBelowMinimumCount);
   const belowMinimumCount = Number.isFinite(parsedBelowMinimumCount) && parsedBelowMinimumCount >= 0 ? parsedBelowMinimumCount : 0;
-  const requestNoteStatus = requisition.approval_threshold_requisition_note_meets_minimum ? 'request note ok' : 'request note short';
-  const lineStatus = lineCount > 0 ? `${belowMinimumCount}/${lineCount} line notes short` : 'no request lines';
-  const depthState = requisition.approval_threshold_note_depth_state === 'complete' ? 'ready' : 'needs notes';
+  const requestNoteStatus = requisition.approval_threshold_requisition_note_meets_minimum ? ui('request note ok') : ui('request note short');
+  const lineStatus = lineCount > 0
+    ? `${formatLocalizedNumber(belowMinimumCount, locale)}/${formatLocalizedNumber(lineCount, locale)} ${ui('line notes short')}`
+    : ui('no request lines');
+  const depthState = requisition.approval_threshold_note_depth_state === 'complete' ? ui('ready') : ui('needs notes');
 
-  return `Notes: ${depthState} · ${requisitionNoteLength}/${parsedMinLength} chars · ${requestNoteStatus} · ${lineStatus}`;
+  return `${ui('Notes:')} ${depthState} · ${formatLocalizedNumber(requisitionNoteLength, locale)}/${formatLocalizedNumber(parsedMinLength, locale)} ${ui('characters')} · ${requestNoteStatus} · ${lineStatus}`;
 }
 
 function isApprovalThresholdGoverned(requisition?: InventoryRequisition | null): boolean {
@@ -1436,6 +1419,33 @@ function formFromRequisition(requisition: InventoryRequisition): RequisitionForm
 
 export default function InventoryRequisitionsPage() {
   const queryClient = useQueryClient();
+  const { locale, ui } = useAppTranslation();
+  const formatDateTime = (value: string | null | undefined): string => {
+    if (!value) return '-';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : formatLocalizedDateTime(date, locale);
+  };
+  const formatDate = (value: string | null | undefined): string => {
+    if (!value) return '-';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : formatLocalizedDate(date, locale);
+  };
+  const formatNumber = (value: number | string | null | undefined): string => {
+    if (value === null || value === undefined || value === '') return formatLocalizedNumber(0, locale);
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? formatLocalizedNumber(parsed, locale, { maximumFractionDigits: 4 }) : String(value);
+  };
+  const formatMoney = (value: number | string | null | undefined): string => {
+    if (value === null || value === undefined || value === '') return '-';
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? formatLocalizedCurrency(parsed, getActiveTenantCurrency(), locale, { maximumFractionDigits: 2 }) : String(value);
+  };
+  const humanizeCode = (value: string | null | undefined) => localizedCodeLabel(value, ui);
+  const requisitionStatusLabel = (value: RequisitionStatus) => requisitionStatusDisplay(value, ui);
+  const slaStateLabel = (value?: string | null) => slaStateDisplay(value, ui);
+  const slaStateDetail = (item: InventoryRequisition) => slaStateDetailDisplay(item, ui, locale);
+  const approvalThresholdLabel = (value?: string | null) => approvalThresholdDisplay(value, ui);
+  const approvalThresholdReasonLabel = (value?: string | null) => approvalThresholdReasonDisplay(value, ui);
   const capabilities = getRoleCapabilities();
   const currentUserId = getCurrentTenantUserId();
   const [status, setStatus] = useState('');
@@ -1486,11 +1496,11 @@ export default function InventoryRequisitionsPage() {
   const [queuePageSize, setQueuePageSize] = useState(25);
 
   const queueFilterError = useMemo(() => [
-    rangeError(neededByFromFilter, neededByToFilter, 'Needed-by start date cannot be after the end date.'),
-    rangeError(createdFromFilter, createdToFilter, 'Created start date cannot be after the end date.'),
-    rangeError(minApprovalThresholdGapFilter, maxApprovalThresholdGapFilter, 'Minimum threshold gap cannot be greater than the maximum.', true),
-    rangeError(minRemainingValueFilter, maxRemainingValueFilter, 'Minimum remaining value cannot be greater than the maximum.', true),
-    rangeError(minRemainingQuantityFilter, maxRemainingQuantityFilter, 'Minimum remaining quantity cannot be greater than the maximum.', true)
+    rangeError(neededByFromFilter, neededByToFilter, ui('Needed-by start date cannot be after the end date.')),
+    rangeError(createdFromFilter, createdToFilter, ui('Created start date cannot be after the end date.')),
+    rangeError(minApprovalThresholdGapFilter, maxApprovalThresholdGapFilter, ui('Minimum threshold gap cannot be greater than the maximum.'), true),
+    rangeError(minRemainingValueFilter, maxRemainingValueFilter, ui('Minimum remaining value cannot be greater than the maximum.'), true),
+    rangeError(minRemainingQuantityFilter, maxRemainingQuantityFilter, ui('Minimum remaining quantity cannot be greater than the maximum.'), true)
   ].find((message): message is string => Boolean(message)) || null, [
     createdFromFilter,
     createdToFilter,
@@ -1501,7 +1511,8 @@ export default function InventoryRequisitionsPage() {
     minRemainingQuantityFilter,
     minRemainingValueFilter,
     neededByFromFilter,
-    neededByToFilter
+    neededByToFilter,
+    ui
   ]);
 
   const filterSignature = useMemo(() => JSON.stringify([
@@ -1764,7 +1775,7 @@ export default function InventoryRequisitionsPage() {
 
   const fulfillMutation = useMutation({
     mutationFn: () => {
-      if (!selected?.id) throw new Error('Select a requisition first.');
+      if (!selected?.id) throw new Error(ui("Select a requisition first."));
       const items = Object.entries(fulfillmentLines)
         .filter(([, quantity]) => quantity && Number(quantity) > 0)
         .map(([requisition_item_id, quantity]) => ({
@@ -2133,7 +2144,7 @@ export default function InventoryRequisitionsPage() {
 
   const commentMutation = useMutation({
     mutationFn: () => {
-      if (!selected?.id) throw new Error('Select a requisition first.');
+      if (!selected?.id) throw new Error(ui("Select a requisition first."));
       return apiMutationRequest<{ requisition: InventoryRequisition }>(`/inventory-requisitions/${selected.id}/comments`, {
         method: 'POST',
         body: JSON.stringify({ comment: activityComment.trim() })
@@ -2381,15 +2392,15 @@ export default function InventoryRequisitionsPage() {
     ? [
         ...approvalThresholdApiRequirements,
         selected?.status === 'draft'
-          ? `Draft notes must be at least ${selectedApprovalThresholdNoteMinLength} characters before submission (${selected?.notes?.trim().length || 0}/${selectedApprovalThresholdNoteMinLength}).`
+          ? `${ui('Draft notes must be at least')} ${formatNumber(selectedApprovalThresholdNoteMinLength)} ${ui('characters before submission')} (${formatNumber(selected?.notes?.trim().length || 0)}/${formatNumber(selectedApprovalThresholdNoteMinLength)}).`
           : null,
         ['submitted', 'approved', 'rejected', 'cancelled'].includes(String(selected?.status))
-          ? `Workflow note/reason must be at least ${selectedApprovalThresholdNoteMinLength} characters for approve, reject, cancel, or reopen actions (${workflowNotesLength}/${selectedApprovalThresholdNoteMinLength}).`
+          ? `${ui('Workflow note/reason must be at least')} ${formatNumber(selectedApprovalThresholdNoteMinLength)} ${ui('characters for approve, reject, cancel, or reopen actions')} (${formatNumber(workflowNotesLength)}/${formatNumber(selectedApprovalThresholdNoteMinLength)}).`
           : null,
         fulfillAllRemaining
-          ? `Default all-remaining fulfillment note must be at least ${selectedApprovalThresholdNoteMinLength} characters (${defaultFulfillmentNoteLength}/${selectedApprovalThresholdNoteMinLength}).`
+          ? `${ui('Default all-remaining fulfillment note must be at least')} ${formatNumber(selectedApprovalThresholdNoteMinLength)} ${ui('characters')} (${formatNumber(defaultFulfillmentNoteLength)}/${formatNumber(selectedApprovalThresholdNoteMinLength)}).`
           : selectedFulfillmentLineCount > 0
-            ? `Each selected fulfillment line must include a note of at least ${selectedApprovalThresholdNoteMinLength} characters.`
+            ? `${ui('Each selected fulfillment line must include a note of at least')} ${formatNumber(selectedApprovalThresholdNoteMinLength)} ${ui('characters')}.`
             : null
       ].filter((item): item is string => Boolean(item))
     : [];
@@ -2400,13 +2411,13 @@ export default function InventoryRequisitionsPage() {
     <div className="io-operational-page io-requisitions-page io-workspace-page" style={styles.page}>
       <OperationalWorkspaceHero
         iconPath="/inventory-requisitions"
-        eyebrow="Requisition operations"
-        title="Internal stock requests"
-        description="Create, approve, and fulfill internal stock requests while protecting reservation commitments and preserving an auditable stock trail."
+        eyebrow={ui("Requisition operations")}
+        title={ui("Internal stock requests")}
+        description={ui("Create, approve, and fulfill internal stock requests while protecting reservation commitments and preserving an auditable stock trail.")}
         meta={<>
-          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>Reservation-aware fulfillment</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{capabilities.canFulfillInventoryRequisitions ? 'Fulfillment access' : capabilities.canApproveInventoryRequisitions ? 'Approval access' : capabilities.canCreateInventoryRequisitions ? 'Request creation access' : 'Review-only access'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Reservation-aware fulfillment")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{capabilities.canFulfillInventoryRequisitions ? ui('Fulfillment access') : capabilities.canApproveInventoryRequisitions ? ui('Approval access') : capabilities.canCreateInventoryRequisitions ? ui('Request creation access') : ui('Review-only access')}</OperationalWorkspaceMetaPill>
         </>}
         aside={
           <div style={styles.inlineActions}>
@@ -2416,86 +2427,86 @@ export default function InventoryRequisitionsPage() {
               disabled={isManualRefresh}
               onClick={refreshRequisitionPage}
             >
-              {isManualRefresh ? 'Refreshing…' : 'Refresh page'}
+              {isManualRefresh ? ui('Refreshing…') : ui('Refresh page')}
             </button>
             {(summaryQuery.isFetching || requisitionsQuery.isFetching || optionsQuery.isFetching || detailQuery.isFetching) && (
-              <span style={styles.muted}>Refreshing current data…</span>
+              <span style={styles.muted}>{ui("Refreshing current data…")}</span>
             )}
           </div>
         }
       />
 
-      <OperationalWorkspaceStats ariaLabel="Requisition summary">
+      <OperationalWorkspaceStats ariaLabel={ui("Requisition summary")}>
         <OperationalWorkspaceStatCard
-          label="Open requests"
+          label={ui("Open requests")}
           value={formatNumber(summaryQuery.data?.open_request_count)}
-          helper="Requests still moving through the workflow"
+          helper={ui("Requests still moving through the workflow")}
           iconPath="/inventory-requisitions"
           loading={summaryQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Units remaining"
+          label={ui("Units remaining")}
           value={formatNumber(summaryQuery.data?.open_remaining_quantity)}
-          helper="Outstanding quantity across open requests"
+          helper={ui("Outstanding quantity across open requests")}
           iconPath="/stock"
           loading={summaryQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Action needed"
+          label={ui("Action needed")}
           value={formatNumber(summaryQuery.data?.actionable_count)}
-          helper="Requests needing workflow attention"
+          helper={ui("Requests needing workflow attention")}
           tone={Number(summaryQuery.data?.actionable_count || 0) > 0 ? 'warn' : 'good'}
           iconPath="/alerts"
           loading={summaryQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Overdue"
+          label={ui("Overdue")}
           value={formatNumber(summaryQuery.data?.overdue_count)}
-          helper="Open requests past their needed-by date"
+          helper={ui("Open requests past their needed-by date")}
           tone={Number(summaryQuery.data?.overdue_count || 0) > 0 ? 'danger' : 'good'}
           iconPath="/alerts"
           loading={summaryQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Urgent"
+          label={ui("Urgent")}
           value={formatNumber(summaryQuery.data?.urgent_open_count)}
-          helper="Open requests marked urgent"
+          helper={ui("Open requests marked urgent")}
           tone={Number(summaryQuery.data?.urgent_open_count || 0) > 0 ? 'warn' : 'good'}
           iconPath="/inventory-requisitions"
           loading={summaryQuery.isLoading}
         />
       </OperationalWorkspaceStats>
 
-      {queryError && <div style={styles.errorBox}>Some requisition data could not be loaded: {errorMessage(queryError)}</div>}
-      {mutationError && <div style={styles.errorBox}>{errorMessage(mutationError)}</div>}
+      {queryError && <div style={styles.errorBox}>{ui("Some requisition data could not be loaded:")} {errorMessage(queryError, ui)}</div>}
+      {mutationError && <div style={styles.errorBox}>{errorMessage(mutationError, ui)}</div>}
       {createLinkedReservationMutation.data && (
-        <div style={styles.successBox}>Linked reservation {createLinkedReservationMutation.data.reservation_number} created with status {humanizeCode(createLinkedReservationMutation.data.status)}.</div>
+        <div style={styles.successBox}>{ui("Linked reservation")} {createLinkedReservationMutation.data.reservation_number} {ui("created with status")} {humanizeCode(createLinkedReservationMutation.data.status)}.</div>
       )}
       {bulkFulfillmentMutation.data && (
         <div style={styles.successBox}>
           <div>
-            Bulk fulfillment recorded: {formatNumber(bulkFulfillmentMutation.data.requisition_count)} request(s), {formatNumber(bulkFulfillmentMutation.data.fulfilled_line_count)} line(s), {formatNumber(bulkFulfillmentMutation.data.fulfilled_quantity_total)} total units.
+            {ui("Bulk fulfillment recorded:")} {formatNumber(bulkFulfillmentMutation.data.requisition_count)} {ui("request(s),")} {formatNumber(bulkFulfillmentMutation.data.fulfilled_line_count)} {ui("line(s),")} {formatNumber(bulkFulfillmentMutation.data.fulfilled_quantity_total)} {ui("total units.")}
             {bulkFulfillmentMutation.data.approval_threshold_governed_requisition_count !== undefined && (
-              <> Threshold-governed: {formatNumber(bulkFulfillmentMutation.data.approval_threshold_governed_requisition_count)} · below-minimum line notes: {formatNumber(bulkFulfillmentMutation.data.threshold_fulfillment_line_note_below_minimum_count)}.</>
+              <> {ui("Threshold-governed:")} {formatNumber(bulkFulfillmentMutation.data.approval_threshold_governed_requisition_count)} {ui("· below-minimum line notes:")} {formatNumber(bulkFulfillmentMutation.data.threshold_fulfillment_line_note_below_minimum_count)}.</>
             )}
           </div>
           {bulkFulfillmentMutation.data.results?.length ? (
             <div style={styles.bulkResultList}>
               <div style={styles.lineHeader}>
-                <span style={styles.muted}>Bulk fulfillment result rows are available for governance review.</span>
-                <button type="button" style={styles.secondaryButton} onClick={exportBulkFulfillmentResults}>Export result CSV</button>
+                <span style={styles.muted}>{ui("Bulk fulfillment result rows are available for governance review.")}</span>
+                <button type="button" style={styles.secondaryButton} onClick={exportBulkFulfillmentResults}>{ui("Export result CSV")}</button>
               </div>
               {bulkFulfillmentMutation.data.results.slice(0, 8).map((result) => (
                 <div key={result.requisition_id} style={styles.bulkResultRow}>
                   <strong>{result.requisition_number || result.requisition_id}</strong>
-                  <span>{formatNumber(result.fulfilled_line_count)} line(s) · {formatNumber(result.fulfilled_quantity_total)} units · {humanizeCode(result.status || 'updated')}</span>
+                  <span>{formatNumber(result.fulfilled_line_count)} {ui("line(s) ·")} {formatNumber(result.fulfilled_quantity_total)} {ui("units ·")} {humanizeCode(result.status || 'updated')}</span>
                   {result.approval_threshold_notes_required && (
-                    <span>Threshold {result.approval_threshold_level || 'governed'} · note depth {result.approval_threshold_note_depth_state || 'tracked'} · below-minimum fulfillment notes {formatNumber(result.threshold_fulfillment_line_note_below_minimum_count)}</span>
+                    <span>{ui("Threshold")} {result.approval_threshold_level ? approvalThresholdLabel(result.approval_threshold_level) : ui('Governed')} {ui("· note depth")} {result.approval_threshold_note_depth_state ? humanizeCode(result.approval_threshold_note_depth_state) : ui('Tracked')} {ui("· below-minimum fulfillment notes")} {formatNumber(result.threshold_fulfillment_line_note_below_minimum_count)}</span>
                   )}
                 </div>
               ))}
               {bulkFulfillmentMutation.data.results.length > 8 && (
-                <span style={styles.muted}>+{formatNumber(bulkFulfillmentMutation.data.results.length - 8)} more result(s)</span>
+                <span style={styles.muted}>+{formatNumber(bulkFulfillmentMutation.data.results.length - 8)} {ui("more result(s)")}</span>
               )}
             </div>
           ) : null}
@@ -2506,657 +2517,657 @@ export default function InventoryRequisitionsPage() {
         <summary style={styles.analyticsSummary}>
           <OperationalSectionHeader
             iconPath="/insights"
-            title="Planning and governance analysis"
-            description="Demand, approvals, value, backlog, and SLA breakdowns"
+            title={ui("Planning and governance analysis")}
+            description={ui("Demand, approvals, value, backlog, and SLA breakdowns")}
           />
         </summary>
-        <p style={styles.analyticsIntro}>Open this section when you need management analysis. Day-to-day request creation, approval, and fulfillment remain directly below.</p>
+        <p style={styles.analyticsIntro}>{ui("Open this section when you need management analysis. Day-to-day request creation, approval, and fulfillment remain directly below.")}</p>
         <section style={styles.summaryGrid}>
         <div style={styles.card}>
           <div style={styles.lineHeader}>
-            <h3 style={styles.sectionTitle}>Demand summary</h3>
-            <span style={styles.muted}>Next {formatNumber(summaryQuery.data?.due_window_days || 14)} days</span>
+            <h3 style={styles.sectionTitle}>{ui("Demand summary")}</h3>
+            <span style={styles.muted}>{ui("Next")} {formatNumber(summaryQuery.data?.due_window_days || 14)} {ui("days")}</span>
           </div>
           <div style={styles.compactMetrics}>
-            <div><strong>{formatNumber(summaryQuery.data?.due_soon_count)}</strong><br /><span style={styles.muted}>Due soon</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.status_counts?.submitted?.count)}</strong><br /><span style={styles.muted}>Submitted</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.status_counts?.approved?.count)}</strong><br /><span style={styles.muted}>Approved</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.status_counts?.partially_fulfilled?.count)}</strong><br /><span style={styles.muted}>Partial</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.due_soon_count)}</strong><br /><span style={styles.muted}>{ui("Due soon")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.status_counts?.submitted?.count)}</strong><br /><span style={styles.muted}>{ui("Submitted")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.status_counts?.approved?.count)}</strong><br /><span style={styles.muted}>{ui("Approved")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.status_counts?.partially_fulfilled?.count)}</strong><br /><span style={styles.muted}>{ui("Partial")}</span></div>
           </div>
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Top open departments</h3>
+          <h3 style={styles.sectionTitle}>{ui("Top open departments")}</h3>
           {summaryQuery.data?.top_departments?.length ? summaryQuery.data.top_departments.slice(0, 4).map((department) => (
             <div key={department.requesting_department} style={styles.departmentRow}>
               <span>{department.requesting_department}</span>
-              <strong>{formatNumber(department.remaining_quantity_total)} remaining</strong>
+              <strong>{formatNumber(department.remaining_quantity_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No open department demand.</p>}
+          )) : <p style={styles.muted}>{ui("No open department demand.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Top requested products</h3>
+          <h3 style={styles.sectionTitle}>{ui("Top requested products")}</h3>
           {summaryQuery.data?.top_products?.length ? summaryQuery.data.top_products.slice(0, 4).map((product) => (
             <div key={product.product_id} style={styles.departmentRow}>
               <span>{product.product_name}<br /><span style={styles.muted}>{product.product_unit || product.product_category || '-'}</span></span>
-              <strong>{formatNumber(product.remaining_quantity_total)} remaining</strong>
+              <strong>{formatNumber(product.remaining_quantity_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No open product demand.</p>}
+          )) : <p style={styles.muted}>{ui("No open product demand.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Product category demand</h3>
+          <h3 style={styles.sectionTitle}>{ui("Product category demand")}</h3>
           {summaryQuery.data?.top_product_categories?.length ? summaryQuery.data.top_product_categories.slice(0, 4).map((category) => (
             <div key={category.product_category} style={styles.departmentRow}>
-              <span>{category.product_category}<br /><span style={styles.muted}>{formatNumber(category.product_count)} products · {formatNumber(category.request_count)} open requests</span></span>
-              <strong>{formatNumber(category.remaining_quantity_total)} remaining</strong>
+              <span>{category.product_category}<br /><span style={styles.muted}>{formatNumber(category.product_count)} {ui("products ·")} {formatNumber(category.request_count)} {ui("open requests")}</span></span>
+              <strong>{formatNumber(category.remaining_quantity_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No open category demand.</p>}
+          )) : <p style={styles.muted}>{ui("No open category demand.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Top target departments</h3>
+          <h3 style={styles.sectionTitle}>{ui("Top target departments")}</h3>
           {summaryQuery.data?.top_target_departments?.length ? summaryQuery.data.top_target_departments.slice(0, 4).map((department) => (
             <div key={department.target_department} style={styles.departmentRow}>
-              <span>{department.target_department}<br /><span style={styles.muted}>{formatNumber(department.request_count)} open requests</span></span>
-              <strong>{formatNumber(department.remaining_quantity_total)} remaining</strong>
+              <span>{department.target_department}<br /><span style={styles.muted}>{formatNumber(department.request_count)} {ui("open requests")}</span></span>
+              <strong>{formatNumber(department.remaining_quantity_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No open target demand.</p>}
+          )) : <p style={styles.muted}>{ui("No open target demand.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Source location demand</h3>
+          <h3 style={styles.sectionTitle}>{ui("Source location demand")}</h3>
           {summaryQuery.data?.top_source_locations?.length ? summaryQuery.data.top_source_locations.slice(0, 4).map((location) => (
             <div key={location.source_storage_location_id || location.source_storage_location_name} style={styles.departmentRow}>
-              <span>{location.source_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.request_count)} open requests</span></span>
-              <strong>{formatNumber(location.remaining_quantity_total)} remaining</strong>
+              <span>{location.source_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.request_count)} {ui("open requests")}</span></span>
+              <strong>{formatNumber(location.remaining_quantity_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No open source-location demand.</p>}
+          )) : <p style={styles.muted}>{ui("No open source-location demand.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Target location demand</h3>
+          <h3 style={styles.sectionTitle}>{ui("Target location demand")}</h3>
           {summaryQuery.data?.top_target_locations?.length ? summaryQuery.data.top_target_locations.slice(0, 4).map((location) => (
             <div key={location.target_storage_location_id || location.target_storage_location_name} style={styles.departmentRow}>
-              <span>{location.target_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.request_count)} open requests</span></span>
-              <strong>{formatNumber(location.remaining_quantity_total)} remaining</strong>
+              <span>{location.target_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.request_count)} {ui("open requests")}</span></span>
+              <strong>{formatNumber(location.remaining_quantity_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No open target-location demand.</p>}
+          )) : <p style={styles.muted}>{ui("No open target-location demand.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Top requesters</h3>
+          <h3 style={styles.sectionTitle}>{ui("Top requesters")}</h3>
           {summaryQuery.data?.top_requesters?.length ? summaryQuery.data.top_requesters.slice(0, 4).map((requester) => (
             <div key={requester.requester_user_id || requester.requester_user_name} style={styles.departmentRow}>
-              <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.request_count)} open requests</span></span>
-              <strong>{formatNumber(requester.remaining_quantity_total)} remaining</strong>
+              <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.request_count)} {ui("open requests")}</span></span>
+              <strong>{formatNumber(requester.remaining_quantity_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No open requester demand.</p>}
+          )) : <p style={styles.muted}>{ui("No open requester demand.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval queue</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval queue")}</h3>
           <div style={styles.compactMetrics}>
-            <div><strong>{formatNumber(summaryQuery.data?.approval_queue?.pending_count)}</strong><br /><span style={styles.muted}>Pending</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.approval_queue?.urgent_count)}</strong><br /><span style={styles.muted}>Urgent</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.approval_queue?.overdue_count)}</strong><br /><span style={styles.muted}>Overdue</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.approval_queue?.due_soon_count)}</strong><br /><span style={styles.muted}>Due soon</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.approval_queue?.pending_count)}</strong><br /><span style={styles.muted}>{ui("Pending")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.approval_queue?.urgent_count)}</strong><br /><span style={styles.muted}>{ui("Urgent")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.approval_queue?.overdue_count)}</strong><br /><span style={styles.muted}>{ui("Overdue")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.approval_queue?.due_soon_count)}</strong><br /><span style={styles.muted}>{ui("Due soon")}</span></div>
           </div>
-          <p style={styles.muted}>Average pending age: {formatNumber(summaryQuery.data?.approval_queue?.average_pending_age_days)} days · Oldest: {formatNumber(summaryQuery.data?.approval_queue?.oldest_pending_age_days)} days</p>
-          <p style={styles.muted}>Pending value: {formatMoney(summaryQuery.data?.approval_queue?.pending_remaining_estimated_value_total)} · Urgent value: {formatMoney(summaryQuery.data?.approval_queue?.urgent_remaining_estimated_value_total)} · Overdue value: {formatMoney(summaryQuery.data?.approval_queue?.overdue_remaining_estimated_value_total)}</p>
+          <p style={styles.muted}>{ui("Average pending age:")} {formatNumber(summaryQuery.data?.approval_queue?.average_pending_age_days)} {ui("days · Oldest:")} {formatNumber(summaryQuery.data?.approval_queue?.oldest_pending_age_days)} {ui("days")}</p>
+          <p style={styles.muted}>{ui("Pending value:")} {formatMoney(summaryQuery.data?.approval_queue?.pending_remaining_estimated_value_total)} {ui("· Urgent value:")} {formatMoney(summaryQuery.data?.approval_queue?.urgent_remaining_estimated_value_total)} {ui("· Overdue value:")} {formatMoney(summaryQuery.data?.approval_queue?.overdue_remaining_estimated_value_total)}</p>
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval threshold exposure</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval threshold exposure")}</h3>
           <div style={styles.compactMetrics}>
-            <div><strong>{formatNumber(summaryQuery.data?.approval_threshold_exposure?.elevated_approval_count)}</strong><br /><span style={styles.muted}>Elevated approvals</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.approval_threshold_exposure?.high_value_count)}</strong><br /><span style={styles.muted}>Value ≥ {formatMoney(summaryQuery.data?.approval_threshold_exposure?.high_value_threshold || 1000)}</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.approval_threshold_exposure?.executive_value_count)}</strong><br /><span style={styles.muted}>Value ≥ {formatMoney(summaryQuery.data?.approval_threshold_exposure?.executive_value_threshold || 5000)}</span></div>
-            <div><strong>{formatMoney(summaryQuery.data?.approval_threshold_exposure?.largest_pending_remaining_estimated_value)}</strong><br /><span style={styles.muted}>Largest pending value</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.approval_threshold_exposure?.elevated_approval_count)}</strong><br /><span style={styles.muted}>{ui("Elevated approvals")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.approval_threshold_exposure?.high_value_count)}</strong><br /><span style={styles.muted}>{ui("Value ≥")} {formatMoney(summaryQuery.data?.approval_threshold_exposure?.high_value_threshold || 1000)}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.approval_threshold_exposure?.executive_value_count)}</strong><br /><span style={styles.muted}>{ui("Value ≥")} {formatMoney(summaryQuery.data?.approval_threshold_exposure?.executive_value_threshold || 5000)}</span></div>
+            <div><strong>{formatMoney(summaryQuery.data?.approval_threshold_exposure?.largest_pending_remaining_estimated_value)}</strong><br /><span style={styles.muted}>{ui("Largest pending value")}</span></div>
           </div>
-          <p style={styles.muted}>Elevated value: {formatMoney(summaryQuery.data?.approval_threshold_exposure?.elevated_remaining_estimated_value_total)} · High priority: {formatNumber(summaryQuery.data?.approval_threshold_exposure?.high_priority_count)} · Urgent: {formatNumber(summaryQuery.data?.approval_threshold_exposure?.urgent_count)} · Overdue: {formatNumber(summaryQuery.data?.approval_threshold_exposure?.overdue_count)}</p>
+          <p style={styles.muted}>{ui("Elevated value:")} {formatMoney(summaryQuery.data?.approval_threshold_exposure?.elevated_remaining_estimated_value_total)} {ui("· High priority:")} {formatNumber(summaryQuery.data?.approval_threshold_exposure?.high_priority_count)} {ui("· Urgent:")} {formatNumber(summaryQuery.data?.approval_threshold_exposure?.urgent_count)} {ui("· Overdue:")} {formatNumber(summaryQuery.data?.approval_threshold_exposure?.overdue_count)}</p>
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval threshold watchlist</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval threshold watchlist")}</h3>
           {summaryQuery.data?.approval_threshold_near_miss ? (
             <>
               <div style={styles.statsGrid}>
-                <div><strong>{formatNumber(summaryQuery.data.approval_threshold_near_miss.near_high_value_count)}</strong><br /><span style={styles.muted}>Near high-value floor ≥ {formatNumber(summaryQuery.data.approval_threshold_near_miss.high_value_watch_floor)}</span></div>
-                <div><strong>{formatNumber(summaryQuery.data.approval_threshold_near_miss.near_executive_value_count)}</strong><br /><span style={styles.muted}>Near executive floor ≥ {formatNumber(summaryQuery.data.approval_threshold_near_miss.executive_value_watch_floor)}</span></div>
-                <div><strong>{formatNumber(summaryQuery.data.approval_threshold_near_miss.overdue_near_threshold_count)}</strong><br /><span style={styles.muted}>Overdue near-threshold</span></div>
-                <div><strong>{formatMoney(summaryQuery.data.approval_threshold_near_miss.largest_near_threshold_value)}</strong><br /><span style={styles.muted}>Largest near threshold</span></div>
+                <div><strong>{formatNumber(summaryQuery.data.approval_threshold_near_miss.near_high_value_count)}</strong><br /><span style={styles.muted}>{ui("Near high-value floor ≥")} {formatNumber(summaryQuery.data.approval_threshold_near_miss.high_value_watch_floor)}</span></div>
+                <div><strong>{formatNumber(summaryQuery.data.approval_threshold_near_miss.near_executive_value_count)}</strong><br /><span style={styles.muted}>{ui("Near executive floor ≥")} {formatNumber(summaryQuery.data.approval_threshold_near_miss.executive_value_watch_floor)}</span></div>
+                <div><strong>{formatNumber(summaryQuery.data.approval_threshold_near_miss.overdue_near_threshold_count)}</strong><br /><span style={styles.muted}>{ui("Overdue near-threshold")}</span></div>
+                <div><strong>{formatMoney(summaryQuery.data.approval_threshold_near_miss.largest_near_threshold_value)}</strong><br /><span style={styles.muted}>{ui("Largest near threshold")}</span></div>
               </div>
-              <p style={styles.muted}>Near high-value total: {formatMoney(summaryQuery.data.approval_threshold_near_miss.near_high_value_total)} · Near executive total: {formatMoney(summaryQuery.data.approval_threshold_near_miss.near_executive_value_total)}</p>
+              <p style={styles.muted}>{ui("Near high-value total:")} {formatMoney(summaryQuery.data.approval_threshold_near_miss.near_high_value_total)} {ui("· Near executive total:")} {formatMoney(summaryQuery.data.approval_threshold_near_miss.near_executive_value_total)}</p>
             </>
-          ) : <p style={styles.muted}>No approval threshold watchlist data.</p>}
+          ) : <p style={styles.muted}>{ui("No approval threshold watchlist data.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval thresholds by reason</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval thresholds by reason")}</h3>
           {summaryQuery.data?.approval_threshold_by_reason?.length ? summaryQuery.data.approval_threshold_by_reason.map((reason) => (
             <div key={reason.approval_threshold_reason} style={styles.departmentRow}>
-              <span>{approvalThresholdReasonLabel(reason.approval_threshold_reason)}<br /><span style={styles.muted}>{formatNumber(reason.pending_count)} pending · {formatNumber(reason.urgent_count)} urgent · {formatNumber(reason.high_value_count)} high value · {formatNumber(reason.overdue_count)} overdue</span></span>
-              <strong>{formatMoney(reason.pending_remaining_estimated_value_total)} pending value</strong>
+              <span>{approvalThresholdReasonLabel(reason.approval_threshold_reason)}<br /><span style={styles.muted}>{formatNumber(reason.pending_count)} {ui("pending ·")} {formatNumber(reason.urgent_count)} {ui("urgent ·")} {formatNumber(reason.high_value_count)} {ui("high value ·")} {formatNumber(reason.overdue_count)} {ui("overdue")}</span></span>
+              <strong>{formatMoney(reason.pending_remaining_estimated_value_total)} {ui("pending value")}</strong>
             </div>
-          )) : <p style={styles.muted}>No threshold exposure by reason.</p>}
+          )) : <p style={styles.muted}>{ui("No threshold exposure by reason.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval thresholds by level</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval thresholds by level")}</h3>
           {summaryQuery.data?.approval_threshold_by_level?.length ? summaryQuery.data.approval_threshold_by_level.map((level) => (
             <div key={level.approval_threshold_level} style={styles.departmentRow}>
-              <span>{approvalThresholdLabel(level.approval_threshold_level)}<br /><span style={styles.muted}>{formatNumber(level.pending_count)} pending · {formatNumber(level.urgent_count)} urgent · {formatNumber(level.overdue_count)} overdue</span></span>
-              <strong>{formatMoney(level.pending_remaining_estimated_value_total)} pending value</strong>
+              <span>{approvalThresholdLabel(level.approval_threshold_level)}<br /><span style={styles.muted}>{formatNumber(level.pending_count)} {ui("pending ·")} {formatNumber(level.urgent_count)} {ui("urgent ·")} {formatNumber(level.overdue_count)} {ui("overdue")}</span></span>
+              <strong>{formatMoney(level.pending_remaining_estimated_value_total)} {ui("pending value")}</strong>
             </div>
-          )) : <p style={styles.muted}>No approval threshold level exposure.</p>}
+          )) : <p style={styles.muted}>{ui("No approval threshold level exposure.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval thresholds by priority</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval thresholds by priority")}</h3>
           {summaryQuery.data?.approval_threshold_by_priority?.length ? summaryQuery.data.approval_threshold_by_priority.map((priority) => (
             <div key={priority.priority} style={styles.departmentRow}>
-              <span><span style={statusStyle(priority.priority)}>{humanizeCode(priority.priority)}</span><br /><span style={styles.muted}>{formatNumber(priority.elevated_approval_count)} elevated · {formatNumber(priority.high_value_count)} high value · {formatNumber(priority.executive_value_count)} executive · {formatNumber(priority.overdue_count)} overdue</span></span>
-              <strong>{formatMoney(priority.elevated_remaining_estimated_value_total)} elevated</strong>
+              <span><span style={statusStyle(priority.priority)}>{humanizeCode(priority.priority)}</span><br /><span style={styles.muted}>{formatNumber(priority.elevated_approval_count)} {ui("elevated ·")} {formatNumber(priority.high_value_count)} {ui("high value ·")} {formatNumber(priority.executive_value_count)} {ui("executive ·")} {formatNumber(priority.overdue_count)} {ui("overdue")}</span></span>
+              <strong>{formatMoney(priority.elevated_remaining_estimated_value_total)} {ui("elevated")}</strong>
             </div>
-          )) : <p style={styles.muted}>No threshold exposure by priority.</p>}
+          )) : <p style={styles.muted}>{ui("No threshold exposure by priority.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval thresholds by department</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval thresholds by department")}</h3>
           {summaryQuery.data?.approval_threshold_by_department?.length ? summaryQuery.data.approval_threshold_by_department.map((department) => (
             <div key={department.requesting_department} style={styles.departmentRow}>
-              <span>{department.requesting_department}<br /><span style={styles.muted}>{formatNumber(department.elevated_approval_count)} elevated · {formatNumber(department.urgent_count)} urgent · {formatNumber(department.high_value_count)} high value · {formatNumber(department.overdue_count)} overdue</span></span>
-              <strong>{formatMoney(department.elevated_remaining_estimated_value_total)} elevated</strong>
+              <span>{department.requesting_department}<br /><span style={styles.muted}>{formatNumber(department.elevated_approval_count)} {ui("elevated ·")} {formatNumber(department.urgent_count)} {ui("urgent ·")} {formatNumber(department.high_value_count)} {ui("high value ·")} {formatNumber(department.overdue_count)} {ui("overdue")}</span></span>
+              <strong>{formatMoney(department.elevated_remaining_estimated_value_total)} {ui("elevated")}</strong>
             </div>
-          )) : <p style={styles.muted}>No threshold exposure by department.</p>}
+          )) : <p style={styles.muted}>{ui("No threshold exposure by department.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval thresholds by requester</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval thresholds by requester")}</h3>
           {summaryQuery.data?.approval_threshold_by_requester?.length ? summaryQuery.data.approval_threshold_by_requester.map((requester) => (
             <div key={requester.requester_user_id || requester.requester_user_name} style={styles.departmentRow}>
-              <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.elevated_approval_count)} elevated · {formatNumber(requester.urgent_count)} urgent · {formatNumber(requester.high_value_count)} high value · {formatNumber(requester.overdue_count)} overdue</span></span>
-              <strong>{formatMoney(requester.elevated_remaining_estimated_value_total)} elevated</strong>
+              <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.elevated_approval_count)} {ui("elevated ·")} {formatNumber(requester.urgent_count)} {ui("urgent ·")} {formatNumber(requester.high_value_count)} {ui("high value ·")} {formatNumber(requester.overdue_count)} {ui("overdue")}</span></span>
+              <strong>{formatMoney(requester.elevated_remaining_estimated_value_total)} {ui("elevated")}</strong>
             </div>
-          )) : <p style={styles.muted}>No threshold exposure by requester.</p>}
+          )) : <p style={styles.muted}>{ui("No threshold exposure by requester.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval thresholds by target department</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval thresholds by target department")}</h3>
           {summaryQuery.data?.approval_threshold_by_target_department?.length ? summaryQuery.data.approval_threshold_by_target_department.map((department) => (
             <div key={department.target_department} style={styles.departmentRow}>
-              <span>{department.target_department}<br /><span style={styles.muted}>{formatNumber(department.elevated_approval_count)} elevated · {formatNumber(department.urgent_count)} urgent · {formatNumber(department.high_value_count)} high value · {formatNumber(department.overdue_count)} overdue</span></span>
-              <strong>{formatMoney(department.elevated_remaining_estimated_value_total)} elevated</strong>
+              <span>{department.target_department}<br /><span style={styles.muted}>{formatNumber(department.elevated_approval_count)} {ui("elevated ·")} {formatNumber(department.urgent_count)} {ui("urgent ·")} {formatNumber(department.high_value_count)} {ui("high value ·")} {formatNumber(department.overdue_count)} {ui("overdue")}</span></span>
+              <strong>{formatMoney(department.elevated_remaining_estimated_value_total)} {ui("elevated")}</strong>
             </div>
-          )) : <p style={styles.muted}>No threshold exposure by target department.</p>}
+          )) : <p style={styles.muted}>{ui("No threshold exposure by target department.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval thresholds by source location</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval thresholds by source location")}</h3>
           {summaryQuery.data?.approval_threshold_by_source_location?.length ? summaryQuery.data.approval_threshold_by_source_location.map((location) => (
             <div key={location.source_storage_location_id || location.source_storage_location_name} style={styles.departmentRow}>
-              <span>{location.source_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.elevated_approval_count)} elevated · {formatNumber(location.urgent_count)} urgent · {formatNumber(location.high_value_count)} high value · {formatNumber(location.overdue_count)} overdue</span></span>
-              <strong>{formatMoney(location.elevated_remaining_estimated_value_total)} elevated</strong>
+              <span>{location.source_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.elevated_approval_count)} {ui("elevated ·")} {formatNumber(location.urgent_count)} {ui("urgent ·")} {formatNumber(location.high_value_count)} {ui("high value ·")} {formatNumber(location.overdue_count)} {ui("overdue")}</span></span>
+              <strong>{formatMoney(location.elevated_remaining_estimated_value_total)} {ui("elevated")}</strong>
             </div>
-          )) : <p style={styles.muted}>No threshold exposure by source location.</p>}
+          )) : <p style={styles.muted}>{ui("No threshold exposure by source location.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval thresholds by target location</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval thresholds by target location")}</h3>
           {summaryQuery.data?.approval_threshold_by_target_location?.length ? summaryQuery.data.approval_threshold_by_target_location.map((location) => (
             <div key={location.target_storage_location_id || location.target_storage_location_name} style={styles.departmentRow}>
-              <span>{location.target_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.elevated_approval_count)} elevated · {formatNumber(location.urgent_count)} urgent · {formatNumber(location.high_value_count)} high value · {formatNumber(location.overdue_count)} overdue</span></span>
-              <strong>{formatMoney(location.elevated_remaining_estimated_value_total)} elevated</strong>
+              <span>{location.target_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.elevated_approval_count)} {ui("elevated ·")} {formatNumber(location.urgent_count)} {ui("urgent ·")} {formatNumber(location.high_value_count)} {ui("high value ·")} {formatNumber(location.overdue_count)} {ui("overdue")}</span></span>
+              <strong>{formatMoney(location.elevated_remaining_estimated_value_total)} {ui("elevated")}</strong>
             </div>
-          )) : <p style={styles.muted}>No threshold exposure by target location.</p>}
+          )) : <p style={styles.muted}>{ui("No threshold exposure by target location.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval thresholds by product</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval thresholds by product")}</h3>
           {summaryQuery.data?.approval_threshold_by_product?.length ? summaryQuery.data.approval_threshold_by_product.map((product) => (
             <div key={product.product_id} style={styles.departmentRow}>
-              <span>{product.product_name}<br /><span style={styles.muted}>{formatNumber(product.elevated_approval_count)} elevated requests · {formatNumber(product.high_value_count)} high value · {formatNumber(product.executive_value_count)} executive · {formatNumber(product.overdue_count)} overdue</span></span>
-              <strong>{formatMoney(product.elevated_product_remaining_estimated_value_total)} elevated</strong>
+              <span>{product.product_name}<br /><span style={styles.muted}>{formatNumber(product.elevated_approval_count)} {ui("elevated requests ·")} {formatNumber(product.high_value_count)} {ui("high value ·")} {formatNumber(product.executive_value_count)} {ui("executive ·")} {formatNumber(product.overdue_count)} {ui("overdue")}</span></span>
+              <strong>{formatMoney(product.elevated_product_remaining_estimated_value_total)} {ui("elevated")}</strong>
             </div>
-          )) : <p style={styles.muted}>No threshold exposure by product.</p>}
+          )) : <p style={styles.muted}>{ui("No threshold exposure by product.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval thresholds by category</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval thresholds by category")}</h3>
           {summaryQuery.data?.approval_threshold_by_category?.length ? summaryQuery.data.approval_threshold_by_category.map((category) => (
             <div key={category.product_category} style={styles.departmentRow}>
-              <span>{category.product_category}<br /><span style={styles.muted}>{formatNumber(category.elevated_approval_count)} elevated · {formatNumber(category.urgent_count)} urgent · {formatNumber(category.high_value_count)} high value · {formatNumber(category.overdue_count)} overdue</span></span>
-              <strong>{formatMoney(category.elevated_remaining_estimated_value_total)} elevated</strong>
+              <span>{category.product_category}<br /><span style={styles.muted}>{formatNumber(category.elevated_approval_count)} {ui("elevated ·")} {formatNumber(category.urgent_count)} {ui("urgent ·")} {formatNumber(category.high_value_count)} {ui("high value ·")} {formatNumber(category.overdue_count)} {ui("overdue")}</span></span>
+              <strong>{formatMoney(category.elevated_remaining_estimated_value_total)} {ui("elevated")}</strong>
             </div>
-          )) : <p style={styles.muted}>No threshold exposure by category.</p>}
+          )) : <p style={styles.muted}>{ui("No threshold exposure by category.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval thresholds by due state</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval thresholds by due state")}</h3>
           {summaryQuery.data?.approval_threshold_by_due_state?.length ? summaryQuery.data.approval_threshold_by_due_state.map((state) => (
             <div key={state.due_state} style={styles.departmentRow}>
-              <span>{humanizeCode(state.due_state)}<br /><span style={styles.muted}>{formatNumber(state.elevated_approval_count)} elevated · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.high_value_count)} high value · {formatNumber(state.overdue_count)} overdue</span></span>
-              <strong>{formatMoney(state.elevated_remaining_estimated_value_total)} elevated</strong>
+              <span>{humanizeCode(state.due_state)}<br /><span style={styles.muted}>{formatNumber(state.elevated_approval_count)} {ui("elevated ·")} {formatNumber(state.urgent_count)} {ui("urgent ·")} {formatNumber(state.high_value_count)} {ui("high value ·")} {formatNumber(state.overdue_count)} {ui("overdue")}</span></span>
+              <strong>{formatMoney(state.elevated_remaining_estimated_value_total)} {ui("elevated")}</strong>
             </div>
-          )) : <p style={styles.muted}>No threshold exposure by due state.</p>}
+          )) : <p style={styles.muted}>{ui("No threshold exposure by due state.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval thresholds by age bucket</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval thresholds by age bucket")}</h3>
           {summaryQuery.data?.approval_threshold_by_age_bucket?.length ? summaryQuery.data.approval_threshold_by_age_bucket.map((bucket) => (
             <div key={bucket.approval_age_bucket} style={styles.departmentRow}>
-              <span>{humanizeCode(bucket.approval_age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.elevated_approval_count)} elevated · {formatNumber(bucket.urgent_count)} urgent · {formatNumber(bucket.high_value_count)} high value · {formatNumber(bucket.overdue_count)} overdue</span></span>
-              <strong>{formatMoney(bucket.elevated_remaining_estimated_value_total)} elevated</strong>
+              <span>{humanizeCode(bucket.approval_age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.elevated_approval_count)} {ui("elevated ·")} {formatNumber(bucket.urgent_count)} {ui("urgent ·")} {formatNumber(bucket.high_value_count)} {ui("high value ·")} {formatNumber(bucket.overdue_count)} {ui("overdue")}</span></span>
+              <strong>{formatMoney(bucket.elevated_remaining_estimated_value_total)} {ui("elevated")}</strong>
             </div>
-          )) : <p style={styles.muted}>No threshold exposure by age bucket.</p>}
+          )) : <p style={styles.muted}>{ui("No threshold exposure by age bucket.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval thresholds by SLA state</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval thresholds by SLA state")}</h3>
           {summaryQuery.data?.approval_threshold_by_sla_state?.length ? summaryQuery.data.approval_threshold_by_sla_state.map((state) => (
             <div key={state.approval_sla_state} style={styles.departmentRow}>
-              <span>{humanizeCode(state.approval_sla_state)}<br /><span style={styles.muted}>{formatNumber(state.elevated_approval_count)} elevated · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.high_value_count)} high value · {formatNumber(state.overdue_count)} overdue</span></span>
-              <strong>{formatMoney(state.elevated_remaining_estimated_value_total)} elevated</strong>
+              <span>{humanizeCode(state.approval_sla_state)}<br /><span style={styles.muted}>{formatNumber(state.elevated_approval_count)} {ui("elevated ·")} {formatNumber(state.urgent_count)} {ui("urgent ·")} {formatNumber(state.high_value_count)} {ui("high value ·")} {formatNumber(state.overdue_count)} {ui("overdue")}</span></span>
+              <strong>{formatMoney(state.elevated_remaining_estimated_value_total)} {ui("elevated")}</strong>
             </div>
-          )) : <p style={styles.muted}>No threshold exposure by SLA state.</p>}
+          )) : <p style={styles.muted}>{ui("No threshold exposure by SLA state.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Oldest threshold approvals</h3>
+          <h3 style={styles.sectionTitle}>{ui("Oldest threshold approvals")}</h3>
           {summaryQuery.data?.approval_threshold_oldest?.length ? summaryQuery.data.approval_threshold_oldest.slice(0, 5).map((request) => (
             <div key={request.id} style={styles.summaryRow}>
-              <span>{request.requisition_number}<br /><span style={styles.muted}>{request.requesting_department || 'No department'} → {request.target_department || 'No target'} · {approvalThresholdLabel(request.approval_threshold_level || 'standard')} · {formatNumber(request.product_count)} products</span></span>
-              <strong>{formatNumber(request.pending_age_days)}d · {formatMoney(request.remaining_estimated_value_total)} value</strong>
+              <span>{request.requisition_number}<br /><span style={styles.muted}>{request.requesting_department || ui('No department')} → {request.target_department || ui('No target')} · {approvalThresholdLabel(request.approval_threshold_level || 'standard')} · {formatNumber(request.product_count)} {ui("products")}</span></span>
+              <strong>{formatNumber(request.pending_age_days)}{ui("d ·")} {formatMoney(request.remaining_estimated_value_total)} {ui("value")}</strong>
             </div>
-          )) : <p style={styles.muted}>No elevated threshold approvals.</p>}
+          )) : <p style={styles.muted}>{ui("No elevated threshold approvals.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval value by priority</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval value by priority")}</h3>
           {summaryQuery.data?.approval_queue_by_priority?.length ? summaryQuery.data.approval_queue_by_priority.map((priority) => (
             <div key={priority.priority} style={styles.departmentRow}>
-              <span><span style={statusStyle(priority.priority)}>{humanizeCode(priority.priority)}</span><br /><span style={styles.muted}>{formatNumber(priority.pending_count)} pending · {formatNumber(priority.overdue_count)} overdue · avg {formatNumber(priority.average_pending_age_days)}d</span></span>
-              <strong>{formatMoney(priority.pending_remaining_estimated_value_total)} pending</strong>
+              <span><span style={statusStyle(priority.priority)}>{humanizeCode(priority.priority)}</span><br /><span style={styles.muted}>{formatNumber(priority.pending_count)} {ui("pending ·")} {formatNumber(priority.overdue_count)} {ui("overdue · avg")} {formatNumber(priority.average_pending_age_days)}{ui("d")}</span></span>
+              <strong>{formatMoney(priority.pending_remaining_estimated_value_total)} {ui("pending")}</strong>
             </div>
-          )) : <p style={styles.muted}>No pending approval value by priority.</p>}
+          )) : <p style={styles.muted}>{ui("No pending approval value by priority.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval value by department</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval value by department")}</h3>
           {summaryQuery.data?.approval_queue_by_department?.length ? summaryQuery.data.approval_queue_by_department.map((department) => (
             <div key={department.requesting_department} style={styles.departmentRow}>
-              <span>{department.requesting_department}<br /><span style={styles.muted}>{formatNumber(department.pending_count)} pending · {formatNumber(department.urgent_count)} urgent · {formatNumber(department.overdue_count)} overdue · avg {formatNumber(department.average_pending_age_days)}d</span></span>
-              <strong>{formatMoney(department.pending_remaining_estimated_value_total)} pending</strong>
+              <span>{department.requesting_department}<br /><span style={styles.muted}>{formatNumber(department.pending_count)} {ui("pending ·")} {formatNumber(department.urgent_count)} {ui("urgent ·")} {formatNumber(department.overdue_count)} {ui("overdue · avg")} {formatNumber(department.average_pending_age_days)}{ui("d")}</span></span>
+              <strong>{formatMoney(department.pending_remaining_estimated_value_total)} {ui("pending")}</strong>
             </div>
-          )) : <p style={styles.muted}>No pending approval value by department.</p>}
+          )) : <p style={styles.muted}>{ui("No pending approval value by department.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval value by target department</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval value by target department")}</h3>
           {summaryQuery.data?.approval_queue_by_target_department?.length ? summaryQuery.data.approval_queue_by_target_department.map((department) => (
             <div key={department.target_department} style={styles.departmentRow}>
-              <span>{department.target_department}<br /><span style={styles.muted}>{formatNumber(department.pending_count)} pending · {formatNumber(department.urgent_count)} urgent · {formatNumber(department.overdue_count)} overdue · avg {formatNumber(department.average_pending_age_days)}d</span></span>
-              <strong>{formatMoney(department.pending_remaining_estimated_value_total)} pending</strong>
+              <span>{department.target_department}<br /><span style={styles.muted}>{formatNumber(department.pending_count)} {ui("pending ·")} {formatNumber(department.urgent_count)} {ui("urgent ·")} {formatNumber(department.overdue_count)} {ui("overdue · avg")} {formatNumber(department.average_pending_age_days)}{ui("d")}</span></span>
+              <strong>{formatMoney(department.pending_remaining_estimated_value_total)} {ui("pending")}</strong>
             </div>
-          )) : <p style={styles.muted}>No pending approval value by target department.</p>}
+          )) : <p style={styles.muted}>{ui("No pending approval value by target department.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval value by source location</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval value by source location")}</h3>
           {summaryQuery.data?.approval_queue_by_source_location?.length ? summaryQuery.data.approval_queue_by_source_location.map((location) => (
             <div key={location.source_storage_location_id || location.source_storage_location_name} style={styles.departmentRow}>
-              <span>{location.source_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.pending_count)} pending · {formatNumber(location.urgent_count)} urgent · {formatNumber(location.overdue_count)} overdue · avg {formatNumber(location.average_pending_age_days)}d</span></span>
-              <strong>{formatMoney(location.pending_remaining_estimated_value_total)} pending</strong>
+              <span>{location.source_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.pending_count)} {ui("pending ·")} {formatNumber(location.urgent_count)} {ui("urgent ·")} {formatNumber(location.overdue_count)} {ui("overdue · avg")} {formatNumber(location.average_pending_age_days)}{ui("d")}</span></span>
+              <strong>{formatMoney(location.pending_remaining_estimated_value_total)} {ui("pending")}</strong>
             </div>
-          )) : <p style={styles.muted}>No pending approval value by source location.</p>}
+          )) : <p style={styles.muted}>{ui("No pending approval value by source location.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval value by target location</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval value by target location")}</h3>
           {summaryQuery.data?.approval_queue_by_target_location?.length ? summaryQuery.data.approval_queue_by_target_location.map((location) => (
             <div key={location.target_storage_location_id || location.target_storage_location_name} style={styles.departmentRow}>
-              <span>{location.target_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.pending_count)} pending · {formatNumber(location.urgent_count)} urgent · {formatNumber(location.overdue_count)} overdue · avg {formatNumber(location.average_pending_age_days)}d</span></span>
-              <strong>{formatMoney(location.pending_remaining_estimated_value_total)} pending</strong>
+              <span>{location.target_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.pending_count)} {ui("pending ·")} {formatNumber(location.urgent_count)} {ui("urgent ·")} {formatNumber(location.overdue_count)} {ui("overdue · avg")} {formatNumber(location.average_pending_age_days)}{ui("d")}</span></span>
+              <strong>{formatMoney(location.pending_remaining_estimated_value_total)} {ui("pending")}</strong>
             </div>
-          )) : <p style={styles.muted}>No pending approval value by target location.</p>}
+          )) : <p style={styles.muted}>{ui("No pending approval value by target location.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval value by requester</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval value by requester")}</h3>
           {summaryQuery.data?.approval_queue_by_requester?.length ? summaryQuery.data.approval_queue_by_requester.map((requester) => (
             <div key={requester.requester_user_id || requester.requester_user_name} style={styles.departmentRow}>
-              <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.pending_count)} pending · {formatNumber(requester.urgent_count)} urgent · {formatNumber(requester.overdue_count)} overdue · avg {formatNumber(requester.average_pending_age_days)}d</span></span>
-              <strong>{formatMoney(requester.pending_remaining_estimated_value_total)} pending</strong>
+              <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.pending_count)} {ui("pending ·")} {formatNumber(requester.urgent_count)} {ui("urgent ·")} {formatNumber(requester.overdue_count)} {ui("overdue · avg")} {formatNumber(requester.average_pending_age_days)}{ui("d")}</span></span>
+              <strong>{formatMoney(requester.pending_remaining_estimated_value_total)} {ui("pending")}</strong>
             </div>
-          )) : <p style={styles.muted}>No pending approval value by requester.</p>}
+          )) : <p style={styles.muted}>{ui("No pending approval value by requester.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval value by product</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval value by product")}</h3>
           {summaryQuery.data?.approval_queue_by_product?.length ? summaryQuery.data.approval_queue_by_product.map((product) => (
             <div key={product.product_id} style={styles.departmentRow}>
-              <span>{product.product_name}<br /><span style={styles.muted}>{formatNumber(product.pending_count)} pending · {formatNumber(product.urgent_count)} urgent · {formatNumber(product.overdue_count)} overdue · {formatNumber(product.pending_remaining_quantity_total)} {product.product_unit || 'units'} remaining</span></span>
-              <strong>{formatMoney(product.pending_remaining_estimated_value_total)} pending</strong>
+              <span>{product.product_name}<br /><span style={styles.muted}>{formatNumber(product.pending_count)} {ui("pending ·")} {formatNumber(product.urgent_count)} {ui("urgent ·")} {formatNumber(product.overdue_count)} {ui("overdue ·")} {formatNumber(product.pending_remaining_quantity_total)} {product.product_unit || ui('units')} {ui("remaining")}</span></span>
+              <strong>{formatMoney(product.pending_remaining_estimated_value_total)} {ui("pending")}</strong>
             </div>
-          )) : <p style={styles.muted}>No pending approval value by product.</p>}
+          )) : <p style={styles.muted}>{ui("No pending approval value by product.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval value by category</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval value by category")}</h3>
           {summaryQuery.data?.approval_queue_by_category?.length ? summaryQuery.data.approval_queue_by_category.map((category) => (
             <div key={category.product_category} style={styles.departmentRow}>
-              <span>{category.product_category}<br /><span style={styles.muted}>{formatNumber(category.pending_count)} pending · {formatNumber(category.urgent_count)} urgent · {formatNumber(category.overdue_count)} overdue · {formatNumber(category.pending_remaining_quantity_total)} units remaining</span></span>
-              <strong>{formatMoney(category.pending_remaining_estimated_value_total)} pending</strong>
+              <span>{category.product_category}<br /><span style={styles.muted}>{formatNumber(category.pending_count)} {ui("pending ·")} {formatNumber(category.urgent_count)} {ui("urgent ·")} {formatNumber(category.overdue_count)} {ui("overdue ·")} {formatNumber(category.pending_remaining_quantity_total)} {ui("units remaining")}</span></span>
+              <strong>{formatMoney(category.pending_remaining_estimated_value_total)} {ui("pending")}</strong>
             </div>
-          )) : <p style={styles.muted}>No pending approval value by category.</p>}
+          )) : <p style={styles.muted}>{ui("No pending approval value by category.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval value by age bucket</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval value by age bucket")}</h3>
           {summaryQuery.data?.approval_queue_by_age_bucket?.length ? summaryQuery.data.approval_queue_by_age_bucket.map((bucket) => (
             <div key={bucket.age_bucket} style={styles.departmentRow}>
-              <span>{humanizeCode(bucket.age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.pending_count)} pending · {formatNumber(bucket.urgent_count)} urgent · {formatNumber(bucket.overdue_count)} overdue · avg {formatNumber(bucket.average_pending_age_days)}d</span></span>
-              <strong>{formatMoney(bucket.pending_remaining_estimated_value_total)} pending</strong>
+              <span>{humanizeCode(bucket.age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.pending_count)} {ui("pending ·")} {formatNumber(bucket.urgent_count)} {ui("urgent ·")} {formatNumber(bucket.overdue_count)} {ui("overdue · avg")} {formatNumber(bucket.average_pending_age_days)}{ui("d")}</span></span>
+              <strong>{formatMoney(bucket.pending_remaining_estimated_value_total)} {ui("pending")}</strong>
             </div>
-          )) : <p style={styles.muted}>No pending approval value by age bucket.</p>}
+          )) : <p style={styles.muted}>{ui("No pending approval value by age bucket.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval value by SLA state</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval value by SLA state")}</h3>
           {summaryQuery.data?.approval_queue_by_sla_state?.length ? summaryQuery.data.approval_queue_by_sla_state.map((state) => (
             <div key={state.approval_sla_state} style={styles.departmentRow}>
-              <span>{humanizeCode(state.approval_sla_state)}<br /><span style={styles.muted}>{formatNumber(state.pending_count)} pending · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.overdue_count)} overdue · avg {formatNumber(state.average_pending_age_days)}d</span></span>
-              <strong>{formatMoney(state.pending_remaining_estimated_value_total)} pending</strong>
+              <span>{humanizeCode(state.approval_sla_state)}<br /><span style={styles.muted}>{formatNumber(state.pending_count)} {ui("pending ·")} {formatNumber(state.urgent_count)} {ui("urgent ·")} {formatNumber(state.overdue_count)} {ui("overdue · avg")} {formatNumber(state.average_pending_age_days)}{ui("d")}</span></span>
+              <strong>{formatMoney(state.pending_remaining_estimated_value_total)} {ui("pending")}</strong>
             </div>
-          )) : <p style={styles.muted}>No pending approval value by SLA state.</p>}
+          )) : <p style={styles.muted}>{ui("No pending approval value by SLA state.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Approval value by due state</h3>
+          <h3 style={styles.sectionTitle}>{ui("Approval value by due state")}</h3>
           {summaryQuery.data?.approval_queue_by_due_state?.length ? summaryQuery.data.approval_queue_by_due_state.map((state) => (
             <div key={state.due_state} style={styles.departmentRow}>
-              <span>{humanizeCode(state.due_state)}<br /><span style={styles.muted}>{formatNumber(state.pending_count)} pending · {formatNumber(state.urgent_count)} urgent · {formatNumber(state.overdue_count)} overdue · {formatNumber(state.due_soon_count)} due soon · avg {formatNumber(state.average_pending_age_days)}d</span></span>
-              <strong>{formatMoney(state.pending_remaining_estimated_value_total)} pending</strong>
+              <span>{humanizeCode(state.due_state)}<br /><span style={styles.muted}>{formatNumber(state.pending_count)} {ui("pending ·")} {formatNumber(state.urgent_count)} {ui("urgent ·")} {formatNumber(state.overdue_count)} {ui("overdue ·")} {formatNumber(state.due_soon_count)} {ui("due soon · avg")} {formatNumber(state.average_pending_age_days)}{ui("d")}</span></span>
+              <strong>{formatMoney(state.pending_remaining_estimated_value_total)} {ui("pending")}</strong>
             </div>
-          )) : <p style={styles.muted}>No pending approval value by due state.</p>}
+          )) : <p style={styles.muted}>{ui("No pending approval value by due state.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Oldest pending approvals</h3>
+          <h3 style={styles.sectionTitle}>{ui("Oldest pending approvals")}</h3>
           {summaryQuery.data?.approval_queue_oldest?.length ? summaryQuery.data.approval_queue_oldest.slice(0, 5).map((request) => (
             <div key={request.id} style={styles.summaryRow}>
-              <span>{request.requisition_number}<br /><span style={styles.muted}>{request.requesting_department || 'No department'} → {request.target_department || 'No target'} · {humanizeCode(request.priority)} · {formatNumber(request.product_count)} products</span></span>
-              <strong>{formatNumber(request.pending_age_days)}d · {formatNumber(request.remaining_quantity_total)} units · {formatMoney(request.remaining_estimated_value_total)} value</strong>
+              <span>{request.requisition_number}<br /><span style={styles.muted}>{request.requesting_department || ui('No department')} → {request.target_department || ui('No target')} · {humanizeCode(request.priority)} · {formatNumber(request.product_count)} {ui("products")}</span></span>
+              <strong>{formatNumber(request.pending_age_days)}{ui("d ·")} {formatNumber(request.remaining_quantity_total)} {ui("units ·")} {formatMoney(request.remaining_estimated_value_total)} {ui("value")}</strong>
             </div>
-          )) : <p style={styles.muted}>No pending approvals.</p>}
+          )) : <p style={styles.muted}>{ui("No pending approvals.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Fulfillment progress</h3>
+          <h3 style={styles.sectionTitle}>{ui("Fulfillment progress")}</h3>
           <div style={styles.compactMetrics}>
-            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_progress?.requested_quantity_total)}</strong><br /><span style={styles.muted}>Requested</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_progress?.fulfilled_quantity_total)}</strong><br /><span style={styles.muted}>Fulfilled</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_progress?.remaining_quantity_total)}</strong><br /><span style={styles.muted}>Remaining</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_progress?.fulfillment_rate_percent)}%</strong><br /><span style={styles.muted}>Fulfillment rate</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_progress?.requested_quantity_total)}</strong><br /><span style={styles.muted}>{ui("Requested")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_progress?.fulfilled_quantity_total)}</strong><br /><span style={styles.muted}>{ui("Fulfilled")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_progress?.remaining_quantity_total)}</strong><br /><span style={styles.muted}>{ui("Remaining")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_progress?.fulfillment_rate_percent)}%</strong><br /><span style={styles.muted}>{ui("Fulfillment rate")}</span></div>
           </div>
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Estimated value exposure</h3>
+          <h3 style={styles.sectionTitle}>{ui("Estimated value exposure")}</h3>
           <div style={styles.compactMetrics}>
-            <div><strong>{formatMoney(summaryQuery.data?.estimated_value_summary?.requested_estimated_value_total)}</strong><br /><span style={styles.muted}>Open requested value</span></div>
-            <div><strong>{formatMoney(summaryQuery.data?.estimated_value_summary?.fulfilled_estimated_value_total)}</strong><br /><span style={styles.muted}>Fulfilled value</span></div>
-            <div><strong>{formatMoney(summaryQuery.data?.estimated_value_summary?.remaining_estimated_value_total)}</strong><br /><span style={styles.muted}>Remaining value</span></div>
-            <div><strong>{formatMoney(summaryQuery.data?.estimated_value_summary?.urgent_remaining_estimated_value_total)}</strong><br /><span style={styles.muted}>Urgent remaining value</span></div>
+            <div><strong>{formatMoney(summaryQuery.data?.estimated_value_summary?.requested_estimated_value_total)}</strong><br /><span style={styles.muted}>{ui("Open requested value")}</span></div>
+            <div><strong>{formatMoney(summaryQuery.data?.estimated_value_summary?.fulfilled_estimated_value_total)}</strong><br /><span style={styles.muted}>{ui("Fulfilled value")}</span></div>
+            <div><strong>{formatMoney(summaryQuery.data?.estimated_value_summary?.remaining_estimated_value_total)}</strong><br /><span style={styles.muted}>{ui("Remaining value")}</span></div>
+            <div><strong>{formatMoney(summaryQuery.data?.estimated_value_summary?.urgent_remaining_estimated_value_total)}</strong><br /><span style={styles.muted}>{ui("Urgent remaining value")}</span></div>
           </div>
-          <p style={styles.muted}>Actionable remaining value: {formatMoney(summaryQuery.data?.estimated_value_summary?.actionable_remaining_estimated_value_total)}</p>
+          <p style={styles.muted}>{ui("Actionable remaining value:")} {formatMoney(summaryQuery.data?.estimated_value_summary?.actionable_remaining_estimated_value_total)}</p>
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Value exposure by priority</h3>
+          <h3 style={styles.sectionTitle}>{ui("Value exposure by priority")}</h3>
           {summaryQuery.data?.estimated_value_by_priority?.length ? summaryQuery.data.estimated_value_by_priority.map((priority) => (
             <div key={priority.priority} style={styles.departmentRow}>
-              <span><span style={statusStyle(priority.priority)}>{humanizeCode(priority.priority)}</span><br /><span style={styles.muted}>{formatNumber(priority.request_count)} open · {formatNumber(priority.overdue_count)} overdue · {formatNumber(priority.due_soon_count)} due soon</span></span>
-              <strong>{formatMoney(priority.remaining_estimated_value_total)} remaining</strong>
+              <span><span style={statusStyle(priority.priority)}>{humanizeCode(priority.priority)}</span><br /><span style={styles.muted}>{formatNumber(priority.request_count)} {ui("open ·")} {formatNumber(priority.overdue_count)} {ui("overdue ·")} {formatNumber(priority.due_soon_count)} {ui("due soon")}</span></span>
+              <strong>{formatMoney(priority.remaining_estimated_value_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No priority value exposure.</p>}
+          )) : <p style={styles.muted}>{ui("No priority value exposure.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Value exposure by status</h3>
+          <h3 style={styles.sectionTitle}>{ui("Value exposure by status")}</h3>
           {summaryQuery.data?.estimated_value_by_status?.length ? summaryQuery.data.estimated_value_by_status.map((status) => (
             <div key={status.status} style={styles.departmentRow}>
-              <span><span style={statusStyle(status.status)}>{requisitionStatusLabel(status.status)}</span><br /><span style={styles.muted}>{formatNumber(status.request_count)} open · urgent value {formatMoney(status.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatMoney(status.remaining_estimated_value_total)} remaining</strong>
+              <span><span style={statusStyle(status.status)}>{requisitionStatusLabel(status.status)}</span><br /><span style={styles.muted}>{formatNumber(status.request_count)} {ui("open · urgent value")} {formatMoney(status.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(status.remaining_estimated_value_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No status value exposure.</p>}
+          )) : <p style={styles.muted}>{ui("No status value exposure.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Value exposure by department</h3>
+          <h3 style={styles.sectionTitle}>{ui("Value exposure by department")}</h3>
           {summaryQuery.data?.top_estimated_value_departments?.length ? summaryQuery.data.top_estimated_value_departments.slice(0, 4).map((department) => (
             <div key={department.requesting_department} style={styles.departmentRow}>
-              <span>{department.requesting_department}<br /><span style={styles.muted}>{formatNumber(department.request_count)} open · urgent value {formatMoney(department.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatMoney(department.remaining_estimated_value_total)} remaining</strong>
+              <span>{department.requesting_department}<br /><span style={styles.muted}>{formatNumber(department.request_count)} {ui("open · urgent value")} {formatMoney(department.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(department.remaining_estimated_value_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No department value exposure.</p>}
+          )) : <p style={styles.muted}>{ui("No department value exposure.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Value exposure by target department</h3>
+          <h3 style={styles.sectionTitle}>{ui("Value exposure by target department")}</h3>
           {summaryQuery.data?.top_estimated_value_target_departments?.length ? summaryQuery.data.top_estimated_value_target_departments.slice(0, 4).map((department) => (
             <div key={department.target_department} style={styles.departmentRow}>
-              <span>{department.target_department}<br /><span style={styles.muted}>{formatNumber(department.request_count)} open · urgent value {formatMoney(department.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatMoney(department.remaining_estimated_value_total)} remaining</strong>
+              <span>{department.target_department}<br /><span style={styles.muted}>{formatNumber(department.request_count)} {ui("open · urgent value")} {formatMoney(department.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(department.remaining_estimated_value_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No target department value exposure.</p>}
+          )) : <p style={styles.muted}>{ui("No target department value exposure.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Value exposure by source location</h3>
+          <h3 style={styles.sectionTitle}>{ui("Value exposure by source location")}</h3>
           {summaryQuery.data?.top_estimated_value_source_locations?.length ? summaryQuery.data.top_estimated_value_source_locations.slice(0, 4).map((location) => (
             <div key={location.source_storage_location_id || location.source_storage_location_name} style={styles.departmentRow}>
-              <span>{location.source_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.request_count)} open · urgent value {formatMoney(location.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatMoney(location.remaining_estimated_value_total)} remaining</strong>
+              <span>{location.source_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.request_count)} {ui("open · urgent value")} {formatMoney(location.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(location.remaining_estimated_value_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No source location value exposure.</p>}
+          )) : <p style={styles.muted}>{ui("No source location value exposure.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Value exposure by target location</h3>
+          <h3 style={styles.sectionTitle}>{ui("Value exposure by target location")}</h3>
           {summaryQuery.data?.top_estimated_value_target_locations?.length ? summaryQuery.data.top_estimated_value_target_locations.slice(0, 4).map((location) => (
             <div key={location.target_storage_location_id || location.target_storage_location_name} style={styles.departmentRow}>
-              <span>{location.target_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.request_count)} open · urgent value {formatMoney(location.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatMoney(location.remaining_estimated_value_total)} remaining</strong>
+              <span>{location.target_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.request_count)} {ui("open · urgent value")} {formatMoney(location.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(location.remaining_estimated_value_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No target location value exposure.</p>}
+          )) : <p style={styles.muted}>{ui("No target location value exposure.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Value exposure by product</h3>
+          <h3 style={styles.sectionTitle}>{ui("Value exposure by product")}</h3>
           {summaryQuery.data?.top_estimated_value_products?.length ? summaryQuery.data.top_estimated_value_products.slice(0, 4).map((product) => (
             <div key={product.product_id} style={styles.departmentRow}>
-              <span>{product.product_name}<br /><span style={styles.muted}>{product.product_unit || product.product_category || '-'} · urgent value {formatMoney(product.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatMoney(product.remaining_estimated_value_total)} remaining</strong>
+              <span>{product.product_name}<br /><span style={styles.muted}>{product.product_unit || product.product_category || '-'} {ui("· urgent value")} {formatMoney(product.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(product.remaining_estimated_value_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No product value exposure.</p>}
+          )) : <p style={styles.muted}>{ui("No product value exposure.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Value exposure by category</h3>
+          <h3 style={styles.sectionTitle}>{ui("Value exposure by category")}</h3>
           {summaryQuery.data?.top_estimated_value_categories?.length ? summaryQuery.data.top_estimated_value_categories.slice(0, 4).map((category) => (
             <div key={category.product_category} style={styles.departmentRow}>
-              <span>{category.product_category}<br /><span style={styles.muted}>{formatNumber(category.product_count)} products · {formatNumber(category.request_count)} open · urgent value {formatMoney(category.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatMoney(category.remaining_estimated_value_total)} remaining</strong>
+              <span>{category.product_category}<br /><span style={styles.muted}>{formatNumber(category.product_count)} {ui("products ·")} {formatNumber(category.request_count)} {ui("open · urgent value")} {formatMoney(category.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(category.remaining_estimated_value_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No category value exposure.</p>}
+          )) : <p style={styles.muted}>{ui("No category value exposure.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Value exposure by requester</h3>
+          <h3 style={styles.sectionTitle}>{ui("Value exposure by requester")}</h3>
           {summaryQuery.data?.top_estimated_value_requesters?.length ? summaryQuery.data.top_estimated_value_requesters.slice(0, 4).map((requester) => (
             <div key={requester.requester_user_id || requester.requester_user_name} style={styles.departmentRow}>
-              <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.request_count)} open · urgent value {formatMoney(requester.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatMoney(requester.remaining_estimated_value_total)} remaining</strong>
+              <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.request_count)} {ui("open · urgent value")} {formatMoney(requester.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(requester.remaining_estimated_value_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No requester value exposure.</p>}
+          )) : <p style={styles.muted}>{ui("No requester value exposure.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Fulfillment backlog</h3>
+          <h3 style={styles.sectionTitle}>{ui("Fulfillment backlog")}</h3>
           <div style={styles.compactMetrics}>
-            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_backlog?.partially_fulfilled_count)}</strong><br /><span style={styles.muted}>Partial requests</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_backlog?.stale_partially_fulfilled_count)}</strong><br /><span style={styles.muted}>Stale &gt; {formatNumber(summaryQuery.data?.fulfillment_backlog?.stale_after_days || 3)}d</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_backlog?.oldest_partial_age_days)}</strong><br /><span style={styles.muted}>Oldest partial days</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_backlog?.remaining_quantity_total)}</strong><br /><span style={styles.muted}>Partial remaining</span></div>
-            <div><strong>{formatMoney(summaryQuery.data?.fulfillment_backlog?.remaining_estimated_value_total)}</strong><br /><span style={styles.muted}>Partial value</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_backlog?.partially_fulfilled_count)}</strong><br /><span style={styles.muted}>{ui("Partial requests")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_backlog?.stale_partially_fulfilled_count)}</strong><br /><span style={styles.muted}>{ui("Stale >")} {formatNumber(summaryQuery.data?.fulfillment_backlog?.stale_after_days || 3)}{ui("d")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_backlog?.oldest_partial_age_days)}</strong><br /><span style={styles.muted}>{ui("Oldest partial days")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.fulfillment_backlog?.remaining_quantity_total)}</strong><br /><span style={styles.muted}>{ui("Partial remaining")}</span></div>
+            <div><strong>{formatMoney(summaryQuery.data?.fulfillment_backlog?.remaining_estimated_value_total)}</strong><br /><span style={styles.muted}>{ui("Partial value")}</span></div>
           </div>
         </div>
 
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Oldest partial fulfillments</h3>
+          <h3 style={styles.sectionTitle}>{ui("Oldest partial fulfillments")}</h3>
           {summaryQuery.data?.fulfillment_backlog_oldest?.length ? summaryQuery.data.fulfillment_backlog_oldest.slice(0, 5).map((request) => (
             <div key={request.id} style={styles.summaryRow}>
-              <span>{request.requisition_number}<br /><span style={styles.muted}>{request.requesting_department || 'No department'} → {request.target_department || 'No target'} · {humanizeCode(request.priority)}</span></span>
-              <strong>{formatNumber(request.partial_age_days)}d · {formatNumber(request.remaining_quantity_total)} units · {formatMoney(request.remaining_estimated_value_total)} value</strong>
+              <span>{request.requisition_number}<br /><span style={styles.muted}>{request.requesting_department || ui('No department')} → {request.target_department || ui('No target')} · {humanizeCode(request.priority)}</span></span>
+              <strong>{formatNumber(request.partial_age_days)}{ui("d ·")} {formatNumber(request.remaining_quantity_total)} {ui("units ·")} {formatMoney(request.remaining_estimated_value_total)} {ui("value")}</strong>
             </div>
-          )) : <p style={styles.muted}>No aged partial fulfillments.</p>}
+          )) : <p style={styles.muted}>{ui("No aged partial fulfillments.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Fulfillment backlog by priority</h3>
+          <h3 style={styles.sectionTitle}>{ui("Fulfillment backlog by priority")}</h3>
           {summaryQuery.data?.fulfillment_backlog_by_priority?.length ? summaryQuery.data.fulfillment_backlog_by_priority.map((priority) => (
             <div key={priority.priority} style={styles.departmentRow}>
-              <span>{humanizeCode(priority.priority)}<br /><span style={styles.muted}>{formatNumber(priority.partially_fulfilled_count)} partial · {formatNumber(priority.stale_partially_fulfilled_count)} stale · oldest {formatNumber(priority.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(priority.remaining_quantity_total)} units · {formatMoney(priority.remaining_estimated_value_total)} value</strong>
+              <span>{humanizeCode(priority.priority)}<br /><span style={styles.muted}>{formatNumber(priority.partially_fulfilled_count)} {ui("partial ·")} {formatNumber(priority.stale_partially_fulfilled_count)} {ui("stale · oldest")} {formatNumber(priority.oldest_partial_age_days)}{ui("d")}</span></span>
+              <strong>{formatNumber(priority.remaining_quantity_total)} {ui("units ·")} {formatMoney(priority.remaining_estimated_value_total)} {ui("value")}</strong>
             </div>
-          )) : <p style={styles.muted}>No priority-level fulfillment backlog.</p>}
+          )) : <p style={styles.muted}>{ui("No priority-level fulfillment backlog.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Fulfillment backlog by age bucket</h3>
+          <h3 style={styles.sectionTitle}>{ui("Fulfillment backlog by age bucket")}</h3>
           {summaryQuery.data?.fulfillment_backlog_by_age_bucket?.length ? summaryQuery.data.fulfillment_backlog_by_age_bucket.map((bucket) => (
             <div key={bucket.age_bucket} style={styles.departmentRow}>
-              <span>{humanizeCode(bucket.age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.partially_fulfilled_count)} partial · {formatNumber(bucket.stale_partially_fulfilled_count)} stale · oldest {formatNumber(bucket.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(bucket.remaining_quantity_total)} units · {formatMoney(bucket.remaining_estimated_value_total)} value</strong>
+              <span>{humanizeCode(bucket.age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.partially_fulfilled_count)} {ui("partial ·")} {formatNumber(bucket.stale_partially_fulfilled_count)} {ui("stale · oldest")} {formatNumber(bucket.oldest_partial_age_days)}{ui("d")}</span></span>
+              <strong>{formatNumber(bucket.remaining_quantity_total)} {ui("units ·")} {formatMoney(bucket.remaining_estimated_value_total)} {ui("value")}</strong>
             </div>
-          )) : <p style={styles.muted}>No age-bucket fulfillment backlog.</p>}
+          )) : <p style={styles.muted}>{ui("No age-bucket fulfillment backlog.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Fulfillment backlog by due state</h3>
+          <h3 style={styles.sectionTitle}>{ui("Fulfillment backlog by due state")}</h3>
           {summaryQuery.data?.fulfillment_backlog_by_due_state?.length ? summaryQuery.data.fulfillment_backlog_by_due_state.map((state) => (
             <div key={state.due_state} style={styles.departmentRow}>
-              <span>{humanizeCode(state.due_state)}<br /><span style={styles.muted}>{formatNumber(state.partially_fulfilled_count)} partial · {formatNumber(state.stale_partially_fulfilled_count)} stale · oldest {formatNumber(state.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(state.remaining_quantity_total)} units · {formatMoney(state.remaining_estimated_value_total)} value</strong>
+              <span>{humanizeCode(state.due_state)}<br /><span style={styles.muted}>{formatNumber(state.partially_fulfilled_count)} {ui("partial ·")} {formatNumber(state.stale_partially_fulfilled_count)} {ui("stale · oldest")} {formatNumber(state.oldest_partial_age_days)}{ui("d")}</span></span>
+              <strong>{formatNumber(state.remaining_quantity_total)} {ui("units ·")} {formatMoney(state.remaining_estimated_value_total)} {ui("value")}</strong>
             </div>
-          )) : <p style={styles.muted}>No due-state fulfillment backlog.</p>}
+          )) : <p style={styles.muted}>{ui("No due-state fulfillment backlog.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Fulfillment backlog by SLA state</h3>
+          <h3 style={styles.sectionTitle}>{ui("Fulfillment backlog by SLA state")}</h3>
           {summaryQuery.data?.fulfillment_backlog_by_sla_state?.length ? summaryQuery.data.fulfillment_backlog_by_sla_state.map((state) => (
             <div key={state.sla_state} style={styles.departmentRow}>
-              <span>{humanizeCode(state.sla_state)}<br /><span style={styles.muted}>{formatNumber(state.partially_fulfilled_count)} partial · {formatNumber(state.stale_partially_fulfilled_count)} stale · oldest {formatNumber(state.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(state.remaining_quantity_total)} units · {formatMoney(state.remaining_estimated_value_total)} value</strong>
+              <span>{humanizeCode(state.sla_state)}<br /><span style={styles.muted}>{formatNumber(state.partially_fulfilled_count)} {ui("partial ·")} {formatNumber(state.stale_partially_fulfilled_count)} {ui("stale · oldest")} {formatNumber(state.oldest_partial_age_days)}{ui("d")}</span></span>
+              <strong>{formatNumber(state.remaining_quantity_total)} {ui("units ·")} {formatMoney(state.remaining_estimated_value_total)} {ui("value")}</strong>
             </div>
-          )) : <p style={styles.muted}>No SLA-state fulfillment backlog.</p>}
+          )) : <p style={styles.muted}>{ui("No SLA-state fulfillment backlog.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Fulfillment backlog by product</h3>
+          <h3 style={styles.sectionTitle}>{ui("Fulfillment backlog by product")}</h3>
           {summaryQuery.data?.fulfillment_backlog_by_product?.length ? summaryQuery.data.fulfillment_backlog_by_product.slice(0, 4).map((product) => (
             <div key={product.product_id} style={styles.departmentRow}>
-              <span>{product.product_name}<br /><span style={styles.muted}>{formatNumber(product.partially_fulfilled_count)} partial · {formatNumber(product.stale_partially_fulfilled_count)} stale · oldest {formatNumber(product.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(product.remaining_quantity_total)} {product.product_unit || 'units'} · {formatMoney(product.remaining_estimated_value_total)} value</strong>
+              <span>{product.product_name}<br /><span style={styles.muted}>{formatNumber(product.partially_fulfilled_count)} {ui("partial ·")} {formatNumber(product.stale_partially_fulfilled_count)} {ui("stale · oldest")} {formatNumber(product.oldest_partial_age_days)}{ui("d")}</span></span>
+              <strong>{formatNumber(product.remaining_quantity_total)} {product.product_unit || ui('units')} · {formatMoney(product.remaining_estimated_value_total)} {ui("value")}</strong>
             </div>
-          )) : <p style={styles.muted}>No product-level fulfillment backlog.</p>}
+          )) : <p style={styles.muted}>{ui("No product-level fulfillment backlog.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Fulfillment backlog by category</h3>
+          <h3 style={styles.sectionTitle}>{ui("Fulfillment backlog by category")}</h3>
           {summaryQuery.data?.fulfillment_backlog_by_category?.length ? summaryQuery.data.fulfillment_backlog_by_category.slice(0, 4).map((category) => (
             <div key={category.product_category} style={styles.departmentRow}>
-              <span>{category.product_category}<br /><span style={styles.muted}>{formatNumber(category.product_count)} products · {formatNumber(category.partially_fulfilled_count)} partial · {formatNumber(category.stale_partially_fulfilled_count)} stale · oldest {formatNumber(category.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(category.remaining_quantity_total)} units · {formatMoney(category.remaining_estimated_value_total)} value</strong>
+              <span>{category.product_category}<br /><span style={styles.muted}>{formatNumber(category.product_count)} {ui("products ·")} {formatNumber(category.partially_fulfilled_count)} {ui("partial ·")} {formatNumber(category.stale_partially_fulfilled_count)} {ui("stale · oldest")} {formatNumber(category.oldest_partial_age_days)}{ui("d")}</span></span>
+              <strong>{formatNumber(category.remaining_quantity_total)} {ui("units ·")} {formatMoney(category.remaining_estimated_value_total)} {ui("value")}</strong>
             </div>
-          )) : <p style={styles.muted}>No category-level fulfillment backlog.</p>}
+          )) : <p style={styles.muted}>{ui("No category-level fulfillment backlog.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Fulfillment backlog by requester</h3>
+          <h3 style={styles.sectionTitle}>{ui("Fulfillment backlog by requester")}</h3>
           {summaryQuery.data?.fulfillment_backlog_by_requester?.length ? summaryQuery.data.fulfillment_backlog_by_requester.slice(0, 4).map((requester) => (
             <div key={requester.requester_user_id || requester.requester_user_name} style={styles.departmentRow}>
-              <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.partially_fulfilled_count)} partial · {formatNumber(requester.stale_partially_fulfilled_count)} stale · oldest {formatNumber(requester.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(requester.remaining_quantity_total)} units · {formatMoney(requester.remaining_estimated_value_total)} value</strong>
+              <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.partially_fulfilled_count)} {ui("partial ·")} {formatNumber(requester.stale_partially_fulfilled_count)} {ui("stale · oldest")} {formatNumber(requester.oldest_partial_age_days)}{ui("d")}</span></span>
+              <strong>{formatNumber(requester.remaining_quantity_total)} {ui("units ·")} {formatMoney(requester.remaining_estimated_value_total)} {ui("value")}</strong>
             </div>
-          )) : <p style={styles.muted}>No requester-level fulfillment backlog.</p>}
+          )) : <p style={styles.muted}>{ui("No requester-level fulfillment backlog.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Fulfillment backlog by department</h3>
+          <h3 style={styles.sectionTitle}>{ui("Fulfillment backlog by department")}</h3>
           {summaryQuery.data?.fulfillment_backlog_by_department?.length ? summaryQuery.data.fulfillment_backlog_by_department.slice(0, 4).map((department) => (
             <div key={department.requesting_department} style={styles.departmentRow}>
-              <span>{department.requesting_department}<br /><span style={styles.muted}>{formatNumber(department.partially_fulfilled_count)} partial · {formatNumber(department.stale_partially_fulfilled_count)} stale · oldest {formatNumber(department.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(department.remaining_quantity_total)} units · {formatMoney(department.remaining_estimated_value_total)} value</strong>
+              <span>{department.requesting_department}<br /><span style={styles.muted}>{formatNumber(department.partially_fulfilled_count)} {ui("partial ·")} {formatNumber(department.stale_partially_fulfilled_count)} {ui("stale · oldest")} {formatNumber(department.oldest_partial_age_days)}{ui("d")}</span></span>
+              <strong>{formatNumber(department.remaining_quantity_total)} {ui("units ·")} {formatMoney(department.remaining_estimated_value_total)} {ui("value")}</strong>
             </div>
-          )) : <p style={styles.muted}>No department-level fulfillment backlog.</p>}
+          )) : <p style={styles.muted}>{ui("No department-level fulfillment backlog.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Fulfillment backlog by target department</h3>
+          <h3 style={styles.sectionTitle}>{ui("Fulfillment backlog by target department")}</h3>
           {summaryQuery.data?.fulfillment_backlog_by_target_department?.length ? summaryQuery.data.fulfillment_backlog_by_target_department.slice(0, 4).map((department) => (
             <div key={department.target_department} style={styles.departmentRow}>
-              <span>{department.target_department}<br /><span style={styles.muted}>{formatNumber(department.partially_fulfilled_count)} partial · {formatNumber(department.stale_partially_fulfilled_count)} stale · oldest {formatNumber(department.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(department.remaining_quantity_total)} units · {formatMoney(department.remaining_estimated_value_total)} value</strong>
+              <span>{department.target_department}<br /><span style={styles.muted}>{formatNumber(department.partially_fulfilled_count)} {ui("partial ·")} {formatNumber(department.stale_partially_fulfilled_count)} {ui("stale · oldest")} {formatNumber(department.oldest_partial_age_days)}{ui("d")}</span></span>
+              <strong>{formatNumber(department.remaining_quantity_total)} {ui("units ·")} {formatMoney(department.remaining_estimated_value_total)} {ui("value")}</strong>
             </div>
-          )) : <p style={styles.muted}>No target-department fulfillment backlog.</p>}
+          )) : <p style={styles.muted}>{ui("No target-department fulfillment backlog.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Fulfillment backlog by source location</h3>
+          <h3 style={styles.sectionTitle}>{ui("Fulfillment backlog by source location")}</h3>
           {summaryQuery.data?.fulfillment_backlog_by_source_location?.length ? summaryQuery.data.fulfillment_backlog_by_source_location.slice(0, 4).map((location) => (
             <div key={location.source_storage_location_id || location.source_storage_location_name} style={styles.departmentRow}>
-              <span>{location.source_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.partially_fulfilled_count)} partial · {formatNumber(location.stale_partially_fulfilled_count)} stale · oldest {formatNumber(location.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(location.remaining_quantity_total)} units · {formatMoney(location.remaining_estimated_value_total)} value</strong>
+              <span>{location.source_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.partially_fulfilled_count)} {ui("partial ·")} {formatNumber(location.stale_partially_fulfilled_count)} {ui("stale · oldest")} {formatNumber(location.oldest_partial_age_days)}{ui("d")}</span></span>
+              <strong>{formatNumber(location.remaining_quantity_total)} {ui("units ·")} {formatMoney(location.remaining_estimated_value_total)} {ui("value")}</strong>
             </div>
-          )) : <p style={styles.muted}>No source-location fulfillment backlog.</p>}
+          )) : <p style={styles.muted}>{ui("No source-location fulfillment backlog.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Fulfillment backlog by target location</h3>
+          <h3 style={styles.sectionTitle}>{ui("Fulfillment backlog by target location")}</h3>
           {summaryQuery.data?.fulfillment_backlog_by_target_location?.length ? summaryQuery.data.fulfillment_backlog_by_target_location.slice(0, 4).map((location) => (
             <div key={location.target_storage_location_id || location.target_storage_location_name} style={styles.departmentRow}>
-              <span>{location.target_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.partially_fulfilled_count)} partial · {formatNumber(location.stale_partially_fulfilled_count)} stale · oldest {formatNumber(location.oldest_partial_age_days)}d</span></span>
-              <strong>{formatNumber(location.remaining_quantity_total)} units · {formatMoney(location.remaining_estimated_value_total)} value</strong>
+              <span>{location.target_storage_location_name}<br /><span style={styles.muted}>{formatNumber(location.partially_fulfilled_count)} {ui("partial ·")} {formatNumber(location.stale_partially_fulfilled_count)} {ui("stale · oldest")} {formatNumber(location.oldest_partial_age_days)}{ui("d")}</span></span>
+              <strong>{formatNumber(location.remaining_quantity_total)} {ui("units ·")} {formatMoney(location.remaining_estimated_value_total)} {ui("value")}</strong>
             </div>
-          )) : <p style={styles.muted}>No target-location fulfillment backlog.</p>}
+          )) : <p style={styles.muted}>{ui("No target-location fulfillment backlog.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Queue aging</h3>
+          <h3 style={styles.sectionTitle}>{ui("Queue aging")}</h3>
           <div style={styles.compactMetrics}>
-            <div><strong>{formatNumber(summaryQuery.data?.age_buckets?.under_24h_count)}</strong><br /><span style={styles.muted}>Under 24h</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.age_buckets?.one_to_three_day_count)}</strong><br /><span style={styles.muted}>1–3 days</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.age_buckets?.three_to_seven_day_count)}</strong><br /><span style={styles.muted}>3–7 days</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.age_buckets?.over_seven_day_count)}</strong><br /><span style={styles.muted}>7+ days</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.age_buckets?.under_24h_count)}</strong><br /><span style={styles.muted}>{ui("Under 24h")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.age_buckets?.one_to_three_day_count)}</strong><br /><span style={styles.muted}>{ui("1–3 days")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.age_buckets?.three_to_seven_day_count)}</strong><br /><span style={styles.muted}>{ui("3–7 days")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.age_buckets?.over_seven_day_count)}</strong><br /><span style={styles.muted}>{ui("7+ days")}</span></div>
           </div>
-          <p style={styles.muted}>Average open age: {formatNumber(summaryQuery.data?.age_buckets?.average_open_age_days)} days · Oldest: {formatNumber(summaryQuery.data?.age_buckets?.oldest_open_age_days)} days</p>
+          <p style={styles.muted}>{ui("Average open age:")} {formatNumber(summaryQuery.data?.age_buckets?.average_open_age_days)} {ui("days · Oldest:")} {formatNumber(summaryQuery.data?.age_buckets?.oldest_open_age_days)} {ui("days")}</p>
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Oldest open requests</h3>
+          <h3 style={styles.sectionTitle}>{ui("Oldest open requests")}</h3>
           {summaryQuery.data?.open_queue_oldest?.length ? summaryQuery.data.open_queue_oldest.slice(0, 5).map((request) => (
             <div key={request.id} style={styles.departmentRow}>
-              <span>{request.requisition_number}<br /><span style={styles.muted}>{requisitionStatusLabel(request.status)} · {humanizeCode(request.priority)} · {request.requesting_department || 'No department'} · needed {formatDate(request.needed_by)}</span></span>
-              <strong>{formatNumber(request.open_age_days)}d · {formatMoney(request.remaining_estimated_value_total)}</strong>
+              <span>{request.requisition_number}<br /><span style={styles.muted}>{requisitionStatusLabel(request.status)} · {humanizeCode(request.priority)} · {request.requesting_department || ui('No department')} {ui("· needed")} {formatDate(request.needed_by)}</span></span>
+              <strong>{formatNumber(request.open_age_days)}{ui("d ·")} {formatMoney(request.remaining_estimated_value_total)}</strong>
             </div>
-          )) : <p style={styles.muted}>No open request aging actions.</p>}
+          )) : <p style={styles.muted}>{ui("No open request aging actions.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Value exposure by age bucket</h3>
+          <h3 style={styles.sectionTitle}>{ui("Value exposure by age bucket")}</h3>
           {summaryQuery.data?.estimated_value_by_age_bucket?.length ? summaryQuery.data.estimated_value_by_age_bucket.map((bucket) => (
             <div key={bucket.age_bucket} style={styles.departmentRow}>
-              <span>{humanizeCode(bucket.age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.request_count)} open · urgent value {formatMoney(bucket.urgent_remaining_estimated_value_total)}</span></span>
-              <strong>{formatMoney(bucket.remaining_estimated_value_total)} remaining</strong>
+              <span>{humanizeCode(bucket.age_bucket)}<br /><span style={styles.muted}>{formatNumber(bucket.request_count)} {ui("open · urgent value")} {formatMoney(bucket.urgent_remaining_estimated_value_total)}</span></span>
+              <strong>{formatMoney(bucket.remaining_estimated_value_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No age-bucket value exposure.</p>}
+          )) : <p style={styles.muted}>{ui("No age-bucket value exposure.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>SLA breach risk</h3>
+          <h3 style={styles.sectionTitle}>{ui("SLA breach risk")}</h3>
           <div style={styles.compactMetrics}>
-            <div><strong>{formatNumber(summaryQuery.data?.sla_risk?.approval_sla_breach_count)}</strong><br /><span style={styles.muted}>Approval &gt; {formatNumber(summaryQuery.data?.sla_risk?.approval_sla_days || 2)}d</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.sla_risk?.fulfillment_sla_breach_count)}</strong><br /><span style={styles.muted}>Fulfillment &gt; {formatNumber(summaryQuery.data?.sla_risk?.fulfillment_sla_days || 3)}d</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.sla_risk?.due_date_breach_count)}</strong><br /><span style={styles.muted}>Past needed by</span></div>
-            <div><strong>{formatNumber(summaryQuery.data?.sla_risk?.urgent_stale_count)}</strong><br /><span style={styles.muted}>Urgent &gt; {formatNumber(summaryQuery.data?.sla_risk?.urgent_stale_hours || 24)}h</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.sla_risk?.approval_sla_breach_count)}</strong><br /><span style={styles.muted}>{ui("Approval >")} {formatNumber(summaryQuery.data?.sla_risk?.approval_sla_days || 2)}{ui("d")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.sla_risk?.fulfillment_sla_breach_count)}</strong><br /><span style={styles.muted}>{ui("Fulfillment >")} {formatNumber(summaryQuery.data?.sla_risk?.fulfillment_sla_days || 3)}{ui("d")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.sla_risk?.due_date_breach_count)}</strong><br /><span style={styles.muted}>{ui("Past needed by")}</span></div>
+            <div><strong>{formatNumber(summaryQuery.data?.sla_risk?.urgent_stale_count)}</strong><br /><span style={styles.muted}>{ui("Urgent >")} {formatNumber(summaryQuery.data?.sla_risk?.urgent_stale_hours || 24)}{ui("h")}</span></div>
           </div>
-          <p style={styles.muted}>Oldest actionable age: {formatNumber(summaryQuery.data?.sla_risk?.oldest_action_age_days)} days</p>
+          <p style={styles.muted}>{ui("Oldest actionable age:")} {formatNumber(summaryQuery.data?.sla_risk?.oldest_action_age_days)} {ui("days")}</p>
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Oldest SLA risk actions</h3>
+          <h3 style={styles.sectionTitle}>{ui("Oldest SLA risk actions")}</h3>
           {summaryQuery.data?.sla_risk_oldest?.length ? summaryQuery.data.sla_risk_oldest.slice(0, 5).map((request) => (
             <div key={request.id} style={styles.departmentRow}>
-              <span>{request.requisition_number}<br /><span style={styles.muted}>{humanizeCode(request.risk_reason)} · {humanizeCode(request.priority)} · {request.requesting_department || 'No department'} · needed {formatDate(request.needed_by)}</span></span>
-              <strong>{formatNumber(request.action_age_days)}d · {formatMoney(request.remaining_estimated_value_total)}</strong>
+              <span>{request.requisition_number}<br /><span style={styles.muted}>{humanizeCode(request.risk_reason)} · {humanizeCode(request.priority)} · {request.requesting_department || ui('No department')} {ui("· needed")} {formatDate(request.needed_by)}</span></span>
+              <strong>{formatNumber(request.action_age_days)}{ui("d ·")} {formatMoney(request.remaining_estimated_value_total)}</strong>
             </div>
-          )) : <p style={styles.muted}>No breached SLA actions.</p>}
+          )) : <p style={styles.muted}>{ui("No breached SLA actions.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>SLA risk by department</h3>
+          <h3 style={styles.sectionTitle}>{ui("SLA risk by department")}</h3>
           {summaryQuery.data?.top_sla_risk_departments?.length ? summaryQuery.data.top_sla_risk_departments.slice(0, 4).map((department) => (
             <div key={department.requesting_department} style={styles.departmentRow}>
-              <span>{department.requesting_department}<br /><span style={styles.muted}>{formatNumber(department.approval_sla_breach_count)} approval · {formatNumber(department.fulfillment_sla_breach_count)} fulfillment · {formatNumber(department.due_date_breach_count)} due · {formatNumber(department.urgent_stale_count)} urgent</span></span>
-              <strong>{formatNumber(department.at_risk_request_count)} at risk</strong>
+              <span>{department.requesting_department}<br /><span style={styles.muted}>{formatNumber(department.approval_sla_breach_count)} {ui("approval ·")} {formatNumber(department.fulfillment_sla_breach_count)} {ui("fulfillment ·")} {formatNumber(department.due_date_breach_count)} {ui("due ·")} {formatNumber(department.urgent_stale_count)} {ui("urgent")}</span></span>
+              <strong>{formatNumber(department.at_risk_request_count)} {ui("at risk")}</strong>
             </div>
-          )) : <p style={styles.muted}>No department-level SLA risk.</p>}
+          )) : <p style={styles.muted}>{ui("No department-level SLA risk.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>SLA risk by product</h3>
+          <h3 style={styles.sectionTitle}>{ui("SLA risk by product")}</h3>
           {summaryQuery.data?.top_sla_risk_products?.length ? summaryQuery.data.top_sla_risk_products.slice(0, 4).map((product) => (
             <div key={product.product_id} style={styles.departmentRow}>
-              <span>{product.product_name}<br /><span style={styles.muted}>{formatNumber(product.approval_sla_breach_count)} approval · {formatNumber(product.fulfillment_sla_breach_count)} fulfillment · {formatNumber(product.due_date_breach_count)} due · {formatNumber(product.urgent_stale_count)} urgent</span></span>
-              <strong>{formatNumber(product.at_risk_remaining_quantity)} {product.product_unit || 'units'} at risk</strong>
+              <span>{product.product_name}<br /><span style={styles.muted}>{formatNumber(product.approval_sla_breach_count)} {ui("approval ·")} {formatNumber(product.fulfillment_sla_breach_count)} {ui("fulfillment ·")} {formatNumber(product.due_date_breach_count)} {ui("due ·")} {formatNumber(product.urgent_stale_count)} {ui("urgent")}</span></span>
+              <strong>{formatNumber(product.at_risk_remaining_quantity)} {product.product_unit || ui('units')} {ui("at risk")}</strong>
             </div>
-          )) : <p style={styles.muted}>No product-level SLA risk.</p>}
+          )) : <p style={styles.muted}>{ui("No product-level SLA risk.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>SLA risk by requester</h3>
+          <h3 style={styles.sectionTitle}>{ui("SLA risk by requester")}</h3>
           {summaryQuery.data?.top_sla_risk_requesters?.length ? summaryQuery.data.top_sla_risk_requesters.slice(0, 4).map((requester) => (
             <div key={requester.requester_user_id || requester.requester_user_name} style={styles.departmentRow}>
-              <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.approval_sla_breach_count)} approval · {formatNumber(requester.fulfillment_sla_breach_count)} fulfillment · {formatNumber(requester.due_date_breach_count)} due · {formatNumber(requester.urgent_stale_count)} urgent</span></span>
-              <strong>{formatNumber(requester.at_risk_request_count)} at risk</strong>
+              <span>{requester.requester_user_name}<br /><span style={styles.muted}>{formatNumber(requester.approval_sla_breach_count)} {ui("approval ·")} {formatNumber(requester.fulfillment_sla_breach_count)} {ui("fulfillment ·")} {formatNumber(requester.due_date_breach_count)} {ui("due ·")} {formatNumber(requester.urgent_stale_count)} {ui("urgent")}</span></span>
+              <strong>{formatNumber(requester.at_risk_request_count)} {ui("at risk")}</strong>
             </div>
-          )) : <p style={styles.muted}>No requester-level SLA risk.</p>}
+          )) : <p style={styles.muted}>{ui("No requester-level SLA risk.")}</p>}
         </div>
         <div style={styles.card}>
-          <h3 style={styles.sectionTitle}>Priority demand</h3>
+          <h3 style={styles.sectionTitle}>{ui("Priority demand")}</h3>
           {summaryQuery.data?.priority_breakdown?.length ? summaryQuery.data.priority_breakdown.map((priority) => (
             <div key={priority.priority} style={styles.departmentRow}>
-              <span><span style={statusStyle(priority.priority)}>{humanizeCode(priority.priority)}</span><br /><span style={styles.muted}>{formatNumber(priority.request_count)} open · {formatNumber(priority.overdue_count)} overdue · {formatNumber(priority.due_soon_count)} due soon</span></span>
-              <strong>{formatNumber(priority.remaining_quantity_total)} remaining</strong>
+              <span><span style={statusStyle(priority.priority)}>{humanizeCode(priority.priority)}</span><br /><span style={styles.muted}>{formatNumber(priority.request_count)} {ui("open ·")} {formatNumber(priority.overdue_count)} {ui("overdue ·")} {formatNumber(priority.due_soon_count)} {ui("due soon")}</span></span>
+              <strong>{formatNumber(priority.remaining_quantity_total)} {ui("remaining")}</strong>
             </div>
-          )) : <p style={styles.muted}>No open priority demand.</p>}
+          )) : <p style={styles.muted}>{ui("No open priority demand.")}</p>}
         </div>
         </section>
       </details>
@@ -3174,14 +3185,14 @@ export default function InventoryRequisitionsPage() {
           <div style={styles.sectionHeaderBlock}>
             <OperationalSectionHeader
               iconPath="/inventory-requisitions"
-              title={editingDraftId ? 'Edit draft request' : 'Create request'}
-              description="Build an internal demand request with department, location, priority, date, and product quantities."
-              actions={editingDraftId ? <button type="button" style={styles.secondaryButton} onClick={cancelDraftEditing}>Cancel edit</button> : undefined}
+              title={editingDraftId ? ui('Edit draft request') : ui('Create request')}
+              description={ui('Build an internal demand request with department, location, priority, date, and product quantities.')}
+              actions={editingDraftId ? <button type="button" style={styles.secondaryButton} onClick={cancelDraftEditing}>{ui('Cancel edit')}</button> : undefined}
             />
           </div>
           <div style={styles.twoColumns}>
             <label style={styles.field}>
-              Requesting department
+              {ui('Requesting department')}
               <input
                 style={styles.input}
                 list="requisition-requesting-departments"
@@ -3191,7 +3202,7 @@ export default function InventoryRequisitionsPage() {
               />
             </label>
             <label style={styles.field}>
-              Target department
+              {ui('Target department')}
               <input
                 style={styles.input}
                 list="requisition-target-departments"
@@ -3200,46 +3211,46 @@ export default function InventoryRequisitionsPage() {
               />
             </label>
             <label style={styles.field}>
-              Source location
+              {ui('Source location')}
               <select
                 style={styles.input}
                 value={form.source_storage_location_id}
                 onChange={(event) => setForm((current) => ({ ...current, source_storage_location_id: event.target.value }))}
               >
-                <option value="">Use during fulfillment</option>
+                <option value="">{ui('Use during fulfillment')}</option>
                 {activeLocationOptions.map((location) => (
-                  <option key={location.id} value={location.id}>{location.name}{location.retired ? ' (retired)' : ''}</option>
+                  <option key={location.id} value={location.id}>{location.name}{location.retired ? ` (${ui('retired')})` : ''}</option>
                 ))}
               </select>
             </label>
             <label style={styles.field}>
-              Target location
+              {ui('Target location')}
               <select
                 style={styles.input}
                 value={form.target_storage_location_id}
                 onChange={(event) => setForm((current) => ({ ...current, target_storage_location_id: event.target.value }))}
               >
-                <option value="">No target location</option>
+                <option value="">{ui('No target location')}</option>
                 {activeLocationOptions.map((location) => (
-                  <option key={location.id} value={location.id}>{location.name}{location.retired ? ' (retired)' : ''}</option>
+                  <option key={location.id} value={location.id}>{location.name}{location.retired ? ` (${ui('retired')})` : ''}</option>
                 ))}
               </select>
             </label>
             <label style={styles.field}>
-              Priority
+              {ui('Priority')}
               <select
                 style={styles.input}
                 value={form.priority}
                 onChange={(event) => setForm((current) => ({ ...current, priority: event.target.value as RequisitionFormState['priority'] }))}
               >
-                <option value="low">Low</option>
-                <option value="normal">Normal</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
+                <option value="low">{ui('Low')}</option>
+                <option value="normal">{ui('Normal')}</option>
+                <option value="high">{ui('High')}</option>
+                <option value="urgent">{ui('Urgent')}</option>
               </select>
             </label>
             <label style={styles.field}>
-              Needed by
+              {ui('Needed by')}
               <input
                 style={styles.input}
                 type="date"
@@ -3249,7 +3260,7 @@ export default function InventoryRequisitionsPage() {
             </label>
           </div>
           <label style={styles.field}>
-            Notes
+            {ui('Notes')}
             <textarea
               style={styles.textarea}
               value={form.notes}
@@ -3258,8 +3269,8 @@ export default function InventoryRequisitionsPage() {
           </label>
 
           <div style={styles.lineHeader}>
-            <h4 style={styles.subsectionTitle}>Items</h4>
-            <button type="button" style={styles.secondaryButton} onClick={addFormLine}>Add line</button>
+            <h4 style={styles.subsectionTitle}>{ui('Items')}</h4>
+            <button type="button" style={styles.secondaryButton} onClick={addFormLine}>{ui('Add line')}</button>
           </div>
           {form.items.map((item, index) => (
             <div key={index} style={styles.lineGrid}>
@@ -3269,9 +3280,9 @@ export default function InventoryRequisitionsPage() {
                 onChange={(event) => { updateFormLine(index, 'product_id', event.target.value); updateFormLine(index, 'uom_code', ''); }}
                 required
               >
-                <option value="">Select product</option>
+                <option value="">{ui('Select product')}</option>
                 {createProductOptions.map((product) => (
-                  <option key={product.id} value={product.id} disabled={form.items.some((otherItem, otherIndex) => otherIndex !== index && otherItem.product_id === product.id)}>{product.name} ({product.unit}){product.retired ? ' (retired)' : ''}</option>
+                  <option key={product.id} value={product.id} disabled={form.items.some((otherItem, otherIndex) => otherIndex !== index && otherItem.product_id === product.id)}>{product.name} ({product.unit}){product.retired ? ` (${ui('retired')})` : ''}</option>
                 ))}
               </select>
               <input
@@ -3279,7 +3290,7 @@ export default function InventoryRequisitionsPage() {
                 type="number"
                 min="0.0001"
                 step="0.0001"
-                placeholder="Qty"
+                placeholder={ui('Qty')}
                 value={item.requested_quantity}
                 onChange={(event) => updateFormLine(index, 'requested_quantity', event.target.value)}
                 required
@@ -3290,36 +3301,36 @@ export default function InventoryRequisitionsPage() {
                 purpose="issue"
                 onChange={(value) => updateFormLine(index, 'uom_code', value)}
                 style={styles.lineQuantityInput}
-                ariaLabel={`Unit of measure for requisition line ${index + 1}`}
+                ariaLabel={`${ui('Unit of measure for requisition line')} ${formatNumber(index + 1)}`}
               />
               <input
                 style={styles.lineNotesInput}
-                placeholder="Line notes"
+                placeholder={ui('Line notes')}
                 value={item.notes}
                 onChange={(event) => updateFormLine(index, 'notes', event.target.value)}
               />
-              <button type="button" style={styles.lineRemoveButton} onClick={() => removeFormLine(index)}>Remove</button>
+              <button type="button" style={styles.lineRemoveButton} onClick={() => removeFormLine(index)}>{ui('Remove')}</button>
             </div>
           ))}
-          {draftHasStarted && !draftDepartmentValid && <p style={styles.warningBox}>Enter the requesting department.</p>}
-          {draftHasStarted && !draftItemsValid && <p style={styles.warningBox}>Every request line needs a product and a quantity greater than zero.</p>}
-          {draftHasDuplicateProducts && <p style={styles.warningBox}>The same product cannot appear more than once in a request. Combine duplicate quantities into one line.</p>}
+          {draftHasStarted && !draftDepartmentValid && <p style={styles.warningBox}>{ui('Enter the requesting department.')}</p>}
+          {draftHasStarted && !draftItemsValid && <p style={styles.warningBox}>{ui('Every request line needs a product and a quantity greater than zero.')}</p>}
+          {draftHasDuplicateProducts && <p style={styles.warningBox}>{ui('The same product cannot appear more than once in a request. Combine duplicate quantities into one line.')}</p>}
           {draftSaveThresholdGoverned && !editedDraftNotesMeetThresholdDepth && (
-            <p style={styles.warningBox}>Draft notes of at least {draftSaveThresholdNoteMinLength} characters are required to save this {approvalThresholdLabel(draftSaveThresholdLevel)} request ({approvalThresholdReasonLabel(draftSaveThresholdReason)} · {editedDraftNotesLength}/{draftSaveThresholdNoteMinLength}).</p>
+            <p style={styles.warningBox}>{ui('Draft notes of at least')} {formatNumber(draftSaveThresholdNoteMinLength)} {ui('characters are required to save this')} {approvalThresholdLabel(draftSaveThresholdLevel)} {ui('request')} ({approvalThresholdReasonLabel(draftSaveThresholdReason)} · {formatNumber(editedDraftNotesLength)}/{formatNumber(draftSaveThresholdNoteMinLength)}).</p>
           )}
           {draftSaveThresholdGoverned && !editedDraftLineNotesMeetThresholdDepth && (
-            <p style={styles.warningBox}>Each draft request line needs notes of at least {draftSaveThresholdNoteMinLength} characters to save this {approvalThresholdLabel(draftSaveThresholdLevel)} request ({editedDraftLineNotesBelowMinimumCount} line{editedDraftLineNotesBelowMinimumCount === 1 ? '' : 's'} below minimum).</p>
+            <p style={styles.warningBox}>{ui('Each draft request line needs notes of at least')} {formatNumber(draftSaveThresholdNoteMinLength)} {ui('characters to save this')} {approvalThresholdLabel(draftSaveThresholdLevel)} {ui('request')} ({formatNumber(editedDraftLineNotesBelowMinimumCount)} {editedDraftLineNotesBelowMinimumCount === 1 ? ui('line below minimum') : ui('lines below minimum')}).</p>
           )}
           <button style={styles.primaryButton} type="submit" disabled={saveDraftMutation.isPending || !canSaveDraft}>
-            {saveDraftMutation.isPending ? 'Saving…' : editingDraftId ? 'Save draft changes' : 'Create draft requisition'}
+            {saveDraftMutation.isPending ? ui('Saving…') : editingDraftId ? ui('Save draft changes') : ui('Create draft requisition')}
           </button>
         </form>
         ) : (
           <section className="app-panel app-panel--padded" style={styles.sideCard}>
             <OperationalSectionHeader
               iconPath="/inventory-requisitions"
-              title="Request creation"
-              description="You have read-only requisition access. You can review requests and their audit history, but you cannot create or edit drafts."
+              title={ui('Request creation')}
+              description={ui('You have read-only requisition access. You can review requests and their audit history, but you cannot create or edit drafts.')}
             />
           </section>
         )}
@@ -3328,8 +3339,8 @@ export default function InventoryRequisitionsPage() {
           <div style={styles.sectionHeaderBlock}>
             <OperationalSectionHeader
               iconPath="/inventory-requisitions"
-              title="Request queue"
-              description="Search and review requisitions, then open one for approval, fulfillment, cancellation, or audit work."
+              title={ui('Request queue')}
+              description={ui('Search and review requisitions, then open one for approval, fulfillment, cancellation, or audit work.')}
             />
           </div>
           <div style={styles.queueFilterPanel}>
@@ -3338,22 +3349,22 @@ export default function InventoryRequisitionsPage() {
                   style={styles.smallInput}
                   value={queueSearch}
                   onChange={(event) => setQueueSearch(event.target.value)}
-                  placeholder="Search request, department, notes, or product"
+                  placeholder={ui('Search request, department, notes, or product')}
                 />
                 <select style={styles.smallSelect} value={status} onChange={(event) => setStatus(event.target.value)}>
-                  <option value="">All statuses</option>
-                  <option value="draft">Draft</option>
-                  <option value="submitted">Submitted</option>
-                  <option value="approved">Approved</option>
-                  <option value="partially_fulfilled">Partially fulfilled</option>
-                  <option value="fulfilled">Fulfilled</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="cancelled">Cancelled</option>
+                  <option value="">{ui('All statuses')}</option>
+                  <option value="draft">{ui('Draft')}</option>
+                  <option value="submitted">{ui('Submitted')}</option>
+                  <option value="approved">{ui('Approved')}</option>
+                  <option value="partially_fulfilled">{ui('Partially fulfilled')}</option>
+                  <option value="fulfilled">{ui('Fulfilled')}</option>
+                  <option value="rejected">{ui('Rejected')}</option>
+                  <option value="cancelled">{ui('Cancelled')}</option>
                 </select>
                 <select style={styles.smallSelect} value={productFilter} onChange={(event) => setProductFilter(event.target.value)}>
-                  <option value="">All products</option>
+                  <option value="">{ui('All products')}</option>
                   {filterProductOptions.map((product) => (
-                    <option key={product.id} value={product.id}>{product.name}{product.retired ? ' (retired)' : ''}</option>
+                    <option key={product.id} value={product.id}>{product.name}{product.retired ? ` (${ui('retired')})` : ''}</option>
                   ))}
                 </select>
                 <button
@@ -3361,10 +3372,10 @@ export default function InventoryRequisitionsPage() {
                   style={styles.secondaryButton}
                   onClick={() => setShowAdvancedFilters((current) => !current)}
                 >
-                  {showAdvancedFilters ? 'Hide advanced filters' : 'Advanced filters'}
+                  {showAdvancedFilters ? ui('Hide advanced filters') : ui('Advanced filters')}
                 </button>
                 {filtersActive && (
-                  <button type="button" style={styles.secondaryButton} onClick={clearQueueFilters}>Clear filters</button>
+                  <button type="button" style={styles.secondaryButton} onClick={clearQueueFilters}>{ui('Clear filters')}</button>
                 )}
                 <button
                   type="button"
@@ -3372,7 +3383,7 @@ export default function InventoryRequisitionsPage() {
                   onClick={() => exportQueueMutation.mutate()}
                   disabled={exportQueueMutation.isPending || Boolean(queueFilterError)}
                 >
-                  {exportQueueMutation.isPending ? 'Exporting…' : 'Export queue CSV'}
+                  {exportQueueMutation.isPending ? ui('Exporting…') : ui('Export queue CSV')}
                 </button>
               </div>
               {showAdvancedFilters && (
@@ -3382,109 +3393,109 @@ export default function InventoryRequisitionsPage() {
                     value={departmentFilter}
                     list="requisition-requesting-departments"
                     onChange={(event) => setDepartmentFilter(event.target.value)}
-                    placeholder="Requesting department"
+                    placeholder={ui('Requesting department')}
                   />
                   <input
                     style={styles.smallInput}
                     value={targetDepartmentFilter}
                     list="requisition-target-departments"
                     onChange={(event) => setTargetDepartmentFilter(event.target.value)}
-                    placeholder="Target department"
+                    placeholder={ui('Target department')}
                   />
                   <select style={styles.smallSelect} value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}>
-                    <option value="">All priorities</option>
-                    <option value="low">Low</option>
-                    <option value="normal">Normal</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
+                    <option value="">{ui('All priorities')}</option>
+                    <option value="low">{ui('Low')}</option>
+                    <option value="normal">{ui('Normal')}</option>
+                    <option value="high">{ui('High')}</option>
+                    <option value="urgent">{ui('Urgent')}</option>
                   </select>
                   <select style={styles.smallSelect} value={dueState} onChange={(event) => setDueState(event.target.value)}>
-                    <option value="">All due states</option>
-                    <option value="open">Open only</option>
-                    <option value="overdue">Overdue</option>
-                    <option value="due_soon">Due soon</option>
+                    <option value="">{ui('All due states')}</option>
+                    <option value="open">{ui('Open only')}</option>
+                    <option value="overdue">{ui('Overdue')}</option>
+                    <option value="due_soon">{ui('Due soon')}</option>
                   </select>
                   <select style={styles.smallSelect} value={fulfillmentState} onChange={(event) => setFulfillmentState(event.target.value)}>
-                    <option value="">All fulfillment</option>
-                    <option value="unfulfilled">Unfulfilled</option>
-                    <option value="partially_fulfilled">Partially fulfilled</option>
-                    <option value="stale_partial">Stale partials</option>
-                    <option value="complete">Complete</option>
+                    <option value="">{ui('All fulfillment')}</option>
+                    <option value="unfulfilled">{ui('Unfulfilled')}</option>
+                    <option value="partially_fulfilled">{ui('Partially fulfilled')}</option>
+                    <option value="stale_partial">{ui('Stale partials')}</option>
+                    <option value="complete">{ui('Complete')}</option>
                   </select>
                   <select style={styles.smallSelect} value={slaState} onChange={(event) => setSlaState(event.target.value)}>
-                    <option value="">All SLA states</option>
-                    <option value="approval_breached">Approval SLA breached</option>
-                    <option value="fulfillment_breached">Fulfillment SLA breached</option>
-                    <option value="due_breached">Past needed-by date</option>
-                    <option value="urgent_stale">Urgent stale</option>
+                    <option value="">{ui('All SLA states')}</option>
+                    <option value="approval_breached">{ui('Approval SLA breached')}</option>
+                    <option value="fulfillment_breached">{ui('Fulfillment SLA breached')}</option>
+                    <option value="due_breached">{ui('Past needed-by date')}</option>
+                    <option value="urgent_stale">{ui('Urgent stale')}</option>
                   </select>
                   <select style={styles.smallSelect} value={ageBucket} onChange={(event) => setAgeBucket(event.target.value)}>
-                    <option value="">All age buckets</option>
-                    <option value="under_24h">Open under 24h</option>
-                    <option value="one_to_three_days">Open 1-3 days</option>
-                    <option value="three_to_seven_days">Open 3-7 days</option>
-                    <option value="over_seven_days">Open over 7 days</option>
+                    <option value="">{ui('All age buckets')}</option>
+                    <option value="under_24h">{ui('Open under 24h')}</option>
+                    <option value="one_to_three_days">{ui('Open 1-3 days')}</option>
+                    <option value="three_to_seven_days">{ui('Open 3-7 days')}</option>
+                    <option value="over_seven_days">{ui('Open over 7 days')}</option>
                   </select>
                   <select style={styles.smallSelect} value={approvalThresholdLevel} onChange={(event) => setApprovalThresholdLevel(event.target.value)}>
-                    <option value="">All approval thresholds</option>
-                    <option value="standard">Standard approvals</option>
-                    <option value="elevated">Elevated approvals</option>
-                    <option value="executive_value">Executive value approvals</option>
+                    <option value="">{ui('All approval thresholds')}</option>
+                    <option value="standard">{ui('Standard approvals')}</option>
+                    <option value="elevated">{ui('Elevated approvals')}</option>
+                    <option value="executive_value">{ui('Executive value approvals')}</option>
                   </select>
                   <select style={styles.smallSelect} value={approvalThresholdReason} onChange={(event) => setApprovalThresholdReason(event.target.value)}>
-                    <option value="">All threshold reasons</option>
-                    <option value="standard">Standard approval</option>
-                    <option value="high_priority">High priority threshold</option>
-                    <option value="high_value">High value threshold</option>
-                    <option value="executive_value">Executive value threshold</option>
+                    <option value="">{ui('All threshold reasons')}</option>
+                    <option value="standard">{ui('Standard approval')}</option>
+                    <option value="high_priority">{ui('High priority threshold')}</option>
+                    <option value="high_value">{ui('High value threshold')}</option>
+                    <option value="executive_value">{ui('Executive value threshold')}</option>
                   </select>
                   <select style={styles.smallSelect} value={approvalThresholdWatch} onChange={(event) => setApprovalThresholdWatch(event.target.value)}>
-                    <option value="">All threshold watchlist</option>
-                    <option value="near_high_value">Near high-value threshold</option>
-                    <option value="near_executive_value">Near executive threshold</option>
-                    <option value="any_near_threshold">Any near-threshold</option>
+                    <option value="">{ui('All threshold watchlist')}</option>
+                    <option value="near_high_value">{ui('Near high-value threshold')}</option>
+                    <option value="near_executive_value">{ui('Near executive threshold')}</option>
+                    <option value="any_near_threshold">{ui('Any near-threshold')}</option>
                   </select>
                   <select style={styles.smallSelect} value={approvalThresholdNextLevel} onChange={(event) => setApprovalThresholdNextLevel(event.target.value)}>
-                    <option value="">All next thresholds</option>
-                    <option value="high_value">Next: high value</option>
-                    <option value="executive_value">Next: executive value</option>
-                    <option value="none">No next threshold</option>
+                    <option value="">{ui('All next thresholds')}</option>
+                    <option value="high_value">{ui('Next: high value')}</option>
+                    <option value="executive_value">{ui('Next: executive value')}</option>
+                    <option value="none">{ui('No next threshold')}</option>
                   </select>
                   <select style={styles.smallSelect} value={approvalThresholdNoteDepthState} onChange={(event) => setApprovalThresholdNoteDepthState(event.target.value)}>
-                    <option value="">All note-depth states</option>
-                    <option value="complete">Threshold notes complete</option>
-                    <option value="incomplete">Threshold notes incomplete</option>
+                    <option value="">{ui('All note-depth states')}</option>
+                    <option value="complete">{ui('Threshold notes complete')}</option>
+                    <option value="incomplete">{ui('Threshold notes incomplete')}</option>
                   </select>
-                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={minApprovalThresholdGapFilter} onChange={(event) => setMinApprovalThresholdGapFilter(event.target.value)} placeholder="Min threshold gap" />
-                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={maxApprovalThresholdGapFilter} onChange={(event) => setMaxApprovalThresholdGapFilter(event.target.value)} placeholder="Max threshold gap" />
-                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={minRemainingValueFilter} onChange={(event) => setMinRemainingValueFilter(event.target.value)} placeholder="Min remaining value" />
-                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={maxRemainingValueFilter} onChange={(event) => setMaxRemainingValueFilter(event.target.value)} placeholder="Max remaining value" />
-                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={minRemainingQuantityFilter} onChange={(event) => setMinRemainingQuantityFilter(event.target.value)} placeholder="Min remaining qty" />
-                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={maxRemainingQuantityFilter} onChange={(event) => setMaxRemainingQuantityFilter(event.target.value)} placeholder="Max remaining qty" />
+                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={minApprovalThresholdGapFilter} onChange={(event) => setMinApprovalThresholdGapFilter(event.target.value)} placeholder={ui('Min threshold gap')} />
+                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={maxApprovalThresholdGapFilter} onChange={(event) => setMaxApprovalThresholdGapFilter(event.target.value)} placeholder={ui('Max threshold gap')} />
+                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={minRemainingValueFilter} onChange={(event) => setMinRemainingValueFilter(event.target.value)} placeholder={ui('Min remaining value')} />
+                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={maxRemainingValueFilter} onChange={(event) => setMaxRemainingValueFilter(event.target.value)} placeholder={ui('Max remaining value')} />
+                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={minRemainingQuantityFilter} onChange={(event) => setMinRemainingQuantityFilter(event.target.value)} placeholder={ui('Min remaining qty')} />
+                  <input style={styles.smallInput} type="number" min="0" step="0.01" value={maxRemainingQuantityFilter} onChange={(event) => setMaxRemainingQuantityFilter(event.target.value)} placeholder={ui('Max remaining qty')} />
                   <select style={styles.smallSelect} value={sourceLocationFilter} onChange={(event) => setSourceLocationFilter(event.target.value)}>
-                    <option value="">All source locations</option>
+                    <option value="">{ui('All source locations')}</option>
                     {filterLocationOptions.map((location) => (
-                      <option key={location.id} value={location.id}>{location.name}{location.retired ? ' (retired)' : ''}</option>
+                      <option key={location.id} value={location.id}>{location.name}{location.retired ? ` (${ui('retired')})` : ''}</option>
                     ))}
                   </select>
                   <select style={styles.smallSelect} value={targetLocationFilter} onChange={(event) => setTargetLocationFilter(event.target.value)}>
-                    <option value="">All target locations</option>
+                    <option value="">{ui('All target locations')}</option>
                     {filterLocationOptions.map((location) => (
-                      <option key={location.id} value={location.id}>{location.name}{location.retired ? ' (retired)' : ''}</option>
+                      <option key={location.id} value={location.id}>{location.name}{location.retired ? ` (${ui('retired')})` : ''}</option>
                     ))}
                   </select>
                   <select style={styles.smallSelect} value={requesterFilter} onChange={(event) => setRequesterFilter(event.target.value)}>
-                    <option value="">All requesters</option>
+                    <option value="">{ui('All requesters')}</option>
                     {(optionsQuery.data?.requesters || []).map((requester) => (
                       <option key={requester.id} value={requester.id}>{requester.name}</option>
                     ))}
                   </select>
-                  <input style={styles.smallInput} type="date" value={neededByFromFilter} onChange={(event) => setNeededByFromFilter(event.target.value)} aria-label="Needed by from" title="Needed by from" />
-                  <input style={styles.smallInput} type="date" value={neededByToFilter} onChange={(event) => setNeededByToFilter(event.target.value)} aria-label="Needed by to" title="Needed by to" />
-                  <input style={styles.smallInput} type="date" value={createdFromFilter} onChange={(event) => setCreatedFromFilter(event.target.value)} aria-label="Created from" title="Created from" />
-                  <input style={styles.smallInput} type="date" value={createdToFilter} onChange={(event) => setCreatedToFilter(event.target.value)} aria-label="Created to" title="Created to" />
+                  <input style={styles.smallInput} type="date" value={neededByFromFilter} onChange={(event) => setNeededByFromFilter(event.target.value)} aria-label={ui('Needed by from')} title={ui('Needed by from')} />
+                  <input style={styles.smallInput} type="date" value={neededByToFilter} onChange={(event) => setNeededByToFilter(event.target.value)} aria-label={ui('Needed by to')} title={ui('Needed by to')} />
+                  <input style={styles.smallInput} type="date" value={createdFromFilter} onChange={(event) => setCreatedFromFilter(event.target.value)} aria-label={ui('Created from')} title={ui('Created from')} />
+                  <input style={styles.smallInput} type="date" value={createdToFilter} onChange={(event) => setCreatedToFilter(event.target.value)} aria-label={ui('Created to')} title={ui('Created to')} />
                   <select style={styles.smallSelect} value={productCategoryFilter} onChange={(event) => setProductCategoryFilter(event.target.value)}>
-                    <option value="">All product categories</option>
+                    <option value="">{ui('All product categories')}</option>
                     {productCategoryOptions.map((category) => (
                       <option key={category} value={category}>{category}</option>
                     ))}
@@ -3496,8 +3507,8 @@ export default function InventoryRequisitionsPage() {
           {capabilities.canFulfillInventoryRequisitions && bulkEligibleRequisitions.length > 0 && (
             <div style={styles.bulkFulfillmentPanel}>
               <div style={styles.lineHeader}>
-                <h4 style={styles.sectionTitle}>Bulk fulfill selected requests</h4>
-                <span style={styles.muted}>{formatNumber(bulkFulfillmentIds.filter((id) => visibleBulkFulfillmentIds.has(id)).length)} selected</span>
+                <h4 style={styles.sectionTitle}>{ui('Bulk fulfill selected requests')}</h4>
+                <span style={styles.muted}>{formatNumber(bulkFulfillmentIds.filter((id) => visibleBulkFulfillmentIds.has(id)).length)} {ui('selected')}</span>
               </div>
               <div style={styles.filterRow}>
                 <select
@@ -3505,16 +3516,16 @@ export default function InventoryRequisitionsPage() {
                   value={bulkFulfillmentLocationId}
                   onChange={(event) => setBulkFulfillmentLocationId(event.target.value)}
                 >
-                  <option value="">Use each request source location</option>
+                  <option value="">{ui('Use each request source location')}</option>
                   {activeLocationOptions.map((location) => (
-                    <option key={location.id} value={location.id}>{location.name}{location.retired ? ' (retired)' : ''}</option>
+                    <option key={location.id} value={location.id}>{location.name}{location.retired ? ` (${ui('retired')})` : ''}</option>
                   ))}
                 </select>
                 <input
                   style={styles.searchInput}
                   value={bulkFulfillmentNote}
                   onChange={(event) => setBulkFulfillmentNote(event.target.value)}
-                  placeholder={bulkThresholdGoverned ? `Default note, ${bulkApprovalThresholdNoteMinLength}+ chars for threshold requests` : 'Default fulfillment note for all remaining lines'}
+                  placeholder={bulkThresholdGoverned ? `${ui('Default note,')} ${formatNumber(bulkApprovalThresholdNoteMinLength)}+ ${ui('characters for threshold requests')}` : ui('Default fulfillment note for all remaining lines')}
                 />
                 <button
                   type="button"
@@ -3522,84 +3533,84 @@ export default function InventoryRequisitionsPage() {
                   disabled={!canBulkFulfill || bulkFulfillmentMutation.isPending}
                   onClick={() => bulkFulfillmentMutation.mutate()}
                 >
-                  {bulkFulfillmentMutation.isPending ? 'Bulk fulfilling…' : 'Fulfill all remaining'}
+                  {bulkFulfillmentMutation.isPending ? ui('Bulk fulfilling…') : ui('Fulfill all remaining')}
                 </button>
                 {bulkFulfillmentIds.length > 0 && (
-                  <button type="button" style={styles.secondaryButton} onClick={clearBulkFulfillmentSelection}>Clear bulk selection</button>
+                  <button type="button" style={styles.secondaryButton} onClick={clearBulkFulfillmentSelection}>{ui('Clear bulk selection')}</button>
                 )}
               </div>
-              {bulkIneligibleCount > 0 && <p style={styles.warningBox}>{formatNumber(bulkIneligibleCount)} selected request(s) are not approved or partially fulfilled.</p>}
+              {bulkIneligibleCount > 0 && <p style={styles.warningBox}>{formatNumber(bulkIneligibleCount)} {ui('selected request(s) are not approved or partially fulfilled.')}</p>}
               {bulkThresholdGoverned && !bulkFulfillmentNoteMeetsThreshold && (
-                <p style={styles.warningBox}>Bulk threshold fulfillment requires a default note of at least {bulkApprovalThresholdNoteMinLength} characters ({bulkFulfillmentNoteLength}/{bulkApprovalThresholdNoteMinLength}).</p>
+                <p style={styles.warningBox}>{ui('Bulk threshold fulfillment requires a default note of at least')} {formatNumber(bulkApprovalThresholdNoteMinLength)} {ui('characters')} ({formatNumber(bulkFulfillmentNoteLength)}/{formatNumber(bulkApprovalThresholdNoteMinLength)}).</p>
               )}
               {bulkEligibleRequisitions.length > 0 && (
                 <div style={bulkReadinessBlocksFulfillment ? styles.errorBox : styles.readinessPanel}>
                   <div style={styles.lineHeader}>
-                    <strong>Bulk readiness preview</strong>
+                    <strong>{ui('Bulk readiness preview')}</strong>
                     <span style={styles.inlineActions}>
-                      {bulkReadinessQuery.isFetching && <span style={styles.muted}>Checking selected requests…</span>}
+                      {bulkReadinessQuery.isFetching && <span style={styles.muted}>{ui('Checking selected requests…')}</span>}
                       {bulkReadinessQuery.data?.results?.length ? (
-                        <button type="button" style={styles.secondaryButtonSmall} onClick={exportBulkReadinessResults}>Export readiness CSV</button>
+                        <button type="button" style={styles.secondaryButtonSmall} onClick={exportBulkReadinessResults}>{ui('Export readiness CSV')}</button>
                       ) : null}
                     </span>
                   </div>
                   {bulkReadinessQuery.data ? (
                     <>
                       <p style={styles.muted}>
-                        {formatNumber(bulkReadinessQuery.data.ready_requisition_count)} ready · {formatNumber(bulkReadinessQuery.data.blocked_requisition_count)} blocked · {formatNumber(bulkReadinessQuery.data.warning_count)} warning(s)
+                        {formatNumber(bulkReadinessQuery.data.ready_requisition_count)} {ui('ready ·')} {formatNumber(bulkReadinessQuery.data.blocked_requisition_count)} {ui('blocked ·')} {formatNumber(bulkReadinessQuery.data.warning_count)} {ui('warning(s)')}
                       </p>
                       {bulkReadinessQuery.data.approval_threshold_governed_requisition_count !== undefined && (
                         <p style={styles.muted}>
-                          {formatNumber(bulkReadinessQuery.data.approval_threshold_governed_requisition_count)} threshold-governed · {formatNumber(bulkReadinessQuery.data.threshold_fulfillment_line_note_below_minimum_count)} fulfillment line note(s) below minimum
+                          {formatNumber(bulkReadinessQuery.data.approval_threshold_governed_requisition_count)} {ui('threshold-governed ·')} {formatNumber(bulkReadinessQuery.data.threshold_fulfillment_line_note_below_minimum_count)} {ui('fulfillment line note(s) below minimum')}
                         </p>
                       )}
                       {bulkReadinessQuery.data.blocked_requisition_numbers?.length ? (
-                        <p style={styles.warningText}>Blocked: {bulkReadinessQuery.data.blocked_requisition_numbers.join(', ')}</p>
+                        <p style={styles.warningText}>{ui('Blocked:')} {bulkReadinessQuery.data.blocked_requisition_numbers.join(', ')}</p>
                       ) : null}
                       {Object.entries(bulkReadinessQuery.data.blocker_code_counts || {}).length > 0 && (
-                        <p style={styles.warningText}>Blockers: {Object.entries(bulkReadinessQuery.data.blocker_code_counts || {}).map(([code, count]) => `${humanizeCode(code)} (${formatNumber(count)})`).join(', ')}</p>
+                        <p style={styles.warningText}>{ui('Blockers:')} {Object.entries(bulkReadinessQuery.data.blocker_code_counts || {}).map(([code, count]) => `${humanizeCode(code)} (${formatNumber(count)})`).join(', ')}</p>
                       )}
                       {bulkReadinessQuery.data.results?.length ? (
                         <div style={styles.bulkReadinessResultList}>
                           {bulkReadinessQuery.data.results.slice(0, 8).map((result, index) => (
                             <div key={result.requisition_id || result.requisition_number || index} style={result.ready ? styles.bulkReadinessResultReady : styles.bulkReadinessResultBlocked}>
-                              <strong>{result.requisition_number || result.requisition_id || `Selected request ${index + 1}`}</strong>
-                              <span>{result.ready ? 'Ready' : 'Blocked'} · {formatNumber(result.lines?.filter((line) => line.ready).length || 0)} ready line(s) · {formatNumber(result.lines?.length || 0)} total line(s)</span>
+                              <strong>{result.requisition_number || result.requisition_id || `${ui('Selected request')} ${formatNumber(index + 1)}`}</strong>
+                              <span>{result.ready ? ui('Ready') : ui('Blocked')} · {formatNumber(result.lines?.filter((line) => line.ready).length || 0)} {ui('ready line(s) ·')} {formatNumber(result.lines?.length || 0)} {ui('total line(s)')}</span>
                               {result.approval_threshold_notes_required && (
-                                <span>Threshold-governed · line note minimum {formatNumber(result.threshold_fulfillment_line_note_min_length)} · below minimum {formatNumber(result.threshold_fulfillment_line_note_below_minimum_count)}</span>
+                                <span>{ui('Threshold-governed · line note minimum')} {formatNumber(result.threshold_fulfillment_line_note_min_length)} · {ui('below minimum')} {formatNumber(result.threshold_fulfillment_line_note_below_minimum_count)}</span>
                               )}
                               {result.blockers?.length ? (
-                                <span style={styles.warningText}>Blockers: {result.blockers.slice(0, 3).map((blocker) => humanizeCode(blocker.code)).join(', ')}</span>
+                                <span style={styles.warningText}>{ui('Blockers:')} {result.blockers.slice(0, 3).map((blocker) => humanizeCode(blocker.code)).join(', ')}</span>
                               ) : null}
                               {result.warnings?.length ? (
-                                <span style={styles.muted}>Warnings: {result.warnings.slice(0, 3).map((warning) => humanizeCode(warning.code)).join(', ')}</span>
+                                <span style={styles.muted}>{ui('Warnings:')} {result.warnings.slice(0, 3).map((warning) => humanizeCode(warning.code)).join(', ')}</span>
                               ) : null}
                             </div>
                           ))}
                           {bulkReadinessQuery.data.results.length > 8 && (
-                            <span style={styles.muted}>+{formatNumber(bulkReadinessQuery.data.results.length - 8)} more readiness result(s)</span>
+                            <span style={styles.muted}>+{formatNumber(bulkReadinessQuery.data.results.length - 8)} {ui('more readiness result(s)')}</span>
                           )}
                         </div>
                       ) : null}
                     </>
                   ) : (
-                    <p style={styles.muted}>Select eligible requests to preview stock and threshold blockers before bulk fulfillment.</p>
+                    <p style={styles.muted}>{ui('Select eligible requests to preview stock and threshold blockers before bulk fulfillment.')}</p>
                   )}
                 </div>
               )}
               {bulkEligibleRequisitions.length > 0 && (
-                <p style={styles.muted}>Bulk fulfillment records all remaining quantities for {formatNumber(bulkEligibleRequisitions.length)} eligible request(s) using the audited backend bulk endpoint.</p>
+                <p style={styles.muted}>{ui('Bulk fulfillment records all remaining quantities for')} {formatNumber(bulkEligibleRequisitions.length)} {ui('eligible request(s) using the audited backend bulk endpoint.')}</p>
               )}
             </div>
           )}
-          {requisitionsQuery.isLoading && <p style={styles.muted}>Loading requisitions…</p>}
+          {requisitionsQuery.isLoading && <p style={styles.muted}>{ui('Loading requisitions…')}</p>}
           {queueRows.map((item) => {
             const bulkSelectable = ['approved', 'partially_fulfilled'].includes(String(item.status));
             const bulkSelected = bulkFulfillmentIds.includes(item.id);
             return (
               <div key={item.id} style={styles.queueItemRow}>
                 {capabilities.canFulfillInventoryRequisitions && (
-                  <label style={bulkSelectable ? styles.bulkSelectLabel : styles.bulkSelectLabelDisabled} title={bulkSelectable ? 'Select for bulk all-remaining fulfillment' : 'Only approved or partially fulfilled requests can be bulk fulfilled'}>
+                  <label style={bulkSelectable ? styles.bulkSelectLabel : styles.bulkSelectLabelDisabled} title={bulkSelectable ? ui('Select for bulk all-remaining fulfillment') : ui('Only approved or partially fulfilled requests can be bulk fulfilled')}>
                     <input
                       type="checkbox"
                       checked={bulkSelected}
@@ -3615,7 +3626,7 @@ export default function InventoryRequisitionsPage() {
                 >
                   <span style={styles.listTitle}>{item.requisition_number}</span>
                   <span style={statusStyle(item.status)}>{requisitionStatusLabel(item.status)}</span>
-                  <span style={styles.muted}>{item.requesting_department} · {humanizeCode(item.priority)}</span>
+                  <span style={styles.muted}>{item.requesting_department} · {localizedCodeLabel(item.priority, ui)}</span>
                   {item.sla_state && (
                     <span style={styles.warningText}>
                       {slaStateLabel(item.sla_state)}{slaStateDetail(item) ? ` · ${slaStateDetail(item)}` : ''}
@@ -3623,31 +3634,31 @@ export default function InventoryRequisitionsPage() {
                   )}
                   {item.approval_threshold_level && (
                     <span style={item.approval_threshold_level === 'standard' ? styles.muted : styles.warningText}>
-                      {approvalThresholdLabel(item.approval_threshold_level)}{item.approval_threshold_reason ? ` · ${approvalThresholdReasonLabel(item.approval_threshold_reason)}` : ''}{item.approval_threshold_next_level ? ` · ${formatNumber(item.approval_threshold_value_gap)} to ${approvalThresholdLabel(item.approval_threshold_next_level)}` : ''}
+                      {approvalThresholdLabel(item.approval_threshold_level)}{item.approval_threshold_reason ? ` · ${approvalThresholdReasonLabel(item.approval_threshold_reason)}` : ''}{item.approval_threshold_next_level ? ` · ${formatNumber(item.approval_threshold_value_gap)} ${ui('to')} ${approvalThresholdLabel(item.approval_threshold_next_level)}` : ''}
                     </span>
                   )}
-                  {formatApprovalThresholdQueueNoteDepth(item) && (
+                  {formatApprovalThresholdQueueNoteDepth(item, ui, locale) && (
                     <span style={item.approval_threshold_note_depth_state === 'complete' ? styles.muted : styles.warningText}>
-                      {formatApprovalThresholdQueueNoteDepth(item)}
+                      {formatApprovalThresholdQueueNoteDepth(item, ui, locale)}
                     </span>
                   )}
-                  <span style={styles.muted}>{formatNumber(item.fulfilled_quantity_total)} / {formatNumber(item.requested_quantity_total)} fulfilled</span>
+                  <span style={styles.muted}>{formatNumber(item.fulfilled_quantity_total)} / {formatNumber(item.requested_quantity_total)} {ui('fulfilled')}</span>
                   {item.partial_fulfillment_state && (
                     <span style={item.partial_fulfillment_state === 'stale_partial' ? styles.warningText : styles.muted}>
-                      Partial fulfillment: {item.partial_fulfillment_state === 'stale_partial' ? 'stale' : 'active'}{item.partial_fulfillment_age_days !== null && item.partial_fulfillment_age_days !== undefined ? ` · ${formatNumber(item.partial_fulfillment_age_days)}d` : ''}
+                      {ui('Partial fulfillment:')} {item.partial_fulfillment_state === 'stale_partial' ? ui('stale') : ui('active')}{item.partial_fulfillment_age_days !== null && item.partial_fulfillment_age_days !== undefined ? ` · ${formatNumber(item.partial_fulfillment_age_days)}${ui('d')}` : ''}
                     </span>
                   )}
-                  <span style={styles.muted}>Est. remaining value: {formatMoney(item.remaining_estimated_value_total)}</span>
+                  <span style={styles.muted}>{ui('Est. remaining value:')} {formatMoney(item.remaining_estimated_value_total)}</span>
                 </button>
               </div>
             );
           })}
           {!requisitionsQuery.isLoading && !queueFilterError && queueRows.length === 0 && (
-            <p style={styles.muted}>No requisitions match the current filters.</p>
+            <p style={styles.muted}>{ui('No requisitions match the current filters.')}</p>
           )}
           <div style={styles.pager}>
             <label style={styles.pagerInfo}>
-              Rows per page
+              {ui('Rows per page')}
               <select
                 style={styles.smallSelect}
                 value={queuePageSize}
@@ -3659,7 +3670,7 @@ export default function InventoryRequisitionsPage() {
               </select>
             </label>
             <span style={styles.pagerInfo}>
-              {queueRows.length > 0 ? `Showing ${queueRangeStart}-${queueRangeEnd}` : 'No rows'} · Page {queuePage}
+              {queueRows.length > 0 ? `${ui('Showing')} ${formatNumber(queueRangeStart)}–${formatNumber(queueRangeEnd)}` : ui('No rows')} · {ui('Page')} {formatNumber(queuePage)}
             </span>
             <div style={styles.inlineActions}>
               <button
@@ -3668,7 +3679,7 @@ export default function InventoryRequisitionsPage() {
                 disabled={queuePage === 1 || requisitionsQuery.isFetching}
                 onClick={() => setQueuePage((current) => Math.max(1, current - 1))}
               >
-                Previous
+                {ui('Previous')}
               </button>
               <button
                 type="button"
@@ -3676,7 +3687,7 @@ export default function InventoryRequisitionsPage() {
                 disabled={!queueHasNextPage || requisitionsQuery.isFetching || Boolean(queueFilterError)}
                 onClick={() => setQueuePage((current) => current + 1)}
               >
-                Next
+                {ui('Next')}
               </button>
             </div>
           </div>
@@ -3687,34 +3698,34 @@ export default function InventoryRequisitionsPage() {
         <div style={styles.sectionHeaderBlock}>
           <OperationalSectionHeader
             iconPath="/inventory-requisitions"
-            title="Selected request"
-            description="Review request details, workflow history, reservation protection, fulfillment readiness, and available actions."
+            title={ui('Selected request')}
+            description={ui('Review request details, workflow history, reservation protection, fulfillment readiness, and available actions.')}
           />
         </div>
-        {!selected && <p style={styles.muted}>Select a requisition to review details and actions.</p>}
+        {!selected && <p style={styles.muted}>{ui('Select a requisition to review details and actions.')}</p>}
         {selected && (
           <div>
             <div style={styles.detailGrid}>
               <div><strong>{selected.requisition_number}</strong><br /><span style={statusStyle(selected.status)}>{requisitionStatusLabel(selected.status)}</span></div>
-              <div><strong>Department</strong><br />{selected.requesting_department}</div>
-              <div><strong>Priority</strong><br />{humanizeCode(selected.priority)}</div>
-              <div><strong>Needed by</strong><br />{formatDate(selected.needed_by)}</div>
-              <div><strong>Source</strong><br />{selected.source_storage_location_name || '-'}</div>
-              <div><strong>Target</strong><br />{selected.target_department || selected.target_storage_location_name || '-'}</div>
-              <div><strong>Submitted</strong><br />{formatDateTime(selected.submitted_at)}<br /><span style={styles.muted}>{selected.submitted_by_user_name || ''}</span></div>
-              <div><strong>Approved</strong><br />{formatDateTime(selected.approved_at)}<br /><span style={styles.muted}>{selected.approved_by_user_name || ''}</span></div>
-              <div><strong>Rejected</strong><br />{formatDateTime(selected.rejected_at)}<br /><span style={styles.muted}>{selected.rejected_by_user_name || ''}</span></div>
-              <div><strong>Cancelled</strong><br />{formatDateTime(selected.cancelled_at)}<br /><span style={styles.muted}>{selected.cancelled_by_user_name || ''}</span></div>
-              <div><strong>Last fulfilled</strong><br />{formatDateTime(selected.last_fulfilled_at)}<br /><span style={styles.muted}>{selected.last_fulfilled_by_user_name || ''}</span></div>
-              <div><strong>Partial fulfillment</strong><br />{selected.partial_fulfillment_state ? <span style={selected.partial_fulfillment_state === 'stale_partial' ? styles.warningText : styles.muted}>{selected.partial_fulfillment_state === 'stale_partial' ? 'Stale partial' : 'Active partial'}</span> : '-'}<br /><span style={styles.muted}>{selected.partial_fulfillment_age_days !== null && selected.partial_fulfillment_age_days !== undefined ? `${formatNumber(selected.partial_fulfillment_age_days)} days since last fulfillment/update` : ''}</span></div>
-              <div><strong>SLA state</strong><br />{selected.sla_state ? <span style={styles.warningText}>{slaStateLabel(selected.sla_state)}</span> : '-'}<br /><span style={styles.muted}>{slaStateDetail(selected)}</span></div>
-              <div><strong>Approval threshold</strong><br />{selected.approval_threshold_level ? <span style={selected.approval_threshold_level === 'standard' ? styles.muted : styles.warningText}>{approvalThresholdLabel(selected.approval_threshold_level)}</span> : '-'}<br /><span style={styles.muted}>{approvalThresholdReasonLabel(selected.approval_threshold_reason)}{selected.approval_threshold_next_level ? ` · ${formatNumber(selected.approval_threshold_value_gap)} to ${approvalThresholdLabel(selected.approval_threshold_next_level)}` : ''}</span></div>
-              <div><strong>Estimated value</strong><br />Requested: {formatMoney(selected.requested_estimated_value_total)}<br /><span style={styles.muted}>Remaining: {formatMoney(selected.remaining_estimated_value_total)}</span></div>
-              <div><strong>Updated</strong><br />{formatDateTime(selected.updated_at)}</div>
+              <div><strong>{ui('Department')}</strong><br />{selected.requesting_department}</div>
+              <div><strong>{ui('Priority')}</strong><br />{localizedCodeLabel(selected.priority, ui)}</div>
+              <div><strong>{ui('Needed by')}</strong><br />{formatDate(selected.needed_by)}</div>
+              <div><strong>{ui('Source')}</strong><br />{selected.source_storage_location_name || '-'}</div>
+              <div><strong>{ui('Target')}</strong><br />{selected.target_department || selected.target_storage_location_name || '-'}</div>
+              <div><strong>{ui('Submitted')}</strong><br />{formatDateTime(selected.submitted_at)}<br /><span style={styles.muted}>{selected.submitted_by_user_name || ''}</span></div>
+              <div><strong>{ui('Approved')}</strong><br />{formatDateTime(selected.approved_at)}<br /><span style={styles.muted}>{selected.approved_by_user_name || ''}</span></div>
+              <div><strong>{ui('Rejected')}</strong><br />{formatDateTime(selected.rejected_at)}<br /><span style={styles.muted}>{selected.rejected_by_user_name || ''}</span></div>
+              <div><strong>{ui('Cancelled')}</strong><br />{formatDateTime(selected.cancelled_at)}<br /><span style={styles.muted}>{selected.cancelled_by_user_name || ''}</span></div>
+              <div><strong>{ui('Last fulfilled')}</strong><br />{formatDateTime(selected.last_fulfilled_at)}<br /><span style={styles.muted}>{selected.last_fulfilled_by_user_name || ''}</span></div>
+              <div><strong>{ui('Partial fulfillment')}</strong><br />{selected.partial_fulfillment_state ? <span style={selected.partial_fulfillment_state === 'stale_partial' ? styles.warningText : styles.muted}>{selected.partial_fulfillment_state === 'stale_partial' ? ui('Stale partial') : ui('Active partial')}</span> : '-'}<br /><span style={styles.muted}>{selected.partial_fulfillment_age_days !== null && selected.partial_fulfillment_age_days !== undefined ? `${formatNumber(selected.partial_fulfillment_age_days)} ${ui('days since last fulfillment/update')}` : ''}</span></div>
+              <div><strong>{ui('SLA state')}</strong><br />{selected.sla_state ? <span style={styles.warningText}>{slaStateLabel(selected.sla_state)}</span> : '-'}<br /><span style={styles.muted}>{slaStateDetail(selected)}</span></div>
+              <div><strong>{ui('Approval threshold')}</strong><br />{selected.approval_threshold_level ? <span style={selected.approval_threshold_level === 'standard' ? styles.muted : styles.warningText}>{approvalThresholdLabel(selected.approval_threshold_level)}</span> : '-'}<br /><span style={styles.muted}>{approvalThresholdReasonLabel(selected.approval_threshold_reason)}{selected.approval_threshold_next_level ? ` · ${formatNumber(selected.approval_threshold_value_gap)} ${ui('to')} ${approvalThresholdLabel(selected.approval_threshold_next_level)}` : ''}</span></div>
+              <div><strong>{ui('Estimated value')}</strong><br />{ui('Requested:')} {formatMoney(selected.requested_estimated_value_total)}<br /><span style={styles.muted}>{ui('Remaining:')} {formatMoney(selected.remaining_estimated_value_total)}</span></div>
+              <div><strong>{ui('Updated')}</strong><br />{formatDateTime(selected.updated_at)}</div>
             </div>
             {selected.status === 'draft' && capabilities.canCreateInventoryRequisitions && canManageSelectedDraftByOwnership && (
               <div style={styles.actionsRow}>
-                <button type="button" style={styles.secondaryButton} onClick={loadSelectedDraftForEditing}>Edit draft details</button>
+                <button type="button" style={styles.secondaryButton} onClick={loadSelectedDraftForEditing}>{ui('Edit draft details')}</button>
               </div>
             )}
             {canCreateLinkedReservation && (
@@ -3728,20 +3739,20 @@ export default function InventoryRequisitionsPage() {
                     activate: capabilities.canAllocateInventoryReservations
                   })}
                 >
-                  {createLinkedReservationMutation.isPending ? 'Creating linked reservation…' : 'Create linked reservation'}
+                  {createLinkedReservationMutation.isPending ? ui('Creating linked reservation…') : ui('Create linked reservation')}
                 </button>
-                <span style={styles.muted}>Creates the reservation from this request so source ownership and open quantities stay validated.</span>
+                <span style={styles.muted}>{ui('Creates the reservation from this request so source ownership and open quantities stay validated.')}</span>
               </div>
             )}
             {selected.status === 'draft' && approvalThresholdNotesRequired && !draftNotesMeetThresholdDepth && (
-              <p style={styles.warningBox}>Draft notes of at least {selectedApprovalThresholdNoteMinLength} characters are required before submitting this {approvalThresholdLabel(selected.approval_threshold_level)} request.</p>
+              <p style={styles.warningBox}>{ui('Draft notes of at least')} {formatNumber(selectedApprovalThresholdNoteMinLength)} {ui('characters are required before submitting this')} {approvalThresholdLabel(selected.approval_threshold_level)} {ui('request')}.</p>
             )}
             {selected.status === 'draft' && approvalThresholdNotesRequired && !selectedDraftLineNotesMeetThresholdDepth && (
-              <p style={styles.warningBox}>Each draft request line needs notes of at least {selectedApprovalThresholdNoteMinLength} characters before submitting this {approvalThresholdLabel(selected.approval_threshold_level)} request ({selectedDraftLineNotesBelowMinimumCount} line{selectedDraftLineNotesBelowMinimumCount === 1 ? '' : 's'} below minimum).</p>
+              <p style={styles.warningBox}>{ui('Each draft request line needs notes of at least')} {formatNumber(selectedApprovalThresholdNoteMinLength)} {ui('characters before submitting this')} {approvalThresholdLabel(selected.approval_threshold_level)} {ui('request')} ({formatNumber(selectedDraftLineNotesBelowMinimumCount)} {selectedDraftLineNotesBelowMinimumCount === 1 ? ui('line below minimum') : ui('lines below minimum')}).</p>
             )}
             {approvalThresholdGovernanceRequirements.length > 0 && (
               <div style={styles.warningBox}>
-                <strong>Approval threshold action requirements</strong>
+                <strong>{ui('Approval threshold action requirements')}</strong>
                 <ul style={styles.compactList}>
                   {approvalThresholdGovernanceRequirements.map((requirement) => (
                     <li key={requirement}>{requirement}</li>
@@ -3749,23 +3760,23 @@ export default function InventoryRequisitionsPage() {
                 </ul>
               </div>
             )}
-            {selected.approval_notes && <p style={styles.successBox}>Approval notes: {selected.approval_notes}</p>}
-            {selected.rejection_reason && <p style={styles.errorBox}>Rejection reason: {selected.rejection_reason}</p>}
-            {selected.cancellation_reason && <p style={styles.warningBox}>Cancellation reason: {selected.cancellation_reason}</p>}
+            {selected.approval_notes && <p style={styles.successBox}>{ui('Approval notes:')} {selected.approval_notes}</p>}
+            {selected.rejection_reason && <p style={styles.errorBox}>{ui('Rejection reason:')} {selected.rejection_reason}</p>}
+            {selected.cancellation_reason && <p style={styles.warningBox}>{ui('Cancellation reason:')} {selected.cancellation_reason}</p>}
             {selected.notes && <p style={styles.noteBox}>{selected.notes}</p>}
 
             <div style={styles.tableWrapper}>
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>Product</th>
-                    <th style={styles.th}>Requested</th>
-                    <th style={styles.th}>Fulfilled</th>
-                    <th style={styles.th}>Remaining</th>
-                    <th style={styles.th}>Est. remaining value</th>
-                    <th style={styles.th}>Request note depth</th>
-                    <th style={styles.th}>Fulfill now</th>
-                    <th style={styles.th}>Fulfillment note</th>
+                    <th style={styles.th}>{ui('Product')}</th>
+                    <th style={styles.th}>{ui('Requested')}</th>
+                    <th style={styles.th}>{ui('Fulfilled')}</th>
+                    <th style={styles.th}>{ui('Remaining')}</th>
+                    <th style={styles.th}>{ui('Est. remaining value')}</th>
+                    <th style={styles.th}>{ui('Request note depth')}</th>
+                    <th style={styles.th}>{ui('Fulfill now')}</th>
+                    <th style={styles.th}>{ui('Fulfillment note')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3783,9 +3794,9 @@ export default function InventoryRequisitionsPage() {
                         <td style={styles.td}>{formatNumber(remaining)}</td>
                         <td style={styles.td}>{formatMoney(item.remaining_estimated_value)}</td>
                         <td style={styles.td}>
-                          {item.notes ? <span>{item.notes}</span> : <span style={styles.muted}>No request note</span>}
-                          {formatApprovalThresholdLineNoteDepth(item) && (
-                            <><br /><span style={item.approval_threshold_line_note_meets_minimum ? styles.muted : styles.warningText}>{formatApprovalThresholdLineNoteDepth(item)}</span></>
+                          {item.notes ? <span>{item.notes}</span> : <span style={styles.muted}>{ui('No request note')}</span>}
+                          {formatApprovalThresholdLineNoteDepth(item, ui, locale) && (
+                            <><br /><span style={item.approval_threshold_line_note_meets_minimum ? styles.muted : styles.warningText}>{formatApprovalThresholdLineNoteDepth(item, ui, locale)}</span></>
                           )}
                         </td>
                         <td style={styles.td}>
@@ -3806,10 +3817,10 @@ export default function InventoryRequisitionsPage() {
                             disabled={!canFulfill || fulfillAllRemaining || remaining <= 0}
                             value={fulfillmentLineNotes[item.id] || ''}
                             onChange={(event) => setFulfillmentLineNotes((current) => ({ ...current, [item.id]: event.target.value }))}
-                            placeholder={fulfillmentNoteDepthRequired ? `At least ${selectedApprovalThresholdNoteMinLength} characters required` : 'Picker, handoff, or exception note'}
+                            placeholder={fulfillmentNoteDepthRequired ? `${ui('At least')} ${formatNumber(selectedApprovalThresholdNoteMinLength)} ${ui('characters required')}` : ui('Picker, handoff, or exception note')}
                           />
                           {fulfillmentNoteDepthRequired && (
-                            <><br /><span style={fulfillmentNoteMeetsThresholdDepth ? styles.muted : styles.warningText}>Fulfillment note depth: {fulfillmentNoteLength}/{selectedApprovalThresholdNoteMinLength}</span></>
+                            <><br /><span style={fulfillmentNoteMeetsThresholdDepth ? styles.muted : styles.warningText}>{ui('Fulfillment note depth:')} {formatNumber(fulfillmentNoteLength)}/{formatNumber(selectedApprovalThresholdNoteMinLength)}</span></>
                           )}
                         </td>
                       </tr>
@@ -3822,34 +3833,34 @@ export default function InventoryRequisitionsPage() {
             {showWorkflowActions && (
               <div style={styles.workflowPanel}>
                 <label style={styles.field}>
-                  Workflow notes / reason
+                  {ui('Workflow notes / reason')}
                   <input
                     style={styles.input}
                     value={workflowNotes}
                     onChange={(event) => setWorkflowNotes(event.target.value)}
-                    placeholder={approvalThresholdNotesRequired ? `At least ${selectedApprovalThresholdNoteMinLength} characters required for threshold approve/reject/cancel/reopen` : 'Required for reject/cancel/reopen'}
+                    placeholder={approvalThresholdNotesRequired ? `${ui('At least')} ${formatNumber(selectedApprovalThresholdNoteMinLength)} ${ui('characters required for threshold approve/reject/cancel/reopen')}` : ui('Required for reject/cancel/reopen')}
                   />
                 </label>
                 {approvalThresholdNotesRequired && (
                   <p style={styles.warningBox}>
-                    Approval, rejection, cancellation, or reopen notes of at least {selectedApprovalThresholdNoteMinLength} characters are required for this {approvalThresholdLabel(selected?.approval_threshold_level)} request ({approvalThresholdReasonLabel(selected?.approval_threshold_reason)}). Current note depth: {workflowNotesLength}/{selectedApprovalThresholdNoteMinLength}.
+                    {ui('Approval, rejection, cancellation, or reopen notes of at least')} {formatNumber(selectedApprovalThresholdNoteMinLength)} {ui('characters are required for this')} {approvalThresholdLabel(selected?.approval_threshold_level)} {ui('request')} ({approvalThresholdReasonLabel(selected?.approval_threshold_reason)}). {ui('Current note depth:')} {formatNumber(workflowNotesLength)}/{formatNumber(selectedApprovalThresholdNoteMinLength)}.
                   </p>
                 )}
                 <div style={styles.actionsRow}>
                   {showSubmitAction && (
-                    <button style={styles.secondaryButton} disabled={!canSubmit || workflowMutation.isPending} onClick={() => runWorkflow('submit')}>Submit</button>
+                    <button style={styles.secondaryButton} disabled={!canSubmit || workflowMutation.isPending} onClick={() => runWorkflow('submit')}>{ui('Submit')}</button>
                   )}
                   {showApproveAction && (
-                    <button style={styles.primaryButton} disabled={!canApprove || workflowMutation.isPending} onClick={() => runWorkflow('approve')}>Approve</button>
+                    <button style={styles.primaryButton} disabled={!canApprove || workflowMutation.isPending} onClick={() => runWorkflow('approve')}>{ui('Approve')}</button>
                   )}
                   {showRejectAction && (
-                    <button style={styles.dangerButton} disabled={!canReject || !workflowNotes.trim() || workflowMutation.isPending} onClick={() => runWorkflow('reject')}>Reject</button>
+                    <button style={styles.dangerButton} disabled={!canReject || !workflowNotes.trim() || workflowMutation.isPending} onClick={() => runWorkflow('reject')}>{ui('Reject')}</button>
                   )}
                   {showCancelAction && (
-                    <button style={styles.dangerButton} disabled={!canCancel || !workflowNotes.trim() || workflowMutation.isPending} onClick={() => runWorkflow('cancel')}>Cancel</button>
+                    <button style={styles.dangerButton} disabled={!canCancel || !workflowNotes.trim() || workflowMutation.isPending} onClick={() => runWorkflow('cancel')}>{ui('Cancel')}</button>
                   )}
                   {showReopenAction && (
-                    <button style={styles.secondaryButton} disabled={!canReopen || !workflowNotes.trim() || workflowMutation.isPending} onClick={() => runWorkflow('reopen')}>Reopen to draft</button>
+                    <button style={styles.secondaryButton} disabled={!canReopen || !workflowNotes.trim() || workflowMutation.isPending} onClick={() => runWorkflow('reopen')}>{ui('Reopen to draft')}</button>
                   )}
                 </div>
               </div>
@@ -3857,16 +3868,16 @@ export default function InventoryRequisitionsPage() {
 
             <div style={styles.workflowPanel}>
               <label style={styles.field}>
-                Fulfillment source location
+                {ui('Fulfillment source location')}
                 <select
                   style={styles.input}
                   value={fulfillmentLocationId || selected.source_storage_location_id || ''}
                   disabled={!canFulfill}
                   onChange={(event) => setFulfillmentLocationId(event.target.value)}
                 >
-                  <option value="">Select source location</option>
+                  <option value="">{ui('Select source location')}</option>
                   {activeLocationOptions.map((location) => (
-                    <option key={location.id} value={location.id}>{location.name}{location.retired ? ' (retired)' : ''}</option>
+                    <option key={location.id} value={location.id}>{location.name}{location.retired ? ` (${ui('retired')})` : ''}</option>
                   ))}
                 </select>
               </label>
@@ -3883,25 +3894,25 @@ export default function InventoryRequisitionsPage() {
                     }
                   }}
                 />
-                Fulfill all remaining lines for this request
+                {ui('Fulfill all remaining lines for this request')}
               </label>
               {fulfillAllRemaining && (
                 <label style={styles.field}>
-                  Default all-remaining fulfillment note
+                  {ui('Default all-remaining fulfillment note')}
                   <input
                     style={styles.input}
                     value={defaultFulfillmentNote}
                     disabled={!canFulfill}
                     onChange={(event) => setDefaultFulfillmentNote(event.target.value)}
-                    placeholder={approvalThresholdNotesRequired ? `At least ${selectedApprovalThresholdNoteMinLength} characters required` : 'Applied to each remaining fulfillment line'}
+                    placeholder={approvalThresholdNotesRequired ? `${ui('At least')} ${formatNumber(selectedApprovalThresholdNoteMinLength)} ${ui('characters required')}` : ui('Applied to each remaining fulfillment line')}
                   />
                 </label>
               )}
               {approvalThresholdNotesRequired && !fulfillmentThresholdLinesMeetNoteDepth && (fulfillAllRemaining || selectedFulfillmentLineCount > 0) && (
                 <p style={styles.warningBox}>
                   {fulfillAllRemaining
-                    ? `Default fulfillment note must be at least ${selectedApprovalThresholdNoteMinLength} characters for this ${approvalThresholdLabel(selected?.approval_threshold_level)} request (${defaultFulfillmentNoteLength}/${selectedApprovalThresholdNoteMinLength}).`
-                    : `Each fulfilled line needs a note of at least ${selectedApprovalThresholdNoteMinLength} characters for this ${approvalThresholdLabel(selected?.approval_threshold_level)} request.`}
+                    ? `${ui('Default fulfillment note must be at least')} ${formatNumber(selectedApprovalThresholdNoteMinLength)} ${ui('characters for this')} ${approvalThresholdLabel(selected?.approval_threshold_level)} ${ui('request')} (${formatNumber(defaultFulfillmentNoteLength)}/${formatNumber(selectedApprovalThresholdNoteMinLength)}).`
+                    : `${ui('Each fulfilled line needs a note of at least')} ${formatNumber(selectedApprovalThresholdNoteMinLength)} ${ui('characters for this')} ${approvalThresholdLabel(selected?.approval_threshold_level)} ${ui('request')}.`}
                 </p>
               )}
               <button
@@ -3909,15 +3920,15 @@ export default function InventoryRequisitionsPage() {
                 disabled={!canFulfill || fulfillMutation.isPending || readinessQuery.data?.ready === false || (!fulfillAllRemaining && selectedFulfillmentLineCount === 0) || !fulfillmentThresholdLinesMeetNoteDepth}
                 onClick={() => fulfillMutation.mutate()}
               >
-                {fulfillMutation.isPending ? 'Fulfilling…' : 'Record fulfillment'}
+                {fulfillMutation.isPending ? ui('Fulfilling…') : ui('Record fulfillment')}
               </button>
             </div>
 
             {canFulfill && (
               <div style={styles.readinessPanel}>
                 <div style={styles.lineHeader}>
-                  <h4 style={styles.sectionTitle}>Fulfillment readiness</h4>
-                  {readinessQuery.isFetching && <span style={styles.muted}>Checking stock…</span>}
+                  <h4 style={styles.sectionTitle}>{ui('Fulfillment readiness')}</h4>
+                  {readinessQuery.isFetching && <span style={styles.muted}>{ui('Checking stock…')}</span>}
                 </div>
                 {readinessQuery.data?.blockers?.map((blocker) => (
                   <p key={`${blocker.code}-${blocker.product_name || blocker.message}`} style={styles.errorBox}>{blocker.message}</p>
@@ -3927,24 +3938,24 @@ export default function InventoryRequisitionsPage() {
                 ))}
                 {readinessQuery.data?.approval_threshold_notes_required && readinessQuery.data.threshold_fulfillment_line_notes_meet_minimum === false && (
                   <p style={styles.warningBox}>
-                    {formatNumber(readinessQuery.data.threshold_fulfillment_line_note_below_minimum_count)} selected fulfillment line note(s) are below the {formatNumber(readinessQuery.data.threshold_fulfillment_line_note_min_length)} character threshold minimum.
+                    {formatNumber(readinessQuery.data.threshold_fulfillment_line_note_below_minimum_count)} {ui('selected fulfillment line note(s) are below the')} {formatNumber(readinessQuery.data.threshold_fulfillment_line_note_min_length)} {ui('character threshold minimum.')}
                   </p>
                 )}
                 {readinessQuery.data?.lines?.length ? (
                   <>
-                    <p style={styles.muted}>Available stock excludes quantities committed to active reservations. Fulfillment cannot use reserved stock.</p>
+                    <p style={styles.muted}>{ui('Available stock excludes quantities committed to active reservations. Fulfillment cannot use reserved stock.')}</p>
                     <div style={styles.tableWrapper}>
                     <table style={styles.table}>
                       <thead>
                         <tr>
-                          <th style={styles.th}>Product</th>
-                          <th style={styles.th}>Remaining</th>
-                          <th style={styles.th}>On hand</th>
-                          <th style={styles.th}>Reserved</th>
-                          <th style={styles.th}>Available</th>
-                          <th style={styles.th}>Projected on hand</th>
-                          <th style={styles.th}>Projected available</th>
-                          <th style={styles.th}>Readiness</th>
+                          <th style={styles.th}>{ui('Product')}</th>
+                          <th style={styles.th}>{ui('Remaining')}</th>
+                          <th style={styles.th}>{ui('On hand')}</th>
+                          <th style={styles.th}>{ui('Reserved')}</th>
+                          <th style={styles.th}>{ui('Available')}</th>
+                          <th style={styles.th}>{ui('Projected on hand')}</th>
+                          <th style={styles.th}>{ui('Projected available')}</th>
+                          <th style={styles.th}>{ui('Readiness')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -3958,9 +3969,9 @@ export default function InventoryRequisitionsPage() {
                             <td style={styles.td}>{line.projected_on_hand_quantity === null || line.projected_on_hand_quantity === undefined ? '-' : formatNumber(line.projected_on_hand_quantity)}</td>
                             <td style={styles.td}>{line.projected_quantity === null ? '-' : formatNumber(line.projected_quantity)}</td>
                             <td style={styles.td}>
-                              <span style={line.ready ? styles.successBadge : styles.dangerBadge}>{line.ready ? (line.warning_code ? 'Warning' : 'Ready') : humanizeCode(line.blocker_code || 'blocked')}</span>
+                              <span style={line.ready ? styles.successBadge : styles.dangerBadge}>{line.ready ? (line.warning_code ? ui('Warning') : ui('Ready')) : localizedCodeLabel(line.blocker_code || 'blocked', ui)}</span>
                               {line.threshold_fulfillment_line_note_meets_minimum === false && (
-                                <div style={styles.muted}>Note {formatNumber(line.threshold_fulfillment_line_note_length)}/{formatNumber(line.threshold_fulfillment_line_note_min_length)} chars</div>
+                                <div style={styles.muted}>{ui('Note')} {formatNumber(line.threshold_fulfillment_line_note_length)}/{formatNumber(line.threshold_fulfillment_line_note_min_length)} {ui('characters')}</div>
                               )}
                             </td>
                           </tr>
@@ -3970,22 +3981,22 @@ export default function InventoryRequisitionsPage() {
                     </div>
                   </>
                 ) : (
-                  <p style={styles.muted}>Select a source location to check fulfillment readiness.</p>
+                  <p style={styles.muted}>{ui('Select a source location to check fulfillment readiness.')}</p>
                 )}
               </div>
             )}
 
             <div style={styles.activityPanel}>
               <div style={styles.lineHeader}>
-                <h4 style={styles.sectionTitle}>Activity timeline</h4>
-                {activityQuery.isFetching && <span style={styles.muted}>Refreshing…</span>}
+                <h4 style={styles.sectionTitle}>{ui('Activity timeline')}</h4>
+                {activityQuery.isFetching && <span style={styles.muted}>{ui('Refreshing…')}</span>}
               </div>
               <div style={styles.commentComposer}>
                 <input
                   style={styles.input}
                   value={activityComment}
                   onChange={(event) => setActivityComment(event.target.value)}
-                  placeholder="Add an internal activity note"
+                  placeholder={ui('Add an internal activity note')}
                 />
                 <button
                   type="button"
@@ -3997,43 +4008,43 @@ export default function InventoryRequisitionsPage() {
                   }
                   onClick={() => commentMutation.mutate()}
                 >
-                  {commentMutation.isPending ? 'Adding…' : 'Add note'}
+                  {commentMutation.isPending ? ui('Adding…') : ui('Add note')}
                 </button>
               </div>
               {isApprovalThresholdGoverned(selected) && (
-                <p style={styles.muted}>Approval-threshold requisitions require activity notes of at least {selectedApprovalThresholdNoteMinLength} characters.</p>
+                <p style={styles.muted}>{ui('Approval-threshold requisitions require activity notes of at least')} {formatNumber(selectedApprovalThresholdNoteMinLength)} {ui('characters')}.</p>
               )}
               {activityQuery.data?.length ? (
                 <div style={styles.timelineList}>
                   {activityQuery.data.map((entry) => (
                     <div key={entry.id} style={styles.timelineItem}>
-                      <strong style={styles.timelineTitle}>{activityLabel(entry.action)}</strong>
-                      <span style={styles.muted}>{formatDateTime(entry.created_at)} · {entry.user_name || 'System'}</span>
+                      <strong style={styles.timelineTitle}>{ui(activityLabel(entry.action))}</strong>
+                      <span style={styles.muted}>{formatDateTime(entry.created_at)} · {entry.user_name || ui('System')}</span>
                       {metadataText(entry.metadata) && <span style={styles.muted}>{metadataText(entry.metadata)}</span>}
                     </div>
                   ))}
                 </div>
               ) : (
-                <p style={styles.muted}>No audit activity recorded yet.</p>
+                <p style={styles.muted}>{ui('No audit activity recorded yet.')}</p>
               )}
             </div>
 
             <div style={styles.workflowPanel}>
               <div style={styles.lineHeader}>
-                <h4 style={styles.sectionTitle}>Fulfillment history</h4>
-                {fulfillmentHistoryQuery.isFetching && <span style={styles.muted}>Refreshing…</span>}
+                <h4 style={styles.sectionTitle}>{ui('Fulfillment history')}</h4>
+                {fulfillmentHistoryQuery.isFetching && <span style={styles.muted}>{ui('Refreshing…')}</span>}
               </div>
               {fulfillmentHistoryQuery.data?.length ? (
                 <div style={styles.tableWrapper}>
                   <table style={styles.table}>
                     <thead>
                       <tr>
-                        <th style={styles.th}>When</th>
-                        <th style={styles.th}>Product</th>
-                        <th style={styles.th}>Qty</th>
-                        <th style={styles.th}>Source</th>
-                        <th style={styles.th}>Notes</th>
-                        <th style={styles.th}>By</th>
+                        <th style={styles.th}>{ui('When')}</th>
+                        <th style={styles.th}>{ui('Product')}</th>
+                        <th style={styles.th}>{ui('Qty')}</th>
+                        <th style={styles.th}>{ui('Source')}</th>
+                        <th style={styles.th}>{ui('Notes')}</th>
+                        <th style={styles.th}>{ui('By')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -4051,7 +4062,7 @@ export default function InventoryRequisitionsPage() {
                   </table>
                 </div>
               ) : (
-                <p style={styles.muted}>No fulfillment records yet.</p>
+                <p style={styles.muted}>{ui('No fulfillment records yet.')}</p>
               )}
             </div>
           </div>

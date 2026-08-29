@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAppTranslation } from "../../i18n/I18nContext";
 import { hasPermission } from "../../lib/permissions";
 import { getTenantFeatureEntitlement, type TenantSubscriptionAccess } from "../../lib/tenantSubscriptionAccess";
 import { enterpriseInventoryTabFeatures, enterpriseInventoryTabs } from "./EnterpriseInventoryTabConfig";
@@ -35,6 +36,7 @@ function findInitialEnterpriseInventoryTab() {
 }
 
 export function useEnterpriseInventoryPageController() {
+  const { ui } = useAppTranslation();
   const [activeTab, setActiveTab] = useState(findInitialEnterpriseInventoryTab);
   const {
     errorMessage,
@@ -86,7 +88,7 @@ export function useEnterpriseInventoryPageController() {
   }, [activeTab, subscriptionAccess]);
 
   const queryStatusInput = pageData.queries as unknown as Parameters<typeof getEnterpriseInventoryActiveTabLastUpdatedAt>[1];
-  const activeTabQueryError = getEnterpriseInventoryActiveTabQueryError(activeTab, queryStatusInput);
+  const activeTabQueryError = getEnterpriseInventoryActiveTabQueryError(activeTab, queryStatusInput, ui);
   const lastRefreshedAt = getEnterpriseInventoryActiveTabLastUpdatedAt(activeTab, queryStatusInput);
 
   const actions = useEnterpriseInventoryPageActions({

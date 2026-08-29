@@ -14,6 +14,8 @@ import type {
   ProductCostValuationSummaryResponse,
   ProductItem
 } from '../../types/inventory';
+import { useAppTranslation } from '../../i18n/I18nContext';
+import { formatLocalizedNumber } from '../../i18n/formatters';
 
 type ProductCostValuationPanelProps = {
   costValuationQuery: {
@@ -45,13 +47,14 @@ export function ProductCostValuationPanel({
   onExportCostValuationDetailsCsv,
   onViewCategory
 }: ProductCostValuationPanelProps) {
+  const { ui, locale } = useAppTranslation();
   return (
     <section style={styles.panel}>
       <div style={styles.packageHeader}>
         <div>
-          <h3 style={styles.panelTitle}>Cost Valuation Summary</h3>
+          <h3 style={styles.panelTitle}>{ui("Cost Valuation Summary")}</h3>
           <p style={styles.panelSubtitle}>
-            Read-only estimated inventory valuation by cost basis. This does not change stock quantities or receiving behavior.
+            {ui("Read-only estimated inventory valuation by cost basis. This does not change stock quantities or receiving behavior.")}
           </p>
         </div>
         <button
@@ -59,63 +62,63 @@ export function ProductCostValuationPanel({
           style={styles.secondaryButton}
           onClick={() => costValuationQuery.refetch()}
         >
-          Refresh Valuation
+          {ui("Refresh Valuation")}
         </button>
       </div>
 
       {costValuationQuery.isLoading ? (
-        <div style={styles.emptyCell}>Loading cost valuation summary...</div>
+        <div style={styles.emptyCell}>{ui("Loading cost valuation summary...")}</div>
       ) : costValuationQuery.isError ? (
-        <div style={styles.errorBox}>Unable to load cost valuation summary.</div>
+        <div style={styles.errorBox}>{ui("Unable to load cost valuation summary.")}</div>
       ) : (
         <>
           <div style={styles.costReadinessGrid}>
             <StatCard
-              title="Estimated Value"
-              value={formatMoney(costValuationSummary?.totals.total_estimated_inventory_value)}
-              subtitle="Latest received cost, then standard fallback"
+              title={ui("Estimated Value")}
+              value={formatMoney(costValuationSummary?.totals.total_estimated_inventory_value, locale)}
+              subtitle={ui("Latest received cost, then standard fallback")}
             />
             <StatCard
-              title="Received Cost Value"
-              value={formatMoney(costValuationSummary?.totals.received_cost_value)}
-              subtitle="Valued from movement cost audit"
+              title={ui("Received Cost Value")}
+              value={formatMoney(costValuationSummary?.totals.received_cost_value, locale)}
+              subtitle={ui("Valued from movement cost audit")}
               tone="good"
             />
             <StatCard
-              title="Standard Fallback Value"
-              value={formatMoney(costValuationSummary?.totals.standard_fallback_value)}
-              subtitle="Valued from product standard cost"
+              title={ui("Standard Fallback Value")}
+              value={formatMoney(costValuationSummary?.totals.standard_fallback_value, locale)}
+              subtitle={ui("Valued from product standard cost")}
             />
             <StatCard
-              title="Unvalued Stock"
+              title={ui("Unvalued Stock")}
               value={toNumber(costValuationSummary?.totals.unvalued_stocked_products)}
-              subtitle={`${toNumber(costValuationSummary?.totals.unvalued_stock_quantity).toLocaleString()} units excluded from value`}
+              subtitle={`${formatLocalizedNumber(Number(toNumber(costValuationSummary?.totals.unvalued_stock_quantity)), locale)} ${ui('units excluded from value')}`}
               tone={toNumber(costValuationSummary?.totals.unvalued_stocked_products) > 0 ? 'warn' : 'good'}
             />
           </div>
 
           <div style={styles.riskGrid}>
             <CostValuationList
-              title="Top value products"
-              emptyText="No valued stocked products found."
+              title={ui("Top value products")}
+              emptyText={ui("No valued stocked products found.")}
               rows={costValuationSummary?.top_value_products ?? []}
               onOpenHistory={onOpenCostHistory}
             />
             <div style={styles.riskCard}>
-              <h4 style={styles.sectionTitle}>Value by basis</h4>
+              <h4 style={styles.sectionTitle}>{ui("Value by basis")}</h4>
               {(costValuationSummary?.basis_breakdown ?? []).length === 0 ? (
-                <div style={styles.rowSubtle}>No stocked product valuation basis found.</div>
+                <div style={styles.rowSubtle}>{ui("No stocked product valuation basis found.")}</div>
               ) : (
                 <div style={styles.riskList}>
                   {(costValuationSummary?.basis_breakdown ?? []).map((row) => (
                     <div key={row.valuation_basis} style={styles.riskListItem}>
                       <div>
-                        <div style={styles.rowTitle}>{formatValuationBasis(row.valuation_basis)}</div>
+                        <div style={styles.rowTitle}>{ui(formatValuationBasis(row.valuation_basis))}</div>
                         <div style={styles.rowSubtle}>
-                          {toNumber(row.stocked_products)} products • {toNumber(row.stock_quantity).toLocaleString()} units
+                          {toNumber(row.stocked_products)} {ui("products •")} {formatLocalizedNumber(Number(toNumber(row.stock_quantity)), locale)} {ui("units")}
                         </div>
                       </div>
-                      <div style={styles.rowTitle}>{formatMoney(row.estimated_value)}</div>
+                      <div style={styles.rowTitle}>{formatMoney(row.estimated_value, locale)}</div>
                     </div>
                   ))}
                 </div>
@@ -127,26 +130,26 @@ export function ProductCostValuationPanel({
             <table style={styles.compactTable}>
               <thead>
                 <tr>
-                  <th style={styles.th}>Category</th>
-                  <th style={styles.th}>Stocked Products</th>
-                  <th style={styles.th}>Stock Qty</th>
-                  <th style={styles.th}>Estimated Value</th>
-                  <th style={styles.th}>Unvalued</th>
-                  <th style={styles.th}>Action</th>
+                  <th style={styles.th}>{ui("Category")}</th>
+                  <th style={styles.th}>{ui("Stocked Products")}</th>
+                  <th style={styles.th}>{ui("Stock Qty")}</th>
+                  <th style={styles.th}>{ui("Estimated Value")}</th>
+                  <th style={styles.th}>{ui("Unvalued")}</th>
+                  <th style={styles.th}>{ui("Action")}</th>
                 </tr>
               </thead>
               <tbody>
                 {(costValuationSummary?.category_breakdown ?? []).length === 0 ? (
                   <tr>
-                    <td style={styles.emptyCell} colSpan={6}>No stocked category valuation found.</td>
+                    <td style={styles.emptyCell} colSpan={6}>{ui("No stocked category valuation found.")}</td>
                   </tr>
                 ) : (
                   (costValuationSummary?.category_breakdown ?? []).map((row) => (
                     <tr key={row.category}>
                       <td style={styles.td}>{row.category}</td>
                       <td style={styles.td}>{toNumber(row.stocked_products)}</td>
-                      <td style={styles.td}>{toNumber(row.stock_quantity).toLocaleString()}</td>
-                      <td style={styles.td}>{formatMoney(row.estimated_value)}</td>
+                      <td style={styles.td}>{formatLocalizedNumber(Number(toNumber(row.stock_quantity)), locale)}</td>
+                      <td style={styles.td}>{formatMoney(row.estimated_value, locale)}</td>
                       <td style={styles.td}>{toNumber(row.unvalued_stocked_products)}</td>
                       <td style={styles.td}>
                         <button
@@ -154,7 +157,7 @@ export function ProductCostValuationPanel({
                           style={styles.secondaryButton}
                           onClick={() => onViewCategory(row.category === 'Uncategorized' ? '' : row.category)}
                         >
-                          View Category
+                          {ui("View Category")}
                         </button>
                       </td>
                     </tr>
@@ -166,9 +169,9 @@ export function ProductCostValuationPanel({
 
           <div style={styles.packageHeader}>
             <div>
-              <h4 style={styles.sectionTitle}>Valuation detail</h4>
+              <h4 style={styles.sectionTitle}>{ui("Valuation detail")}</h4>
               <p style={styles.panelSubtitle}>
-                Filtered stocked-product valuation rows for review and export. Read-only; uses the same cost basis as the summary above.
+                {ui("Filtered stocked-product valuation rows for review and export. Read-only; uses the same cost basis as the summary above.")}
               </p>
             </div>
             <button
@@ -177,101 +180,101 @@ export function ProductCostValuationPanel({
               onClick={onExportCostValuationDetailsCsv}
               disabled={(costValuationDetails?.rows ?? []).length === 0}
             >
-              Export Valuation CSV
+              {ui("Export Valuation CSV")}
             </button>
           </div>
 
           <div style={styles.filterGrid}>
             <div>
-              <label style={styles.label}>Valuation basis</label>
+              <label style={styles.label}>{ui("Valuation basis")}</label>
               <select
                 style={styles.input}
                 value={costValuationDetailFilters.valuationBasis}
                 onChange={(event) => setCostValuationDetailFilters((current) => ({ ...current, valuationBasis: event.target.value }))}
               >
-                <option value="">All stocked</option>
-                <option value="received">Received cost</option>
-                <option value="standard">Standard fallback</option>
-                <option value="none">No cost</option>
+                <option value="">{ui("All stocked")}</option>
+                <option value="received">{ui("Received cost")}</option>
+                <option value="standard">{ui("Standard fallback")}</option>
+                <option value="none">{ui("No cost")}</option>
               </select>
             </div>
             <div>
-              <label style={styles.label}>Search detail</label>
+              <label style={styles.label}>{ui("Search detail")}</label>
               <input
                 style={styles.input}
                 value={costValuationDetailFilters.search}
                 onChange={(event) => setCostValuationDetailFilters((current) => ({ ...current, search: event.target.value }))}
-                placeholder="Search product or category"
+                placeholder={ui("Search product or category")}
               />
             </div>
             <div>
-              <label style={styles.label}>Sort</label>
+              <label style={styles.label}>{ui("Sort")}</label>
               <select
                 style={styles.input}
                 value={costValuationDetailFilters.sort}
                 onChange={(event) => setCostValuationDetailFilters((current) => ({ ...current, sort: event.target.value }))}
               >
-                <option value="estimated_value">Estimated value</option>
-                <option value="stock_quantity">Stock quantity</option>
-                <option value="name">Product name</option>
+                <option value="estimated_value">{ui("Estimated value")}</option>
+                <option value="stock_quantity">{ui("Stock quantity")}</option>
+                <option value="name">{ui("Product name")}</option>
               </select>
             </div>
             <div>
-              <label style={styles.label}>Direction</label>
+              <label style={styles.label}>{ui("Direction")}</label>
               <select
                 style={styles.input}
                 value={costValuationDetailFilters.direction}
                 onChange={(event) => setCostValuationDetailFilters((current) => ({ ...current, direction: event.target.value }))}
               >
-                <option value="desc">Descending</option>
-                <option value="asc">Ascending</option>
+                <option value="desc">{ui("Descending")}</option>
+                <option value="asc">{ui("Ascending")}</option>
               </select>
             </div>
           </div>
 
           {costValuationDetailsQuery.isLoading ? (
-            <div style={styles.emptyCell}>Loading valuation detail...</div>
+            <div style={styles.emptyCell}>{ui("Loading valuation detail...")}</div>
           ) : costValuationDetailsQuery.isError ? (
-            <div style={styles.errorBox}>Unable to load valuation detail.</div>
+            <div style={styles.errorBox}>{ui("Unable to load valuation detail.")}</div>
           ) : (
             <div style={styles.tableWrapperCompact}>
               <div style={styles.rowSubtle}>
-                Showing {(costValuationDetails?.rows ?? []).length} of {toNumber(costValuationDetails?.total)} stocked products • Filtered value {formatMoney(costValuationDetails?.filtered_estimated_inventory_value)}
+                {ui("Showing")} {(costValuationDetails?.rows ?? []).length} {ui("of")} {toNumber(costValuationDetails?.total)} {ui("stocked products • Filtered value")} {formatMoney(costValuationDetails?.filtered_estimated_inventory_value, locale)}
               </div>
               <table style={styles.compactTable}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>Product</th>
-                    <th style={styles.th}>Basis</th>
-                    <th style={styles.th}>Stock</th>
-                    <th style={styles.th}>Effective Cost</th>
-                    <th style={styles.th}>Estimated Value</th>
-                    <th style={styles.th}>Action</th>
+                    <th style={styles.th}>{ui("Product")}</th>
+                    <th style={styles.th}>{ui("Basis")}</th>
+                    <th style={styles.th}>{ui("Stock")}</th>
+                    <th style={styles.th}>{ui("Effective Cost")}</th>
+                    <th style={styles.th}>{ui("Estimated Value")}</th>
+                    <th style={styles.th}>{ui("Action")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(costValuationDetails?.rows ?? []).length === 0 ? (
                     <tr>
-                      <td style={styles.emptyCell} colSpan={6}>No valuation detail rows match the current filters.</td>
+                      <td style={styles.emptyCell} colSpan={6}>{ui("No valuation detail rows match the current filters.")}</td>
                     </tr>
                   ) : (
                     (costValuationDetails?.rows ?? []).map((row: ProductCostValuationItem) => (
                       <tr key={row.id}>
                         <td style={styles.td}>
                           <strong>{row.name}</strong>
-                          <div style={styles.rowSubtle}>{row.category || 'Uncategorized'}</div>
+                          <div style={styles.rowSubtle}>{row.category || ui('Uncategorized')}</div>
                         </td>
-                        <td style={styles.td}>{formatValuationBasis(row.valuation_basis)}</td>
-                        <td style={styles.td}>{toNumber(row.current_stock_quantity).toLocaleString()} {row.unit}</td>
-                        <td style={styles.td}>{formatMoney(row.effective_unit_cost)}</td>
-                        <td style={styles.td}>{formatMoney(row.estimated_inventory_value)}</td>
+                        <td style={styles.td}>{ui(formatValuationBasis(row.valuation_basis))}</td>
+                        <td style={styles.td}>{formatLocalizedNumber(Number(toNumber(row.current_stock_quantity)), locale)} {row.unit}</td>
+                        <td style={styles.td}>{formatMoney(row.effective_unit_cost, locale)}</td>
+                        <td style={styles.td}>{formatMoney(row.estimated_inventory_value, locale)}</td>
                         <td style={styles.td}>
                           <button
                             type="button"
                             style={styles.secondaryButton}
                             onClick={() => onOpenCostHistory(row)}
                           >
-                            Cost History
+                            {ui("Cost History")}
                           </button>
                         </td>
                       </tr>

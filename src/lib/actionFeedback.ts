@@ -4,6 +4,7 @@ export type ActionFeedbackDetail = {
   type: ActionFeedbackType;
   message: string;
   requestId?: string;
+  translateMessage?: boolean;
 };
 
 export const PLATFORM_MUTATION_FEEDBACK_EVENT = 'platform-mutation-feedback';

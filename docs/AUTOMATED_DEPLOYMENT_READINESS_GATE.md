@@ -11,6 +11,8 @@ The production gate now runs automatically in both release paths:
 
 The manual **Run workflow** option remains available as a fallback. Normal production pushes no longer require a manual click.
 
+The workflow performs the deployment wait twice: once before source/runtime-gate preparation and again immediately before Playwright starts. The second check closes the gap where Vercel or Render can begin a rollout/restart while dependencies, static checks, or Chromium are being prepared.
+
 Repository-wide lint is now clean and runs as a blocking step inside **Frontend Validation** on every push and pull request. A lint failure prevents deployment readiness from starting until the source issue is corrected.
 
 ## Canonical files

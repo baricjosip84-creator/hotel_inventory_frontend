@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import { OperationalSectionHeader } from "../../components/ui/OperationalWorkspace";
-
+import { useAppTranslation } from "../../i18n/I18nContext";
 import {
-  formatDateTime,
-  formatMoney,
-  toNumber,
-} from "./inventoryUsageFormatting";
+  formatLocalizedCurrency,
+  formatLocalizedDateTime,
+  formatLocalizedNumber,
+} from "../../i18n/formatters";
+
+import { toNumber } from "./inventoryUsageFormatting";
 import { styles } from "./inventoryUsageStyles";
 import type {
   InventoryUsagePeriodClosure,
@@ -63,6 +65,17 @@ export function InventoryUsagePeriodClosuresPanel({
   const [periodStart, setPeriodStart] = useState(defaultPeriodStart);
   const [periodEnd, setPeriodEnd] = useState(defaultPeriodEnd);
   const [notes, setNotes] = useState("");
+  const { locale, ui } = useAppTranslation();
+  const formatNumber = (value: number | string | null | undefined, maximumFractionDigits = 2) => {
+    if (value === null || value === undefined || value === "") return "—";
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return String(value);
+    return formatLocalizedNumber(numeric, locale, { maximumFractionDigits });
+  };
+  const formatDateTimeLocal = (value: string | null | undefined) =>
+    formatLocalizedDateTime(value, locale);
+  const formatMoneyLocal = (value: number | string | null | undefined, currency?: string | null) =>
+    formatLocalizedCurrency(toNumber(value), currency || "EUR", locale, { maximumFractionDigits: 2 });
 
   const currentPeriodAlreadyClosed = useMemo(() => {
     if (!periodStart || !periodEnd) {
@@ -222,7 +235,7 @@ export function InventoryUsagePeriodClosuresPanel({
         reversed_count: closure.reversed_count ?? "",
         follow_up_count: closure.follow_up_count ?? "",
         closed_by:
-          closure.closed_by_user_name || closure.closed_by_user_id || "System",
+          closure.closed_by_user_name || closure.closed_by_user_id || ui("System"),
         closed_by_user_id: closure.closed_by_user_id || "",
         closed_at: closure.closed_at || "",
         created_at: closure.created_at || "",
@@ -237,7 +250,7 @@ export function InventoryUsagePeriodClosuresPanel({
     }
 
     const confirmed = window.confirm(
-      "Close this usage period? This creates an immutable usage rollup and locks usage posting/reversal inside the period.",
+      ui("Close this usage period? This creates an immutable usage rollup and locks usage posting/reversal inside the period."),
     );
     if (!confirmed) {
       return;
@@ -250,13 +263,13 @@ export function InventoryUsagePeriodClosuresPanel({
     <section style={styles.cardWide}>
       <OperationalSectionHeader
         iconPath="/audit"
-        title="Usage period close"
-        description="Freeze a usage period into an audit-ready rollup with quantity, estimated value, exceptions, reversals, and follow-up exposure. Closed periods block new backdated usage and usage reversals inside the closed range."
+        title={ui("Usage period close")}
+        description={ui("Freeze a usage period into an audit-ready rollup with quantity, estimated value, exceptions, reversals, and follow-up exposure. Closed periods block new backdated usage and usage reversals inside the closed range.")}
       />
 
       <div style={styles.formGrid}>
         <label style={styles.fieldLabel}>
-          Period start
+          {ui("Period start")}
           <input
             type="datetime-local"
             value={periodStart}
@@ -265,7 +278,7 @@ export function InventoryUsagePeriodClosuresPanel({
           />
         </label>
         <label style={styles.fieldLabel}>
-          Period end
+          {ui("Period end")}
           <input
             type="datetime-local"
             value={periodEnd}
@@ -274,11 +287,11 @@ export function InventoryUsagePeriodClosuresPanel({
           />
         </label>
         <label style={styles.fieldLabel}>
-          Closure notes
+          {ui("Closure notes")}
           <input
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
-            placeholder="Month-end close, department review, finance export..."
+            placeholder={ui("Month-end close, department review, finance export...")}
             style={styles.input}
           />
         </label>
@@ -296,7 +309,7 @@ export function InventoryUsagePeriodClosuresPanel({
             new Date(periodEnd).getTime() <= new Date(periodStart).getTime()
           }
         >
-          {previewing ? "Previewing..." : "Preview close impact"}
+          {previewing ? ui("Previewing...") : ui("Preview close impact")}
         </button>
         <button
           type="button"
@@ -304,7 +317,7 @@ export function InventoryUsagePeriodClosuresPanel({
           onClick={handleSubmit}
           disabled={!canClose || Boolean(previewResult?.preview?.blocked)}
         >
-          {closing ? "Closing period..." : "Close usage period"}
+          {closing ? ui("Closing period...") : ui("Close usage period")}
         </button>
         <button
           type="button"
@@ -312,7 +325,7 @@ export function InventoryUsagePeriodClosuresPanel({
           onClick={handleExportPreviewCsv}
           disabled={!previewResult?.preview}
         >
-          Export preview CSV
+          {ui("Export preview CSV")}
         </button>
         <button
           type="button"
@@ -320,41 +333,41 @@ export function InventoryUsagePeriodClosuresPanel({
           onClick={handleExportClosuresCsv}
           disabled={!closures.length}
         >
-          Export closures CSV
+          {ui("Export closures CSV")}
         </button>
         {currentPeriodAlreadyClosed ? (
           <span style={styles.warningText}>
-            This exact period is already closed and locked.
+            {ui("This exact period is already closed and locked.")}
           </span>
         ) : null}
         {periodStart &&
         periodEnd &&
         new Date(periodEnd).getTime() <= new Date(periodStart).getTime() ? (
           <span style={styles.warningText}>
-            Period end must be after period start.
+            {ui("Period end must be after period start.")}
           </span>
         ) : null}
       </div>
 
       {previewError ? (
         <p style={styles.errorText}>
-          Period close preview failed: {previewError.message}
+          {ui("Period close preview failed: ")}{previewError.message}
         </p>
       ) : null}
       {closeError ? (
         <p style={styles.errorText}>
-          Period close failed: {closeError.message}
+          {ui("Period close failed: ")}{closeError.message}
         </p>
       ) : null}
       {error ? (
         <p style={styles.errorText}>
-          Failed to load period closures: {error.message}
+          {ui("Failed to load period closures: ")}{error.message}
         </p>
       ) : null}
       {previewResult?.preview ? (
         <div style={styles.metricGrid}>
           <div style={styles.metricCard}>
-            <span style={styles.metricLabel}>Preview status</span>
+            <span style={styles.metricLabel}>{ui("Preview status")}</span>
             <strong
               style={
                 previewResult.preview.blocked
@@ -362,68 +375,65 @@ export function InventoryUsagePeriodClosuresPanel({
                   : styles.successText
               }
             >
-              {previewResult.preview.blocked ? "Blocked" : "Ready"}
+              {previewResult.preview.blocked ? ui("Blocked") : ui("Ready")}
             </strong>
             <small>
               {previewResult.preview.blocker_message || previewResult.message}
             </small>
           </div>
           <div style={styles.metricCard}>
-            <span style={styles.metricLabel}>Usage events</span>
-            <strong>{toNumber(previewResult.preview.usage_count)}</strong>
+            <span style={styles.metricLabel}>{ui("Usage events")}</span>
+            <strong>{formatNumber(previewResult.preview.usage_count, 0)}</strong>
             <small>
-              {toNumber(previewResult.preview.total_quantity)} total quantity
+              {formatNumber(previewResult.preview.total_quantity)} {ui("total quantity")}
             </small>
           </div>
           <div style={styles.metricCard}>
-            <span style={styles.metricLabel}>Estimated value</span>
+            <span style={styles.metricLabel}>{ui("Estimated value")}</span>
             <strong>
-              {formatMoney(previewResult.preview.estimated_usage_value, previewResult.preview.currency_code)}
+              {formatMoneyLocal(previewResult.preview.estimated_usage_value, previewResult.preview.currency_code)}
             </strong>
             <small>
-              {toNumber(previewResult.preview.exception_count)} exceptions
+              {formatNumber(previewResult.preview.exception_count, 0)} {ui("exceptions")}
             </small>
           </div>
           <div style={styles.metricCard}>
-            <span style={styles.metricLabel}>Governance</span>
+            <span style={styles.metricLabel}>{ui("Governance")}</span>
             <strong>
-              {toNumber(previewResult.preview.follow_up_count)} follow-up
+              {formatNumber(previewResult.preview.follow_up_count, 0)} {ui("follow-up")}
             </strong>
             <small>
-              {toNumber(previewResult.preview.reversed_count)} reversed entries
-              in range
+              {formatNumber(previewResult.preview.reversed_count, 0)} {ui("reversed entries in range")}
             </small>
           </div>
         </div>
       ) : null}
       {closeResult?.closure ? (
         <p style={styles.successText}>
-          Closed period with {toNumber(closeResult.closure.usage_count)} usage
-          events and {formatMoney(closeResult.closure.estimated_usage_value, closeResult.closure.currency_code)}{" "}
-          estimated usage value.
+          {ui("Closed period with")} {formatNumber(closeResult.closure.usage_count, 0)} {ui("usage events and")} {formatMoneyLocal(closeResult.closure.estimated_usage_value, closeResult.closure.currency_code)} {ui("estimated usage value.")}
         </p>
       ) : null}
 
       {loading ? (
         <p style={styles.sectionDescription}>
-          Loading usage period closures...
+          {ui("Loading usage period closures...")}
         </p>
       ) : !closures.length ? (
-        <p style={styles.emptyState}>No usage periods have been closed yet.</p>
+        <p style={styles.emptyState}>{ui("No usage periods have been closed yet.")}</p>
       ) : (
         <div style={styles.tableWrap}>
           <table style={styles.table}>
             <thead>
               <tr>
-                <th style={styles.th}>Period</th>
-                <th style={styles.th}>Usage</th>
-                <th style={styles.th}>Quantity</th>
-                <th style={styles.th}>Estimated value</th>
-                <th style={styles.th}>Exceptions</th>
-                <th style={styles.th}>Reversals</th>
-                <th style={styles.th}>Follow-up</th>
-                <th style={styles.th}>Closed by</th>
-                <th style={styles.th}>Notes</th>
+                <th style={styles.th}>{ui("Period")}</th>
+                <th style={styles.th}>{ui("Usage")}</th>
+                <th style={styles.th}>{ui("Quantity")}</th>
+                <th style={styles.th}>{ui("Estimated value")}</th>
+                <th style={styles.th}>{ui("Exceptions")}</th>
+                <th style={styles.th}>{ui("Reversals")}</th>
+                <th style={styles.th}>{ui("Follow-up")}</th>
+                <th style={styles.th}>{ui("Closed by")}</th>
+                <th style={styles.th}>{ui("Notes")}</th>
               </tr>
             </thead>
             <tbody>
@@ -431,26 +441,26 @@ export function InventoryUsagePeriodClosuresPanel({
                 <tr key={closure.id}>
                   <td style={styles.td}>
                     <div style={styles.contextCell}>
-                      <span>{formatDateTime(closure.period_start)}</span>
-                      <small>to {formatDateTime(closure.period_end)}</small>
+                      <span>{formatDateTimeLocal(closure.period_start)}</span>
+                      <small>{ui("to")} {formatDateTimeLocal(closure.period_end)}</small>
                     </div>
                   </td>
-                  <td style={styles.td}>{toNumber(closure.usage_count)}</td>
-                  <td style={styles.td}>{toNumber(closure.total_quantity)}</td>
+                  <td style={styles.td}>{formatNumber(closure.usage_count, 0)}</td>
+                  <td style={styles.td}>{formatNumber(closure.total_quantity)}</td>
                   <td style={styles.td}>
-                    {formatMoney(closure.estimated_usage_value, closure.currency_code)}
+                    {formatMoneyLocal(closure.estimated_usage_value, closure.currency_code)}
                   </td>
-                  <td style={styles.td}>{toNumber(closure.exception_count)}</td>
-                  <td style={styles.td}>{toNumber(closure.reversed_count)}</td>
-                  <td style={styles.td}>{toNumber(closure.follow_up_count)}</td>
+                  <td style={styles.td}>{formatNumber(closure.exception_count, 0)}</td>
+                  <td style={styles.td}>{formatNumber(closure.reversed_count, 0)}</td>
+                  <td style={styles.td}>{formatNumber(closure.follow_up_count, 0)}</td>
                   <td style={styles.td}>
                     <div style={styles.contextCell}>
                       <span>
                         {closure.closed_by_user_name ||
                           closure.closed_by_user_id ||
-                          "System"}
+                          ui("System")}
                       </span>
-                      <small>{formatDateTime(closure.closed_at)}</small>
+                      <small>{formatDateTimeLocal(closure.closed_at)}</small>
                     </div>
                   </td>
                   <td style={styles.td}>{closure.notes || "-"}</td>

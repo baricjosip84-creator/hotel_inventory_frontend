@@ -18,13 +18,15 @@ import { ProductCostAlertSummaryPanel } from './ProductCostAlertSummaryPanel';
 import { ProductCostReportSummaryPanel } from './ProductCostReportSummaryPanel';
 import { ProductCostActionDetailsPanel } from './ProductCostActionDetailsPanel';
 import { styles } from './productStyles';
+import { useAppTranslation } from '../../i18n/I18nContext';
 
 type ProductCostAnalyticsSectionsPanelProps = ReturnType<typeof useProductPageViewModel>;
 
 function CostWorkspaceIntro({ title, description }: { title: string; description: string }) {
+  const { ui } = useAppTranslation();
   return (
     <section className="products-cost-intro" style={styles.panel}>
-      <span className="products-cost-intro__eyebrow">Cost intelligence</span>
+      <span className="products-cost-intro__eyebrow">{ui("Cost intelligence")}</span>
       <h3 style={styles.panelTitle}>{title}</h3>
       <p style={{ ...styles.panelSubtitle, marginBottom: 0 }}>{description}</p>
     </section>
@@ -32,12 +34,13 @@ function CostWorkspaceIntro({ title, description }: { title: string; description
 }
 
 export function ProductCostAnalyticsSectionsPanel(props: ProductCostAnalyticsSectionsPanelProps) {
+  const { ui } = useAppTranslation();
   if (props.workspaceView === 'valuation') {
     return (
       <>
         <CostWorkspaceIntro
-          title="Cost & valuation"
-          description="Review cost coverage and estimated stock value without changing products, stock, shipments, or receiving records."
+          title={ui("Cost & valuation")}
+          description={ui("Review cost coverage and estimated stock value without changing products, stock, shipments, or receiving records.")}
         />
 
         <ProductCostingReadinessPanel
@@ -70,8 +73,8 @@ export function ProductCostAnalyticsSectionsPanel(props: ProductCostAnalyticsSec
     return (
       <>
         <CostWorkspaceIntro
-          title="Cost review"
-          description="Work through cost exceptions, recommendations, and supporting evidence. These sections are read-only and point people back to audited product and receiving workflows for any actual change."
+          title={ui("Cost review")}
+          description={ui("Work through cost exceptions, recommendations, and supporting evidence. These sections are read-only and point people back to audited product and receiving workflows for any actual change.")}
         />
 
         <ProductCostActionSummaryPanel
@@ -159,8 +162,8 @@ export function ProductCostAnalyticsSectionsPanel(props: ProductCostAnalyticsSec
     return (
       <>
         <CostWorkspaceIntro
-          title="Cost controls & audit"
-          description="Review finance-close readiness, hardening checks, governance evidence, and exportable audit material. This remains tenant-scoped and does not automatically change cost or stock records."
+          title={ui("Cost controls & audit")}
+          description={ui("Review finance-close readiness, hardening checks, governance evidence, and exportable audit material. This remains tenant-scoped and does not automatically change cost or stock records.")}
         />
 
         <ProductCostHardeningSummaryPanel

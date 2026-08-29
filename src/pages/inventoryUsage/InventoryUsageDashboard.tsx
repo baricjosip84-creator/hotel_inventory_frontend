@@ -1,4 +1,6 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useAppTranslation } from "../../i18n/I18nContext";
+import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from "../../i18n/formatters";
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
@@ -21,10 +23,6 @@ import {
 } from "./inventoryUsageConfig";
 import {
   formatCodeLabel,
-  formatDate,
-  formatDateTime,
-  formatDays,
-  formatMoney,
   formatUsageReason,
   shortenId,
   toNumber,
@@ -304,6 +302,36 @@ export function InventoryUsageDashboard({
   alertScanResult,
   onScanAlerts,
 }: InventoryUsageDashboardProps) {
+  const { locale, ui } = useAppTranslation();
+  const formatNumber = (value: number | string | null | undefined, maximumFractionDigits = 2) => {
+    if (value === null || value === undefined || value === "") return "—";
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return String(value);
+    return formatLocalizedNumber(numeric, locale, { maximumFractionDigits });
+  };
+  const formatDateLocal = (value: string | null | undefined) => formatLocalizedDate(value, locale);
+  const formatDateTimeLocal = (value: string | null | undefined) => formatLocalizedDateTime(value, locale);
+  const formatMoneyLocal = (value: number | string | null | undefined, currency?: string | null) =>
+    formatLocalizedCurrency(toNumber(value), currency || "EUR", locale, { maximumFractionDigits: 2 });
+  const formatDaysLocal = (value: number | string | null | undefined) => {
+    if (value === null || value === undefined || value === "") return "—";
+    const days = toNumber(value);
+    return `${formatLocalizedNumber(days, locale, { maximumFractionDigits: days < 10 ? 1 : 0 })} ${Math.abs(days - 1) < 0.0001 ? ui("day") : ui("days")}`;
+  };
+  const formatUsageReasonLocal = (reason: string | null | undefined) => {
+    const labels: Record<string, string> = {
+      guest_use: "Guest use", internal_use: "Internal use", damage: "Damage", waste: "Waste",
+      event: "Event", maintenance: "Maintenance", other: "Other"
+    };
+    return reason && labels[reason] ? ui(labels[reason]) : (reason ? formatUsageReason(reason) : ui("Unassigned"));
+  };
+  const formatCodeLabelLocal = (value: string | null | undefined) => {
+    const labels: Record<string, string> = {
+      pending: "Pending", reviewed: "Reviewed", follow_up_required: "Follow-up required",
+      depleted: "Depleted", below_minimum: "Below minimum", usage_exceeds_current_stock: "Usage exceeds current stock", healthy: "Healthy"
+    };
+    return value && labels[value] ? ui(labels[value]) : formatCodeLabel(value);
+  };
   const totals = summary?.totals;
   const ledgerStart = ledgerTotal > 0 ? (ledgerPage - 1) * ledgerPageSize + 1 : 0;
   const ledgerEnd = ledgerTotal > 0
@@ -402,7 +430,7 @@ export function InventoryUsageDashboard({
         })),
       );
     } catch (error) {
-      setAnalyticsExportError(error instanceof Error ? error.message : "Could not export usage impact.");
+      setAnalyticsExportError(error instanceof Error ? error.message : ui("Could not export usage impact."));
     } finally {
       setExportingImpact(false);
     }
@@ -446,7 +474,7 @@ export function InventoryUsageDashboard({
         })),
       );
     } catch (error) {
-      setAnalyticsExportError(error instanceof Error ? error.message : "Could not export usage anomalies.");
+      setAnalyticsExportError(error instanceof Error ? error.message : ui("Could not export usage anomalies."));
     } finally {
       setExportingAnomalies(false);
     }
@@ -456,13 +484,13 @@ export function InventoryUsageDashboard({
     <div className="io-operational-page io-usage-ledger-page io-workspace-page" style={styles.page}>
       <OperationalWorkspaceHero
         iconPath="/inventory-usage"
-        eyebrow="Usage operations"
-        title="Inventory usage ledger"
-        description="Record and review why stock leaves the business, with operational attribution, stock impact, audit evidence, templates, and controlled period close."
+        eyebrow={ui("Usage operations")}
+        title={ui("Inventory usage ledger")}
+        description={ui("Record and review why stock leaves the business, with operational attribution, stock impact, audit evidence, templates, and controlled period close.")}
         meta={<>
-          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>Stock-linked audit trail</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{permissions.canRecord || permissions.canBulkRecord ? "Usage recording available" : "Review-only for current role"}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Stock-linked audit trail")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{permissions.canRecord || permissions.canBulkRecord ? ui("Usage recording available") : ui("Review-only for current role")}</OperationalWorkspaceMetaPill>
         </>}
         aside={
           <div style={styles.heroActions}>
@@ -472,7 +500,7 @@ export function InventoryUsageDashboard({
               onClick={onRefreshPage}
               disabled={refreshingPage}
             >
-              {refreshingPage ? "Refreshing..." : "Refresh page"}
+              {refreshingPage ? ui("Refreshing...") : ui("Refresh page")}
             </button>
             <button
               type="button"
@@ -480,66 +508,66 @@ export function InventoryUsageDashboard({
               onClick={onExportCsv}
               disabled={!exportRowCount || exportingCsv}
             >
-              {exportingCsv ? "Preparing CSV..." : "Export filtered CSV"}
+              {exportingCsv ? ui("Preparing CSV...") : ui("Export filtered CSV")}
             </button>
           </div>
         }
       />
 
-      <OperationalWorkspaceStats ariaLabel="Usage summary">
+      <OperationalWorkspaceStats ariaLabel={ui("Usage summary")}>
         <OperationalWorkspaceStatCard
-          label="Usage events"
-          value={toNumber(totals?.usage_count)}
-          helper="Matching the current filters"
+          label={ui("Usage events")}
+          value={formatNumber(totals?.usage_count, 0)}
+          helper={ui("Matching the current filters")}
           iconPath="/inventory-usage"
           loading={summaryLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Quantity consumed"
-          value={toNumber(totals?.total_quantity)}
-          helper="May combine products measured in different units"
+          label={ui("Quantity consumed")}
+          value={formatNumber(totals?.total_quantity)}
+          helper={ui("May combine products measured in different units")}
           iconPath="/stock"
           loading={summaryLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Estimated usage value"
-          value={formatMoney(totals?.estimated_usage_value, summary?.currency_code)}
-          helper="Estimated from available cost evidence"
+          label={ui("Estimated usage value")}
+          value={formatMoneyLocal(totals?.estimated_usage_value, summary?.currency_code)}
+          helper={ui("Estimated from available cost evidence")}
           tone="blue"
           iconPath="/reports"
           loading={summaryLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Missing cost entries"
-          value={toNumber(totals?.missing_cost_count)}
-          helper="Usage records without usable cost evidence"
+          label={ui("Missing cost entries")}
+          value={formatNumber(totals?.missing_cost_count, 0)}
+          helper={ui("Usage records without usable cost evidence")}
           tone={toNumber(totals?.missing_cost_count) > 0 ? "warn" : "good"}
           iconPath="/alerts"
           loading={summaryLoading}
         />
         <OperationalWorkspaceStatCard
-          label="First consumed"
-          value={formatDateTime(totals?.first_consumed_at)}
-          helper="Earliest matching usage event"
+          label={ui("First consumed")}
+          value={formatDateTimeLocal(totals?.first_consumed_at)}
+          helper={ui("Earliest matching usage event")}
           iconPath="/inventory-usage"
           loading={summaryLoading}
           className="io-workspace-stat--timestamp"
         />
         <OperationalWorkspaceStatCard
-          label="Last consumed"
-          value={formatDateTime(totals?.last_consumed_at)}
-          helper="Most recent matching usage event"
+          label={ui("Last consumed")}
+          value={formatDateTimeLocal(totals?.last_consumed_at)}
+          helper={ui("Most recent matching usage event")}
           iconPath="/inventory-usage"
           loading={summaryLoading}
           className="io-workspace-stat--timestamp"
         />
       </OperationalWorkspaceStats>
 
-      <OperationalWorkspaceTabs ariaLabel="Usage ledger work areas" hint="Choose the part of usage operations you want to work in.">
+      <OperationalWorkspaceTabs ariaLabel={ui("Usage ledger work areas")} hint={ui("Choose the part of usage operations you want to work in.")}>
         <OperationalWorkspaceTab
           active={activeArea === "overview"}
           iconPath="/dashboard"
-          label="Overview"
+          label={ui("Overview")}
           count={toNumber(totals?.usage_count) || undefined}
           onClick={() => setActiveArea("overview")}
         />
@@ -547,14 +575,14 @@ export function InventoryUsageDashboard({
           <OperationalWorkspaceTab
             active={activeArea === "record"}
             iconPath="/inventory-usage"
-            label="Record usage"
+            label={ui("Record usage")}
             onClick={() => setActiveArea("record")}
           />
         ) : null}
         <OperationalWorkspaceTab
           active={activeArea === "templates"}
           iconPath="/automation-schedules"
-          label="Templates"
+          label={ui("Templates")}
           count={templates.length || undefined}
           onClick={() => setActiveArea("templates")}
         />
@@ -562,7 +590,7 @@ export function InventoryUsageDashboard({
           <OperationalWorkspaceTab
             active={activeArea === "close"}
             iconPath="/audit"
-            label="Period close"
+            label={ui("Period close")}
             count={periodClosures.length || undefined}
             onClick={() => setActiveArea("close")}
           />
@@ -570,7 +598,7 @@ export function InventoryUsageDashboard({
         <OperationalWorkspaceTab
           active={activeArea === "ledger"}
           iconPath="/stock-movements"
-          label="Ledger"
+          label={ui("Ledger")}
           count={ledgerTotal || undefined}
           onClick={() => setActiveArea("ledger")}
         />
@@ -580,27 +608,25 @@ export function InventoryUsageDashboard({
       <section style={styles.filterCard}>
         <OperationalSectionHeader
           iconPath="/stock-movements"
-          title="Operational filters"
-          description="Filter by product, location, reason, department, date, and reversal status."
+          title={ui("Operational filters")}
+          description={ui("Filter by product, location, reason, department, date, and reversal status.")}
           actions={
             <div style={styles.inlineActions}>
-              <span style={styles.filterPill}>{activeFilterCount} active</span>
+              <span style={styles.filterPill}>{activeFilterCount} {ui("active")}</span>
               <button
                 type="button"
                 style={styles.secondaryButton}
                 onClick={() => setFilters(DEFAULT_USAGE_FILTERS)}
                 disabled={activeFilterCount === 0}
               >
-                Reset filters
-              </button>
+                {ui("Reset filters")}</button>
             </div>
           }
         />
 
         <div style={styles.filterGrid}>
           <label style={styles.fieldLabel}>
-            Product
-            <select
+            {ui("Product")}<select
               style={styles.input}
               value={filters.product_id}
               onChange={(event) =>
@@ -611,17 +637,16 @@ export function InventoryUsageDashboard({
               }
               disabled={usageOptionsLoading}
             >
-              <option value="">All products</option>
+              <option value="">{ui("All products")}</option>
               {filterProductOptions.map((product) => (
                 <option key={product.id} value={product.id}>
-                  {product.name}{product.unit ? ` · ${product.unit}` : ""}{product.retired ? " · Retired" : ""}
+                  {product.name}{product.unit ? ` · ${product.unit}` : ""}{product.retired ? ui(" · Retired") : ""}
                 </option>
               ))}
             </select>
           </label>
           <label style={styles.fieldLabel}>
-            Storage location
-            <select
+            {ui("Storage location")}<select
               style={styles.input}
               value={filters.storage_location_id}
               onChange={(event) =>
@@ -632,17 +657,16 @@ export function InventoryUsageDashboard({
               }
               disabled={usageOptionsLoading}
             >
-              <option value="">All locations</option>
+              <option value="">{ui("All locations")}</option>
               {filterStorageLocations.map((location) => (
                 <option key={location.id} value={location.id}>
-                  {location.name}{location.retired ? " · Retired" : ""}
+                  {location.name}{location.retired ? ui(" · Retired") : ""}
                 </option>
               ))}
             </select>
           </label>
           <label style={styles.fieldLabel}>
-            Reason
-            <select
+            {ui("Reason")}<select
               style={styles.input}
               value={filters.consumption_reason}
               onChange={(event) =>
@@ -652,7 +676,7 @@ export function InventoryUsageDashboard({
                 }))
               }
             >
-              <option value="">All reasons</option>
+              <option value="">{ui("All reasons")}</option>
               {USAGE_REASON_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -661,8 +685,7 @@ export function InventoryUsageDashboard({
             </select>
           </label>
           <label style={styles.fieldLabel}>
-            Department / team
-            <input
+            {ui("Department / team")}<input
               style={styles.input}
               value={filters.department}
               onChange={(event) =>
@@ -671,7 +694,7 @@ export function InventoryUsageDashboard({
                   department: event.target.value,
                 }))
               }
-              placeholder="Housekeeping, kitchen, maintenance..."
+              placeholder={ui("Housekeeping, kitchen, maintenance...")}
               list="inventory-usage-departments"
             />
             <datalist id="inventory-usage-departments">
@@ -681,8 +704,7 @@ export function InventoryUsageDashboard({
             </datalist>
           </label>
           <label style={styles.fieldLabel}>
-            From
-            <input
+            {ui("From")}<input
               type="date"
               style={styles.input}
               value={filters.start_date}
@@ -695,8 +717,7 @@ export function InventoryUsageDashboard({
             />
           </label>
           <label style={styles.fieldLabel}>
-            To
-            <input
+            {ui("To")}<input
               type="date"
               style={styles.input}
               value={filters.end_date}
@@ -719,17 +740,15 @@ export function InventoryUsageDashboard({
                 }))
               }
             />
-            Include reversed usage
-          </label>
+            {ui("Include reversed usage")}</label>
         </div>
         {invalidDateRange ? (
           <p style={styles.errorText}>
-            The To date must be the same as or later than the From date.
-          </p>
+            {ui("The To date must be the same as or later than the From date.")}</p>
         ) : null}
         {usageOptionsError ? (
           <p style={styles.errorText}>
-            Product and location choices could not be loaded: {usageOptionsError.message}
+            {ui("Product and location choices could not be loaded: ")}{usageOptionsError.message}
           </p>
         ) : null}
       </section>
@@ -838,24 +857,22 @@ export function InventoryUsageDashboard({
 
       <section style={styles.breakdownGrid}>
         <div style={styles.card}>
-          <h2 style={styles.sectionTitle}>By reason</h2>
+          <h2 style={styles.sectionTitle}>{ui("By reason")}</h2>
           {summaryLoading ? (
-            <p style={styles.sectionDescription}>Loading reason breakdown...</p>
+            <p style={styles.sectionDescription}>{ui("Loading reason breakdown...")}</p>
           ) : !summary?.by_reason?.length ? (
             <p style={styles.emptyState}>
-              No usage reason data for the selected filters.
-            </p>
+              {ui("No usage reason data for the selected filters.")}</p>
           ) : (
             <div style={styles.breakdownList}>
               {summary.by_reason.map((row) => (
                 <div key={row.consumption_reason} style={styles.breakdownRow}>
-                  <span>{formatUsageReason(row.consumption_reason)}</span>
-                  <strong>{toNumber(row.total_quantity)}</strong>
+                  <span>{formatUsageReasonLocal(row.consumption_reason)}</span>
+                  <strong>{formatNumber(row.total_quantity)}</strong>
                   <small>
-                    {toNumber(row.usage_count)} events ·{" "}
-                    {formatMoney(row.estimated_usage_value, summary?.currency_code)} est. value
-                    {toNumber(row.missing_cost_count)
-                      ? ` · ${toNumber(row.missing_cost_count)} missing cost`
+                    {formatNumber(row.usage_count, 0)} {ui("events ·")}{" "}
+                    {formatMoneyLocal(row.estimated_usage_value, summary?.currency_code)} {ui("est. value")}{toNumber(row.missing_cost_count)
+                      ? ` · ${formatNumber(row.missing_cost_count, 0)} ${ui("missing cost")}`
                       : ""}
                   </small>
                 </div>
@@ -865,15 +882,13 @@ export function InventoryUsageDashboard({
         </div>
 
         <div style={styles.card}>
-          <h2 style={styles.sectionTitle}>By department</h2>
+          <h2 style={styles.sectionTitle}>{ui("By department")}</h2>
           {summaryLoading ? (
             <p style={styles.sectionDescription}>
-              Loading department breakdown...
-            </p>
+              {ui("Loading department breakdown...")}</p>
           ) : !summary?.by_department?.length ? (
             <p style={styles.emptyState}>
-              No department data for the selected filters.
-            </p>
+              {ui("No department data for the selected filters.")}</p>
           ) : (
             <div style={styles.breakdownList}>
               {summary.by_department.map((row) => (
@@ -881,13 +896,12 @@ export function InventoryUsageDashboard({
                   key={row.department || "unassigned"}
                   style={styles.breakdownRow}
                 >
-                  <span>{row.department || "Unassigned"}</span>
-                  <strong>{toNumber(row.total_quantity)}</strong>
+                  <span>{row.department || ui("Unassigned")}</span>
+                  <strong>{formatNumber(row.total_quantity)}</strong>
                   <small>
-                    {toNumber(row.usage_count)} events ·{" "}
-                    {formatMoney(row.estimated_usage_value, summary?.currency_code)} est. value
-                    {toNumber(row.missing_cost_count)
-                      ? ` · ${toNumber(row.missing_cost_count)} missing cost`
+                    {formatNumber(row.usage_count, 0)} {ui("events ·")}{" "}
+                    {formatMoneyLocal(row.estimated_usage_value, summary?.currency_code)} {ui("est. value")}{toNumber(row.missing_cost_count)
+                      ? ` · ${formatNumber(row.missing_cost_count, 0)} ${ui("missing cost")}`
                       : ""}
                   </small>
                 </div>
@@ -897,15 +911,13 @@ export function InventoryUsageDashboard({
         </div>
 
         <div style={styles.card}>
-          <h2 style={styles.sectionTitle}>By location</h2>
+          <h2 style={styles.sectionTitle}>{ui("By location")}</h2>
           {summaryLoading ? (
             <p style={styles.sectionDescription}>
-              Loading location breakdown...
-            </p>
+              {ui("Loading location breakdown...")}</p>
           ) : !summary?.by_location?.length ? (
             <p style={styles.emptyState}>
-              No location data for the selected filters.
-            </p>
+              {ui("No location data for the selected filters.")}</p>
           ) : (
             <div style={styles.breakdownList}>
               {summary.by_location.map((row) => (
@@ -916,13 +928,13 @@ export function InventoryUsageDashboard({
                   <span>
                     {row.storage_location_name || row.storage_location_id}
                   </span>
-                  <strong>{toNumber(row.total_quantity)}</strong>
+                  <strong>{formatNumber(row.total_quantity)}</strong>
                   <small>
-                    {toNumber(row.usage_count)} events ·{" "}
-                    {formatMoney(row.estimated_usage_value, summary?.currency_code)} est. value · last{" "}
-                    {formatDateTime(row.last_consumed_at)}
+                    {formatNumber(row.usage_count, 0)} {ui("events ·")}{" "}
+                    {formatMoneyLocal(row.estimated_usage_value, summary?.currency_code)} {ui("est. value · last")}{" "}
+                    {formatDateTimeLocal(row.last_consumed_at)}
                     {toNumber(row.missing_cost_count)
-                      ? ` · ${toNumber(row.missing_cost_count)} missing cost`
+                      ? ` · ${formatNumber(row.missing_cost_count, 0)} ${ui("missing cost")}`
                       : ""}
                   </small>
                 </div>
@@ -932,13 +944,12 @@ export function InventoryUsageDashboard({
         </div>
 
         <div style={styles.card}>
-          <h2 style={styles.sectionTitle}>By user</h2>
+          <h2 style={styles.sectionTitle}>{ui("By user")}</h2>
           {summaryLoading ? (
-            <p style={styles.sectionDescription}>Loading user breakdown...</p>
+            <p style={styles.sectionDescription}>{ui("Loading user breakdown...")}</p>
           ) : !summary?.by_user?.length ? (
             <p style={styles.emptyState}>
-              No user attribution data for the selected filters.
-            </p>
+              {ui("No user attribution data for the selected filters.")}</p>
           ) : (
             <div style={styles.breakdownList}>
               {summary.by_user.map((row) => (
@@ -953,15 +964,15 @@ export function InventoryUsageDashboard({
                   <span>
                     {row.created_by_user_name ||
                       row.created_by_user_id ||
-                      "System / unknown"}
+                      ui("System / unknown")}
                   </span>
-                  <strong>{toNumber(row.total_quantity)}</strong>
+                  <strong>{formatNumber(row.total_quantity)}</strong>
                   <small>
-                    {toNumber(row.usage_count)} events ·{" "}
-                    {formatMoney(row.estimated_usage_value, summary?.currency_code)} est. value · last{" "}
-                    {formatDateTime(row.last_consumed_at)}
+                    {formatNumber(row.usage_count, 0)} {ui("events ·")}{" "}
+                    {formatMoneyLocal(row.estimated_usage_value, summary?.currency_code)} {ui("est. value · last")}{" "}
+                    {formatDateTimeLocal(row.last_consumed_at)}
                     {toNumber(row.missing_cost_count)
-                      ? ` · ${toNumber(row.missing_cost_count)} missing cost`
+                      ? ` · ${formatNumber(row.missing_cost_count, 0)} ${ui("missing cost")}`
                       : ""}
                   </small>
                 </div>
@@ -972,36 +983,33 @@ export function InventoryUsageDashboard({
 
         {analyticsExportError ? (
           <div style={styles.cardWide}>
-            <p style={styles.errorText}>Usage analytics export failed: {analyticsExportError}</p>
+            <p style={styles.errorText}>{ui("Usage analytics export failed: ")}{analyticsExportError}</p>
           </div>
         ) : null}
 
         <div style={styles.cardWide}>
           <OperationalSectionHeader
             iconPath="/reports"
-            title="Daily usage trend"
+            title={ui("Daily usage trend")}
           />
           {summaryLoading ? (
             <p style={styles.sectionDescription}>
-              Loading daily usage trend...
-            </p>
+              {ui("Loading daily usage trend...")}</p>
           ) : !summary?.by_day?.length ? (
             <p style={styles.emptyState}>
-              No daily usage trend data for the selected filters.
-            </p>
+              {ui("No daily usage trend data for the selected filters.")}</p>
           ) : (
             <div style={styles.trendList}>
               {summary.by_day.map((row) => (
                 <div key={row.usage_date} style={styles.trendRow}>
-                  <span>{formatDate(row.usage_date)}</span>
-                  <strong>{toNumber(row.total_quantity)} consumed</strong>
+                  <span>{formatDateLocal(row.usage_date)}</span>
+                  <strong>{formatNumber(row.total_quantity)} {ui("consumed")}</strong>
                   <small>
-                    {toNumber(row.usage_count)} events ·{" "}
-                    {toNumber(row.product_count)} products ·{" "}
-                    {toNumber(row.location_count)} locations ·{" "}
-                    {formatMoney(row.estimated_usage_value, summary?.currency_code)} est. value
-                    {toNumber(row.missing_cost_count)
-                      ? ` · ${toNumber(row.missing_cost_count)} missing cost`
+                    {formatNumber(row.usage_count, 0)} {ui("events ·")}{" "}
+                    {formatNumber(row.product_count, 0)} {ui("products ·")}{" "}
+                    {formatNumber(row.location_count, 0)} {ui("locations ·")}{" "}
+                    {formatMoneyLocal(row.estimated_usage_value, summary?.currency_code)} {ui("est. value")}{toNumber(row.missing_cost_count)
+                      ? ` · ${formatNumber(row.missing_cost_count, 0)} ${ui("missing cost")}`
                       : ""}
                   </small>
                 </div>
@@ -1013,8 +1021,8 @@ export function InventoryUsageDashboard({
         <div style={styles.cardWide}>
           <OperationalSectionHeader
             iconPath="/stock"
-            title="Usage stock impact"
-            description="Shows consumed products whose current stock may now be depleted, below minimum, or lower than the quantity consumed in the selected period."
+            title={ui("Usage stock impact")}
+            description={ui("Shows consumed products whose current stock may now be depleted, below minimum, or lower than the quantity consumed in the selected period.")}
             actions={
               <button
                 type="button"
@@ -1022,45 +1030,43 @@ export function InventoryUsageDashboard({
                 onClick={exportImpactCsv}
                 disabled={exportingImpact || !impact?.rows?.length}
               >
-                {exportingImpact ? "Preparing impact CSV..." : "Export filtered impact CSV"}
+                {exportingImpact ? ui("Preparing impact CSV...") : ui("Export filtered impact CSV")}
               </button>
             }
           />
           {impactLoading ? (
             <p style={styles.sectionDescription}>
-              Loading usage stock impact...
-            </p>
+              {ui("Loading usage stock impact...")}</p>
           ) : !impact?.rows?.length ? (
             <p style={styles.emptyState}>
-              No stock impact rows for the selected filters.
-            </p>
+              {ui("No stock impact rows for the selected filters.")}</p>
           ) : (
             <>
               <div style={styles.governanceGrid}>
                 <div style={styles.governanceCard}>
-                  <span>Impacted rows</span>
-                  <strong>{toNumber(impact.summary?.impacted_count)}</strong>
+                  <span>{ui("Impacted rows")}</span>
+                  <strong>{formatNumber(impact.summary?.impacted_count, 0)}</strong>
                 </div>
                 <div style={styles.governanceCard}>
-                  <span>Depleted</span>
-                  <strong>{toNumber(impact.summary?.depleted_count)}</strong>
+                  <span>{ui("Depleted")}</span>
+                  <strong>{formatNumber(impact.summary?.depleted_count, 0)}</strong>
                 </div>
                 <div style={styles.governanceCard}>
-                  <span>Below minimum</span>
+                  <span>{ui("Below minimum")}</span>
                   <strong>
-                    {toNumber(impact.summary?.below_minimum_count)}
+                    {formatNumber(impact.summary?.below_minimum_count, 0)}
                   </strong>
                 </div>
                 <div style={styles.governanceCard}>
-                  <span>Usage value</span>
+                  <span>{ui("Usage value")}</span>
                   <strong>
-                    {formatMoney(impact.summary?.estimated_usage_value, impact?.currency_code)}
+                    {formatMoneyLocal(impact.summary?.estimated_usage_value, impact?.currency_code)}
                   </strong>
                 </div>
                 <div style={styles.governanceCard}>
-                  <span>Recommended reorder</span>
+                  <span>{ui("Recommended reorder")}</span>
                   <strong>
-                    {toNumber(impact.summary?.recommended_reorder_quantity)}
+                    {formatNumber(impact.summary?.recommended_reorder_quantity)}
                   </strong>
                 </div>
               </div>
@@ -1068,16 +1074,16 @@ export function InventoryUsageDashboard({
                 <table style={styles.table}>
                   <thead>
                     <tr>
-                      <th style={styles.th}>Product</th>
-                      <th style={styles.th}>Location</th>
-                      <th style={styles.th}>Used</th>
-                      <th style={styles.th}>Current</th>
-                      <th style={styles.th}>Minimum</th>
-                      <th style={styles.th}>Avg/day</th>
-                      <th style={styles.th}>Coverage</th>
-                      <th style={styles.th}>Reorder</th>
-                      <th style={styles.th}>Status</th>
-                      <th style={styles.th}>Last used</th>
+                      <th style={styles.th}>{ui("Product")}</th>
+                      <th style={styles.th}>{ui("Location")}</th>
+                      <th style={styles.th}>{ui("Used")}</th>
+                      <th style={styles.th}>{ui("Current")}</th>
+                      <th style={styles.th}>{ui("Minimum")}</th>
+                      <th style={styles.th}>{ui("Avg/day")}</th>
+                      <th style={styles.th}>{ui("Coverage")}</th>
+                      <th style={styles.th}>{ui("Reorder")}</th>
+                      <th style={styles.th}>{ui("Status")}</th>
+                      <th style={styles.th}>{ui("Last used")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1090,33 +1096,33 @@ export function InventoryUsageDashboard({
                           {row.storage_location_name || row.storage_location_id}
                         </td>
                         <td style={styles.td}>
-                          {toNumber(row.total_quantity)}{" "}
+                          {formatNumber(row.total_quantity)}{" "}
                           {row.product_unit || ""}
                         </td>
                         <td style={styles.td}>
-                          {toNumber(row.current_quantity)}{" "}
+                          {formatNumber(row.current_quantity)}{" "}
                           {row.product_unit || ""}
                         </td>
                         <td style={styles.td}>
-                          {toNumber(row.effective_min_quantity)}{" "}
+                          {formatNumber(row.effective_min_quantity)}{" "}
                           {row.product_unit || ""}
                         </td>
                         <td style={styles.td}>
-                          {toNumber(row.average_daily_usage)}{" "}
+                          {formatNumber(row.average_daily_usage)}{" "}
                           {row.product_unit || ""}
                         </td>
                         <td style={styles.td}>
-                          {formatDays(row.estimated_days_of_coverage)}
+                          {formatDaysLocal(row.estimated_days_of_coverage)}
                         </td>
                         <td style={styles.td}>
-                          {toNumber(row.recommended_reorder_quantity)}{" "}
+                          {formatNumber(row.recommended_reorder_quantity)}{" "}
                           {row.product_unit || ""}
                         </td>
                         <td style={styles.td}>
-                          {formatCodeLabel(String(row.impact_status))}
+                          {formatCodeLabelLocal(String(row.impact_status))}
                         </td>
                         <td style={styles.td}>
-                          {formatDateTime(row.last_consumed_at)}
+                          {formatDateTimeLocal(row.last_consumed_at)}
                         </td>
                       </tr>
                     ))}
@@ -1130,8 +1136,8 @@ export function InventoryUsageDashboard({
         <div style={styles.cardWide}>
           <OperationalSectionHeader
             iconPath="/alerts"
-            title="Usage anomaly watch"
-            description="Flags products whose highest daily usage in the selected period is more than 2× their observed daily average."
+            title={ui("Usage anomaly watch")}
+            description={ui("Flags products whose highest daily usage in the selected period is more than 2× their observed daily average.")}
             actions={
               <button
                 type="button"
@@ -1139,67 +1145,64 @@ export function InventoryUsageDashboard({
                 onClick={exportAnomaliesCsv}
                 disabled={exportingAnomalies || !anomalies?.rows?.length}
               >
-                {exportingAnomalies ? "Preparing anomalies CSV..." : "Export filtered anomalies CSV"}
+                {exportingAnomalies ? ui("Preparing anomalies CSV...") : ui("Export filtered anomalies CSV")}
               </button>
             }
           />
           {anomaliesLoading ? (
-            <p style={styles.sectionDescription}>Loading anomaly watch...</p>
+            <p style={styles.sectionDescription}>{ui("Loading anomaly watch...")}</p>
           ) : !anomalies?.rows?.length ? (
             <p style={styles.emptyState}>
-              No usage spikes detected for the selected filters.
-            </p>
+              {ui("No usage spikes detected for the selected filters.")}</p>
           ) : (
             <>
               <div style={styles.governanceGrid}>
                 <div style={styles.governanceCard}>
-                  <span>Spike days</span>
-                  <strong>{toNumber(anomalies.summary?.spike_count)}</strong>
+                  <span>{ui("Spike days")}</span>
+                  <strong>{formatNumber(anomalies.summary?.spike_count, 0)}</strong>
                 </div>
                 <div style={styles.governanceCard}>
-                  <span>Impacted products</span>
+                  <span>{ui("Impacted products")}</span>
                   <strong>
-                    {toNumber(anomalies.summary?.impacted_product_count)}
+                    {formatNumber(anomalies.summary?.impacted_product_count, 0)}
                   </strong>
                 </div>
                 <div style={styles.governanceCard}>
-                  <span>Highest multiplier</span>
+                  <span>{ui("Highest multiplier")}</span>
                   <strong>
-                    {toNumber(anomalies.summary?.highest_spike_multiplier)}×
-                  </strong>
+                    {formatNumber(anomalies.summary?.highest_spike_multiplier)}{ui("×")}</strong>
                 </div>
               </div>
               <div style={styles.tableWrap}>
                 <table style={styles.table}>
                   <thead>
                     <tr>
-                      <th style={styles.th}>Date</th>
-                      <th style={styles.th}>Product</th>
-                      <th style={styles.th}>Daily usage</th>
-                      <th style={styles.th}>Average</th>
-                      <th style={styles.th}>Spike</th>
-                      <th style={styles.th}>Observed days</th>
+                      <th style={styles.th}>{ui("Date")}</th>
+                      <th style={styles.th}>{ui("Product")}</th>
+                      <th style={styles.th}>{ui("Daily usage")}</th>
+                      <th style={styles.th}>{ui("Average")}</th>
+                      <th style={styles.th}>{ui("Spike")}</th>
+                      <th style={styles.th}>{ui("Observed days")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {anomalies.rows.map((row) => (
                       <tr key={`${row.product_id}-${row.usage_date}`}>
-                        <td style={styles.td}>{formatDate(row.usage_date)}</td>
+                        <td style={styles.td}>{formatDateLocal(row.usage_date)}</td>
                         <td style={styles.td}>
                           {row.product_name || row.product_id}
                         </td>
                         <td style={styles.td}>
-                          {toNumber(row.daily_quantity)}{" "}
+                          {formatNumber(row.daily_quantity)}{" "}
                           {row.product_unit || ""}
                         </td>
                         <td style={styles.td}>
-                          {toNumber(row.average_daily_quantity)}{" "}
+                          {formatNumber(row.average_daily_quantity)}{" "}
                           {row.product_unit || ""}
                         </td>
                         <td style={styles.td}>
-                          {toNumber(row.spike_multiplier)}×
-                        </td>
-                        <td style={styles.td}>{toNumber(row.observed_days)}</td>
+                          {formatNumber(row.spike_multiplier)}{ui("×")}</td>
+                        <td style={styles.td}>{formatNumber(row.observed_days, 0)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1212,27 +1215,25 @@ export function InventoryUsageDashboard({
         <div style={styles.cardWide}>
           <OperationalSectionHeader
             iconPath="/products"
-            title="Top consumed products"
+            title={ui("Top consumed products")}
           />
           {summaryLoading ? (
             <p style={styles.sectionDescription}>
-              Loading product breakdown...
-            </p>
+              {ui("Loading product breakdown...")}</p>
           ) : !summary?.by_product?.length ? (
             <p style={styles.emptyState}>
-              No product usage data for the selected filters.
-            </p>
+              {ui("No product usage data for the selected filters.")}</p>
           ) : (
             <div style={styles.tableWrap}>
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>Product</th>
-                    <th style={styles.th}>Events</th>
-                    <th style={styles.th}>Quantity</th>
-                    <th style={styles.th}>Estimated value</th>
-                    <th style={styles.th}>Unit cost</th>
-                    <th style={styles.th}>Unit</th>
+                    <th style={styles.th}>{ui("Product")}</th>
+                    <th style={styles.th}>{ui("Events")}</th>
+                    <th style={styles.th}>{ui("Quantity")}</th>
+                    <th style={styles.th}>{ui("Estimated value")}</th>
+                    <th style={styles.th}>{ui("Unit cost")}</th>
+                    <th style={styles.th}>{ui("Unit")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1241,15 +1242,15 @@ export function InventoryUsageDashboard({
                       <td style={styles.td}>
                         {row.product_name || row.product_id}
                       </td>
-                      <td style={styles.td}>{toNumber(row.usage_count)}</td>
-                      <td style={styles.td}>{toNumber(row.total_quantity)}</td>
+                      <td style={styles.td}>{formatNumber(row.usage_count, 0)}</td>
+                      <td style={styles.td}>{formatNumber(row.total_quantity)}</td>
                       <td style={styles.td}>
-                        {formatMoney(row.estimated_usage_value, summary?.currency_code)}
+                        {formatMoneyLocal(row.estimated_usage_value, summary?.currency_code)}
                       </td>
                       <td style={styles.td}>
                         {row.estimated_unit_cost
-                          ? formatMoney(row.estimated_unit_cost, summary?.currency_code)
-                          : "Missing"}
+                          ? formatMoneyLocal(row.estimated_unit_cost, summary?.currency_code)
+                          : ui("Missing")}
                       </td>
                       <td style={styles.td}>{row.product_unit || "-"}</td>
                     </tr>
@@ -1283,91 +1284,89 @@ export function InventoryUsageDashboard({
         <section style={styles.card}>
           <OperationalSectionHeader
             iconPath="/audit"
-            title="Usage log detail"
-            description="Operational audit view for the selected consumption entry, including stock movements, review state, reversal linkage, and evidence attachments."
+            title={ui("Usage log detail")}
+            description={ui("Operational audit view for the selected consumption entry, including stock movements, review state, reversal linkage, and evidence attachments.")}
             actions={
               <button
                 type="button"
                 style={styles.secondaryButton}
                 onClick={onCloseUsageLogDetail}
               >
-                Close detail
-              </button>
+                {ui("Close detail")}</button>
             }
           />
 
           {usageLogDetailLoading ? (
-            <p style={styles.sectionDescription}>Loading usage detail...</p>
+            <p style={styles.sectionDescription}>{ui("Loading usage detail...")}</p>
           ) : usageLogDetailError ? (
             <p style={styles.errorText}>
-              Failed to load usage detail: {usageLogDetailError.message}
+              {ui("Failed to load usage detail: ")}{usageLogDetailError.message}
             </p>
           ) : usageLogDetail ? (
             <>
               <div style={styles.governanceGrid}>
                 <div style={styles.governanceCard}>
-                  <span>Product</span>
+                  <span>{ui("Product")}</span>
                   <strong>
                     {usageLogDetail.product_name || usageLogDetail.product_id}
                   </strong>
                   <small>
-                    {toNumber(usageLogDetail.quantity)}{" "}
-                    {usageLogDetail.product_unit || ""} consumed
-                  </small>
+                    {formatNumber(usageLogDetail.quantity)}{" "}
+                    {usageLogDetail.product_unit || ""} {ui("consumed")}</small>
                 </div>
                 <div style={styles.governanceCard}>
-                  <span>Location</span>
+                  <span>{ui("Location")}</span>
                   <strong>
                     {usageLogDetail.storage_location_name ||
                       usageLogDetail.storage_location_id}
                   </strong>
                   <small>
                     {usageLogDetail.storage_location_temperature_zone ||
-                      "No temperature zone"}
+                      ui("No temperature zone")}
                   </small>
                 </div>
                 <div style={styles.governanceCard}>
-                  <span>Reason / department</span>
+                  <span>{ui("Reason / department")}</span>
                   <strong>
-                    {formatUsageReason(usageLogDetail.consumption_reason)}
+                    {formatUsageReasonLocal(usageLogDetail.consumption_reason)}
                   </strong>
                   <small>
-                    {usageLogDetail.department || "No department"}
+                    {usageLogDetail.department || ui("No department")}
                     {usageLogDetail.event_name
                       ? ` · ${usageLogDetail.event_name}`
                       : ""}
                   </small>
                 </div>
                 <div style={styles.governanceCard}>
-                  <span>Estimated value</span>
+                  <span>{ui("Estimated value")}</span>
                   <strong>
-                    {formatMoney(usageLogDetail.estimated_usage_value, usageLogDetail.currency_code)}
+                    {formatMoneyLocal(usageLogDetail.estimated_usage_value, usageLogDetail.currency_code)}
                   </strong>
                   <small>
                     {usageLogDetail.estimated_unit_cost
-                      ? `${formatMoney(usageLogDetail.estimated_unit_cost, usageLogDetail.currency_code)} / ${usageLogDetail.product_unit || "unit"}`
-                      : "Missing standard cost"}
+                      ? `${formatMoneyLocal(usageLogDetail.estimated_unit_cost, usageLogDetail.currency_code)} / ${usageLogDetail.product_unit || ui("unit")}`
+                      : ui("Missing standard cost")}
                   </small>
                 </div>
                 <div style={styles.governanceCard}>
-                  <span>Balance impact</span>
+                  <span>{ui("Balance impact")}</span>
                   <strong>
-                    {usageLogDetail.quantity_before ?? "-"} →{" "}
-                    {usageLogDetail.quantity_after ?? "-"}
+                    {formatNumber(usageLogDetail.quantity_before)} →{" "}
+                    {formatNumber(usageLogDetail.quantity_after)}
                   </strong>
                   <small>
-                    Movement {shortenId(usageLogDetail.stock_movement_id, 12)}
+                    {ui("Movement ")}{shortenId(usageLogDetail.stock_movement_id, 12)}
                   </small>
                 </div>
                 <div style={styles.governanceCard}>
-                  <span>Review status</span>
-                  <strong>{formatCodeLabel(usageLogDetail.review_status || "pending")}</strong>
+                  <span>{ui("Review status")}</span>
+                  <strong>{formatCodeLabelLocal(usageLogDetail.review_status || "pending")}</strong>
                   <small>
                     {usageLogDetail.reviewed_by_user_name ||
                       usageLogDetail.reviewed_by_user_id ||
-                      "Not reviewed"}
+                      ui("Not reviewed")}
                     {usageLogDetail.reviewed_at
-                      ? ` · ${formatDateTime(usageLogDetail.reviewed_at)}`
+                      ? ` · ${formatDateTimeLocal(usageLogDetail.reviewed_at)}`
                       : ""}
                   </small>
                 </div>
@@ -1375,40 +1374,40 @@ export function InventoryUsageDashboard({
 
               <div style={styles.governanceGrid}>
                 <div style={styles.governanceCardWide}>
-                  <span>Notes and reference</span>
-                  <strong>{usageLogDetail.notes || "No notes captured"}</strong>
+                  <span>{ui("Notes and reference")}</span>
+                  <strong>{usageLogDetail.notes || ui("No notes captured")}</strong>
                   <small>
                     {usageLogDetail.reference_type
-                      ? `${formatCodeLabel(usageLogDetail.reference_type)}: ${shortenId(usageLogDetail.reference_id, 12)}`
-                      : "No linked reference"}
+                      ? `${formatCodeLabelLocal(usageLogDetail.reference_type)}: ${shortenId(usageLogDetail.reference_id, 12)}`
+                      : ui("No linked reference")}
                   </small>
                   <small>
-                    Recorded by{" "}
+                    {ui("Recorded by")}{" "}
                     {usageLogDetail.created_by_user_name ||
                       usageLogDetail.created_by_user_id ||
                       "system"}{" "}
-                    · consumed {formatDateTime(usageLogDetail.consumed_at)}
+                    {ui("· consumed ")}{formatDateTimeLocal(usageLogDetail.consumed_at)}
                   </small>
                 </div>
                 <div style={styles.governanceCardWide}>
-                  <span>Movement audit</span>
+                  <span>{ui("Movement audit")}</span>
                   <strong>
-                    Usage movement:{" "}
+                    {ui("Usage movement:")}{" "}
                     {shortenId(usageLogDetail.stock_movement?.id || usageLogDetail.stock_movement_id, 12)}
                   </strong>
                   <small>
                     {usageLogDetail.stock_movement
-                      ? `${usageLogDetail.stock_movement.reason || "No reason"} · ${usageLogDetail.stock_movement.change ?? "-"} · ${formatDateTime(usageLogDetail.stock_movement.created_at)}`
-                      : "No stock movement summary returned"}
+                      ? `${usageLogDetail.stock_movement.reason || ui("No reason")} · ${usageLogDetail.stock_movement.change ?? "-"} · ${formatDateTimeLocal(usageLogDetail.stock_movement.created_at)}`
+                      : ui("No stock movement summary returned")}
                   </small>
                   <strong>
-                    Reversal movement:{" "}
+                    {ui("Reversal movement:")}{" "}
                     {shortenId(usageLogDetail.reversal_stock_movement?.id || usageLogDetail.reversal_stock_movement_id, 12)}
                   </strong>
                   <small>
                     {usageLogDetail.reversal_stock_movement
-                      ? `${usageLogDetail.reversal_stock_movement.reason || "No reason"} · ${usageLogDetail.reversal_stock_movement.change ?? "-"} · ${formatDateTime(usageLogDetail.reversal_stock_movement.created_at)}`
-                      : usageLogDetail.reversal_reason || "Not reversed"}
+                      ? `${usageLogDetail.reversal_stock_movement.reason || ui("No reason")} · ${usageLogDetail.reversal_stock_movement.change ?? "-"} · ${formatDateTimeLocal(usageLogDetail.reversal_stock_movement.created_at)}`
+                      : usageLogDetail.reversal_reason || ui("Not reversed")}
                   </small>
                 </div>
               </div>
@@ -1417,10 +1416,10 @@ export function InventoryUsageDashboard({
                 <table style={styles.table}>
                   <thead>
                     <tr>
-                      <th style={styles.th}>Evidence file</th>
-                      <th style={styles.th}>Type</th>
-                      <th style={styles.th}>Uploaded by</th>
-                      <th style={styles.th}>Uploaded</th>
+                      <th style={styles.th}>{ui("Evidence file")}</th>
+                      <th style={styles.th}>{ui("Type")}</th>
+                      <th style={styles.th}>{ui("Uploaded by")}</th>
+                      <th style={styles.th}>{ui("Uploaded")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1441,15 +1440,14 @@ export function InventoryUsageDashboard({
                               "-"}
                           </td>
                           <td style={styles.td}>
-                            {formatDateTime(attachment.created_at)}
+                            {formatDateTimeLocal(attachment.created_at)}
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
                         <td style={styles.td} colSpan={4}>
-                          No evidence attachments linked to this usage log.
-                        </td>
+                          {ui("No evidence attachments linked to this usage log.")}</td>
                       </tr>
                     )}
                   </tbody>
@@ -1464,16 +1462,13 @@ export function InventoryUsageDashboard({
       <section style={styles.card}>
         <OperationalSectionHeader
           iconPath="/stock-movements"
-          title="Usage ledger"
+          title={ui("Usage ledger")}
           description={<>
-            Filtered usage records linked to stock movement IDs for audit traceability. Reversals restore stock through a compensating movement instead of deleting history.
-            <br />
-            Showing {ledgerStart}-{ledgerEnd} of {ledgerTotal} matching usage records.
-          </>}
+            {ui("Filtered usage records linked to stock movement IDs for audit traceability. Reversals restore stock through a compensating movement instead of deleting history.")}<br />
+            {ui("Showing ")}{ledgerStart}-{ledgerEnd} {ui("of ")}{ledgerTotal} {ui("matching usage records.")}</>}
           actions={
             <label style={styles.fieldLabel}>
-              Rows per page
-              <select
+              {ui("Rows per page")}<select
                 style={styles.input}
                 value={ledgerPageSize}
                 onChange={(event) => onLedgerPageSizeChange(Number(event.target.value))}
@@ -1487,43 +1482,42 @@ export function InventoryUsageDashboard({
         />
         {reverseError ? (
           <p style={styles.errorText}>
-            Usage reversal failed: {reverseError.message}
+            {ui("Usage reversal failed: ")}{reverseError.message}
           </p>
         ) : null}
 
         {logsLoading ? (
-          <p style={styles.sectionDescription}>Loading usage ledger...</p>
+          <p style={styles.sectionDescription}>{ui("Loading usage ledger...")}</p>
         ) : logsError ? (
           <p style={styles.errorText}>
-            Failed to load usage ledger: {logsError.message}
+            {ui("Failed to load usage ledger: ")}{logsError.message}
           </p>
         ) : !logs.length ? (
           <p style={styles.emptyState}>
-            No usage logs match the selected filters.
-          </p>
+            {ui("No usage logs match the selected filters.")}</p>
         ) : (
           <div style={styles.tableWrap}>
             <table style={styles.table}>
               <thead>
                 <tr>
-                  <th style={styles.th}>Consumed</th>
-                  <th style={styles.th}>Product</th>
-                  <th style={styles.th}>Location</th>
-                  <th style={styles.th}>Reason</th>
-                  <th style={styles.th}>Department</th>
-                  <th style={styles.th}>Quantity</th>
-                  <th style={styles.th}>Est. value</th>
-                  <th style={styles.th}>Balance</th>
-                  <th style={styles.th}>Context</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Action</th>
+                  <th style={styles.th}>{ui("Consumed")}</th>
+                  <th style={styles.th}>{ui("Product")}</th>
+                  <th style={styles.th}>{ui("Location")}</th>
+                  <th style={styles.th}>{ui("Reason")}</th>
+                  <th style={styles.th}>{ui("Department")}</th>
+                  <th style={styles.th}>{ui("Quantity")}</th>
+                  <th style={styles.th}>{ui("Est. value")}</th>
+                  <th style={styles.th}>{ui("Balance")}</th>
+                  <th style={styles.th}>{ui("Context")}</th>
+                  <th style={styles.th}>{ui("Status")}</th>
+                  <th style={styles.th}>{ui("Action")}</th>
                 </tr>
               </thead>
               <tbody>
                 {logs.map((usage) => (
                   <tr key={usage.id}>
                     <td style={styles.td}>
-                      {formatDateTime(usage.consumed_at)}
+                      {formatDateTimeLocal(usage.consumed_at)}
                     </td>
                     <td style={styles.td}>
                       {usage.product_name || usage.product_id}
@@ -1532,57 +1526,57 @@ export function InventoryUsageDashboard({
                       {usage.storage_location_name || usage.storage_location_id}
                     </td>
                     <td style={styles.td}>
-                      {formatUsageReason(usage.consumption_reason)}
+                      {formatUsageReasonLocal(usage.consumption_reason)}
                     </td>
                     <td style={styles.td}>{usage.department || "-"}</td>
                     <td style={styles.td}>
-                      -{toNumber(usage.quantity)} {usage.product_unit || ""}
+                      -{formatNumber(usage.quantity)} {usage.product_unit || ""}
                     </td>
                     <td style={styles.td}>
                       <div style={styles.contextCell}>
-                        <span>{formatMoney(usage.estimated_usage_value, usage.currency_code)}</span>
+                        <span>{formatMoneyLocal(usage.estimated_usage_value, usage.currency_code)}</span>
                         <small>
                           {usage.estimated_unit_cost
-                            ? `${formatMoney(usage.estimated_unit_cost, usage.currency_code)} / ${usage.product_unit || "unit"}`
-                            : "Missing standard cost"}
+                            ? `${formatMoneyLocal(usage.estimated_unit_cost, usage.currency_code)} / ${usage.product_unit || ui("unit")}`
+                            : ui("Missing standard cost")}
                         </small>
                       </div>
                     </td>
                     <td style={styles.td}>
-                      {usage.quantity_before ?? "-"} →{" "}
-                      {usage.quantity_after ?? "-"}
+                      {formatNumber(usage.quantity_before)} →{" "}
+                      {formatNumber(usage.quantity_after)}
                     </td>
                     <td style={styles.td}>
                       <div style={styles.contextCell}>
-                        <span>{usage.event_name || "No event/job"}</span>
-                        <small>{usage.notes ? "Notes recorded — open Details" : "No notes"}</small>
+                        <span>{usage.event_name || ui("No event/job")}</span>
+                        <small>{usage.notes ? ui("Notes recorded — open Details") : ui("No notes")}</small>
                         <small>
                           {usage.reference_type
-                            ? `${formatCodeLabel(usage.reference_type)}: ${shortenId(usage.reference_id, 12)}`
-                            : "No linked reference"}
+                            ? `${formatCodeLabelLocal(usage.reference_type)}: ${shortenId(usage.reference_id, 12)}`
+                            : ui("No linked reference")}
                         </small>
                         <small>
-                          Movement {shortenId(usage.stock_movement_id, 12)}
+                          {ui("Movement ")}{shortenId(usage.stock_movement_id, 12)}
                         </small>
                         <small>
-                          By{" "}
+                          {ui("By")}{" "}
                           {usage.created_by_user_name ||
                             usage.created_by_user_id ||
-                            "system"}
+                            ui("System")}
                         </small>
                       </div>
                     </td>
                     <td style={styles.td}>
                       {usage.reversed_at ? (
                         <div style={styles.contextCell}>
-                          <strong>Reversed</strong>
-                          <small>{formatDateTime(usage.reversed_at)}</small>
+                          <strong>{ui("Reversed")}</strong>
+                          <small>{formatDateTimeLocal(usage.reversed_at)}</small>
                           <small>
-                            {usage.reversal_reason || "No reversal reason"}
+                            {usage.reversal_reason || ui("No reversal reason")}
                           </small>
                         </div>
                       ) : (
-                        <span>Active</span>
+                        <span>{ui("Active")}</span>
                       )}
                     </td>
                     <td style={styles.td}>
@@ -1592,8 +1586,7 @@ export function InventoryUsageDashboard({
                           style={styles.secondaryButton}
                           onClick={() => onSelectUsageLog(usage.id)}
                         >
-                          Details
-                        </button>
+                          {ui("Details")}</button>
                         {permissions.canReverse ? (
                           <button
                             type="button"
@@ -1606,8 +1599,8 @@ export function InventoryUsageDashboard({
                             }
                           >
                             {reversingUsageId === usage.id
-                              ? "Reversing..."
-                              : "Reverse"}
+                              ? ui("Reversing...")
+                              : ui("Reverse")}
                           </button>
                         ) : null}
                       </div>
@@ -1626,17 +1619,15 @@ export function InventoryUsageDashboard({
               onClick={() => onLedgerPageChange(Math.max(1, ledgerPage - 1))}
               disabled={ledgerPage <= 1 || logsLoading}
             >
-              Previous
-            </button>
-            <span style={styles.filterPill}>Page {ledgerPage} of {Math.max(1, Math.ceil(ledgerTotal / ledgerPageSize))}</span>
+              {ui("Previous")}</button>
+            <span style={styles.filterPill}>{ui("Page ")}{ledgerPage} {ui("of ")}{Math.max(1, Math.ceil(ledgerTotal / ledgerPageSize))}</span>
             <button
               type="button"
               style={styles.secondaryButton}
               onClick={() => onLedgerPageChange(ledgerPage + 1)}
               disabled={ledgerPage >= Math.ceil(ledgerTotal / ledgerPageSize) || logsLoading}
             >
-              Next
-            </button>
+              {ui("Next")}</button>
           </div>
         ) : null}
       </section>

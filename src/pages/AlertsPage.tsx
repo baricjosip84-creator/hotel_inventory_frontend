@@ -3,6 +3,9 @@ import type { CSSProperties, FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedDateTime } from '../i18n/formatters';
+import type { AppLocale } from '../i18n/config';
 import './OperationalExperiencePages.css';
 import './AlertsPage.css';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
@@ -163,30 +166,52 @@ async function overrideBlockingAlert(input: { id: string; reason: string }): Pro
   });
 }
 
-function formatDateTime(value: string | null | undefined): string {
+function formatDateTime(value: string | null | undefined, locale: AppLocale): string {
   if (!value) return '—';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return formatLocalizedDateTime(value, locale);
 }
 
-function formatAlertType(value: string | null | undefined): string {
-  if (!value) return 'Alert';
+const CANONICAL_ALERT_TYPE_LABELS: Readonly<Record<string, string>> = {
+  LOW_STOCK: 'Low stock',
+  NEGATIVE_STOCK: 'Negative stock',
+  NEGATIVE_STOCK_BLOCKING: 'Negative stock',
+  EXPIRED_STOCK: 'Expired stock',
+  EXPIRING_STOCK: 'Expiring stock',
+  FINALIZED_SHIPMENT_INCOMPLETE: 'Finalized shipment incomplete',
+  FINALIZED_SHIPMENT_INCOMPLETE_BLOCKING: 'Finalized shipment incomplete',
+  INVENTORY_USAGE_ANOMALY: 'Inventory usage anomaly',
+  INVENTORY_USAGE_DAMAGE_WASTE: 'Inventory usage damage waste',
+  INVENTORY_USAGE_EXCEPTIONS: 'Inventory usage exceptions',
+  ORPHANED_SHIPMENT_ITEM_BLOCKING: 'Orphaned shipment item',
+  OVER_RECEIVED_BLOCKING: 'Over received',
+  PO_OVER_RECEIVED_BLOCKING: 'Purchase order over received',
+  SHIPMENT_IMMUTABLE_BLOCKING: 'Shipment immutable',
+  STOCK_LEDGER_DESYNC_BLOCKING: 'Stock ledger desync',
+  STOCK_LOT_DESYNC_BLOCKING: 'Stock lot desync',
+  SYSTEM_HEALTH_DEGRADED_BLOCKING: 'System health degraded'
+};
 
-  const words = value
-    .trim()
+function formatAlertType(value: string | null | undefined, ui: (englishText: string) => string): string {
+  if (!value) return ui('Alert');
+
+  const normalized = value.trim();
+  const canonicalLabel = CANONICAL_ALERT_TYPE_LABELS[normalized.toUpperCase()];
+  if (canonicalLabel) return ui(canonicalLabel);
+
+  const words = normalized
     .split(/[_-]+|\s+/)
     .filter(Boolean)
     .map((word) => word.toLowerCase());
 
-  if (!words.length) return 'Alert';
+  if (!words.length) return ui('Alert');
   const text = words.join(' ');
   return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 }
 
-function severityLabel(severity: AlertSeverity): string {
-  if (severity === 'critical') return 'Critical';
-  if (severity === 'warning') return 'Warning';
-  return 'Info';
+function severityLabel(severity: AlertSeverity, ui: (englishText: string) => string): string {
+  if (severity === 'critical') return ui('Critical');
+  if (severity === 'warning') return ui('Warning');
+  return ui('Info');
 }
 
 function severityStyle(severity: AlertSeverity): CSSProperties {
@@ -270,6 +295,7 @@ function mutationErrorMessage(error: unknown, fallback: string): string {
 }
 
 export default function AlertsPage() {
+  const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const { canManageAlerts, canOverrideAlerts } = getRoleCapabilities();
@@ -310,12 +336,12 @@ export default function AlertsPage() {
     onSuccess: async () => {
       setManualAlertForm(emptyManualAlertForm);
       setActionError(null);
-      setActionMessage('Manual alert created successfully.');
+      setActionMessage(ui('Manual alert created successfully.'));
       await invalidateAlertSurfaces();
     },
     onError: (error) => {
       setActionMessage(null);
-      setActionError(mutationErrorMessage(error, 'Failed to create the manual alert.'));
+      setActionError(mutationErrorMessage(error, ui('Failed to create the manual alert.')));
     }
   });
 
@@ -323,12 +349,12 @@ export default function AlertsPage() {
     mutationFn: (input: AlertActionInput) => acknowledgeAlert(input.id),
     onSuccess: async (_result, input) => {
       setActionError(null);
-      setActionMessage(`${input.title} acknowledged successfully.`);
+      setActionMessage(`${input.title} ${ui('acknowledged successfully.')}`);
       await invalidateAlertSurfaces();
     },
     onError: (error) => {
       setActionMessage(null);
-      setActionError(mutationErrorMessage(error, 'Failed to acknowledge the alert.'));
+      setActionError(mutationErrorMessage(error, ui('Failed to acknowledge the alert.')));
     }
   });
 
@@ -337,12 +363,12 @@ export default function AlertsPage() {
     onSuccess: async (_result, input) => {
       setResolutionNoteByAlertId((current) => ({ ...current, [input.id]: '' }));
       setActionError(null);
-      setActionMessage(`${input.title} resolved successfully.`);
+      setActionMessage(`${input.title} ${ui('resolved successfully.')}`);
       await invalidateAlertSurfaces();
     },
     onError: (error) => {
       setActionMessage(null);
-      setActionError(mutationErrorMessage(error, 'Failed to resolve the alert.'));
+      setActionError(mutationErrorMessage(error, ui('Failed to resolve the alert.')));
     }
   });
 
@@ -350,12 +376,12 @@ export default function AlertsPage() {
     mutationFn: (input: AlertActionInput) => reopenAlert(input.id),
     onSuccess: async (_result, input) => {
       setActionError(null);
-      setActionMessage(`${input.title} reopened successfully.`);
+      setActionMessage(`${input.title} ${ui('reopened successfully.')}`);
       await invalidateAlertSurfaces();
     },
     onError: (error) => {
       setActionMessage(null);
-      setActionError(mutationErrorMessage(error, 'Failed to reopen the alert.'));
+      setActionError(mutationErrorMessage(error, ui('Failed to reopen the alert.')));
     }
   });
 
@@ -363,12 +389,12 @@ export default function AlertsPage() {
     mutationFn: (input: AlertActionInput) => escalateAlert(input.id),
     onSuccess: async (_result, input) => {
       setActionError(null);
-      setActionMessage(`${input.title} escalation level increased successfully.`);
+      setActionMessage(`${input.title} ${ui('escalation level increased successfully.')}`);
       await invalidateAlertSurfaces();
     },
     onError: (error) => {
       setActionMessage(null);
-      setActionError(mutationErrorMessage(error, 'Failed to escalate the alert.'));
+      setActionError(mutationErrorMessage(error, ui('Failed to escalate the alert.')));
     }
   });
 
@@ -377,12 +403,12 @@ export default function AlertsPage() {
     onSuccess: async (_result, input) => {
       setOverrideReasonByAlertId((current) => ({ ...current, [input.id]: '' }));
       setActionError(null);
-      setActionMessage('Blocking alert overridden and closed successfully.');
+      setActionMessage(ui('Blocking alert overridden and closed successfully.'));
       await invalidateAlertSurfaces();
     },
     onError: (error) => {
       setActionMessage(null);
-      setActionError(mutationErrorMessage(error, 'Failed to override the blocking alert.'));
+      setActionError(mutationErrorMessage(error, ui('Failed to override the blocking alert.')));
     }
   });
 
@@ -428,19 +454,19 @@ export default function AlertsPage() {
 
     if (!type) {
       setActionMessage(null);
-      setActionError('Alert type is required.');
+      setActionError(ui('Alert type is required.'));
       return;
     }
 
     if (!message) {
       setActionMessage(null);
-      setActionError('Alert message is required.');
+      setActionError(ui('Alert message is required.'));
       return;
     }
 
     if (
       manualAlertForm.severity === 'critical'
-      && !window.confirm('Create a Critical alert? Unresolved Critical alerts block protected stock and shipment operations until they are resolved.')
+      && !window.confirm(ui('Create a Critical alert? Unresolved Critical alerts block protected stock and shipment operations until they are resolved.'))
     ) {
       return;
     }
@@ -451,8 +477,8 @@ export default function AlertsPage() {
   if (alertsQuery.isLoading) {
     return (
       <div className="app-panel app-panel--padded" style={styles.loadingState}>
-        <strong>Loading alerts…</strong>
-        <span>Retrieving the current tenant alert queue.</span>
+        <strong>{ui('Loading alerts…')}</strong>
+        <span>{ui('Retrieving the current tenant alert queue.')}</span>
       </div>
     );
   }
@@ -460,10 +486,10 @@ export default function AlertsPage() {
   if (alertsQuery.isError) {
     return (
       <div className="app-error-state" style={styles.loadErrorState}>
-        <strong>Alerts could not be loaded.</strong>
-        <span>{mutationErrorMessage(alertsQuery.error, 'The alert request failed.')}</span>
+        <strong>{ui('Alerts could not be loaded.')}</strong>
+        <span>{mutationErrorMessage(alertsQuery.error, ui('The alert request failed.'))}</span>
         <button type="button" style={styles.secondaryButton} onClick={() => alertsQuery.refetch()}>
-          Retry
+          {ui('Retry')}
         </button>
       </div>
     );
@@ -473,40 +499,40 @@ export default function AlertsPage() {
     <div className="io-operational-page alerts-page io-workspace-page" style={styles.page} data-alerts-refined="true">
       <OperationalWorkspaceHero
         iconPath="/alerts"
-        eyebrow="Operational alert control"
-        title="Alert workspace"
+        eyebrow={ui('Operational alert control')}
+        title={ui('Alert workspace')}
         description={
           <p>
-            Open the linked source page first, confirm the real condition, acknowledge the alert when somebody takes ownership, then resolve it with a meaningful note. Escalation increases the alert's escalation level but does not notify anyone automatically.
+            {ui("Open the linked source page first, confirm the real condition, acknowledge the alert when somebody takes ownership, then resolve it with a meaningful note. Escalation increases the alert's escalation level but does not notify anyone automatically.")}
           </p>
         }
         meta={
           <>
-            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Open → acknowledge → resolve</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Source workflow stays authoritative</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Open → acknowledge → resolve')}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Source workflow stays authoritative')}</OperationalWorkspaceMetaPill>
           </>
         }
         aside={
           <>
-            <OperationalWorkspaceStatus value={summary.unresolved} label={`open alert${summary.unresolved === 1 ? '' : 's'} in the current view`} />
+            <OperationalWorkspaceStatus value={summary.unresolved} label={summary.unresolved === 1 ? ui('open alert in the current view') : ui('open alerts in the current view')} />
             <button type="button" className="app-button app-button--secondary" onClick={() => alertsQuery.refetch()} disabled={alertsQuery.isFetching}>
-              {alertsQuery.isFetching ? 'Refreshing…' : 'Refresh alerts'}
+              {alertsQuery.isFetching ? ui('Refreshing…') : ui('Refresh alerts')}
             </button>
           </>
         }
       />
 
       <div className="app-grid-stats io-workspace-stats" style={styles.statsGrid}>
-        <OperationalWorkspaceStatCard label="Visible results" value={summary.total} helper={<>Up to {filters.limit} alerts matching the applied filters</>} tone="blue" iconPath="/alerts" />
-        <OperationalWorkspaceStatCard label="Open" value={summary.unresolved} helper="Still requiring review or action" tone="amber" iconPath="/action-center" />
-        <OperationalWorkspaceStatCard label="Critical open" value={summary.critical} helper="Blocks protected stock and shipment operations until resolved" tone="red" iconPath="/reliability-command" />
-        <OperationalWorkspaceStatCard label="Unacknowledged open" value={summary.unacknowledged} helper="No operator has taken ownership yet" tone="slate" iconPath="/collaboration" />
+        <OperationalWorkspaceStatCard label={ui('Visible results')} value={summary.total} helper={<>{ui('Up to')} {filters.limit} {ui('alerts matching the applied filters')}</>} tone="blue" iconPath="/alerts" />
+        <OperationalWorkspaceStatCard label={ui('Open')} value={summary.unresolved} helper={ui('Still requiring review or action')} tone="amber" iconPath="/action-center" />
+        <OperationalWorkspaceStatCard label={ui('Critical open')} value={summary.critical} helper={ui('Blocks protected stock and shipment operations until resolved')} tone="red" iconPath="/reliability-command" />
+        <OperationalWorkspaceStatCard label={ui('Unacknowledged open')} value={summary.unacknowledged} helper={ui('No operator has taken ownership yet')} tone="slate" iconPath="/collaboration" />
       </div>
 
       {!canManageAlerts ? (
         <div className="app-warning-state" style={styles.messageBox}>
-          Current access role: {accessRoleLabel}. You can review alerts and open permitted source pages, but alert changes require Alerts write permission.
+          {ui('Current access role:')} {ui(accessRoleLabel)}. {ui('You can review alerts and open permitted source pages, but alert changes require Alerts write permission.')}
         </div>
       ) : null}
 
@@ -515,20 +541,20 @@ export default function AlertsPage() {
 
       {canManageAlerts ? (
         <section className="app-panel app-panel--padded alerts-section alerts-section--manual" style={styles.panel}>
-          <div className="alerts-section-heading"><span className="alerts-heading-icon"><TenantNavIcon path="/alerts" size={18} /></span><h2 style={styles.panelTitle}>Create a manual alert</h2></div>
+          <div className="alerts-section-heading"><span className="alerts-heading-icon"><TenantNavIcon path="/alerts" size={18} /></span><h2 style={styles.panelTitle}>{ui('Create a manual alert')}</h2></div>
           <p style={styles.formHint}>
-            Use this only for a real operational issue that is not already represented by an existing alert. New manual alerts start at escalation level 0.
+            {ui('Use this only for a real operational issue that is not already represented by an existing alert. New manual alerts start at escalation level 0.')}
           </p>
 
           <form onSubmit={submitManualAlert} style={styles.formStack}>
             <div className="app-grid-toolbar" style={styles.createGrid}>
               <label style={styles.fieldLabel}>
-                <span>Alert type</span>
+                <span>{ui('Alert type')}</span>
                 <input
                   style={styles.input}
                   value={manualAlertForm.type}
                   onChange={(event) => updateManualAlertField('type', event.target.value)}
-                  placeholder="Example: Supplier delivery delay"
+                  placeholder={ui('Example: Supplier delivery delay')}
                   maxLength={100}
                   disabled={createAlertMutation.isPending}
                   required
@@ -536,50 +562,50 @@ export default function AlertsPage() {
               </label>
 
               <label style={styles.fieldLabel}>
-                <span>Severity</span>
+                <span>{ui('Severity')}</span>
                 <select
                   style={styles.input}
                   value={manualAlertForm.severity}
                   onChange={(event) => updateManualAlertField('severity', event.target.value as AlertSeverity)}
                   disabled={createAlertMutation.isPending}
                 >
-                  <option value="info">Info</option>
-                  <option value="warning">Warning</option>
-                  <option value="critical">Critical</option>
+                  <option value="info">{ui('Info')}</option>
+                  <option value="warning">{ui('Warning')}</option>
+                  <option value="critical">{ui('Critical')}</option>
                 </select>
                 {manualAlertForm.severity === 'critical' ? (
-                  <small style={styles.criticalHelp}>Critical alerts block protected stock and shipment operations until resolved.</small>
+                  <small style={styles.criticalHelp}>{ui('Critical alerts block protected stock and shipment operations until resolved.')}</small>
                 ) : null}
               </label>
 
               {canReadProducts ? (
                 <label style={styles.fieldLabel}>
-                  <span>Related product (optional)</span>
+                  <span>{ui('Related product (optional)')}</span>
                   <select
                     style={styles.input}
                     value={manualAlertForm.product_id}
                     onChange={(event) => updateManualAlertField('product_id', event.target.value)}
                     disabled={createAlertMutation.isPending || productsQuery.isLoading}
                   >
-                    <option value="">No product link</option>
+                    <option value="">{ui('No product link')}</option>
                     {(productsQuery.data ?? []).map((product) => (
                       <option key={product.id} value={product.id}>
                         {product.name}{product.category ? ` — ${product.category}` : ''}
                       </option>
                     ))}
                   </select>
-                  {productsQuery.isError ? <small style={styles.fieldHelp}>Products could not be loaded. The alert can still be created without a product link.</small> : null}
+                  {productsQuery.isError ? <small style={styles.fieldHelp}>{ui('Products could not be loaded. The alert can still be created without a product link.')}</small> : null}
                 </label>
               ) : null}
             </div>
 
             <label style={styles.fieldLabel}>
-              <span>Alert message</span>
+              <span>{ui('Alert message')}</span>
               <textarea
                 style={styles.textareaNeutral}
                 value={manualAlertForm.message}
                 onChange={(event) => updateManualAlertField('message', event.target.value)}
-                placeholder="Describe the issue, its impact, and what needs attention."
+                placeholder={ui('Describe the issue, its impact, and what needs attention.')}
                 maxLength={2000}
                 rows={4}
                 disabled={createAlertMutation.isPending}
@@ -593,7 +619,7 @@ export default function AlertsPage() {
                 disabled={createAlertMutation.isPending || !manualAlertForm.type.trim() || !manualAlertForm.message.trim()}
                 type="submit"
               >
-                {createAlertMutation.isPending ? 'Creating…' : 'Create alert'}
+                {createAlertMutation.isPending ? ui('Creating…') : ui('Create alert')}
               </button>
             </div>
           </form>
@@ -601,50 +627,50 @@ export default function AlertsPage() {
       ) : null}
 
       <section className="app-panel app-panel--padded alerts-section" style={styles.panel}>
-        <div className="alerts-section-heading"><span className="alerts-heading-icon alerts-heading-icon--slate"><TenantNavIcon path="/reports" size={18} /></span><h2 style={styles.panelTitle}>Filter the alert queue</h2></div>
+        <div className="alerts-section-heading"><span className="alerts-heading-icon alerts-heading-icon--slate"><TenantNavIcon path="/reports" size={18} /></span><h2 style={styles.panelTitle}>{ui('Filter the alert queue')}</h2></div>
         <form onSubmit={applyFilters} style={styles.formStack}>
           <div className="app-grid-toolbar" style={styles.filterGrid}>
             <label style={styles.fieldLabel}>
-              <span>Search</span>
+              <span>{ui('Search')}</span>
               <input
                 style={styles.input}
                 value={filterForm.search}
                 onChange={(event) => setFilterForm((current) => ({ ...current, search: event.target.value }))}
-                placeholder="Message, type, or product"
+                placeholder={ui('Message, type, or product')}
                 maxLength={200}
               />
             </label>
 
             <label style={styles.fieldLabel}>
-              <span>Severity</span>
+              <span>{ui('Severity')}</span>
               <select style={styles.input} value={filterForm.severity} onChange={(event) => setFilterForm((current) => ({ ...current, severity: event.target.value }))}>
-                <option value="">All severities</option>
-                <option value="info">Info</option>
-                <option value="warning">Warning</option>
-                <option value="critical">Critical</option>
+                <option value="">{ui('All severities')}</option>
+                <option value="info">{ui('Info')}</option>
+                <option value="warning">{ui('Warning')}</option>
+                <option value="critical">{ui('Critical')}</option>
               </select>
             </label>
 
             <label style={styles.fieldLabel}>
-              <span>Resolution state</span>
+              <span>{ui('Resolution state')}</span>
               <select style={styles.input} value={filterForm.resolved} onChange={(event) => setFilterForm((current) => ({ ...current, resolved: event.target.value }))}>
-                <option value="">Open and resolved</option>
-                <option value="false">Open only</option>
-                <option value="true">Resolved only</option>
+                <option value="">{ui('Open and resolved')}</option>
+                <option value="false">{ui('Open only')}</option>
+                <option value="true">{ui('Resolved only')}</option>
               </select>
             </label>
 
             <label style={styles.fieldLabel}>
-              <span>Ownership state</span>
+              <span>{ui('Ownership state')}</span>
               <select style={styles.input} value={filterForm.acknowledged} onChange={(event) => setFilterForm((current) => ({ ...current, acknowledged: event.target.value }))}>
-                <option value="">Acknowledged and unacknowledged</option>
-                <option value="false">Unacknowledged only</option>
-                <option value="true">Acknowledged only</option>
+                <option value="">{ui('Acknowledged and unacknowledged')}</option>
+                <option value="false">{ui('Unacknowledged only')}</option>
+                <option value="true">{ui('Acknowledged only')}</option>
               </select>
             </label>
 
             <label style={styles.fieldLabel}>
-              <span>Maximum results</span>
+              <span>{ui('Maximum results')}</span>
               <select style={styles.input} value={filterForm.limit} onChange={(event) => setFilterForm((current) => ({ ...current, limit: event.target.value }))}>
                 <option value="25">25</option>
                 <option value="50">50</option>
@@ -654,8 +680,8 @@ export default function AlertsPage() {
             </label>
           </div>
           <div className="app-actions">
-            <button type="submit" style={styles.primaryButton}>Apply filters</button>
-            <button type="button" style={styles.secondaryButton} onClick={clearFilters}>Clear filters</button>
+            <button type="submit" style={styles.primaryButton}>{ui('Apply filters')}</button>
+            <button type="button" style={styles.secondaryButton} onClick={clearFilters}>{ui('Clear filters')}</button>
           </div>
         </form>
       </section>
@@ -663,22 +689,22 @@ export default function AlertsPage() {
       <section className="app-panel app-panel--padded alerts-section alerts-queue-section" style={styles.panel}>
         <div style={styles.queueHeader}>
           <div>
-            <div className="alerts-section-heading"><span className="alerts-heading-icon"><TenantNavIcon path="/alerts" size={18} /></span><h2 style={styles.panelTitle}>Alert queue</h2></div>
-            <p style={styles.formHint}>Open alerts appear before resolved alerts, with Critical items first.</p>
+            <div className="alerts-section-heading"><span className="alerts-heading-icon"><TenantNavIcon path="/alerts" size={18} /></span><h2 style={styles.panelTitle}>{ui('Alert queue')}</h2></div>
+            <p style={styles.formHint}>{ui('Open alerts appear before resolved alerts, with Critical items first.')}</p>
           </div>
-          {alertsQuery.isFetching ? <span style={styles.refreshingText}>Refreshing…</span> : null}
+          {alertsQuery.isFetching ? <span style={styles.refreshingText}>{ui('Refreshing…')}</span> : null}
         </div>
 
         {alerts.length === 0 ? (
           <div className="app-empty-state" style={styles.emptyState}>
-            <strong>No alerts match the applied filters.</strong>
-            <span>Clear the filters or confirm that the tenant currently has no matching alert records.</span>
+            <strong>{ui('No alerts match the applied filters.')}</strong>
+            <span>{ui('Clear the filters or confirm that the tenant currently has no matching alert records.')}</span>
           </div>
         ) : (
           <div style={styles.cardList}>
             {alerts.map((alert) => {
               const next = nextActionLink(alert);
-              const alertTitle = formatAlertType(alert.type);
+              const alertTitle = formatAlertType(alert.type, ui);
               const resolutionNote = resolutionNoteByAlertId[alert.id] ?? '';
               const overrideReason = overrideReasonByAlertId[alert.id] ?? '';
               const isAcknowledging = acknowledgeMutation.isPending && acknowledgeMutation.variables?.id === alert.id;
@@ -693,17 +719,17 @@ export default function AlertsPage() {
                     <div style={styles.cardHeaderText}>
                       <div style={styles.cardTitle}>{alertTitle}</div>
                       <div style={styles.cardMeta}>
-                        {alert.product_name || 'No product linked'} · Created {formatDateTime(alert.created_at)}
+                        {alert.product_name || ui('No product linked')} · {ui('Created')} {formatDateTime(alert.created_at, locale)}
                       </div>
                     </div>
                     <div style={styles.badgeRow} className="alerts-badge-row">
-                      <span style={severityStyle(alert.severity)}>{severityLabel(alert.severity)}</span>
+                      <span style={severityStyle(alert.severity)}>{severityLabel(alert.severity, ui)}</span>
                       <span style={alert.resolved ? styles.resolvedBadge : alert.acknowledged ? styles.acknowledgedBadge : styles.openBadge}>
-                        {alert.resolved ? 'Resolved' : alert.acknowledged ? 'Acknowledged' : 'Open'}
+                        {alert.resolved ? ui('Resolved') : alert.acknowledged ? ui('Acknowledged') : ui('Open')}
                       </span>
                       {blocksProtectedOperations(alert) ? (
                         <span style={styles.blockingBadge}>
-                          {isBlockingAlertType(alert.type) ? 'System blocker' : 'Operational blocker'}
+                          {isBlockingAlertType(alert.type) ? ui('System blocker') : ui('Operational blocker')}
                         </span>
                       ) : null}
                     </div>
@@ -713,47 +739,47 @@ export default function AlertsPage() {
 
                   <div style={styles.keyGrid}>
                     <div style={styles.keyCard} className="alerts-key-card">
-                      <strong style={styles.keyLabel}>Ownership</strong>
-                      <div style={styles.keyValue}>{alert.acknowledged ? alert.acknowledged_by_name || 'Acknowledged' : 'Not acknowledged'}</div>
-                      <small style={styles.keyHelp}>{alert.acknowledged ? formatDateTime(alert.acknowledged_at) : 'No operator has taken ownership.'}</small>
+                      <strong style={styles.keyLabel}>{ui('Ownership')}</strong>
+                      <div style={styles.keyValue}>{alert.acknowledged ? alert.acknowledged_by_name || ui('Acknowledged') : ui('Not acknowledged')}</div>
+                      <small style={styles.keyHelp}>{alert.acknowledged ? formatDateTime(alert.acknowledged_at, locale) : ui('No operator has taken ownership.')}</small>
                     </div>
                     <div style={styles.keyCard} className="alerts-key-card">
-                      <strong style={styles.keyLabel}>Escalation level</strong>
+                      <strong style={styles.keyLabel}>{ui('Escalation level')}</strong>
                       <div style={styles.keyValue}>{alert.escalation_level}</div>
-                      <small style={styles.keyHelp}>{alert.last_escalated_at ? `Last escalated ${formatDateTime(alert.last_escalated_at)}` : 'Not escalated.'}</small>
+                      <small style={styles.keyHelp}>{alert.last_escalated_at ? `${ui('Last escalated')} ${formatDateTime(alert.last_escalated_at, locale)}` : ui('Not escalated.')}</small>
                     </div>
                     <div style={styles.keyCard} className="alerts-key-card">
-                      <strong style={styles.keyLabel}>Resolution</strong>
-                      <div style={styles.keyValue}>{alert.resolved ? alert.resolved_by_name || 'Resolved' : 'Open'}</div>
-                      <small style={styles.keyHelp}>{alert.resolved ? formatDateTime(alert.resolved_at) : 'No resolution recorded.'}</small>
+                      <strong style={styles.keyLabel}>{ui('Resolution')}</strong>
+                      <div style={styles.keyValue}>{alert.resolved ? alert.resolved_by_name || ui('Resolved') : ui('Open')}</div>
+                      <small style={styles.keyHelp}>{alert.resolved ? formatDateTime(alert.resolved_at, locale) : ui('No resolution recorded.')}</small>
                     </div>
                   </div>
 
                   {alert.resolved && alert.resolution_note ? (
                     <div style={styles.resolutionNoteBox}>
-                      <strong>Resolution note</strong>
+                      <strong>{ui('Resolution note')}</strong>
                       <span>{alert.resolution_note}</span>
                     </div>
                   ) : null}
 
                   {!alert.resolved && canManageAlerts ? (
                     <label style={styles.fieldLabel}>
-                      <span>Resolution note</span>
+                      <span>{ui('Resolution note')}</span>
                       <textarea
                         style={styles.textareaNeutral}
                         value={resolutionNote}
                         onChange={(event) => setResolutionNoteByAlertId((current) => ({ ...current, [alert.id]: event.target.value }))}
-                        placeholder="Explain what was checked and why the alert can be closed."
+                        placeholder={ui('Explain what was checked and why the alert can be closed.')}
                         maxLength={2000}
                         rows={2}
                         disabled={isResolving}
                       />
-                      <small style={styles.fieldHelp}>At least 3 characters are required on this page before Resolve is enabled.</small>
+                      <small style={styles.fieldHelp}>{ui('At least 3 characters are required on this page before Resolve is enabled.')}</small>
                     </label>
                   ) : null}
 
                   <div className="app-actions" style={styles.actionRow}>
-                    {next ? <Link to={next.to} style={styles.linkButton}><TenantNavIcon path={next.to} size={16} /><span>{next.label}</span></Link> : null}
+                    {next ? <Link to={next.to} style={styles.linkButton}><TenantNavIcon path={next.to} size={16} /><span>{ui(next.label)}</span></Link> : null}
 
                     {canManageAlerts && !alert.acknowledged && !alert.resolved ? (
                       <button
@@ -762,7 +788,7 @@ export default function AlertsPage() {
                         disabled={isAcknowledging}
                         type="button"
                       >
-                        {isAcknowledging ? 'Acknowledging…' : 'Acknowledge'}
+                        {isAcknowledging ? ui('Acknowledging…') : ui('Acknowledge')}
                       </button>
                     ) : null}
 
@@ -773,7 +799,7 @@ export default function AlertsPage() {
                         disabled={isResolving || resolutionNote.trim().length < 3}
                         type="button"
                       >
-                        {isResolving ? 'Resolving…' : 'Resolve'}
+                        {isResolving ? ui('Resolving…') : ui('Resolve')}
                       </button>
                     ) : null}
 
@@ -781,14 +807,14 @@ export default function AlertsPage() {
                       <button
                         style={styles.secondaryButton}
                         onClick={() => {
-                          if (window.confirm(`Reopen ${alertTitle}? This clears its previous acknowledgement and resolution details.`)) {
+                          if (window.confirm(`${ui('Reopen')} ${alertTitle}? ${ui('This clears its previous acknowledgement and resolution details.')}`)) {
                             reopenMutation.mutate({ id: alert.id, title: alertTitle });
                           }
                         }}
                         disabled={isReopening}
                         type="button"
                       >
-                        {isReopening ? 'Reopening…' : 'Reopen'}
+                        {isReopening ? ui('Reopening…') : ui('Reopen')}
                       </button>
                     ) : null}
 
@@ -796,24 +822,24 @@ export default function AlertsPage() {
                       <button
                         style={styles.warnButton}
                         onClick={() => {
-                          if (window.confirm(`Increase the escalation level for ${alertTitle}? This does not notify anyone automatically.`)) {
+                          if (window.confirm(`${ui('Increase the escalation level for')} ${alertTitle}? ${ui('This does not notify anyone automatically.')}`)) {
                             escalateMutation.mutate({ id: alert.id, title: alertTitle });
                           }
                         }}
                         disabled={isEscalating}
                         type="button"
                       >
-                        {isEscalating ? 'Escalating…' : 'Increase escalation level'}
+                        {isEscalating ? ui('Escalating…') : ui('Increase escalation level')}
                       </button>
                     ) : null}
                   </div>
 
                   {canOverrideAlerts && !alert.resolved && isBlockingAlertType(alert.type) ? (
                     <div className="app-warning-state" style={styles.overrideBox}>
-                      <strong>Emergency blocking-alert override</strong>
-                      <span>Use only when the underlying operational issue has been independently checked and normal closure is not possible.</span>
+                      <strong>{ui('Emergency blocking-alert override')}</strong>
+                      <span>{ui('Use only when the underlying operational issue has been independently checked and normal closure is not possible.')}</span>
                       <label style={styles.fieldLabel}>
-                        <span>Mandatory override reason</span>
+                        <span>{ui('Mandatory override reason')}</span>
                         <textarea
                           style={styles.textareaNeutral}
                           value={overrideReason}
@@ -829,17 +855,17 @@ export default function AlertsPage() {
                           const reason = overrideReason.trim();
                           if (reason.length < 3) {
                             setActionMessage(null);
-                            setActionError('Override reason must contain at least 3 characters.');
+                            setActionError(ui('Override reason must contain at least 3 characters.'));
                             return;
                           }
-                          if (window.confirm(`Override and close the blocking alert ${alertTitle}? This is an emergency administrative action.`)) {
+                          if (window.confirm(`${ui('Override and close the blocking alert')} ${alertTitle}? ${ui('This is an emergency administrative action.')}`)) {
                             overrideMutation.mutate({ id: alert.id, reason });
                           }
                         }}
                         disabled={isOverriding || overrideReason.trim().length < 3}
                         type="button"
                       >
-                        {isOverriding ? 'Overriding…' : 'Override and close blocking alert'}
+                        {isOverriding ? ui('Overriding…') : ui('Override and close blocking alert')}
                       </button>
                     </div>
                   ) : null}

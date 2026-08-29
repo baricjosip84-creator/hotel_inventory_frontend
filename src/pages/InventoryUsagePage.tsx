@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAppTranslation } from "../i18n/I18nContext";
+import { formatLocalizedNumber } from "../i18n/formatters";
 
 import { InventoryUsageDashboard } from "./inventoryUsage/InventoryUsageDashboard";
 import {
@@ -47,6 +49,7 @@ import type {
 
 export default function InventoryUsagePage() {
   const queryClient = useQueryClient();
+  const { locale, ui } = useAppTranslation();
   const permissions = getRoleCapabilities();
   const [filters, setFilters] = useState(DEFAULT_USAGE_FILTERS);
   const [selectedUsageLogId, setSelectedUsageLogId] = useState<string>("");
@@ -160,17 +163,17 @@ export default function InventoryUsagePage() {
       return reverseInventoryUsageLog(usageLogId, reversalReason);
     },
     onSuccess: (data, variables) => {
-      const productName = data.product?.name || "Inventory item";
+      const productName = data.product?.name || ui("Inventory item");
       const restoredQuantity = data.stock ? Number(data.stock.restored_quantity) : null;
       const previousQuantity = data.stock ? Number(data.stock.previous_quantity) : null;
       const newQuantity = data.stock ? Number(data.stock.new_quantity) : null;
-      const unit = data.product?.unit?.trim() || "units";
+      const unit = data.product?.unit?.trim() || ui("units");
       const stockSummary = restoredQuantity !== null
         && previousQuantity !== null
         && newQuantity !== null
-        ? ` ${restoredQuantity} ${unit} restored; stock ${previousQuantity} → ${newQuantity}.`
+        ? ` ${formatLocalizedNumber(restoredQuantity, locale)} ${unit} ${ui("restored; stock")} ${formatLocalizedNumber(previousQuantity, locale)} → ${formatLocalizedNumber(newQuantity, locale)}.`
         : "";
-      const completionMessage = `${data.message || "Inventory usage reversed successfully"} for ${productName}.${stockSummary}`;
+      const completionMessage = `${data.message || ui("Inventory usage reversed successfully")} ${ui("for")} ${productName}.${stockSummary}`;
 
       window.dispatchEvent(new CustomEvent(TENANT_MUTATION_FEEDBACK_EVENT, {
         detail: { type: "success", message: completionMessage },
@@ -198,9 +201,9 @@ export default function InventoryUsagePage() {
     onError: (mutationError) => {
       const message = mutationError instanceof Error
         ? mutationError.message
-        : "Unexpected error while reversing inventory usage.";
+        : ui("Unexpected error while reversing inventory usage.");
       window.dispatchEvent(new CustomEvent(TENANT_MUTATION_FEEDBACK_EVENT, {
-        detail: { type: "error", message: `Inventory usage reversal failed: ${message}` },
+        detail: { type: "error", message: `${ui("Inventory usage reversal failed: ")}${message}` },
       }));
     },
   });
@@ -281,12 +284,12 @@ export default function InventoryUsagePage() {
         || data?.barcode_match?.product_id
         || variables.barcode;
       const stockChange = data?.stock
-        ? ` Stock ${Number(data.stock.previous_quantity)} → ${Number(data.stock.new_quantity)}${locationName ? ` at ${locationName}` : ""}.`
+        ? ` ${ui("Stock")} ${formatLocalizedNumber(Number(data.stock.previous_quantity), locale)} → ${formatLocalizedNumber(Number(data.stock.new_quantity), locale)}${locationName ? ` ${ui("at")} ${locationName}` : ""}.`
         : "";
       const completionLabel = data?.idempotent_replay
-        ? "Quick consume was already recorded"
-        : "Quick consume recorded successfully";
-      const completionMessage = `${completionLabel} for ${productLabel}.${stockChange} The scan form was cleared and is ready for the next barcode.`;
+        ? ui("Quick consume was already recorded")
+        : ui("Quick consume recorded successfully");
+      const completionMessage = `${completionLabel} ${ui("for")} ${productLabel}.${stockChange} ${ui("The scan form was cleared and is ready for the next barcode.")}`;
 
       setBarcodeCompletion((current) => ({
         key: current.key + 1,
@@ -331,9 +334,9 @@ export default function InventoryUsagePage() {
     onError: (mutationError) => {
       const message = mutationError instanceof Error
         ? mutationError.message
-        : "Unexpected error while recording quick consume.";
+        : ui("Unexpected error while recording quick consume.");
       window.dispatchEvent(new CustomEvent(TENANT_MUTATION_FEEDBACK_EVENT, {
-        detail: { type: "error", message: `Quick consume failed: ${message}` },
+        detail: { type: "error", message: `${ui("Quick consume failed: ")}${message}` },
       }));
     },
   });
@@ -651,7 +654,7 @@ export default function InventoryUsagePage() {
 
   const handleArchiveTemplate = (template: InventoryUsageTemplate) => {
     const reason = window.prompt(
-      `Why are you archiving the usage template "${template.name}"?`,
+      `${ui('Why are you archiving the usage template')} "${template.name}"?`,
     );
 
     if (reason === null) {
@@ -669,7 +672,7 @@ export default function InventoryUsagePage() {
       scheduledTemplatesQuery.data?.summary?.due_count || 0,
     );
     const confirmed = window.confirm(
-      `Record ${dueCount} due scheduled usage template${dueCount === 1 ? "" : "s"} now? This will deduct stock for every ready due template.`,
+      `${ui('Record')} ${formatLocalizedNumber(dueCount, locale)} ${ui(dueCount === 1 ? 'due scheduled usage template' : 'due scheduled usage templates')} ${ui('now? This will deduct stock for every ready due template.')}`,
     );
 
     if (!confirmed) {
@@ -682,7 +685,7 @@ export default function InventoryUsagePage() {
 
     if (evidenceAckCount > 0) {
       const acknowledged = window.confirm(
-        `${evidenceAckCount} scheduled usage template line${evidenceAckCount === 1 ? "" : "s"} use damage/waste reasons without linked evidence metadata. Record due templates anyway and audit the missing-evidence acknowledgement?`,
+        `${formatLocalizedNumber(evidenceAckCount, locale)} ${ui(evidenceAckCount === 1 ? 'scheduled usage template line uses damage/waste reasons without linked evidence metadata.' : 'scheduled usage template lines use damage/waste reasons without linked evidence metadata.')} ${ui('Record due templates anyway and audit the missing-evidence acknowledgement?')}`,
       );
 
       if (!acknowledged) {
@@ -700,8 +703,9 @@ export default function InventoryUsagePage() {
     const readiness = templateReadinessQuery.data?.[template.id];
     const evidenceAcknowledgementRequired =
       Number(readiness?.summary?.evidence_acknowledgement_required_count || 0) > 0;
+    const templateLineCount = template.items?.length || 0;
     const confirmed = window.confirm(
-      `Record usage now from template "${template.name}"? This will deduct stock for ${template.items?.length || 0} template lines.`,
+      `${ui('Record usage now from template')} "${template.name}"? ${ui('This will deduct stock for')} ${formatLocalizedNumber(templateLineCount, locale)} ${ui(templateLineCount === 1 ? 'template line.' : 'template lines.')}`,
     );
 
     if (!confirmed) {
@@ -710,7 +714,7 @@ export default function InventoryUsagePage() {
 
     if (evidenceAcknowledgementRequired) {
       const acknowledged = window.confirm(
-        'This template includes damage or waste lines without linked evidence metadata. Record anyway and audit the missing-evidence acknowledgement?',
+        ui('This template includes damage or waste lines without linked evidence metadata. Record anyway and audit the missing-evidence acknowledgement?'),
       );
 
       if (!acknowledged) {
@@ -726,7 +730,7 @@ export default function InventoryUsagePage() {
 
   const handleReverseUsage = (usageLogId: string) => {
     const reversalReason = window.prompt(
-      "Why are you reversing this usage entry?",
+      ui("Why are you reversing this usage entry?"),
     );
 
     if (!reversalReason || !reversalReason.trim()) {
@@ -745,8 +749,8 @@ export default function InventoryUsagePage() {
   ) => {
     const promptMessage =
       reviewStatus === "follow_up_required"
-        ? "What follow-up is required for this usage entry?"
-        : "Optional review notes for this usage entry:";
+        ? ui('What follow-up is required for this usage entry?')
+        : ui('Optional review notes for this usage entry:');
     const reviewNotes = window.prompt(promptMessage);
 
     if (reviewNotes === null) {
@@ -825,9 +829,9 @@ export default function InventoryUsagePage() {
 
       exportSource = allRows;
     } catch (exportError) {
-      const message = exportError instanceof Error ? exportError.message : "Unexpected export error.";
+      const message = exportError instanceof Error ? exportError.message : ui("Unexpected export error.");
       window.dispatchEvent(new CustomEvent(TENANT_MUTATION_FEEDBACK_EVENT, {
-        detail: { type: "error", message: `Usage CSV export failed: ${message}` },
+        detail: { type: "error", message: `${ui("Usage CSV export failed: ")}${message}` },
       }));
       setExportingUsage(false);
       return;

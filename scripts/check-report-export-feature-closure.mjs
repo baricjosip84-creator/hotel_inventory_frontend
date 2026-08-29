@@ -28,8 +28,8 @@ const required = [
   'tabIndex={activeTab === tab.key ? 0 : -1}',
   'role="tabpanel"',
   'Foreign-currency receipt costs are preserved separately and are not silently converted.',
-  "row.product_unit || 'units'",
-  'formatQuantityByUnit(row.quantity_by_unit, row.total_quantity)'
+  'row.product_unit || ui("units")',
+  'formatQuantityByUnit(row.quantity_by_unit, row.total_quantity, locale, ui)'
 ];
 
 const forbidden = [

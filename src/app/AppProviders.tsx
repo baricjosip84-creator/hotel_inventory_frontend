@@ -2,17 +2,25 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, PropsWithChildren } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PLATFORM_MUTATION_FEEDBACK_EVENT, TENANT_MUTATION_FEEDBACK_EVENT } from '../lib/actionFeedback';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { canonicalTenantUiText } from '../i18n/tenantUiTranslations';
 
 type ActionFeedback = {
   id: number;
   type: 'success' | 'error' | 'info';
   message: string;
   requestId?: string;
+  translateMessage?: boolean;
+  surface: 'tenant' | 'platform';
 };
 
-type ActionFeedbackEvent = CustomEvent<Omit<ActionFeedback, 'id'>>;
+type ActionFeedbackEvent = CustomEvent<Omit<ActionFeedback, 'id' | 'surface'>>;
 
 const GLOBAL_DANGEROUS_ACTION_CONFIRM_EVENT = 'global-dangerous-action-confirm';
+
+function isTenantSurface(): boolean {
+  return typeof window !== 'undefined' && !window.location.pathname.startsWith('/platform');
+}
 
 type GlobalConfirmBypassState = {
   activeUntil: number;
@@ -259,12 +267,12 @@ function isFormExplicitlySkipped(form: HTMLFormElement): boolean {
   );
 }
 
-function isAuthForm(form: HTMLFormElement): boolean {
-  return Boolean(form.closest('[data-auth-form="true"]')) || /login|password|mfa/i.test(normalizedFormLabel(form));
+function isAuthForm(form: HTMLFormElement, labelOverride?: string): boolean {
+  return Boolean(form.closest('[data-auth-form="true"]')) || /login|password|mfa/i.test(labelOverride ?? normalizedFormLabel(form));
 }
 
-function shouldSuppressGenericFormSubmitFeedback(form: HTMLFormElement): boolean {
-  const label = normalizedFormLabel(form).toLowerCase();
+function shouldSuppressGenericFormSubmitFeedback(form: HTMLFormElement, labelOverride?: string): boolean {
+  const label = (labelOverride ?? normalizedFormLabel(form)).toLowerCase();
 
   return (
     label === 'create product' ||
@@ -275,6 +283,8 @@ function shouldSuppressGenericFormSubmitFeedback(form: HTMLFormElement): boolean
 }
 
 function useGlobalButtonActionSafety(): void {
+  const { locale, ui } = useAppTranslation();
+
   useEffect(() => {
     const originalConfirm = window.confirm.bind(window);
     const originalPrint = window.print.bind(window);
@@ -290,7 +300,7 @@ function useGlobalButtonActionSafety(): void {
 
     window.print = () => {
       window.dispatchEvent(new CustomEvent(GLOBAL_DANGEROUS_ACTION_CONFIRM_EVENT, {
-        detail: { type: 'info', message: 'Print dialog opened.' }
+        detail: { type: 'info', message: isTenantSurface() ? ui('Print dialog opened.') : 'Print dialog opened.' }
       }));
       return originalPrint();
     };
@@ -300,11 +310,11 @@ function useGlobalButtonActionSafety(): void {
         try {
           await originalWriteText(text);
           window.dispatchEvent(new CustomEvent(GLOBAL_DANGEROUS_ACTION_CONFIRM_EVENT, {
-            detail: { type: 'success', message: 'Copied to clipboard.' }
+            detail: { type: 'success', message: isTenantSurface() ? ui('Copied to clipboard.') : 'Copied to clipboard.' }
           }));
         } catch (error) {
           window.dispatchEvent(new CustomEvent(GLOBAL_DANGEROUS_ACTION_CONFIRM_EVENT, {
-            detail: { type: 'error', message: error instanceof Error ? error.message : 'Clipboard copy failed.' }
+            detail: { type: 'error', message: error instanceof Error ? error.message : isTenantSurface() ? ui('Clipboard copy failed.') : 'Clipboard copy failed.' }
           }));
           throw error;
         }
@@ -317,21 +327,25 @@ function useGlobalButtonActionSafety(): void {
 
       const label = normalizedActionLabel(button);
       if (!label) return;
+      const canonicalLabel = isTenantSurface() ? canonicalTenantUiText(locale, label) : label;
 
-      if (isDangerousButtonLabel(label)) {
-        const confirmed = originalConfirm(`Confirm action: ${label}?`);
+      if (isDangerousButtonLabel(canonicalLabel)) {
+        const confirmationMessage = isTenantSurface()
+          ? ui('Confirm action: {label}?').replace('{label}', label)
+          : `Confirm action: ${label}?`;
+        const confirmed = originalConfirm(confirmationMessage);
         if (!confirmed) {
           event.preventDefault();
           event.stopImmediatePropagation();
           window.dispatchEvent(new CustomEvent(GLOBAL_DANGEROUS_ACTION_CONFIRM_EVENT, {
-            detail: { type: 'info', message: 'Action cancelled.' }
+            detail: { type: 'info', message: isTenantSurface() ? ui('Action cancelled.') : 'Action cancelled.' }
           }));
           return;
         }
 
         globalConfirmBypass.activeUntil = performance.now() + 1000;
         window.dispatchEvent(new CustomEvent(GLOBAL_DANGEROUS_ACTION_CONFIRM_EVENT, {
-          detail: { type: 'info', message: 'Action confirmed.' }
+          detail: { type: 'info', message: isTenantSurface() ? ui('Action confirmed.') : 'Action confirmed.' }
         }));
         return;
       }
@@ -341,10 +355,10 @@ function useGlobalButtonActionSafety(): void {
         (button.type || '').toLowerCase() === 'submit';
 
       if (!isFormSubmitAction) {
-        const localActionFeedback = getLocalActionFeedbackMessage(label);
+        const localActionFeedback = getLocalActionFeedbackMessage(canonicalLabel);
         if (localActionFeedback) {
           window.dispatchEvent(new CustomEvent(GLOBAL_DANGEROUS_ACTION_CONFIRM_EVENT, {
-            detail: { type: 'info', message: localActionFeedback }
+            detail: { type: 'info', message: isTenantSurface() ? ui(localActionFeedback) : localActionFeedback }
           }));
         }
       }
@@ -352,17 +366,17 @@ function useGlobalButtonActionSafety(): void {
 
     const handleGlobalFormSubmit = (event: SubmitEvent) => {
       const form = event.target;
-      if (
-        !(form instanceof HTMLFormElement) ||
-        isFormExplicitlySkipped(form) ||
-        isAuthForm(form) ||
-        shouldSuppressGenericFormSubmitFeedback(form)
-      ) {
-        return;
-      }
+      if (!(form instanceof HTMLFormElement) || isFormExplicitlySkipped(form)) return;
 
+      const displayFormLabel = normalizedFormLabel(form);
+      const canonicalFormLabel = isTenantSurface() ? canonicalTenantUiText(locale, displayFormLabel) : displayFormLabel;
+      if (isAuthForm(form, canonicalFormLabel) || shouldSuppressGenericFormSubmitFeedback(form, canonicalFormLabel)) return;
+
+      const submittedMessage = isTenantSurface()
+        ? ui('{label} submitted.').replace('{label}', displayFormLabel)
+        : `${displayFormLabel} submitted.`;
       window.dispatchEvent(new CustomEvent(GLOBAL_DANGEROUS_ACTION_CONFIRM_EVENT, {
-        detail: { type: 'info', message: `${normalizedFormLabel(form)} submitted.` }
+        detail: { type: 'info', message: submittedMessage }
       }));
     };
 
@@ -385,21 +399,40 @@ function useGlobalButtonActionSafety(): void {
       document.removeEventListener('submit', handleGlobalFormSubmit, true);
       window.removeEventListener(GLOBAL_DANGEROUS_ACTION_CONFIRM_EVENT, handleGlobalActionFeedback);
     };
-  }, []);
+  }, [locale, ui]);
 }
 
 
+function translateTenantFeedbackMessage(ui: (englishText: string) => string, message: string): string {
+  const exact = ui(message);
+  if (exact !== message) return exact;
+
+  const genericSuccess = message.match(/^(.+) (created|deleted|saved) successfully\.$/);
+  if (!genericSuccess) return message;
+
+  const [, rawLabel, action] = genericSuccess;
+  const template = action === 'created'
+    ? '{label} created successfully.'
+    : action === 'deleted'
+      ? '{label} deleted successfully.'
+      : '{label} saved successfully.';
+  return ui(template).replace('{label}', ui(rawLabel));
+}
+
 function ActionFeedbackToasts() {
+  const { ui } = useAppTranslation();
   const [items, setItems] = useState<ActionFeedback[]>([]);
 
   useEffect(() => {
-    const handleFeedback = (event: Event) => {
+    const enqueue = (surface: 'tenant' | 'platform', event: Event) => {
       const feedbackEvent = event as ActionFeedbackEvent;
       const nextItem: ActionFeedback = {
         id: Date.now() + Math.random(),
         type: feedbackEvent.detail.type,
         message: feedbackEvent.detail.message,
-        requestId: feedbackEvent.detail.requestId
+        requestId: feedbackEvent.detail.requestId,
+        translateMessage: feedbackEvent.detail.translateMessage,
+        surface
       };
 
       setItems((current) => [...current.slice(-2), nextItem]);
@@ -408,12 +441,15 @@ function ActionFeedbackToasts() {
       }, nextItem.type === 'success' ? 4500 : nextItem.type === 'info' ? 5500 : 7500);
     };
 
-    window.addEventListener(PLATFORM_MUTATION_FEEDBACK_EVENT, handleFeedback);
-    window.addEventListener(TENANT_MUTATION_FEEDBACK_EVENT, handleFeedback);
+    const handlePlatformFeedback = (event: Event) => enqueue('platform', event);
+    const handleTenantFeedback = (event: Event) => enqueue(isTenantSurface() ? 'tenant' : 'platform', event);
+
+    window.addEventListener(PLATFORM_MUTATION_FEEDBACK_EVENT, handlePlatformFeedback);
+    window.addEventListener(TENANT_MUTATION_FEEDBACK_EVENT, handleTenantFeedback);
 
     return () => {
-      window.removeEventListener(PLATFORM_MUTATION_FEEDBACK_EVENT, handleFeedback);
-      window.removeEventListener(TENANT_MUTATION_FEEDBACK_EVENT, handleFeedback);
+      window.removeEventListener(PLATFORM_MUTATION_FEEDBACK_EVENT, handlePlatformFeedback);
+      window.removeEventListener(TENANT_MUTATION_FEEDBACK_EVENT, handleTenantFeedback);
     };
   }, []);
 
@@ -421,28 +457,33 @@ function ActionFeedbackToasts() {
 
   return (
     <div style={styles.toastRegion} aria-live="polite" aria-atomic="true">
-      {items.map((item) => (
-        <div
-          key={item.id}
-          role="status"
-          style={{
-            ...styles.toast,
-            ...(item.type === 'success' ? styles.successToast : item.type === 'info' ? styles.infoToast : styles.errorToast)
-          }}
-        >
-          <strong>{item.type === 'success' ? 'Success' : item.type === 'info' ? 'Info' : 'Action failed'}</strong>
-          <span>{item.message}</span>
-          {item.requestId ? <small>Request ID: {item.requestId}</small> : null}
-          <button
-            type="button"
-            style={styles.closeButton}
-            onClick={() => setItems((current) => current.filter((currentItem) => currentItem.id !== item.id))}
-            aria-label="Dismiss platform message"
+      {items.map((item) => {
+        const tenant = item.surface === 'tenant';
+        const heading = item.type === 'success' ? 'Success' : item.type === 'info' ? 'Info' : 'Action failed';
+        const message = tenant && item.translateMessage ? translateTenantFeedbackMessage(ui, item.message) : item.message;
+        return (
+          <div
+            key={item.id}
+            role="status"
+            style={{
+              ...styles.toast,
+              ...(item.type === 'success' ? styles.successToast : item.type === 'info' ? styles.infoToast : styles.errorToast)
+            }}
           >
-            ×
-          </button>
-        </div>
-      ))}
+            <strong>{tenant ? ui(heading) : heading}</strong>
+            <span>{message}</span>
+            {item.requestId ? <small>{tenant ? `${ui('Request ID')}: ${item.requestId}` : `Request ID: ${item.requestId}`}</small> : null}
+            <button
+              type="button"
+              style={styles.closeButton}
+              onClick={() => setItems((current) => current.filter((currentItem) => currentItem.id !== item.id))}
+              aria-label={tenant ? ui('Dismiss message') : 'Dismiss platform message'}
+            >
+              ×
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }

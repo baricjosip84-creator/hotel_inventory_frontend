@@ -1,6 +1,9 @@
 import type { KeyboardEvent, ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useAppTranslation } from '../i18n/I18nContext';
+import type { AppLocale } from '../i18n/config';
+import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
@@ -14,7 +17,7 @@ import {
 import { ApiError, apiDownloadFile, apiRequest, type ApiDownloadMetadata } from '../lib/api';
 import { getCurrentAccessRoleLabel, getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
-import { formatCurrencyAmount } from '../lib/tenantCurrency';
+import { formatCurrencyAmount, getActiveTenantCurrency, normalizeCurrencyCode } from '../lib/tenantCurrency';
 import './ReportsPage.css';
 
 type ReportTab =
@@ -207,88 +210,111 @@ function toNumber(value: number | string | null | undefined): number {
   return 0;
 }
 
-function formatNumber(value: number | string | null | undefined, maximumFractionDigits = 2): string {
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(toNumber(value));
+type Ui = (englishText: string) => string;
+
+function formatNumber(value: number | string | null | undefined, locale: AppLocale, maximumFractionDigits = 2): string {
+  return formatLocalizedNumber(toNumber(value), locale, { maximumFractionDigits });
 }
 
-function formatSignedQuantity(value: number | string | null | undefined, unit?: string | null): string {
+function formatSignedQuantity(value: number | string | null | undefined, locale: AppLocale, ui: Ui, unit?: string | null): string {
   const numeric = toNumber(value);
   const prefix = numeric > 0 ? '+' : '';
-  return `${prefix}${formatNumber(numeric)} ${unit || 'units'}`;
+  return `${prefix}${formatNumber(numeric, locale)} ${unit || ui('units')}`;
 }
 
-function formatCostAmount(value: number | string | null | undefined, currency?: string | null): string {
-  return formatCurrencyAmount(value, currency);
+function formatCostAmount(value: number | string | null | undefined, currency: string | null | undefined, locale: AppLocale): string {
+  if (value === null || value === undefined || value === '') return '—';
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return String(value);
+  try {
+    return formatLocalizedCurrency(amount, normalizeCurrencyCode(currency || getActiveTenantCurrency()), locale, { maximumFractionDigits: 2 });
+  } catch {
+    return formatCurrencyAmount(value, currency);
+  }
 }
 
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return '-';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
+function formatDateTime(value: string | null | undefined, locale: AppLocale): string {
+  return value ? formatLocalizedDateTime(value, locale) : '—';
 }
 
-function formatDate(value: string | null | undefined): string {
-  if (!value) return '-';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString();
+function formatDate(value: string | null | undefined, locale: AppLocale): string {
+  return value ? formatLocalizedDate(value, locale) : '—';
 }
 
-function formatCostSource(value: string | null | undefined): string {
+function formatCostSource(value: string | null | undefined, ui: Ui): string {
   switch (value) {
-    case 'stock_movement': return 'Stock movement';
-    case 'shipment_item_unit_cost': return 'Shipment receipt';
-    case 'product_standard': return 'Product standard cost';
-    case 'no_cost': return 'No cost available';
-    default: return value ? value.replace(/_/g, ' ') : '-';
+    case 'stock_movement': return ui('Stock movement');
+    case 'shipment_item_unit_cost': return ui('Shipment receipt');
+    case 'product_standard': return ui('Product standard cost');
+    case 'no_cost': return ui('No cost available');
+    default: return value || '—';
   }
 }
 
 function formatQuantityByUnit(
   quantities: Record<string, number | string> | null | undefined,
-  fallbackTotal?: number | string | null
+  fallbackTotal: number | string | null | undefined,
+  locale: AppLocale,
+  ui: Ui
 ): string {
   const entries = Object.entries(quantities || {}).filter(([, quantity]) => Number.isFinite(Number(quantity)));
   if (entries.length > 0) {
     return entries
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([unit, quantity]) => `${formatNumber(quantity)} ${unit}`)
+      .map(([unit, quantity]) => `${formatNumber(quantity, locale)} ${unit}`)
       .join(', ');
   }
   return fallbackTotal === undefined || fallbackTotal === null
-    ? 'No quantity recorded'
-    : `${formatNumber(fallbackTotal)} (unit breakdown unavailable)`;
+    ? ui('No quantity recorded')
+    : ui('{quantity} (unit breakdown unavailable)').replace('{quantity}', formatNumber(fallbackTotal, locale));
 }
 
-function formatPercent(value: number | string | null | undefined): string {
-  if (value === null || value === undefined || value === '') return 'Not enough evidence';
-  return `${formatNumber(value, 1)}%`;
+function formatPercent(value: number | string | null | undefined, locale: AppLocale, ui: Ui): string {
+  if (value === null || value === undefined || value === '') return ui('Not enough evidence');
+  return ui('{percent}%').replace('{percent}', formatNumber(value, locale, 1));
 }
 
-function formatStatus(value: string | null | undefined): string {
-  if (!value) return '-';
-  return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+const KNOWN_STATUS_LABELS: Record<string, string> = {
+  draft: 'Draft', submitted: 'Submitted', approved: 'Approved', completed: 'Completed', cancelled: 'Cancelled',
+  executed: 'Executed', pending: 'Pending', partial: 'Partial', received: 'Received', rejected: 'Rejected',
+  fulfilled: 'Fulfilled', partially_fulfilled: 'Partially fulfilled', matched: 'Matched', paid: 'Paid', open: 'Open',
+  active: 'Active', expired: 'Expired', due_soon: 'Due soon', upcoming: 'Upcoming'
+};
+
+function formatStatus(value: string | null | undefined, ui: Ui): string {
+  if (!value) return '—';
+  const known = KNOWN_STATUS_LABELS[value];
+  return known ? ui(known) : value;
 }
 
-function formatPurchaseOrderProgress(quantities: PurchaseOrderQuantityByUnit | null | undefined): string {
+function formatPurchaseOrderProgress(quantities: PurchaseOrderQuantityByUnit | null | undefined, locale: AppLocale, ui: Ui): string {
   const entries = Object.entries(quantities || {});
-  if (!entries.length) return 'No item quantities';
+  if (!entries.length) return ui('No item quantities');
   return entries.sort(([a], [b]) => a.localeCompare(b)).map(([unit, values]) =>
-    `${unit}: ${formatNumber(values.ordered_quantity)} ordered / ${formatNumber(values.received_quantity)} received / ${formatNumber(values.remaining_quantity)} remaining`
+    ui('{unit}: {ordered} ordered / {received} received / {remaining} remaining')
+      .replace('{unit}', unit)
+      .replace('{ordered}', formatNumber(values.ordered_quantity, locale))
+      .replace('{received}', formatNumber(values.received_quantity, locale))
+      .replace('{remaining}', formatNumber(values.remaining_quantity, locale))
   ).join(' · ');
 }
 
-function formatRequisitionProgress(quantities: RequisitionQuantityByUnit | null | undefined): string {
+function formatRequisitionProgress(quantities: RequisitionQuantityByUnit | null | undefined, locale: AppLocale, ui: Ui): string {
   const entries = Object.entries(quantities || {});
-  if (!entries.length) return 'No item quantities';
+  if (!entries.length) return ui('No item quantities');
   return entries.sort(([a], [b]) => a.localeCompare(b)).map(([unit, values]) =>
-    `${unit}: ${formatNumber(values.requested_quantity)} requested / ${formatNumber(values.fulfilled_quantity)} fulfilled / ${formatNumber(values.remaining_quantity)} remaining`
+    ui('{unit}: {requested} requested / {fulfilled} fulfilled / {remaining} remaining')
+      .replace('{unit}', unit)
+      .replace('{requested}', formatNumber(values.requested_quantity, locale))
+      .replace('{fulfilled}', formatNumber(values.fulfilled_quantity, locale))
+      .replace('{remaining}', formatNumber(values.remaining_quantity, locale))
   ).join(' · ');
 }
 
-function getReadableError(error: unknown): string {
+function getReadableError(error: unknown, ui: Ui): string {
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
-  return 'Unknown error';
+  return ui('Unknown error');
 }
 
 function isFeatureEntitlementError(error: unknown): boolean {
@@ -299,17 +325,19 @@ function isPermissionDeniedError(error: unknown): boolean {
   return error instanceof ApiError && error.status === 403 && !isFeatureEntitlementError(error);
 }
 
-function humanizeMovementType(value: string | null | undefined): string {
-  if (!value) return '-';
+function humanizeMovementType(value: string | null | undefined, ui: Ui): string {
+  if (!value) return '—';
   const configured = MOVEMENT_TYPE_OPTIONS.find(([key]) => key === value);
-  if (configured) return configured[1];
-  return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+  if (configured) return ui(configured[1]);
+  return value;
 }
 
-function formatReference(type: string | null | undefined, id: string | null | undefined): string {
-  if (!id) return '-';
-  const label = type === 'shipment' ? 'Shipment' : type === 'stock_transfer' ? 'Transfer' : 'Reference';
-  return `${label}: ${id.slice(0, 8)}…`;
+function formatReference(type: string | null | undefined, id: string | null | undefined, ui: Ui): string {
+  if (!id) return '—';
+  const shortId = `${id.slice(0, 8)}…`;
+  if (type === 'shipment') return ui('Shipment: {id}').replace('{id}', shortId);
+  if (type === 'stock_transfer') return ui('Transfer: {id}').replace('{id}', shortId);
+  return ui('Reference: {id}').replace('{id}', shortId);
 }
 
 type InventoryValuationRow = {
@@ -637,6 +665,7 @@ function ReportPanel({ tab, actions, filters, children }: {
   filters?: ReactNode;
   children: ReactNode;
 }) {
+  const { ui } = useAppTranslation();
   return (
     <section
       id={getReportPanelId(tab)}
@@ -647,8 +676,8 @@ function ReportPanel({ tab, actions, filters, children }: {
     >
       <OperationalSectionHeader
         iconPath={REPORT_ICONS[tab]}
-        title={REPORT_TABS.find((item) => item.key === tab)?.label || getReportLabel(tab)}
-        description={REPORT_DESCRIPTIONS[tab]}
+        title={ui(REPORT_TABS.find((item) => item.key === tab)?.label || getReportLabel(tab))}
+        description={ui(REPORT_DESCRIPTIONS[tab])}
         actions={<div className="reports-actions" data-report-controls="true">{actions}</div>}
       />
       {filters ? <div className="reports-filter-bar" data-report-controls="true">{filters}</div> : null}
@@ -734,14 +763,15 @@ function DateRangeFields({ from, to, onFromChange, onToChange, disabled }: {
   onToChange: (value: string) => void;
   disabled: boolean;
 }) {
+  const { ui } = useAppTranslation();
   return (
     <>
       <label className="reports-field reports-field--date">
-        <span>From</span>
+        <span>{ui("From")}</span>
         <input type="date" value={from} max={to || undefined} onChange={(event) => onFromChange(event.target.value)} disabled={disabled} />
       </label>
       <label className="reports-field reports-field--date">
-        <span>To</span>
+        <span>{ui("To")}</span>
         <input type="date" value={to} min={from || undefined} onChange={(event) => onToChange(event.target.value)} disabled={disabled} />
       </label>
     </>
@@ -757,15 +787,18 @@ function ErrorState({ message }: { message: string }) {
 }
 
 function LastRefreshed({ timestamp }: { timestamp: number }) {
-  return <div className="reports-refreshed">Last refreshed: {timestamp ? formatDateTime(new Date(timestamp).toISOString()) : 'Not loaded yet'}</div>;
+  const { locale, ui } = useAppTranslation();
+  return <div className="reports-refreshed">{ui('Last refreshed: {timestamp}').replace(ui("{timestamp}"), timestamp ? formatDateTime(new Date(timestamp).toISOString(), locale) : ui('Not loaded yet'))}</div>;
 }
 
 function RiskBadge({ status }: { status: string }) {
-  const label = status === 'expired' ? 'Expired' : status === 'due_soon' ? 'Due soon' : 'Upcoming';
+  const { ui } = useAppTranslation();
+  const label = status === 'expired' ? ui('Expired') : status === 'due_soon' ? ui('Due soon') : ui('Upcoming');
   return <span className={`reports-risk reports-risk--${status}`}>{label}</span>;
 }
 
 export default function ReportsPage() {
+  const { locale, ui } = useAppTranslation();
   const [activeTab, setActiveTab] = useState<ReportTab>('inventory-valuation');
   const [inventoryFilters, setInventoryFilters] = useState({ category: '', location: '' });
   const [stockFilters, setStockFilters] = useState({ category: '', location: '' });
@@ -937,9 +970,9 @@ export default function ReportsPage() {
   const forecastDeniedByFeature = isFeatureEntitlementError(forecastQuery.error);
   const forecastDeniedByPermission = isPermissionDeniedError(forecastQuery.error);
   const forecastUnavailableReason = !canViewInsights || forecastDeniedByPermission
-    ? 'Forecast access requires Insights - Read in addition to Reports - Read.'
+    ? ui('Forecast access requires Insights - Read in addition to Reports - Read.')
     : (forecastingEntitlement && !forecastingEntitlement.allowed) || forecastDeniedByFeature
-      ? 'Forecasting is not enabled for this tenant subscription.'
+      ? ui('Forecasting is not enabled for this tenant subscription.')
       : null;
 
   const inventoryRows = inventoryValuationQuery.data?.rows ?? [];
@@ -960,7 +993,7 @@ export default function ReportsPage() {
   const procurementSummary = procurementSummaryQuery.data;
 
   const availableReportCount = forecastFeatureReady ? REPORT_TABS.length : REPORT_TABS.length - 1;
-  const activeLabel = REPORT_TABS.find((item) => item.key === activeTab)?.label || 'Report';
+  const activeLabel = ui(REPORT_TABS.find((item) => item.key === activeTab)?.label || 'Report');
   const isExporting = downloadingReport !== null;
   const keyboardTabs = useMemo(
     () => REPORT_TABS.filter((item) => item.key !== 'forecast' || forecastFeatureReady),
@@ -1028,7 +1061,7 @@ export default function ReportsPage() {
       const metadata = await apiDownloadFile(getExportPath(report, format), getReportFilename(report, format));
       setDownloadInfo({ report, format, metadata });
     } catch (error) {
-      setDownloadError(getReadableError(error));
+      setDownloadError(getReadableError(error, ui));
     } finally {
       setDownloadingReport(null);
       setDownloadFormat(null);
@@ -1039,16 +1072,16 @@ export default function ReportsPage() {
     clearDownloadStatus();
     const panel = document.getElementById(getReportPanelId(report));
     if (!panel) {
-      setDownloadError('The report is not ready to print yet.');
+      setDownloadError(ui('The report is not ready to print yet.'));
       return;
     }
     const printWindow = window.open('', '_blank', 'width=1100,height=800');
     if (!printWindow) {
-      setDownloadError('The browser blocked the print window. Allow pop-ups for this site and try again.');
+      setDownloadError(ui('The browser blocked the print window. Allow pop-ups for this site and try again.'));
       return;
     }
     printWindow.opener = null;
-    printWindow.document.title = `${activeLabel} - Inventory Operations`;
+    printWindow.document.title = ui('{report} - Inventory Operations').replace('{report}', activeLabel);
     const style = printWindow.document.createElement('style');
     style.textContent = `
       *{box-sizing:border-box} body{font-family:Arial,sans-serif;color:#0f172a;margin:24px;font-size:12px}
@@ -1091,16 +1124,15 @@ export default function ReportsPage() {
   const actionButtons = (report: ReportTab, isFetching: boolean, disabled = false) => (
     <>
       <button type="button" className="reports-button reports-button--secondary" disabled={isExporting || disabled || isFetching} onClick={() => refreshReport(report)}>
-        {isFetching ? 'Refreshing…' : 'Refresh'}
+        {isFetching ? ui("Refreshing…") : ui("Refresh")}
       </button>
       <button type="button" className="reports-button reports-button--secondary" disabled={isExporting || disabled || isFetching} onClick={() => printReport(report)}>
-        Print
-      </button>
+        {ui("Print")}</button>
       <button type="button" className="reports-button reports-button--secondary" disabled={isExporting || disabled} aria-busy={downloadingReport === report && downloadFormat === 'pdf'} onClick={() => downloadReport(report, 'pdf')}>
-        {downloadingReport === report && downloadFormat === 'pdf' ? 'Creating PDF…' : 'Download PDF'}
+        {downloadingReport === report && downloadFormat === 'pdf' ? ui("Creating PDF…") : ui("Download PDF")}
       </button>
       <button type="button" className="reports-button reports-button--primary" disabled={isExporting || disabled} aria-busy={downloadingReport === report && downloadFormat === 'csv'} onClick={() => downloadReport(report, 'csv')}>
-        {downloadingReport === report && downloadFormat === 'csv' ? 'Exporting…' : 'Export CSV'}
+        {downloadingReport === report && downloadFormat === 'csv' ? ui("Exporting…") : ui("Export CSV")}
       </button>
     </>
   );
@@ -1113,22 +1145,22 @@ export default function ReportsPage() {
   if (anyForbidden) {
     return (
       <section className="app-warning-state reports-access-state">
-        <h2>Reports access required</h2>
-        <p>Your current access role (<strong>{currentAccessRoleLabel || 'unknown'}</strong>) cannot read one or more tenant reporting datasets.</p>
-        <p>Ask a tenant administrator to review your Reports permissions.</p>
+        <h2>{ui("Reports access required")}</h2>
+        <p>{ui('Your current access role ({role}) cannot read one or more tenant reporting datasets.').replace('{role}', currentAccessRoleLabel || ui('unknown'))}</p>
+        <p>{ui("Ask a tenant administrator to review your Reports permissions.")}</p>
       </section>
     );
   }
 
   if (canReadTenantSubscriptionAccess && subscriptionAccessQuery.isLoading) {
-    return <section className="app-panel app-panel--padded">Checking reporting access…</section>;
+    return <section className="app-panel app-panel--padded">{ui("Checking reporting access…")}</section>;
   }
 
   if ((reportsEntitlement && !reportsEntitlement.allowed) || reportsDeniedByFeature) {
     return (
       <section className="app-warning-state reports-access-state">
-        <h2>Reports are not enabled</h2>
-        <p>This tenant subscription does not currently include the Reports feature.</p>
+        <h2>{ui("Reports are not enabled")}</h2>
+        <p>{ui("This tenant subscription does not currently include the Reports feature.")}</p>
       </section>
     );
   }
@@ -1137,47 +1169,47 @@ export default function ReportsPage() {
     <div className="reports-page io-operational-page io-workspace-page">
       <OperationalWorkspaceHero
         iconPath="/reports"
-        eyebrow="Reporting & exports"
-        title="Management reporting workspace"
-        description="Run tenant-scoped inventory, movement, transfer, requisition, procurement, commitment, spend, usage, supplier, expiry, variance, and forecasting reports from live database records. Every report can be printed or exported for offline business use."
+        eyebrow={ui("Reporting & exports")}
+        title={ui("Management reporting workspace")}
+        description={ui("Run tenant-scoped inventory, movement, transfer, requisition, procurement, commitment, spend, usage, supplier, expiry, variance, and forecasting reports from live database records. Every report can be printed or exported for offline business use.")}
         meta={
           <>
-            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Read-only reporting</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Print + PDF + CSV</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Read-only reporting")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Print + PDF + CSV")}</OperationalWorkspaceMetaPill>
           </>
         }
-        aside={<OperationalWorkspaceStatus value={availableReportCount} label="report types available with current access" />}
+        aside={<OperationalWorkspaceStatus value={availableReportCount} label={ui("report types available with current access")} />}
       />
 
-      <OperationalWorkspaceStats ariaLabel="Reporting overview">
-        <OperationalWorkspaceStatCard label="Available reports" value={availableReportCount} helper="Operational and management report types" iconPath="/reports" tone="blue" />
+      <OperationalWorkspaceStats ariaLabel={ui("Reporting overview")}>
+        <OperationalWorkspaceStatCard label={ui("Available reports")} value={availableReportCount} helper={ui("Operational and management report types")} iconPath="/reports" tone="blue" />
         <OperationalWorkspaceStatCard
-          label="Estimated inventory value"
-          value={formatCostAmount(inventoryOverviewQuery.data?.totals.estimated_inventory_value, inventoryOverviewQuery.data?.totals.currency_code)}
-          helper={`${inventoryOverviewQuery.data?.totals.row_count ?? 0} valuation rows`}
+          label={ui("Estimated inventory value")}
+          value={formatCostAmount(inventoryOverviewQuery.data?.totals.estimated_inventory_value, inventoryOverviewQuery.data?.totals.currency_code, locale)}
+          helper={ui('{count} valuation rows').replace('{count}', formatNumber(inventoryOverviewQuery.data?.totals.row_count ?? 0, locale, 0))}
           iconPath="/stock"
           loading={inventoryOverviewQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Low-stock products"
+          label={ui("Low-stock products")}
           value={lowStockOverviewQuery.data?.length ?? 0}
-          helper="Products below configured minimum"
+          helper={ui("Products below configured minimum")}
           iconPath="/replenishment-planning"
           tone={(lowStockOverviewQuery.data?.length ?? 0) > 0 ? 'warn' : 'good'}
           loading={lowStockOverviewQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Overdue shipments"
-          value={formatNumber(procurementOverviewQuery.data?.shipments.overdue_shipments, 0)}
-          helper="Pending or partial past delivery date"
+          label={ui("Overdue shipments")}
+          value={formatNumber(procurementOverviewQuery.data?.shipments.overdue_shipments, locale, 0)}
+          helper={ui("Pending or partial past delivery date")}
           iconPath="/shipments"
           tone={toNumber(procurementOverviewQuery.data?.shipments.overdue_shipments) > 0 ? 'warn' : 'good'}
           loading={procurementOverviewQuery.isLoading}
         />
       </OperationalWorkspaceStats>
 
-      <OperationalWorkspaceTabs ariaLabel="Reports">
+      <OperationalWorkspaceTabs ariaLabel={ui("Reports")}>
         {REPORT_TABS.map((tab) => {
           const forecastDisabled = tab.key === 'forecast' && !forecastFeatureReady;
           return (
@@ -1186,7 +1218,7 @@ export default function ReportsPage() {
               id={getReportTabId(tab.key)}
               active={activeTab === tab.key}
               iconPath={REPORT_ICONS[tab.key]}
-              label={tab.label}
+              label={ui(tab.label)}
               aria-controls={getReportPanelId(tab.key)}
               tabIndex={activeTab === tab.key ? 0 : -1}
               disabled={isExporting || forecastDisabled}
@@ -1200,20 +1232,22 @@ export default function ReportsPage() {
 
       {downloadError ? (
         <div className="app-error-state reports-export-status" role="alert" aria-live="assertive">
-          <span><strong>Export/print failed:</strong> {downloadError}</span>
-          <button type="button" className="reports-link-button" onClick={clearDownloadStatus}>Clear message</button>
+          <span><strong>{ui("Export/print failed:")}</strong> {downloadError}</span>
+          <button type="button" className="reports-link-button" onClick={clearDownloadStatus}>{ui("Clear message")}</button>
         </div>
       ) : null}
       {downloadInfo ? (
         <div className="reports-export-success reports-export-status" role="status" aria-live="polite">
           <span>
-            <strong>{downloadInfo.format.toUpperCase()} ready:</strong> {getReportLabel(downloadInfo.report)}.
-            {downloadInfo.metadata.exportedRows !== null ? ` ${downloadInfo.metadata.exportedRows} rows exported.` : ''}
+            <strong>{ui('{format} ready:').replace('{format}', downloadInfo.format.toUpperCase())}</strong> {ui(getReportLabel(downloadInfo.report))}{ui('.')}
+            {downloadInfo.metadata.exportedRows !== null ? ui(' {count} rows exported.').replace('{count}', formatNumber(downloadInfo.metadata.exportedRows, locale, 0)) : ''}
             {downloadInfo.metadata.wasRowLimited && downloadInfo.metadata.originalRows !== null && downloadInfo.metadata.rowLimit !== null
-              ? ` Original result had ${downloadInfo.metadata.originalRows} rows; the configured limit of ${downloadInfo.metadata.rowLimit} was applied.`
+              ? ui(' Original result had {original} rows; the configured limit of {limit} was applied.')
+                .replace('{original}', formatNumber(downloadInfo.metadata.originalRows, locale, 0))
+                .replace('{limit}', formatNumber(downloadInfo.metadata.rowLimit, locale, 0))
               : ''}
           </span>
-          <button type="button" className="reports-link-button" onClick={clearDownloadStatus}>Clear message</button>
+          <button type="button" className="reports-link-button" onClick={clearDownloadStatus}>{ui("Clear message")}</button>
         </div>
       ) : null}
 
@@ -1223,24 +1257,24 @@ export default function ReportsPage() {
           actions={actionButtons('inventory-valuation', inventoryValuationQuery.isFetching)}
           filters={
             <>
-              <ChoiceFilterField label="Category" value={inventoryFilters.category} placeholder="All categories" options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setInventoryFilters, 'category', value)} />
-              <ChoiceFilterField label="Location" value={inventoryFilters.location} placeholder="All locations" options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setInventoryFilters, 'location', value)} />
-              <div className="reports-filter-note">Filters apply to the on-screen report and PDF/CSV exports.</div>
+              <ChoiceFilterField label={ui("Category")} value={inventoryFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setInventoryFilters, 'category', value)} />
+              <ChoiceFilterField label={ui("Location")} value={inventoryFilters.location} placeholder={ui("All locations")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setInventoryFilters, 'location', value)} />
+              <div className="reports-filter-note">{ui("Filters apply to the on-screen report and PDF/CSV exports.")}</div>
             </>
           }
         >
           <LastRefreshed timestamp={inventoryValuationQuery.dataUpdatedAt} />
-          <p className="reports-note">Foreign-currency receipt costs are preserved separately and are not silently converted.</p>
-          {inventoryValuationQuery.isLoading ? <div>Loading inventory valuation…</div> : null}
-          {inventoryValuationQuery.isError ? <ErrorState message={`Failed to load inventory valuation: ${getReadableError(inventoryValuationQuery.error)}`} /> : null}
-          {!inventoryValuationQuery.isLoading && !inventoryValuationQuery.isError && inventoryRows.length === 0 ? <EmptyState message="No stocked inventory rows matched these filters." /> : null}
+          <p className="reports-note">{ui("Foreign-currency receipt costs are preserved separately and are not silently converted.")}</p>
+          {inventoryValuationQuery.isLoading ? <div>{ui("Loading inventory valuation…")}</div> : null}
+          {inventoryValuationQuery.isError ? <ErrorState message={ui('Failed to load inventory valuation: {error}').replace('{error}', getReadableError(inventoryValuationQuery.error, ui))} /> : null}
+          {!inventoryValuationQuery.isLoading && !inventoryValuationQuery.isError && inventoryRows.length === 0 ? <EmptyState message={ui("No stocked inventory rows matched these filters.")} /> : null}
           {inventoryRows.length > 0 ? (
             <div className="reports-table-wrap"><table className="reports-table"><thead><tr>
-              <th>Product</th><th>Category</th><th>Location</th><th>Quantity</th><th>Unit cost</th><th>Cost source</th><th>Estimated value</th><th>Updated</th>
+              <th>{ui("Product")}</th><th>{ui("Category")}</th><th>{ui("Location")}</th><th>{ui("Quantity")}</th><th>{ui("Unit cost")}</th><th>{ui("Cost source")}</th><th>{ui("Estimated value")}</th><th>{ui("Updated")}</th>
             </tr></thead><tbody>{inventoryRows.map((row) => <tr key={`${row.product_id}-${row.storage_location_id}`}>
               <td className="reports-strong">{row.product_name}</td><td>{row.product_category || '-'}</td><td>{row.storage_location_name}</td>
-              <td>{formatNumber(row.quantity)} {row.product_unit || 'units'}</td><td>{formatCostAmount(row.estimated_unit_cost, row.currency_code)}</td>
-              <td>{formatCostSource(row.estimated_cost_source)}</td><td className="reports-strong">{formatCostAmount(row.estimated_total_value, row.currency_code)}</td><td>{formatDateTime(row.updated_at)}</td>
+              <td>{formatNumber(row.quantity, locale)} {row.product_unit || ui("units")}</td><td>{formatCostAmount(row.estimated_unit_cost, row.currency_code, locale)}</td>
+              <td>{formatCostSource(row.estimated_cost_source, ui)}</td><td className="reports-strong">{formatCostAmount(row.estimated_total_value, row.currency_code, locale)}</td><td>{formatDateTime(row.updated_at, locale)}</td>
             </tr>)}</tbody></table></div>
           ) : null}
         </ReportPanel>
@@ -1252,17 +1286,17 @@ export default function ReportsPage() {
           actions={actionButtons('stock-by-location', stockByLocationQuery.isFetching)}
           filters={
             <>
-              <ChoiceFilterField label="Category" value={stockFilters.category} placeholder="All categories" options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setStockFilters, 'category', value)} />
-              <ChoiceFilterField label="Location" value={stockFilters.location} placeholder="All locations" options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setStockFilters, 'location', value)} />
+              <ChoiceFilterField label={ui("Category")} value={stockFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setStockFilters, 'category', value)} />
+              <ChoiceFilterField label={ui("Location")} value={stockFilters.location} placeholder={ui("All locations")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setStockFilters, 'location', value)} />
             </>
           }
         >
           <LastRefreshed timestamp={stockByLocationQuery.dataUpdatedAt} />
-          {stockByLocationQuery.isLoading ? <div>Loading stock by location…</div> : null}
-          {stockByLocationQuery.isError ? <ErrorState message={`Failed to load stock by location: ${getReadableError(stockByLocationQuery.error)}`} /> : null}
-          {!stockByLocationQuery.isLoading && !stockByLocationQuery.isError && locationRows.length === 0 ? <EmptyState message="No stock locations matched these filters." /> : null}
-          {locationRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Location</th><th>Temperature zone</th><th>Stock rows</th><th>Quantity by unit</th></tr></thead><tbody>
-            {locationRows.map((row) => <tr key={row.storage_location_id}><td className="reports-strong">{row.storage_location_name}</td><td>{row.temperature_zone || '-'}</td><td>{formatNumber(row.stock_row_count, 0)}</td><td>{formatQuantityByUnit(row.quantity_by_unit, row.total_quantity)}</td></tr>)}
+          {stockByLocationQuery.isLoading ? <div>{ui("Loading stock by location…")}</div> : null}
+          {stockByLocationQuery.isError ? <ErrorState message={ui('Failed to load stock by location: {error}').replace('{error}', getReadableError(stockByLocationQuery.error, ui))} /> : null}
+          {!stockByLocationQuery.isLoading && !stockByLocationQuery.isError && locationRows.length === 0 ? <EmptyState message={ui("No stock locations matched these filters.")} /> : null}
+          {locationRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Location")}</th><th>{ui("Temperature zone")}</th><th>{ui("Stock rows")}</th><th>{ui("Quantity by unit")}</th></tr></thead><tbody>
+            {locationRows.map((row) => <tr key={row.storage_location_id}><td className="reports-strong">{row.storage_location_name}</td><td>{row.temperature_zone || '-'}</td><td>{formatNumber(row.stock_row_count, locale, 0)}</td><td>{formatQuantityByUnit(row.quantity_by_unit, row.total_quantity, locale, ui)}</td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
@@ -1274,18 +1308,18 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={movementFilters.from} to={movementFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setMovementFilters, 'from', value)} onToChange={(value) => updateAndClear(setMovementFilters, 'to', value)} />
-              <ChoiceFilterField label="Category" value={movementFilters.category} placeholder="All categories" options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setMovementFilters, 'category', value)} />
-              <AutocompleteFilterField label="Product" value={movementFilters.product} placeholder="Any product name" options={filterOptions.products} listId="report-products-movements" disabled={isExporting} onChange={(value) => updateAndClear(setMovementFilters, 'product', value)} />
-              <label className="reports-field reports-field--compact"><span>Result limit</span><select value={movementFilters.limit} onChange={(event) => updateAndClear(setMovementFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{PRODUCT_MOVEMENT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <ChoiceFilterField label={ui("Category")} value={movementFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setMovementFilters, 'category', value)} />
+              <AutocompleteFilterField label={ui("Product")} value={movementFilters.product} placeholder={ui("Any product name")} options={filterOptions.products} listId="report-products-movements" disabled={isExporting} onChange={(value) => updateAndClear(setMovementFilters, 'product', value)} />
+              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={movementFilters.limit} onChange={(event) => updateAndClear(setMovementFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{PRODUCT_MOVEMENT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
             </>
           }
         >
           <LastRefreshed timestamp={productMovementsQuery.dataUpdatedAt} />
-          {productMovementsQuery.isLoading ? <div>Loading product movements…</div> : null}
-          {productMovementsQuery.isError ? <ErrorState message={`Failed to load product movements: ${getReadableError(productMovementsQuery.error)}`} /> : null}
-          {!productMovementsQuery.isLoading && !productMovementsQuery.isError && movementRows.length === 0 ? <EmptyState message="No products matched the movement report filters." /> : null}
-          {movementRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Product</th><th>Category</th><th>Movements</th><th>Total increase</th><th>Total decrease</th><th>Last movement</th></tr></thead><tbody>
-            {movementRows.map((row) => <tr key={row.product_id}><td className="reports-strong">{row.product_name}</td><td>{row.product_category || '-'}</td><td>{formatNumber(row.movement_count, 0)}</td><td>{formatNumber(row.total_increase)} {row.product_unit || 'units'}</td><td>{formatNumber(row.total_decrease)} {row.product_unit || 'units'}</td><td>{formatDateTime(row.last_movement_at)}</td></tr>)}
+          {productMovementsQuery.isLoading ? <div>{ui("Loading product movements…")}</div> : null}
+          {productMovementsQuery.isError ? <ErrorState message={ui('Failed to load product movements: {error}').replace('{error}', getReadableError(productMovementsQuery.error, ui))} /> : null}
+          {!productMovementsQuery.isLoading && !productMovementsQuery.isError && movementRows.length === 0 ? <EmptyState message={ui("No products matched the movement report filters.")} /> : null}
+          {movementRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Product")}</th><th>{ui("Category")}</th><th>{ui("Movements")}</th><th>{ui("Total increase")}</th><th>{ui("Total decrease")}</th><th>{ui("Last movement")}</th></tr></thead><tbody>
+            {movementRows.map((row) => <tr key={row.product_id}><td className="reports-strong">{row.product_name}</td><td>{row.product_category || '-'}</td><td>{formatNumber(row.movement_count, locale, 0)}</td><td>{formatNumber(row.total_increase, locale)} {row.product_unit || ui("units")}</td><td>{formatNumber(row.total_decrease, locale)} {row.product_unit || ui("units")}</td><td>{formatDateTime(row.last_movement_at, locale)}</td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
@@ -1297,19 +1331,19 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={ledgerFilters.from} to={ledgerFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setLedgerFilters, 'from', value)} onToChange={(value) => updateAndClear(setLedgerFilters, 'to', value)} />
-              <label className="reports-field reports-field--compact"><span>Movement type</span><select value={ledgerFilters.movement_type} onChange={(event) => updateAndClear(setLedgerFilters, 'movement_type', event.target.value)} disabled={isExporting}>{MOVEMENT_TYPE_OPTIONS.map(([value, label]) => <option key={value || 'all'} value={value}>{label}</option>)}</select></label>
-              <AutocompleteFilterField label="Product" value={ledgerFilters.product} placeholder="Any product name" options={filterOptions.products} listId="report-products-ledger" disabled={isExporting} onChange={(value) => updateAndClear(setLedgerFilters, 'product', value)} />
-              <ChoiceFilterField label="Location" value={ledgerFilters.location} placeholder="Any location" options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setLedgerFilters, 'location', value)} />
-              <label className="reports-field reports-field--compact"><span>Result limit</span><select value={ledgerFilters.limit} onChange={(event) => updateAndClear(setLedgerFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <label className="reports-field reports-field--compact"><span>{ui("Movement type")}</span><select value={ledgerFilters.movement_type} onChange={(event) => updateAndClear(setLedgerFilters, 'movement_type', event.target.value)} disabled={isExporting}>{MOVEMENT_TYPE_OPTIONS.map(([value, label]) => <option key={value || 'all'} value={value}>{ui(label)}</option>)}</select></label>
+              <AutocompleteFilterField label={ui("Product")} value={ledgerFilters.product} placeholder={ui("Any product name")} options={filterOptions.products} listId="report-products-ledger" disabled={isExporting} onChange={(value) => updateAndClear(setLedgerFilters, 'product', value)} />
+              <ChoiceFilterField label={ui("Location")} value={ledgerFilters.location} placeholder={ui("Any location")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setLedgerFilters, 'location', value)} />
+              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={ledgerFilters.limit} onChange={(event) => updateAndClear(setLedgerFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
             </>
           }
         >
           <LastRefreshed timestamp={movementLedgerQuery.dataUpdatedAt} />
-          {movementLedgerQuery.isLoading ? <div>Loading movement ledger…</div> : null}
-          {movementLedgerQuery.isError ? <ErrorState message={`Failed to load movement ledger: ${getReadableError(movementLedgerQuery.error)}`} /> : null}
-          {!movementLedgerQuery.isLoading && !movementLedgerQuery.isError && ledgerRows.length === 0 ? <EmptyState message="No stock movements matched these filters." /> : null}
-          {ledgerRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Date / time</th><th>Product</th><th>Location</th><th>Change</th><th>Movement</th><th>Actor</th><th>Reason / reference</th></tr></thead><tbody>
-            {ledgerRows.map((row) => <tr key={row.movement_id}><td>{formatDateTime(row.created_at)}</td><td className="reports-strong">{row.product_name}<span className="reports-subtext">{row.product_category || 'Uncategorized'}</span></td><td>{row.storage_location_name || '-'}</td><td className={toNumber(row.quantity_change) < 0 ? 'reports-warning-text' : 'reports-positive-text'}>{formatSignedQuantity(row.quantity_change, row.product_unit)}</td><td>{humanizeMovementType(row.movement_type)}</td><td>{row.actor_name || 'System / unknown'}</td><td>{row.reason || row.receiving_note || '-'}<span className="reports-subtext">{formatReference(row.reference_type, row.reference_id)}</span></td></tr>)}
+          {movementLedgerQuery.isLoading ? <div>{ui("Loading movement ledger…")}</div> : null}
+          {movementLedgerQuery.isError ? <ErrorState message={ui('Failed to load movement ledger: {error}').replace('{error}', getReadableError(movementLedgerQuery.error, ui))} /> : null}
+          {!movementLedgerQuery.isLoading && !movementLedgerQuery.isError && ledgerRows.length === 0 ? <EmptyState message={ui("No stock movements matched these filters.")} /> : null}
+          {ledgerRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Date / time")}</th><th>{ui("Product")}</th><th>{ui("Location")}</th><th>{ui("Change")}</th><th>{ui("Movement")}</th><th>{ui("Actor")}</th><th>{ui("Reason / reference")}</th></tr></thead><tbody>
+            {ledgerRows.map((row) => <tr key={row.movement_id}><td>{formatDateTime(row.created_at, locale)}</td><td className="reports-strong">{row.product_name}<span className="reports-subtext">{row.product_category || ui("Uncategorized")}</span></td><td>{row.storage_location_name || '-'}</td><td className={toNumber(row.quantity_change) < 0 ? 'reports-warning-text' : 'reports-positive-text'}>{formatSignedQuantity(row.quantity_change, locale, ui, row.product_unit)}</td><td>{humanizeMovementType(row.movement_type, ui)}</td><td>{row.actor_name || ui("System / unknown")}</td><td>{row.reason || row.receiving_note || '-'}<span className="reports-subtext">{formatReference(row.reference_type, row.reference_id, ui)}</span></td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
@@ -1321,19 +1355,19 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={varianceFilters.from} to={varianceFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setVarianceFilters, 'from', value)} onToChange={(value) => updateAndClear(setVarianceFilters, 'to', value)} />
-              <AutocompleteFilterField label="Product" value={varianceFilters.product} placeholder="Any product name" options={filterOptions.products} listId="report-products-variance" disabled={isExporting} onChange={(value) => updateAndClear(setVarianceFilters, 'product', value)} />
-              <ChoiceFilterField label="Location" value={varianceFilters.location} placeholder="Any location" options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setVarianceFilters, 'location', value)} />
-              <label className="reports-field reports-field--compact"><span>Result limit</span><select value={varianceFilters.limit} onChange={(event) => updateAndClear(setVarianceFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <AutocompleteFilterField label={ui("Product")} value={varianceFilters.product} placeholder={ui("Any product name")} options={filterOptions.products} listId="report-products-variance" disabled={isExporting} onChange={(value) => updateAndClear(setVarianceFilters, 'product', value)} />
+              <ChoiceFilterField label={ui("Location")} value={varianceFilters.location} placeholder={ui("Any location")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setVarianceFilters, 'location', value)} />
+              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={varianceFilters.limit} onChange={(event) => updateAndClear(setVarianceFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
             </>
           }
         >
           <LastRefreshed timestamp={inventoryVarianceQuery.dataUpdatedAt} />
-          <p className="reports-note">Cycle counts show expected versus counted stock. Manual adjustments are shown as posted variance records.</p>
-          {inventoryVarianceQuery.isLoading ? <div>Loading count and adjustment variance…</div> : null}
-          {inventoryVarianceQuery.isError ? <ErrorState message={`Failed to load count variance: ${getReadableError(inventoryVarianceQuery.error)}`} /> : null}
-          {!inventoryVarianceQuery.isLoading && !inventoryVarianceQuery.isError && varianceRows.length === 0 ? <EmptyState message="No cycle-count or manual-adjustment records matched these filters." /> : null}
-          {varianceRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Date / time</th><th>Record</th><th>Product</th><th>Location</th><th>Expected</th><th>Counted</th><th>Variance</th><th>Status / actor</th></tr></thead><tbody>
-            {varianceRows.map((row) => <tr key={`${row.record_type}-${row.record_id}`}><td>{formatDateTime(row.created_at)}</td><td>{row.record_type === 'cycle_count' ? 'Cycle count' : 'Manual adjustment'}<span className="reports-subtext">{row.reason || '-'}</span></td><td className="reports-strong">{row.product_name}</td><td>{row.storage_location_name || '-'}</td><td>{row.expected_quantity === null || row.expected_quantity === undefined ? '-' : `${formatNumber(row.expected_quantity)} ${row.product_unit || 'units'}`}</td><td>{row.counted_quantity === null || row.counted_quantity === undefined ? '-' : `${formatNumber(row.counted_quantity)} ${row.product_unit || 'units'}`}</td><td className={toNumber(row.variance_quantity) !== 0 ? 'reports-warning-text' : ''}>{row.variance_quantity === null || row.variance_quantity === undefined ? '-' : formatSignedQuantity(row.variance_quantity, row.product_unit)}</td><td>{row.status || '-'}<span className="reports-subtext">{row.actor_name || 'System / unknown'}</span></td></tr>)}
+          <p className="reports-note">{ui("Cycle counts show expected versus counted stock. Manual adjustments are shown as posted variance records.")}</p>
+          {inventoryVarianceQuery.isLoading ? <div>{ui("Loading count and adjustment variance…")}</div> : null}
+          {inventoryVarianceQuery.isError ? <ErrorState message={ui('Failed to load count variance: {error}').replace('{error}', getReadableError(inventoryVarianceQuery.error, ui))} /> : null}
+          {!inventoryVarianceQuery.isLoading && !inventoryVarianceQuery.isError && varianceRows.length === 0 ? <EmptyState message={ui("No cycle-count or manual-adjustment records matched these filters.")} /> : null}
+          {varianceRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Date / time")}</th><th>{ui("Record")}</th><th>{ui("Product")}</th><th>{ui("Location")}</th><th>{ui("Expected")}</th><th>{ui("Counted")}</th><th>{ui("Variance")}</th><th>{ui("Status / actor")}</th></tr></thead><tbody>
+            {varianceRows.map((row) => <tr key={`${row.record_type}-${row.record_id}`}><td>{formatDateTime(row.created_at, locale)}</td><td>{row.record_type === 'cycle_count' ? ui("Cycle count") : ui("Manual adjustment")}<span className="reports-subtext">{row.reason || '-'}</span></td><td className="reports-strong">{row.product_name}</td><td>{row.storage_location_name || '-'}</td><td>{row.expected_quantity === null || row.expected_quantity === undefined ? '-' : ui('{quantity} {unit}').replace('{quantity}', formatNumber(row.expected_quantity, locale)).replace('{unit}', row.product_unit || ui('units'))}</td><td>{row.counted_quantity === null || row.counted_quantity === undefined ? '-' : ui('{quantity} {unit}').replace('{quantity}', formatNumber(row.counted_quantity, locale)).replace('{unit}', row.product_unit || ui('units'))}</td><td className={toNumber(row.variance_quantity) !== 0 ? 'reports-warning-text' : ''}>{row.variance_quantity === null || row.variance_quantity === undefined ? '-' : formatSignedQuantity(row.variance_quantity, locale, ui, row.product_unit)}</td><td>{formatStatus(row.status, ui)}<span className="reports-subtext">{row.actor_name || ui('System / unknown')}</span></td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
@@ -1345,18 +1379,18 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={transferFilters.from} to={transferFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setTransferFilters, 'from', value)} onToChange={(value) => updateAndClear(setTransferFilters, 'to', value)} />
-              <ChoiceFilterField label="Location" value={transferFilters.location} placeholder="Any source or destination" options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setTransferFilters, 'location', value)} />
-              <label className="reports-field reports-field--compact"><span>Status</span><select value={transferFilters.status} onChange={(event) => updateAndClear(setTransferFilters, 'status', event.target.value)} disabled={isExporting}>{TRANSFER_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label className="reports-field reports-field--compact"><span>Result limit</span><select value={transferFilters.limit} onChange={(event) => updateAndClear(setTransferFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <ChoiceFilterField label={ui("Location")} value={transferFilters.location} placeholder={ui("Any source or destination")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setTransferFilters, 'location', value)} />
+              <label className="reports-field reports-field--compact"><span>{ui("Status")}</span><select value={transferFilters.status} onChange={(event) => updateAndClear(setTransferFilters, 'status', event.target.value)} disabled={isExporting}>{TRANSFER_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{ui(label)}</option>)}</select></label>
+              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={transferFilters.limit} onChange={(event) => updateAndClear(setTransferFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
             </>
           }
         >
           <LastRefreshed timestamp={stockTransferActivityQuery.dataUpdatedAt} />
-          {stockTransferActivityQuery.isLoading ? <div>Loading stock transfers…</div> : null}
-          {stockTransferActivityQuery.isError ? <ErrorState message={`Failed to load stock transfers: ${getReadableError(stockTransferActivityQuery.error)}`} /> : null}
-          {!stockTransferActivityQuery.isLoading && !stockTransferActivityQuery.isError && transferRows.length === 0 ? <EmptyState message="No stock transfers matched these filters." /> : null}
-          {transferRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Created</th><th>From</th><th>To</th><th>Status</th><th>Items</th><th>Quantity by unit</th><th>Created by</th><th>Executed / cancellation</th></tr></thead><tbody>
-            {transferRows.map((row) => <tr key={row.transfer_id}><td>{formatDateTime(row.created_at)}</td><td className="reports-strong">{row.from_location}</td><td className="reports-strong">{row.to_location}</td><td>{formatStatus(row.status)}</td><td>{formatNumber(row.item_count, 0)}</td><td>{formatQuantityByUnit(row.quantity_by_unit)}</td><td>{row.created_by || 'System'}</td><td>{row.executed_at ? formatDateTime(row.executed_at) : row.cancellation_reason || '-'}</td></tr>)}
+          {stockTransferActivityQuery.isLoading ? <div>{ui("Loading stock transfers…")}</div> : null}
+          {stockTransferActivityQuery.isError ? <ErrorState message={ui('Failed to load stock transfers: {error}').replace('{error}', getReadableError(stockTransferActivityQuery.error, ui))} /> : null}
+          {!stockTransferActivityQuery.isLoading && !stockTransferActivityQuery.isError && transferRows.length === 0 ? <EmptyState message={ui("No stock transfers matched these filters.")} /> : null}
+          {transferRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Created")}</th><th>{ui("From")}</th><th>{ui("To")}</th><th>{ui("Status")}</th><th>{ui("Items")}</th><th>{ui("Quantity by unit")}</th><th>{ui("Created by")}</th><th>{ui("Executed / cancellation")}</th></tr></thead><tbody>
+            {transferRows.map((row) => <tr key={row.transfer_id}><td>{formatDateTime(row.created_at, locale)}</td><td className="reports-strong">{row.from_location}</td><td className="reports-strong">{row.to_location}</td><td>{formatStatus(row.status, ui)}</td><td>{formatNumber(row.item_count, locale, 0)}</td><td>{formatQuantityByUnit(row.quantity_by_unit, undefined, locale, ui)}</td><td>{row.created_by || ui("System")}</td><td>{row.executed_at ? formatDateTime(row.executed_at, locale) : row.cancellation_reason || '-'}</td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
@@ -1368,18 +1402,18 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={requisitionFilters.from} to={requisitionFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setRequisitionFilters, 'from', value)} onToChange={(value) => updateAndClear(setRequisitionFilters, 'to', value)} />
-              <ChoiceFilterField label="Department" value={requisitionFilters.department} placeholder="Any requesting department" options={filterOptions.departments} disabled={isExporting} onChange={(value) => updateAndClear(setRequisitionFilters, 'department', value)} />
-              <label className="reports-field reports-field--compact"><span>Status</span><select value={requisitionFilters.status} onChange={(event) => updateAndClear(setRequisitionFilters, 'status', event.target.value)} disabled={isExporting}>{REQUISITION_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label className="reports-field reports-field--compact"><span>Result limit</span><select value={requisitionFilters.limit} onChange={(event) => updateAndClear(setRequisitionFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <ChoiceFilterField label={ui("Department")} value={requisitionFilters.department} placeholder={ui("Any requesting department")} options={filterOptions.departments} disabled={isExporting} onChange={(value) => updateAndClear(setRequisitionFilters, 'department', value)} />
+              <label className="reports-field reports-field--compact"><span>{ui("Status")}</span><select value={requisitionFilters.status} onChange={(event) => updateAndClear(setRequisitionFilters, 'status', event.target.value)} disabled={isExporting}>{REQUISITION_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{ui(label)}</option>)}</select></label>
+              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={requisitionFilters.limit} onChange={(event) => updateAndClear(setRequisitionFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
             </>
           }
         >
           <LastRefreshed timestamp={requisitionActivityQuery.dataUpdatedAt} />
-          {requisitionActivityQuery.isLoading ? <div>Loading requisitions…</div> : null}
-          {requisitionActivityQuery.isError ? <ErrorState message={`Failed to load requisitions: ${getReadableError(requisitionActivityQuery.error)}`} /> : null}
-          {!requisitionActivityQuery.isLoading && !requisitionActivityQuery.isError && requisitionRows.length === 0 ? <EmptyState message="No inventory requisitions matched these filters." /> : null}
-          {requisitionRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Requisition</th><th>Department</th><th>Status</th><th>Priority</th><th>Needed by</th><th>Source → target</th><th>Fulfillment by unit</th><th>Created by</th></tr></thead><tbody>
-            {requisitionRows.map((row) => <tr key={row.requisition_id}><td className="reports-strong">{row.requisition_number}<span className="reports-subtext">{formatDateTime(row.created_at)}</span></td><td>{row.requesting_department || '-'}{row.target_department ? <span className="reports-subtext">To: {row.target_department}</span> : null}</td><td className={row.overdue ? 'reports-warning-text' : ''}>{formatStatus(row.status)}{row.overdue ? <span className="reports-subtext">Past needed-by date</span> : null}</td><td>{formatStatus(row.priority)}</td><td>{formatDate(row.needed_by)}</td><td>{row.source_location || '-'} → {row.target_location || '-'}</td><td>{formatRequisitionProgress(row.quantity_by_unit)}</td><td>{row.created_by || 'System'}</td></tr>)}
+          {requisitionActivityQuery.isLoading ? <div>{ui("Loading requisitions…")}</div> : null}
+          {requisitionActivityQuery.isError ? <ErrorState message={ui('Failed to load requisitions: {error}').replace('{error}', getReadableError(requisitionActivityQuery.error, ui))} /> : null}
+          {!requisitionActivityQuery.isLoading && !requisitionActivityQuery.isError && requisitionRows.length === 0 ? <EmptyState message={ui("No inventory requisitions matched these filters.")} /> : null}
+          {requisitionRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Requisition")}</th><th>{ui("Department")}</th><th>{ui("Status")}</th><th>{ui("Priority")}</th><th>{ui("Needed by")}</th><th>{ui("Source → target")}</th><th>{ui("Fulfillment by unit")}</th><th>{ui("Created by")}</th></tr></thead><tbody>
+            {requisitionRows.map((row) => <tr key={row.requisition_id}><td className="reports-strong">{row.requisition_number}<span className="reports-subtext">{formatDateTime(row.created_at, locale)}</span></td><td>{row.requesting_department || '-'}{row.target_department ? <span className="reports-subtext">{ui('To: {department}').replace('{department}', row.target_department)}</span> : null}</td><td className={row.overdue ? 'reports-warning-text' : ''}>{formatStatus(row.status, ui)}{row.overdue ? <span className="reports-subtext">{ui("Past needed-by date")}</span> : null}</td><td>{formatStatus(row.priority, ui)}</td><td>{formatDate(row.needed_by, locale)}</td><td>{ui('{source} → {target}').replace('{source}', row.source_location || '—').replace('{target}', row.target_location || '—')}</td><td>{formatRequisitionProgress(row.quantity_by_unit, locale, ui)}</td><td>{row.created_by || ui("System")}</td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
@@ -1391,26 +1425,26 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={procurementFilters.from} to={procurementFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setProcurementFilters, 'from', value)} onToChange={(value) => updateAndClear(setProcurementFilters, 'to', value)} />
-              <ChoiceFilterField label="Supplier" value={procurementFilters.supplier} placeholder="Any supplier" options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setProcurementFilters, 'supplier', value)} />
-              <div className="reports-filter-note">Date range filters shipments by creation date.</div>
+              <ChoiceFilterField label={ui("Supplier")} value={procurementFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setProcurementFilters, 'supplier', value)} />
+              <div className="reports-filter-note">{ui("Date range filters shipments by creation date.")}</div>
             </>
           }
         >
           <LastRefreshed timestamp={procurementSummaryQuery.dataUpdatedAt} />
-          {procurementSummaryQuery.isLoading ? <div>Loading procurement summary…</div> : null}
-          {procurementSummaryQuery.isError ? <ErrorState message={`Failed to load procurement summary: ${getReadableError(procurementSummaryQuery.error)}`} /> : null}
+          {procurementSummaryQuery.isLoading ? <div>{ui("Loading procurement summary…")}</div> : null}
+          {procurementSummaryQuery.isError ? <ErrorState message={ui('Failed to load procurement summary: {error}').replace('{error}', getReadableError(procurementSummaryQuery.error, ui))} /> : null}
           {procurementSummary ? <div className="reports-summary-grid">
-            <article className="reports-summary-card"><h4>Shipments</h4>
-              <div><span>Total</span><strong>{formatNumber(procurementSummary.shipments.total_shipments, 0)}</strong></div>
-              <div><span>Pending</span><strong>{formatNumber(procurementSummary.shipments.pending_shipments, 0)}</strong></div>
-              <div><span>Partial</span><strong>{formatNumber(procurementSummary.shipments.partial_shipments, 0)}</strong></div>
-              <div><span>Received</span><strong>{formatNumber(procurementSummary.shipments.received_shipments, 0)}</strong></div>
-              <div><span>Overdue</span><strong>{formatNumber(procurementSummary.shipments.overdue_shipments, 0)}</strong></div>
+            <article className="reports-summary-card"><h4>{ui("Shipments")}</h4>
+              <div><span>{ui("Total")}</span><strong>{formatNumber(procurementSummary.shipments.total_shipments, locale, 0)}</strong></div>
+              <div><span>{ui("Pending")}</span><strong>{formatNumber(procurementSummary.shipments.pending_shipments, locale, 0)}</strong></div>
+              <div><span>{ui("Partial")}</span><strong>{formatNumber(procurementSummary.shipments.partial_shipments, locale, 0)}</strong></div>
+              <div><span>{ui("Received")}</span><strong>{formatNumber(procurementSummary.shipments.received_shipments, locale, 0)}</strong></div>
+              <div><span>{ui("Overdue")}</span><strong>{formatNumber(procurementSummary.shipments.overdue_shipments, locale, 0)}</strong></div>
             </article>
-            <article className="reports-summary-card"><h4>Shipment lines</h4><div><span>Active lines</span><strong>{formatNumber(procurementSummary.lines.total_active_shipment_lines, 0)}</strong></div>
+            <article className="reports-summary-card"><h4>{ui("Shipment lines")}</h4><div><span>{ui("Active lines")}</span><strong>{formatNumber(procurementSummary.lines.total_active_shipment_lines, locale, 0)}</strong></div>
               {procurementSummary.lines.quantity_by_unit && Object.keys(procurementSummary.lines.quantity_by_unit).length > 0
-                ? Object.entries(procurementSummary.lines.quantity_by_unit).sort(([a], [b]) => a.localeCompare(b)).map(([unit, values]) => <div className="reports-unit-block" key={unit}><h5>{unit}</h5><div><span>Ordered</span><strong>{formatNumber(values.ordered_quantity)} {unit}</strong></div><div><span>Received</span><strong>{formatNumber(values.received_quantity)} {unit}</strong></div><div><span>Discrepancy</span><strong>{formatNumber(values.discrepancy)} {unit}</strong></div></div>)
-                : <p className="reports-note">No procurement quantity-by-unit rows returned.</p>}
+                ? Object.entries(procurementSummary.lines.quantity_by_unit).sort(([a], [b]) => a.localeCompare(b)).map(([unit, values]) => <div className="reports-unit-block" key={unit}><h5>{unit}</h5><div><span>{ui("Ordered")}</span><strong>{formatNumber(values.ordered_quantity, locale)} {unit}</strong></div><div><span>{ui("Received")}</span><strong>{formatNumber(values.received_quantity, locale)} {unit}</strong></div><div><span>{ui("Discrepancy")}</span><strong>{formatNumber(values.discrepancy, locale)} {unit}</strong></div></div>)
+                : <p className="reports-note">{ui("No procurement quantity-by-unit rows returned.")}</p>}
             </article>
           </div> : null}
         </ReportPanel>
@@ -1423,21 +1457,21 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={poCommitmentFilters.from} to={poCommitmentFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setPoCommitmentFilters, 'from', value)} onToChange={(value) => updateAndClear(setPoCommitmentFilters, 'to', value)} />
-              <ChoiceFilterField label="Supplier" value={poCommitmentFilters.supplier} placeholder="Any supplier" options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setPoCommitmentFilters, 'supplier', value)} />
-              <AutocompleteFilterField label="Product" value={poCommitmentFilters.product} placeholder="Any product name" options={filterOptions.products} listId="report-products-po-commitments" disabled={isExporting} onChange={(value) => updateAndClear(setPoCommitmentFilters, 'product', value)} />
-              <label className="reports-field reports-field--compact"><span>Status</span><select value={poCommitmentFilters.status} onChange={(event) => updateAndClear(setPoCommitmentFilters, 'status', event.target.value)} disabled={isExporting}>{PURCHASE_ORDER_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label className="reports-field reports-field--compact"><span>Result limit</span><select value={poCommitmentFilters.limit} onChange={(event) => updateAndClear(setPoCommitmentFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-              <div className="reports-filter-note">Date range uses expected delivery date. “Open commitments” means submitted or approved purchase orders.</div>
+              <ChoiceFilterField label={ui("Supplier")} value={poCommitmentFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setPoCommitmentFilters, 'supplier', value)} />
+              <AutocompleteFilterField label={ui("Product")} value={poCommitmentFilters.product} placeholder={ui("Any product name")} options={filterOptions.products} listId="report-products-po-commitments" disabled={isExporting} onChange={(value) => updateAndClear(setPoCommitmentFilters, 'product', value)} />
+              <label className="reports-field reports-field--compact"><span>{ui("Status")}</span><select value={poCommitmentFilters.status} onChange={(event) => updateAndClear(setPoCommitmentFilters, 'status', event.target.value)} disabled={isExporting}>{PURCHASE_ORDER_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{ui(label)}</option>)}</select></label>
+              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={poCommitmentFilters.limit} onChange={(event) => updateAndClear(setPoCommitmentFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <div className="reports-filter-note">{ui("Date range uses expected delivery date. “Open commitments” means submitted or approved purchase orders.")}</div>
             </>
           }
         >
           <LastRefreshed timestamp={purchaseOrderCommitmentsQuery.dataUpdatedAt} />
-          <p className="reports-note">Quantities stay separated by product unit. Monetary totals include only priced lines, remain in the purchase-order currency, and show unpriced line counts explicitly.</p>
-          {purchaseOrderCommitmentsQuery.isLoading ? <div>Loading purchase-order commitments…</div> : null}
-          {purchaseOrderCommitmentsQuery.isError ? <ErrorState message={`Failed to load purchase-order commitments: ${getReadableError(purchaseOrderCommitmentsQuery.error)}`} /> : null}
-          {!purchaseOrderCommitmentsQuery.isLoading && !purchaseOrderCommitmentsQuery.isError && poCommitmentRows.length === 0 ? <EmptyState message="No purchase orders matched these commitment filters." /> : null}
-          {poCommitmentRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>PO</th><th>Supplier</th><th>Status</th><th>Expected</th><th>Receiving progress</th><th>Known ordered</th><th>Known remaining</th><th>Unpriced</th></tr></thead><tbody>
-            {poCommitmentRows.map((row) => <tr key={row.purchase_order_id}><td className="reports-strong">{row.po_number}<span className="reports-subtext">Created {formatDate(row.created_at)}</span></td><td>{row.supplier_name}</td><td className={row.overdue ? 'reports-warning-text' : ''}>{formatStatus(row.status)}{row.overdue ? <span className="reports-subtext">Overdue</span> : null}</td><td>{formatDate(row.expected_delivery_date)}</td><td>{formatPurchaseOrderProgress(row.quantity_by_unit)}</td><td>{formatCostAmount(row.known_ordered_value, row.currency)}</td><td className={toNumber(row.known_remaining_value) > 0 ? 'reports-warning-text' : ''}>{formatCostAmount(row.known_remaining_value, row.currency)}</td><td>{formatNumber(row.unpriced_line_count, 0)} of {formatNumber(row.line_count, 0)} lines</td></tr>)}
+          <p className="reports-note">{ui("Quantities stay separated by product unit. Monetary totals include only priced lines, remain in the purchase-order currency, and show unpriced line counts explicitly.")}</p>
+          {purchaseOrderCommitmentsQuery.isLoading ? <div>{ui("Loading purchase-order commitments…")}</div> : null}
+          {purchaseOrderCommitmentsQuery.isError ? <ErrorState message={ui('Failed to load purchase-order commitments: {error}').replace('{error}', getReadableError(purchaseOrderCommitmentsQuery.error, ui))} /> : null}
+          {!purchaseOrderCommitmentsQuery.isLoading && !purchaseOrderCommitmentsQuery.isError && poCommitmentRows.length === 0 ? <EmptyState message={ui("No purchase orders matched these commitment filters.")} /> : null}
+          {poCommitmentRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("PO")}</th><th>{ui("Supplier")}</th><th>{ui("Status")}</th><th>{ui("Expected")}</th><th>{ui("Receiving progress")}</th><th>{ui("Known ordered")}</th><th>{ui("Known remaining")}</th><th>{ui("Unpriced")}</th></tr></thead><tbody>
+            {poCommitmentRows.map((row) => <tr key={row.purchase_order_id}><td className="reports-strong">{row.po_number}<span className="reports-subtext">{ui('Created {date}').replace('{date}', formatDate(row.created_at, locale))}</span></td><td>{row.supplier_name}</td><td className={row.overdue ? 'reports-warning-text' : ''}>{formatStatus(row.status, ui)}{row.overdue ? <span className="reports-subtext">{ui("Overdue")}</span> : null}</td><td>{formatDate(row.expected_delivery_date, locale)}</td><td>{formatPurchaseOrderProgress(row.quantity_by_unit, locale, ui)}</td><td>{formatCostAmount(row.known_ordered_value, row.currency, locale)}</td><td className={toNumber(row.known_remaining_value) > 0 ? 'reports-warning-text' : ''}>{formatCostAmount(row.known_remaining_value, row.currency, locale)}</td><td>{ui('{unpriced} of {lines} lines').replace('{unpriced}', formatNumber(row.unpriced_line_count, locale, 0)).replace('{lines}', formatNumber(row.line_count, locale, 0))}</td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
@@ -1449,20 +1483,20 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={spendFilters.from} to={spendFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setSpendFilters, 'from', value)} onToChange={(value) => updateAndClear(setSpendFilters, 'to', value)} />
-              <ChoiceFilterField label="Supplier" value={spendFilters.supplier} placeholder="Any supplier" options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'supplier', value)} />
-              <ChoiceFilterField label="Category" value={spendFilters.category} placeholder="All categories" options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'category', value)} />
-              <AutocompleteFilterField label="Product" value={spendFilters.product} placeholder="Any product name" options={filterOptions.products} listId="report-products-spend" disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'product', value)} />
-              <label className="reports-field reports-field--compact"><span>Result limit</span><select value={spendFilters.limit} onChange={(event) => updateAndClear(setSpendFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <ChoiceFilterField label={ui("Supplier")} value={spendFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'supplier', value)} />
+              <ChoiceFilterField label={ui("Category")} value={spendFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'category', value)} />
+              <AutocompleteFilterField label={ui("Product")} value={spendFilters.product} placeholder={ui("Any product name")} options={filterOptions.products} listId="report-products-spend" disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'product', value)} />
+              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={spendFilters.limit} onChange={(event) => updateAndClear(setSpendFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
             </>
           }
         >
           <LastRefreshed timestamp={purchasingSpendQuery.dataUpdatedAt} />
-          <p className="reports-note">Only approved, matched, or paid supplier invoices count as recognized purchasing spend. Currencies remain explicit and are never silently combined.</p>
-          {purchasingSpendQuery.isLoading ? <div>Loading purchasing and spend…</div> : null}
-          {purchasingSpendQuery.isError ? <ErrorState message={`Failed to load purchasing spend: ${getReadableError(purchasingSpendQuery.error)}`} /> : null}
-          {!purchasingSpendQuery.isLoading && !purchasingSpendQuery.isError && spendRows.length === 0 ? <EmptyState message="No recognized supplier-invoice lines matched these filters." /> : null}
-          {spendRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Invoice</th><th>Supplier</th><th>Product</th><th>Quantity</th><th>Unit cost</th><th>Line amount</th><th>Status</th></tr></thead><tbody>
-            {spendRows.map((row) => <tr key={`${row.invoice_id}-${row.product_id}`}><td className="reports-strong">{row.invoice_number}<span className="reports-subtext">{formatDate(row.invoice_date)}</span></td><td>{row.supplier_name}</td><td>{row.product_name}<span className="reports-subtext">{row.product_category || 'Uncategorized'}</span></td><td>{formatNumber(row.quantity)} {row.product_unit || 'units'}</td><td>{formatCostAmount(row.unit_cost, row.currency)}</td><td className="reports-strong">{formatCostAmount(row.line_amount, row.currency)}</td><td>{row.invoice_status}</td></tr>)}
+          <p className="reports-note">{ui("Only approved, matched, or paid supplier invoices count as recognized purchasing spend. Currencies remain explicit and are never silently combined.")}</p>
+          {purchasingSpendQuery.isLoading ? <div>{ui("Loading purchasing and spend…")}</div> : null}
+          {purchasingSpendQuery.isError ? <ErrorState message={ui('Failed to load purchasing spend: {error}').replace('{error}', getReadableError(purchasingSpendQuery.error, ui))} /> : null}
+          {!purchasingSpendQuery.isLoading && !purchasingSpendQuery.isError && spendRows.length === 0 ? <EmptyState message={ui("No recognized supplier-invoice lines matched these filters.")} /> : null}
+          {spendRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Invoice")}</th><th>{ui("Supplier")}</th><th>{ui("Product")}</th><th>{ui("Quantity")}</th><th>{ui("Unit cost")}</th><th>{ui("Line amount")}</th><th>{ui("Status")}</th></tr></thead><tbody>
+            {spendRows.map((row) => <tr key={`${row.invoice_id}-${row.product_id}`}><td className="reports-strong">{row.invoice_number}<span className="reports-subtext">{formatDate(row.invoice_date, locale)}</span></td><td>{row.supplier_name}</td><td>{row.product_name}<span className="reports-subtext">{row.product_category || ui("Uncategorized")}</span></td><td>{formatNumber(row.quantity, locale)} {row.product_unit || ui("units")}</td><td>{formatCostAmount(row.unit_cost, row.currency, locale)}</td><td className="reports-strong">{formatCostAmount(row.line_amount, row.currency, locale)}</td><td>{row.invoice_status}</td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
@@ -1473,20 +1507,20 @@ export default function ReportsPage() {
           actions={actionButtons('low-stock', lowStockQuery.isFetching)}
           filters={
             <>
-              <label className="reports-field reports-field--compact"><span>Threshold scope</span><select value={lowStockFilters.scope} onChange={(event) => updateAndClear(setLowStockFilters, 'scope', event.target.value as 'product' | 'par' | 'both')} disabled={isExporting}><option value="both">Product minima + location par levels</option><option value="product">Product minimum only</option><option value="par">Location par levels only</option></select></label>
-              <ChoiceFilterField label="Category" value={lowStockFilters.category} placeholder="All categories" options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setLowStockFilters, 'category', value)} />
-              <ChoiceFilterField label="Supplier" value={lowStockFilters.supplier} placeholder="Any supplier" options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setLowStockFilters, 'supplier', value)} />
-              <ChoiceFilterField label="Location" value={lowStockFilters.location} placeholder="Any location" options={filterOptions.locations} disabled={isExporting || lowStockFilters.scope === 'product'} onChange={(value) => updateAndClear(setLowStockFilters, 'location', value)} />
-              <div className="reports-filter-note">Product minima compare against tenant-wide stock. Location par rows use active, currently effective par levels and compare against stock at that location.</div>
+              <label className="reports-field reports-field--compact"><span>{ui("Threshold scope")}</span><select value={lowStockFilters.scope} onChange={(event) => updateAndClear(setLowStockFilters, 'scope', event.target.value as 'product' | 'par' | 'both')} disabled={isExporting}><option value="both">{ui("Product minima + location par levels")}</option><option value="product">{ui("Product minimum only")}</option><option value="par">{ui("Location par levels only")}</option></select></label>
+              <ChoiceFilterField label={ui("Category")} value={lowStockFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setLowStockFilters, 'category', value)} />
+              <ChoiceFilterField label={ui("Supplier")} value={lowStockFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setLowStockFilters, 'supplier', value)} />
+              <ChoiceFilterField label={ui("Location")} value={lowStockFilters.location} placeholder={ui("Any location")} options={filterOptions.locations} disabled={isExporting || lowStockFilters.scope === 'product'} onChange={(value) => updateAndClear(setLowStockFilters, 'location', value)} />
+              <div className="reports-filter-note">{ui("Product minima compare against tenant-wide stock. Location par rows use active, currently effective par levels and compare against stock at that location.")}</div>
             </>
           }
         >
           <LastRefreshed timestamp={lowStockQuery.dataUpdatedAt} />
-          {lowStockQuery.isLoading ? <div>Loading low-stock and par shortages…</div> : null}
-          {lowStockQuery.isError ? <ErrorState message={`Failed to load low-stock report: ${getReadableError(lowStockQuery.error)}`} /> : null}
-          {!lowStockQuery.isLoading && !lowStockQuery.isError && lowStockRows.length === 0 ? <EmptyState message="No product-minimum or active location par-level shortages matched these filters." /> : null}
-          {lowStockRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Scope</th><th>Product</th><th>Location / department</th><th>Current</th><th>Minimum</th><th>Target</th><th>Shortage</th><th>To target</th><th>Supplier</th></tr></thead><tbody>
-            {lowStockRows.map((row) => <tr key={`${row.threshold_scope}-${row.par_level_id || row.product_id}`}><td>{row.threshold_scope === 'location_par_level' ? 'Location par' : 'Product minimum'}</td><td className="reports-strong">{row.product_name}<span className="reports-subtext">{row.product_category || 'Uncategorized'}</span></td><td>{row.storage_location_name || 'All tenant locations'}{row.department ? <span className="reports-subtext">{row.department}</span> : null}</td><td>{formatNumber(row.current_stock)} {row.product_unit || 'units'}</td><td>{formatNumber(row.minimum_stock)} {row.product_unit || 'units'}</td><td>{row.target_stock === null || row.target_stock === undefined ? '-' : `${formatNumber(row.target_stock)} ${row.product_unit || 'units'}`}</td><td className="reports-warning-text">{formatNumber(row.shortage_quantity)} {row.product_unit || 'units'}</td><td>{row.replenish_to_target_quantity === null || row.replenish_to_target_quantity === undefined ? '-' : `${formatNumber(row.replenish_to_target_quantity)} ${row.product_unit || 'units'}`}</td><td>{row.supplier_name || 'Not assigned'}</td></tr>)}
+          {lowStockQuery.isLoading ? <div>{ui("Loading low-stock and par shortages…")}</div> : null}
+          {lowStockQuery.isError ? <ErrorState message={ui('Failed to load low-stock report: {error}').replace('{error}', getReadableError(lowStockQuery.error, ui))} /> : null}
+          {!lowStockQuery.isLoading && !lowStockQuery.isError && lowStockRows.length === 0 ? <EmptyState message={ui("No product-minimum or active location par-level shortages matched these filters.")} /> : null}
+          {lowStockRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Scope")}</th><th>{ui("Product")}</th><th>{ui("Location / department")}</th><th>{ui("Current")}</th><th>{ui("Minimum")}</th><th>{ui("Target")}</th><th>{ui("Shortage")}</th><th>{ui("To target")}</th><th>{ui("Supplier")}</th></tr></thead><tbody>
+            {lowStockRows.map((row) => <tr key={`${row.threshold_scope}-${row.par_level_id || row.product_id}`}><td>{row.threshold_scope === 'location_par_level' ? ui("Location par") : ui("Product minimum")}</td><td className="reports-strong">{row.product_name}<span className="reports-subtext">{row.product_category || ui("Uncategorized")}</span></td><td>{row.storage_location_name || ui("All tenant locations")}{row.department ? <span className="reports-subtext">{row.department}</span> : null}</td><td>{formatNumber(row.current_stock, locale)} {row.product_unit || ui("units")}</td><td>{formatNumber(row.minimum_stock, locale)} {row.product_unit || ui("units")}</td><td>{row.target_stock === null || row.target_stock === undefined ? '-' : ui('{quantity} {unit}').replace('{quantity}', formatNumber(row.target_stock, locale)).replace('{unit}', row.product_unit || ui('units'))}</td><td className="reports-warning-text">{formatNumber(row.shortage_quantity, locale)} {row.product_unit || ui("units")}</td><td>{row.replenish_to_target_quantity === null || row.replenish_to_target_quantity === undefined ? '-' : ui('{quantity} {unit}').replace('{quantity}', formatNumber(row.replenish_to_target_quantity, locale)).replace('{unit}', row.product_unit || ui('units'))}</td><td>{row.supplier_name || ui("Not assigned")}</td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
@@ -1497,20 +1531,20 @@ export default function ReportsPage() {
           actions={actionButtons('slow-moving', slowMovingQuery.isFetching)}
           filters={
             <>
-              <label className="reports-field reports-field--compact"><span>Inactive for</span><select value={slowFilters.days} onChange={(event) => updateAndClear(setSlowFilters, 'days', Number(event.target.value))} disabled={isExporting}>{SLOW_MOVING_DAYS_OPTIONS.map((days) => <option key={days} value={days}>{days}+ days</option>)}</select></label>
-              <ChoiceFilterField label="Category" value={slowFilters.category} placeholder="All categories" options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setSlowFilters, 'category', value)} />
-              <AutocompleteFilterField label="Product" value={slowFilters.product} placeholder="Any product name" options={filterOptions.products} listId="report-products-slow" disabled={isExporting} onChange={(value) => updateAndClear(setSlowFilters, 'product', value)} />
-              <label className="reports-field reports-field--compact"><span>Result limit</span><select value={slowFilters.limit} onChange={(event) => updateAndClear(setSlowFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <label className="reports-field reports-field--compact"><span>{ui("Inactive for")}</span><select value={slowFilters.days} onChange={(event) => updateAndClear(setSlowFilters, 'days', Number(event.target.value))} disabled={isExporting}>{SLOW_MOVING_DAYS_OPTIONS.map((days) => <option key={days} value={days}>{ui('{days}+ days').replace('{days}', formatNumber(days, locale, 0))}</option>)}</select></label>
+              <ChoiceFilterField label={ui("Category")} value={slowFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setSlowFilters, 'category', value)} />
+              <AutocompleteFilterField label={ui("Product")} value={slowFilters.product} placeholder={ui("Any product name")} options={filterOptions.products} listId="report-products-slow" disabled={isExporting} onChange={(value) => updateAndClear(setSlowFilters, 'product', value)} />
+              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={slowFilters.limit} onChange={(event) => updateAndClear(setSlowFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
             </>
           }
         >
           <LastRefreshed timestamp={slowMovingQuery.dataUpdatedAt} />
-          <p className="reports-note">Only products with a positive current stock balance are included. Products with no recorded movement are treated as non-moving.</p>
-          {slowMovingQuery.isLoading ? <div>Loading slow and non-moving stock…</div> : null}
-          {slowMovingQuery.isError ? <ErrorState message={`Failed to load slow-moving stock: ${getReadableError(slowMovingQuery.error)}`} /> : null}
-          {!slowMovingQuery.isLoading && !slowMovingQuery.isError && slowRows.length === 0 ? <EmptyState message={`No positive stock has been inactive for ${slowFilters.days} days or more.`} /> : null}
-          {slowRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Product</th><th>Category</th><th>Current stock</th><th>Last movement</th><th>Idle days</th><th>Supplier</th></tr></thead><tbody>
-            {slowRows.map((row) => <tr key={row.product_id}><td className="reports-strong">{row.product_name}</td><td>{row.product_category || '-'}</td><td>{formatNumber(row.current_stock)} {row.product_unit || 'units'}</td><td>{row.last_movement_at ? formatDateTime(row.last_movement_at) : 'Never recorded'}</td><td className="reports-warning-text">{row.days_since_movement === null || row.days_since_movement === undefined ? 'No movement history' : `${formatNumber(row.days_since_movement, 0)} days`}</td><td>{row.supplier_name || 'Not assigned'}</td></tr>)}
+          <p className="reports-note">{ui("Only products with a positive current stock balance are included. Products with no recorded movement are treated as non-moving.")}</p>
+          {slowMovingQuery.isLoading ? <div>{ui("Loading slow and non-moving stock…")}</div> : null}
+          {slowMovingQuery.isError ? <ErrorState message={ui('Failed to load slow-moving stock: {error}').replace('{error}', getReadableError(slowMovingQuery.error, ui))} /> : null}
+          {!slowMovingQuery.isLoading && !slowMovingQuery.isError && slowRows.length === 0 ? <EmptyState message={ui('No positive stock has been inactive for {days} days or more.').replace('{days}', formatNumber(slowFilters.days, locale, 0))} /> : null}
+          {slowRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Product")}</th><th>{ui("Category")}</th><th>{ui("Current stock")}</th><th>{ui("Last movement")}</th><th>{ui("Idle days")}</th><th>{ui("Supplier")}</th></tr></thead><tbody>
+            {slowRows.map((row) => <tr key={row.product_id}><td className="reports-strong">{row.product_name}</td><td>{row.product_category || '-'}</td><td>{formatNumber(row.current_stock, locale)} {row.product_unit || ui("units")}</td><td>{row.last_movement_at ? formatDateTime(row.last_movement_at, locale) : ui("Never recorded")}</td><td className="reports-warning-text">{row.days_since_movement === null || row.days_since_movement === undefined ? ui("No movement history") : ui('{count} days').replace('{count}', formatNumber(row.days_since_movement, locale, 0))}</td><td>{row.supplier_name || ui("Not assigned")}</td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
@@ -1521,21 +1555,21 @@ export default function ReportsPage() {
           actions={actionButtons('usage-summary', usageSummaryQuery.isFetching)}
           filters={
             <>
-              <label className="reports-field reports-field--compact"><span>Quick period</span><select value={usageFilters.days} onChange={(event) => updateAndClear(setUsageFilters, 'days', Number(event.target.value))} disabled={isExporting}>{USAGE_PERIOD_OPTIONS.map((days) => <option key={days} value={days}>Last {days} days</option>)}</select></label>
+              <label className="reports-field reports-field--compact"><span>{ui("Quick period")}</span><select value={usageFilters.days} onChange={(event) => updateAndClear(setUsageFilters, 'days', Number(event.target.value))} disabled={isExporting}>{USAGE_PERIOD_OPTIONS.map((days) => <option key={days} value={days}>{ui('Last {days} days').replace('{days}', formatNumber(days, locale, 0))}</option>)}</select></label>
               <DateRangeFields from={usageFilters.from} to={usageFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setUsageFilters, 'from', value)} onToChange={(value) => updateAndClear(setUsageFilters, 'to', value)} />
-              <ChoiceFilterField label="Category" value={usageFilters.category} placeholder="All categories" options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setUsageFilters, 'category', value)} />
-              <AutocompleteFilterField label="Product" value={usageFilters.product} placeholder="Any product name" options={filterOptions.products} listId="report-products-usage" disabled={isExporting} onChange={(value) => updateAndClear(setUsageFilters, 'product', value)} />
-              <ChoiceFilterField label="Location" value={usageFilters.location} placeholder="Any location" options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setUsageFilters, 'location', value)} />
-              <div className="reports-filter-note">A From/To date range overrides the quick-period window. Reversed usage entries are excluded.</div>
+              <ChoiceFilterField label={ui("Category")} value={usageFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setUsageFilters, 'category', value)} />
+              <AutocompleteFilterField label={ui("Product")} value={usageFilters.product} placeholder={ui("Any product name")} options={filterOptions.products} listId="report-products-usage" disabled={isExporting} onChange={(value) => updateAndClear(setUsageFilters, 'product', value)} />
+              <ChoiceFilterField label={ui("Location")} value={usageFilters.location} placeholder={ui("Any location")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setUsageFilters, 'location', value)} />
+              <div className="reports-filter-note">{ui("A From/To date range overrides the quick-period window. Reversed usage entries are excluded.")}</div>
             </>
           }
         >
           <LastRefreshed timestamp={usageSummaryQuery.dataUpdatedAt} />
-          {usageSummaryQuery.isLoading ? <div>Loading usage report…</div> : null}
-          {usageSummaryQuery.isError ? <ErrorState message={`Failed to load usage report: ${getReadableError(usageSummaryQuery.error)}`} /> : null}
-          {!usageSummaryQuery.isLoading && !usageSummaryQuery.isError && usageRows.length === 0 ? <EmptyState message="No non-reversed usage matched the selected period and filters." /> : null}
-          {usageRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Product</th><th>Entries</th><th>Total consumed</th><th>Guest use</th><th>Internal use</th><th>Damage / waste</th><th>Last use</th></tr></thead><tbody>
-            {usageRows.map((row) => <tr key={row.product_id}><td className="reports-strong">{row.product_name}<span className="reports-subtext">{row.product_category || 'Uncategorized'}</span></td><td>{formatNumber(row.usage_count, 0)}</td><td>{formatNumber(row.total_consumed)} {row.product_unit || 'units'}</td><td>{formatNumber(row.guest_use_quantity)} {row.product_unit || 'units'}</td><td>{formatNumber(row.internal_use_quantity)} {row.product_unit || 'units'}</td><td>{formatNumber(row.damage_waste_quantity)} {row.product_unit || 'units'}</td><td>{formatDateTime(row.last_consumed_at)}</td></tr>)}
+          {usageSummaryQuery.isLoading ? <div>{ui("Loading usage report…")}</div> : null}
+          {usageSummaryQuery.isError ? <ErrorState message={ui('Failed to load usage report: {error}').replace('{error}', getReadableError(usageSummaryQuery.error, ui))} /> : null}
+          {!usageSummaryQuery.isLoading && !usageSummaryQuery.isError && usageRows.length === 0 ? <EmptyState message={ui("No non-reversed usage matched the selected period and filters.")} /> : null}
+          {usageRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Product")}</th><th>{ui("Entries")}</th><th>{ui("Total consumed")}</th><th>{ui("Guest use")}</th><th>{ui("Internal use")}</th><th>{ui("Damage / waste")}</th><th>{ui("Last use")}</th></tr></thead><tbody>
+            {usageRows.map((row) => <tr key={row.product_id}><td className="reports-strong">{row.product_name}<span className="reports-subtext">{row.product_category || ui("Uncategorized")}</span></td><td>{formatNumber(row.usage_count, locale, 0)}</td><td>{formatNumber(row.total_consumed, locale)} {row.product_unit || ui("units")}</td><td>{formatNumber(row.guest_use_quantity, locale)} {row.product_unit || ui("units")}</td><td>{formatNumber(row.internal_use_quantity, locale)} {row.product_unit || ui("units")}</td><td>{formatNumber(row.damage_waste_quantity, locale)} {row.product_unit || ui("units")}</td><td>{formatDateTime(row.last_consumed_at, locale)}</td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
@@ -1547,19 +1581,19 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={supplierFilters.from} to={supplierFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setSupplierFilters, 'from', value)} onToChange={(value) => updateAndClear(setSupplierFilters, 'to', value)} />
-              <ChoiceFilterField label="Supplier" value={supplierFilters.supplier} placeholder="Any supplier" options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setSupplierFilters, 'supplier', value)} />
-              <label className="reports-field reports-field--compact"><span>Result limit</span><select value={supplierFilters.limit} onChange={(event) => updateAndClear(setSupplierFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-              <div className="reports-filter-note">Date range filters shipment and supplier-return activity by creation date.</div>
+              <ChoiceFilterField label={ui("Supplier")} value={supplierFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setSupplierFilters, 'supplier', value)} />
+              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={supplierFilters.limit} onChange={(event) => updateAndClear(setSupplierFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <div className="reports-filter-note">{ui("Date range filters shipment and supplier-return activity by creation date.")}</div>
             </>
           }
         >
           <LastRefreshed timestamp={supplierPerformanceQuery.dataUpdatedAt} />
-          <p className="reports-note">On-time rate and average delay use received shipments that have actual receiving timestamps. Fill rate is averaged per shipment line; discrepancy rate is line-based so different units are never mixed.</p>
-          {supplierPerformanceQuery.isLoading ? <div>Loading supplier performance…</div> : null}
-          {supplierPerformanceQuery.isError ? <ErrorState message={`Failed to load supplier performance: ${getReadableError(supplierPerformanceQuery.error)}`} /> : null}
-          {!supplierPerformanceQuery.isLoading && !supplierPerformanceQuery.isError && supplierRows.length === 0 ? <EmptyState message="No active suppliers matched these filters." /> : null}
-          {supplierRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Supplier</th><th>Shipments</th><th>Open overdue</th><th>On-time delivery</th><th>Avg delay</th><th>Line fill</th><th>Discrepancy lines</th><th>Returns</th><th>Last received</th></tr></thead><tbody>
-            {supplierRows.map((row) => <tr key={row.supplier_id}><td className="reports-strong">{row.supplier_name}</td><td>{formatNumber(row.total_shipments, 0)}<span className="reports-subtext">{formatNumber(row.received_shipments, 0)} received · {formatNumber(row.partial_shipments, 0)} partial · {formatNumber(row.pending_shipments, 0)} pending</span></td><td className={toNumber(row.overdue_shipments) > 0 ? 'reports-warning-text' : ''}>{formatNumber(row.overdue_shipments, 0)}</td><td>{formatPercent(row.on_time_delivery_rate_pct)}<span className="reports-subtext">{formatNumber(row.on_time_received_shipments, 0)} on time / {formatNumber(row.timing_evidence_shipments, 0)} evidence-backed</span></td><td>{row.average_delivery_delay_days === null || row.average_delivery_delay_days === undefined ? 'Not enough evidence' : `${formatNumber(row.average_delivery_delay_days, 1)} days`}</td><td>{formatPercent(row.line_fulfillment_rate_pct)}</td><td className={toNumber(row.discrepancy_line_rate_pct) > 0 ? 'reports-warning-text' : ''}>{formatPercent(row.discrepancy_line_rate_pct)}</td><td>{formatNumber(row.supplier_returns, 0)}<span className="reports-subtext">{formatNumber(row.dispatched_or_completed_returns, 0)} dispatched/completed</span></td><td>{formatDateTime(row.last_received_at)}</td></tr>)}
+          <p className="reports-note">{ui("On-time rate and average delay use received shipments that have actual receiving timestamps. Fill rate is averaged per shipment line; discrepancy rate is line-based so different units are never mixed.")}</p>
+          {supplierPerformanceQuery.isLoading ? <div>{ui("Loading supplier performance…")}</div> : null}
+          {supplierPerformanceQuery.isError ? <ErrorState message={ui('Failed to load supplier performance: {error}').replace('{error}', getReadableError(supplierPerformanceQuery.error, ui))} /> : null}
+          {!supplierPerformanceQuery.isLoading && !supplierPerformanceQuery.isError && supplierRows.length === 0 ? <EmptyState message={ui("No active suppliers matched these filters.")} /> : null}
+          {supplierRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Supplier")}</th><th>{ui("Shipments")}</th><th>{ui("Open overdue")}</th><th>{ui("On-time delivery")}</th><th>{ui("Avg delay")}</th><th>{ui("Line fill")}</th><th>{ui("Discrepancy lines")}</th><th>{ui("Returns")}</th><th>{ui("Last received")}</th></tr></thead><tbody>
+            {supplierRows.map((row) => <tr key={row.supplier_id}><td className="reports-strong">{row.supplier_name}</td><td>{formatNumber(row.total_shipments, locale, 0)}<span className="reports-subtext">{ui('{received} received · {partial} partial · {pending} pending').replace('{received}', formatNumber(row.received_shipments, locale, 0)).replace('{partial}', formatNumber(row.partial_shipments, locale, 0)).replace('{pending}', formatNumber(row.pending_shipments, locale, 0))}</span></td><td className={toNumber(row.overdue_shipments) > 0 ? 'reports-warning-text' : ''}>{formatNumber(row.overdue_shipments, locale, 0)}</td><td>{formatPercent(row.on_time_delivery_rate_pct, locale, ui)}<span className="reports-subtext">{ui('{onTime} on time / {evidence} evidence-backed').replace('{onTime}', formatNumber(row.on_time_received_shipments, locale, 0)).replace('{evidence}', formatNumber(row.timing_evidence_shipments, locale, 0))}</span></td><td>{row.average_delivery_delay_days === null || row.average_delivery_delay_days === undefined ? ui("Not enough evidence") : ui('{count} days').replace('{count}', formatNumber(row.average_delivery_delay_days, locale, 1))}</td><td>{formatPercent(row.line_fulfillment_rate_pct, locale, ui)}</td><td className={toNumber(row.discrepancy_line_rate_pct) > 0 ? 'reports-warning-text' : ''}>{formatPercent(row.discrepancy_line_rate_pct, locale, ui)}</td><td>{formatNumber(row.supplier_returns, locale, 0)}<span className="reports-subtext">{ui('{count} dispatched/completed').replace('{count}', formatNumber(row.dispatched_or_completed_returns, locale, 0))}</span></td><td>{formatDateTime(row.last_received_at, locale)}</td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
@@ -1570,33 +1604,33 @@ export default function ReportsPage() {
           actions={actionButtons('expiry-risk', expiryRiskQuery.isFetching)}
           filters={
             <>
-              <label className="reports-field reports-field--compact"><span>Expiry horizon</span><select value={expiryFilters.days} onChange={(event) => updateAndClear(setExpiryFilters, 'days', Number(event.target.value))} disabled={isExporting}>{EXPIRY_HORIZON_OPTIONS.map((days) => <option key={days} value={days}>Next {days} days</option>)}</select></label>
-              <ChoiceFilterField label="Category" value={expiryFilters.category} placeholder="All categories" options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setExpiryFilters, 'category', value)} />
-              <ChoiceFilterField label="Location" value={expiryFilters.location} placeholder="Any location" options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setExpiryFilters, 'location', value)} />
-              <div className="reports-filter-note">Already expired positive-balance lots are always included.</div>
+              <label className="reports-field reports-field--compact"><span>{ui("Expiry horizon")}</span><select value={expiryFilters.days} onChange={(event) => updateAndClear(setExpiryFilters, 'days', Number(event.target.value))} disabled={isExporting}>{EXPIRY_HORIZON_OPTIONS.map((days) => <option key={days} value={days}>{ui('Next {days} days').replace('{days}', formatNumber(days, locale, 0))}</option>)}</select></label>
+              <ChoiceFilterField label={ui("Category")} value={expiryFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setExpiryFilters, 'category', value)} />
+              <ChoiceFilterField label={ui("Location")} value={expiryFilters.location} placeholder={ui("Any location")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setExpiryFilters, 'location', value)} />
+              <div className="reports-filter-note">{ui("Already expired positive-balance lots are always included.")}</div>
             </>
           }
         >
           <LastRefreshed timestamp={expiryRiskQuery.dataUpdatedAt} />
-          {expiryRiskQuery.isLoading ? <div>Loading expiry risk…</div> : null}
-          {expiryRiskQuery.isError ? <ErrorState message={`Failed to load expiry risk: ${getReadableError(expiryRiskQuery.error)}`} /> : null}
-          {!expiryRiskQuery.isLoading && !expiryRiskQuery.isError && expiryRows.length === 0 ? <EmptyState message={`No matching positive-balance lots expire within the next ${expiryFilters.days} days.`} /> : null}
-          {expiryRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Product</th><th>Location</th><th>Lot / batch</th><th>Expiry</th><th>Quantity</th><th>Condition</th><th>Risk</th></tr></thead><tbody>
-            {expiryRows.map((row) => <tr key={row.inventory_lot_id}><td className="reports-strong">{row.product_name}</td><td>{row.storage_location_name}</td><td>{row.lot_number || '-'}{row.batch_number ? <span className="reports-subtext">Batch: {row.batch_number}</span> : null}</td><td>{formatDate(row.expiry_date)}</td><td>{formatNumber(row.quantity)} {row.product_unit || 'units'}</td><td>{row.condition}</td><td><RiskBadge status={row.risk_status} /></td></tr>)}
+          {expiryRiskQuery.isLoading ? <div>{ui("Loading expiry risk…")}</div> : null}
+          {expiryRiskQuery.isError ? <ErrorState message={ui('Failed to load expiry risk: {error}').replace('{error}', getReadableError(expiryRiskQuery.error, ui))} /> : null}
+          {!expiryRiskQuery.isLoading && !expiryRiskQuery.isError && expiryRows.length === 0 ? <EmptyState message={ui('No matching positive-balance lots expire within the next {days} days.').replace('{days}', formatNumber(expiryFilters.days, locale, 0))} /> : null}
+          {expiryRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Product")}</th><th>{ui("Location")}</th><th>{ui("Lot / batch")}</th><th>{ui("Expiry")}</th><th>{ui("Quantity")}</th><th>{ui("Condition")}</th><th>{ui("Risk")}</th></tr></thead><tbody>
+            {expiryRows.map((row) => <tr key={row.inventory_lot_id}><td className="reports-strong">{row.product_name}</td><td>{row.storage_location_name}</td><td>{row.lot_number || '-'}{row.batch_number ? <span className="reports-subtext">{ui('Batch: {batch}').replace('{batch}', row.batch_number)}</span> : null}</td><td>{formatDate(row.expiry_date, locale)}</td><td>{formatNumber(row.quantity, locale)} {row.product_unit || ui("units")}</td><td>{row.condition}</td><td><RiskBadge status={row.risk_status} /></td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
 
       {activeTab === 'forecast' ? (
         <ReportPanel tab="forecast" actions={actionButtons('forecast', forecastQuery.isFetching, !forecastFeatureReady)}>
-          <p className="reports-note">Forecast is read-only. When forecasting access is enabled, you can print it or export it as PDF or CSV.</p>
+          <p className="reports-note">{ui("Forecast is read-only. When forecasting access is enabled, you can print it or export it as PDF or CSV.")}</p>
           {forecastUnavailableReason ? <ErrorState message={forecastUnavailableReason} /> : null}
           {forecastFeatureReady ? <LastRefreshed timestamp={forecastQuery.dataUpdatedAt} /> : null}
-          {forecastFeatureReady && forecastQuery.isLoading ? <div>Loading forecast…</div> : null}
-          {forecastFeatureReady && forecastQuery.isError && !forecastDeniedByFeature ? <ErrorState message={`Failed to load forecast: ${getReadableError(forecastQuery.error)}`} /> : null}
-          {forecastFeatureReady && !forecastQuery.isLoading && !forecastQuery.isError && forecastRows.length === 0 ? <EmptyState message="No recent consumption data was available to produce a forecast." /> : null}
-          {forecastRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>Product</th><th>Average daily usage</th></tr></thead><tbody>
-            {forecastRows.map((row) => <tr key={row.product_id}><td className="reports-strong">{row.product_name}</td><td>{formatNumber(row.avg_daily_usage)} {row.product_unit || 'units'} / day</td></tr>)}
+          {forecastFeatureReady && forecastQuery.isLoading ? <div>{ui("Loading forecast…")}</div> : null}
+          {forecastFeatureReady && forecastQuery.isError && !forecastDeniedByFeature ? <ErrorState message={ui('Failed to load forecast: {error}').replace('{error}', getReadableError(forecastQuery.error, ui))} /> : null}
+          {forecastFeatureReady && !forecastQuery.isLoading && !forecastQuery.isError && forecastRows.length === 0 ? <EmptyState message={ui("No recent consumption data was available to produce a forecast.")} /> : null}
+          {forecastRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Product")}</th><th>{ui("Average daily usage")}</th></tr></thead><tbody>
+            {forecastRows.map((row) => <tr key={row.product_id}><td className="reports-strong">{row.product_name}</td><td>{ui('{quantity} {unit} / day').replace('{quantity}', formatNumber(row.avg_daily_usage, locale)).replace('{unit}', row.product_unit || ui('units'))}</td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}

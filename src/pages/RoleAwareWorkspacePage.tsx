@@ -3,6 +3,9 @@ import type { CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
+import type { AppLocale } from '../i18n/config';
 import { getAccessToken } from '../lib/auth';
 import {
   TENANT_PERMISSIONS,
@@ -202,16 +205,27 @@ function decodeJwtPayload(token: string | null): Record<string, unknown> | null 
   }
 }
 
-function getCurrentAccessRoleLabel(): string {
+type AccessRoleDisplay = { label: string; localizationKey?: 'Admin' | 'Manager' | 'Staff' | 'Custom role' };
+
+function getCurrentAccessRoleDisplay(): AccessRoleDisplay {
   const snapshot = getTenantPermissionSnapshot();
-  if (snapshot?.access_role_label?.trim()) return snapshot.access_role_label.trim();
+  if (snapshot?.custom_role_id || snapshot?.custom_role_name?.trim()) {
+    return { label: snapshot.access_role_label?.trim() || snapshot.custom_role_name?.trim() || 'custom role' };
+  }
+  if (snapshot?.role === 'admin') return { label: 'admin', localizationKey: 'Admin' };
+  if (snapshot?.role === 'manager') return { label: 'manager', localizationKey: 'Manager' };
+  if (snapshot?.role === 'staff') return { label: 'staff', localizationKey: 'Staff' };
+  if (snapshot?.access_role_label?.trim()) return { label: snapshot.access_role_label.trim() };
 
   const payload = decodeJwtPayload(getAccessToken());
   const customRoleName = payload?.custom_role_name;
-  if (typeof customRoleName === 'string' && customRoleName.trim()) return customRoleName.trim();
+  if (typeof customRoleName === 'string' && customRoleName.trim()) return { label: customRoleName.trim() };
 
   const role = payload?.role;
-  return role === 'admin' || role === 'manager' || role === 'staff' ? role : 'custom role';
+  if (role === 'admin') return { label: role, localizationKey: 'Admin' };
+  if (role === 'manager') return { label: role, localizationKey: 'Manager' };
+  if (role === 'staff') return { label: role, localizationKey: 'Staff' };
+  return { label: 'custom role', localizationKey: 'Custom role' };
 }
 
 function numberValue(value: unknown): number {
@@ -223,11 +237,10 @@ function formatLabel(value?: string | null): string {
   return String(value || 'unknown').replace(/_/g, ' ');
 }
 
-function formatDateTime(value?: string | null): string {
-  if (!value) return 'Not reported';
-
+function formatDateTime(value: string | null | undefined, locale: AppLocale, ui: (englishText: string) => string): string {
+  if (!value) return ui('Not reported');
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? value : formatLocalizedDateTime(date, locale);
 }
 
 function urgencyBadgeStyle(urgency?: string | null): CSSProperties {
@@ -245,26 +258,44 @@ function actionTitleLabel(action: WorkspaceAction): string {
   return title;
 }
 
-function primaryFocusLabel(value?: string[] | string): string {
+function canonicalLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  const raw = String(value || 'unknown');
+  const specialLabels: Record<string, string> = {
+    ai_governance: 'AI governance',
+    control_tower: 'Control tower',
+    decision_intelligence: 'Decision intelligence',
+    multi_domain: 'Multi-domain',
+    approval_required: 'Approval required',
+    review_required: 'Review required',
+    in_review: 'In review',
+    in_progress: 'In progress'
+  };
+  const humanized = specialLabels[raw] || formatLabel(raw).replace(/^./, (character) => character.toUpperCase());
+  return ui(humanized);
+}
+
+function primaryFocusLabel(value: string[] | string | undefined, ui: (englishText: string) => string): string {
   const values = Array.isArray(value) ? value : value ? [value] : [];
-  if (!values.length) return 'Not reported';
-  return values.map((item) => PRIMARY_FOCUS_LABELS[item] || formatLabel(item)).join(' · ');
+  if (!values.length) return ui('Not reported');
+  return values.map((item) => ui(PRIMARY_FOCUS_LABELS[item] || formatLabel(item))).join(' · ');
 }
 
-function actionStrategyLabel(value?: string | null): string {
-  if (!value) return 'Not reported';
-  return ACTION_STRATEGY_LABELS[value] || formatLabel(value);
+function actionStrategyLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  if (!value) return ui('Not reported');
+  return ui(ACTION_STRATEGY_LABELS[value] || formatLabel(value));
 }
 
-function executionModeLabel(value?: string | null): string {
-  if (value === 'read_only_role_aware_workspace_orchestration') return 'Read-only guidance';
-  return formatLabel(value);
+function executionModeLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  if (value === 'read_only_role_aware_workspace_orchestration') return ui('Read-only guidance');
+  return canonicalLabel(value, ui);
 }
 
-function widgetContent(widgetId: string): { title: string; description: string } {
-  return WIDGET_LABELS[widgetId] || {
-    title: formatLabel(widgetId).replace(/\b\w/g, (character) => character.toUpperCase()),
-    description: 'Read-only summary of matching work.'
+function widgetContent(widgetId: string, ui: (englishText: string) => string): { title: string; description: string } {
+  const content = WIDGET_LABELS[widgetId];
+  if (content) return { title: ui(content.title), description: ui(content.description) };
+  return {
+    title: ui(formatLabel(widgetId).replace(/\b\w/g, (character) => character.toUpperCase())),
+    description: ui('Read-only summary of matching work.')
   };
 }
 
@@ -350,6 +381,7 @@ async function fetchWorkspace(domain: ActionDomain, urgency: 'all' | ActionUrgen
 }
 
 export default function RoleAwareWorkspacePage() {
+  const { locale, ui } = useAppTranslation();
   const [domain, setDomain] = useRouteQueryState<ActionDomain>({
     paramName: 'domain',
     defaultValue: 'all',
@@ -360,7 +392,8 @@ export default function RoleAwareWorkspacePage() {
     defaultValue: 'all',
     allowedValues: URGENCY_FILTER_VALUES
   });
-  const accessRoleLabel = getCurrentAccessRoleLabel();
+  const accessRole = getCurrentAccessRoleDisplay();
+  const accessRoleLabel = accessRole.localizationKey ? ui(accessRole.localizationKey) : accessRole.label;
 
   const canViewAlerts = hasPermission(TENANT_PERMISSIONS.ALERTS_READ);
   const canViewExecutionTasks = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
@@ -392,8 +425,8 @@ export default function RoleAwareWorkspacePage() {
   if (workspaceQuery.isLoading) {
     return (
       <div className="card">
-        <div style={{ fontWeight: 800 }}>Loading Workspace</div>
-        <p className="card__subtext">Collecting the work that your role is allowed to see.</p>
+        <div style={{ fontWeight: 800 }}>{ui("Loading Workspace")}</div>
+        <p className="card__subtext">{ui("Collecting the work that your role is allowed to see.")}</p>
       </div>
     );
   }
@@ -401,14 +434,14 @@ export default function RoleAwareWorkspacePage() {
   if (workspaceQuery.error) {
     return (
       <div className="card">
-        <div style={{ fontWeight: 800 }}>Workspace could not be loaded</div>
+        <div style={{ fontWeight: 800 }}>{ui("Workspace could not be loaded")}</div>
         <p className="form-error">
           {workspaceQuery.error instanceof ApiError
             ? workspaceQuery.error.message
-            : 'Unable to load the workspace.'}
+            : ui('Unable to load the workspace.')}
         </p>
         <button className="button button--secondary" type="button" onClick={() => workspaceQuery.refetch()}>
-          Try again
+          {ui("Try again")}
         </button>
       </div>
     );
@@ -425,45 +458,45 @@ export default function RoleAwareWorkspacePage() {
     <div className="workspace-page io-operational-page io-workspace-page io-workspace-legacy-normalized">
       <OperationalWorkspaceHero
         iconPath="/workspace"
-        eyebrow="Role-aware command workspace"
-        title="Workspace"
-        description="A simplified operational view filtered to the work this signed-in role is allowed to see. It guides users to the right source workflow without changing inventory itself."
+        eyebrow={ui("Role-aware command workspace")}
+        title={ui("Workspace")}
+        description={ui("A simplified operational view filtered to the work this signed-in role is allowed to see. It guides users to the right source workflow without changing inventory itself.")}
         meta={
           <>
-            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Role-filtered</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Source actions linked</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Role-filtered")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Source actions linked")}</OperationalWorkspaceMetaPill>
           </>
         }
-        aside={<OperationalWorkspaceStatus value={accessRoleLabel} label="current access role" />}
+        aside={<OperationalWorkspaceStatus value={accessRoleLabel} label={ui("current access role")} />}
       />
 
-      <OperationalWorkspaceStats ariaLabel="Workspace overview">
+      <OperationalWorkspaceStats ariaLabel={ui("Workspace overview")}>
         <OperationalWorkspaceStatCard
-          label="Workspace"
-          value={workspace.workspace_name || 'Role workspace'}
-          helper={`Prepared for the current access role: ${accessRoleLabel}.`}
+          label={ui("Workspace")}
+          value={workspace.workspace_name || ui('Role workspace')}
+          helper={`${ui("Prepared for the current access role:")} ${accessRoleLabel}.`}
           iconPath="/workspace"
           tone="blue"
         />
         <OperationalWorkspaceStatCard
-          label="Actions available"
-          value={numberValue(summary.total_actions ?? actions.length)}
-          helper="Open work currently returned for the selected filters"
+          label={ui("Actions available")}
+          value={formatLocalizedNumber(numberValue(summary.total_actions ?? actions.length), locale)}
+          helper={ui("Open work currently returned for the selected filters")}
           iconPath="/action-center"
           tone="blue"
         />
         <OperationalWorkspaceStatCard
-          label="Critical actions"
-          value={numberValue(summary.critical_actions)}
-          helper="Items that need the fastest attention"
+          label={ui("Critical actions")}
+          value={formatLocalizedNumber(numberValue(summary.critical_actions), locale)}
+          helper={ui("Items that need the fastest attention")}
           iconPath="/alerts"
           tone={numberValue(summary.critical_actions) > 0 ? 'danger' : 'good'}
         />
         <OperationalWorkspaceStatCard
-          label="Role filtering"
-          value="Active"
-          helper="Only work this role is allowed to read is included"
+          label={ui("Role filtering")}
+          value={ui("Active")}
+          helper={ui("Only work this role is allowed to read is included")}
           iconPath="/permissions"
           tone="good"
         />
@@ -472,9 +505,9 @@ export default function RoleAwareWorkspacePage() {
       <div className="card workspace-page__info-card">
         <span className="workspace-page__section-icon"><TenantNavIcon path="/workspace" size={16} /></span>
         <div>
-          <div className="workspace-page__info-title">How this page works</div>
+          <div className="workspace-page__info-title">{ui("How this page works")}</div>
           <p className="card__subtext">
-            Workspace gives each role a simpler view of the Action Center. It shows what deserves attention and sends the user to the correct page, but it does not complete tasks or change inventory itself.
+            {ui("Workspace gives each role a simpler view of the Action Center. It shows what deserves attention and sends the user to the correct page, but it does not complete tasks or change inventory itself.")}
           </p>
         </div>
       </div>
@@ -482,23 +515,23 @@ export default function RoleAwareWorkspacePage() {
       <section className="section workspace-page__section">
         <div className="section__title workspace-page__section-title">
           <span className="workspace-page__section-icon"><TenantNavIcon path="/workspace" size={16} /></span>
-          <span>Workspace controls</span>
+          <span>{ui("Workspace controls")}</span>
         </div>
         <div className="card workspace-page__controls-shell">
           <div className="workspace-page__toolbar">
-            <select aria-label="Filter by work area" className="workspace-page__select" value={domain} onChange={(event) => setDomain(event.target.value as ActionDomain)}>
+            <select aria-label={ui("Filter by work area")} className="workspace-page__select" value={domain} onChange={(event) => setDomain(event.target.value as ActionDomain)}>
               {availableDomains.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
+                <option key={option.value} value={option.value}>{ui(option.label)}</option>
               ))}
             </select>
-            <select aria-label="Filter by urgency" className="workspace-page__select" value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>
+            <select aria-label={ui("Filter by urgency")} className="workspace-page__select" value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>
               {URGENCY_FILTERS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
+                <option key={option.value} value={option.value}>{ui(option.label)}</option>
               ))}
             </select>
             <button className="button button--secondary workspace-page__refresh" type="button" onClick={() => workspaceQuery.refetch()} disabled={workspaceQuery.isFetching}>
               <TenantNavIcon path="/real-time-operations-feed" size={15} />
-              <span>{workspaceQuery.isFetching ? 'Refreshing…' : 'Refresh'}</span>
+              <span>{workspaceQuery.isFetching ? ui('Refreshing…') : ui('Refresh')}</span>
             </button>
           </div>
 
@@ -506,23 +539,23 @@ export default function RoleAwareWorkspacePage() {
             <div className="card workspace-page__context-card">
               <span className="workspace-page__icon workspace-page__icon--blue"><TenantNavIcon path="/workspace" size={17} /></span>
               <div className="workspace-page__context-copy">
-                <div className="card__label">Main purpose</div>
-                <div className="workspace-page__copy">{primaryFocusLabel(workspace.primary_focus)}</div>
+                <div className="card__label">{ui("Main purpose")}</div>
+                <div className="workspace-page__copy">{primaryFocusLabel(workspace.primary_focus, ui)}</div>
               </div>
             </div>
             <div className="card workspace-page__context-card">
               <span className="workspace-page__icon workspace-page__icon--violet"><TenantNavIcon path="/action-center" size={17} /></span>
               <div className="workspace-page__context-copy">
-                <div className="card__label">How work is organised</div>
-                <div className="workspace-page__copy">{actionStrategyLabel(workspace.action_strategy)}</div>
+                <div className="card__label">{ui("How work is organised")}</div>
+                <div className="workspace-page__copy">{actionStrategyLabel(workspace.action_strategy, ui)}</div>
               </div>
             </div>
             <div className="card workspace-page__context-card">
               <span className="workspace-page__icon workspace-page__icon--green"><TenantNavIcon path="/execution-tasks" size={17} /></span>
               <div className="workspace-page__context-copy">
-                <div className="card__label">Page mode</div>
-                <div className="workspace-page__copy">{executionModeLabel(response?.definition?.execution_mode)}</div>
-                <div className="card__subtext">The page gives guidance only. Real work is completed on the source page.</div>
+                <div className="card__label">{ui("Page mode")}</div>
+                <div className="workspace-page__copy">{executionModeLabel(response?.definition?.execution_mode, ui)}</div>
+                <div className="card__subtext">{ui("The page gives guidance only. Real work is completed on the source page.")}</div>
               </div>
             </div>
           </div>
@@ -532,28 +565,28 @@ export default function RoleAwareWorkspacePage() {
       <section className="section workspace-page__section">
         <div className="section__title workspace-page__section-title">
           <span className="workspace-page__section-icon"><TenantNavIcon path="/workspace" size={16} /></span>
-          <span>Workspace summaries</span>
+          <span>{ui("Workspace summaries")}</span>
         </div>
         <div className="workspace-page__widget-grid">
           {widgets.length === 0 ? (
             <div className="card workspace-page__empty-card">
-              <div className="workspace-page__empty-title">No summary groups available</div>
-              <div className="card__subtext">No workspace summary matched this role and filter selection.</div>
+              <div className="workspace-page__empty-title">{ui("No summary groups available")}</div>
+              <div className="card__subtext">{ui("No workspace summary matched this role and filter selection.")}</div>
             </div>
           ) : widgets.map((widget) => {
-            const content = widgetContent(widget.widget_id);
+            const content = widgetContent(widget.widget_id, ui);
             const count = numberValue(widget.visible_action_count);
 
             return (
               <div className="card workspace-page__widget-card" key={widget.widget_id}>
                 <div className="workspace-page__widget-head">
                   <span className="workspace-page__icon workspace-page__icon--blue"><TenantNavIcon path={widgetIconPath(widget.widget_id)} size={17} /></span>
-                  <span className="workspace-page__count-pill">{count}</span>
+                  <span className="workspace-page__count-pill">{formatLocalizedNumber(count, locale)}</span>
                 </div>
-                <div className="card__label">Read-only summary</div>
+                <div className="card__label">{ui("Read-only summary")}</div>
                 <div className="card__value workspace-page__widget-title">{content.title}</div>
                 <div className="card__subtext">{content.description}</div>
-                <div className="workspace-page__widget-count">{count} matching {count === 1 ? 'item' : 'items'}</div>
+                <div className="workspace-page__widget-count">{formatLocalizedNumber(count, locale)} {count === 1 ? ui('matching item') : ui('matching items')}</div>
               </div>
             );
           })}
@@ -563,37 +596,37 @@ export default function RoleAwareWorkspacePage() {
       <section className="section workspace-page__section">
         <div className="section__title workspace-page__section-title">
           <span className="workspace-page__section-icon"><TenantNavIcon path="/action-center" size={16} /></span>
-          <span>Guided next actions</span>
+          <span>{ui("Guided next actions")}</span>
         </div>
         <div className="card workspace-page__guidance-card">
           <span className="workspace-page__icon workspace-page__icon--blue"><TenantNavIcon path="/action-center" size={18} /></span>
           <div className="workspace-page__guidance-copy">
-            <div className="workspace-page__guidance-title">Where to start</div>
+            <div className="workspace-page__guidance-title">{ui("Where to start")}</div>
             <p className="card__subtext">
               {response?.guidance?.next_action_title
-                ? `Start with: ${formatLabel(response.guidance.next_action_title)}.`
-                : 'There is no open action to start with for the selected filters.'}
+                ? `${ui('Start with:')} ${formatLabel(response.guidance.next_action_title)}.`
+                : ui('There is no open action to start with for the selected filters.')}
             </p>
             <p className="card__subtext">
-              {response?.guidance?.operator_guidance || 'Workspace guidance is not available yet.'}
+              {response?.guidance?.operator_guidance || ui('Workspace guidance is not available yet.')}
             </p>
             <p className="card__subtext">
-              {response?.guidance?.escalation_guidance || 'Only permitted work is included.'}
+              {response?.guidance?.escalation_guidance || ui('Only permitted work is included.')}
             </p>
           </div>
         </div>
 
         {actions.length === 0 ? (
           <div className="card workspace-page__empty-card workspace-page__empty-card--actions">
-            <div className="workspace-page__empty-title">No matching actions</div>
+            <div className="workspace-page__empty-title">{ui("No matching actions")}</div>
             <p className="card__subtext">
-              No open work matched the selected area and urgency. Try a broader filter or refresh the page.
+              {ui("No open work matched the selected area and urgency. Try a broader filter or refresh the page.")}
             </p>
           </div>
         ) : (
           <>
             {actions.length > shownActions.length ? (
-              <p className="card__subtext workspace-page__showing-copy">Showing the first {shownActions.length} of {actions.length} actions. Open the Action Center to review the complete returned list.</p>
+              <p className="card__subtext workspace-page__showing-copy">{ui("Showing the first")} {formatLocalizedNumber(shownActions.length, locale)} {ui("of")} {formatLocalizedNumber(actions.length, locale)} {ui("actions. Open the Action Center to review the complete returned list.")}</p>
             ) : null}
             <div className="workspace-page__action-list">
               {shownActions.map((action) => {
@@ -606,29 +639,29 @@ export default function RoleAwareWorkspacePage() {
                         <span className={`workspace-page__icon ${urgencyToneClass(action.urgency)}`}><TenantNavIcon path={actionDomainIconPath(action.action_domain)} size={17} /></span>
                         <div className="workspace-page__action-copy">
                           <div className="workspace-page__action-title">{actionTitleLabel(action)}</div>
-                          <div className="card__subtext">{action.summary || 'No summary provided.'}</div>
+                          <div className="card__subtext">{action.summary || ui('No summary provided.')}</div>
                         </div>
                       </div>
                       <div className="workspace-page__badges">
-                        <span style={urgencyBadgeStyle(action.urgency)}>{formatLabel(action.urgency)}</span>
-                        <span style={badgeStyle}>{formatLabel(action.action_domain)}</span>
-                        <span style={badgeStyle}>{formatLabel(action.action_status)}</span>
+                        <span style={urgencyBadgeStyle(action.urgency)}>{canonicalLabel(action.urgency, ui)}</span>
+                        <span style={badgeStyle}>{canonicalLabel(action.action_domain, ui)}</span>
+                        <span style={badgeStyle}>{canonicalLabel(action.action_status, ui)}</span>
                       </div>
                     </div>
                     {action.recommended_next_step ? (
-                      <div className="workspace-page__next-step"><strong>Next step:</strong><span>{action.recommended_next_step}</span></div>
+                      <div className="workspace-page__next-step"><strong>{ui("Next step:")}</strong><span>{action.recommended_next_step}</span></div>
                     ) : null}
                     <div className="workspace-page__action-footer">
                       <div className="workspace-page__action-buttons">
                         {sourceLink ? (
                           <Link className="button button--secondary workspace-page__source-button" to={sourceLink.to}>
                             <TenantNavIcon path={sourceLink.to.split('?')[0]} size={14} />
-                            <span>{sourceLink.label}</span>
+                            <span>{ui(sourceLink.label)}</span>
                           </Link>
                         ) : null}
                         <Link className="button button--secondary workspace-page__source-button" to={actionCenterLink(action)}>
                           <TenantNavIcon path="/action-center" size={14} />
-                          <span>View in Action Center</span>
+                          <span>{ui("View in Action Center")}</span>
                         </Link>
                       </div>
                     </div>
@@ -638,7 +671,7 @@ export default function RoleAwareWorkspacePage() {
             </div>
           </>
         )}
-        <p className="card__subtext workspace-page__generated-at">Generated at: {formatDateTime(response?.generated_at)}</p>
+        <p className="card__subtext workspace-page__generated-at">{ui("Generated at:")} {formatDateTime(response?.generated_at, locale, ui)}</p>
       </section>
     </div>
   );

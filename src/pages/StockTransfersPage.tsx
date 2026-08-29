@@ -7,6 +7,9 @@ import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissio
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceStatus } from '../components/ui/OperationalWorkspace';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
+import type { AppLocale } from '../i18n/config';
 
 type StockTransferStatus = 'draft' | 'executed' | 'cancelled' | string;
 
@@ -142,18 +145,16 @@ function emptyTransferForm(): TransferFormState {
   };
 }
 
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return 'Not recorded';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+function formatDateTime(value: string | null | undefined, locale: AppLocale, ui: (englishText: string) => string): string {
+  if (!value) return ui('Not recorded');
+  return formatLocalizedDateTime(value, locale);
 }
 
-function formatNumber(value: number | string | null | undefined): string {
+function formatNumber(value: number | string | null | undefined, locale: AppLocale): string {
   if (value === null || value === undefined || value === '') return '0';
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return String(value);
-  return parsed.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  return formatLocalizedNumber(parsed, locale, { maximumFractionDigits: 4 });
 }
 
 function formatReadableText(value: string | null | undefined): string {
@@ -198,8 +199,8 @@ function getStatusBadgeStyle(status: StockTransferStatus): CSSProperties {
   return styles.draftBadge;
 }
 
-function normalizeError(error: unknown, fallback: string): string {
-  if (isVersionConflictError(error)) return getVersionConflictMessage(error);
+function normalizeError(error: unknown, fallback: string, ui: (englishText: string) => string): string {
+  if (isVersionConflictError(error)) return getVersionConflictMessage(error, ui);
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
   return fallback;
@@ -320,13 +321,14 @@ async function cancelTransfer(input: { id: string; reason?: string }): Promise<{
   });
 }
 
-function StatCard(props: { title: string; value: number | string; subtitle: string; loading?: boolean }) {
+function StatCard(props: { title: string; value: number | string; subtitle: string; locale: AppLocale; loading?: boolean }) {
   return (
-    <OperationalWorkspaceStatCard label={props.title} value={formatNumber(props.value)} helper={props.subtitle} loading={props.loading} />
+    <OperationalWorkspaceStatCard label={props.title} value={formatNumber(props.value, props.locale)} helper={props.subtitle} loading={props.loading} />
   );
 }
 
 export default function StockTransfersPage() {
+  const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const detailSectionRef = useRef<HTMLElement | null>(null);
@@ -466,7 +468,7 @@ export default function StockTransfersPage() {
     onSuccess: async (transfer) => {
       setForm(emptyTransferForm());
       setSelectedTransferId(transfer.id);
-      setMessage('Stock transfer draft created successfully. Review the execution check before moving stock.');
+      setMessage(ui('Stock transfer draft created successfully. Review the execution check before moving stock.'));
       setError(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock-transfers'] }),
@@ -476,7 +478,7 @@ export default function StockTransfersPage() {
       window.setTimeout(() => detailSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
     },
     onError: (mutationError) => {
-      setError(normalizeError(mutationError, 'Failed to create stock transfer.'));
+      setError(normalizeError(mutationError, ui('Failed to create stock transfer.'), ui));
       setMessage(null);
     }
   });
@@ -487,7 +489,7 @@ export default function StockTransfersPage() {
       setEditingTransferId(null);
       setForm(emptyTransferForm());
       setSelectedTransferId(transfer.id);
-      setMessage('Stock transfer draft updated successfully.');
+      setMessage(ui('Stock transfer draft updated successfully.'));
       setError(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock-transfers'] }),
@@ -497,7 +499,7 @@ export default function StockTransfersPage() {
       ]);
     },
     onError: (mutationError) => {
-      setError(normalizeError(mutationError, 'Failed to update stock transfer.'));
+      setError(normalizeError(mutationError, ui('Failed to update stock transfer.'), ui));
       setMessage(null);
     }
   });
@@ -506,7 +508,7 @@ export default function StockTransfersPage() {
     mutationFn: executeTransfer,
     onSuccess: async (result) => {
       setSelectedTransferId(result.transfer.id);
-      setMessage(result.message || 'Stock transfer executed successfully.');
+      setMessage(ui(result.message || 'Stock transfer executed successfully.'));
       setError(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock-transfers'] }),
@@ -521,7 +523,7 @@ export default function StockTransfersPage() {
       ]);
     },
     onError: (mutationError) => {
-      setError(normalizeError(mutationError, 'Failed to execute stock transfer.'));
+      setError(normalizeError(mutationError, ui('Failed to execute stock transfer.'), ui));
       setMessage(null);
     }
   });
@@ -531,7 +533,7 @@ export default function StockTransfersPage() {
     onSuccess: async (result) => {
       setSelectedTransferId(result.transfer.id);
       setCancelReason('');
-      setMessage(result.message || 'Stock transfer cancelled successfully.');
+      setMessage(ui(result.message || 'Stock transfer cancelled successfully.'));
       setError(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock-transfers'] }),
@@ -540,7 +542,7 @@ export default function StockTransfersPage() {
       ]);
     },
     onError: (mutationError) => {
-      setError(normalizeError(mutationError, 'Failed to cancel stock transfer.'));
+      setError(normalizeError(mutationError, ui('Failed to cancel stock transfer.'), ui));
       setMessage(null);
     }
   });
@@ -596,26 +598,26 @@ export default function StockTransfersPage() {
   };
 
   const validateForm = (): string | null => {
-    if (editingTransferId && !canUpdateStockTransfers) return 'Your current role cannot update stock transfer drafts.';
-    if (!editingTransferId && !canCreateStockTransfers) return 'Your current role cannot create stock transfers.';
-    if (!form.from_storage_location_id || !form.to_storage_location_id) return 'Select both source and destination storage locations.';
-    if (form.from_storage_location_id === form.to_storage_location_id) return 'Source and destination storage locations must be different.';
-    if (!form.items.length) return 'Add at least one product to the transfer.';
+    if (editingTransferId && !canUpdateStockTransfers) return ui('Your current role cannot update stock transfer drafts.');
+    if (!editingTransferId && !canCreateStockTransfers) return ui('Your current role cannot create stock transfers.');
+    if (!form.from_storage_location_id || !form.to_storage_location_id) return ui('Select both source and destination storage locations.');
+    if (form.from_storage_location_id === form.to_storage_location_id) return ui('Source and destination storage locations must be different.');
+    if (!form.items.length) return ui('Add at least one product to the transfer.');
 
     const usedProducts = new Set<string>();
     for (const item of form.items) {
-      if (!item.product_id) return 'Every transfer item must have a product.';
-      if (usedProducts.has(item.product_id)) return 'A product can only appear once per transfer.';
+      if (!item.product_id) return ui('Every transfer item must have a product.');
+      if (usedProducts.has(item.product_id)) return ui('A product can only appear once per transfer.');
       usedProducts.add(item.product_id);
 
       const quantity = Number(item.quantity);
-      if (!Number.isFinite(quantity) || quantity <= 0) return 'Every transfer item quantity must be greater than zero.';
+      if (!Number.isFinite(quantity) || quantity <= 0) return ui('Every transfer item quantity must be greater than zero.');
 
       const sourceProduct = sourceProductById.get(item.product_id);
       if (sourceProduct?.available_quantity !== null && sourceProduct?.available_quantity !== undefined) {
         const available = Number(sourceProduct.available_quantity || 0);
         if (quantity > available) {
-          return `${sourceProduct.name} has ${formatNumber(available)} ${sourceProduct.unit || 'units'} of unreserved stock available at the source location.`;
+          return `${sourceProduct.name} ${ui('has')} ${formatNumber(available, locale)} ${sourceProduct.unit || ui('units')} ${ui('of unreserved stock available at the source location.')}`;
         }
       }
     }
@@ -637,7 +639,7 @@ export default function StockTransfersPage() {
     if (editingTransferId) {
       const draftVersion = selectedTransfer?.id === editingTransferId ? selectedTransfer.version : null;
       if (!draftVersion) {
-        setError('Refresh the selected transfer before saving draft changes.');
+        setError(ui('Refresh the selected transfer before saving draft changes.'));
         return;
       }
       updateMutation.mutate({ id: editingTransferId, input: form, version: draftVersion });
@@ -670,9 +672,9 @@ export default function StockTransfersPage() {
       if (selectedTransfer?.status === 'executed') tasks.push(transferMovementsQuery.refetch());
       if (selectedTransfer?.status === 'draft') tasks.push(transferAvailabilityQuery.refetch());
       await Promise.all(tasks);
-      setMessage('Stock transfer information refreshed.');
+      setMessage(ui('Stock transfer information refreshed.'));
     } catch (refreshError) {
-      setError(normalizeError(refreshError, 'Failed to refresh stock transfers.'));
+      setError(normalizeError(refreshError, ui('Failed to refresh stock transfers.'), ui));
     }
   };
 
@@ -692,14 +694,14 @@ export default function StockTransfersPage() {
 
       const rows: unknown[][] = [
         [
-          'Transfer ID', 'Status', 'From Location', 'To Location', 'Item Count',
-          'Combined Item Quantity (mixed units)', 'Created At', 'Created By',
-          'Executed At', 'Executed By', 'Cancelled At', 'Cancelled By',
-          'Cancellation Reason', 'Notes', 'Version'
+          ui('Transfer ID'), ui('Status'), ui('From Location'), ui('To Location'), ui('Item Count'),
+          ui('Combined Item Quantity (mixed units)'), ui('Created At'), ui('Created By'),
+          ui('Executed At'), ui('Executed By'), ui('Cancelled At'), ui('Cancelled By'),
+          ui('Cancellation Reason'), ui('Notes'), ui('Version')
         ],
         ...allTransfers.map((transfer) => [
           transfer.id,
-          transfer.status,
+          ui(formatReadableText(transfer.status)),
           transfer.from_storage_location_name,
           transfer.to_storage_location_name,
           transfer.item_count ?? '',
@@ -718,9 +720,9 @@ export default function StockTransfersPage() {
 
       const stamp = new Date().toISOString().slice(0, 10);
       downloadCsv(`stock-transfers-filtered-${stamp}.csv`, rows);
-      setMessage(`Exported ${allTransfers.length} filtered stock transfer${allTransfers.length === 1 ? '' : 's'}.`);
+      setMessage(`${ui('Exported')} ${formatLocalizedNumber(allTransfers.length, locale)} ${ui(allTransfers.length === 1 ? 'filtered stock transfer.' : 'filtered stock transfers.')}`);
     } catch (exportError) {
-      setError(normalizeError(exportError, 'Could not export the filtered stock transfers.'));
+      setError(normalizeError(exportError, ui('Could not export the filtered stock transfers.'), ui));
     } finally {
       setIsExporting(false);
     }
@@ -729,30 +731,30 @@ export default function StockTransfersPage() {
   const handleExecuteSelectedTransfer = () => {
     if (!selectedTransfer) return;
     if (transferAvailabilityQuery.isError || !selectedTransferAvailability) {
-      setError('Execution preview is unavailable. Refresh the transfer and confirm source availability before executing.');
+      setError(ui('Execution preview is unavailable. Refresh the transfer and confirm source availability before executing.'));
       setMessage(null);
       return;
     }
     if (!selectedTransferAvailability.executable) {
-      setError(selectedTransferAvailability.message || 'One or more transfer items do not have enough source stock.');
+      setError(ui(selectedTransferAvailability.message || 'One or more transfer items do not have enough source stock.'));
       setMessage(null);
       return;
     }
 
     const itemSummary = selectedTransfer.items
-      .map((item) => `- ${item.product_name}: ${formatNumber(item.quantity)} ${item.product_unit}`)
+      .map((item) => `- ${item.product_name}: ${formatNumber(item.quantity, locale)} ${item.product_unit}`)
       .join('\n');
     const confirmed = window.confirm(
-      `Execute this stock transfer?\n\n${selectedTransfer.from_storage_location_name} → ${selectedTransfer.to_storage_location_name}\n\n${itemSummary}\n\nThis moves stock immediately, protects reserved stock, and cannot be edited afterwards.`
+      `${ui('Execute this stock transfer?')}\n\n${selectedTransfer.from_storage_location_name} → ${selectedTransfer.to_storage_location_name}\n\n${itemSummary}\n\n${ui('This moves stock immediately, protects reserved stock, and cannot be edited afterwards.')}`
     );
     if (confirmed) executeMutation.mutate(selectedTransfer.id);
   };
 
   const handleCancelSelectedTransfer = () => {
     if (!selectedTransfer) return;
-    const reasonLine = cancelReason.trim() ? `\n\nReason: ${cancelReason.trim()}` : '';
+    const reasonLine = cancelReason.trim() ? `\n\n${ui('Reason:')} ${cancelReason.trim()}` : '';
     const confirmed = window.confirm(
-      `Cancel this stock transfer draft?${reasonLine}\n\nCancellation does not move stock and cannot be undone.`
+      `${ui('Cancel this stock transfer draft?')}${reasonLine}\n\n${ui('Cancellation does not move stock and cannot be undone.')}`
     );
     if (confirmed) cancelMutation.mutate({ id: selectedTransfer.id, reason: cancelReason });
   };
@@ -760,22 +762,22 @@ export default function StockTransfersPage() {
   const exportSelectedTransferDetailCsv = () => {
     if (!selectedTransfer) return;
     const transferRows: unknown[][] = [
-      ['Transfer ID', selectedTransfer.id],
-      ['Version', selectedTransfer.version],
-      ['Status', selectedTransfer.status],
-      ['From Location', selectedTransfer.from_storage_location_name],
-      ['To Location', selectedTransfer.to_storage_location_name],
-      ['Created At', selectedTransfer.created_at],
-      ['Created By', selectedTransfer.created_by_user_name ?? ''],
-      ['Executed At', selectedTransfer.executed_at ?? ''],
-      ['Executed By', selectedTransfer.executed_by_user_name ?? ''],
-      ['Cancelled At', selectedTransfer.cancelled_at ?? ''],
-      ['Cancelled By', selectedTransfer.cancelled_by_user_name ?? ''],
-      ['Cancellation Reason', selectedTransfer.cancellation_reason ?? ''],
-      ['Notes', getDisplayNotes(selectedTransfer) ?? ''],
+      [ui('Transfer ID'), selectedTransfer.id],
+      [ui('Version'), selectedTransfer.version],
+      [ui('Status'), ui(formatReadableText(selectedTransfer.status))],
+      [ui('From Location'), selectedTransfer.from_storage_location_name],
+      [ui('To Location'), selectedTransfer.to_storage_location_name],
+      [ui('Created At'), selectedTransfer.created_at],
+      [ui('Created By'), selectedTransfer.created_by_user_name ?? ''],
+      [ui('Executed At'), selectedTransfer.executed_at ?? ''],
+      [ui('Executed By'), selectedTransfer.executed_by_user_name ?? ''],
+      [ui('Cancelled At'), selectedTransfer.cancelled_at ?? ''],
+      [ui('Cancelled By'), selectedTransfer.cancelled_by_user_name ?? ''],
+      [ui('Cancellation Reason'), selectedTransfer.cancellation_reason ?? ''],
+      [ui('Notes'), getDisplayNotes(selectedTransfer) ?? ''],
       [],
-      ['Items'],
-      ['Product', 'Category', 'Quantity', 'Unit'],
+      [ui('Items')],
+      [ui('Product'), ui('Category'), ui('Quantity'), ui('Unit')],
       ...selectedTransfer.items.map((item) => [
         item.product_name,
         item.product_category ?? '',
@@ -787,17 +789,17 @@ export default function StockTransfersPage() {
     const movementRows: unknown[][] = selectedTransferMovements.length
       ? [
           [],
-          ['Movement Audit'],
-          ['Time', 'Product', 'Movement Type', 'Storage Location', 'Change', 'Unit', 'Original Reason', 'User', 'Movement ID'],
+          [ui('Movement Audit')],
+          [ui('Time'), ui('Product'), ui('Movement Type'), ui('Storage Location'), ui('Change'), ui('Unit'), ui('Original Reason'), ui('User'), ui('Movement ID')],
           ...selectedTransferMovements.map((movement) => [
             movement.created_at,
             movement.product_name,
-            getMovementTypeLabel(movement),
+            ui(getMovementTypeLabel(movement)),
             movement.storage_location_name ?? '',
             movement.change,
             movement.product_unit,
             movement.reason ?? '',
-            movement.user_name ?? 'Support/System',
+            movement.user_name ?? ui('Support/System'),
             movement.id
           ])
         ]
@@ -810,45 +812,45 @@ export default function StockTransfersPage() {
     if (!selectedTransfer) return;
 
     const itemRows = selectedTransfer.items.map((item) => `
-      <tr><td>${escapeHtml(item.product_name)}</td><td>${escapeHtml(item.product_category || '-')}</td><td>${escapeHtml(formatNumber(item.quantity))}</td><td>${escapeHtml(item.product_unit)}</td></tr>
+      <tr><td>${escapeHtml(item.product_name)}</td><td>${escapeHtml(item.product_category || '-')}</td><td>${escapeHtml(formatNumber(item.quantity, locale))}</td><td>${escapeHtml(item.product_unit)}</td></tr>
     `).join('');
 
     const movementRows = selectedTransferMovements.length
       ? selectedTransferMovements.map((movement) => `
           <tr>
-            <td>${escapeHtml(formatDateTime(movement.created_at))}</td>
+            <td>${escapeHtml(formatDateTime(movement.created_at, locale, ui))}</td>
             <td>${escapeHtml(movement.product_name)}</td>
-            <td>${escapeHtml(getMovementTypeLabel(movement))}</td>
-            <td>${escapeHtml(movement.storage_location_name || 'Location not recorded')}</td>
-            <td>${escapeHtml(formatNumber(movement.change))} ${escapeHtml(movement.product_unit)}</td>
-            <td>${escapeHtml(movement.user_name || 'Support/System')}</td>
+            <td>${escapeHtml(ui(getMovementTypeLabel(movement)))}</td>
+            <td>${escapeHtml(movement.storage_location_name || ui('Location not recorded'))}</td>
+            <td>${escapeHtml(formatNumber(movement.change, locale))} ${escapeHtml(movement.product_unit)}</td>
+            <td>${escapeHtml(movement.user_name || ui('Support/System'))}</td>
           </tr>
         `).join('')
-      : '<tr><td colspan="6">No movement audit rows loaded.</td></tr>';
+      : `<tr><td colspan="6">${escapeHtml(ui('No movement audit rows loaded.'))}</td></tr>`;
 
     const availabilityRows = selectedTransferAvailability?.items?.length
       ? selectedTransferAvailability.items.map((item) => `
           <tr>
             <td>${escapeHtml(item.product_name)}</td>
-            <td>${escapeHtml(formatNumber(item.requested_quantity))} ${escapeHtml(item.product_unit)}</td>
-            <td>${escapeHtml(formatNumber(item.on_hand_quantity))} ${escapeHtml(item.product_unit)}</td>
-            <td>${escapeHtml(formatNumber(item.reserved_quantity))} ${escapeHtml(item.product_unit)}</td>
-            <td>${escapeHtml(formatNumber(item.available_quantity))} ${escapeHtml(item.product_unit)}</td>
-            <td>${escapeHtml(formatNumber(item.remaining_after_transfer))} ${escapeHtml(item.product_unit)}</td>
-            <td>${item.sufficient ? 'Ready' : 'Insufficient unreserved stock'}</td>
+            <td>${escapeHtml(formatNumber(item.requested_quantity, locale))} ${escapeHtml(item.product_unit)}</td>
+            <td>${escapeHtml(formatNumber(item.on_hand_quantity, locale))} ${escapeHtml(item.product_unit)}</td>
+            <td>${escapeHtml(formatNumber(item.reserved_quantity, locale))} ${escapeHtml(item.product_unit)}</td>
+            <td>${escapeHtml(formatNumber(item.available_quantity, locale))} ${escapeHtml(item.product_unit)}</td>
+            <td>${escapeHtml(formatNumber(item.remaining_after_transfer, locale))} ${escapeHtml(item.product_unit)}</td>
+            <td>${item.sufficient ? ui('Ready') : ui('Insufficient unreserved stock')}</td>
           </tr>
         `).join('')
       : '';
 
     const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1000,height=760');
     if (!printWindow) {
-      setError('Browser blocked the print window. Allow pop-ups for this site and try again.');
+      setError(ui('Browser blocked the print window. Allow pop-ups for this site and try again.'));
       setMessage(null);
       return;
     }
 
     printWindow.document.write(`
-      <!doctype html><html><head><title>Stock Transfer ${escapeHtml(selectedTransfer.id)}</title>
+      <!doctype html><html><head><title>${escapeHtml(ui('Stock Transfer'))} ${escapeHtml(selectedTransfer.id)}</title>
       <style>
         body { font-family: Arial, sans-serif; color: #0f172a; margin: 32px; }
         h1 { margin-bottom: 4px; } .meta { color: #475569; margin: 4px 0; }
@@ -859,19 +861,19 @@ export default function StockTransfersPage() {
         .notes { margin-top: 12px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; white-space: pre-wrap; }
         @media print { button { display: none; } body { margin: 20px; } }
       </style></head><body>
-        <button onclick="window.print()">Print</button>
-        <h1>Stock Transfer</h1>
-        <div class="badge">${escapeHtml(selectedTransfer.status.toUpperCase())}</div>
-        <p class="meta"><strong>Transfer ID:</strong> ${escapeHtml(selectedTransfer.id)} · <strong>Version:</strong> ${escapeHtml(selectedTransfer.version)}</p>
-        <p class="meta"><strong>Route:</strong> ${escapeHtml(selectedTransfer.from_storage_location_name)} → ${escapeHtml(selectedTransfer.to_storage_location_name)}</p>
-        <p class="meta"><strong>Created:</strong> ${escapeHtml(formatDateTime(selectedTransfer.created_at))} by ${escapeHtml(selectedTransfer.created_by_user_name || 'Not recorded')}</p>
-        ${selectedTransfer.executed_at ? `<p class="meta"><strong>Executed:</strong> ${escapeHtml(formatDateTime(selectedTransfer.executed_at))} by ${escapeHtml(selectedTransfer.executed_by_user_name || 'Not recorded')}</p>` : ''}
-        ${selectedTransfer.cancelled_at ? `<p class="meta"><strong>Cancelled:</strong> ${escapeHtml(formatDateTime(selectedTransfer.cancelled_at))} by ${escapeHtml(selectedTransfer.cancelled_by_user_name || 'Not recorded')}</p>` : ''}
-        ${selectedTransfer.cancellation_reason ? `<p class="meta"><strong>Cancellation reason:</strong> ${escapeHtml(formatCancellationReason(selectedTransfer.cancellation_reason))}</p>` : ''}
-        ${getDisplayNotes(selectedTransfer) ? `<div class="notes"><strong>Notes:</strong><br />${escapeHtml(getDisplayNotes(selectedTransfer))}</div>` : ''}
-        <section><h2>Items</h2><table><thead><tr><th>Product</th><th>Category</th><th>Quantity</th><th>Unit</th></tr></thead><tbody>${itemRows}</tbody></table></section>
-        ${availabilityRows ? `<section><h2>Execution Check</h2><p class="meta">${escapeHtml(selectedTransferAvailability?.message || '')}</p><table><thead><tr><th>Product</th><th>Requested</th><th>On Hand</th><th>Reserved</th><th>Available</th><th>After Transfer</th><th>Status</th></tr></thead><tbody>${availabilityRows}</tbody></table></section>` : ''}
-        ${selectedTransfer.status === 'executed' ? `<section><h2>Movement Audit</h2><table><thead><tr><th>Time</th><th>Product</th><th>Direction</th><th>Location</th><th>Change</th><th>User</th></tr></thead><tbody>${movementRows}</tbody></table></section>` : ''}
+        <button onclick="window.print()">${escapeHtml(ui('Print'))}</button>
+        <h1>${escapeHtml(ui('Stock Transfer'))}</h1>
+        <div class="badge">${escapeHtml(ui(formatReadableText(selectedTransfer.status)))}</div>
+        <p class="meta"><strong>${escapeHtml(ui('Transfer ID:'))}</strong> ${escapeHtml(selectedTransfer.id)} · <strong>${escapeHtml(ui('Version:'))}</strong> ${escapeHtml(selectedTransfer.version)}</p>
+        <p class="meta"><strong>${escapeHtml(ui('Route:'))}</strong> ${escapeHtml(selectedTransfer.from_storage_location_name)} → ${escapeHtml(selectedTransfer.to_storage_location_name)}</p>
+        <p class="meta"><strong>${escapeHtml(ui('Created:'))}</strong> ${escapeHtml(formatDateTime(selectedTransfer.created_at, locale, ui))} ${escapeHtml(ui('by'))} ${escapeHtml(selectedTransfer.created_by_user_name || ui('Not recorded'))}</p>
+        ${selectedTransfer.executed_at ? `<p class="meta"><strong>${escapeHtml(ui('Executed:'))}</strong> ${escapeHtml(formatDateTime(selectedTransfer.executed_at, locale, ui))} ${escapeHtml(ui('by'))} ${escapeHtml(selectedTransfer.executed_by_user_name || ui('Not recorded'))}</p>` : ''}
+        ${selectedTransfer.cancelled_at ? `<p class="meta"><strong>${escapeHtml(ui('Cancelled:'))}</strong> ${escapeHtml(formatDateTime(selectedTransfer.cancelled_at, locale, ui))} ${escapeHtml(ui('by'))} ${escapeHtml(selectedTransfer.cancelled_by_user_name || ui('Not recorded'))}</p>` : ''}
+        ${selectedTransfer.cancellation_reason ? `<p class="meta"><strong>${escapeHtml(ui('Cancellation reason:'))}</strong> ${escapeHtml(ui(formatCancellationReason(selectedTransfer.cancellation_reason)))}</p>` : ''}
+        ${getDisplayNotes(selectedTransfer) ? `<div class="notes"><strong>${escapeHtml(ui('Notes:'))}</strong><br />${escapeHtml(getDisplayNotes(selectedTransfer))}</div>` : ''}
+        <section><h2>${escapeHtml(ui('Items'))}</h2><table><thead><tr><th>${escapeHtml(ui('Product'))}</th><th>${escapeHtml(ui('Category'))}</th><th>${escapeHtml(ui('Quantity'))}</th><th>${escapeHtml(ui('Unit'))}</th></tr></thead><tbody>${itemRows}</tbody></table></section>
+        ${availabilityRows ? `<section><h2>${escapeHtml(ui('Execution Check'))}</h2><p class="meta">${escapeHtml(ui(selectedTransferAvailability?.message || ''))}</p><table><thead><tr><th>${escapeHtml(ui('Product'))}</th><th>${escapeHtml(ui('Requested'))}</th><th>${escapeHtml(ui('On Hand'))}</th><th>${escapeHtml(ui('Reserved'))}</th><th>${escapeHtml(ui('Available'))}</th><th>${escapeHtml(ui('After Transfer'))}</th><th>${escapeHtml(ui('Status'))}</th></tr></thead><tbody>${availabilityRows}</tbody></table></section>` : ''}
+        ${selectedTransfer.status === 'executed' ? `<section><h2>${escapeHtml(ui('Movement Audit'))}</h2><table><thead><tr><th>${escapeHtml(ui('Time'))}</th><th>${escapeHtml(ui('Product'))}</th><th>${escapeHtml(ui('Direction'))}</th><th>${escapeHtml(ui('Location'))}</th><th>${escapeHtml(ui('Change'))}</th><th>${escapeHtml(ui('User'))}</th></tr></thead><tbody>${movementRows}</tbody></table></section>` : ''}
       </body></html>
     `);
     printWindow.document.close();
@@ -892,23 +894,23 @@ export default function StockTransfersPage() {
     <div className="io-operational-page io-stock-transfers-page io-workspace-page" style={styles.page}>
       <OperationalWorkspaceHero
         iconPath="/stock-transfers"
-        eyebrow="Internal logistics"
-        title="Stock transfer workspace"
-        description="Plan controlled moves between storage locations, keep drafts separate from execution, and preserve a complete movement audit trail."
+        eyebrow={ui("Internal logistics")}
+        title={ui("Stock transfer workspace")}
+        description={ui("Plan controlled moves between storage locations, keep drafts separate from execution, and preserve a complete movement audit trail.")}
         meta={<>
-          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>Draft before execution</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{canExecuteStockTransfers ? 'Execution access' : `${accessRoleLabel} review access`}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Draft before execution")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{canExecuteStockTransfers ? ui("Execution access") : `${ui(accessRoleLabel)} ${ui('review access')}`}</OperationalWorkspaceMetaPill>
         </>}
-        aside={<OperationalWorkspaceStatus value={transferSummaryQuery.isLoading ? '—' : summary.transfer_count} label="transfers matching the current filters" />}
+        aside={<OperationalWorkspaceStatus value={transferSummaryQuery.isLoading ? '—' : summary.transfer_count} label={ui("transfers matching the current filters")} />}
       />
 
       <div className="app-grid-stats io-workspace-stats" style={styles.statsGrid}>
-        <StatCard title="Transfers" value={summary.transfer_count} subtitle="Matching the current filters" loading={transferSummaryQuery.isLoading} />
-        <StatCard title="Drafts" value={summary.draft_count} subtitle="Waiting for execution or cancellation" loading={transferSummaryQuery.isLoading} />
-        <StatCard title="Executed" value={summary.executed_count} subtitle="Stock already moved" loading={transferSummaryQuery.isLoading} />
-        <StatCard title="Cancelled" value={summary.cancelled_count} subtitle="Drafts closed without moving stock" loading={transferSummaryQuery.isLoading} />
-        <StatCard title="Line Items" value={summary.item_count} subtitle="Product lines across matching transfers" loading={transferSummaryQuery.isLoading} />
+        <StatCard locale={locale} title={ui("Transfers")} value={summary.transfer_count} subtitle={ui("Matching the current filters")} loading={transferSummaryQuery.isLoading} />
+        <StatCard locale={locale} title={ui("Drafts")} value={summary.draft_count} subtitle={ui("Waiting for execution or cancellation")} loading={transferSummaryQuery.isLoading} />
+        <StatCard locale={locale} title={ui("Executed")} value={summary.executed_count} subtitle={ui("Stock already moved")} loading={transferSummaryQuery.isLoading} />
+        <StatCard locale={locale} title={ui("Cancelled")} value={summary.cancelled_count} subtitle={ui("Drafts closed without moving stock")} loading={transferSummaryQuery.isLoading} />
+        <StatCard locale={locale} title={ui("Line Items")} value={summary.item_count} subtitle={ui("Product lines across matching transfers")} loading={transferSummaryQuery.isLoading} />
       </div>
 
       {message ? <div className="app-success-state" style={styles.feedbackBox}>{message}</div> : null}
@@ -916,7 +918,7 @@ export default function StockTransfersPage() {
 
       {!canCreateStockTransfers && !editingTransferId ? (
         <div className="app-warning-state" style={styles.feedbackBox}>
-          Current access role: {accessRoleLabel}. The page is available for review, but this role cannot create stock transfer drafts.
+          {ui("Current access role:")} {ui(accessRoleLabel)}{ui(". The page is available for review, but this role cannot create stock transfer drafts.")}
         </div>
       ) : null}
 
@@ -925,25 +927,25 @@ export default function StockTransfersPage() {
           <div className="io-section-heading-with-icon">
             <span className="io-section-heading-icon"><TenantNavIcon path="/stock-transfers" size={17} /></span>
             <div className="io-section-heading-copy">
-              <h3 style={styles.panelTitle}>{editingTransferId ? 'Edit Transfer Draft' : 'Create Transfer Draft'}</h3>
+              <h3 style={styles.panelTitle}>{editingTransferId ? ui("Edit Transfer Draft") : ui("Create Transfer Draft")}</h3>
               <p style={styles.panelSubtitle}>
               {editingTransferId
-                ? 'Update the selected draft before execution. Editing a draft does not change stock.'
-                : 'Plan an internal move between two storage locations. Stock changes only after an authorized user executes the draft.'}
+                ? ui("Update the selected draft before execution. Editing a draft does not change stock.")
+                : ui("Plan an internal move between two storage locations. Stock changes only after an authorized user executes the draft.")}
               </p>
             </div>
           </div>
-          {editingTransferId ? <span style={styles.draftBadge}>EDITING DRAFT</span> : null}
+          {editingTransferId ? <span style={styles.draftBadge}>{ui("EDITING DRAFT")}</span> : null}
         </div>
 
         {transferOptionsQuery.isError ? (
-          <div className="app-error-state">Products and storage locations could not be loaded. Refresh before creating a transfer.</div>
+          <div className="app-error-state">{ui("Products and storage locations could not be loaded. Refresh before creating a transfer.")}</div>
         ) : null}
 
         <form onSubmit={handleSubmit} style={styles.formStack}>
           <div className="app-grid-2" style={styles.formGrid}>
             <div>
-              <label htmlFor="transfer-from-location" style={styles.label}>From location</label>
+              <label htmlFor="transfer-from-location" style={styles.label}>{ui("From location")}</label>
               <select
                 id="transfer-from-location"
                 style={styles.input}
@@ -952,17 +954,17 @@ export default function StockTransfersPage() {
                 disabled={!canWriteTransferForm || transferOptionsQuery.isLoading}
                 required
               >
-                <option value="">Select source</option>
+                <option value="">{ui("Select source")}</option>
                 {locations.map((location) => (
                   <option key={location.id} value={location.id} disabled={location.id === form.to_storage_location_id}>
-                    {location.name}{location.temperature_zone ? ` · ${location.temperature_zone}` : ''}
+                    {location.name}{location.temperature_zone ? ` · ${ui(formatReadableText(location.temperature_zone))}` : ''}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label htmlFor="transfer-to-location" style={styles.label}>To location</label>
+              <label htmlFor="transfer-to-location" style={styles.label}>{ui("To location")}</label>
               <select
                 id="transfer-to-location"
                 style={styles.input}
@@ -971,10 +973,10 @@ export default function StockTransfersPage() {
                 disabled={!canWriteTransferForm || transferOptionsQuery.isLoading}
                 required
               >
-                <option value="">Select destination</option>
+                <option value="">{ui("Select destination")}</option>
                 {locations.map((location) => (
                   <option key={location.id} value={location.id} disabled={location.id === form.from_storage_location_id}>
-                    {location.name}{location.temperature_zone ? ` · ${location.temperature_zone}` : ''}
+                    {location.name}{location.temperature_zone ? ` · ${ui(formatReadableText(location.temperature_zone))}` : ''}
                   </option>
                 ))}
               </select>
@@ -982,34 +984,34 @@ export default function StockTransfersPage() {
           </div>
 
           <div>
-            <label htmlFor="transfer-notes" style={styles.label}>Transfer notes</label>
+            <label htmlFor="transfer-notes" style={styles.label}>{ui("Transfer notes")}</label>
             <textarea
               id="transfer-notes"
-              style={{ ...styles.input, minHeight: 82, resize: 'vertical' }}
+              style={{ ...styles.input, minHeight: 82, resize: "vertical" }}
               value={form.notes}
               onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-              placeholder="Optional business reason, request reference, or internal note"
+              placeholder={ui("Optional business reason, request reference, or internal note")}
               maxLength={4000}
               disabled={!canWriteTransferForm}
             />
-            <div style={styles.fieldHint}>{form.notes.length.toLocaleString()} / 4,000 characters</div>
+            <div style={styles.fieldHint}>{formatLocalizedNumber(form.notes.length, locale)} {ui("/ 4,000 characters")}</div>
           </div>
 
           <div style={styles.itemHeaderRow}>
             <div>
-              <h4 style={styles.itemTitle}>Transfer items</h4>
-              <p style={styles.panelSubtitle}>Each product can appear once. Availability is based on unreserved stock at the selected source.</p>
+              <h4 style={styles.itemTitle}>{ui("Transfer items")}</h4>
+              <p style={styles.panelSubtitle}>{ui("Each product can appear once. Availability is based on unreserved stock at the selected source.")}</p>
             </div>
             <button type="button" style={styles.secondaryButton} onClick={addItemRow} disabled={!canWriteTransferForm}>
-              Add item
+              {ui("Add item")}
             </button>
           </div>
 
           {form.from_storage_location_id && sourceOptionsQuery.isLoading ? (
-            <div className="app-empty-state">Checking unreserved source stock…</div>
+            <div className="app-empty-state">{ui("Checking unreserved source stock…")}</div>
           ) : null}
           {form.from_storage_location_id && sourceOptionsQuery.isError ? (
-            <div className="app-warning-state">Source availability preview is unavailable. The backend will still validate the draft before saving.</div>
+            <div className="app-warning-state">{ui("Source availability preview is unavailable. The backend will still validate the draft before saving.")}</div>
           ) : null}
 
           <div style={styles.itemRows}>
@@ -1025,7 +1027,7 @@ export default function StockTransfersPage() {
                 <div key={`${index}-${item.product_id}`} style={styles.itemRow}>
                   <div className="app-grid-2" style={styles.formGrid}>
                     <div>
-                      <label htmlFor={`transfer-product-${index}`} style={styles.label}>Product</label>
+                      <label htmlFor={`transfer-product-${index}`} style={styles.label}>{ui("Product")}</label>
                       <select
                         id={`transfer-product-${index}`}
                         style={styles.input}
@@ -1034,16 +1036,16 @@ export default function StockTransfersPage() {
                         disabled={!canWriteTransferForm || transferOptionsQuery.isLoading || sourceOptionsQuery.isLoading}
                         required
                       >
-                        <option value="">Select product</option>
+                        <option value="">{ui("Select product")}</option>
                         {sourceProducts.map((product) => {
                           const alreadyUsed = form.items.some((row, rowIndex) => rowIndex !== index && row.product_id === product.id);
                           const unavailable = Boolean(form.from_storage_location_id) && product.transferable === false && product.id !== item.product_id;
                           const availability = form.from_storage_location_id && product.available_quantity !== null && product.available_quantity !== undefined
-                            ? ` · ${formatNumber(product.available_quantity)} ${product.unit || 'units'} available`
+                            ? ` · ${formatNumber(product.available_quantity, locale)} ${product.unit || ui("units")} ${ui('available')}`
                             : '';
                           return (
                             <option key={product.id} value={product.id} disabled={alreadyUsed || unavailable}>
-                              {product.name} ({product.unit || 'unit'}){availability}
+                              {product.name} ({product.unit || ui("unit")}){availability}
                             </option>
                           );
                         })}
@@ -1052,7 +1054,7 @@ export default function StockTransfersPage() {
 
                     <div style={styles.quantityRow}>
                       <div style={{ flex: 1 }}>
-                        <label htmlFor={`transfer-quantity-${index}`} style={styles.label}>Quantity</label>
+                        <label htmlFor={`transfer-quantity-${index}`} style={styles.label}>{ui("Quantity")}</label>
                         <input
                           id={`transfer-quantity-${index}`}
                           style={styles.input}
@@ -1071,17 +1073,17 @@ export default function StockTransfersPage() {
                         onClick={() => removeItemRow(index)}
                         disabled={!canWriteTransferForm || form.items.length === 1}
                       >
-                        Remove
+                        {ui("Remove")}
                       </button>
                     </div>
                   </div>
 
                   {selectedProduct && available !== null ? (
                     <div style={remaining !== null && remaining < 0 ? styles.availabilityWarning : styles.availabilitySummary}>
-                      <span>On hand: <strong>{formatNumber(selectedProduct.on_hand_quantity)} {selectedProduct.unit}</strong></span>
-                      <span>Reserved: <strong>{formatNumber(selectedProduct.reserved_quantity)} {selectedProduct.unit}</strong></span>
-                      <span>Available: <strong>{formatNumber(available)} {selectedProduct.unit}</strong></span>
-                      <span>After draft quantity: <strong>{formatNumber(remaining)} {selectedProduct.unit}</strong></span>
+                      <span>{ui("On hand:")} <strong>{formatNumber(selectedProduct.on_hand_quantity, locale)} {selectedProduct.unit}</strong></span>
+                      <span>{ui("Reserved:")} <strong>{formatNumber(selectedProduct.reserved_quantity, locale)} {selectedProduct.unit}</strong></span>
+                      <span>{ui("Available:")} <strong>{formatNumber(available, locale)} {selectedProduct.unit}</strong></span>
+                      <span>{ui("After draft quantity:")} <strong>{formatNumber(remaining, locale)} {selectedProduct.unit}</strong></span>
                     </div>
                   ) : null}
                 </div>
@@ -1092,12 +1094,12 @@ export default function StockTransfersPage() {
           <div style={styles.actionsRow}>
             <button type="submit" style={styles.primaryButton} disabled={!canWriteTransferForm || submitPending || transferOptionsQuery.isError}>
               {editingTransferId
-                ? (updateMutation.isPending ? 'Saving…' : 'Save draft changes')
-                : (createMutation.isPending ? 'Creating…' : 'Create transfer draft')}
+                ? (updateMutation.isPending ? ui("Saving…") : ui("Save draft changes"))
+                : (createMutation.isPending ? ui("Creating…") : ui("Create transfer draft"))}
             </button>
             {editingTransferId ? (
               <button type="button" style={styles.secondaryButton} onClick={cancelEditing} disabled={updateMutation.isPending}>
-                Cancel editing
+                {ui("Cancel editing")}
               </button>
             ) : null}
           </div>
@@ -1109,68 +1111,68 @@ export default function StockTransfersPage() {
           <div className="io-section-heading-with-icon">
             <span className="io-section-heading-icon"><TenantNavIcon path="/stock-transfers" size={17} /></span>
             <div className="io-section-heading-copy">
-              <h3 style={styles.panelTitle}>Stock Transfers</h3>
-              <p style={styles.panelSubtitle}>Search drafts and completed transfers, then open one for execution, cancellation, print, export, or movement audit.</p>
+              <h3 style={styles.panelTitle}>{ui("Stock Transfers")}</h3>
+              <p style={styles.panelSubtitle}>{ui("Search drafts and completed transfers, then open one for execution, cancellation, print, export, or movement audit.")}</p>
             </div>
           </div>
           <div style={styles.filterActions}>
             <button type="button" style={styles.secondaryButton} onClick={refreshTransferBoard} disabled={isRefreshingTransfers}>
-              {isRefreshingTransfers ? 'Refreshing…' : 'Refresh transfers'}
+              {isRefreshingTransfers ? ui("Refreshing…") : ui("Refresh transfers")}
             </button>
             <button type="button" style={styles.secondaryButton} onClick={exportFilteredTransfersCsv} disabled={totalTransfers === 0 || isExporting || transferSummaryQuery.isError}>
-              {isExporting ? 'Preparing CSV…' : 'Export filtered CSV'}
+              {isExporting ? ui("Preparing CSV…") : ui("Export filtered CSV")}
             </button>
             <button type="button" style={styles.secondaryButton} onClick={clearTransferFilters} disabled={!hasActiveFilters}>
-              Clear filters
+              {ui("Clear filters")}
             </button>
           </div>
         </div>
 
         <div className="app-grid-2" style={styles.filterGrid}>
           <div>
-            <label htmlFor="transfer-search" style={styles.label}>Search transfers</label>
+            <label htmlFor="transfer-search" style={styles.label}>{ui("Search transfers")}</label>
             <input
               id="transfer-search"
               style={styles.input}
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Product, location, notes, creator, executor, cancellation, or transfer ID"
+              placeholder={ui("Product, location, notes, creator, executor, cancellation, or transfer ID")}
               maxLength={255}
               type="search"
             />
           </div>
 
           <div>
-            <label htmlFor="transfer-status-filter" style={styles.label}>Status</label>
+            <label htmlFor="transfer-status-filter" style={styles.label}>{ui("Status")}</label>
             <select id="transfer-status-filter" style={styles.input} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="">All statuses</option>
-              <option value="draft">Draft</option>
-              <option value="executed">Executed</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="">{ui("All statuses")}</option>
+              <option value="draft">{ui("Draft")}</option>
+              <option value="executed">{ui("Executed")}</option>
+              <option value="cancelled">{ui("Cancelled")}</option>
             </select>
           </div>
 
           <div>
-            <label htmlFor="transfer-from-filter" style={styles.label}>From location</label>
+            <label htmlFor="transfer-from-filter" style={styles.label}>{ui("From location")}</label>
             <select id="transfer-from-filter" style={styles.input} value={fromLocationFilter} onChange={(event) => setFromLocationFilter(event.target.value)} disabled={transferOptionsQuery.isLoading}>
-              <option value="">Any source</option>
+              <option value="">{ui("Any source")}</option>
               {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
             </select>
           </div>
 
           <div>
-            <label htmlFor="transfer-to-filter" style={styles.label}>To location</label>
+            <label htmlFor="transfer-to-filter" style={styles.label}>{ui("To location")}</label>
             <select id="transfer-to-filter" style={styles.input} value={toLocationFilter} onChange={(event) => setToLocationFilter(event.target.value)} disabled={transferOptionsQuery.isLoading}>
-              <option value="">Any destination</option>
+              <option value="">{ui("Any destination")}</option>
               {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
             </select>
           </div>
 
           <div>
-            <label htmlFor="transfer-product-filter" style={styles.label}>Product</label>
+            <label htmlFor="transfer-product-filter" style={styles.label}>{ui("Product")}</label>
             <select id="transfer-product-filter" style={styles.input} value={productFilter} onChange={(event) => setProductFilter(event.target.value)} disabled={transferOptionsQuery.isLoading}>
-              <option value="">Any product</option>
-              {products.map((product) => <option key={product.id} value={product.id}>{product.name} ({product.unit || 'unit'})</option>)}
+              <option value="">{ui("Any product")}</option>
+              {products.map((product) => <option key={product.id} value={product.id}>{product.name} ({product.unit || ui("unit")})</option>)}
             </select>
           </div>
         </div>
@@ -1178,11 +1180,11 @@ export default function StockTransfersPage() {
         <div style={styles.resultsToolbar}>
           <span style={styles.resultCount}>
             {transferSummaryQuery.isLoading
-              ? 'Calculating transfer totals…'
-              : `Showing ${firstVisible.toLocaleString()}–${lastVisible.toLocaleString()} of ${totalTransfers.toLocaleString()} matching transfers`}
+              ? ui("Calculating transfer totals…")
+              : `${ui('Showing')} ${formatLocalizedNumber(firstVisible, locale)}–${formatLocalizedNumber(lastVisible, locale)} ${ui('of')} ${formatLocalizedNumber(totalTransfers, locale)} ${ui('matching transfers')}`}
           </span>
           <label style={styles.rowsLabel} htmlFor="transfer-page-size">
-            Rows per page
+            {ui("Rows per page")}
             <select
               id="transfer-page-size"
               style={styles.compactSelect}
@@ -1194,12 +1196,12 @@ export default function StockTransfersPage() {
           </label>
         </div>
 
-        {transfersQuery.isLoading ? <div className="app-empty-state">Loading transfers…</div> : null}
-        {transfersQuery.isError ? <div className="app-error-state">Failed to load stock transfers.</div> : null}
-        {transferSummaryQuery.isError ? <div className="app-warning-state">Full filtered totals are unavailable. Visible transfer cards can still be reviewed.</div> : null}
+        {transfersQuery.isLoading ? <div className="app-empty-state">{ui("Loading transfers…")}</div> : null}
+        {transfersQuery.isError ? <div className="app-error-state">{ui("Failed to load stock transfers.")}</div> : null}
+        {transferSummaryQuery.isError ? <div className="app-warning-state">{ui("Full filtered totals are unavailable. Visible transfer cards can still be reviewed.")}</div> : null}
         {!transfersQuery.isLoading && transfers.length === 0 ? (
           <div className="app-empty-state">
-            {hasActiveFilters ? 'No stock transfers match the current filters.' : 'No stock transfers exist yet.'}
+            {hasActiveFilters ? ui("No stock transfers match the current filters.") : ui("No stock transfers exist yet.")}
           </div>
         ) : null}
 
@@ -1216,19 +1218,19 @@ export default function StockTransfersPage() {
               >
                 <div style={styles.transferCardTop}>
                   <strong>{transfer.from_storage_location_name} → {transfer.to_storage_location_name}</strong>
-                  <span style={getStatusBadgeStyle(transfer.status)}>{transfer.status.toUpperCase()}</span>
+                  <span style={getStatusBadgeStyle(transfer.status)}>{ui(formatReadableText(transfer.status))}</span>
                 </div>
                 <div style={styles.transferMeta}>
-                  {formatNumber(transfer.item_count)} line item{Number(transfer.item_count || 0) === 1 ? '' : 's'} · Created {formatDateTime(transfer.created_at)}
-                  {transfer.created_by_user_name ? ` by ${transfer.created_by_user_name}` : ''}
+                  {formatNumber(transfer.item_count, locale)} {ui(Number(transfer.item_count || 0) === 1 ? "line item" : "line items")} {ui("· Created")} {formatDateTime(transfer.created_at, locale, ui)}
+                  {transfer.created_by_user_name ? ` ${ui('by')} ${transfer.created_by_user_name}` : ''}
                 </div>
                 {transfer.status === 'executed' && transfer.executed_at ? (
-                  <div style={styles.transferMeta}>Executed {formatDateTime(transfer.executed_at)}{transfer.executed_by_user_name ? ` by ${transfer.executed_by_user_name}` : ''}</div>
+                  <div style={styles.transferMeta}>{ui("Executed")} {formatDateTime(transfer.executed_at, locale, ui)}{transfer.executed_by_user_name ? ` ${ui('by')} ${transfer.executed_by_user_name}` : ''}</div>
                 ) : null}
                 {transfer.status === 'cancelled' && transfer.cancelled_at ? (
-                  <div style={styles.transferMeta}>Cancelled {formatDateTime(transfer.cancelled_at)}{transfer.cancelled_by_user_name ? ` by ${transfer.cancelled_by_user_name}` : ''}</div>
+                  <div style={styles.transferMeta}>{ui("Cancelled")} {formatDateTime(transfer.cancelled_at, locale, ui)}{transfer.cancelled_by_user_name ? ` ${ui('by')} ${transfer.cancelled_by_user_name}` : ''}</div>
                 ) : null}
-                {transfer.cancellation_reason ? <div style={styles.cancelReason}>Cancellation: {formatCancellationReason(transfer.cancellation_reason)}</div> : null}
+                {transfer.cancellation_reason ? <div style={styles.cancelReason}>{ui("Cancellation:")} {ui(formatCancellationReason(transfer.cancellation_reason))}</div> : null}
                 {displayNotes ? <div style={styles.transferNotes}>{displayNotes}</div> : null}
               </button>
             );
@@ -1237,9 +1239,9 @@ export default function StockTransfersPage() {
 
         {totalPages > 1 ? (
           <div style={styles.paginationRow}>
-            <button type="button" style={styles.secondaryButton} onClick={() => setPage((current) => Math.max(current - 1, 1))} disabled={page <= 1 || transfersQuery.isFetching}>Previous</button>
-            <span style={styles.pageLabel}>Page {page.toLocaleString()} of {totalPages.toLocaleString()}</span>
-            <button type="button" style={styles.secondaryButton} onClick={() => setPage((current) => Math.min(current + 1, totalPages))} disabled={page >= totalPages || transfersQuery.isFetching}>Next</button>
+            <button type="button" style={styles.secondaryButton} onClick={() => setPage((current) => Math.max(current - 1, 1))} disabled={page <= 1 || transfersQuery.isFetching}>{ui("Previous")}</button>
+            <span style={styles.pageLabel}>{ui("Page")} {formatLocalizedNumber(page, locale)} {ui("of")} {formatLocalizedNumber(totalPages, locale)}</span>
+            <button type="button" style={styles.secondaryButton} onClick={() => setPage((current) => Math.min(current + 1, totalPages))} disabled={page >= totalPages || transfersQuery.isFetching}>{ui("Next")}</button>
           </div>
         ) : null}
       </section>
@@ -1250,50 +1252,50 @@ export default function StockTransfersPage() {
             <div className="io-section-heading-with-icon">
               <span className="io-section-heading-icon"><TenantNavIcon path="/stock-transfers" size={17} /></span>
               <div className="io-section-heading-copy">
-                <h3 style={styles.panelTitle}>Transfer Detail</h3>
-                <p style={styles.panelSubtitle}>Review the selected transfer’s route, lifecycle, items, source-stock check, and execution audit.</p>
+                <h3 style={styles.panelTitle}>{ui("Transfer Detail")}</h3>
+                <p style={styles.panelSubtitle}>{ui("Review the selected transfer’s route, lifecycle, items, source-stock check, and execution audit.")}</p>
               </div>
             </div>
-            <button type="button" style={styles.secondaryButton} onClick={() => setSelectedTransferId(null)}>Close detail</button>
+            <button type="button" style={styles.secondaryButton} onClick={() => setSelectedTransferId(null)}>{ui("Close detail")}</button>
           </div>
 
           {!selectedVisible && !transferDetailQuery.isLoading && selectedTransfer ? (
-            <div className="app-warning-state">This selected transfer is outside the current list page or filters. Its direct-link detail remains open.</div>
+            <div className="app-warning-state">{ui("This selected transfer is outside the current list page or filters. Its direct-link detail remains open.")}</div>
           ) : null}
-          {transferDetailQuery.isLoading ? <div className="app-empty-state">Loading transfer detail…</div> : null}
-          {transferDetailQuery.isError ? <div className="app-error-state">Failed to load transfer detail. The transfer may no longer exist or may not belong to this tenant.</div> : null}
+          {transferDetailQuery.isLoading ? <div className="app-empty-state">{ui("Loading transfer detail…")}</div> : null}
+          {transferDetailQuery.isError ? <div className="app-error-state">{ui("Failed to load transfer detail. The transfer may no longer exist or may not belong to this tenant.")}</div> : null}
 
           {selectedTransfer ? (
             <div style={styles.detailBlock}>
               <div style={styles.detailHeader}>
                 <div>
                   <div style={styles.detailRoute}>{selectedTransfer.from_storage_location_name} → {selectedTransfer.to_storage_location_name}</div>
-                  <div style={styles.transferMeta}>Transfer ID: {selectedTransfer.id} · Version {selectedTransfer.version}</div>
-                  <div style={styles.transferMeta}>Created {formatDateTime(selectedTransfer.created_at)} by {selectedTransfer.created_by_user_name || 'Not recorded'}</div>
-                  {selectedTransfer.executed_at ? <div style={styles.transferMeta}>Executed {formatDateTime(selectedTransfer.executed_at)} by {selectedTransfer.executed_by_user_name || 'Not recorded'}</div> : null}
-                  {selectedTransfer.cancelled_at ? <div style={styles.transferMeta}>Cancelled {formatDateTime(selectedTransfer.cancelled_at)} by {selectedTransfer.cancelled_by_user_name || 'Not recorded'}</div> : null}
+                  <div style={styles.transferMeta}>{ui("Transfer ID:")} {selectedTransfer.id} {ui("· Version")} {selectedTransfer.version}</div>
+                  <div style={styles.transferMeta}>{ui("Created")} {formatDateTime(selectedTransfer.created_at, locale, ui)} {ui("by")} {selectedTransfer.created_by_user_name || ui("Not recorded")}</div>
+                  {selectedTransfer.executed_at ? <div style={styles.transferMeta}>{ui("Executed")} {formatDateTime(selectedTransfer.executed_at, locale, ui)} {ui("by")} {selectedTransfer.executed_by_user_name || ui("Not recorded")}</div> : null}
+                  {selectedTransfer.cancelled_at ? <div style={styles.transferMeta}>{ui("Cancelled")} {formatDateTime(selectedTransfer.cancelled_at, locale, ui)} {ui("by")} {selectedTransfer.cancelled_by_user_name || ui("Not recorded")}</div> : null}
                 </div>
                 <div style={styles.detailHeaderActions}>
-                  <button type="button" style={styles.secondaryButton} onClick={exportSelectedTransferDetailCsv}>Export detail CSV</button>
-                  <button type="button" style={styles.secondaryButton} onClick={printSelectedTransferDetail}>Print detail</button>
-                  <span style={getStatusBadgeStyle(selectedTransfer.status)}>{selectedTransfer.status.toUpperCase()}</span>
+                  <button type="button" style={styles.secondaryButton} onClick={exportSelectedTransferDetailCsv}>{ui("Export detail CSV")}</button>
+                  <button type="button" style={styles.secondaryButton} onClick={printSelectedTransferDetail}>{ui("Print detail")}</button>
+                  <span style={getStatusBadgeStyle(selectedTransfer.status)}>{ui(formatReadableText(selectedTransfer.status))}</span>
                 </div>
               </div>
 
               {selectedTransfer.cancellation_reason ? (
-                <div style={styles.cancellationBox}><strong>Cancellation reason:</strong> {formatCancellationReason(selectedTransfer.cancellation_reason)}</div>
+                <div style={styles.cancellationBox}><strong>{ui("Cancellation reason:")}</strong> {ui(ui(formatCancellationReason(selectedTransfer.cancellation_reason)))}</div>
               ) : null}
-              {getDisplayNotes(selectedTransfer) ? <div style={styles.detailNotes}><strong>Transfer notes</strong><br />{getDisplayNotes(selectedTransfer)}</div> : null}
+              {getDisplayNotes(selectedTransfer) ? <div style={styles.detailNotes}><strong>{ui("Transfer notes")}</strong><br />{getDisplayNotes(selectedTransfer)}</div> : null}
 
               <div style={styles.tableWrapper}>
                 <table style={styles.table}>
-                  <thead><tr><th style={styles.th}>Product</th><th style={styles.th}>Category</th><th style={styles.th}>Quantity</th><th style={styles.th}>Unit</th></tr></thead>
+                  <thead><tr><th style={styles.th}>{ui("Product")}</th><th style={styles.th}>{ui("Category")}</th><th style={styles.th}>{ui("Quantity")}</th><th style={styles.th}>{ui("Unit")}</th></tr></thead>
                   <tbody>
                     {selectedTransfer.items.map((item) => (
                       <tr key={item.id}>
                         <td style={styles.td}><strong>{item.product_name}</strong></td>
-                        <td style={styles.td}>{item.product_category || 'Not categorized'}</td>
-                        <td style={styles.td}>{formatNumber(item.quantity)}</td>
+                        <td style={styles.td}>{item.product_category || ui("Not categorized")}</td>
+                        <td style={styles.td}>{formatNumber(item.quantity, locale)}</td>
                         <td style={styles.td}>{item.product_unit}</td>
                       </tr>
                     ))}
@@ -1303,13 +1305,13 @@ export default function StockTransfersPage() {
 
               {selectedTransfer.status === 'draft' ? (
                 <div style={styles.availabilityBlock}>
-                  <h4 style={styles.itemTitle}>Execution Check</h4>
-                  <p style={styles.panelSubtitle}>The transfer can use only unreserved stock at the source location.</p>
-                  {transferAvailabilityQuery.isLoading ? <div className="app-empty-state">Checking source stock…</div> : null}
-                  {transferAvailabilityQuery.isError ? <div className="app-error-state">Source-stock preview is unavailable. Refresh before executing this transfer.</div> : null}
+                  <h4 style={styles.itemTitle}>{ui("Execution Check")}</h4>
+                  <p style={styles.panelSubtitle}>{ui("The transfer can use only unreserved stock at the source location.")}</p>
+                  {transferAvailabilityQuery.isLoading ? <div className="app-empty-state">{ui("Checking source stock…")}</div> : null}
+                  {transferAvailabilityQuery.isError ? <div className="app-error-state">{ui("Source-stock preview is unavailable. Refresh before executing this transfer.")}</div> : null}
                   {selectedTransferAvailability ? (
-                    <div className={selectedTransferAvailability.executable ? 'app-success-state' : 'app-warning-state'} style={styles.feedbackBox}>
-                      {selectedTransferAvailability.message}
+                    <div className={selectedTransferAvailability.executable ? "app-success-state" : "app-warning-state"} style={styles.feedbackBox}>
+                      {ui(selectedTransferAvailability.message)}
                     </div>
                   ) : null}
                   {selectedTransferAvailability?.items?.length ? (
@@ -1317,20 +1319,20 @@ export default function StockTransfersPage() {
                       <table style={styles.table}>
                         <thead>
                           <tr>
-                            <th style={styles.th}>Product</th><th style={styles.th}>Requested</th><th style={styles.th}>On Hand</th>
-                            <th style={styles.th}>Reserved</th><th style={styles.th}>Available</th><th style={styles.th}>After Transfer</th><th style={styles.th}>Readiness</th>
+                            <th style={styles.th}>{ui("Product")}</th><th style={styles.th}>{ui("Requested")}</th><th style={styles.th}>{ui("On Hand")}</th>
+                            <th style={styles.th}>{ui("Reserved")}</th><th style={styles.th}>{ui("Available")}</th><th style={styles.th}>{ui("After Transfer")}</th><th style={styles.th}>{ui("Readiness")}</th>
                           </tr>
                         </thead>
                         <tbody>
                           {selectedTransferAvailability.items.map((item) => (
                             <tr key={item.product_id}>
                               <td style={styles.td}><strong>{item.product_name}</strong></td>
-                              <td style={styles.td}>{formatNumber(item.requested_quantity)} {item.product_unit}</td>
-                              <td style={styles.td}>{formatNumber(item.on_hand_quantity)} {item.product_unit}</td>
-                              <td style={styles.td}>{formatNumber(item.reserved_quantity)} {item.product_unit}</td>
-                              <td style={styles.td}>{formatNumber(item.available_quantity)} {item.product_unit}</td>
-                              <td style={styles.td}>{formatNumber(item.remaining_after_transfer)} {item.product_unit}</td>
-                              <td style={styles.td}><span style={item.sufficient ? styles.readyBadge : styles.notReadyBadge}>{item.sufficient ? 'Ready' : 'Insufficient'}</span></td>
+                              <td style={styles.td}>{formatNumber(item.requested_quantity, locale)} {item.product_unit}</td>
+                              <td style={styles.td}>{formatNumber(item.on_hand_quantity, locale)} {item.product_unit}</td>
+                              <td style={styles.td}>{formatNumber(item.reserved_quantity, locale)} {item.product_unit}</td>
+                              <td style={styles.td}>{formatNumber(item.available_quantity, locale)} {item.product_unit}</td>
+                              <td style={styles.td}>{formatNumber(item.remaining_after_transfer, locale)} {item.product_unit}</td>
+                              <td style={styles.td}><span style={item.sufficient ? styles.readyBadge : styles.notReadyBadge}>{item.sufficient ? ui("Ready") : ui("Insufficient")}</span></td>
                             </tr>
                           ))}
                         </tbody>
@@ -1342,26 +1344,26 @@ export default function StockTransfersPage() {
 
               {selectedTransfer.status === 'executed' ? (
                 <div style={styles.movementBlock}>
-                  <h4 style={styles.itemTitle}>Movement Audit</h4>
-                  <p style={styles.panelSubtitle}>Each product has an outbound row at the source and an inbound row at the destination.</p>
-                  {transferMovementsQuery.isLoading ? <div className="app-empty-state">Loading transfer movements…</div> : null}
-                  {transferMovementsQuery.isError ? <div className="app-error-state">Failed to load the transfer movement audit.</div> : null}
+                  <h4 style={styles.itemTitle}>{ui("Movement Audit")}</h4>
+                  <p style={styles.panelSubtitle}>{ui("Each product has an outbound row at the source and an inbound row at the destination.")}</p>
+                  {transferMovementsQuery.isLoading ? <div className="app-empty-state">{ui("Loading transfer movements…")}</div> : null}
+                  {transferMovementsQuery.isError ? <div className="app-error-state">{ui("Failed to load the transfer movement audit.")}</div> : null}
                   {!transferMovementsQuery.isLoading && !transferMovementsQuery.isError && selectedTransferMovements.length === 0 ? (
-                    <div className="app-warning-state">No movement audit rows were found for this executed transfer. This requires support review.</div>
+                    <div className="app-warning-state">{ui("No movement audit rows were found for this executed transfer. This requires support review.")}</div>
                   ) : null}
                   {selectedTransferMovements.length > 0 ? (
                     <div style={styles.tableWrapper}>
                       <table style={styles.table}>
-                        <thead><tr><th style={styles.th}>Time</th><th style={styles.th}>Product</th><th style={styles.th}>Direction</th><th style={styles.th}>Location</th><th style={styles.th}>Change</th><th style={styles.th}>Operator</th></tr></thead>
+                        <thead><tr><th style={styles.th}>{ui("Time")}</th><th style={styles.th}>{ui("Product")}</th><th style={styles.th}>{ui("Direction")}</th><th style={styles.th}>{ui("Location")}</th><th style={styles.th}>{ui("Change")}</th><th style={styles.th}>{ui("Operator")}</th></tr></thead>
                         <tbody>
                           {selectedTransferMovements.map((movement) => (
                             <tr key={movement.id}>
-                              <td style={styles.td}>{formatDateTime(movement.created_at)}</td>
+                              <td style={styles.td}>{formatDateTime(movement.created_at, locale, ui)}</td>
                               <td style={styles.td}><strong>{movement.product_name}</strong></td>
-                              <td style={styles.td}><span style={Number(movement.change) < 0 ? styles.outBadge : styles.inBadge}>{getMovementTypeLabel(movement)}</span></td>
-                              <td style={styles.td}>{movement.storage_location_name || 'Location not recorded'}</td>
-                              <td style={styles.td}><strong>{Number(movement.change) > 0 ? '+' : ''}{formatNumber(movement.change)} {movement.product_unit}</strong></td>
-                              <td style={styles.td}>{movement.user_name || 'Support/System'}<div style={styles.auditHint} title={movement.reason || ''}>Audit ID: {movement.id.slice(0, 8)}</div></td>
+                              <td style={styles.td}><span style={Number(movement.change) < 0 ? styles.outBadge : styles.inBadge}>{ui(getMovementTypeLabel(movement))}</span></td>
+                              <td style={styles.td}>{movement.storage_location_name || ui("Location not recorded")}</td>
+                              <td style={styles.td}><strong>{Number(movement.change) > 0 ? '+' : ''}{formatNumber(movement.change, locale)} {movement.product_unit}</strong></td>
+                              <td style={styles.td}>{movement.user_name || ui("Support/System")}<div style={styles.auditHint} title={movement.reason || ''}>{ui("Audit ID:")} {movement.id.slice(0, 8)}</div></td>
                             </tr>
                           ))}
                         </tbody>
@@ -1374,40 +1376,40 @@ export default function StockTransfersPage() {
               {selectedTransfer.status === 'draft' ? (
                 <div style={styles.draftActionsBlock}>
                   <div style={styles.actionsRow}>
-                    <button type="button" style={styles.secondaryButton} onClick={startEditingSelectedTransfer} disabled={!canUpdateStockTransfers || executeMutation.isPending || cancelMutation.isPending || updateMutation.isPending}>Edit draft</button>
+                    <button type="button" style={styles.secondaryButton} onClick={startEditingSelectedTransfer} disabled={!canUpdateStockTransfers || executeMutation.isPending || cancelMutation.isPending || updateMutation.isPending}>{ui("Edit draft")}</button>
                     <button
                       type="button"
                       style={styles.primaryButton}
                       onClick={handleExecuteSelectedTransfer}
                       disabled={!canExecuteStockTransfers || executeMutation.isPending || cancelMutation.isPending || !executePreviewReady || selectedTransferAvailability?.executable === false}
                     >
-                      {executeMutation.isPending ? 'Executing…' : 'Execute transfer'}
+                      {executeMutation.isPending ? ui("Executing…") : ui("Execute transfer")}
                     </button>
                   </div>
 
                   <div style={styles.cancelArea}>
-                    <label htmlFor="transfer-cancel-reason" style={styles.label}>Cancellation reason (optional)</label>
+                    <label htmlFor="transfer-cancel-reason" style={styles.label}>{ui("Cancellation reason (optional)")}</label>
                     <textarea
                       id="transfer-cancel-reason"
                       style={styles.cancelReasonInput}
                       value={cancelReason}
                       onChange={(event) => setCancelReason(event.target.value)}
-                      placeholder="Reason for closing this draft without moving stock"
+                      placeholder={ui("Reason for closing this draft without moving stock")}
                       rows={2}
                       maxLength={1000}
                       disabled={!canCancelStockTransfers || executeMutation.isPending || cancelMutation.isPending}
                     />
                     <div style={styles.cancelFooter}>
-                      <span style={styles.fieldHint}>{cancelReason.length.toLocaleString()} / 1,000 characters</span>
+                      <span style={styles.fieldHint}>{formatLocalizedNumber(cancelReason.length, locale)} {ui("/ 1,000 characters")}</span>
                       <button type="button" style={styles.dangerButton} onClick={handleCancelSelectedTransfer} disabled={!canCancelStockTransfers || executeMutation.isPending || cancelMutation.isPending}>
-                        {cancelMutation.isPending ? 'Cancelling…' : 'Cancel draft'}
+                        {cancelMutation.isPending ? ui("Cancelling…") : ui("Cancel draft")}
                       </button>
                     </div>
                   </div>
 
-                  {!canUpdateStockTransfers ? <span style={styles.permissionHint}>Your role cannot edit transfer drafts.</span> : null}
-                  {!canExecuteStockTransfers ? <span style={styles.permissionHint}>Your role cannot execute transfers.</span> : null}
-                  {!canCancelStockTransfers ? <span style={styles.permissionHint}>Your role cannot cancel transfer drafts.</span> : null}
+                  {!canUpdateStockTransfers ? <span style={styles.permissionHint}>{ui("Your role cannot edit transfer drafts.")}</span> : null}
+                  {!canExecuteStockTransfers ? <span style={styles.permissionHint}>{ui("Your role cannot execute transfers.")}</span> : null}
+                  {!canCancelStockTransfers ? <span style={styles.permissionHint}>{ui("Your role cannot cancel transfer drafts.")}</span> : null}
                 </div>
               ) : null}
             </div>

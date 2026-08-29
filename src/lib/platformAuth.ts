@@ -141,6 +141,7 @@ export type PlatformIdentity = {
   is_active?: boolean;
   created_at?: string;
   session_id?: string | null;
+  locale?: string | null;
 };
 
 function buildPlatformUrl(path: string): string {
@@ -170,7 +171,8 @@ function parsePlatformIdentity(payload: unknown): PlatformIdentity {
         : 'unknown',
     is_active: typeof value?.is_active === 'boolean' ? value.is_active : undefined,
     created_at: typeof value?.created_at === 'string' ? value.created_at : undefined,
-    session_id: typeof value?.session_id === 'string' || value?.session_id === null ? value.session_id : undefined
+    session_id: typeof value?.session_id === 'string' || value?.session_id === null ? value.session_id : undefined,
+    locale: typeof value?.locale === 'string' || value?.locale === null ? value.locale : undefined
   };
 }
 

@@ -233,7 +233,7 @@ for (const signal of [
   "width: '280px', minWidth: '280px'",
   "whiteSpace: 'normal'",
   "marginLeft: 'auto'",
-  'Open alerts require attention'
+  "t('common.openAlertsAttention')"
 ]) {
   if (!layout.includes(signal)) {
     failures.push(`AppLayout.tsx is missing the open-alert navigation indicator signal: ${signal}`);

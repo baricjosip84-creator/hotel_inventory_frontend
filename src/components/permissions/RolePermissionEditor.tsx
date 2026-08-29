@@ -10,6 +10,7 @@ import {
   OperationalWorkspaceTab,
   OperationalWorkspaceTabs
 } from '../ui/OperationalWorkspace';
+import { useAppTranslation } from '../../i18n/I18nContext';
 import './RolePermissionEditor.css';
 
 export type RolePermissionEditorProps<Role extends string, Permission extends string> = {
@@ -85,6 +86,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
   warningMessage,
   footerAddon
 }: RolePermissionEditorProps<Role, Permission>) {
+  const { ui } = useAppTranslation();
   const [search, setSearch] = useState('');
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('role-permissions');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
@@ -122,11 +124,11 @@ export default function RolePermissionEditor<Role extends string, Permission ext
     : false;
   const isCustomRole = activeRole?.role_kind === 'custom';
   const isPlatformScope = scopeLabel.toLowerCase() === 'platform';
-  const resetLabel = isCustomRole ? 'Reset to starting template' : 'Reset to defaults';
-  const baselineStatus = isCustomRole ? 'Using starting template' : 'Using hardcoded defaults';
+  const resetLabel = isCustomRole ? ui("Reset to starting template") : ui("Reset to defaults");
+  const baselineStatus = isCustomRole ? ui("Using starting template") : ui("Using hardcoded defaults");
   const baselineHelp = isCustomRole
-    ? 'The starting template remains available if you need to restore this role.'
-    : 'Hardcoded defaults remain available if you need to restore this role.';
+    ? ui("The starting template remains available if you need to restore this role.")
+    : ui("Hardcoded defaults remain available if you need to restore this role.");
 
   useEffect(() => {
     if (!dirty) return undefined;
@@ -226,7 +228,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
   const requestRoleChange = (role: Role) => {
     if (role === activeRole?.role) return;
     if (dirty) {
-      if (!window.confirm('Discard unsaved permission changes and switch roles?')) return;
+      if (!window.confirm(ui("Discard unsaved permission changes and switch roles?"))) return;
       onDiscardDraft?.();
     }
     setSearch('');
@@ -237,7 +239,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
   const requestWorkspaceView = (nextView: WorkspaceView) => {
     if (nextView === workspaceView) return;
     if (dirty) {
-      if (!window.confirm('Discard unsaved permission changes and leave the role editor?')) return;
+      if (!window.confirm(ui("Discard unsaved permission changes and leave the role editor?"))) return;
       onDiscardDraft?.();
     }
     setSearch('');
@@ -262,7 +264,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
       <div style={styles.roleCollections} className="role-permission-editor__role-collections">
         <div style={styles.roleCollection} className="role-permission-editor__role-collection">
           <div style={styles.roleCollectionHeader} className="role-permission-editor__role-collection-header">
-            <strong>{scopeLabel} roles</strong><span>Protected role baselines</span>
+            <strong>{scopeLabel} {ui("roles")}</strong><span>{ui("Protected role baselines")}</span>
           </div>
           <div style={styles.roleTabs} className="role-permission-editor__role-cards">
             {builtInRoles.map((role) => (
@@ -274,8 +276,8 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                 className={`role-permission-editor__role-card${role.role === activeRole?.role ? ' is-active' : ''}`}
               >
                 <strong>{role.display_name || roleLabel(role.role)}</strong>
-                <span>{role.effective_permissions.length} enabled</span>
-                <small>{role.editable ? (role.is_default ? 'Default baseline' : `${role.override_count} saved overrides`) : 'Protected'}</small>
+                <span>{role.effective_permissions.length} {ui("enabled")}</span>
+                <small>{role.editable ? (role.is_default ? ui("Default baseline") : `${role.override_count} ${ui("saved overrides")}`) : ui("Protected")}</small>
               </button>
             ))}
           </div>
@@ -283,7 +285,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
         {customRoles.length ? (
           <div style={styles.roleCollection} className="role-permission-editor__role-collection">
             <div style={styles.roleCollectionHeader} className="role-permission-editor__role-collection-header">
-              <strong>Custom roles</strong><span>Tenant-specific operational roles</span>
+              <strong>{ui("Custom roles")}</strong><span>{ui("Tenant-specific operational roles")}</span>
             </div>
             <div style={styles.roleTabs} className="role-permission-editor__role-cards">
               {customRoles.map((role) => (
@@ -295,8 +297,8 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                   className={`role-permission-editor__role-card${role.role === activeRole?.role ? ' is-active' : ''}${role.is_active === false ? ' is-inactive' : ''}`}
                 >
                   <strong>{role.display_name || roleLabel(role.role)}</strong>
-                  <span>{role.effective_permissions.length} enabled · {role.user_count || 0} users</span>
-                  <small>{role.is_active === false ? 'Inactive' : role.is_default ? `Template: ${role.source_template_name || 'Blank'}` : `${role.override_count} changes from template`}</small>
+                  <span>{role.effective_permissions.length} {ui("enabled ·")} {role.user_count || 0} {ui("users")}</span>
+                  <small>{role.is_active === false ? ui("Inactive") : role.is_default ? `${ui("Template:")} ${role.source_template_name || ui("Blank")}` : `${role.override_count} ${ui("changes from template")}`}</small>
                 </button>
               ))}
             </div>
@@ -312,17 +314,17 @@ export default function RolePermissionEditor<Role extends string, Permission ext
               <p style={styles.roleHelp}>
                 {activeRole.editable
                   ? activeRole.role_kind === 'custom'
-                    ? `Changes apply to every user assigned to this tenant custom role${activeRole.description ? ` — ${activeRole.description}` : ''}.`
-                    : 'Changes apply to every active user assigned to this role.'
-                  : 'This role is protected and cannot be edited.'}
+                    ? `${ui("Changes apply to every user assigned to this tenant custom role")}${activeRole.description ? ` — ${activeRole.description}` : ""}.`
+                    : ui("Changes apply to every active user assigned to this role.")
+                  : ui("This role is protected and cannot be edited.")}
               </p>
             </div>
             <div style={styles.toolbarControls} className="role-permission-editor__toolbar-controls">
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search permissions"
-                aria-label="Search permissions"
+                placeholder={ui("Search permissions")}
+                aria-label={ui("Search permissions")}
                 style={styles.search}
                 className="role-permission-editor__search"
               />
@@ -330,13 +332,13 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                 {operationalWorkspace ? (
                   <>
                     <button type="button" className="app-button app-button--secondary role-permission-editor__utility-button" onClick={() => setShowTechnicalKeys((current) => !current)}>
-                      {showTechnicalKeys ? 'Hide technical keys' : 'Show technical keys'}
+                      {showTechnicalKeys ? ui("Hide technical keys") : ui("Show technical keys")}
                     </button>
                     <button type="button" className="app-button app-button--secondary role-permission-editor__utility-button" onClick={() => setExpandedGroups(new Set(allGroupNames))} disabled={filtering || expandedGroups.size === allGroupNames.length}>
-                      Expand all
+                      {ui("Expand all")}
                     </button>
                     <button type="button" className="app-button app-button--secondary role-permission-editor__utility-button" onClick={() => setExpandedGroups(new Set())} disabled={filtering || expandedGroups.size === 0}>
-                      Collapse all
+                      {ui("Collapse all")}
                     </button>
                   </>
                 ) : null}
@@ -348,7 +350,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                     disabled={refreshing || saving || resetting}
                     onClick={() => void onRefresh()}
                   >
-                    {refreshing ? 'Refreshing…' : 'Refresh'}
+                    {refreshing ? ui("Refreshing…") : ui("Refresh")}
                   </button>
                 ) : null}
                 <button
@@ -361,7 +363,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                   disabled={!activeRole.editable || resetting || saving || activeRole.is_default}
                   onClick={() => void onReset()}
                 >
-                  {resetting ? 'Resetting…' : resetLabel}
+                  {resetting ? ui("Resetting…") : resetLabel}
                 </button>
                 <button
                   type="button"
@@ -373,7 +375,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                   disabled={!activeRole.editable || !dirty || saving || resetting}
                   onClick={() => void onSave()}
                 >
-                  {saving ? 'Saving…' : 'Save role permissions'}
+                  {saving ? ui("Saving…") : ui("Save role permissions")}
                 </button>
               </div>
             </div>
@@ -381,12 +383,12 @@ export default function RolePermissionEditor<Role extends string, Permission ext
 
           {!operationalWorkspace ? (
             <div style={styles.summaryGrid}>
-              <div style={styles.summaryCard}><strong>{draftSet.size}</strong><span>Enabled</span></div>
-              <div style={styles.summaryCard}><strong>{catalog.length - draftSet.size}</strong><span>Disabled</span></div>
-              <div style={styles.summaryCard}><strong>{lockedSet.size}</strong><span>Locked</span></div>
+              <div style={styles.summaryCard}><strong>{draftSet.size}</strong><span>{ui("Enabled")}</span></div>
+              <div style={styles.summaryCard}><strong>{catalog.length - draftSet.size}</strong><span>{ui("Disabled")}</span></div>
+              <div style={styles.summaryCard}><strong>{lockedSet.size}</strong><span>{ui("Locked")}</span></div>
               <div style={styles.summaryCard}>
                 <strong>{activeRole.override_count}</strong>
-                <span>{isCustomRole ? 'Changes from template' : 'Saved overrides'}</span>
+                <span>{isCustomRole ? ui("Changes from template") : ui("Saved overrides")}</span>
               </div>
             </div>
           ) : null}
@@ -394,8 +396,8 @@ export default function RolePermissionEditor<Role extends string, Permission ext
           <div style={styles.groups} className="role-permission-editor__groups">
             {grouped.length === 0 ? (
               <div style={styles.emptySearch} className="app-empty-state role-permission-editor__empty-search">
-                <strong>No permissions match “{search.trim()}”.</strong>
-                <button type="button" className="app-button app-button--secondary" onClick={() => setSearch('')}>Clear search</button>
+                <strong>{ui("No permissions match “")}{search.trim()}”.</strong>
+                <button type="button" className="app-button app-button--secondary" onClick={() => setSearch('')}>{ui("Clear search")}</button>
               </div>
             ) : null}
             {grouped.map(([group, items]) => {
@@ -419,13 +421,13 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                         <span className="role-permission-editor__group-chevron" aria-hidden="true">{expanded ? '−' : '+'}</span>
                         <span>
                           <strong>{groupLabel(group)}</strong>
-                          <small>{enabledCount} of {items.length} enabled</small>
+                          <small>{enabledCount} {ui("of")} {items.length} {ui("enabled")}</small>
                         </span>
                       </button>
                     ) : (
                       <div>
                         <h3 style={styles.groupTitle}>{groupLabel(group)}</h3>
-                        <span style={styles.groupCount}>{enabledCount} of {items.length} enabled</span>
+                        <span style={styles.groupCount}>{enabledCount} {ui("of")} {items.length} {ui("enabled")}</span>
                       </div>
                     )}
                     {expanded && activeRole.editable && editableItems.length ? (
@@ -437,7 +439,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                           disabled={enableDisabled}
                           onClick={() => setGroup(items, true)}
                         >
-                          {filtering ? 'Enable shown' : 'Enable group'}
+                          {filtering ? ui("Enable shown") : ui("Enable group")}
                         </button>
                         <button
                           type="button"
@@ -446,7 +448,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                           disabled={disableDisabled}
                           onClick={() => setGroup(items, false)}
                         >
-                          {filtering ? 'Disable shown' : 'Disable group'}
+                          {filtering ? ui("Disable shown") : ui("Disable group")}
                         </button>
                       </div>
                     ) : null}
@@ -465,7 +467,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                             style={{ ...styles.permissionRow, ...(forbidden ? styles.permissionForbidden : {}) }}
                             className={`role-permission-editor__permission-row${forbidden ? ' is-reserved' : ''}`}
                             title={(dependencyMap.get(item.permission) || []).length
-                              ? `Requires: ${(dependencyMap.get(item.permission) || []).join(', ')}`
+                              ? `${ui("Requires:")} ${(dependencyMap.get(item.permission) || []).join(", ")}`
                               : undefined}
                           >
                             <input
@@ -479,9 +481,9 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                               {(!operationalWorkspace || showTechnicalKeys) ? <code style={styles.permissionCode}>{item.permission}</code> : null}
                             </span>
                             <span style={styles.badges} className="role-permission-editor__badges">
-                              {locked ? <em style={styles.lockedBadge}>Locked</em> : null}
+                              {locked ? <em style={styles.lockedBadge}>{ui("Locked")}</em> : null}
                               {forbidden ? <em style={styles.reservedBadge}>{reservedLabel}</em> : null}
-                              {differsFromDefault ? <em style={styles.overrideBadge}>Override</em> : <em style={styles.defaultBadge}>Default</em>}
+                              {differsFromDefault ? <em style={styles.overrideBadge}>{ui("Override")}</em> : <em style={styles.defaultBadge}>{ui("Default")}</em>}
                             </span>
                           </label>
                         );
@@ -495,7 +497,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
 
           <footer style={styles.actionBar} className="role-permission-editor__action-bar app-panel">
             <div>
-              <strong>{dirty ? 'Unsaved permission changes' : activeRole.is_default ? baselineStatus : 'Saved custom policy active'}</strong>
+              <strong>{dirty ? ui("Unsaved permission changes") : activeRole.is_default ? baselineStatus : ui("Saved custom policy active")}</strong>
               <span style={styles.actionHelp}>{baselineHelp}</span>
             </div>
             <div style={styles.actionButtons}>
@@ -509,7 +511,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                 disabled={!activeRole.editable || resetting || saving || activeRole.is_default}
                 onClick={() => void onReset()}
               >
-                {resetting ? 'Resetting…' : resetLabel}
+                {resetting ? ui("Resetting…") : resetLabel}
               </button>
               <button
                 type="button"
@@ -521,7 +523,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                 disabled={!activeRole.editable || !dirty || saving || resetting}
                 onClick={() => void onSave()}
               >
-                {saving ? 'Saving…' : 'Save role permissions'}
+                {saving ? ui("Saving…") : ui("Save role permissions")}
               </button>
             </div>
           </footer>
@@ -540,33 +542,33 @@ export default function RolePermissionEditor<Role extends string, Permission ext
         <>
           <OperationalWorkspaceHero
             iconPath={workspaceIconPath}
-            eyebrow={workspaceEyebrow || `${scopeLabel} access governance`}
+            eyebrow={workspaceEyebrow || `${scopeLabel} ${ui("access governance")}`}
             title={title}
             description={description}
             meta={
               <>
-                <OperationalWorkspaceMetaPill>{scopeLabel}-scoped</OperationalWorkspaceMetaPill>
-                <OperationalWorkspaceMetaPill>Protected safety baseline</OperationalWorkspaceMetaPill>
-                <OperationalWorkspaceMetaPill>Permission changes audited</OperationalWorkspaceMetaPill>
+                <OperationalWorkspaceMetaPill>{scopeLabel}{ui("-scoped")}</OperationalWorkspaceMetaPill>
+                <OperationalWorkspaceMetaPill>{ui("Protected safety baseline")}</OperationalWorkspaceMetaPill>
+                <OperationalWorkspaceMetaPill>{ui("Permission changes audited")}</OperationalWorkspaceMetaPill>
               </>
             }
-            aside={<OperationalWorkspaceStatus value={roles.length} label="roles available in this access workspace" />}
+            aside={<OperationalWorkspaceStatus value={roles.length} label={ui("roles available in this access workspace")} />}
           />
 
-          <OperationalWorkspaceStats ariaLabel={`${scopeLabel} permission overview`}>
-            <OperationalWorkspaceStatCard label="Permissions" value={catalog.length} helper={`${allGroupNames.length} permission groups`} tone="blue" iconPath="/permissions" />
-            <OperationalWorkspaceStatCard label="Built-in roles" value={builtInRoles.length} helper={isPlatformScope ? "Fixed Platform role catalog" : "Protected Admin, Manager and Staff baselines"} tone="neutral" iconPath="/users" />
-            <OperationalWorkspaceStatCard label={isPlatformScope ? "Editable roles" : "Custom roles"} value={isPlatformScope ? roles.filter((role) => role.editable).length : customRoles.length} helper={isPlatformScope ? "Superadmin remains immutable" : "Tenant-specific job access profiles"} tone={(isPlatformScope ? roles.some((role) => role.editable) : customRoles.length) ? 'blue' : 'neutral'} iconPath="/permissions" />
-            <OperationalWorkspaceStatCard label="Selected enabled" value={draftSet.size} helper={activeRole ? `${activeRole.display_name || roleLabel(activeRole.role)}${dirty ? ' · unsaved draft' : ''}` : 'No role selected'} tone={dirty ? 'warn' : 'good'} iconPath="/permissions" />
-            <OperationalWorkspaceStatCard label="Locked" value={lockedSet.size} helper="Safety permissions that cannot be removed" tone="warn" iconPath="/permissions" />
-            <OperationalWorkspaceStatCard label={isCustomRole ? 'Template changes' : 'Saved overrides'} value={activeRole?.override_count || 0} helper={activeRole?.is_default ? 'Using baseline permissions' : isPlatformScope ? 'Platform-wide permission changes' : 'Tenant-specific permission changes'} tone={(activeRole?.override_count || 0) > 0 ? 'warn' : 'neutral'} iconPath="/audit" />
+          <OperationalWorkspaceStats ariaLabel={`${scopeLabel} ${ui("permission overview")}`}>
+            <OperationalWorkspaceStatCard label={ui("Permissions")} value={catalog.length} helper={`${allGroupNames.length} ${ui("permission groups")}`} tone="blue" iconPath="/permissions" />
+            <OperationalWorkspaceStatCard label={ui("Built-in roles")} value={builtInRoles.length} helper={isPlatformScope ? ui("Fixed Platform role catalog") : ui("Protected Admin, Manager and Staff baselines")} tone="neutral" iconPath="/users" />
+            <OperationalWorkspaceStatCard label={isPlatformScope ? ui("Editable roles") : ui("Custom roles")} value={isPlatformScope ? roles.filter((role) => role.editable).length : customRoles.length} helper={isPlatformScope ? ui("Superadmin remains immutable") : ui("Tenant-specific job access profiles")} tone={(isPlatformScope ? roles.some((role) => role.editable) : customRoles.length) ? 'blue' : 'neutral'} iconPath="/permissions" />
+            <OperationalWorkspaceStatCard label={ui("Selected enabled")} value={draftSet.size} helper={activeRole ? `${activeRole.display_name || roleLabel(activeRole.role)}${dirty ? ` · ${ui("unsaved draft")}` : ""}` : ui("No role selected")} tone={dirty ? 'warn' : 'good'} iconPath="/permissions" />
+            <OperationalWorkspaceStatCard label={ui("Locked")} value={lockedSet.size} helper={ui("Safety permissions that cannot be removed")} tone="warn" iconPath="/permissions" />
+            <OperationalWorkspaceStatCard label={isCustomRole ? ui("Template changes") : ui("Saved overrides")} value={activeRole?.override_count || 0} helper={activeRole?.is_default ? ui("Using baseline permissions") : isPlatformScope ? ui("Platform-wide permission changes") : ui("Tenant-specific permission changes")} tone={(activeRole?.override_count || 0) > 0 ? 'warn' : 'neutral'} iconPath="/audit" />
           </OperationalWorkspaceStats>
 
-          <OperationalWorkspaceTabs ariaLabel={`${scopeLabel} permission work areas`} hint={isPlatformScope ? "Edit fixed Platform role access. Changes apply to active requests immediately." : "Edit role access or manage tenant custom roles."}>
+          <OperationalWorkspaceTabs ariaLabel={`${scopeLabel} ${ui("permission work areas")}`} hint={isPlatformScope ? ui("Edit fixed Platform role access. Changes apply to active requests immediately.") : ui("Edit role access or manage tenant custom roles.")}>
             <OperationalWorkspaceTab
               active={workspaceView === 'role-permissions'}
               iconPath="/permissions"
-              label="Role permissions"
+              label={ui("Role permissions")}
               count={roles.length}
               onClick={() => requestWorkspaceView('role-permissions')}
             />
@@ -574,7 +576,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
               <OperationalWorkspaceTab
                 active={workspaceView === 'custom-roles'}
                 iconPath="/users"
-                label="Custom roles"
+                label={ui("Custom roles")}
                 count={customRoles.length}
                 onClick={() => requestWorkspaceView('custom-roles')}
               />
@@ -584,13 +586,13 @@ export default function RolePermissionEditor<Role extends string, Permission ext
       ) : (
         <header style={styles.hero}>
           <div>
-            <div style={styles.eyebrow}>{scopeLabel} access governance</div>
+            <div style={styles.eyebrow}>{scopeLabel} {ui("access governance")}</div>
             <h1 style={styles.title}>{title}</h1>
             <p style={styles.description}>{description}</p>
           </div>
           <div style={styles.heroMetrics}>
-            <span style={styles.metric}>{catalog.length} permissions</span>
-            <span style={styles.metric}>{roles.length} roles</span>
+            <span style={styles.metric}>{catalog.length} {ui("permissions")}</span>
+            <span style={styles.metric}>{roles.length} {ui("roles")}</span>
           </div>
         </header>
       )}

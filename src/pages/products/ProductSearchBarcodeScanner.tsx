@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ChangeEvent, CSSProperties } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { useAppTranslation } from '../../i18n/I18nContext';
 
 const SUPPORTED_FORMATS: Html5QrcodeSupportedFormats[] = [
   Html5QrcodeSupportedFormats.CODE_128,
@@ -48,6 +49,7 @@ const formatScannerError = (error: unknown): string => {
 };
 
 export function ProductSearchBarcodeScanner({ onDecoded }: ProductSearchBarcodeScannerProps) {
+  const { ui } = useAppTranslation();
   const reactId = useId();
   const scannerContainerId = `product-search-camera-${reactId.replace(/:/g, '')}`;
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -207,7 +209,7 @@ export function ProductSearchBarcodeScanner({ onDecoded }: ProductSearchBarcodeS
       startingRef.current = false;
     } catch (scannerError) {
       await stopScanner();
-      setError(formatScannerError(scannerError));
+      setError(ui(formatScannerError(scannerError)));
     }
   };
 
@@ -243,7 +245,7 @@ export function ProductSearchBarcodeScanner({ onDecoded }: ProductSearchBarcodeS
       await stopScanner();
       setError(imageError instanceof Error && imageError.message
         ? imageError.message
-        : 'No supported barcode or QR code could be decoded from that image.');
+        : ui('No supported barcode or QR code could be decoded from that image.'));
     } finally {
       setIsDecodingImage(false);
       event.target.value = '';
@@ -266,16 +268,16 @@ export function ProductSearchBarcodeScanner({ onDecoded }: ProductSearchBarcodeS
         aria-expanded={isOpen}
         aria-controls={`${scannerContainerId}-panel`}
       >
-        Scan barcode
+        {ui("Scan barcode")}
       </button>
 
       {isOpen ? (
         <div id={`${scannerContainerId}-panel`} style={scannerStyles.panel}>
           <div style={scannerStyles.header}>
             <div>
-              <strong style={scannerStyles.title}>Find a product by barcode</strong>
+              <strong style={scannerStyles.title}>{ui("Find a product by barcode")}</strong>
               <p style={scannerStyles.description}>
-                Scan a product or package barcode. A successful scan closes this panel and filters the Product List immediately.
+                {ui("Scan a product or package barcode. A successful scan closes this panel and filters the Product List immediately.")}
               </p>
             </div>
             <button
@@ -284,7 +286,7 @@ export function ProductSearchBarcodeScanner({ onDecoded }: ProductSearchBarcodeS
               style={scannerStyles.secondaryButton}
               onClick={() => void closeScanner()}
             >
-              Close
+              {ui("Close")}
             </button>
           </div>
 
@@ -299,7 +301,7 @@ export function ProductSearchBarcodeScanner({ onDecoded }: ProductSearchBarcodeS
               onClick={() => void startScanner()}
               disabled={isRunning || isStarting || isDecodingImage}
             >
-              {isStarting ? 'Starting camera...' : isRunning ? 'Camera running' : 'Start camera'}
+              {isStarting ? ui('Starting camera...') : isRunning ? ui('Camera running') : ui('Start camera')}
             </button>
             <button
               type="button"
@@ -311,7 +313,7 @@ export function ProductSearchBarcodeScanner({ onDecoded }: ProductSearchBarcodeS
               onClick={() => void stopScanner()}
               disabled={!isRunning}
             >
-              Stop camera
+              {ui("Stop camera")}
             </button>
             <button
               type="button"
@@ -323,7 +325,7 @@ export function ProductSearchBarcodeScanner({ onDecoded }: ProductSearchBarcodeS
               onClick={() => fileInputRef.current?.click()}
               disabled={isStarting || isDecodingImage}
             >
-              {isDecodingImage ? 'Decoding image...' : 'Scan from image'}
+              {isDecodingImage ? ui('Decoding image...') : ui('Scan from image')}
             </button>
           </div>
 
@@ -343,12 +345,12 @@ export function ProductSearchBarcodeScanner({ onDecoded }: ProductSearchBarcodeS
           {error ? <p style={scannerStyles.errorText}>{error}</p> : null}
           {candidateValue ? (
             <p style={scannerStyles.confirmationText}>
-              Detected <strong>{candidateValue}</strong>. Hold still while the same value is confirmed
+              {ui("Detected")} <strong>{candidateValue}</strong>{ui(". Hold still while the same value is confirmed")}
               {' '}({Math.min(confirmationCount, REQUIRED_MATCHING_DECODE_COUNT)}/{REQUIRED_MATCHING_DECODE_COUNT}).
             </p>
           ) : (
             <p style={scannerStyles.helpText}>
-              Camera access requires HTTPS or localhost and browser permission. A handheld USB scanner can also type directly into the search field.
+              {ui("Camera access requires HTTPS or localhost and browser permission. A handheld USB scanner can also type directly into the search field.")}
             </p>
           )}
         </div>

@@ -15,6 +15,33 @@ import type {
 import { getActiveTenantCurrency } from '../../lib/tenantCurrency';
 import { downloadCsv } from './productFormatting';
 
+type UiTranslator = (englishText: string) => string;
+const identityUi: UiTranslator = (englishText) => englishText;
+
+const HEADER_LABELS: Record<string, string> = {
+  movement_id: 'Movement ID', product_id: 'Product ID', product_name: 'Product name', change: 'Change', reason: 'Reason',
+  unit_cost: 'Unit cost', total_cost: 'Total cost', cost_source: 'Cost source', shipment_id: 'Shipment ID', shipment_po_number: 'Shipment PO number',
+  receiving_note: 'Receiving note', user: 'User', created_at: 'Created at', currency_code: 'Currency', history_id: 'History ID',
+  previous_standard_unit_cost: 'Previous standard unit cost', new_standard_unit_cost: 'New standard unit cost', changed_by: 'Changed by',
+  changed_at: 'Changed at', change_source: 'Change source', id: 'Product ID', sku: 'SKU', name: 'Product name', category: 'Category',
+  unit: 'Unit', min_stock: 'Minimum stock', supplier: 'Supplier', default_barcode: 'Default barcode', current_stock_quantity: 'Current stock quantity',
+  latest_unit_cost: 'Latest unit cost', standard_unit_cost: 'Standard unit cost', effective_unit_cost: 'Effective unit cost',
+  effective_cost_source: 'Effective cost source', effective_cost_at: 'Effective cost at', latest_cost_source: 'Latest cost source', latest_cost_at: 'Latest cost at',
+  estimated_inventory_value: 'Estimated inventory value', cost_variance_status: 'Cost variance status', cost_variance_amount: 'Cost variance amount',
+  cost_variance_percent: 'Cost variance percent', version: 'Version', valuation_basis: 'Valuation basis', stock_quantity: 'Stock quantity',
+  action_type: 'Action type', recommended_action: 'Recommended action', action_priority_score: 'Action priority score',
+  cost_history_spread_percent: 'Cost history spread percent', risk_type: 'Risk type', risk_priority_score: 'Risk priority score',
+  min_unit_cost: 'Minimum unit cost', max_unit_cost: 'Maximum unit cost'
+};
+
+function humanizeHeader(key: string): string {
+  return HEADER_LABELS[key] || key.split('_').filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+}
+
+function withLocalizedHeaders(row: Record<string, unknown>, ui: UiTranslator): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(row).map(([key, value]) => [ui(humanizeHeader(key)), value]));
+}
+
 
 function withTenantCurrency<T extends Record<string, unknown>>(row: T): T & { currency_code: string } {
   return { ...row, currency_code: getActiveTenantCurrency() };
@@ -22,7 +49,8 @@ function withTenantCurrency<T extends Record<string, unknown>>(row: T): T & { cu
 
 export function exportCostHistoryCsv(
   selectedCostProduct: ProductItem | ProductCostRiskItem | null,
-  costHistory: ProductCostHistoryItem[]
+  costHistory: ProductCostHistoryItem[],
+  ui: UiTranslator = identityUi
 ) {
   if (!selectedCostProduct || costHistory.length === 0) return;
 
@@ -42,12 +70,13 @@ export function exportCostHistoryCsv(
     created_at: movement.created_at
   }));
 
-  downloadCsv(`product-cost-history-${selectedCostProduct.id}.csv`, rows);
+  downloadCsv(`product-cost-history-${selectedCostProduct.id}.csv`, rows.map((row) => withLocalizedHeaders(row, ui)));
 }
 
 export function exportStandardCostHistoryCsv(
   selectedCostProduct: ProductItem | ProductCostRiskItem | null,
-  standardCostHistory: ProductStandardCostHistoryItem[]
+  standardCostHistory: ProductStandardCostHistoryItem[],
+  ui: UiTranslator = identityUi
 ) {
   if (!selectedCostProduct || standardCostHistory.length === 0) return;
 
@@ -62,10 +91,10 @@ export function exportStandardCostHistoryCsv(
     change_source: entry.change_source
   }));
 
-  downloadCsv(`product-standard-cost-history-${selectedCostProduct.id}.csv`, rows);
+  downloadCsv(`product-standard-cost-history-${selectedCostProduct.id}.csv`, rows.map((row) => withLocalizedHeaders(row, ui)));
 }
 
-export function exportProductsCsv(products: ProductItem[]) {
+export function exportProductsCsv(products: ProductItem[], ui: UiTranslator = identityUi) {
   const rows = products.map((product) => withTenantCurrency({
     id: product.id,
     sku: product.sku,
@@ -91,13 +120,13 @@ export function exportProductsCsv(products: ProductItem[]) {
     version: product.version
   }));
 
-  downloadCsv('products-costing.csv', rows);
+  downloadCsv('products-costing.csv', rows.map((row) => withLocalizedHeaders(row, ui)));
 }
 
-export function exportCostReportCsv(costReportSummary: ProductCostReportSummaryResponse | undefined) {
+export function exportCostReportCsv(costReportSummary: ProductCostReportSummaryResponse | undefined, ui: UiTranslator = identityUi) {
   const rows = (costReportSummary?.export_rows ?? []).map((row) => withTenantCurrency(row));
   if (rows.length === 0) return;
-  downloadCsv('product-cost-report-summary.csv', rows);
+  downloadCsv('product-cost-report-summary.csv', rows.map((row) => withLocalizedHeaders(row, ui)));
 }
 
 export function printCostReport(costReportSummary: ProductCostReportSummaryResponse | undefined) {
@@ -106,35 +135,39 @@ export function printCostReport(costReportSummary: ProductCostReportSummaryRespo
 }
 
 export function exportCostGovernanceAuditCsv(
-  costGovernanceAuditPack: ProductCostGovernanceAuditPackResponse | undefined
+  costGovernanceAuditPack: ProductCostGovernanceAuditPackResponse | undefined,
+  ui: UiTranslator = identityUi
 ) {
   const rows = (costGovernanceAuditPack?.audit_rows ?? []).map((row) => withTenantCurrency(row));
   if (rows.length === 0) return;
-  downloadCsv('product-cost-governance-audit-pack.csv', rows);
+  downloadCsv('product-cost-governance-audit-pack.csv', rows.map((row) => withLocalizedHeaders(row, ui)));
 }
 
 export function exportCostGovernanceReviewPackCsv(
-  costGovernanceReviewPack: ProductCostGovernanceReviewPackResponse | undefined
+  costGovernanceReviewPack: ProductCostGovernanceReviewPackResponse | undefined,
+  ui: UiTranslator = identityUi
 ) {
   const rows = (costGovernanceReviewPack?.review_export_rows ?? []).map((row) => withTenantCurrency(row));
   if (rows.length === 0) return;
-  downloadCsv('product-cost-governance-review-pack.csv', rows);
+  downloadCsv('product-cost-governance-review-pack.csv', rows.map((row) => withLocalizedHeaders(row, ui)));
 }
 
 export function exportCostGovernanceClosureCsv(
-  costGovernanceClosureSummary: ProductCostGovernanceClosureSummaryResponse | undefined
+  costGovernanceClosureSummary: ProductCostGovernanceClosureSummaryResponse | undefined,
+  ui: UiTranslator = identityUi
 ) {
   const rows = (costGovernanceClosureSummary?.archive_rows ?? []).map((row) => withTenantCurrency(row));
   if (rows.length === 0) return;
-  downloadCsv('product-cost-governance-closure-summary.csv', rows);
+  downloadCsv('product-cost-governance-closure-summary.csv', rows.map((row) => withLocalizedHeaders(row, ui)));
 }
 
 export function exportCostGovernanceHandoffCsv(
-  costGovernanceHandoffSummary: ProductCostGovernanceHandoffSummaryResponse | undefined
+  costGovernanceHandoffSummary: ProductCostGovernanceHandoffSummaryResponse | undefined,
+  ui: UiTranslator = identityUi
 ) {
   const rows = (costGovernanceHandoffSummary?.handoff_rows ?? []).map((row) => withTenantCurrency(row));
   if (rows.length === 0) return;
-  downloadCsv('product-cost-governance-handoff-summary.csv', rows);
+  downloadCsv('product-cost-governance-handoff-summary.csv', rows.map((row) => withLocalizedHeaders(row, ui)));
 }
 
 export function printCostGovernanceAudit(
@@ -145,7 +178,8 @@ export function printCostGovernanceAudit(
 }
 
 export function exportCostValuationDetailsCsv(
-  costValuationDetails: ProductCostValuationDetailsResponse | undefined
+  costValuationDetails: ProductCostValuationDetailsResponse | undefined,
+  ui: UiTranslator = identityUi
 ) {
   const rows = (costValuationDetails?.rows ?? []).map((row) => withTenantCurrency({
     product_id: row.id,
@@ -163,11 +197,12 @@ export function exportCostValuationDetailsCsv(
   }));
 
   if (rows.length === 0) return;
-  downloadCsv('product-cost-valuation-details.csv', rows);
+  downloadCsv('product-cost-valuation-details.csv', rows.map((row) => withLocalizedHeaders(row, ui)));
 }
 
 export function exportCostActionDetailsCsv(
-  costActionDetails: ProductCostActionDetailsResponse | undefined
+  costActionDetails: ProductCostActionDetailsResponse | undefined,
+  ui: UiTranslator = identityUi
 ) {
   const rows = (costActionDetails?.rows ?? []).map((row) => withTenantCurrency({
     product_id: row.id,
@@ -186,10 +221,10 @@ export function exportCostActionDetailsCsv(
   }));
 
   if (rows.length === 0) return;
-  downloadCsv('product-cost-action-details.csv', rows);
+  downloadCsv('product-cost-action-details.csv', rows.map((row) => withLocalizedHeaders(row, ui)));
 }
 
-export function exportCostRiskDetailsCsv(costRiskDetails: ProductCostRiskDetailsResponse | undefined) {
+export function exportCostRiskDetailsCsv(costRiskDetails: ProductCostRiskDetailsResponse | undefined, ui: UiTranslator = identityUi) {
   const rows = (costRiskDetails?.rows ?? []).map((row) => withTenantCurrency({
     product_id: row.id,
     product_name: row.name,
@@ -208,5 +243,5 @@ export function exportCostRiskDetailsCsv(costRiskDetails: ProductCostRiskDetails
   }));
 
   if (rows.length === 0) return;
-  downloadCsv('product-cost-risk-details.csv', rows);
+  downloadCsv('product-cost-risk-details.csv', rows.map((row) => withLocalizedHeaders(row, ui)));
 }

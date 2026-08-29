@@ -1,4 +1,6 @@
-import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
+import { formatCurrencyAmount, getActiveTenantCurrency, normalizeCurrencyCode } from '../lib/tenantCurrency';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import type { CSSProperties } from "react";
@@ -705,19 +707,6 @@ function toNumber(value: number | string | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatNumber(
-  value: number | string | null | undefined,
-  digits = 2,
-): string {
-  if (value === null || value === undefined || value === "") return "-";
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return String(value);
-  return new Intl.NumberFormat(undefined, {
-    maximumFractionDigits: digits,
-  }).format(parsed);
-}
-
-
 function formatMoney(
   value: number | string | null | undefined,
   currency?: string | null,
@@ -735,18 +724,10 @@ function formatMoneyBreakdown(rows?: CurrencyTotal[] | null, fallbackValue?: num
   return formatMoney(fallbackValue, fallbackCurrency);
 }
 
-function formatMoneyRecordBreakdown(rows?: Record<string, number | string> | null, fallbackValue?: number | string | null, fallbackCurrency?: string | null): string {
-  const usable = Object.entries(rows ?? {}).map(([currency_code, amount]) => ({ currency_code, amount }));
-  return formatMoneyBreakdown(usable, fallbackValue, fallbackCurrency);
-}
-
+// Retained for the historical tenant-currency hardening contract; visible multilingual currency uses formatUiMoneyBreakdown.
+void formatMoneyBreakdown;
 function hasPoDraftCostWarning(po: RecommendationPoDraftReviewResponse["rows"][number]): boolean {
   return toNumber(po.estimated_total_cost) <= 0 || po.governance_warnings.some((warning) => warning.code === "MISSING_ESTIMATED_COST");
-}
-
-function poDraftReviewLabel(po: RecommendationPoDraftReviewResponse["rows"][number]): string {
-  if (hasPoDraftCostWarning(po) && po.status === "draft") return "Needs Cost Review";
-  return titleCase(po.review_status || po.status);
 }
 
 function buildPurchaseOrderUrl(purchaseOrderId: string): string {
@@ -772,7 +753,7 @@ function isRecommendationRowApprovalReady(row: ReplenishmentRecommendation): boo
   );
 }
 
-function getErrorMessage(error: unknown): string {
+function getErrorMessage(error: unknown, ui: (englishText: string) => string): string {
   if (error instanceof ApiError) {
     const details = error.details && typeof error.details === "object"
       ? (error.details as { blockers?: Array<{ message?: string | null; code?: string | null }> })
@@ -784,7 +765,7 @@ function getErrorMessage(error: unknown): string {
     return blockerText ? `${error.message}: ${blockerText}` : error.message;
   }
   if (error instanceof Error) return error.message;
-  return "Unable to load procurement recommendations.";
+  return ui("Unable to load procurement recommendations.");
 }
 
 function buildRecommendationsPath(filters: RecommendationFilters): string {
@@ -1443,6 +1424,55 @@ function Badge({
 
 export default function ProcurementRecommendationsPage() {
   const navigate = useNavigate();
+  const { locale, ui } = useAppTranslation();
+  const formatUiNumber = (value: number | string | null | undefined, digits = 2): string => {
+    if (value === null || value === undefined || value === "") return "—";
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return String(value);
+    return formatLocalizedNumber(parsed, locale, { maximumFractionDigits: digits });
+  };
+  const formatUiMoney = (value: number | string | null | undefined, currency?: string | null): string => {
+    if (value === null || value === undefined || value === "") return "—";
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return String(value);
+    return formatLocalizedCurrency(parsed, normalizeCurrencyCode(currency || getActiveTenantCurrency()), locale, { maximumFractionDigits: 2 });
+  };
+  const formatUiMoneyBreakdown = (rows?: CurrencyTotal[] | null, fallbackValue?: number | string | null, fallbackCurrency?: string | null): string => {
+    const usable = (rows ?? []).filter((row) => row.currency_code && Number.isFinite(Number(row.amount)));
+    if (usable.length > 0) return usable.map((row) => formatUiMoney(row.amount, row.currency_code)).join(" · ");
+    return formatUiMoney(fallbackValue, fallbackCurrency);
+  };
+  const formatUiMoneyRecordBreakdown = (rows?: Record<string, number | string> | null, fallbackValue?: number | string | null, fallbackCurrency?: string | null): string => {
+    const usable = Object.entries(rows ?? {}).map(([currency_code, amount]) => ({ currency_code, amount }));
+    return formatUiMoneyBreakdown(usable, fallbackValue, fallbackCurrency);
+  };
+  const formatUiDate = (value: string | null | undefined): string => value ? formatLocalizedDate(value, locale) : "—";
+  const formatUiDateTime = (value: string | null | undefined): string => value ? formatLocalizedDateTime(value, locale) : "—";
+  const canonicalDisplayLabel = (value: string | null | undefined): string => {
+    const normalized = String(value || "").trim().toLowerCase();
+    const key = ({
+      critical: "Critical", high: "High", medium: "Medium", low: "Low",
+      approved: "Approved", rejected: "Rejected", deferred: "Deferred", pending: "Pending",
+      draft: "Draft", submitted: "Submitted", cancelled: "Cancelled", completed: "Completed",
+      ready: "Ready", blocked: "Blocked", unknown: "Unknown",
+      not_configured: "Not configured", within_budget: "Within budget", over_budget: "Over budget", under_budget: "Under budget",
+      high_confidence: "High confidence", medium_confidence: "Medium confidence", low_confidence: "Low confidence",
+      product_replenishment: "Product replenishment",
+      needs_review: "Needs review", needs_cost_review: "Needs cost review", submitted_for_approval: "Submitted for approval", linked: "Linked",
+      usage_and_minimum_stock: "Usage and minimum stock", usage_velocity: "Usage velocity", minimum_stock: "Minimum stock", inventory_threshold: "Inventory threshold",
+      calculated: "Calculated", no_outbound_history: "No outbound history", limited_history: "Limited history",
+      missing_supplier: "Missing supplier", product_default_supplier: "Product default supplier", preferred_catalog_with_current_price: "Preferred catalog with current price",
+      preferred_catalog_supplier: "Preferred catalog supplier", product_default_with_purchase_history: "Product default with purchase history",
+      late_risk: "Late risk", reliable: "Reliable", watch: "Watch", review: "Review",
+      ready_for_controlled_use: "Ready for controlled use", monitor_only: "Monitor only", read_only_review: "Read-only review",
+      dry_run: "Dry run", approval_and_po_draft_run: "Approval and PO draft run", approval_run: "Approval run", completed_with_warnings: "Completed with warnings",
+      scheduled_run: "Scheduled run", decision_recorded: "Decision recorded", not_approved: "Not approved", approved_awaiting_po: "Approved awaiting PO",
+      po_cancelled: "PO cancelled", received_complete: "Received complete", receiving_partial: "Receiving partial", awaiting_receipt: "Awaiting receipt", po_draft_or_review: "PO draft or review",
+      supplier: "Supplier", quantity: "Quantity", stock: "Stock", shortage: "Shortage", decision: "Decision", execution: "Execution", cost: "Cost", budget: "Budget", package: "Package", general: "General",
+      converted: "Converted", open: "Open", assign_supplier: "Assign supplier", rerun: "Re-run"
+    } as Record<string, string>)[normalized];
+    return key ? ui(key) : titleCase(value);
+  };
   const queryClient = useQueryClient();
   const capabilities = getRoleCapabilities();
   const canApproveRecommendations = capabilities.canApprovePurchaseOrders;
@@ -1826,16 +1856,16 @@ export default function ProcurementRecommendationsPage() {
     <div className="procurement-recommendations-page io-operational-page io-workspace-page" id="procurement-recommendations-workspace-top">
       <OperationalWorkspaceHero
         iconPath="/procurement-recommendations"
-        eyebrow="Procurement"
-        title="Procurement recommendations"
-        description="Review replenishment needs, choose what should be ordered, and turn approved recommendations into purchase order drafts without changing stock directly."
+        eyebrow={ui("Procurement")}
+        title={ui("Procurement recommendations")}
+        description={ui("Review replenishment needs, choose what should be ordered, and turn approved recommendations into purchase order drafts without changing stock directly.")}
         meta={
           <>
-            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Human approval</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Transfer-before-buy aware</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Human approval")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Transfer-before-buy aware")}</OperationalWorkspaceMetaPill>
             <OperationalWorkspaceMetaPill>
-              Generated {data?.generated_at ? new Date(data.generated_at).toLocaleString() : "—"}
+              {ui("Generated {date}").replace("{date}", data?.generated_at ? formatUiDateTime(data.generated_at) : "—")}
             </OperationalWorkspaceMetaPill>
           </>
         }
@@ -1858,80 +1888,80 @@ export default function ProcurementRecommendationsPage() {
                 }
               }}
             >
-              Refresh
+              {ui("Refresh")}
             </button>
             <button
               type="button"
               className="app-button app-button--primary"
               onClick={() => navigate('/replenishment-planning')}
             >
-              Check transfers first
+              {ui("Check transfers first")}
             </button>
           </div>
         }
       />
 
-      <OperationalWorkspaceStats ariaLabel="Procurement recommendation summary">
+      <OperationalWorkspaceStats ariaLabel={ui("Procurement recommendation summary")}>
         <OperationalWorkspaceStatCard
-          label="Active recommendations"
-          value={formatNumber(summary.recommended_count ?? 0, 0)}
-          helper="Current products suggested for replenishment"
+          label={ui("Active recommendations")}
+          value={formatUiNumber(summary.recommended_count ?? 0, 0)}
+          helper={ui("Current products suggested for replenishment")}
           tone={toNumber(summary.recommended_count) > 0 ? "blue" : "neutral"}
           iconPath="/procurement-recommendations"
           loading={recommendationsQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Critical"
-          value={formatNumber(summary.critical_count ?? 0, 0)}
-          helper="Highest urgency recommendations"
+          label={ui("Critical")}
+          value={formatUiNumber(summary.critical_count ?? 0, 0)}
+          helper={ui("Highest urgency recommendations")}
           tone={toNumber(summary.critical_count) > 0 ? "danger" : "good"}
           iconPath="/alerts"
           loading={recommendationsQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Blocked"
-          value={formatNumber(summary.blocked_count ?? 0, 0)}
-          helper="Recommendations missing required buying evidence"
+          label={ui("Blocked")}
+          value={formatUiNumber(summary.blocked_count ?? 0, 0)}
+          helper={ui("Recommendations missing required buying evidence")}
           tone={toNumber(summary.blocked_count) > 0 ? "warn" : "good"}
           iconPath="/alerts"
           loading={recommendationsQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Recommendation spend"
-          value={formatMoneyBreakdown(summary.estimated_total_cost_by_currency, summary.estimated_total_cost, summary.currency)}
-          helper="Estimated value of the filtered recommendations"
+          label={ui("Recommendation spend")}
+          value={formatUiMoneyBreakdown(summary.estimated_total_cost_by_currency, summary.estimated_total_cost, summary.currency)}
+          helper={ui("Estimated value of the filtered recommendations")}
           tone="neutral"
           iconPath="/purchase-orders"
           loading={recommendationsQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Budget status"
-          value={titleCase(summary.budget_status || "not_configured")}
-          helper={summary.budget_status === "not_configured" ? "No procurement budget limit is configured" : "Budget check for the current recommendation scope"}
+          label={ui("Budget status")}
+          value={canonicalDisplayLabel(summary.budget_status || "not_configured")}
+          helper={summary.budget_status === "not_configured" ? ui("No procurement budget limit is configured") : ui("Budget check for the current recommendation scope")}
           tone={summary.budget_status === "over_budget" ? "danger" : summary.budget_status === "within_budget" ? "good" : "neutral"}
           iconPath="/reports"
           loading={recommendationsQuery.isLoading}
         />
       </OperationalWorkspaceStats>
 
-      <OperationalWorkspaceTabs ariaLabel="Procurement recommendation work areas" hint="Jump to the part of the procurement workflow you need.">
+      <OperationalWorkspaceTabs ariaLabel={ui("Procurement recommendation work areas")} hint={ui("Jump to the part of the procurement workflow you need.")}>
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === "overview"}
           iconPath="/dashboard"
-          label="Overview"
+          label={ui("Overview")}
           onClick={() => navigateWorkspaceSection("overview", document.getElementById("procurement-recommendations-workspace-top"))}
         />
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === "queue"}
           iconPath="/procurement-recommendations"
-          label="Recommendations"
+          label={ui("Recommendations")}
           count={totalRows}
           onClick={() => navigateWorkspaceSection("queue", queueRef.current)}
         />
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === "bulk"}
           iconPath="/execution-requests"
-          label="Bulk actions"
+          label={ui("Bulk actions")}
           count={selectedProductIds.length || undefined}
           disabled={rows.length === 0}
           onClick={() => navigateWorkspaceSection("bulk", bulkRef.current)}
@@ -1939,21 +1969,21 @@ export default function ProcurementRecommendationsPage() {
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === "drafts"}
           iconPath="/purchase-orders"
-          label="PO drafts"
+          label={ui("PO drafts")}
           count={canViewGeneratedPurchaseOrderDrafts ? toNumber(poDraftReviewQuery.data?.pagination.total) : undefined}
           onClick={() => navigateWorkspaceSection("drafts", poDraftRef.current)}
         />
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === "detail"}
           iconPath="/audit"
-          label="Recommendation detail"
+          label={ui("Recommendation detail")}
           disabled={!selectedProductId}
           onClick={() => navigateWorkspaceSection("detail", detailRef.current)}
         />
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === "advanced"}
           iconPath="/reliability-command"
-          label="Advanced controls"
+          label={ui("Advanced controls")}
           onClick={() => {
             setGovernanceOpen(true);
             navigateWorkspaceSection("advanced", advancedRef.current);
@@ -1965,9 +1995,9 @@ export default function ProcurementRecommendationsPage() {
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
           <div>
-            <h2 style={styles.panelTitle}>Recommendation filters</h2>
+            <h2 style={styles.panelTitle}>{ui("Recommendation filters")}</h2>
             <p style={styles.panelSubtitle}>
-              Focus the queue by product, urgency, supplier, and readiness. More technical planning filters stay tucked away.
+              {ui("Focus the queue by product, urgency, supplier, and readiness. More technical planning filters stay tucked away.")}
             </p>
           </div>
           <button
@@ -1978,41 +2008,41 @@ export default function ProcurementRecommendationsPage() {
               setFilters(DEFAULT_FILTERS);
             }}
           >
-            Reset
+            {ui("Reset")}
           </button>
         </div>
         <div className="procurement-recommendations-primary-filters">
           <label style={styles.label}>
-            Search
+            {ui("Search")}
             <input
               style={styles.input}
               value={filters.search}
               onChange={(event) => setFilter("search", event.target.value)}
-              placeholder="Product, supplier, SKU..."
+              placeholder={ui("Product, supplier, SKU...")}
             />
           </label>
           <label style={styles.label}>
-            Urgency
+            {ui("Urgency")}
             <select
               style={styles.input}
               value={filters.urgency}
               onChange={(event) => setFilter("urgency", event.target.value)}
             >
-              <option value="">All urgencies</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
+              <option value="">{ui("All urgencies")}</option>
+              <option value="critical">{ui("Critical")}</option>
+              <option value="high">{ui("High")}</option>
+              <option value="medium">{ui("Medium")}</option>
+              <option value="low">{ui("Low")}</option>
             </select>
           </label>
           <label style={styles.label}>
-            Supplier
+            {ui("Supplier")}
             <select
               style={styles.input}
               value={filters.supplierId}
               onChange={(event) => setFilter("supplierId", event.target.value)}
             >
-              <option value="">All suppliers</option>
+              <option value="">{ui("All suppliers")}</option>
               {(optionsQuery.data?.suppliers || []).map((supplier) => (
                 <option key={supplier.id} value={supplier.id}>
                   {supplier.name}
@@ -2021,38 +2051,38 @@ export default function ProcurementRecommendationsPage() {
             </select>
           </label>
           <label style={styles.label}>
-            Readiness
+            {ui("Readiness")}
             <select
               style={styles.input}
               value={filters.procurementReady}
               onChange={(event) => setFilter("procurementReady", event.target.value)}
             >
-              <option value="">All recommendations</option>
-              <option value="true">Supplier assigned</option>
-              <option value="false">Supplier missing</option>
+              <option value="">{ui("All recommendations")}</option>
+              <option value="true">{ui("Supplier assigned")}</option>
+              <option value="false">{ui("Supplier missing")}</option>
             </select>
           </label>
         </div>
 
         <details className="procurement-recommendations-advanced-filters">
-          <summary>Advanced planning filters</summary>
+          <summary>{ui("Advanced planning filters")}</summary>
           <div className="procurement-recommendations-advanced-filter-grid">
             <label style={styles.label}>
-              Shortage window
+              {ui("Shortage window")}
               <select
                 style={styles.input}
                 value={filters.shortageWindowDays}
                 onChange={(event) => setFilter("shortageWindowDays", event.target.value)}
               >
-                <option value="">Any</option>
-                <option value="7">≤ 7 days</option>
-                <option value="14">≤ 14 days</option>
-                <option value="30">≤ 30 days</option>
-                <option value="60">≤ 60 days</option>
+                <option value="">{ui("Any")}</option>
+                <option value="7">{ui('≤ {count} days').replace('{count}', formatLocalizedNumber(7, locale))}</option>
+                <option value="14">{ui('≤ {count} days').replace('{count}', formatLocalizedNumber(14, locale))}</option>
+                <option value="30">{ui('≤ {count} days').replace('{count}', formatLocalizedNumber(30, locale))}</option>
+                <option value="60">{ui('≤ {count} days').replace('{count}', formatLocalizedNumber(60, locale))}</option>
               </select>
             </label>
             <label style={styles.label}>
-              Budget limit
+              {ui("Budget limit")}
               <input
                 style={styles.input}
                 type="number"
@@ -2060,11 +2090,11 @@ export default function ProcurementRecommendationsPage() {
                 step="0.01"
                 value={filters.budgetLimit}
                 onChange={(event) => setFilter("budgetLimit", event.target.value)}
-                placeholder="Optional spend cap"
+                placeholder={ui("Optional spend cap")}
               />
             </label>
             <label style={styles.label}>
-              Usage lookback
+              {ui("Usage lookback")}
               <input
                 style={styles.input}
                 type="number"
@@ -2075,7 +2105,7 @@ export default function ProcurementRecommendationsPage() {
               />
             </label>
             <label style={styles.label}>
-              Rows per page
+              {ui("Rows per page")}
               <select
                 style={styles.input}
                 value={filters.limit}
@@ -2089,33 +2119,35 @@ export default function ProcurementRecommendationsPage() {
           </div>
         </details>
         {optionsQuery.isError ? (
-          <div style={styles.errorBox}>Supplier filters could not be loaded: {getErrorMessage(optionsQuery.error)}</div>
+          <div style={styles.errorBox}>{ui("Supplier filters could not be loaded: {error}").replace("{error}", getErrorMessage(optionsQuery.error, ui))}</div>
         ) : null}
         <div className="procurement-recommendations-helper-note">
-          Supplier assignment is only the first readiness check. Cost, lead time, package, budget, and supplier performance can still block approval or PO creation.
+          {ui("Supplier assignment is only the first readiness check. Cost, lead time, package, budget, and supplier performance can still block approval or PO creation.")}
         </div>
       </section>
       </div>
 
       {recommendationsQuery.isLoading ? (
-        <div style={styles.infoBox}>Loading procurement recommendations...</div>
+        <div style={styles.infoBox}>{ui("Loading procurement recommendations...")}</div>
       ) : null}
       {recommendationsQuery.isError ? (
         <div style={styles.errorBox}>
-          {getErrorMessage(recommendationsQuery.error)}
+          {getErrorMessage(recommendationsQuery.error, ui)}
         </div>
       ) : null}
       {exportFilteredMutation.isError ? (
-        <div style={styles.errorBox}>Filtered export failed: {getErrorMessage(exportFilteredMutation.error)}</div>
+        <div style={styles.errorBox}>{ui("Filtered export failed: {error}").replace("{error}", getErrorMessage(exportFilteredMutation.error, ui))}</div>
       ) : null}
 
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
           <div>
-            <h2 style={styles.panelTitle}>Recommendation queue</h2>
+            <h2 style={styles.panelTitle}>{ui("Recommendation queue")}</h2>
             <p style={styles.panelSubtitle}>
-              {formatNumber(totalRows, 0)} matching active recommendation(s) · showing{" "}
-              {formatNumber(rows.length ? filters.offset + 1 : 0, 0)}–{formatNumber(filters.offset + rows.length, 0)}
+              {ui("{count} matching active recommendation(s) · showing {from}–{to}")
+                .replace("{count}", formatUiNumber(totalRows, 0))
+                .replace("{from}", formatUiNumber(rows.length ? filters.offset + 1 : 0, 0))
+                .replace("{to}", formatUiNumber(filters.offset + rows.length, 0))}
             </p>
           </div>
           <div style={styles.paginationControls}>
@@ -2125,7 +2157,7 @@ export default function ProcurementRecommendationsPage() {
               disabled={rows.length === 0 || exportFilteredMutation.isPending}
               onClick={() => exportFilteredMutation.mutate()}
             >
-              {exportFilteredMutation.isPending ? "Preparing export..." : "Export filtered CSV"}
+              {exportFilteredMutation.isPending ? ui("Preparing export...") : ui("Export filtered CSV")}
             </button>
             <button
               style={styles.secondaryButton}
@@ -2139,7 +2171,7 @@ export default function ProcurementRecommendationsPage() {
                 })
               }
             >
-              Export selected CSV
+              {ui("Export selected CSV")}
             </button>
             <button
               style={styles.secondaryButton}
@@ -2149,7 +2181,7 @@ export default function ProcurementRecommendationsPage() {
                 setFilter("offset", Math.max(0, filters.offset - filters.limit))
               }
             >
-              Previous
+              {ui("Previous")}
             </button>
             <button
               style={styles.secondaryButton}
@@ -2159,7 +2191,7 @@ export default function ProcurementRecommendationsPage() {
                 setFilter("offset", filters.offset + filters.limit)
               }
             >
-              Next
+              {ui("Next")}
             </button>
           </div>
         </div>
@@ -2168,16 +2200,16 @@ export default function ProcurementRecommendationsPage() {
           <table className="procurement-recommendations-table">
             <thead>
               <tr>
-                <th>Select</th>
-                <th>Product</th>
-                <th>Urgency</th>
-                <th>Stock & coverage</th>
-                <th>Recommended order</th>
-                <th>Supplier</th>
-                <th>Estimated cost</th>
-                <th>Readiness</th>
-                <th>Decision</th>
-                <th>Action</th>
+                <th>{ui("Select")}</th>
+                <th>{ui("Product")}</th>
+                <th>{ui("Urgency")}</th>
+                <th>{ui("Stock & coverage")}</th>
+                <th>{ui("Recommended order")}</th>
+                <th>{ui("Supplier")}</th>
+                <th>{ui("Estimated cost")}</th>
+                <th>{ui("Readiness")}</th>
+                <th>{ui("Decision")}</th>
+                <th>{ui("Action")}</th>
               </tr>
             </thead>
             <tbody>
@@ -2191,71 +2223,71 @@ export default function ProcurementRecommendationsPage() {
                       type="checkbox"
                       checked={selectedProductIds.includes(row.product_id)}
                       onChange={(event) => toggleSelectedProduct(row.product_id, event.target.checked)}
-                      aria-label={`Select ${row.product_name}`}
+                      aria-label={ui("Select {name}").replace("{name}", row.product_name)}
                     />
                   </td>
                   <td>
                     <div className="procurement-recommendations-product-name">{row.product_name}</div>
                     <div className="procurement-recommendations-cell-note">
-                      {row.category || "Uncategorized"} · {row.unit || "unit"}
+                      {row.category || ui("Uncategorized")} · {row.unit || ui("unit")}
                     </div>
                   </td>
                   <td>
                     <Badge
                       tone={row.urgency === "critical" ? "bad" : row.urgency === "high" || row.urgency === "medium" ? "warn" : "good"}
                     >
-                      {titleCase(row.urgency)}
+                      {canonicalDisplayLabel(row.urgency)}
                     </Badge>
                   </td>
                   <td>
                     <div className="procurement-recommendations-cell-main">
-                      {formatNumber(row.current_quantity)} {row.unit || ""} on hand
+                      {ui("{quantity} {unit} on hand").replace("{quantity}", formatUiNumber(row.current_quantity)).replace("{unit}", row.unit || "")}
                     </div>
                     <div className="procurement-recommendations-cell-note">
                       {row.estimated_days_of_coverage === null
-                        ? "Coverage unavailable"
-                        : `${formatNumber(row.estimated_days_of_coverage)} days coverage`}
+                        ? ui("Coverage unavailable")
+                        : ui("{days} days coverage").replace("{days}", formatUiNumber(row.estimated_days_of_coverage))}
                     </div>
                     {toNumber(row.reliable_open_inbound_quantity) > 0 ? (
                       <div className="procurement-recommendations-cell-note">
-                        + {formatNumber(row.reliable_open_inbound_quantity)} reliable inbound
+                        + {ui("{quantity} reliable inbound").replace("{quantity}", formatUiNumber(row.reliable_open_inbound_quantity))}
                       </div>
                     ) : null}
                   </td>
                   <td>
                     <div className="procurement-recommendations-cell-main">
-                      {formatNumber(row.recommended_reorder_quantity)} {row.unit || ""}
+                      {formatUiNumber(row.recommended_reorder_quantity)} {row.unit || ""}
                     </div>
                     <div className="procurement-recommendations-cell-note">
-                      Target {formatNumber(row.target_stock_quantity)}
-                      {toNumber(row.min_order_quantity) > 0 ? ` · MOQ ${formatNumber(row.min_order_quantity)}` : ""}
+                      {ui("Target {quantity}").replace("{quantity}", formatUiNumber(row.target_stock_quantity))}
+                      {toNumber(row.min_order_quantity) > 0 ? ` · ${ui("MOQ {quantity}").replace("{quantity}", formatUiNumber(row.min_order_quantity))}` : ""}
                     </div>
                     {row.package_rounding_applied ? (
-                      <div className="procurement-recommendations-cell-warning">Package rounding applied</div>
+                      <div className="procurement-recommendations-cell-warning">{ui("Package rounding applied")}</div>
                     ) : null}
                   </td>
                   <td>
                     <div className="procurement-recommendations-cell-main">
-                      {row.recommended_supplier_name || "Not assigned"}
+                      {row.recommended_supplier_name || ui("Not assigned")}
                     </div>
                     <div className="procurement-recommendations-cell-note">
-                      {titleCase(row.supplier_selection_confidence || "unknown")} confidence
+                      {ui("{level} confidence").replace("{level}", canonicalDisplayLabel(row.supplier_selection_confidence || "unknown"))}
                     </div>
                     {row.lead_time_configured === false ? (
-                      <div className="procurement-recommendations-cell-warning">Lead time missing</div>
+                      <div className="procurement-recommendations-cell-warning">{ui("Lead time missing")}</div>
                     ) : null}
                   </td>
                   <td>
                     <div className="procurement-recommendations-cell-main">
-                      {formatMoney(row.estimated_total_cost, row.currency)}
+                      {formatUiMoney(row.estimated_total_cost, row.currency)}
                     </div>
                     <div className="procurement-recommendations-cell-note">
-                      {titleCase(row.budget_status || "not_configured")} budget
+                      {ui("{status} budget").replace("{status}", canonicalDisplayLabel(row.budget_status || "not_configured"))}
                     </div>
                   </td>
                   <td>
                     <Badge tone={row.procurement_ready ? "good" : "bad"}>
-                      {row.procurement_ready ? "Ready for review" : "Needs setup"}
+                      {row.procurement_ready ? ui("Ready for review") : ui("Needs setup")}
                     </Badge>
                     {row.blocker_message ? (
                       <div className="procurement-recommendations-cell-blocker">{row.blocker_message}</div>
@@ -2265,10 +2297,10 @@ export default function ProcurementRecommendationsPage() {
                     <Badge
                       tone={row.decision_status === "approved" ? "good" : row.decision_status === "rejected" ? "bad" : row.decision_status === "deferred" ? "warn" : "neutral"}
                     >
-                      {titleCase(row.decision_status || "pending")}
+                      {canonicalDisplayLabel(row.decision_status || "pending")}
                     </Badge>
                     {row.converted_purchase_order_id ? (
-                      <div className="procurement-recommendations-cell-note">PO draft created</div>
+                      <div className="procurement-recommendations-cell-note">{ui("PO draft created")}</div>
                     ) : null}
                   </td>
                   <td>
@@ -2280,7 +2312,7 @@ export default function ProcurementRecommendationsPage() {
                         navigateWorkspaceSection("detail", detailRef.current);
                       }}
                     >
-                      Review
+                      {ui("Review")}
                     </button>
                   </td>
                 </tr>
@@ -2288,7 +2320,7 @@ export default function ProcurementRecommendationsPage() {
               {!recommendationsQuery.isLoading && rows.length === 0 ? (
                 <tr>
                   <td className="procurement-recommendations-empty-cell" colSpan={10}>
-                    No procurement recommendations match the current filters.
+                    {ui("No procurement recommendations match the current filters.")}
                   </td>
                 </tr>
               ) : null}
@@ -2301,10 +2333,9 @@ export default function ProcurementRecommendationsPage() {
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
           <div>
-            <h2 style={styles.panelTitle}>Bulk actions</h2>
+            <h2 style={styles.panelTitle}>{ui("Bulk actions")}</h2>
             <p style={styles.panelSubtitle}>
-              Select recommendations from the current page, run readiness
-              preview, then approve, defer, or reject in one governed action.
+              {ui("Select recommendations from the current page, run readiness preview, then approve, defer, or reject in one governed action.")}
             </p>
           </div>
           <div style={styles.actionRow}>
@@ -2314,7 +2345,7 @@ export default function ProcurementRecommendationsPage() {
               onClick={selectPageReady}
               disabled={rows.length === 0}
             >
-              Select page-ready candidates
+              {ui("Select page-ready candidates")}
             </button>
             <button
               style={styles.secondaryButton}
@@ -2322,18 +2353,18 @@ export default function ProcurementRecommendationsPage() {
               onClick={clearBulkSelectionState}
               disabled={selectedProductIds.length === 0}
             >
-              Clear
+              {ui("Clear")}
             </button>
           </div>
         </div>
         <div style={styles.bulkGrid}>
           <StatCard
-            label="Selected"
-            value={formatNumber(selectedProductIds.length, 0)}
+            label={ui("Selected")}
+            value={formatUiNumber(selectedProductIds.length, 0)}
           />
           <StatCard
-            label="Ready to approve"
-            value={formatNumber(approvableSelectedCount, 0)}
+            label={ui("Ready to approve")}
+            value={formatUiNumber(approvableSelectedCount, 0)}
             tone={
               approvableSelectedCount === selectedProductIds.length &&
               selectedProductIds.length > 0
@@ -2344,8 +2375,8 @@ export default function ProcurementRecommendationsPage() {
             }
           />
           <StatCard
-            label="Approved for PO draft"
-            value={formatNumber(poConvertibleSelectedCount, 0)}
+            label={ui("Approved for PO draft")}
+            value={formatUiNumber(poConvertibleSelectedCount, 0)}
             tone={
               poConvertibleSelectedCount > 0 &&
               poConvertibleSelectedCount === selectedProductIds.length
@@ -2356,8 +2387,8 @@ export default function ProcurementRecommendationsPage() {
             }
           />
           <StatCard
-            label="Blocked selected"
-            value={formatNumber(
+            label={ui("Blocked selected")}
+            value={formatUiNumber(
               Math.max(0, selectedProductIds.length - approvableSelectedCount),
               0,
             )}
@@ -2369,28 +2400,28 @@ export default function ProcurementRecommendationsPage() {
           />
         </div>
         <label style={{ ...styles.label, marginTop: 12 }}>
-          Bulk decision note
+          {ui("Bulk decision note")}
           <textarea
             style={styles.textarea}
             value={bulkDecisionNote}
             onChange={(event) => setBulkDecisionNote(event.target.value)}
-            placeholder="Optional note applied to every selected recommendation"
+            placeholder={ui("Optional note applied to every selected recommendation")}
           />
         </label>
         {!canApproveRecommendations ? (
-          <div style={styles.infoBox}>Purchase order approval permission is required for bulk readiness, bulk approval, defer, and reject actions.</div>
+          <div style={styles.infoBox}>{ui("Purchase order approval permission is required for bulk readiness, bulk approval, defer, and reject actions.")}</div>
         ) : null}
         {!canCreatePurchaseOrderDrafts ? (
-          <div style={styles.infoBox}>Purchase order create permission is required to convert approved recommendations into PO drafts.</div>
+          <div style={styles.infoBox}>{ui("Purchase order create permission is required to convert approved recommendations into PO drafts.")}</div>
         ) : null}
         {bulkReadinessMutation.isError ? (
           <div style={styles.errorBox}>
-            {getErrorMessage(bulkReadinessMutation.error)}
+            {getErrorMessage(bulkReadinessMutation.error, ui)}
           </div>
         ) : null}
         {bulkDecisionMutation.isError ? (
           <div style={styles.errorBox}>
-            {getErrorMessage(bulkDecisionMutation.error)}
+            {getErrorMessage(bulkDecisionMutation.error, ui)}
           </div>
         ) : null}
         {bulkReadiness ? (
@@ -2401,26 +2432,17 @@ export default function ProcurementRecommendationsPage() {
                 : styles.errorBox
             }
           >
-            Readiness preview:{" "}
-            {formatNumber(bulkReadiness.summary.ready_count, 0)} ready,{" "}
-            {formatNumber(bulkReadiness.summary.blocked_count, 0)} blocked,{" "}
-            {formatNumber(bulkReadiness.summary.failed_count, 0)} failed,{" "}
-            {formatNumber(bulkReadiness.summary.warning_count, 0)} warnings ·
-            estimated spend{" "}
-            {formatMoneyBreakdown(
-              bulkReadiness.summary.estimated_total_cost_by_currency,
-              bulkReadiness.summary.estimated_total_cost,
-              bulkReadiness.summary.budget_currency,
-            )}.
+            {ui("Readiness preview: {ready} ready, {blocked} blocked, {failed} failed, {warnings} warnings · estimated spend {spend}.")
+              .replace("{ready}", formatUiNumber(bulkReadiness.summary.ready_count, 0))
+              .replace("{blocked}", formatUiNumber(bulkReadiness.summary.blocked_count, 0))
+              .replace("{failed}", formatUiNumber(bulkReadiness.summary.failed_count, 0))
+              .replace("{warnings}", formatUiNumber(bulkReadiness.summary.warning_count, 0))
+              .replace("{spend}", formatUiMoneyBreakdown(bulkReadiness.summary.estimated_total_cost_by_currency, bulkReadiness.summary.estimated_total_cost, bulkReadiness.summary.budget_currency))}
             {bulkReadiness.summary.budget_status &&
             bulkReadiness.summary.budget_status !== "not_configured" ? (
               <>
                 {" "}
-                Budget: {titleCase(bulkReadiness.summary.budget_status)} (
-                {formatMoney(
-                  bulkReadiness.summary.budget_variance,
-                  bulkReadiness.summary.budget_currency,
-                )} variance).
+                {ui("Budget: {status} ({variance} variance).").replace("{status}", canonicalDisplayLabel(bulkReadiness.summary.budget_status)).replace("{variance}", formatUiMoney(bulkReadiness.summary.budget_variance, bulkReadiness.summary.budget_currency))}
               </>
             ) : null}
             {bulkReadiness.results.some((row) => !row.can_approve) ? (
@@ -2433,7 +2455,7 @@ export default function ProcurementRecommendationsPage() {
                       {row.product_name || row.product_id}:{" "}
                       {(row.blockers || [])
                         .map((blocker) => blocker.message || blocker.code)
-                        .join("; ") || "Not approvable"}
+                        .join("; ") || ui("Not approvable")}
                     </li>
                   ))}
               </ul>
@@ -2442,41 +2464,34 @@ export default function ProcurementRecommendationsPage() {
         ) : null}
         {bulkDecisionMutation.data ? (
           <div style={styles.infoBox}>
-            Bulk decision complete:{" "}
-            {formatNumber(bulkDecisionMutation.data.decided_count, 0)} decided,{" "}
-            {formatNumber(bulkDecisionMutation.data.blocked_count, 0)} blocked,{" "}
-            {formatNumber(bulkDecisionMutation.data.failed_count, 0)} failed.
+            {ui("Bulk decision complete: {decided} decided, {blocked} blocked, {failed} failed.")
+              .replace("{decided}", formatUiNumber(bulkDecisionMutation.data.decided_count, 0))
+              .replace("{blocked}", formatUiNumber(bulkDecisionMutation.data.blocked_count, 0))
+              .replace("{failed}", formatUiNumber(bulkDecisionMutation.data.failed_count, 0))}
           </div>
         ) : null}
         {poDraftConversionMutation.isError ? (
           <div style={styles.errorBox}>
-            {getErrorMessage(poDraftConversionMutation.error)}
+            {getErrorMessage(poDraftConversionMutation.error, ui)}
           </div>
         ) : null}
         {poDraftConversionMutation.data ? (
           <div style={styles.infoBox}>
-            PO draft conversion complete:{" "}
-            {formatNumber(poDraftConversionMutation.data.converted_count, 0)}{" "}
-            recommendations converted into{" "}
-            {formatNumber(
-              poDraftConversionMutation.data.purchase_order_count,
-              0,
-            )}{" "}
-            draft PO(s).
+            {ui("PO draft conversion complete: {recommendations} recommendations converted into {orders} draft PO(s).")
+              .replace("{recommendations}", formatUiNumber(poDraftConversionMutation.data.converted_count, 0))
+              .replace("{orders}", formatUiNumber(poDraftConversionMutation.data.purchase_order_count, 0))}
             <ul style={styles.reasonList}>
               {poDraftConversionMutation.data.purchase_orders.map((po) => (
                 <li key={po.purchase_order_id} style={styles.conversionResultItem}>
                   <span>
-                    {po.po_number} · {po.supplier_name || "Supplier unavailable"} ·{" "}
-                    {formatNumber(po.item_count, 0)} item(s) ·{" "}
-                    {formatMoney(po.estimated_total_cost, po.currency)}
+                    {po.po_number} · {po.supplier_name || ui("Supplier unavailable")} · {ui("{count} item(s)").replace("{count}", formatUiNumber(po.item_count, 0))} · {formatUiMoney(po.estimated_total_cost, po.currency)}
                   </span>
                   <button
                     type="button"
                     style={styles.inlineActionButton}
                     onClick={() => navigate(buildPurchaseOrderUrl(po.purchase_order_id))}
                   >
-                    Open draft
+                    {ui("Open draft")}
                   </button>
                 </li>
               ))}
@@ -2498,7 +2513,7 @@ export default function ProcurementRecommendationsPage() {
               })
             }
           >
-            Preview approval readiness
+            {ui("Preview approval readiness")}
           </button>
           <button
             className="app-button app-button--primary"
@@ -2511,9 +2526,9 @@ export default function ProcurementRecommendationsPage() {
             }
             onClick={() =>
               requestConfirmation({
-                title: `Approve ${selectedProductIds.length} recommendation(s)?`,
-                message: "This records approval decisions only after the server rechecks every selected recommendation under transaction locks.",
-                confirmLabel: "Bulk approve",
+                title: ui("Approve {count} recommendation(s)?").replace("{count}", formatUiNumber(selectedProductIds.length, 0)),
+                message: ui("This records approval decisions only after the server rechecks every selected recommendation under transaction locks."),
+                confirmLabel: ui("Bulk approve"),
                 tone: "primary",
                 action: () =>
                   bulkDecisionMutation.mutate({
@@ -2524,7 +2539,7 @@ export default function ProcurementRecommendationsPage() {
               })
             }
           >
-            Bulk approve
+            {ui("Bulk approve")}
           </button>
           <button
             className="app-button app-button--primary"
@@ -2537,9 +2552,9 @@ export default function ProcurementRecommendationsPage() {
             }
             onClick={() =>
               requestConfirmation({
-                title: `Create purchase order draft(s) from ${selectedProductIds.length} approval(s)?`,
-                message: "The server rechecks approved supplier, quantity, cost, package, and threshold evidence under transaction locks before creating supplier-grouped purchase order drafts. Stock is not changed.",
-                confirmLabel: "Create PO drafts",
+                title: ui("Create purchase order draft(s) from {count} approval(s)?").replace("{count}", formatUiNumber(selectedProductIds.length, 0)),
+                message: ui("The server rechecks approved supplier, quantity, cost, package, and threshold evidence under transaction locks before creating supplier-grouped purchase order drafts. Stock is not changed."),
+                confirmLabel: ui("Create PO drafts"),
                 tone: "primary",
                 action: () =>
                   poDraftConversionMutation.mutate({
@@ -2548,7 +2563,7 @@ export default function ProcurementRecommendationsPage() {
               })
             }
           >
-            Create PO draft(s)
+            {ui("Create PO draft(s)")}
           </button>
           <button
             className="app-button app-button--secondary"
@@ -2565,7 +2580,7 @@ export default function ProcurementRecommendationsPage() {
               })
             }
           >
-            Bulk defer
+            {ui("Bulk defer")}
           </button>
           <button
             className="app-button app-button--danger"
@@ -2576,9 +2591,9 @@ export default function ProcurementRecommendationsPage() {
             }
             onClick={() =>
               requestConfirmation({
-                title: `Reject ${selectedProductIds.length} recommendation(s)?`,
-                message: "This records a rejection decision for every selected recommendation.",
-                confirmLabel: "Bulk reject",
+                title: ui("Reject {count} recommendation(s)?").replace("{count}", formatUiNumber(selectedProductIds.length, 0)),
+                message: ui("This records a rejection decision for every selected recommendation."),
+                confirmLabel: ui("Bulk reject"),
                 tone: "danger",
                 action: () =>
                   bulkDecisionMutation.mutate({
@@ -2589,7 +2604,7 @@ export default function ProcurementRecommendationsPage() {
               })
             }
           >
-            Bulk reject
+            {ui("Bulk reject")}
           </button>
         </div>
       </section>
@@ -2600,9 +2615,9 @@ export default function ProcurementRecommendationsPage() {
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
           <div>
-            <h2 style={styles.panelTitle}>Purchase order drafts</h2>
+            <h2 style={styles.panelTitle}>{ui("Purchase order drafts")}</h2>
             <p style={styles.panelSubtitle}>
-              Review purchase order drafts created from approved recommendations before they move through the normal purchase order lifecycle.
+              {ui("Review purchase order drafts created from approved recommendations before they move through the normal purchase order lifecycle.")}
             </p>
           </div>
           <div style={styles.actionGroup}>
@@ -2612,7 +2627,7 @@ export default function ProcurementRecommendationsPage() {
               disabled={!canViewGeneratedPurchaseOrderDrafts || toNumber(poDraftReviewQuery.data?.pagination.total) === 0 || exportPoDraftReviewMutation.isPending}
               onClick={() => exportPoDraftReviewMutation.mutate()}
             >
-              {exportPoDraftReviewMutation.isPending ? "Preparing export..." : "Export draft CSV"}
+              {exportPoDraftReviewMutation.isPending ? ui("Preparing export...") : ui("Export draft CSV")}
             </button>
             <button
               style={styles.secondaryButton}
@@ -2620,30 +2635,30 @@ export default function ProcurementRecommendationsPage() {
               disabled={!canViewGeneratedPurchaseOrderDrafts}
               onClick={() => void poDraftReviewQuery.refetch()}
             >
-              Refresh drafts
+              {ui("Refresh drafts")}
             </button>
           </div>
         </div>
         {!canViewGeneratedPurchaseOrderDrafts ? (
-          <div style={styles.infoBox}>Purchase order read permission is required to load recommendation-generated PO draft review data.</div>
+          <div style={styles.infoBox}>{ui("Purchase order read permission is required to load recommendation-generated PO draft review data.")}</div>
         ) : null}
         {poDraftReviewQuery.isLoading ? (
-          <div style={styles.infoBox}>Loading generated PO drafts...</div>
+          <div style={styles.infoBox}>{ui("Loading generated PO drafts...")}</div>
         ) : null}
         {poDraftReviewQuery.isError ? (
           <div style={styles.errorBox}>
-            {getErrorMessage(poDraftReviewQuery.error)}
+            {getErrorMessage(poDraftReviewQuery.error, ui)}
           </div>
         ) : null}
         {exportPoDraftReviewMutation.isError ? (
-          <div style={styles.errorBox}>PO draft export failed: {getErrorMessage(exportPoDraftReviewMutation.error)}</div>
+          <div style={styles.errorBox}>{ui("PO draft export failed: {error}").replace("{error}", getErrorMessage(exportPoDraftReviewMutation.error, ui))}</div>
         ) : null}
         {poDraftReviewQuery.data ? (
           <>
             <div style={styles.bulkGrid}>
               <StatCard
-                label="Loaded drafts"
-                value={formatNumber(
+                label={ui("Loaded drafts")}
+                value={formatUiNumber(
                   poDraftReviewQuery.data.summary.draft_count,
                   0,
                 )}
@@ -2654,15 +2669,15 @@ export default function ProcurementRecommendationsPage() {
                 }
               />
               <StatCard
-                label="Loaded submitted"
-                value={formatNumber(
+                label={ui("Loaded submitted")}
+                value={formatUiNumber(
                   poDraftReviewQuery.data.summary.submitted_count,
                   0,
                 )}
               />
               <StatCard
-                label="Loaded warnings"
-                value={formatNumber(
+                label={ui("Loaded warnings")}
+                value={formatUiNumber(
                   poDraftReviewQuery.data.summary.warning_count,
                   0,
                 )}
@@ -2673,8 +2688,8 @@ export default function ProcurementRecommendationsPage() {
                 }
               />
               <StatCard
-                label="Loaded spend"
-                value={formatMoneyBreakdown(
+                label={ui("Loaded spend")}
+                value={formatUiMoneyBreakdown(
                   poDraftReviewQuery.data.summary.estimated_total_cost_by_currency,
                   poDraftReviewQuery.data.summary.estimated_total_cost,
                 )}
@@ -2682,21 +2697,21 @@ export default function ProcurementRecommendationsPage() {
             </div>
             {toNumber(poDraftReviewQuery.data.summary.warning_count) > 0 ? (
               <div style={styles.commercialWarningBox}>
-                <strong>Commercial review required:</strong> one or more generated PO drafts have missing or zero item costs. Open the draft in Purchase Orders, edit the draft line costs, then submit or approve it from the normal PO lifecycle.
+                {ui("Commercial review required: one or more generated PO drafts have missing or zero item costs. Open the draft in Purchase Orders, edit the draft line costs, then submit or approve it from the normal PO lifecycle.")}
               </div>
             ) : null}
             <div style={{ ...styles.tableWrap, marginTop: 12 }}>
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>PO draft</th>
-                    <th style={styles.th}>Supplier</th>
-                    <th style={styles.th}>Status</th>
-                    <th style={styles.th}>Items</th>
-                    <th style={styles.th}>Estimated spend</th>
-                    <th style={styles.th}>Source link</th>
-                    <th style={styles.th}>Warnings</th>
-                    <th style={styles.th}>Action</th>
+                    <th style={styles.th}>{ui("PO draft")}</th>
+                    <th style={styles.th}>{ui("Supplier")}</th>
+                    <th style={styles.th}>{ui("Status")}</th>
+                    <th style={styles.th}>{ui("Items")}</th>
+                    <th style={styles.th}>{ui("Estimated spend")}</th>
+                    <th style={styles.th}>{ui("Source link")}</th>
+                    <th style={styles.th}>{ui("Warnings")}</th>
+                    <th style={styles.th}>{ui("Action")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2705,13 +2720,10 @@ export default function ProcurementRecommendationsPage() {
                       <td style={styles.td}>
                         <div style={styles.primaryText}>{po.po_number}</div>
                         <div style={styles.mutedText}>
-                          Created{" "}
-                          {po.created_at
-                            ? new Date(po.created_at).toLocaleString()
-                            : "-"}
+                          {ui("Created {date}").replace("{date}", formatUiDateTime(po.created_at))}
                         </div>
                         <div style={styles.mutedText}>
-                          Expected {po.expected_delivery_date || "not set"}
+                          {ui("Expected {date}").replace("{date}", po.expected_delivery_date ? formatUiDate(po.expected_delivery_date) : ui("Not set"))}
                         </div>
                       </td>
                       <td style={styles.td}>
@@ -2727,13 +2739,13 @@ export default function ProcurementRecommendationsPage() {
                                 : "good"
                           }
                         >
-                          {poDraftReviewLabel(po)}
+                          {hasPoDraftCostWarning(po) && po.status === "draft" ? ui("Needs cost review") : canonicalDisplayLabel(po.review_status || po.status)}
                         </Badge>
                       </td>
                       <td style={styles.td}>
-                        <div>{formatNumber(po.item_count, 0)} item(s)</div>
+                        <div>{ui("{count} item(s)").replace("{count}", formatUiNumber(po.item_count, 0))}</div>
                         <div style={styles.mutedText}>
-                          Qty {formatNumber(po.total_quantity)}
+                          {ui("Qty {quantity}").replace("{quantity}", formatUiNumber(po.total_quantity))}
                         </div>
                         <ul style={styles.reasonList}>
                           {po.items.slice(0, 3).map((item) => (
@@ -2741,17 +2753,17 @@ export default function ProcurementRecommendationsPage() {
                               key={`${po.purchase_order_id}-${item.product_id}`}
                             >
                               {item.product_name || item.product_id}:{" "}
-                              {formatNumber(item.quantity)} @{" "}
-                              {formatMoney(item.unit_cost, po.currency)}
+                              {formatUiNumber(item.quantity)} @{" "}
+                              {formatUiMoney(item.unit_cost, po.currency)}
                             </li>
                           ))}
                           {po.items.length > 3 ? (
-                            <li>+{po.items.length - 3} more</li>
+                            <li>{ui("+{count} more").replace("{count}", formatUiNumber(po.items.length - 3, 0))}</li>
                           ) : null}
                         </ul>
                       </td>
                       <td style={styles.td}>
-                        {formatMoney(po.estimated_total_cost, po.currency)}
+                        {formatUiMoney(po.estimated_total_cost, po.currency)}
                       </td>
                       <td style={styles.td}>
                         <Badge
@@ -2764,13 +2776,14 @@ export default function ProcurementRecommendationsPage() {
                             : "Needs review"}
                         </Badge>
                         <div style={styles.mutedText}>
-                          {formatNumber(po.linked_recommendation_count, 0)} /{" "}
-                          {formatNumber(po.item_count, 0)} linked
+                          {ui("{linked} / {total} linked")
+                            .replace("{linked}", formatUiNumber(po.linked_recommendation_count, 0))
+                            .replace("{total}", formatUiNumber(po.item_count, 0))}
                         </div>
                       </td>
                       <td style={styles.td}>
                         {po.governance_warnings.length === 0 ? (
-                          <Badge tone="good">Clear</Badge>
+                          <Badge tone="good">{ui("Clear")}</Badge>
                         ) : (
                           <ul style={styles.reasonList}>
                             {po.governance_warnings.map((warning) => (
@@ -2789,10 +2802,10 @@ export default function ProcurementRecommendationsPage() {
                           style={styles.primaryButton}
                           onClick={() => navigate(buildPurchaseOrderUrl(po.purchase_order_id))}
                         >
-                          Open purchase order
+                          {ui("Open purchase order")}
                         </button>
                         {hasPoDraftCostWarning(po) ? (
-                          <div style={styles.blockerText}>Enter positive item costs in Purchase Orders before submitting this draft.</div>
+                          <div style={styles.blockerText}>{ui("Enter positive item costs in Purchase Orders before submitting this draft.")}</div>
                         ) : null}
                       </td>
                     </tr>
@@ -2800,7 +2813,7 @@ export default function ProcurementRecommendationsPage() {
                   {poDraftReviewQuery.data.rows.length === 0 ? (
                     <tr>
                       <td style={styles.emptyCell} colSpan={8}>
-                        No recommendation-generated PO drafts found.
+                        {ui("No recommendation-generated PO drafts found.")}
                       </td>
                     </tr>
                   ) : null}
@@ -2809,7 +2822,10 @@ export default function ProcurementRecommendationsPage() {
             </div>
             <div style={styles.paginationFooter}>
               <span style={styles.mutedText}>
-                Showing {poDraftReviewQuery.data.rows.length ? poDraftOffset + 1 : 0}–{poDraftOffset + poDraftReviewQuery.data.rows.length} of {formatNumber(poDraftReviewQuery.data.pagination.total, 0)} generated purchase order(s)
+                {ui("Showing {start}–{end} of {total} generated purchase order(s)")
+                  .replace("{start}", formatUiNumber(poDraftReviewQuery.data.rows.length ? poDraftOffset + 1 : 0, 0))
+                  .replace("{end}", formatUiNumber(poDraftOffset + poDraftReviewQuery.data.rows.length, 0))
+                  .replace("{total}", formatUiNumber(poDraftReviewQuery.data.pagination.total, 0))}
               </span>
               <div style={styles.paginationControls}>
                 <button
@@ -2818,7 +2834,7 @@ export default function ProcurementRecommendationsPage() {
                   disabled={poDraftOffset === 0 || poDraftReviewQuery.isFetching}
                   onClick={() => setPoDraftOffset(Math.max(0, poDraftOffset - poDraftLimit))}
                 >
-                  Previous
+                  {ui("Previous")}
                 </button>
                 <button
                   type="button"
@@ -2826,7 +2842,7 @@ export default function ProcurementRecommendationsPage() {
                   disabled={!poDraftReviewQuery.data.pagination.has_more || poDraftReviewQuery.isFetching}
                   onClick={() => setPoDraftOffset(poDraftOffset + poDraftLimit)}
                 >
-                  Next
+                  {ui("Next")}
                 </button>
               </div>
             </div>
@@ -2840,9 +2856,9 @@ export default function ProcurementRecommendationsPage() {
       <section style={styles.detailPanel}>
         <div style={styles.panelHeader}>
           <div>
-            <h2 style={styles.panelTitle}>Recommendation detail</h2>
+            <h2 style={styles.panelTitle}>{ui("Recommendation detail")}</h2>
             <p style={styles.panelSubtitle}>
-              Review the selected product's stock need, supplier evidence, cost, and approval readiness.
+              {ui("Review the selected product's stock need, supplier evidence, cost, and approval readiness.")}
             </p>
           </div>
           {selectedProductId ? (
@@ -2861,14 +2877,14 @@ export default function ProcurementRecommendationsPage() {
                     : undefined
                 }
               >
-                Export detail CSV
+                {ui("Export detail CSV")}
               </button>
               <button
                 style={styles.secondaryButton}
                 type="button"
                 onClick={() => setSelectedProductId(null)}
               >
-                Close
+                {ui("Close")}
               </button>
             </div>
           ) : null}
@@ -2876,34 +2892,34 @@ export default function ProcurementRecommendationsPage() {
 
         {!selectedProductId ? (
           <div style={styles.infoBox}>
-            Select “Review” on a recommendation row to see the full buying evidence and available actions.
+            {ui("Select “Review” on a recommendation row to see the full buying evidence and available actions.")}
           </div>
         ) : null}
         {selectedProductId && detailQuery.isLoading ? (
-          <div style={styles.infoBox}>Loading recommendation detail...</div>
+          <div style={styles.infoBox}>{ui("Loading recommendation detail...")}</div>
         ) : null}
         {selectedProductId && detailQuery.isError ? (
           <div style={styles.errorBox}>
-            {getErrorMessage(detailQuery.error)}
+            {getErrorMessage(detailQuery.error, ui)}
           </div>
         ) : null}
 
         {selectedDetail ? (
           <div style={styles.detailGrid}>
             <div style={styles.detailCard}>
-              <div style={styles.statLabel}>Product</div>
+              <div style={styles.statLabel}>{ui("Product")}</div>
               <h3 style={styles.detailTitle}>{selectedDetail.product_name}</h3>
               <p style={styles.riskText}>
-                {selectedDetail.category || "Uncategorized"} ·{" "}
-                {selectedDetail.unit || "unit"} ·{" "}
-                {titleCase(selectedDetail.source_signal)}
+                {selectedDetail.category || ui("Uncategorized")} ·{" "}
+                {selectedDetail.unit || ui("unit")} ·{" "}
+                {canonicalDisplayLabel(selectedDetail.source_signal)}
               </p>
               <Badge tone={selectedDetail.procurement_ready ? "good" : "bad"}>
-                {selectedDetail.procurement_ready ? "Supplier assigned" : "Supplier missing"}
+                {selectedDetail.procurement_ready ? ui("Supplier assigned") : ui("Supplier missing")}
               </Badge>
               <p style={styles.riskText}>
-                Execution scope:{" "}
-                {titleCase(
+                {ui("Execution scope:")}{" "}
+                {canonicalDisplayLabel(
                   selectedDetail.detail?.execution_scope ||
                     "product_replenishment",
                 )}
@@ -2911,76 +2927,76 @@ export default function ProcurementRecommendationsPage() {
             </div>
 
             <div style={styles.detailCard}>
-              <div style={styles.statLabel}>Depletion reasoning</div>
+              <div style={styles.statLabel}>{ui("Depletion reasoning")}</div>
               <div style={styles.metricLine}>
-                <strong>ADU:</strong>{" "}
-                {formatNumber(selectedDetail.average_daily_usage)}{" "}
-                {selectedDetail.unit || ""}/day
+                <strong>{ui("ADU:")}</strong>{" "}
+                {ui("{value} {unit}/day")
+                  .replace("{value}", formatUiNumber(selectedDetail.average_daily_usage))
+                  .replace("{unit}", selectedDetail.unit || ui("unit"))}
               </div>
               <div style={styles.metricLine}>
-                <strong>Coverage:</strong>{" "}
+                <strong>{ui("Coverage:")}</strong>{" "}
                 {selectedDetail.estimated_days_of_coverage === null
-                  ? "No usage signal"
-                  : `${formatNumber(selectedDetail.estimated_days_of_coverage)} days`}
+                  ? ui("No usage signal")
+                  : ui("{count} days").replace("{count}", formatUiNumber(selectedDetail.estimated_days_of_coverage))}
               </div>
               <div style={styles.metricLine}>
-                <strong>Projected depletion:</strong>{" "}
-                {selectedDetail.projected_depletion_date || "-"}
+                <strong>{ui("Projected depletion:")}</strong>{" "}
+                {formatUiDate(selectedDetail.projected_depletion_date)}
               </div>
               <div style={styles.metricLine}>
-                <strong>Lead time + buffer:</strong>{" "}
+                <strong>{ui("Lead time + buffer:")}</strong>{" "}
                 {selectedDetail.lead_time_configured === false
-                  ? `Missing lead time · effective ${formatNumber(
-                      toNumber(selectedDetail.effective_lead_time_days),
-                      0,
-                    )} + buffer ${formatNumber(
-                      toNumber(selectedDetail.lead_time_buffer_days ?? detailQuery.data?.lead_time_buffer_days),
-                      0,
-                    )} day(s)`
-                  : `${formatNumber(
-                      toNumber(selectedDetail.lead_time_days) +
-                        toNumber(selectedDetail.lead_time_buffer_days ?? detailQuery.data?.lead_time_buffer_days),
-                      0,
-                    )} days`}
+                  ? ui("Missing lead time · effective {effective} + buffer {buffer} day(s)")
+                      .replace("{effective}", formatUiNumber(toNumber(selectedDetail.effective_lead_time_days), 0))
+                      .replace("{buffer}", formatUiNumber(toNumber(selectedDetail.lead_time_buffer_days ?? detailQuery.data?.lead_time_buffer_days), 0))
+                  : ui("{count} days").replace(
+                      "{count}",
+                      formatUiNumber(
+                        toNumber(selectedDetail.lead_time_days) +
+                          toNumber(selectedDetail.lead_time_buffer_days ?? detailQuery.data?.lead_time_buffer_days),
+                        0,
+                      ),
+                    )}
               </div>
             </div>
 
             <div style={styles.detailCard}>
-              <div style={styles.statLabel}>Threshold and supply position</div>
-              <div style={styles.metricLine}><strong>Current stock:</strong> {formatNumber(selectedDetail.current_quantity)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>Current product minimum:</strong> {formatNumber(selectedDetail.product_min_stock ?? selectedDetail.min_stock)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>Calculated threshold:</strong> {formatNumber(selectedDetail.system_recommended_min_stock ?? selectedDetail.calculated_min_stock)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>Governed threshold:</strong> {formatNumber(selectedDetail.governed_min_stock ?? selectedDetail.min_stock)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>Threshold evidence:</strong> {formatNumber(toNumber(selectedDetail.min_stock_confidence_score) * 100, 0)}% · {titleCase(selectedDetail.min_stock_recommendation_status)}</div>
-              <div style={styles.metricLine}><strong>Gross open inbound:</strong> {formatNumber(selectedDetail.gross_open_inbound_quantity)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>Reliable inbound counted:</strong> {formatNumber(selectedDetail.reliable_open_inbound_quantity)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>At-risk inbound excluded:</strong> {formatNumber(selectedDetail.at_risk_open_inbound_quantity)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>Inventory position:</strong> {formatNumber(selectedDetail.current_inventory_position)} {selectedDetail.unit || ""}</div>
+              <div style={styles.statLabel}>{ui("Threshold and supply position")}</div>
+              <div style={styles.metricLine}><strong>{ui("Current stock:")}</strong> {formatUiNumber(selectedDetail.current_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>{ui("Current product minimum:")}</strong> {formatUiNumber(selectedDetail.product_min_stock ?? selectedDetail.min_stock)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>{ui("Calculated threshold:")}</strong> {formatUiNumber(selectedDetail.system_recommended_min_stock ?? selectedDetail.calculated_min_stock)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>{ui("Governed threshold:")}</strong> {formatUiNumber(selectedDetail.governed_min_stock ?? selectedDetail.min_stock)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>{ui("Threshold evidence:")}</strong> {formatUiNumber(toNumber(selectedDetail.min_stock_confidence_score) * 100, 0)}% · {canonicalDisplayLabel(selectedDetail.min_stock_recommendation_status)}</div>
+              <div style={styles.metricLine}><strong>{ui("Gross open inbound:")}</strong> {formatUiNumber(selectedDetail.gross_open_inbound_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>{ui("Reliable inbound counted:")}</strong> {formatUiNumber(selectedDetail.reliable_open_inbound_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>{ui("At-risk inbound excluded:")}</strong> {formatUiNumber(selectedDetail.at_risk_open_inbound_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>{ui("Inventory position:")}</strong> {formatUiNumber(selectedDetail.current_inventory_position)} {selectedDetail.unit || ""}</div>
             </div>
 
             <div style={styles.detailCard}>
-              <div style={styles.statLabel}>Separate reorder plan</div>
-              <div style={styles.metricLine}><strong>Target coverage:</strong> {formatNumber(selectedDetail.target_coverage_days ?? detailQuery.data?.target_coverage_days, 0)} days</div>
-              <div style={styles.metricLine}><strong>Target stock:</strong> {formatNumber(selectedDetail.target_stock_quantity)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>Need before MOQ:</strong> {formatNumber(selectedDetail.base_reorder_quantity)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>MOQ-adjusted need:</strong> {formatNumber(selectedDetail.moq_adjusted_reorder_quantity)} {selectedDetail.unit || ""}</div>
-              <div style={styles.metricLine}><strong>Recommended order:</strong> {formatNumber(selectedDetail.recommended_reorder_quantity)} {selectedDetail.unit || ""}</div>
-              <p style={styles.riskText}>Package size and MOQ affect this order quantity only; they do not inflate the minimum-stock threshold.</p>
+              <div style={styles.statLabel}>{ui("Separate reorder plan")}</div>
+              <div style={styles.metricLine}><strong>{ui("Target coverage:")}</strong> {ui("{count} days").replace("{count}", formatUiNumber(selectedDetail.target_coverage_days ?? detailQuery.data?.target_coverage_days, 0))}</div>
+              <div style={styles.metricLine}><strong>{ui("Target stock:")}</strong> {formatUiNumber(selectedDetail.target_stock_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>{ui("Need before MOQ:")}</strong> {formatUiNumber(selectedDetail.base_reorder_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>{ui("MOQ-adjusted need:")}</strong> {formatUiNumber(selectedDetail.moq_adjusted_reorder_quantity)} {selectedDetail.unit || ""}</div>
+              <div style={styles.metricLine}><strong>{ui("Recommended order:")}</strong> {formatUiNumber(selectedDetail.recommended_reorder_quantity)} {selectedDetail.unit || ""}</div>
+              <p style={styles.riskText}>{ui("Package size and MOQ affect this order quantity only; they do not inflate the minimum-stock threshold.")}</p>
             </div>
 
             <div style={styles.detailCard}>
-              <div style={styles.statLabel}>Budget governance</div>
+              <div style={styles.statLabel}>{ui("Budget governance")}</div>
               <div style={styles.metricLine}>
-                <strong>Status:</strong>{" "}
-                {titleCase(selectedDetail.budget_status || "not_configured")}
+                <strong>{ui("Status:")}</strong>{" "}
+                {canonicalDisplayLabel(selectedDetail.budget_status || "not_configured")}
               </div>
               <div style={styles.metricLine}>
-                <strong>Limit:</strong>{" "}
-                {formatMoney(selectedDetail.budget_limit, selectedDetail.budget_currency)}
+                <strong>{ui("Limit:")}</strong>{" "}
+                {formatUiMoney(selectedDetail.budget_limit, selectedDetail.budget_currency)}
               </div>
               <div style={styles.metricLine}>
-                <strong>Remaining:</strong>{" "}
-                {formatMoney(
+                <strong>{ui("Remaining:")}</strong>{" "}
+                {formatUiMoney(
                   selectedDetail.budget_remaining_after_recommendation,
                   selectedDetail.budget_currency,
                 )}
@@ -2993,31 +3009,31 @@ export default function ProcurementRecommendationsPage() {
             </div>
 
             <div style={styles.detailCard}>
-              <div style={styles.statLabel}>Supplier reasoning</div>
+              <div style={styles.statLabel}>{ui("Supplier reasoning")}</div>
               <div style={styles.metricLine}>
-                <strong>Supplier:</strong>{" "}
+                <strong>{ui("Supplier:")}</strong>{" "}
                 {selectedDetail.recommended_supplier_name || "-"}
               </div>
               <div style={styles.metricLine}>
-                <strong>Confidence:</strong>{" "}
-                {titleCase(selectedDetail.supplier_selection_confidence)}
+                <strong>{ui("Confidence:")}</strong>{" "}
+                {canonicalDisplayLabel(selectedDetail.supplier_selection_confidence)}
               </div>
               <div style={styles.metricLine}>
-                <strong>Reason:</strong>{" "}
-                {titleCase(selectedDetail.supplier_selection_reason)}
+                <strong>{ui("Reason:")}</strong>{" "}
+                {canonicalDisplayLabel(selectedDetail.supplier_selection_reason)}
               </div>
               <div style={styles.metricLine}>
-                <strong>Performance:</strong>{" "}
-                {titleCase(selectedDetail.supplier_performance_status)}{" "}
+                <strong>{ui("Performance:")}</strong>{" "}
+                {canonicalDisplayLabel(selectedDetail.supplier_performance_status)}{" "}
                 {selectedDetail.supplier_performance_score !== null &&
                 selectedDetail.supplier_performance_score !== undefined
-                  ? `· ${formatNumber(selectedDetail.supplier_performance_score, 0)}`
+                  ? `· ${formatUiNumber(selectedDetail.supplier_performance_score, 0)}`
                   : ""}
               </div>
               <div style={styles.metricLine}>
-                <strong>Last purchase:</strong>{" "}
-                {selectedDetail.last_purchase_date || "-"} ·{" "}
-                {formatMoney(
+                <strong>{ui("Last purchase:")}</strong>{" "}
+                {formatUiDate(selectedDetail.last_purchase_date)} ·{" "}
+                {formatUiMoney(
                   selectedDetail.last_purchase_unit_cost,
                   selectedDetail.last_purchase_currency ||
                     selectedDetail.currency,
@@ -3026,71 +3042,71 @@ export default function ProcurementRecommendationsPage() {
             </div>
 
             <div style={styles.detailCardWide}>
-              <div style={styles.statLabel}>Approval decision</div>
+              <div style={styles.statLabel}>{ui("Approval decision")}</div>
               <div style={styles.metricLine}>
-                <strong>Status:</strong>{" "}
-                {titleCase(selectedDetail.decision_status || "pending")}
+                <strong>{ui("Status:")}</strong>{" "}
+                {canonicalDisplayLabel(selectedDetail.decision_status || "pending")}
               </div>
               {selectedDetail.decided_at ? (
                 <div style={styles.metricLine}>
-                  <strong>Decided:</strong>{" "}
-                  {new Date(selectedDetail.decided_at).toLocaleString()}
+                  <strong>{ui("Decided:")}</strong>{" "}
+                  {formatUiDateTime(selectedDetail.decided_at)}
                 </div>
               ) : null}
               {selectedDetail.decision_note ? (
                 <div style={styles.metricLine}>
-                  <strong>Last note:</strong> {selectedDetail.decision_note}
+                  <strong>{ui("Last note:")}</strong> {selectedDetail.decision_note}
                 </div>
               ) : null}
               {selectedDetail.converted_purchase_order_id ? (
                 <div style={styles.metricLine}>
-                  <strong>PO draft:</strong>{" "}
+                  <strong>{ui("PO draft:")}</strong>{" "}
                   <button
                     type="button"
                     style={styles.linkButton}
                     onClick={() => navigate(buildPurchaseOrderUrl(selectedDetail.converted_purchase_order_id as string))}
                   >
-                    Open in Purchase Orders
+                    {ui("Open in Purchase Orders")}
                   </button>
                   {selectedDetail.converted_at
-                    ? ` · ${new Date(selectedDetail.converted_at).toLocaleString()}`
+                    ? ` · ${formatUiDateTime(selectedDetail.converted_at)}`
                     : ""}
                 </div>
               ) : null}
               {selectedDetail.previous_converted_purchase_order_id ? (
                 <div style={styles.infoBox}>
-                  <strong>Previous procurement cycle:</strong>{" "}
+                  <strong>{ui("Previous procurement cycle:")}</strong>{" "}
                   <button
                     type="button"
                     style={styles.linkButton}
                     onClick={() => navigate(buildPurchaseOrderUrl(selectedDetail.previous_converted_purchase_order_id as string))}
                   >
-                    Open previous purchase order
+                    {ui("Open previous purchase order")}
                   </button>
                   {selectedDetail.previous_converted_purchase_order_status
-                    ? ` · ${titleCase(selectedDetail.previous_converted_purchase_order_status)}`
+                    ? ` · ${canonicalDisplayLabel(selectedDetail.previous_converted_purchase_order_status)}`
                     : ""}
                   <div style={styles.mutedText}>
-                    That purchase order is closed. The current stock need is a new recommendation cycle and requires a new decision.
+                    {ui("That purchase order is closed. The current stock need is a new recommendation cycle and requires a new decision.")}
                   </div>
                 </div>
               ) : null}
               <label style={{ ...styles.label, marginTop: 10 }}>
-                Decision note
+                {ui("Decision note")}
                 <textarea
                   style={styles.textarea}
                   value={decisionNote}
                   onChange={(event) => setDecisionNote(event.target.value)}
-                  placeholder="Optional approval, rejection, or defer note"
+                  placeholder={ui("Optional approval, rejection, or defer note")}
                   disabled={!canApproveRecommendations || Boolean(selectedDetail.detail?.current_conversion_open)}
                 />
               </label>
               {!canApproveRecommendations ? (
-                <div style={styles.infoBox}>Purchase order approval permission is required to approve, defer, or reject this recommendation.</div>
+                <div style={styles.infoBox}>{ui("Purchase order approval permission is required to approve, defer, or reject this recommendation.")}</div>
               ) : null}
               {decisionMutation.isError ? (
                 <div style={styles.errorBox}>
-                  {getErrorMessage(decisionMutation.error)}
+                  {getErrorMessage(decisionMutation.error, ui)}
                 </div>
               ) : null}
               <div style={styles.actionRow}>
@@ -3104,9 +3120,9 @@ export default function ProcurementRecommendationsPage() {
                   }
                   onClick={() =>
                     requestConfirmation({
-                      title: "Approve recommendation?",
-                      message: "The server rechecks approval readiness under a transaction lock, then records the current commercial snapshot. Purchase order creation remains a separate action.",
-                      confirmLabel: "Approve",
+                      title: ui("Approve recommendation?"),
+                      message: ui("The server rechecks approval readiness under a transaction lock, then records the current commercial snapshot. Purchase order creation remains a separate action."),
+                      confirmLabel: ui("Approve"),
                       tone: "primary",
                       action: () =>
                         decisionMutation.mutate({
@@ -3117,7 +3133,7 @@ export default function ProcurementRecommendationsPage() {
                     })
                   }
                 >
-                  Approve
+                  {ui("Approve")}
                 </button>
                 <button
                   style={styles.secondaryButton}
@@ -3131,7 +3147,7 @@ export default function ProcurementRecommendationsPage() {
                     })
                   }
                 >
-                  Defer
+                  {ui("Defer")}
                 </button>
                 <button
                   style={styles.dangerButton}
@@ -3139,9 +3155,9 @@ export default function ProcurementRecommendationsPage() {
                   disabled={!canApproveRecommendations || Boolean(selectedDetail.detail?.current_conversion_open) || decisionMutation.isPending}
                   onClick={() =>
                     requestConfirmation({
-                      title: "Reject recommendation?",
-                      message: "This records a rejection decision for the current recommendation evidence.",
-                      confirmLabel: "Reject",
+                      title: ui("Reject recommendation?"),
+                      message: ui("This records a rejection decision for the current recommendation evidence."),
+                      confirmLabel: ui("Reject"),
                       tone: "danger",
                       action: () =>
                         decisionMutation.mutate({
@@ -3152,18 +3168,18 @@ export default function ProcurementRecommendationsPage() {
                     })
                   }
                 >
-                  Reject
+                  {ui("Reject")}
                 </button>
               </div>
               {!selectedDetail.detail?.can_enter_approval_review ? (
                 <p style={styles.blockerText}>
-                  Approval is blocked until the current recommendation passes all row-level readiness checks. Review the blockers below.
+                  {ui("Approval is blocked until the current recommendation passes all row-level readiness checks. Review the blockers below.")}
                 </p>
               ) : null}
             </div>
 
             <div style={styles.detailCardWide}>
-              <div style={styles.statLabel}>Recommendation explanation</div>
+              <div style={styles.statLabel}>{ui("Recommendation explanation")}</div>
               <ul style={styles.reasonList}>
                 {(selectedDetail.detail?.reasoning || []).map((reason) => (
                   <li key={reason}>{reason}</li>
@@ -3185,53 +3201,53 @@ export default function ProcurementRecommendationsPage() {
             </div>
 
             <div style={styles.detailCard}>
-              <div style={styles.statLabel}>Cost and conversion</div>
+              <div style={styles.statLabel}>{ui("Cost and conversion")}</div>
               <div style={styles.metricLine}>
-                <strong>Unit cost:</strong>{" "}
-                {formatMoney(
+                <strong>{ui("Unit cost:")}</strong>{" "}
+                {formatUiMoney(
                   selectedDetail.estimated_unit_cost,
                   selectedDetail.currency,
                 )}
               </div>
               <div style={styles.metricLine}>
-                <strong>Total cost:</strong>{" "}
-                {formatMoney(
+                <strong>{ui("Total cost:")}</strong>{" "}
+                {formatUiMoney(
                   selectedDetail.estimated_total_cost,
                   selectedDetail.currency,
                 )}
               </div>
               <div style={styles.metricLine}>
-                <strong>MOQ:</strong>{" "}
-                {formatNumber(selectedDetail.min_order_quantity)}{" "}
+                <strong>{ui("MOQ:")}</strong>{" "}
+                {formatUiNumber(selectedDetail.min_order_quantity)}{" "}
                 {selectedDetail.unit || ""}
               </div>
               <div style={styles.metricLine}>
-                <strong>Order package:</strong>{" "}
-                {selectedDetail.order_package_name || "Base unit"}
+                <strong>{ui("Order package:")}</strong>{" "}
+                {selectedDetail.order_package_name || ui("Base unit")}
               </div>
               <div style={styles.metricLine}>
-                <strong>Package count:</strong>{" "}
-                {formatNumber(
+                <strong>{ui("Package count:")}</strong>{" "}
+                {formatUiNumber(
                   selectedDetail.recommended_order_package_count,
                   0,
                 )}{" "}
-                × {formatNumber(selectedDetail.units_per_order_package || 1)}{" "}
-                {selectedDetail.unit || "unit(s)"}
+                × {formatUiNumber(selectedDetail.units_per_order_package || 1)}{" "}
+                {selectedDetail.unit || ui("unit(s)")}
               </div>
               {selectedDetail.package_rounding_applied ? (
                 <div style={styles.metricLine}>
-                  <strong>Package rounding:</strong> +
-                  {formatNumber(selectedDetail.package_rounding_added_quantity)}{" "}
+                  <strong>{ui("Package rounding:")}</strong> +
+                  {formatUiNumber(selectedDetail.package_rounding_added_quantity)}{" "}
                   {selectedDetail.unit || ""}
                 </div>
               ) : null}
               <div style={styles.metricLine}>
-                <strong>Approval readiness:</strong>{" "}
-                {selectedDetail.detail?.can_enter_approval_review ? "Ready" : "Blocked"}
+                <strong>{ui("Approval readiness:")}</strong>{" "}
+                {selectedDetail.detail?.can_enter_approval_review ? ui("Ready") : ui("Blocked")}
               </div>
               <div style={styles.metricLine}>
-                <strong>Approved and eligible for PO-draft conversion:</strong>{" "}
-                {selectedDetail.detail?.can_generate_po_draft ? "Yes" : "No"}
+                <strong>{ui("Approved and eligible for PO-draft conversion:")}</strong>{" "}
+                {selectedDetail.detail?.can_generate_po_draft ? ui("Yes") : ui("No")}
               </div>
             </div>
           </div>
@@ -3243,9 +3259,9 @@ export default function ProcurementRecommendationsPage() {
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
           <div>
-            <h2 style={styles.panelTitle}>Priority review</h2>
+            <h2 style={styles.panelTitle}>{ui("Priority review")}</h2>
             <p style={styles.panelSubtitle}>
-              The most urgent recommendations in the current queue, summarized for quick review.
+              {ui("The most urgent recommendations in the current queue, summarized for quick review.")}
             </p>
           </div>
         </div>
@@ -3255,36 +3271,35 @@ export default function ProcurementRecommendationsPage() {
               <div style={styles.riskCardHeader}>
                 <strong>{row.product_name}</strong>
                 <Badge tone={row.urgency === "critical" ? "bad" : "warn"}>
-                  {titleCase(row.urgency)}
+                  {canonicalDisplayLabel(row.urgency)}
                 </Badge>
               </div>
               <p style={styles.riskText}>
                 {row.estimated_days_of_coverage === null
-                  ? "Coverage cannot be projected."
-                  : `${formatNumber(row.estimated_days_of_coverage)} days of coverage remain.`}
+                  ? ui("Coverage cannot be projected.")
+                  : ui("{count} days of coverage remain.").replace("{count}", formatUiNumber(row.estimated_days_of_coverage))}
               </p>
               <p style={styles.riskText}>
-                Recommend {formatNumber(row.recommended_reorder_quantity)}{" "}
-                {row.unit || "units"} from{" "}
-                {row.recommended_supplier_name || "unassigned supplier"}.
+                {ui("Recommend {quantity} {unit} from {supplier}.")
+                  .replace("{quantity}", formatUiNumber(row.recommended_reorder_quantity))
+                  .replace("{unit}", row.unit || ui("units"))
+                  .replace("{supplier}", row.recommended_supplier_name || ui("unassigned supplier"))}
               </p>
               <p style={styles.riskText}>
-                Supplier confidence:{" "}
-                {titleCase(row.supplier_selection_confidence || "unknown")} ·{" "}
-                {titleCase(row.supplier_performance_status || "unknown")}.
+                {ui("Supplier confidence: {confidence} · {performance}.")
+                  .replace("{confidence}", canonicalDisplayLabel(row.supplier_selection_confidence || "unknown"))
+                  .replace("{performance}", canonicalDisplayLabel(row.supplier_performance_status || "unknown"))}
               </p>
               {row.package_rounding_applied ? (
                 <p style={styles.riskText}>
-                  Package governance rounded the order to{" "}
-                  {formatNumber(row.recommended_order_package_count, 0)}{" "}
-                  pack(s).
+                  {ui("Package governance rounded the order to {count} pack(s).").replace("{count}", formatUiNumber(row.recommended_order_package_count, 0))}
                 </p>
               ) : null}
             </article>
           ))}
           {!recommendationsQuery.isLoading && highestRiskRows.length === 0 ? (
             <div style={styles.infoBox}>
-              No active high-risk recommendations to summarize.
+              {ui("No active high-risk recommendations to summarize.")}
             </div>
           ) : null}
         </div>
@@ -3297,42 +3312,39 @@ export default function ProcurementRecommendationsPage() {
         onToggle={(event) => setGovernanceOpen(event.currentTarget.open)}
       >
         <summary style={styles.governanceSummary}>
-          <span>Advanced procurement controls</span>
-          <span style={styles.mutedText}>Scheduling, exception handling, execution history, and operational review</span>
+          <span>{ui("Advanced procurement controls")}</span>
+          <span style={styles.mutedText}>{ui("Scheduling, exception handling, execution history, and operational review")}</span>
         </summary>
         <div style={styles.governanceContent}>
 
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
           <div>
-            <h2 style={styles.panelTitle}>Procurement execution dashboard</h2>
-            <p style={styles.panelSubtitle}>
-              Execution-level view of shortage response, pending risk,
-              supplier workload, generated PO drafts, and recommendation aging.
-            </p>
+            <h2 style={styles.panelTitle}>{ui("Procurement execution dashboard")}</h2>
+            <p style={styles.panelSubtitle}>{ui("Execution-level view of shortage response, pending risk, supplier workload, generated PO drafts, and recommendation aging.")}</p>
           </div>
           <button
             style={styles.secondaryButton}
             type="button"
             onClick={() => void executionDashboardQuery.refetch()}
           >
-            Refresh dashboard
+            {ui("Refresh dashboard")}
           </button>
         </div>
         {executionDashboardQuery.isLoading ? (
-          <div style={styles.infoBox}>Loading execution dashboard...</div>
+          <div style={styles.infoBox}>{ui("Loading execution dashboard…")}</div>
         ) : null}
         {executionDashboardQuery.isError ? (
           <div style={styles.errorBox}>
-            {getErrorMessage(executionDashboardQuery.error)}
+            {getErrorMessage(executionDashboardQuery.error, ui)}
           </div>
         ) : null}
         {dashboardSummary ? (
           <>
             <div style={styles.bulkGrid}>
               <StatCard
-                label="Shortages preventable"
-                value={formatNumber(
+                label={ui("Shortages preventable")}
+                value={formatUiNumber(
                   dashboardSummary.shortages_preventable_count,
                   0,
                 )}
@@ -3343,16 +3355,16 @@ export default function ProcurementRecommendationsPage() {
                 }
               />
               <StatCard
-                label="PO conversions recorded"
-                value={formatNumber(
+                label={ui("PO conversions recorded")}
+                value={formatUiNumber(
                   dashboardSummary.po_conversion_evidence_count ?? dashboardSummary.projected_stockout_avoidance_count,
                   0,
                 )}
                 tone="good"
               />
               <StatCard
-                label="Pending risk"
-                value={formatNumber(
+                label={ui("Pending risk")}
+                value={formatUiNumber(
                   dashboardSummary.pending_procurement_risk_count,
                   0,
                 )}
@@ -3363,8 +3375,8 @@ export default function ProcurementRecommendationsPage() {
                 }
               />
               <StatCard
-                label="Open PO drafts"
-                value={formatNumber(dashboardSummary.open_po_draft_count, 0)}
+                label={ui("Open PO drafts")}
+                value={formatUiNumber(dashboardSummary.open_po_draft_count, 0)}
                 tone={
                   toNumber(dashboardSummary.po_draft_warning_count) > 0
                     ? "warn"
@@ -3372,12 +3384,12 @@ export default function ProcurementRecommendationsPage() {
                 }
               />
               <StatCard
-                label="Open draft spend"
-                value={formatMoneyBreakdown(dashboardSummary.open_po_draft_spend_by_currency, dashboardSummary.open_po_draft_spend)}
+                label={ui("Open draft spend")}
+                value={formatUiMoneyBreakdown(dashboardSummary.open_po_draft_spend_by_currency, dashboardSummary.open_po_draft_spend)}
               />
               <StatCard
-                label="Execution risk score"
-                value={formatNumber(dashboardSummary.execution_risk_score, 0)}
+                label={ui("Execution risk score")}
+                value={formatUiNumber(dashboardSummary.execution_risk_score, 0)}
                 tone={
                   toNumber(dashboardSummary.execution_risk_score) > 25
                     ? "bad"
@@ -3389,7 +3401,7 @@ export default function ProcurementRecommendationsPage() {
             </div>
             <div style={styles.dashboardColumns}>
               <div style={styles.detailCardWide}>
-                <div style={styles.statLabel}>Supplier execution</div>
+                <div style={styles.statLabel}>{ui("Supplier execution")}</div>
                 <div style={styles.compactList}>
                   {(dashboard?.supplier_execution || []).slice(0, 6).map((supplier) => (
                     <div
@@ -3399,47 +3411,51 @@ export default function ProcurementRecommendationsPage() {
                       <div>
                         <strong>{supplier.supplier_name}</strong>
                         <div style={styles.mutedText}>
-                          {formatNumber(supplier.recommendation_count, 0)} recs · {formatNumber(supplier.ready_count, 0)} ready · {formatNumber(supplier.blocked_count, 0)} blocked · {formatNumber(supplier.open_po_draft_count, 0)} draft(s)
+                          {ui("{recommendations} recs · {ready} ready · {blocked} blocked · {drafts} draft(s)")
+                            .replace("{recommendations}", formatUiNumber(supplier.recommendation_count, 0))
+                            .replace("{ready}", formatUiNumber(supplier.ready_count, 0))
+                            .replace("{blocked}", formatUiNumber(supplier.blocked_count, 0))
+                            .replace("{drafts}", formatUiNumber(supplier.open_po_draft_count, 0))}
                         </div>
                       </div>
                       <div style={styles.primaryText}>
-                        {formatMoneyBreakdown(supplier.estimated_total_cost_by_currency, supplier.estimated_total_cost)}
+                        {formatUiMoneyBreakdown(supplier.estimated_total_cost_by_currency, supplier.estimated_total_cost)}
                       </div>
                     </div>
                   ))}
                   {!dashboard?.supplier_execution?.length ? (
-                    <div style={styles.mutedText}>No supplier workload to show.</div>
+                    <div style={styles.mutedText}>{ui("No supplier workload to show.")}</div>
                   ) : null}
                 </div>
               </div>
               <div style={styles.detailCardWide}>
-                <div style={styles.statLabel}>Risk highlights</div>
+                <div style={styles.statLabel}>{ui("Risk highlights")}</div>
                 <div style={styles.compactList}>
                   {(dashboard?.risk_highlights || []).slice(0, 6).map((risk) => (
                     <div key={`dashboard-risk-${risk.product_id}`} style={styles.compactListRow}>
                       <div>
                         <strong>{risk.product_name}</strong>
                         <div style={styles.mutedText}>
-                          {titleCase(risk.urgency)} · {risk.estimated_days_of_coverage === null || risk.estimated_days_of_coverage === undefined ? "No coverage" : `${formatNumber(risk.estimated_days_of_coverage)} days`} · {risk.recommended_supplier_name || "No supplier"}
+                          {canonicalDisplayLabel(risk.urgency)} · {risk.estimated_days_of_coverage === null || risk.estimated_days_of_coverage === undefined ? ui("No coverage") : ui("{count} days").replace("{count}", formatUiNumber(risk.estimated_days_of_coverage))} · {risk.recommended_supplier_name || ui("No supplier")}
                         </div>
                         {risk.blocker_message ? (
                           <div style={styles.blockerText}>{risk.blocker_message}</div>
                         ) : null}
                       </div>
                       <Badge tone={risk.procurement_ready ? "good" : "bad"}>
-                        {risk.procurement_ready ? "Ready" : "Blocked"}
+                        {risk.procurement_ready ? ui("Ready") : ui("Blocked")}
                       </Badge>
                     </div>
                   ))}
                   {!dashboard?.risk_highlights?.length ? (
-                    <div style={styles.mutedText}>No high-risk procurement highlights.</div>
+                    <div style={styles.mutedText}>{ui("No high-risk procurement highlights.")}</div>
                   ) : null}
                 </div>
               </div>
               <div style={styles.detailCardWide}>
-                <div style={styles.statLabel}>Recommendation aging</div>
+                <div style={styles.statLabel}>{ui("Recommendation aging")}</div>
                 <div style={styles.metricLine}>
-                  <strong>0-2 days:</strong> {formatNumber(dashboard.recommendation_aging.buckets["0_2_days"], 0)} · <strong>3-6:</strong> {formatNumber(dashboard.recommendation_aging.buckets["3_6_days"], 0)} · <strong>7-13:</strong> {formatNumber(dashboard.recommendation_aging.buckets["7_13_days"], 0)} · <strong>14+:</strong> {formatNumber(dashboard.recommendation_aging.buckets["14_plus_days"], 0)}
+                  <strong>{ui("0–2 days:")}</strong> {formatUiNumber(dashboard.recommendation_aging.buckets["0_2_days"], 0)} · <strong>{ui("3–6 days:")}</strong> {formatUiNumber(dashboard.recommendation_aging.buckets["3_6_days"], 0)} · <strong>{ui("7–13 days:")}</strong> {formatUiNumber(dashboard.recommendation_aging.buckets["7_13_days"], 0)} · <strong>{ui("14+ days:")}</strong> {formatUiNumber(dashboard.recommendation_aging.buckets["14_plus_days"], 0)}
                 </div>
                 <div style={styles.compactList}>
                   {dashboard.recommendation_aging.oldest_decisions.slice(0, 4).map((row) => (
@@ -3447,16 +3463,18 @@ export default function ProcurementRecommendationsPage() {
                       <div>
                         <strong>{row.product_name}</strong>
                         <div style={styles.mutedText}>
-                          {titleCase(row.decision_status)} · {formatNumber(row.age_days)} days old
+                          {ui("{status} · {count} days old")
+                            .replace("{status}", canonicalDisplayLabel(row.decision_status))
+                            .replace("{count}", formatUiNumber(row.age_days))}
                         </div>
                       </div>
                       <Badge tone={row.converted_purchase_order_id ? "good" : "warn"}>
-                        {row.converted_purchase_order_id ? "Converted" : "Open"}
+                        {row.converted_purchase_order_id ? ui("Converted") : ui("Open")}
                       </Badge>
                     </div>
                   ))}
                   {!dashboard.recommendation_aging.oldest_decisions.length ? (
-                    <div style={styles.mutedText}>No persisted recommendation decisions yet.</div>
+                    <div style={styles.mutedText}>{ui("No persisted recommendation decisions yet.")}</div>
                   ) : null}
                 </div>
               </div>
@@ -3468,31 +3486,29 @@ export default function ProcurementRecommendationsPage() {
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
           <div>
-            <h2 style={styles.panelTitle}>Recommendation production review</h2>
-            <p style={styles.panelSubtitle}>
-              Read-only production check for the current replenishment recommendations: supplier readiness, cost evidence, lead-time evidence, budget blockers, and human approval safety.
-            </p>
+            <h2 style={styles.panelTitle}>{ui("Recommendation production review")}</h2>
+            <p style={styles.panelSubtitle}>{ui("Read-only production check for the current replenishment recommendations: supplier readiness, cost evidence, lead-time evidence, budget blockers, and human approval safety.")}</p>
           </div>
           <button
             style={styles.secondaryButton}
             type="button"
             onClick={() => void productionReviewQuery.refetch()}
           >
-            Refresh review
+            {ui("Refresh review")}
           </button>
         </div>
         {productionReviewQuery.isLoading ? (
-          <div style={styles.infoBox}>Loading production review...</div>
+          <div style={styles.infoBox}>{ui("Loading production review…")}</div>
         ) : null}
         {productionReviewQuery.isError ? (
-          <div style={styles.errorBox}>{getErrorMessage(productionReviewQuery.error)}</div>
+          <div style={styles.errorBox}>{getErrorMessage(productionReviewQuery.error, ui)}</div>
         ) : null}
         {productionReview ? (
           <>
             <div style={styles.bulkGrid}>
               <StatCard
-                label="Production status"
-                value={titleCase(productionReview.production_status)}
+                label={ui("Production status")}
+                value={canonicalDisplayLabel(productionReview.production_status)}
                 tone={
                   productionReview.production_status === "blocked"
                     ? "bad"
@@ -3502,76 +3518,79 @@ export default function ProcurementRecommendationsPage() {
                 }
               />
               <StatCard
-                label="Ready for approval"
-                value={formatNumber(productionReview.readiness_buckets.ready_for_approval, 0)}
+                label={ui("Ready for approval")}
+                value={formatUiNumber(productionReview.readiness_buckets.ready_for_approval, 0)}
                 tone="good"
               />
               <StatCard
-                label="Blocked"
-                value={formatNumber(productionReview.readiness_buckets.blocked, 0)}
+                label={ui("Blocked")}
+                value={formatUiNumber(productionReview.readiness_buckets.blocked, 0)}
                 tone={toNumber(productionReview.readiness_buckets.blocked) > 0 ? "bad" : "good"}
               />
               <StatCard
-                label="Approved not converted"
-                value={formatNumber(productionReview.readiness_buckets.approved_not_converted, 0)}
+                label={ui("Approved not converted")}
+                value={formatUiNumber(productionReview.readiness_buckets.approved_not_converted, 0)}
                 tone={toNumber(productionReview.readiness_buckets.approved_not_converted) > 0 ? "warn" : "good"}
               />
               <StatCard
-                label="High priority"
-                value={formatNumber(productionReview.readiness_buckets.high_priority, 0)}
+                label={ui("High priority")}
+                value={formatUiNumber(productionReview.readiness_buckets.high_priority, 0)}
                 tone={toNumber(productionReview.readiness_buckets.high_priority) > 0 ? "warn" : "good"}
               />
               <StatCard
-                label="Shortage window"
-                value={formatNumber(productionReview.readiness_buckets.shortage_window, 0)}
+                label={ui("Shortage window")}
+                value={formatUiNumber(productionReview.readiness_buckets.shortage_window, 0)}
                 tone={toNumber(productionReview.readiness_buckets.shortage_window) > 0 ? "bad" : "good"}
               />
             </div>
             <div style={styles.dashboardColumns}>
               <div style={styles.detailCardWide}>
-                <div style={styles.statLabel}>Safety contract</div>
+                <div style={styles.statLabel}>{ui("Safety contract")}</div>
                 <div style={styles.metricLine}>
-                  Mode: <strong>{titleCase(productionReview.safety_contract.mode)}</strong>
+                  {ui("Mode:")} <strong>{canonicalDisplayLabel(productionReview.safety_contract.mode)}</strong>
                 </div>
                 <div style={styles.mutedText}>
-                  Mutates inventory: {productionReview.safety_contract.mutates_inventory ? "yes" : "no"} · Creates POs: {productionReview.safety_contract.creates_purchase_orders ? "yes" : "no"} · Approves recommendations: {productionReview.safety_contract.approves_recommendations ? "yes" : "no"}
+                  {ui("Mutates inventory: {inventory} · Creates POs: {purchaseOrders} · Approves recommendations: {approvals}")
+                    .replace("{inventory}", productionReview.safety_contract.mutates_inventory ? ui("Yes") : ui("No"))
+                    .replace("{purchaseOrders}", productionReview.safety_contract.creates_purchase_orders ? ui("Yes") : ui("No"))
+                    .replace("{approvals}", productionReview.safety_contract.approves_recommendations ? ui("Yes") : ui("No"))}
                 </div>
               </div>
               <div style={styles.detailCardWide}>
-                <div style={styles.statLabel}>Blockers</div>
+                <div style={styles.statLabel}>{ui("Blockers")}</div>
                 <div style={styles.compactList}>
                   {productionReview.blockers.map((blocker) => (
                     <div key={`production-blocker-${blocker.code}`} style={styles.compactListRow}>
                       <div>
                         <strong>{blocker.code || "BLOCKER"}</strong>
-                        <div style={styles.blockerText}>{blocker.message || "Production blocker requires review."}</div>
+                        <div style={styles.blockerText}>{blocker.message || ui("Production blocker requires review.")}</div>
                         {blocker.required_action ? <div style={styles.mutedText}>{blocker.required_action}</div> : null}
                       </div>
-                      <Badge tone="bad">{formatNumber(blocker.affected_count ?? 0, 0)}</Badge>
+                      <Badge tone="bad">{formatUiNumber(blocker.affected_count ?? 0, 0)}</Badge>
                     </div>
                   ))}
-                  {!productionReview.blockers.length ? <div style={styles.mutedText}>No production blockers for current filters.</div> : null}
+                  {!productionReview.blockers.length ? <div style={styles.mutedText}>{ui("No production blockers for current filters.")}</div> : null}
                 </div>
               </div>
               <div style={styles.detailCardWide}>
-                <div style={styles.statLabel}>Warnings</div>
+                <div style={styles.statLabel}>{ui("Warnings")}</div>
                 <div style={styles.compactList}>
                   {productionReview.warnings.map((warning) => (
                     <div key={`production-warning-${warning.code}`} style={styles.compactListRow}>
                       <div>
                         <strong>{warning.code || "WARNING"}</strong>
-                        <div style={styles.mutedText}>{warning.message || "Recommendation evidence should be reviewed."}</div>
+                        <div style={styles.mutedText}>{warning.message || ui("Recommendation evidence should be reviewed.")}</div>
                         {warning.recommended_action ? <div style={styles.mutedText}>{warning.recommended_action}</div> : null}
                       </div>
-                      <Badge tone={warning.severity === "high" ? "bad" : "warn"}>{formatNumber(warning.affected_count ?? 0, 0)}</Badge>
+                      <Badge tone={warning.severity === "high" ? "bad" : "warn"}>{formatUiNumber(warning.affected_count ?? 0, 0)}</Badge>
                     </div>
                   ))}
-                  {!productionReview.warnings.length ? <div style={styles.mutedText}>No warning-level evidence gaps for current filters.</div> : null}
+                  {!productionReview.warnings.length ? <div style={styles.mutedText}>{ui("No warning-level evidence gaps for current filters.")}</div> : null}
                 </div>
               </div>
             </div>
             <div style={styles.detailPanel}>
-              <div style={styles.statLabel}>Next safe actions</div>
+              <div style={styles.statLabel}>{ui("Next safe actions")}</div>
               <ul style={styles.list}>
                 {productionReview.next_actions.map((action) => (
                   <li key={action}>{action}</li>
@@ -3585,10 +3604,8 @@ export default function ProcurementRecommendationsPage() {
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
           <div>
-            <h2 style={styles.panelTitle}>Recommendation scheduling engine</h2>
-            <p style={styles.panelSubtitle}>
-              Preview or execute a bounded scheduled recommendation run using the current lookback, shortage-window, and budget filters. Execution can auto-approve ready rows and optionally generate PO drafts.
-            </p>
+            <h2 style={styles.panelTitle}>{ui("Recommendation scheduling engine")}</h2>
+            <p style={styles.panelSubtitle}>{ui("Preview or execute a bounded scheduled recommendation run using the current lookback, shortage-window, and budget filters. Execution can auto-approve ready rows and optionally generate PO drafts.")}</p>
           </div>
           <div style={styles.buttonRow}>
             <button
@@ -3597,31 +3614,31 @@ export default function ProcurementRecommendationsPage() {
               onClick={() => scheduledRunMutation.mutate({ dryRun: true })}
               disabled={!canApproveRecommendations || scheduledRunMutation.isPending}
             >
-              Preview scheduled run
+              {ui("Preview scheduled run")}
             </button>
             <button
               style={styles.primaryButton}
               type="button"
               onClick={() =>
                 requestConfirmation({
-                  title: "Execute scheduled procurement run?",
+                  title: ui("Execute scheduled procurement run?"),
                   message: scheduledConvertToPo && canCreatePurchaseOrderDrafts
-                    ? `This can approve up to ${scheduledMaxApprovals} ready recommendations and create purchase order drafts.`
-                    : `This can approve up to ${scheduledMaxApprovals} ready recommendations. It will not create purchase order drafts.`,
-                  confirmLabel: "Execute run",
+                    ? ui("This can approve up to {count} ready recommendations and create purchase order drafts.").replace("{count}", formatUiNumber(scheduledMaxApprovals, 0))
+                    : ui("This can approve up to {count} ready recommendations. It will not create purchase order drafts.").replace("{count}", formatUiNumber(scheduledMaxApprovals, 0)),
+                  confirmLabel: ui("Execute run"),
                   tone: "primary",
                   action: () => scheduledRunMutation.mutate({ dryRun: false }),
                 })
               }
               disabled={!canApproveRecommendations || scheduledRunMutation.isPending}
             >
-              Execute scheduled run
+              {ui("Execute scheduled run")}
             </button>
           </div>
         </div>
         <div style={styles.filterGrid}>
           <label style={styles.label}>
-            Max approvals
+            {ui("Max approvals")}
             <input
               style={styles.input}
               type="number"
@@ -3632,7 +3649,7 @@ export default function ProcurementRecommendationsPage() {
             />
           </label>
           <label style={styles.label}>
-            Execution note
+            {ui("Execution note")}
             <input
               style={styles.input}
               value={scheduledNote}
@@ -3640,7 +3657,7 @@ export default function ProcurementRecommendationsPage() {
             />
           </label>
           <label style={{ ...styles.label, justifyContent: "center" }}>
-            <span>Generate PO drafts after approval</span>
+            <span>{ui("Generate PO drafts after approval")}</span>
             <input
               type="checkbox"
               checked={scheduledConvertToPo && canCreatePurchaseOrderDrafts}
@@ -3650,23 +3667,23 @@ export default function ProcurementRecommendationsPage() {
           </label>
         </div>
         {!canApproveRecommendations ? (
-          <div style={styles.infoBox}>Purchase order approval permission is required to preview or execute scheduled procurement recommendation runs.</div>
+          <div style={styles.infoBox}>{ui("Purchase order approval permission is required to preview or execute scheduled procurement recommendation runs.")}</div>
         ) : null}
         {!canCreatePurchaseOrderDrafts ? (
-          <div style={styles.infoBox}>Purchase order create permission is required before scheduled runs can generate PO drafts.</div>
+          <div style={styles.infoBox}>{ui("Purchase order create permission is required before scheduled runs can generate PO drafts.")}</div>
         ) : null}
         {scheduledRunMutation.isError ? (
-          <div style={styles.errorBox}>{getErrorMessage(scheduledRunMutation.error)}</div>
+          <div style={styles.errorBox}>{getErrorMessage(scheduledRunMutation.error, ui)}</div>
         ) : null}
         {scheduledRunMutation.data ? (
           <div style={styles.detailPanel}>
             <div style={styles.bulkGrid}>
-              <StatCard label="Run mode" value={titleCase(scheduledRunMutation.data.run_mode)} />
-              <StatCard label="Status" value={titleCase(scheduledRunMutation.data.status)} tone={scheduledRunMutation.data.status === "blocked" ? "bad" : scheduledRunMutation.data.status === "completed_with_warnings" ? "warn" : "good"} />
-              <StatCard label="Candidates" value={formatNumber(scheduledRunMutation.data.summary.candidate_count, 0)} />
-              <StatCard label="Ready" value={formatNumber(scheduledRunMutation.data.summary.ready_count, 0)} tone="good" />
-              <StatCard label="Approved" value={formatNumber(scheduledRunMutation.data.summary.approved_count, 0)} />
-              <StatCard label="PO drafts" value={formatNumber(scheduledRunMutation.data.summary.po_draft_count, 0)} />
+              <StatCard label={ui("Run mode")} value={canonicalDisplayLabel(scheduledRunMutation.data.run_mode)} />
+              <StatCard label={ui("Status")} value={canonicalDisplayLabel(scheduledRunMutation.data.status)} tone={scheduledRunMutation.data.status === "blocked" ? "bad" : scheduledRunMutation.data.status === "completed_with_warnings" ? "warn" : "good"} />
+              <StatCard label={ui("Candidates")} value={formatUiNumber(scheduledRunMutation.data.summary.candidate_count, 0)} />
+              <StatCard label={ui("Ready")} value={formatUiNumber(scheduledRunMutation.data.summary.ready_count, 0)} tone="good" />
+              <StatCard label={ui("Approved")} value={formatUiNumber(scheduledRunMutation.data.summary.approved_count, 0)} />
+              <StatCard label={ui("PO drafts")} value={formatUiNumber(scheduledRunMutation.data.summary.po_draft_count, 0)} />
             </div>
             {(scheduledRunMutation.data.blockers?.length || 0) > 0 ? (
               <div style={styles.errorBox}>
@@ -3682,12 +3699,12 @@ export default function ProcurementRecommendationsPage() {
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>Product</th>
-                    <th style={styles.th}>Supplier</th>
-                    <th style={styles.th}>Urgency</th>
-                    <th style={styles.th}>Qty</th>
-                    <th style={styles.th}>Cost</th>
-                    <th style={styles.th}>Warnings</th>
+                    <th style={styles.th}>{ui("Product")}</th>
+                    <th style={styles.th}>{ui("Supplier")}</th>
+                    <th style={styles.th}>{ui("Urgency")}</th>
+                    <th style={styles.th}>{ui("Qty")}</th>
+                    <th style={styles.th}>{ui("Cost")}</th>
+                    <th style={styles.th}>{ui("Warnings")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3695,9 +3712,9 @@ export default function ProcurementRecommendationsPage() {
                     <tr key={`scheduled-${row.product_id}`} style={styles.tr}>
                       <td style={styles.td}>{row.product_name || row.product_id}</td>
                       <td style={styles.td}>{row.supplier_name || "-"}</td>
-                      <td style={styles.td}>{titleCase(row.urgency)}</td>
-                      <td style={styles.td}>{formatNumber(row.recommended_reorder_quantity)}</td>
-                      <td style={styles.td}>{formatMoney(row.estimated_total_cost, row.currency)}</td>
+                      <td style={styles.td}>{canonicalDisplayLabel(row.urgency)}</td>
+                      <td style={styles.td}>{formatUiNumber(row.recommended_reorder_quantity)}</td>
+                      <td style={styles.td}>{formatUiMoney(row.estimated_total_cost, row.currency)}</td>
                       <td style={styles.td}>{(row.warnings ?? []).map((warning) => warning.code).join(", ") || "-"}</td>
                     </tr>
                   ))}
@@ -3711,73 +3728,73 @@ export default function ProcurementRecommendationsPage() {
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
           <div>
-            <h2 style={styles.panelTitle}>Procurement execution history</h2>
-            <p style={styles.panelSubtitle}>
-              Auditable trail of recommendation decisions, scheduled runs, PO draft conversion outcomes, and automation execution status.
-            </p>
+            <h2 style={styles.panelTitle}>{ui("Procurement execution history")}</h2>
+            <p style={styles.panelSubtitle}>{ui("Auditable trail of recommendation decisions, scheduled runs, PO draft conversion outcomes, and automation execution status.")}</p>
           </div>
           <button
             style={styles.secondaryButton}
             type="button"
             onClick={() => void executionHistoryQuery.refetch()}
           >
-            Refresh history
+            {ui("Refresh history")}
           </button>
         </div>
         {executionHistoryQuery.isLoading ? (
-          <div style={styles.infoBox}>Loading procurement execution history...</div>
+          <div style={styles.infoBox}>{ui("Loading procurement execution history…")}</div>
         ) : null}
         {executionHistoryQuery.isError ? (
-          <div style={styles.errorBox}>{getErrorMessage(executionHistoryQuery.error)}</div>
+          <div style={styles.errorBox}>{getErrorMessage(executionHistoryQuery.error, ui)}</div>
         ) : null}
         {executionHistoryQuery.data ? (
           <>
             <div style={styles.bulkGrid}>
-              <StatCard label="Decision events" value={formatNumber(executionHistoryQuery.data.summary.decision_event_count, 0)} />
-              <StatCard label="Approved" value={formatNumber(executionHistoryQuery.data.summary.approved_count, 0)} tone="good" />
-              <StatCard label="Converted" value={formatNumber(executionHistoryQuery.data.summary.converted_count, 0)} />
-              <StatCard label="Scheduled runs" value={formatNumber(executionHistoryQuery.data.summary.schedule_run_count, 0)} />
-              <StatCard label="Blocked runs" value={formatNumber(executionHistoryQuery.data.summary.blocked_run_count, 0)} tone={toNumber(executionHistoryQuery.data.summary.blocked_run_count) > 0 ? "bad" : "good"} />
-              <StatCard label="PO drafts" value={formatNumber(executionHistoryQuery.data.summary.po_draft_count, 0)} />
+              <StatCard label={ui("Decision events")} value={formatUiNumber(executionHistoryQuery.data.summary.decision_event_count, 0)} />
+              <StatCard label={ui("Approved")} value={formatUiNumber(executionHistoryQuery.data.summary.approved_count, 0)} tone="good" />
+              <StatCard label={ui("Converted")} value={formatUiNumber(executionHistoryQuery.data.summary.converted_count, 0)} />
+              <StatCard label={ui("Scheduled runs")} value={formatUiNumber(executionHistoryQuery.data.summary.schedule_run_count, 0)} />
+              <StatCard label={ui("Blocked runs")} value={formatUiNumber(executionHistoryQuery.data.summary.blocked_run_count, 0)} tone={toNumber(executionHistoryQuery.data.summary.blocked_run_count) > 0 ? "bad" : "good"} />
+              <StatCard label={ui("PO drafts")} value={formatUiNumber(executionHistoryQuery.data.summary.po_draft_count, 0)} />
             </div>
             <div style={styles.tableWrap}>
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>When</th>
-                    <th style={styles.th}>Event</th>
-                    <th style={styles.th}>Subject</th>
-                    <th style={styles.th}>Status</th>
-                    <th style={styles.th}>Cost</th>
-                    <th style={styles.th}>PO linkage</th>
+                    <th style={styles.th}>{ui("When")}</th>
+                    <th style={styles.th}>{ui("Event")}</th>
+                    <th style={styles.th}>{ui("Subject")}</th>
+                    <th style={styles.th}>{ui("Status")}</th>
+                    <th style={styles.th}>{ui("Cost")}</th>
+                    <th style={styles.th}>{ui("PO linkage")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {executionHistoryQuery.data.timeline.slice(0, 20).map((event, index) => {
                     const isRun = event.event_type === "scheduled_run";
                     const subject = isRun
-                      ? `${titleCase(String(event.run_mode || "scheduled_run"))} · ${formatNumber(event.candidate_count as string | number | undefined, 0)} candidates`
-                      : String(event.product_name || event.recommendation_key || event.product_id || "Recommendation");
+                      ? ui("{mode} · {count} candidates")
+                          .replace("{mode}", canonicalDisplayLabel(String(event.run_mode || "scheduled_run")))
+                          .replace("{count}", formatUiNumber(event.candidate_count as string | number | undefined, 0))
+                      : String(event.product_name || event.recommendation_key || event.product_id || ui("Recommendation"));
                     const status = String(event.status || "-");
                     const poLink = isRun
-                      ? `${formatNumber(event.po_draft_count as string | number | undefined, 0)} draft(s)`
+                      ? ui("{count} draft(s)").replace("{count}", formatUiNumber(event.po_draft_count as string | number | undefined, 0))
                       : String(event.converted_po_number || event.converted_purchase_order_id || "-");
                     return (
                       <tr key={`execution-history-${index}-${String(event.occurred_at || "")}`} style={styles.tr}>
-                        <td style={styles.td}>{event.occurred_at ? new Date(String(event.occurred_at)).toLocaleString() : "-"}</td>
-                        <td style={styles.td}>{isRun ? "Scheduled run" : "Decision"}</td>
+                        <td style={styles.td}>{event.occurred_at ? formatUiDateTime(String(event.occurred_at)) : "—"}</td>
+                        <td style={styles.td}>{isRun ? ui("Scheduled run") : ui("Decision")}</td>
                         <td style={styles.td}>{subject}</td>
-                        <td style={styles.td}><Badge tone={status === "blocked" || status === "rejected" ? "bad" : status === "deferred" || status === "completed_with_warnings" ? "warn" : "good"}>{titleCase(status)}</Badge></td>
+                        <td style={styles.td}><Badge tone={status === "blocked" || status === "rejected" ? "bad" : status === "deferred" || status === "completed_with_warnings" ? "warn" : "good"}>{canonicalDisplayLabel(status)}</Badge></td>
                         <td style={styles.td}>{isRun
-                          ? formatMoneyRecordBreakdown(event.estimated_total_cost_by_currency as Record<string, number | string> | undefined, event.estimated_total_cost as string | number | null | undefined, event.budget_currency as string | null | undefined)
-                          : formatMoney(event.estimated_total_cost as string | number | null | undefined, event.currency as string | null | undefined)}</td>
+                          ? formatUiMoneyRecordBreakdown(event.estimated_total_cost_by_currency as Record<string, number | string> | undefined, event.estimated_total_cost as string | number | null | undefined, event.budget_currency as string | null | undefined)
+                          : formatUiMoney(event.estimated_total_cost as string | number | null | undefined, event.currency as string | null | undefined)}</td>
                         <td style={styles.td}>{poLink}</td>
                       </tr>
                     );
                   })}
                   {executionHistoryQuery.data.timeline.length === 0 ? (
                     <tr>
-                      <td style={styles.emptyCell} colSpan={6}>No procurement execution history yet.</td>
+                      <td style={styles.emptyCell} colSpan={6}>{ui("No procurement execution history yet.")}</td>
                     </tr>
                   ) : null}
                 </tbody>
@@ -3790,34 +3807,32 @@ export default function ProcurementRecommendationsPage() {
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
           <div>
-            <h2 style={styles.panelTitle}>Recommendation outcomes</h2>
-            <p style={styles.panelSubtitle}>
-              Read-only follow-up showing whether approved recommendations reached a purchase order, were received, restored the governed threshold, or still produced alerts.
-            </p>
+            <h2 style={styles.panelTitle}>{ui("Recommendation outcomes")}</h2>
+            <p style={styles.panelSubtitle}>{ui("Read-only follow-up showing whether approved recommendations reached a purchase order, were received, restored the governed threshold, or still produced alerts.")}</p>
           </div>
           <button
             style={styles.secondaryButton}
             type="button"
             onClick={() => void recommendationOutcomesQuery.refetch()}
           >
-            Refresh outcomes
+            {ui("Refresh outcomes")}
           </button>
         </div>
         {recommendationOutcomesQuery.isLoading ? (
-          <div style={styles.infoBox}>Loading recorded recommendation outcomes...</div>
+          <div style={styles.infoBox}>{ui("Loading recorded recommendation outcomes…")}</div>
         ) : null}
         {recommendationOutcomesQuery.isError ? (
-          <div style={styles.errorBox}>{getErrorMessage(recommendationOutcomesQuery.error)}</div>
+          <div style={styles.errorBox}>{getErrorMessage(recommendationOutcomesQuery.error, ui)}</div>
         ) : null}
         {recommendationOutcomesQuery.data ? (
           <>
             <div style={styles.bulkGrid}>
-              <StatCard label="Loaded outcomes" value={formatNumber(recommendationOutcomesQuery.data.summary.total, 0)} />
-              <StatCard label="Threshold restored" value={formatNumber(recommendationOutcomesQuery.data.summary.threshold_met_count, 0)} tone="good" />
-              <StatCard label="Fully received" value={formatNumber(recommendationOutcomesQuery.data.summary.received_complete_count, 0)} tone="good" />
+              <StatCard label={ui("Loaded outcomes")} value={formatUiNumber(recommendationOutcomesQuery.data.summary.total, 0)} />
+              <StatCard label={ui("Threshold restored")} value={formatUiNumber(recommendationOutcomesQuery.data.summary.threshold_met_count, 0)} tone="good" />
+              <StatCard label={ui("Fully received")} value={formatUiNumber(recommendationOutcomesQuery.data.summary.received_complete_count, 0)} tone="good" />
               <StatCard
-                label="Post-decision alerts"
-                value={formatNumber(recommendationOutcomesQuery.data.summary.rows_with_post_decision_alerts, 0)}
+                label={ui("Post-decision alerts")}
+                value={formatUiNumber(recommendationOutcomesQuery.data.summary.rows_with_post_decision_alerts, 0)}
                 tone={toNumber(recommendationOutcomesQuery.data.summary.rows_with_post_decision_alerts) > 0 ? "warn" : "good"}
               />
             </div>
@@ -3825,53 +3840,53 @@ export default function ProcurementRecommendationsPage() {
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>Product</th>
-                    <th style={styles.th}>Decision</th>
-                    <th style={styles.th}>Outcome</th>
-                    <th style={styles.th}>Recommended / ordered</th>
-                    <th style={styles.th}>Received</th>
-                    <th style={styles.th}>Current stock / threshold</th>
-                    <th style={styles.th}>PO</th>
-                    <th style={styles.th}>Alerts after decision</th>
+                    <th style={styles.th}>{ui("Product")}</th>
+                    <th style={styles.th}>{ui("Decision")}</th>
+                    <th style={styles.th}>{ui("Outcome")}</th>
+                    <th style={styles.th}>{ui("Recommended / ordered")}</th>
+                    <th style={styles.th}>{ui("Received")}</th>
+                    <th style={styles.th}>{ui("Current stock / threshold")}</th>
+                    <th style={styles.th}>{ui("PO")}</th>
+                    <th style={styles.th}>{ui("Alerts after decision")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {recommendationOutcomesQuery.data.rows.map((row) => (
                     <tr key={row.decision_id} style={styles.tr}>
                       <td style={styles.td}>
-                        <div style={styles.primaryText}>{row.product_name || row.product_id || "Unknown product"}</div>
-                        <div style={styles.mutedText}>{row.decided_at ? new Date(row.decided_at).toLocaleString() : "-"}</div>
+                        <div style={styles.primaryText}>{row.product_name || row.product_id || ui("Unknown product")}</div>
+                        <div style={styles.mutedText}>{row.decided_at ? formatUiDateTime(row.decided_at) : "—"}</div>
                       </td>
-                      <td style={styles.td}>{titleCase(row.decision_status)}</td>
+                      <td style={styles.td}>{canonicalDisplayLabel(row.decision_status)}</td>
                       <td style={styles.td}>
                         <Badge tone={row.outcome_status === "received_complete" ? "good" : row.outcome_status === "po_cancelled" || row.outcome_status === "not_approved" ? "bad" : "warn"}>
-                          {titleCase(row.outcome_status)}
+                          {canonicalDisplayLabel(row.outcome_status)}
                         </Badge>
                       </td>
                       <td style={styles.td}>
-                        {formatNumber(row.recommended_reorder_quantity)} / {formatNumber(row.ordered_quantity)} {row.unit || ""}
+                        {formatUiNumber(row.recommended_reorder_quantity)} / {formatUiNumber(row.ordered_quantity)} {row.unit || ""}
                       </td>
                       <td style={styles.td}>
-                        {formatNumber(row.received_quantity)} {row.unit || ""}
+                        {formatUiNumber(row.received_quantity)} {row.unit || ""}
                         {row.fulfillment_ratio !== null && row.fulfillment_ratio !== undefined ? (
-                          <div style={styles.mutedText}>{formatNumber(toNumber(row.fulfillment_ratio) * 100, 0)}% fulfilled</div>
+                          <div style={styles.mutedText}>{ui("{percent}% fulfilled").replace("{percent}", formatUiNumber(toNumber(row.fulfillment_ratio) * 100, 0))}</div>
                         ) : null}
                       </td>
                       <td style={styles.td}>
-                        {formatNumber(row.current_quantity)} / {formatNumber(row.governed_min_stock_at_decision)} {row.unit || ""}
+                        {formatUiNumber(row.current_quantity)} / {formatUiNumber(row.governed_min_stock_at_decision)} {row.unit || ""}
                         <div style={row.threshold_met ? styles.mutedText : styles.warningText}>
-                          {row.threshold_met ? "Threshold met" : "Below governed threshold"}
+                          {row.threshold_met ? ui("Threshold met") : ui("Below governed threshold")}
                         </div>
                       </td>
                       <td style={styles.td}>
-                        {row.po_number || row.converted_purchase_order_id || "Not created"}
-                        {row.purchase_order_status ? <div style={styles.mutedText}>{titleCase(row.purchase_order_status)}</div> : null}
+                        {row.po_number || row.converted_purchase_order_id || ui("Not created")}
+                        {row.purchase_order_status ? <div style={styles.mutedText}>{canonicalDisplayLabel(row.purchase_order_status)}</div> : null}
                       </td>
-                      <td style={styles.td}>{formatNumber(row.post_decision_alert_count, 0)}</td>
+                      <td style={styles.td}>{formatUiNumber(row.post_decision_alert_count, 0)}</td>
                     </tr>
                   ))}
                   {recommendationOutcomesQuery.data.rows.length === 0 ? (
-                    <tr><td style={styles.emptyCell} colSpan={8}>No recommendation outcomes have been recorded yet.</td></tr>
+                    <tr><td style={styles.emptyCell} colSpan={8}>{ui("No recommendation outcomes have been recorded yet.")}</td></tr>
                   ) : null}
                 </tbody>
               </table>
@@ -3883,83 +3898,84 @@ export default function ProcurementRecommendationsPage() {
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
           <div>
-            <h2 style={styles.panelTitle}>Procurement exception queue</h2>
-            <p style={styles.panelSubtitle}>
-              Operational blockers and warnings across supplier assignment, quantity, stockout, approval, conversion, budget, and package governance.
-            </p>
+            <h2 style={styles.panelTitle}>{ui("Procurement exception queue")}</h2>
+            <p style={styles.panelSubtitle}>{ui("Operational blockers and warnings across supplier assignment, quantity, stockout, approval, conversion, budget, and package governance.")}</p>
           </div>
           <button
             style={styles.secondaryButton}
             type="button"
             onClick={() => void exceptionQueueQuery.refetch()}
           >
-            Refresh exceptions
+            {ui("Refresh exceptions")}
           </button>
         </div>
         {exceptionQueueQuery.isLoading ? (
-          <div style={styles.infoBox}>Loading procurement exceptions...</div>
+          <div style={styles.infoBox}>{ui("Loading procurement exceptions…")}</div>
         ) : null}
         {exceptionQueueQuery.isError ? (
           <div style={styles.errorBox}>
-            {getErrorMessage(exceptionQueueQuery.error)}
+            {getErrorMessage(exceptionQueueQuery.error, ui)}
           </div>
         ) : null}
         {exceptionResolutionMutation.isError ? (
           <div style={styles.errorBox}>
-            {getErrorMessage(exceptionResolutionMutation.error)}
+            {getErrorMessage(exceptionResolutionMutation.error, ui)}
           </div>
         ) : null}
         {exceptionResolutionMutation.data ? (
           <div style={styles.infoBox}>
-            Resolution {titleCase(exceptionResolutionMutation.data.action)} completed: {formatNumber(exceptionResolutionMutation.data.cleared_exception_count, 0)} cleared, {formatNumber(exceptionResolutionMutation.data.remaining_exception_count, 0)} remaining.
+            {ui("Resolution {action} completed: {cleared} cleared, {remaining} remaining.")
+              .replace("{action}", canonicalDisplayLabel(exceptionResolutionMutation.data.action))
+              .replace("{cleared}", formatUiNumber(exceptionResolutionMutation.data.cleared_exception_count, 0))
+              .replace("{remaining}", formatUiNumber(exceptionResolutionMutation.data.remaining_exception_count, 0))}
           </div>
         ) : null}
         {!canApproveRecommendations ? (
-          <div style={styles.infoBox}>Purchase order approval permission is required to resolve procurement exceptions or apply recommendation decisions from this page.</div>
+          <div style={styles.infoBox}>{ui("Purchase order approval permission is required to resolve procurement exceptions or apply recommendation decisions from this page.")}</div>
         ) : null}
         {canApproveRecommendations && !canManageProducts ? (
-          <div style={styles.infoBox}>Product write permission is additionally required to assign a supplier to a product from an exception.</div>
+          <div style={styles.infoBox}>{ui("Product write permission is additionally required to assign a supplier to a product from an exception.")}</div>
         ) : null}
         {optionsQuery.isError ? (
-          <div style={styles.errorBox}>Supplier choices could not be loaded: {getErrorMessage(optionsQuery.error)}</div>
+          <div style={styles.errorBox}>{ui("Supplier choices could not be loaded: {error}").replace("{error}", getErrorMessage(optionsQuery.error, ui))}</div>
         ) : null}
         {exceptions ? (
           <>
             <div style={styles.bulkGrid}>
               <StatCard
-                label="Total exceptions"
-                value={formatNumber(exceptions.summary.total_exceptions, 0)}
+                label={ui("Total exceptions")}
+                value={formatUiNumber(exceptions.summary.total_exceptions, 0)}
                 tone={toNumber(exceptions.summary.total_exceptions) > 0 ? "warn" : "good"}
               />
               <StatCard
-                label="Critical"
-                value={formatNumber(exceptions.summary.critical_count, 0)}
+                label={ui("Critical")}
+                value={formatUiNumber(exceptions.summary.critical_count, 0)}
                 tone={toNumber(exceptions.summary.critical_count) > 0 ? "bad" : "good"}
               />
               <StatCard
-                label="High"
-                value={formatNumber(exceptions.summary.high_count, 0)}
+                label={ui("High")}
+                value={formatUiNumber(exceptions.summary.high_count, 0)}
                 tone={toNumber(exceptions.summary.high_count) > 0 ? "bad" : "good"}
               />
               <StatCard
-                label="Affected products"
-                value={formatNumber(exceptions.summary.affected_product_count, 0)}
+                label={ui("Affected products")}
+                value={formatUiNumber(exceptions.summary.affected_product_count, 0)}
               />
               <StatCard
-                label="Affected suppliers"
-                value={formatNumber(exceptions.summary.affected_supplier_count, 0)}
+                label={ui("Affected suppliers")}
+                value={formatUiNumber(exceptions.summary.affected_supplier_count, 0)}
               />
             </div>
             <div style={{ ...styles.tableWrap, marginTop: 12 }}>
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>Exception</th>
-                    <th style={styles.th}>Product</th>
-                    <th style={styles.th}>Supplier</th>
-                    <th style={styles.th}>Coverage</th>
-                    <th style={styles.th}>Decision</th>
-                    <th style={styles.th}>Resolution</th>
+                    <th style={styles.th}>{ui("Exception")}</th>
+                    <th style={styles.th}>{ui("Product")}</th>
+                    <th style={styles.th}>{ui("Supplier")}</th>
+                    <th style={styles.th}>{ui("Coverage")}</th>
+                    <th style={styles.th}>{ui("Decision")}</th>
+                    <th style={styles.th}>{ui("Resolution")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3977,10 +3993,10 @@ export default function ProcurementRecommendationsPage() {
                                   : "neutral"
                           }
                         >
-                          {titleCase(exception.severity)}
+                          {canonicalDisplayLabel(exception.severity)}
                         </Badge>
                         <div style={styles.primaryText}>{titleCase(exception.code)}</div>
-                        <div style={styles.mutedText}>{titleCase(exception.category)}</div>
+                        <div style={styles.mutedText}>{canonicalDisplayLabel(exception.category)}</div>
                         <div style={styles.blockerText}>{exception.message}</div>
                       </td>
                       <td style={styles.td}>
@@ -3991,17 +4007,19 @@ export default function ProcurementRecommendationsPage() {
                         >
                           {exception.product_name}
                         </button>
-                        <div style={styles.mutedText}>{titleCase(exception.urgency || "unknown")}</div>
+                        <div style={styles.mutedText}>{canonicalDisplayLabel(exception.urgency || "unknown")}</div>
                         <div style={styles.mutedText}>
-                          Recommend {formatNumber(exception.recommended_reorder_quantity)} · {formatMoney(exception.estimated_total_cost, exception.currency || exception.row?.currency)}
+                          {ui("Recommend {quantity} · {cost}")
+                            .replace("{quantity}", formatUiNumber(exception.recommended_reorder_quantity))
+                            .replace("{cost}", formatUiMoney(exception.estimated_total_cost, exception.currency || exception.row?.currency))}
                         </div>
                       </td>
-                      <td style={styles.td}>{exception.supplier_name || "Unassigned"}</td>
+                      <td style={styles.td}>{exception.supplier_name || ui("Unassigned")}</td>
                       <td style={styles.td}>
                         {exception.estimated_days_of_coverage === null || exception.estimated_days_of_coverage === undefined
-                          ? "No projection"
-                          : `${formatNumber(exception.estimated_days_of_coverage)} days`}
-                        <div style={styles.mutedText}>Depletion {exception.projected_depletion_date || "-"}</div>
+                          ? ui("No projection")
+                          : ui("{count} days").replace("{count}", formatUiNumber(exception.estimated_days_of_coverage))}
+                        <div style={styles.mutedText}>{ui("Depletion {date}").replace("{date}", formatUiDate(exception.projected_depletion_date))}</div>
                       </td>
                       <td style={styles.td}>
                         <Badge
@@ -4015,14 +4033,14 @@ export default function ProcurementRecommendationsPage() {
                                   : "neutral"
                           }
                         >
-                          {titleCase(exception.decision_status || "pending")}
+                          {canonicalDisplayLabel(exception.decision_status || "pending")}
                         </Badge>
                         {exception.converted_purchase_order_id ? (
-                          <div style={styles.mutedText}>Converted</div>
+                          <div style={styles.mutedText}>{ui("Converted")}</div>
                         ) : null}
                       </td>
                       <td style={styles.td}>
-                        <div style={styles.mutedText}>{exception.resolution_hint || "Review recommendation detail."}</div>
+                        <div style={styles.mutedText}>{exception.resolution_hint || ui("Review recommendation detail.")}</div>
                         {exception.code === "MISSING_SUPPLIER" ? (
                           <select
                             style={{ ...styles.input, marginTop: 8, width: "100%" }}
@@ -4030,7 +4048,7 @@ export default function ProcurementRecommendationsPage() {
                             onChange={(event) => updateExceptionSupplierId(exception.exception_key, event.target.value)}
                             disabled={!canManageProducts}
                           >
-                            <option value="">Select active supplier</option>
+                            <option value="">{ui("Select active supplier")}</option>
                             {(optionsQuery.data?.suppliers || []).map((supplier) => (
                               <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
                             ))}
@@ -4040,7 +4058,7 @@ export default function ProcurementRecommendationsPage() {
                           style={{ ...styles.textarea, marginTop: 8, width: "100%", minHeight: 54 }}
                           value={exceptionResolutionNotes[exception.exception_key] || ""}
                           onChange={(event) => updateExceptionNote(exception.exception_key, event.target.value)}
-                          placeholder="Resolution note"
+                          placeholder={ui("Resolution note")}
                         />
                         <div style={styles.exceptionActionRow}>
                           {exception.code === "MISSING_SUPPLIER" ? (
@@ -4050,15 +4068,15 @@ export default function ProcurementRecommendationsPage() {
                               disabled={!canApproveRecommendations || !canManageProducts || !exceptionSupplierIds[exception.exception_key] || exceptionResolutionMutation.isPending}
                               onClick={() =>
                                 requestConfirmation({
-                                  title: "Assign supplier to product?",
-                                  message: "This changes the product's default supplier and records the change in the audit trail.",
-                                  confirmLabel: "Assign supplier",
+                                  title: ui("Assign supplier to product?"),
+                                  message: ui("This changes the product's default supplier and records the change in the audit trail."),
+                                  confirmLabel: ui("Assign supplier"),
                                   tone: "primary",
                                   action: () => resolveException(exception, "assign_supplier"),
                                 })
                               }
                             >
-                              Assign supplier
+                              {ui("Assign supplier")}
                             </button>
                           ) : null}
                           <button
@@ -4067,7 +4085,7 @@ export default function ProcurementRecommendationsPage() {
                             disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
                             onClick={() => resolveException(exception, "rerun")}
                           >
-                            Re-run
+                            {ui("Re-run")}
                           </button>
                           {exception.code === "HIGH_RISK_PENDING_DECISION" ? (
                             <>
@@ -4077,7 +4095,7 @@ export default function ProcurementRecommendationsPage() {
                                 disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
                                 onClick={() => resolveException(exception, "defer")}
                               >
-                                Defer
+                                {ui("Defer")}
                               </button>
                               {exception.row?.detail?.can_enter_approval_review ? (
                                 <button
@@ -4086,15 +4104,15 @@ export default function ProcurementRecommendationsPage() {
                                   disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
                                   onClick={() =>
                                     requestConfirmation({
-                                      title: "Approve recommendation?",
-                                      message: "Approval records a governed procurement decision. It does not create a purchase order until conversion is requested.",
-                                      confirmLabel: "Approve",
+                                      title: ui("Approve recommendation?"),
+                                      message: ui("Approval records a governed procurement decision. It does not create a purchase order until conversion is requested."),
+                                      confirmLabel: ui("Approve"),
                                       tone: "primary",
                                       action: () => resolveException(exception, "approve"),
                                     })
                                   }
                                 >
-                                  Approve
+                                  {ui("Approve")}
                                 </button>
                               ) : null}
                               <button
@@ -4103,21 +4121,21 @@ export default function ProcurementRecommendationsPage() {
                                 disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
                                 onClick={() =>
                                   requestConfirmation({
-                                    title: "Reject recommendation?",
-                                    message: "This records a rejection decision for the current recommendation evidence.",
-                                    confirmLabel: "Reject",
+                                    title: ui("Reject recommendation?"),
+                                    message: ui("This records a rejection decision for the current recommendation evidence."),
+                                    confirmLabel: ui("Reject"),
                                     tone: "danger",
                                     action: () => resolveException(exception, "reject"),
                                   })
                                 }
                               >
-                                Reject
+                                {ui("Reject")}
                               </button>
                             </>
                           ) : null}
                         </div>
                         {resolvingExceptionKey?.startsWith(`${exception.product_id}:`) ? (
-                          <div style={styles.mutedText}>Applying resolution...</div>
+                          <div style={styles.mutedText}>{ui("Applying resolution…")}</div>
                         ) : null}
                       </td>
                     </tr>
@@ -4125,7 +4143,7 @@ export default function ProcurementRecommendationsPage() {
                   {exceptions.rows.length === 0 ? (
                     <tr>
                       <td style={styles.emptyCell} colSpan={6}>
-                        No procurement exceptions found for the current filters.
+                        {ui("No procurement exceptions found for the current filters.")}
                       </td>
                     </tr>
                   ) : null}
@@ -4154,7 +4172,7 @@ export default function ProcurementRecommendationsPage() {
             <p style={styles.modalMessage}>{confirmation.message}</p>
             <div style={styles.modalActions}>
               <button type="button" style={styles.secondaryButton} onClick={() => setConfirmation(null)}>
-                Cancel
+                {ui("Cancel")}
               </button>
               <button
                 type="button"

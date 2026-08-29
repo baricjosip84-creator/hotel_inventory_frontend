@@ -3,9 +3,12 @@ import type { CSSProperties, FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedCurrency, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
+import type { AppLocale } from '../i18n/config';
 import { getRoleCapabilities } from '../lib/permissions';
 import { showTenantActionError } from '../lib/actionFeedback';
-import { formatCurrencyAmount } from '../lib/tenantCurrency';
+import { getActiveTenantCurrency } from '../lib/tenantCurrency';
 import type { ProductItem } from '../types/inventory';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
@@ -265,34 +268,38 @@ const intentFallbacks: Record<CopilotIntent, { label: string; description: strin
   }
 };
 
-function readableError(error: unknown): string {
+function readableError(error: unknown, ui: UiTranslator): string {
   if (error instanceof ApiError || error instanceof Error) return error.message;
-  return 'Unknown request failure.';
+  return ui('Unknown request failure.');
 }
 
 function formatLabel(value?: string | null): string {
-  return String(value || 'not reported').replace(/_/g, ' ');
+  return String(value || 'Not reported').replace(/_/g, ' ');
 }
 
-function formatDateTime(value?: string | null): string {
-  if (!value) return 'Not reported';
+type UiTranslator = (englishText: string) => string;
+
+function formatDateTime(value: string | null | undefined, locale: AppLocale, ui: UiTranslator): string {
+  if (!value) return ui('Not reported');
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+  return Number.isNaN(parsed.getTime()) ? value : formatLocalizedDateTime(parsed, locale);
 }
 
-function formatConfidence(value?: number | null): string {
-  if (typeof value !== 'number' || Number.isNaN(value)) return 'Not scored';
-  return `${Math.round(value * 100)}%`;
+function formatConfidence(value: number | null | undefined, locale: AppLocale, ui: UiTranslator): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) return ui('Not scored');
+  return formatLocalizedNumber(value, locale, { style: 'percent', maximumFractionDigits: 0 });
 }
 
-function displayCost(value: unknown): string {
-  if (value === null || value === undefined || value === '') return 'Not reported';
-  return formatCurrencyAmount(value as number | string);
+function displayCost(value: unknown, locale: AppLocale, ui: UiTranslator): string {
+  if (value === null || value === undefined || value === '') return ui('Not reported');
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return String(value);
+  return formatLocalizedCurrency(amount, getActiveTenantCurrency(), locale, { maximumFractionDigits: 4 });
 }
 
-function displayUnknown(value: unknown): string {
-  if (value === null || value === undefined || value === '') return 'Not reported';
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+function displayUnknown(value: unknown, ui: UiTranslator): string {
+  if (value === null || value === undefined || value === '') return ui('Not reported');
+  if (typeof value === 'boolean') return value ? ui('Yes') : ui('No');
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 }
@@ -332,18 +339,19 @@ const safetyLabels: Record<string, string> = {
   execution_requests_remain_human_approved: 'Execution Requests remain human approved'
 };
 
-function providerModeDetails(mode?: string | null) {
-  return providerModeCopy[String(mode || 'unavailable')] || {
-    label: formatLabel(mode),
-    explanation: 'The server reports how this result was produced.'
+function providerModeDetails(mode: string | null | undefined, ui: UiTranslator) {
+  const copy = providerModeCopy[String(mode || 'unavailable')];
+  return copy ? { label: ui(copy.label), explanation: ui(copy.explanation) } : {
+    label: ui(formatLabel(mode)),
+    explanation: ui('The server reports how this result was produced.')
   };
 }
 
-function resultProviderLabel(provider?: string | null): string {
-  if (provider === 'openai_responses') return 'External AI explanation';
-  if (provider === 'local_rules_fallback') return 'Built-in rules fallback';
-  if (provider === 'local_rules') return 'Built-in rules';
-  return formatLabel(provider);
+function resultProviderLabel(provider: string | null | undefined, ui: UiTranslator): string {
+  if (provider === 'openai_responses') return ui('External AI explanation');
+  if (provider === 'local_rules_fallback') return ui('Built-in rules fallback');
+  if (provider === 'local_rules') return ui('Built-in rules');
+  return ui(formatLabel(provider));
 }
 
 async function fetchCapabilities(): Promise<CopilotCapabilities> {
@@ -397,12 +405,13 @@ function Badge(props: { children: React.ReactNode; tone?: 'default' | 'good' | '
 }
 
 export default function AIOperationsCopilotPage() {
+  const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
   const capabilities = getRoleCapabilities();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedRunId = searchParams.get('run_id');
   const [intent, setIntent] = useState<CopilotIntent>('operational_priority_summary');
-  const [prompt, setPrompt] = useState('Summarize the most important operational evidence I should review now.');
+  const [prompt, setPrompt] = useState(() => ui('Summarize the most important operational evidence I should review now.'));
   const [productId, setProductId] = useState('');
   const [proposedMinStock, setProposedMinStock] = useState('');
   const [minStockOverrideReason, setMinStockOverrideReason] = useState('');
@@ -459,8 +468,8 @@ export default function AIOperationsCopilotPage() {
     mutationFn: createRun,
     onSuccess: async (run) => {
       setActionMessage(run.proposal_snapshot
-        ? 'Copilot proposal created. It must be reviewed in Intelligence Review before an Execution Request draft can be created.'
-        : 'Copilot analysis completed. No operational data was changed.');
+        ? ui('Copilot proposal created. It must be reviewed in Intelligence Review before an Execution Request draft can be created.')
+        : ui('Copilot analysis completed. No operational data was changed.'));
       setSelectedRunId(run.id);
       setSearchParams({ run_id: run.id });
       await Promise.all([
@@ -470,7 +479,7 @@ export default function AIOperationsCopilotPage() {
       ]);
     },
     onError: (error) => {
-      const message = readableError(error);
+      const message = readableError(error, ui);
       setActionMessage(message);
       showTenantActionError(message);
     }
@@ -482,7 +491,7 @@ export default function AIOperationsCopilotPage() {
     : runRows[0] || null;
 
   const provider = capabilitiesQuery.data?.provider;
-  const modeDetails = providerModeDetails(provider?.effective_mode);
+  const modeDetails = providerModeDetails(provider?.effective_mode, ui);
   const selectedProduct = (productsQuery.data || []).find((product) => product.id === productId) || null;
   const minStockValue = Number(effectiveProposedMinStock);
   const standardCostValue = Number(proposedStandardUnitCost);
@@ -536,17 +545,17 @@ export default function AIOperationsCopilotPage() {
     if (nextIntent !== 'prepare_min_stock_proposal') setProposedMinStock('');
     if (nextIntent !== 'prepare_standard_cost_proposal') setProposedStandardUnitCost('');
     if (nextIntent === 'operational_priority_summary') {
-      setPrompt('Summarize the most important operational evidence I should review now.');
+      setPrompt(ui('Summarize the most important operational evidence I should review now.'));
     } else if (nextIntent === 'product_risk_explanation') {
-      setPrompt('Explain the operational risk for this product using only the tenant evidence available to me.');
+      setPrompt(ui('Explain the operational risk for this product using only the tenant evidence available to me.'));
     } else if (nextIntent === 'product_replenishment_plan') {
-      setPrompt('Explain the minimum-stock threshold and the separate reorder quantity using reliable inbound, MOQ, and package evidence. Do not create a purchase order.');
+      setPrompt(ui('Explain the minimum-stock threshold and the separate reorder quantity using reliable inbound, MOQ, and package evidence. Do not create a purchase order.'));
     } else if (nextIntent === 'supplier_performance_summary') {
-      setPrompt('Summarize which suppliers require operational review and explain the evidence.');
+      setPrompt(ui('Summarize which suppliers require operational review and explain the evidence.'));
     } else if (nextIntent === 'prepare_min_stock_proposal') {
-      setPrompt('Calculate a transparent minimum-stock recommendation, prepare the recommended value for governed review, and explain every input. Do not change the product.');
+      setPrompt(ui('Calculate a transparent minimum-stock recommendation, prepare the recommended value for governed review, and explain every input. Do not change the product.'));
     } else {
-      setPrompt('Prepare a governed standard-cost proposal and explain the received-cost evidence. Do not change the product.');
+      setPrompt(ui('Prepare a governed standard-cost proposal and explain the received-cost evidence. Do not change the product.'));
     }
   };
 
@@ -589,7 +598,7 @@ export default function AIOperationsCopilotPage() {
     : isStandardCostProposal
       ? proposal?.payload?.standard_unit_cost
       : undefined;
-  const proposalValueLabel = isMinStockProposal ? 'minimum stock' : isStandardCostProposal ? 'standard unit cost' : 'value';
+  const proposalValueLabel = isMinStockProposal ? ui('minimum stock') : isStandardCostProposal ? ui('standard unit cost') : ui('value');
   const response = selectedRun?.response_snapshot || {};
   const reviewLink = selectedRun?.source_action_id
     ? `/intelligence-review?source_action_id=${encodeURIComponent(selectedRun.source_action_id)}`
@@ -602,48 +611,48 @@ export default function AIOperationsCopilotPage() {
     <div className="ai-copilot-page io-operational-page io-workspace-page io-workspace-legacy-normalized" style={styles.page}>
       <OperationalWorkspaceHero
         iconPath="/ai-copilot"
-        eyebrow="Governed tenant intelligence"
-        title="AI Copilot"
-        description="Choose a defined inventory analysis or prepare a product proposal for human review. The Copilot explains information but cannot change inventory, submit approvals, or execute work."
+        eyebrow={ui("Governed tenant intelligence")}
+        title={ui("AI Copilot")}
+        description={ui("Choose a defined inventory analysis or prepare a product proposal for human review. The Copilot explains information but cannot change inventory, submit approvals, or execute work.")}
         meta={
           <>
-            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>No autonomous execution</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Human review required</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("No autonomous execution")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Human review required")}</OperationalWorkspaceMetaPill>
           </>
         }
-        aside={<OperationalWorkspaceStatus value={modeDetails.label} label="current analysis mode" />}
+        aside={<OperationalWorkspaceStatus value={modeDetails.label} label={ui("current analysis mode")} />}
       />
 
-      {capabilitiesQuery.isError ? <div style={styles.error}>{readableError(capabilitiesQuery.error)}</div> : null}
+      {capabilitiesQuery.isError ? <div style={styles.error}>{readableError(capabilitiesQuery.error, ui)}</div> : null}
       {actionMessage ? <div style={styles.info}>{actionMessage}</div> : null}
 
-      <OperationalWorkspaceStats ariaLabel="AI Copilot overview">
+      <OperationalWorkspaceStats ariaLabel={ui("AI Copilot overview")}>
         <OperationalWorkspaceStatCard
-          label="How results are produced"
+          label={ui("How results are produced")}
           value={modeDetails.label}
-          helper={provider?.model && provider?.effective_mode === 'openai_responses' ? `Model: ${provider.model}` : modeDetails.explanation}
+          helper={provider?.model && provider?.effective_mode === 'openai_responses' ? `${ui('Model:')} ${provider.model}` : modeDetails.explanation}
           iconPath="/ai-copilot"
           tone="blue"
         />
         <OperationalWorkspaceStatCard
-          label="External data sharing"
-          value={provider?.external_provider_ready ? 'Configured' : 'Not active'}
-          helper="Each completed run records whether tenant evidence was shared externally"
+          label={ui("External data sharing")}
+          value={provider?.external_provider_ready ? ui('Configured') : ui('Not active')}
+          helper={ui("Each completed run records whether tenant evidence was shared externally")}
           iconPath="/system-context"
           tone={provider?.external_provider_ready ? 'warn' : 'good'}
         />
         <OperationalWorkspaceStatCard
-          label="What it can change"
-          value="None"
-          helper="The Copilot cannot submit, approve, or execute an Execution Request"
+          label={ui("What it can change")}
+          value={ui("None")}
+          helper={ui("The Copilot cannot submit, approve, or execute an Execution Request")}
           iconPath="/reliability-command"
           tone="good"
         />
         <OperationalWorkspaceStatCard
-          label="Runs this hour"
-          value={capabilitiesQuery.data?.run_limits ? `${capabilitiesQuery.data.run_limits.user_runs_used}/${capabilitiesQuery.data.run_limits.user_limit}` : 'Loading'}
-          helper={`Tenant usage: ${capabilitiesQuery.data?.run_limits ? `${capabilitiesQuery.data.run_limits.tenant_runs_used}/${capabilitiesQuery.data.run_limits.tenant_limit}` : 'not reported'}`}
+          label={ui("Runs this hour")}
+          value={capabilitiesQuery.data?.run_limits ? `${formatLocalizedNumber(capabilitiesQuery.data.run_limits.user_runs_used, locale)}/${formatLocalizedNumber(capabilitiesQuery.data.run_limits.user_limit, locale)}` : ui('Loading')}
+          helper={`${ui('Tenant usage:')} ${capabilitiesQuery.data?.run_limits ? `${formatLocalizedNumber(capabilitiesQuery.data.run_limits.tenant_runs_used, locale)}/${formatLocalizedNumber(capabilitiesQuery.data.run_limits.tenant_limit, locale)}` : ui('Not reported')}`}
           iconPath="/automation-schedules"
           tone="neutral"
         />
@@ -657,10 +666,10 @@ export default function AIOperationsCopilotPage() {
       ) : null}
 
       <div className="ai-copilot-main-grid" style={styles.mainGrid}>
-        <Panel title="Start a new analysis" subtitle="Choose the result you need. Options are limited by your current permissions." iconPath="/ai-copilot">
+        <Panel title={ui("Start a new analysis")} subtitle={ui("Choose the result you need. Options are limited by your current permissions.")} iconPath="/ai-copilot">
           <form onSubmit={handleSubmit} style={styles.form} data-skip-global-action-feedback="true">
             <label style={styles.field}>
-              <span style={styles.label}>Analysis type</span>
+              <span style={styles.label}>{ui("Analysis type")}</span>
               <select value={intent} onChange={(event) => handleIntentChange(event.target.value as CopilotIntent)} style={styles.input}>
                 {(capabilitiesQuery.data?.intents || Object.entries(intentFallbacks).map(([key, item]) => ({
                   intent: key as CopilotIntent,
@@ -669,19 +678,19 @@ export default function AIOperationsCopilotPage() {
                   missing_permissions: []
                 }))).map((item) => (
                   <option key={item.intent} value={item.intent} disabled={!item.available}>
-                    {item.label}{item.available ? '' : ' — unavailable for this role'}
+                    {capabilitiesQuery.data?.intents ? item.label : ui(item.label)}{item.available ? '' : ` — ${ui('unavailable for this role')}`}
                   </option>
                 ))}
               </select>
-              <span style={styles.help}>{selectedIntentCapability?.description || intentFallbacks[intent].description}</span>
+              <span style={styles.help}>{selectedIntentCapability?.description || ui(intentFallbacks[intent].description)}</span>
               {selectedIntentCapability && !selectedIntentCapability.available ? (
-                <span style={styles.fieldError}>Missing permissions: {selectedIntentCapability.missing_permissions.join(', ')}</span>
+                <span style={styles.fieldError}>{ui("Missing permissions:")} {selectedIntentCapability.missing_permissions.join(', ')}</span>
               ) : null}
             </label>
 
             {needsProduct ? (
               <label style={styles.field}>
-                <span style={styles.label}>Product</span>
+                <span style={styles.label}>{ui("Product")}</span>
                 <select value={productId} onChange={(event) => {
                   setProductId(event.target.value);
                   setProposedMinStock('');
@@ -689,63 +698,63 @@ export default function AIOperationsCopilotPage() {
                   setMinStockValueTouched(false);
                   setProposedStandardUnitCost('');
                 }} style={styles.input}>
-                  <option value="">Select a product</option>
+                  <option value="">{ui("Select a product")}</option>
                   {(productsQuery.data || []).map((product) => (
                     <option key={product.id} value={product.id}>
-                      {product.name} — min {displayUnknown(product.min_stock)} {product.unit} · standard cost {displayCost(product.standard_unit_cost)}
+                      {product.name} — {ui('min')} {displayUnknown(product.min_stock, ui)} {product.unit} · {ui('standard cost')} {displayCost(product.standard_unit_cost, locale, ui)}
                     </option>
                   ))}
                 </select>
-                {productsQuery.isLoading ? <span style={styles.help}>Loading products…</span> : null}
-                {productsQuery.isError ? <span style={styles.fieldError}>{readableError(productsQuery.error)}</span> : null}
+                {productsQuery.isLoading ? <span style={styles.help}>{ui("Loading products…")}</span> : null}
+                {productsQuery.isError ? <span style={styles.fieldError}>{readableError(productsQuery.error, ui)}</span> : null}
               </label>
             ) : null}
 
             {['prepare_min_stock_proposal', 'product_replenishment_plan'].includes(intent) ? (
               <div style={styles.recommendationStack}>
                 {minimumStockRecommendationQuery.isLoading || minimumStockRecommendationQuery.isFetching ? (
-                  <div style={styles.notice}>Calculating the minimum-stock threshold and replenishment plan from tenant evidence…</div>
+                  <div style={styles.notice}>{ui("Calculating the minimum-stock threshold and replenishment plan from tenant evidence…")}</div>
                 ) : minimumStockRecommendationQuery.isError ? (
-                  <div style={styles.error}>{readableError(minimumStockRecommendationQuery.error)}</div>
+                  <div style={styles.error}>{readableError(minimumStockRecommendationQuery.error, ui)}</div>
                 ) : minimumStockRecommendation ? (
                   <>
                     <div style={styles.recommendationBox}>
                       <div style={styles.proposalHeader}>
                         <div>
-                          <div style={styles.eyebrow}>Deterministic threshold recommendation</div>
-                          <h3 style={styles.proposalTitle}>Recommended minimum stock: {minimumStockRecommendation.recommended_min_stock} {minimumStockRecommendation.unit || ''}</h3>
+                          <div style={styles.eyebrow}>{ui("Deterministic threshold recommendation")}</div>
+                          <h3 style={styles.proposalTitle}>{ui("Recommended minimum stock:")} {formatLocalizedNumber(minimumStockRecommendation.recommended_min_stock, locale)} {minimumStockRecommendation.unit || ''}</h3>
                         </div>
                         <Badge tone={minimumStockRecommendation.recommendation_status === 'calculated' ? 'good' : 'warn'}>
-                          {formatLabel(minimumStockRecommendation.recommendation_status)}
+                          {ui(formatLabel(minimumStockRecommendation.recommendation_status))}
                         </Badge>
                       </div>
                       <div style={styles.keyValueGrid}>
-                        <div><span style={styles.keyLabel}>Current minimum</span><strong>{minimumStockRecommendation.current_min_stock}</strong></div>
-                        <div><span style={styles.keyLabel}>Recommended minimum</span><strong>{minimumStockRecommendation.recommended_min_stock}</strong></div>
-                        <div><span style={styles.keyLabel}>Raw requirement</span><strong>{minimumStockRecommendation.raw_recommended_min_stock}</strong></div>
-                        <div><span style={styles.keyLabel}>Evidence quality</span><strong>{formatConfidence(minimumStockRecommendation.confidence_score)}</strong></div>
-                        <div><span style={styles.keyLabel}>Direction</span><strong>{formatLabel(minimumStockRecommendation.direction)}</strong></div>
-                        <div><span style={styles.keyLabel}>Base-unit increment</span><strong>{minimumStockRecommendation.inputs.base_unit_increment ?? 1}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui("Current minimum")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.current_min_stock, locale)}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui("Recommended minimum")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.recommended_min_stock, locale)}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui("Raw requirement")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.raw_recommended_min_stock, locale)}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui("Evidence quality")}</span><strong>{formatConfidence(minimumStockRecommendation.confidence_score, locale, ui)}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui("Direction")}</span><strong>{ui(formatLabel(minimumStockRecommendation.direction))}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui("Base-unit increment")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.inputs.base_unit_increment ?? 1, locale)}</strong></div>
                       </div>
                       <p style={styles.help}>{minimumStockRecommendation.formula}</p>
                       <div style={styles.calculationGrid}>
-                        <div><span style={styles.keyLabel}>Demand used/day</span><strong>{minimumStockRecommendation.inputs.selected_daily_demand}</strong></div>
-                        <div><span style={styles.keyLabel}>Configured lead time</span><strong>{minimumStockRecommendation.inputs.lead_time_configured ? `${minimumStockRecommendation.inputs.configured_lead_time_days} days` : 'Not configured'}</strong></div>
-                        <div><span style={styles.keyLabel}>Effective coverage</span><strong>{minimumStockRecommendation.inputs.effective_coverage_days} days</strong></div>
-                        <div><span style={styles.keyLabel}>Lead-time demand</span><strong>{minimumStockRecommendation.calculation.expected_lead_time_demand}</strong></div>
-                        <div><span style={styles.keyLabel}>Safety stock</span><strong>{minimumStockRecommendation.calculation.safety_stock}</strong></div>
-                        <div><span style={styles.keyLabel}>Before base rounding</span><strong>{minimumStockRecommendation.calculation.before_base_unit_rounding ?? minimumStockRecommendation.calculation.before_package_rounding}</strong></div>
-                        <div><span style={styles.keyLabel}>After base rounding</span><strong>{minimumStockRecommendation.calculation.after_base_unit_rounding ?? minimumStockRecommendation.calculation.after_package_rounding}</strong></div>
-                        <div><span style={styles.keyLabel}>Supplier delay buffer</span><strong>{minimumStockRecommendation.inputs.supplier_delay_buffer_days} days</strong></div>
-                        <div><span style={styles.keyLabel}>30d / 90d usage</span><strong>{minimumStockRecommendation.inputs.total_outbound_30d} / {minimumStockRecommendation.inputs.total_outbound_90d}</strong></div>
-                        <div><span style={styles.keyLabel}>Last outbound evidence</span><strong>{formatDateTime(minimumStockRecommendation.inputs.last_outbound_at)}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui("Demand used/day")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.inputs.selected_daily_demand, locale)}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui("Configured lead time")}</span><strong>{minimumStockRecommendation.inputs.lead_time_configured ? `${formatLocalizedNumber(minimumStockRecommendation.inputs.configured_lead_time_days || 0, locale)} ${ui('days')}` : ui('Not configured')}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui("Effective coverage")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.inputs.effective_coverage_days, locale)} {ui('days')}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui("Lead-time demand")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.calculation.expected_lead_time_demand, locale)}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui("Safety stock")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.calculation.safety_stock, locale)}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui("Before base rounding")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.calculation.before_base_unit_rounding ?? minimumStockRecommendation.calculation.before_package_rounding, locale)}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui("After base rounding")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.calculation.after_base_unit_rounding ?? minimumStockRecommendation.calculation.after_package_rounding, locale)}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui("Supplier delay buffer")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.inputs.supplier_delay_buffer_days, locale)} {ui('days')}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui("30d / 90d usage")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.inputs.total_outbound_30d, locale)} / {formatLocalizedNumber(minimumStockRecommendation.inputs.total_outbound_90d, locale)}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui("Last outbound evidence")}</span><strong>{formatDateTime(minimumStockRecommendation.inputs.last_outbound_at, locale, ui)}</strong></div>
                       </div>
-                      <div style={styles.notice}>Package size and minimum-order rules are intentionally excluded from the minimum-stock threshold. They are applied only to the separate reorder quantity below.</div>
+                      <div style={styles.notice}>{ui("Package size and minimum-order rules are intentionally excluded from the minimum-stock threshold. They are applied only to the separate reorder quantity below.")}</div>
                       <details>
-                        <summary style={styles.detailsSummary}>Show threshold assumptions and warnings</summary>
+                        <summary style={styles.detailsSummary}>{ui("Show threshold assumptions and warnings")}</summary>
                         <ul style={styles.list}>
                           {minimumStockRecommendation.assumptions.map((item) => <li key={item}>{item}</li>)}
-                          {minimumStockRecommendation.warnings.map((item) => <li key={item}><strong>Warning:</strong> {item}</li>)}
+                          {minimumStockRecommendation.warnings.map((item) => <li key={item}><strong>{ui("Warning:")}</strong> {item}</li>)}
                         </ul>
                       </details>
                       <div style={styles.help}>{minimumStockRecommendation.confidence_meaning}</div>
@@ -755,50 +764,50 @@ export default function AIOperationsCopilotPage() {
                       <div style={styles.proposalBox}>
                         <div style={styles.proposalHeader}>
                           <div>
-                            <div style={styles.eyebrow}>Separate replenishment plan</div>
-                            <h3 style={styles.proposalTitle}>Recommended order quantity: {minimumStockRecommendation.replenishment_plan.recommended_reorder_quantity} {minimumStockRecommendation.unit || ''}</h3>
+                            <div style={styles.eyebrow}>{ui("Separate replenishment plan")}</div>
+                            <h3 style={styles.proposalTitle}>{ui("Recommended order quantity:")} {formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.recommended_reorder_quantity, locale)} {minimumStockRecommendation.unit || ''}</h3>
                           </div>
                           <Badge tone={minimumStockRecommendation.replenishment_plan.recommended_reorder_quantity > 0 ? 'warn' : 'good'}>
-                            {minimumStockRecommendation.replenishment_plan.recommended_reorder_quantity > 0 ? 'Order suggested' : 'No order suggested'}
+                            {minimumStockRecommendation.replenishment_plan.recommended_reorder_quantity > 0 ? ui('Order suggested') : ui('No order suggested')}
                           </Badge>
                         </div>
                         <div style={styles.keyValueGrid}>
-                          <div><span style={styles.keyLabel}>Current stock</span><strong>{minimumStockRecommendation.replenishment_plan.current_stock}</strong></div>
-                          <div><span style={styles.keyLabel}>Reliable inbound</span><strong>{minimumStockRecommendation.replenishment_plan.reliable_open_inbound_quantity}</strong></div>
-                          <div><span style={styles.keyLabel}>At-risk inbound</span><strong>{minimumStockRecommendation.replenishment_plan.at_risk_open_inbound_quantity}</strong></div>
-                          <div><span style={styles.keyLabel}>Inbound evidence</span><strong>{minimumStockRecommendation.replenishment_plan.inbound_data_available === false ? 'Unavailable for this role' : 'Available'}</strong></div>
-                          <div><span style={styles.keyLabel}>Inventory position</span><strong>{minimumStockRecommendation.replenishment_plan.inventory_position}</strong></div>
-                          <div><span style={styles.keyLabel}>Target stock</span><strong>{minimumStockRecommendation.replenishment_plan.target_stock_quantity}</strong></div>
-                          <div><span style={styles.keyLabel}>Before MOQ</span><strong>{minimumStockRecommendation.replenishment_plan.pre_moq_reorder_quantity}</strong></div>
-                          <div><span style={styles.keyLabel}>Minimum order quantity</span><strong>{minimumStockRecommendation.replenishment_plan.min_order_quantity}</strong></div>
-                          <div><span style={styles.keyLabel}>Package size</span><strong>{minimumStockRecommendation.replenishment_plan.units_per_order_package}</strong></div>
-                          <div><span style={styles.keyLabel}>Packages to order</span><strong>{minimumStockRecommendation.replenishment_plan.recommended_order_package_count}</strong></div>
-                          <div><span style={styles.keyLabel}>Final order quantity</span><strong>{minimumStockRecommendation.replenishment_plan.recommended_reorder_quantity}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("Current stock")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.current_stock, locale)}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("Reliable inbound")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.reliable_open_inbound_quantity, locale)}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("At-risk inbound")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.at_risk_open_inbound_quantity, locale)}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("Inbound evidence")}</span><strong>{minimumStockRecommendation.replenishment_plan.inbound_data_available === false ? ui('Unavailable for this role') : ui('Available')}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("Inventory position")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.inventory_position, locale)}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("Target stock")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.target_stock_quantity, locale)}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("Before MOQ")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.pre_moq_reorder_quantity, locale)}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("Minimum order quantity")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.min_order_quantity, locale)}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("Package size")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.units_per_order_package, locale)}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("Packages to order")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.recommended_order_package_count, locale)}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("Final order quantity")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.recommended_reorder_quantity, locale)}</strong></div>
                         </div>
                         <p style={styles.help}>{minimumStockRecommendation.replenishment_plan.formula}</p>
                         <details>
-                          <summary style={styles.detailsSummary}>Show replenishment assumptions and warnings</summary>
+                          <summary style={styles.detailsSummary}>{ui("Show replenishment assumptions and warnings")}</summary>
                           <ul style={styles.list}>
                             {minimumStockRecommendation.replenishment_plan.assumptions.map((item) => <li key={item}>{item}</li>)}
-                            {minimumStockRecommendation.replenishment_plan.warnings.map((item) => <li key={item}><strong>Warning:</strong> {item}</li>)}
+                            {minimumStockRecommendation.replenishment_plan.warnings.map((item) => <li key={item}><strong>{ui("Warning:")}</strong> {item}</li>)}
                           </ul>
                         </details>
                         <div style={styles.actionRow}>
                           <Link to="/procurement-recommendations" style={styles.linkButton} data-skip-global-action-feedback="true">
-                            Open all-products replenishment workbench
+                            {ui("Open all-products replenishment workbench")}
                           </Link>
                         </div>
                       </div>
                     ) : null}
                   </>
                 ) : productId ? null : (
-                  <div style={styles.notice}>Select a product to calculate its threshold and replenishment plan.</div>
+                  <div style={styles.notice}>{ui("Select a product to calculate its threshold and replenishment plan.")}</div>
                 )}
 
                 {intent === 'prepare_min_stock_proposal' ? (
                   <>
                     <label style={styles.field}>
-                      <span style={styles.label}>Final proposed minimum stock</span>
+                      <span style={styles.label}>{ui("Final proposed minimum stock")}</span>
                       <input
                         type="number"
                         min="0"
@@ -811,23 +820,23 @@ export default function AIOperationsCopilotPage() {
                         }}
                         style={styles.input}
                       />
-                      <span style={styles.help}>The threshold recommendation is filled automatically. You may change it, but an explanation is required. The separate reorder quantity is advisory and does not change the product or create a purchase order.</span>
-                      {minStockNoChange ? <span style={styles.fieldError}>The final value matches the current product minimum, so there is no change to propose.</span> : null}
+                      <span style={styles.help}>{ui("The threshold recommendation is filled automatically. You may change it, but an explanation is required. The separate reorder quantity is advisory and does not change the product or create a purchase order.")}</span>
+                      {minStockNoChange ? <span style={styles.fieldError}>{ui("The final value matches the current product minimum, so there is no change to propose.")}</span> : null}
                     </label>
 
                     {minStockOverrideApplied ? (
                       <label style={styles.field}>
-                        <span style={styles.label}>Why are you overriding the threshold recommendation?</span>
+                        <span style={styles.label}>{ui("Why are you overriding the threshold recommendation?")}</span>
                         <textarea
                           value={minStockOverrideReason}
                           onChange={(event) => setMinStockOverrideReason(event.target.value)}
                           rows={3}
                           maxLength={1000}
                           style={styles.textarea}
-                          placeholder="Explain the business evidence or policy reason for using a different threshold."
+                          placeholder={ui("Explain the business evidence or policy reason for using a different threshold.")}
                         />
-                        <span style={styles.help}>{minStockOverrideReason.length}/1000 characters</span>
-                        {minStockOverrideReason.trim().length < 3 ? <span style={styles.fieldError}>An override explanation is required.</span> : null}
+                        <span style={styles.help}>{formatLocalizedNumber(minStockOverrideReason.length, locale)}/1,000 {ui("characters")}</span>
+                        {minStockOverrideReason.trim().length < 3 ? <span style={styles.fieldError}>{ui("An override explanation is required.")}</span> : null}
                       </label>
                     ) : null}
                   </>
@@ -837,7 +846,7 @@ export default function AIOperationsCopilotPage() {
 
             {intent === 'prepare_standard_cost_proposal' ? (
               <label style={styles.field}>
-                <span style={styles.label}>Proposed standard unit cost</span>
+                <span style={styles.label}>{ui("Proposed standard unit cost")}</span>
                 <input
                   type="number"
                   min="0"
@@ -847,15 +856,15 @@ export default function AIOperationsCopilotPage() {
                   onChange={(event) => setProposedStandardUnitCost(event.target.value)}
                   style={styles.input}
                 />
-                <span style={styles.help}>The server records the current standard cost and recent cost-bearing movement evidence. This does not update the product.</span>
-                {standardCostNoChange ? <span style={styles.fieldError}>The proposed cost matches the current product cost, so there is no change to propose.</span> : null}
+                <span style={styles.help}>{ui("The server records the current standard cost and recent cost-bearing movement evidence. This does not update the product.")}</span>
+                {standardCostNoChange ? <span style={styles.fieldError}>{ui("The proposed cost matches the current product cost, so there is no change to propose.")}</span> : null}
               </label>
             ) : null}
 
             <label style={styles.field}>
-              <span style={styles.label}>{provider?.effective_mode === 'openai_responses' ? 'Question or instructions' : 'Reason for this analysis'}</span>
+              <span style={styles.label}>{provider?.effective_mode === 'openai_responses' ? ui('Question or instructions') : ui('Reason for this analysis')}</span>
               <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={6} maxLength={2000} style={styles.textarea} />
-              <span style={styles.help}>{provider?.effective_mode === 'openai_responses' ? 'The external AI model can use this text when writing its explanation.' : 'Built-in rules do not interpret an open-ended question. The selected analysis type controls the result; this text is saved as the reason for the request.'} {prompt.length}/2000 characters</span>
+              <span style={styles.help}>{provider?.effective_mode === 'openai_responses' ? ui('The external AI model can use this text when writing its explanation.') : ui('Built-in rules do not interpret an open-ended question. The selected analysis type controls the result; this text is saved as the reason for the request.')} {formatLocalizedNumber(prompt.length, locale)}/2,000 {ui("characters")}</span>
             </label>
 
             {provider?.external_processing_confirmation_required ? (
@@ -866,72 +875,72 @@ export default function AIOperationsCopilotPage() {
                   onChange={(event) => setExternalProcessingConfirmed(event.target.checked)}
                 />
                 <span>
-                  I confirm that the tenant evidence assembled for this run may be sent to the configured external AI provider. The run will record whether external sharing occurred.
+                  {ui("I confirm that the tenant evidence assembled for this run may be sent to the configured external AI provider. The run will record whether external sharing occurred.")}
                 </span>
               </label>
             ) : null}
 
             <button type="submit" className="primary-button" style={styles.primaryButton} disabled={!canSubmit}>
-              {createMutation.isPending ? 'Running governed analysis…' : selectedIntentCapability?.proposal_supported ? 'Prepare proposal for Intelligence Review' : 'Run read-only analysis'}
+              {createMutation.isPending ? ui('Running governed analysis…') : selectedIntentCapability?.proposal_supported ? ui('Prepare proposal for Intelligence Review') : ui('Run read-only analysis')}
             </button>
             {!capabilities.canGovernDecisionIntelligence ? (
-              <div style={styles.notice}>Your role can view permitted history but cannot start analyses.</div>
+              <div style={styles.notice}>{ui("Your role can view permitted history but cannot start analyses.")}</div>
             ) : null}
             {capabilities.canGovernDecisionIntelligence && !capabilitiesQuery.data?.can_run ? (
-              <div style={styles.notice}>{capabilitiesQuery.data?.run_unavailable_reason || provider?.unavailable_reason || 'Analysis is currently unavailable.'}</div>
+              <div style={styles.notice}>{capabilitiesQuery.data?.run_unavailable_reason || provider?.unavailable_reason || ui('Analysis is currently unavailable.')}</div>
             ) : null}
             {selectedIntentCapability?.proposal_supported && !capabilitiesQuery.data?.can_create_execution_request_after_review ? (
-              <div style={styles.notice}>You may prepare the proposal, but another authorised user must create the Execution Request after approval.</div>
+              <div style={styles.notice}>{ui("You may prepare the proposal, but another authorised user must create the Execution Request after approval.")}</div>
             ) : null}
           </form>
         </Panel>
 
         <Panel
           iconPath="/intelligence-review"
-          title="Selected result"
+          title={ui("Selected result")}
           subtitle={selectedRun
-            ? `${intentFallbacks[selectedRun.intent]?.label || formatLabel(selectedRun.intent)} · ${formatDateTime(selectedRun.created_at)}`
-            : 'Run an analysis or select a historical result.'}
+            ? `${ui(intentFallbacks[selectedRun.intent]?.label || formatLabel(selectedRun.intent))} · ${formatDateTime(selectedRun.created_at, locale, ui)}`
+            : ui('Run an analysis or select a historical result.')}
         >
-          {selectedRunKey && selectedRunQuery.isLoading ? <div style={styles.empty}>Loading the selected result…</div> : null}
+          {selectedRunKey && selectedRunQuery.isLoading ? <div style={styles.empty}>{ui("Loading the selected result…")}</div> : null}
           {selectedRunKey && selectedRunQuery.isError ? (
             <div style={styles.error}>
-              <div>{readableError(selectedRunQuery.error)}</div>
-              <button type="button" onClick={clearRunSelection} style={styles.inlineButton}>Clear selection</button>
+              <div>{readableError(selectedRunQuery.error, ui)}</div>
+              <button type="button" onClick={clearRunSelection} style={styles.inlineButton}>{ui("Clear selection")}</button>
             </div>
           ) : null}
-          {!selectedRun && !(selectedRunKey && (selectedRunQuery.isLoading || selectedRunQuery.isError)) ? <div style={styles.empty}>No permitted Copilot runs are available.</div> : null}
+          {!selectedRun && !(selectedRunKey && (selectedRunQuery.isLoading || selectedRunQuery.isError)) ? <div style={styles.empty}>{ui("No permitted Copilot runs are available.")}</div> : null}
           {selectedRun ? (
             <div className="ai-copilot-result" style={styles.resultStack}>
               <div style={styles.badgeRow}>
-                <Badge tone={selectedRun.run_status === 'completed' ? 'good' : selectedRun.run_status === 'failed' ? 'bad' : 'warn'}>{formatLabel(selectedRun.run_status)}</Badge>
-                <Badge>{formatLabel(selectedRun.intent)}</Badge>
-                <Badge>{resultProviderLabel(selectedRun.provider)}</Badge>
+                <Badge tone={selectedRun.run_status === 'completed' ? 'good' : selectedRun.run_status === 'failed' ? 'bad' : 'warn'}>{ui(formatLabel(selectedRun.run_status))}</Badge>
+                <Badge>{ui(formatLabel(selectedRun.intent))}</Badge>
+                <Badge>{resultProviderLabel(selectedRun.provider, ui)}</Badge>
                 <Badge tone={selectedRun.data_shared_externally ? 'warn' : 'good'}>
-                  {selectedRun.data_shared_externally ? 'Evidence shared externally' : 'No external data sharing'}
+                  {selectedRun.data_shared_externally ? ui('Evidence shared externally') : ui('No external data sharing')}
                 </Badge>
-                <Badge>Confidence {formatConfidence(selectedRun.confidence_score)}</Badge>
+                <Badge>{ui('Confidence')} {formatConfidence(selectedRun.confidence_score, locale, ui)}</Badge>
               </div>
 
               {selectedRun.run_status === 'failed' ? (
-                <div style={styles.error}>{selectedRun.error_message || selectedRun.error_code || 'Copilot run failed.'}</div>
+                <div style={styles.error}>{selectedRun.error_message || selectedRun.error_code || ui('Copilot run failed.')}</div>
               ) : (
                 <>
-                  <div style={styles.answer}>{response.answer || 'No answer was recorded.'}</div>
+                  <div style={styles.answer}>{response.answer || ui('No answer was recorded.')}</div>
                   {(response.highlights || []).length ? (
                     <div>
-                      <h3 style={styles.sectionTitle}>Highlights</h3>
+                      <h3 style={styles.sectionTitle}>{ui("Highlights")}</h3>
                       <ul style={styles.list}>{(response.highlights || []).map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul>
                     </div>
                   ) : null}
                   {(response.evidence || []).length ? (
                     <div>
-                      <h3 style={styles.sectionTitle}>Evidence references</h3>
+                      <h3 style={styles.sectionTitle}>{ui("Evidence references")}</h3>
                       <div style={styles.evidenceGrid}>
                         {(response.evidence || []).map((item, index) => (
                           <div key={`${item.kind}-${item.id || index}`} style={styles.evidenceCard}>
                             <strong>{item.label}</strong>
-                            <span style={styles.help}>{formatLabel(item.kind)}{capabilities.canViewTenantDiagnostics && item.id ? ` · ${item.id}` : ''}</span>
+                            <span style={styles.help}>{ui(formatLabel(item.kind))}{capabilities.canViewTenantDiagnostics && item.id ? ` · ${item.id}` : ''}</span>
                           </div>
                         ))}
                       </div>
@@ -944,38 +953,38 @@ export default function AIOperationsCopilotPage() {
                 <div style={styles.proposalBox}>
                   <div style={styles.proposalHeader}>
                     <div>
-                      <div style={styles.eyebrow}>Structured proposal</div>
-                      <h3 style={styles.proposalTitle}>{proposal.title || 'Governed proposal'}</h3>
+                      <div style={styles.eyebrow}>{ui("Structured proposal")}</div>
+                      <h3 style={styles.proposalTitle}>{proposal.title || ui('Governed proposal')}</h3>
                     </div>
-                    <Badge tone="warn">Human review required</Badge>
+                    <Badge tone="warn">{ui("Human review required")}</Badge>
                   </div>
                   <div style={styles.keyValueGrid}>
-                    <div><span style={styles.keyLabel}>Request type</span><strong>{formatLabel(proposal.request_type)}</strong></div>
-                    <div><span style={styles.keyLabel}>Product</span><strong>{proposal.payload?.product_name || (capabilities.canViewTenantDiagnostics ? proposal.payload?.product_id : null) || 'Not reported'}</strong></div>
-                    <div><span style={styles.keyLabel}>Current {proposalValueLabel}</span><strong>{isStandardCostProposal ? displayCost(proposalCurrentValue) : displayUnknown(proposalCurrentValue)}</strong></div>
-                    {isMinStockProposal ? <div><span style={styles.keyLabel}>System recommendation</span><strong>{displayUnknown(proposal.payload?.system_recommended_min_stock)}</strong></div> : null}
-                    <div><span style={styles.keyLabel}>Final proposed {proposalValueLabel}</span><strong>{isStandardCostProposal ? displayCost(proposalTargetValue) : displayUnknown(proposalTargetValue)}</strong></div>
-                    {isMinStockProposal ? <div><span style={styles.keyLabel}>Human override</span><strong>{proposal.payload?.user_override_applied ? 'Yes' : 'No'}</strong></div> : null}
+                    <div><span style={styles.keyLabel}>{ui("Request type")}</span><strong>{ui(formatLabel(proposal.request_type))}</strong></div>
+                    <div><span style={styles.keyLabel}>{ui("Product")}</span><strong>{proposal.payload?.product_name || (capabilities.canViewTenantDiagnostics ? proposal.payload?.product_id : null) || ui('Not reported')}</strong></div>
+                    <div><span style={styles.keyLabel}>{ui("Current")} {proposalValueLabel}</span><strong>{isStandardCostProposal ? displayCost(proposalCurrentValue, locale, ui) : displayUnknown(proposalCurrentValue, ui)}</strong></div>
+                    {isMinStockProposal ? <div><span style={styles.keyLabel}>{ui("System recommendation")}</span><strong>{displayUnknown(proposal.payload?.system_recommended_min_stock, ui)}</strong></div> : null}
+                    <div><span style={styles.keyLabel}>{ui("Final proposed")} {proposalValueLabel}</span><strong>{isStandardCostProposal ? displayCost(proposalTargetValue, locale, ui) : displayUnknown(proposalTargetValue, ui)}</strong></div>
+                    {isMinStockProposal ? <div><span style={styles.keyLabel}>{ui("Human override")}</span><strong>{proposal.payload?.user_override_applied ? ui('Yes') : ui('No')}</strong></div> : null}
                   </div>
-                  {isMinStockProposal && proposal.payload?.override_reason ? <p style={styles.help}>Override reason: {proposal.payload.override_reason}</p> : null}
-                  <p style={styles.help}>No product field has changed. A permitted reviewer must approve this proposal in Intelligence Review before a draft Execution Request can be created.</p>
+                  {isMinStockProposal && proposal.payload?.override_reason ? <p style={styles.help}>{ui("Override reason:")} {proposal.payload.override_reason}</p> : null}
+                  <p style={styles.help}>{ui("No product field has changed. A permitted reviewer must approve this proposal in Intelligence Review before a draft Execution Request can be created.")}</p>
                   <div style={styles.actionRow}>
-                    <Link to={reviewLink} style={styles.linkButton} data-skip-global-action-feedback="true"><TenantNavIcon path="/intelligence-review" size={16} />Open in Intelligence Review</Link>
-                    {selectedRun.execution_request_id ? <Link to={executionRequestLink} style={styles.secondaryLink} data-skip-global-action-feedback="true"><TenantNavIcon path="/execution-requests" size={16} />Open linked Execution Request</Link> : null}
+                    <Link to={reviewLink} style={styles.linkButton} data-skip-global-action-feedback="true"><TenantNavIcon path="/intelligence-review" size={16} />{ui("Open in Intelligence Review")}</Link>
+                    {selectedRun.execution_request_id ? <Link to={executionRequestLink} style={styles.secondaryLink} data-skip-global-action-feedback="true"><TenantNavIcon path="/execution-requests" size={16} />{ui("Open linked Execution Request")}</Link> : null}
                   </div>
                 </div>
               ) : null}
 
               <div style={styles.metadataGrid}>
-                <div><span style={styles.keyLabel}>Created</span><strong>{formatDateTime(selectedRun.created_at)}</strong></div>
-                <div><span style={styles.keyLabel}>Completed</span><strong>{formatDateTime(selectedRun.completed_at)}</strong></div>
-                <div><span style={styles.keyLabel}>External data sharing</span><strong>{selectedRun.data_shared_externally ? 'Yes' : 'No'}</strong></div>
+                <div><span style={styles.keyLabel}>{ui("Created")}</span><strong>{formatDateTime(selectedRun.created_at, locale, ui)}</strong></div>
+                <div><span style={styles.keyLabel}>{ui("Completed")}</span><strong>{formatDateTime(selectedRun.completed_at, locale, ui)}</strong></div>
+                <div><span style={styles.keyLabel}>{ui("External data sharing")}</span><strong>{selectedRun.data_shared_externally ? ui('Yes') : ui('No')}</strong></div>
                 {capabilities.canViewTenantDiagnostics ? (
                   <>
-                    <div><span style={styles.keyLabel}>Run identifier</span><strong>{selectedRun.id}</strong></div>
-                    <div><span style={styles.keyLabel}>Latency</span><strong>{selectedRun.latency_ms == null ? 'Not reported' : `${selectedRun.latency_ms} ms`}</strong></div>
-                    <div><span style={styles.keyLabel}>Provider response reference</span><strong>{selectedRun.provider_response_id ? 'Stored as a reference' : 'None'}</strong></div>
-                    <div><span style={styles.keyLabel}>External processing confirmed</span><strong>{selectedRun.external_processing_confirmed ? 'Yes' : 'No'}</strong></div>
+                    <div><span style={styles.keyLabel}>{ui("Run identifier")}</span><strong>{selectedRun.id}</strong></div>
+                    <div><span style={styles.keyLabel}>{ui("Latency")}</span><strong>{selectedRun.latency_ms == null ? ui('Not reported') : `${formatLocalizedNumber(selectedRun.latency_ms, locale)} ms`}</strong></div>
+                    <div><span style={styles.keyLabel}>{ui("Provider response reference")}</span><strong>{selectedRun.provider_response_id ? ui('Stored as a reference') : ui('None')}</strong></div>
+                    <div><span style={styles.keyLabel}>{ui("External processing confirmed")}</span><strong>{selectedRun.external_processing_confirmed ? ui('Yes') : ui('No')}</strong></div>
                   </>
                 ) : null}
               </div>
@@ -984,29 +993,29 @@ export default function AIOperationsCopilotPage() {
         </Panel>
       </div>
 
-      <Panel title="Run history" iconPath="/audit" subtitle={runsQuery.data && runsQuery.data.total > runRows.length ? `Showing the newest ${runRows.length} of ${runsQuery.data.total} permitted runs.` : `${runsQuery.data?.total || 0} permitted run(s). Select one to view the saved result above.`}>
-        {runsQuery.isError ? <div style={styles.error}>{readableError(runsQuery.error)}</div> : null}
-        {runsQuery.isLoading ? <div style={styles.empty}>Loading Copilot history…</div> : null}
+      <Panel title={ui("Run history")} iconPath="/audit" subtitle={runsQuery.data && runsQuery.data.total > runRows.length ? `${ui('Showing the newest')} ${formatLocalizedNumber(runRows.length, locale)} ${ui('of')} ${formatLocalizedNumber(runsQuery.data.total, locale)} ${ui('permitted runs.')}` : `${formatLocalizedNumber(runsQuery.data?.total || 0, locale)} ${ui('permitted run(s). Select one to view the saved result above.')}`}>
+        {runsQuery.isError ? <div style={styles.error}>{readableError(runsQuery.error, ui)}</div> : null}
+        {runsQuery.isLoading ? <div style={styles.empty}>{ui("Loading Copilot history…")}</div> : null}
         <div className="ai-copilot-history-list" style={styles.historyList}>
           {runRows.map((run) => (
             <button key={run.id} type="button" onClick={() => selectRun(run.id)} className="ai-copilot-history-button" style={{ ...styles.historyButton, ...(selectedRun?.id === run.id ? styles.historyButtonSelected : {}) }}>
               <div style={styles.historyMain}>
-                <strong>{intentFallbacks[run.intent]?.label || formatLabel(run.intent)}</strong>
+                <strong>{ui(intentFallbacks[run.intent]?.label || formatLabel(run.intent))}</strong>
                 <span className="ai-copilot-history-prompt" style={styles.historyPrompt}>{run.user_prompt}</span>
               </div>
               <div style={styles.historyMeta}>
-                <Badge tone={run.run_status === 'completed' ? 'good' : run.run_status === 'failed' ? 'bad' : 'warn'}>{formatLabel(run.run_status)}</Badge>
-                {run.proposal_snapshot ? <Badge tone="warn">Proposal</Badge> : <Badge>Read only</Badge>}
-                <span>{formatDateTime(run.created_at)}</span>
-                <span style={styles.historyView}><TenantNavIcon path="/intelligence-review" size={14} />View saved result</span>
+                <Badge tone={run.run_status === 'completed' ? 'good' : run.run_status === 'failed' ? 'bad' : 'warn'}>{ui(formatLabel(run.run_status))}</Badge>
+                {run.proposal_snapshot ? <Badge tone="warn">{ui("Proposal")}</Badge> : <Badge>{ui("Read only")}</Badge>}
+                <span>{formatDateTime(run.created_at, locale, ui)}</span>
+                <span style={styles.historyView}><TenantNavIcon path="/intelligence-review" size={14} />{ui("View saved result")}</span>
               </div>
             </button>
           ))}
-          {!runRows.length && !runsQuery.isLoading ? <div style={styles.empty}>No runs have been created.</div> : null}
+          {!runRows.length && !runsQuery.isLoading ? <div style={styles.empty}>{ui("No runs have been created.")}</div> : null}
         </div>
       </Panel>
 
-      <Panel title="What the Copilot is not allowed to do" iconPath="/reliability-command" subtitle="These restrictions are enforced by the server, not by instructions given to an AI model.">
+      <Panel title={ui("What the Copilot is not allowed to do")} iconPath="/reliability-command" subtitle={ui("These restrictions are enforced by the server, not by instructions given to an AI model.")}>
         <div style={styles.safetyGrid}>
           {Object.entries(capabilitiesQuery.data?.safety_contract || {
             tenant_scoped_reads_only: true,
@@ -1017,8 +1026,8 @@ export default function AIOperationsCopilotPage() {
             proposals_require_ai_review: true
           }).map(([key, value]) => (
             <div key={key} style={styles.safetyItem}>
-              <Badge tone="good">{value ? 'Protected' : 'Not allowed'}</Badge>
-              <span>{safetyLabels[key] || formatLabel(key)}</span>
+              <Badge tone="good">{value ? ui('Protected') : ui('Not allowed')}</Badge>
+              <span>{ui(safetyLabels[key] || formatLabel(key))}</span>
             </div>
           ))}
         </div>

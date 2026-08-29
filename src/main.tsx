@@ -8,6 +8,7 @@ import {
   RuntimeErrorBoundary
 } from './observability/runtimeErrorMonitoring';
 import { syncRuntimeSessionContext } from './observability/sessionContext';
+import { I18nProvider } from './i18n/I18nProvider';
 import './index.css';
 
 initializeRuntimeErrorMonitoring();
@@ -22,7 +23,9 @@ const root = ReactDOM.createRoot(document.getElementById('root')!, {
 root.render(
   <React.StrictMode>
     <RuntimeErrorBoundary fallback={ApplicationErrorFallback} beforeCapture={(scope) => scope.setTag('error_boundary', 'application-root')}>
-      <App />
+      <I18nProvider>
+        <App />
+      </I18nProvider>
     </RuntimeErrorBoundary>
   </React.StrictMode>
 );

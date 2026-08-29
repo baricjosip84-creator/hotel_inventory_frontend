@@ -39,7 +39,7 @@ requireIncludes(capabilities, [
   'saveSettings.isPending',
   'previewMutation.isPending || finalizeMutation.isPending',
   'create.isPending || execute.isPending',
-  "execute.isPending ? (direction === 'assemble' ? 'Assembling…' : 'Disassembling…')",
+  `execute.isPending ? (direction === 'assemble' ? ui("Assembling…") : ui("Disassembling…"))`,
   'saveDefinition.isPending',
   'saveValues.isPending',
   'rotateWebhook.isPending',

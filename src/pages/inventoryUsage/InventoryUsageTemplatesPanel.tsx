@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import { OperationalSectionHeader } from '../../components/ui/OperationalWorkspace';
+import { useAppTranslation } from '../../i18n/I18nContext';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../../i18n/formatters';
 
 import { USAGE_REASON_OPTIONS } from './inventoryUsageConfig';
-import { formatDateTime, formatUsageReason, toNumber } from './inventoryUsageFormatting';
+import { toNumber } from './inventoryUsageFormatting';
 import { styles } from './inventoryUsageStyles';
 import type { InventoryUsageTemplate, InventoryUsageTemplateConsumeResponse, InventoryUsageTemplateDraft, InventoryUsageTemplateLine, InventoryUsageTemplateReadiness, InventoryUsageProductOption, InventoryUsageStorageLocationOption } from './inventoryUsageTypes';
 import { showTenantActionError } from '../../lib/actionFeedback';
@@ -14,6 +16,14 @@ const createBlankLine = (): InventoryUsageTemplateLine => ({
   consumption_reason: '',
   notes: ''
 });
+
+type Ui = (text: string) => string;
+
+const formatUsageReasonDisplay = (reason: string | null | undefined, ui: Ui): string => {
+  if (!reason) return ui('Unassigned');
+  const option = USAGE_REASON_OPTIONS.find((entry) => entry.value === reason);
+  return option ? ui(option.label) : reason;
+};
 
 type InventoryUsageTemplatesPanelProps = {
   productOptions: InventoryUsageProductOption[];
@@ -60,6 +70,7 @@ export function InventoryUsageTemplatesPanel({
   canManageTemplates = true,
   canRecordTemplates = true
 }: InventoryUsageTemplatesPanelProps) {
+  const { locale, ui } = useAppTranslation();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [department, setDepartment] = useState('');
@@ -106,12 +117,12 @@ export function InventoryUsageTemplatesPanel({
     const items = lines.filter((line) => line.product_id.trim() && line.storage_location_id.trim() && Number(line.quantity) > 0);
 
     if (!name.trim()) {
-      showTenantActionError('Template name is required.');
+      showTenantActionError(ui('Template name is required.'));
       return;
     }
 
     if (!items.length) {
-      showTenantActionError('Add at least one valid template line.');
+      showTenantActionError(ui('Add at least one valid template line.'));
       return;
     }
 
@@ -142,123 +153,123 @@ export function InventoryUsageTemplatesPanel({
     <section style={styles.card}>
       <OperationalSectionHeader
         iconPath="/automation-schedules"
-        title="Usage templates"
-        description="Save repeatable consumption packs for recurring jobs, events, housekeeping carts, waste rounds, or maintenance kits, then load them into the bulk recorder."
-        actions={<span style={styles.filterPill}>{templates.length} templates</span>}
+        title={ui('Usage templates')}
+        description={ui('Save repeatable consumption packs for recurring jobs, events, housekeeping carts, waste rounds, or maintenance kits, then load them into the bulk recorder.')}
+        actions={<span style={styles.filterPill}>{formatLocalizedNumber(templates.length, locale)} {ui(templates.length === 1 ? 'template' : 'templates')}</span>}
       />
 
       <div style={styles.templateGrid}>
         <div style={styles.templateBuilderCard}>
-          <h3 style={styles.subsectionTitle}>Create reusable template</h3>
+          <h3 style={styles.subsectionTitle}>{ui('Create reusable template')}</h3>
           <div style={styles.filterGrid}>
             <label style={styles.fieldLabel}>
-              Template name
-              <input style={styles.input} value={name} onChange={(event) => setName(event.target.value)} placeholder="Banquet setup, room turnover, maintenance kit..." />
+              {ui('Template name')}
+              <input style={styles.input} value={name} onChange={(event) => setName(event.target.value)} placeholder={ui('Banquet setup, room turnover, maintenance kit...')} />
             </label>
             <label style={styles.fieldLabel}>
-              Default reason
+              {ui('Default reason')}
               <select style={styles.input} value={reason} onChange={(event) => setReason(event.target.value)}>
                 {USAGE_REASON_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+                  <option key={option.value} value={option.value}>{ui(option.label)}</option>
                 ))}
               </select>
             </label>
             <label style={styles.fieldLabel}>
-              Department / team
-              <input style={styles.input} value={department} onChange={(event) => setDepartment(event.target.value)} placeholder="Optional owner" />
+              {ui('Department / team')}
+              <input style={styles.input} value={department} onChange={(event) => setDepartment(event.target.value)} placeholder={ui('Optional owner')} />
             </label>
             <label style={styles.fieldLabel}>
-              Event / job
-              <input style={styles.input} value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder="Optional repeatable context" />
+              {ui('Event / job')}
+              <input style={styles.input} value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder={ui('Optional repeatable context')} />
             </label>
             <label style={styles.fieldLabel}>
-              Description
-              <input style={styles.input} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="When staff should use this template" />
+              {ui('Description')}
+              <input style={styles.input} value={description} onChange={(event) => setDescription(event.target.value)} placeholder={ui('When staff should use this template')} />
             </label>
             <label style={styles.fieldLabel}>
-              Notes
-              <input style={styles.input} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Default notes copied into usage" />
+              {ui('Notes')}
+              <input style={styles.input} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder={ui('Default notes copied into usage')} />
             </label>
             <label style={styles.fieldLabel}>
-              Schedule frequency
+              {ui('Schedule frequency')}
               <select style={styles.input} value={scheduleFrequency} onChange={(event) => setScheduleFrequency(event.target.value)}>
-                <option value="">No schedule</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
+                <option value="">{ui('No schedule')}</option>
+                <option value="daily">{ui('Daily')}</option>
+                <option value="weekly">{ui('Weekly')}</option>
+                <option value="monthly">{ui('Monthly')}</option>
               </select>
             </label>
             <label style={styles.fieldLabel}>
-              Schedule interval
+              {ui('Schedule interval')}
               <input type="number" min="1" max="365" style={styles.input} value={scheduleInterval} onChange={(event) => setScheduleInterval(event.target.value)} disabled={!scheduleFrequency} />
             </label>
             <label style={styles.fieldLabel}>
-              Next run
+              {ui('Next run')}
               <input type="datetime-local" style={styles.input} value={nextRunAt} onChange={(event) => setNextRunAt(event.target.value)} disabled={!scheduleFrequency} />
             </label>
             <label style={styles.checkboxLabel}>
               <input type="checkbox" checked={scheduleEnabled} onChange={(event) => setScheduleEnabled(event.target.checked)} disabled={!scheduleFrequency} />
-              Activate schedule
+              {ui('Activate schedule')}
             </label>
           </div>
 
           {lines.map((line, index) => (
             <div key={index} style={styles.bulkLineGrid}>
               <label style={styles.fieldLabel}>
-                Product
+                {ui('Product')}
                 <select style={styles.input} value={line.product_id} onChange={(event) => updateLine(index, 'product_id', event.target.value)} disabled={optionsLoading}>
-                  <option value="">Select product</option>
+                  <option value="">{ui('Select product')}</option>
                   {productOptions.map((product) => (
-                    <option key={product.id} value={product.id}>{product.name}{product.unit ? ` · ${product.unit}` : ""}</option>
+                    <option key={product.id} value={product.id}>{product.name}{product.unit ? ` · ${product.unit}` : ''}</option>
                   ))}
                 </select>
               </label>
               <label style={styles.fieldLabel}>
-                Storage location
+                {ui('Storage location')}
                 <select style={styles.input} value={line.storage_location_id} onChange={(event) => updateLine(index, 'storage_location_id', event.target.value)} disabled={optionsLoading}>
-                  <option value="">Select location</option>
+                  <option value="">{ui('Select location')}</option>
                   {storageLocations.map((location) => (
                     <option key={location.id} value={location.id}>{location.name}</option>
                   ))}
                 </select>
               </label>
               <label style={styles.fieldLabel}>
-                Quantity
+                {ui('Quantity')}
                 <input type="number" min="0" step="0.01" style={styles.input} value={line.quantity} onChange={(event) => updateLine(index, 'quantity', event.target.value)} placeholder="0" />
               </label>
               <label style={styles.fieldLabel}>
-                Line reason
+                {ui('Line reason')}
                 <select style={styles.input} value={line.consumption_reason} onChange={(event) => updateLine(index, 'consumption_reason', event.target.value)}>
-                  <option value="">Use default</option>
+                  <option value="">{ui('Use default')}</option>
                   {USAGE_REASON_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
+                    <option key={option.value} value={option.value}>{ui(option.label)}</option>
                   ))}
                 </select>
               </label>
-              <button type="button" style={styles.secondaryButton} onClick={() => removeLine(index)} disabled={lines.length === 1}>Remove</button>
+              <button type="button" style={styles.secondaryButton} onClick={() => removeLine(index)} disabled={lines.length === 1}>{ui('Remove')}</button>
             </div>
           ))}
 
           <div style={styles.bulkFooter}>
-            <button type="button" style={styles.secondaryButton} onClick={addLine}>Add template line</button>
+            <button type="button" style={styles.secondaryButton} onClick={addLine}>{ui('Add template line')}</button>
             <button type="button" style={styles.primaryButton} onClick={handleCreate} disabled={creating || !name.trim() || validLineCount === 0}>
-              {creating ? 'Saving template...' : 'Save usage template'}
+              {creating ? ui('Saving template...') : ui('Save usage template')}
             </button>
           </div>
-          {createError ? <p style={styles.errorText}>Template save failed: {createError.message}</p> : null}
-          {archiveError ? <p style={styles.errorText}>Template archive failed: {archiveError.message}</p> : null}
-          {recordError ? <p style={styles.errorText}>Template recording failed: {recordError.message}</p> : null}
-          {recordResult ? <p style={styles.successText}>{recordResult.message} · {recordResult.usage_count} lines recorded.</p> : null}
+          {createError ? <p style={styles.errorText}>{ui('Template save failed: ')}{createError.message}</p> : null}
+          {archiveError ? <p style={styles.errorText}>{ui('Template archive failed: ')}{archiveError.message}</p> : null}
+          {recordError ? <p style={styles.errorText}>{ui('Template recording failed: ')}{recordError.message}</p> : null}
+          {recordResult ? <p style={styles.successText}>{recordResult.message} · {formatLocalizedNumber(toNumber(recordResult.usage_count), locale)} {ui('lines recorded.')}</p> : null}
         </div>
 
         <div style={styles.templateListCard}>
-          <h3 style={styles.subsectionTitle}>Saved templates</h3>
+          <h3 style={styles.subsectionTitle}>{ui('Saved templates')}</h3>
           {loading ? (
-            <p style={styles.sectionDescription}>Loading usage templates...</p>
+            <p style={styles.sectionDescription}>{ui('Loading usage templates...')}</p>
           ) : error ? (
-            <p style={styles.errorText}>Failed to load usage templates: {error.message}</p>
+            <p style={styles.errorText}>{ui('Failed to load usage templates: ')}{error.message}</p>
           ) : !templates.length ? (
-            <p style={styles.emptyState}>No templates saved yet.</p>
+            <p style={styles.emptyState}>{ui('No templates saved yet.')}</p>
           ) : (
             <div style={styles.templateList}>
               {templates.map((template) => {
@@ -270,59 +281,61 @@ export function InventoryUsageTemplatesPanel({
                   + reservedStockCount;
                 const warningCount = toNumber(readiness?.summary?.below_minimum_after_use_count);
                 const evidenceAcknowledgementCount = toNumber(readiness?.summary?.evidence_acknowledgement_required_count);
+                const itemCount = template.items?.length || 0;
+                const plannedQuantity = template.items?.reduce((sum, item) => sum + toNumber(item.quantity), 0) || 0;
 
                 return (
-                <div key={template.id} style={styles.templateCard}>
-                  <div>
-                    <strong>{template.name}</strong>
-                    <p style={styles.templateMeta}>
-                      {formatUsageReason(template.consumption_reason)} · {template.department || 'No department'} · {template.items?.length || 0} lines
-                    </p>
-                    {template.description ? <p style={styles.sectionDescription}>{template.description}</p> : null}
-                    <small style={styles.mutedText}>
-                      {template.items?.reduce((sum, item) => sum + toNumber(item.quantity), 0)} total planned quantity
-                    </small>
-                    <div style={styles.templateMetrics}>
-                      <span style={canRecord ? styles.successPill : styles.dangerPill}>
-                        {canRecord ? 'Stock-ready' : 'Blocked by stock'}
-                      </span>
-                      {blockedCount > 0 ? <span style={styles.dangerPill}>{blockedCount} blocked lines</span> : null}
-                      {reservedStockCount > 0 ? <span style={styles.dangerPill}>{reservedStockCount} use reserved stock</span> : null}
-                      {warningCount > 0 ? <span style={styles.warningPill}>{warningCount} below min after use</span> : null}
-                      {evidenceAcknowledgementCount > 0 ? <span style={styles.warningPill}>{evidenceAcknowledgementCount} evidence acknowledgements</span> : null}
+                  <div key={template.id} style={styles.templateCard}>
+                    <div>
+                      <strong>{template.name}</strong>
+                      <p style={styles.templateMeta}>
+                        {formatUsageReasonDisplay(template.consumption_reason, ui)} · {template.department || ui('No department')} · {formatLocalizedNumber(itemCount, locale)} {ui(itemCount === 1 ? 'line' : 'lines')}
+                      </p>
+                      {template.description ? <p style={styles.sectionDescription}>{template.description}</p> : null}
+                      <small style={styles.mutedText}>
+                        {formatLocalizedNumber(plannedQuantity, locale, { maximumFractionDigits: 2 })} {ui('total planned quantity')}
+                      </small>
+                      <div style={styles.templateMetrics}>
+                        <span style={canRecord ? styles.successPill : styles.dangerPill}>
+                          {canRecord ? ui('Stock-ready') : ui('Blocked by stock')}
+                        </span>
+                        {blockedCount > 0 ? <span style={styles.dangerPill}>{formatLocalizedNumber(blockedCount, locale)} {ui('blocked lines')}</span> : null}
+                        {reservedStockCount > 0 ? <span style={styles.dangerPill}>{formatLocalizedNumber(reservedStockCount, locale)} {ui('use reserved stock')}</span> : null}
+                        {warningCount > 0 ? <span style={styles.warningPill}>{formatLocalizedNumber(warningCount, locale)} {ui('below min after use')}</span> : null}
+                        {evidenceAcknowledgementCount > 0 ? <span style={styles.warningPill}>{formatLocalizedNumber(evidenceAcknowledgementCount, locale)} {ui('evidence acknowledgements')}</span> : null}
+                      </div>
+                      <div style={styles.templateMetrics}>
+                        <span style={styles.filterPill}>{formatLocalizedNumber(toNumber(template.use_count), locale)} {ui('runs')}</span>
+                        <span style={styles.filterPill}>
+                          {ui('Last used:')} {template.last_used_at ? formatLocalizedDateTime(template.last_used_at, locale) : ui('Never')}
+                        </span>
+                        {template.last_used_by_user_name ? (
+                          <span style={styles.filterPill}>{ui('By')} {template.last_used_by_user_name}</span>
+                        ) : null}
+                      </div>
                     </div>
-                    <div style={styles.templateMetrics}>
-                      <span style={styles.filterPill}>{toNumber(template.use_count)} runs</span>
-                      <span style={styles.filterPill}>
-                        Last used: {template.last_used_at ? formatDateTime(template.last_used_at) : 'Never'}
-                      </span>
-                      {template.last_used_by_user_name ? (
-                        <span style={styles.filterPill}>By {template.last_used_by_user_name}</span>
-                      ) : null}
+                    <div style={styles.templateActions}>
+                      <button type="button" style={styles.secondaryButton} onClick={() => onUseTemplate(template)}>
+                        {ui('Load into recorder')}
+                      </button>
+                      <button
+                        type="button"
+                        style={styles.primaryButton}
+                        onClick={() => onRecordTemplate(template)}
+                        disabled={!canRecordTemplates || recordingTemplateId === template.id || !(template.items?.length) || !canRecord}
+                      >
+                        {recordingTemplateId === template.id ? ui('Recording...') : evidenceAcknowledgementCount > 0 ? ui('Record with acknowledgement') : ui('Record now')}
+                      </button>
+                      <button
+                        type="button"
+                        style={styles.dangerButton}
+                        onClick={() => onArchiveTemplate(template)}
+                        disabled={!canManageTemplates || archivingTemplateId === template.id}
+                      >
+                        {archivingTemplateId === template.id ? ui('Archiving...') : ui('Archive')}
+                      </button>
                     </div>
                   </div>
-                  <div style={styles.templateActions}>
-                    <button type="button" style={styles.secondaryButton} onClick={() => onUseTemplate(template)}>
-                      Load into recorder
-                    </button>
-                    <button
-                      type="button"
-                      style={styles.primaryButton}
-                      onClick={() => onRecordTemplate(template)}
-                      disabled={!canRecordTemplates || recordingTemplateId === template.id || !(template.items?.length) || !canRecord}
-                    >
-                      {recordingTemplateId === template.id ? 'Recording...' : evidenceAcknowledgementCount > 0 ? 'Record with acknowledgement' : 'Record now'}
-                    </button>
-                    <button
-                      type="button"
-                      style={styles.dangerButton}
-                      onClick={() => onArchiveTemplate(template)}
-                      disabled={!canManageTemplates || archivingTemplateId === template.id}
-                    >
-                      {archivingTemplateId === template.id ? 'Archiving...' : 'Archive'}
-                    </button>
-                  </div>
-                </div>
                 );
               })}
             </div>

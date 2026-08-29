@@ -20,7 +20,7 @@ for (const value of [
   'reverseDependencyMap',
   'normalizeDraft',
   'onDiscardDraft?.()',
-  "filtering ? 'Enable shown' : 'Enable group'",
+  'filtering ? ui("Enable shown") : ui("Enable group")',
   'No permissions match',
   'Using starting template',
   'OperationalWorkspaceHero',
@@ -56,7 +56,7 @@ for (const value of [
   'Custom role library',
   'aria-pressed={role.role === selectedRole}',
   'tenant-permissions-role-card__manage',
-  "role.role === selectedRole ? 'Selected' : 'Manage →'",
+  'role.role === selectedRole ? ui("Selected") : ui("Manage →")',
   'Tenant permission settings could not be loaded. Check tenant administrator access and try again.'
 ]) includes(tenantPage, value, 'tenant permissions page');
 

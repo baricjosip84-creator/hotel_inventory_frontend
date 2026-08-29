@@ -1,6 +1,8 @@
 
 import { fetchCurrentPlatformIdentity } from '../lib/platformAuth';
 import { InventoryMark } from '../components/brand/InventoryBrand';
+import { LanguageSelector } from '../components/i18n/LanguageSelector';
+import { useAppTranslation } from '../i18n/I18nContext';
 import '../layouts/PlatformTheme.css';
 
 import { useEffect, useState } from 'react';
@@ -11,6 +13,7 @@ import { platformApiRequest, restorePlatformSession } from '../lib/platformApi';
 import { savePlatformAuthTokens } from '../lib/platformAuth';
 
 export default function PlatformLoginPage() {
+  const { t } = useAppTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const skipSessionRecovery = Boolean(
@@ -64,7 +67,7 @@ export default function PlatformLoginPage() {
       const from = (location.state as { from?: string } | null)?.from || '/platform/tenants';
       navigate(from, { replace: true });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Platform login failed');
+      setErrorMessage(error instanceof Error ? error.message : t('platformLogin.errorFallback', 'Platform login failed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -73,65 +76,66 @@ export default function PlatformLoginPage() {
   return (
     <main className="platform-theme" style={styles.page}>
       <div style={styles.shell}>
-        <section style={styles.brandPanel} aria-label="Inventory Operations platform administration">
+        <section style={styles.brandPanel} aria-label={t('platformLogin.aria')}>
           <div style={styles.brandRow}>
             <InventoryMark size={42} tone="dark" accent="red" />
             <div>
               <div style={styles.brandName}>Inventory Operations</div>
-              <div style={styles.brandCaption}>PLATFORM ADMINISTRATION</div>
+              <div style={styles.brandCaption}>{t('platformLogin.brandCaption')}</div>
             </div>
           </div>
           <div>
-            <div style={styles.kicker}>Secure operator access</div>
-            <h1 style={styles.hero}>Control the platform without mixing tenant access.</h1>
-            <p style={styles.heroText}>Platform accounts manage tenants, support, reliability, billing, security, readiness, and operational governance from a separate administrative surface.</p>
+            <div style={styles.kicker}>{t('platformLogin.kicker')}</div>
+            <h1 style={styles.hero}>{t('platformLogin.hero')}</h1>
+            <p style={styles.heroText}>{t('platformLogin.heroText')}</p>
           </div>
           <div style={styles.features}>
-            <div style={styles.feature}><span style={styles.featureIcon}>□</span><div><strong>Tenant governance</strong><span style={styles.featureText}>Provisioning, lifecycle, plans, access and account attention.</span></div></div>
-            <div style={styles.feature}><span style={styles.featureIcon}>↔</span><div><strong>Support & reliability</strong><span style={styles.featureText}>Support sessions, incidents, monitoring, runbooks and platform health.</span></div></div>
-            <div style={styles.feature}><span style={styles.featureIcon}>✓</span><div><strong>Launch control</strong><span style={styles.featureText}>Readiness evidence, deployment validation and commercial launch checks.</span></div></div>
+            <div style={styles.feature}><span style={styles.featureIcon}>□</span><div><strong>{t('platformLogin.featureTenantTitle')}</strong><span style={styles.featureText}>{t('platformLogin.featureTenantText')}</span></div></div>
+            <div style={styles.feature}><span style={styles.featureIcon}>↔</span><div><strong>{t('platformLogin.featureReliabilityTitle')}</strong><span style={styles.featureText}>{t('platformLogin.featureReliabilityText')}</span></div></div>
+            <div style={styles.feature}><span style={styles.featureIcon}>✓</span><div><strong>{t('platformLogin.featureLaunchTitle')}</strong><span style={styles.featureText}>{t('platformLogin.featureLaunchText')}</span></div></div>
           </div>
-          <div style={styles.brandFooter}>Platform operators only</div>
+          <div style={styles.brandFooter}>{t('platformLogin.footer')}</div>
         </section>
 
         <section style={styles.loginPanel}>
           <form onSubmit={handleSubmit} style={styles.card} data-auth-form="true">
+            <div style={styles.languageRow}><LanguageSelector scope="local" compact /></div>
             <div>
-              <div style={styles.eyebrow}>Platform access</div>
-              <h2 style={styles.title}>Sign in to administration</h2>
-              <p style={styles.subtitle}>Use a platform account. Tenant user credentials belong on the tenant sign-in page.</p>
+              <div style={styles.eyebrow}>{t('platformLogin.eyebrow')}</div>
+              <h2 style={styles.title}>{t('platformLogin.title')}</h2>
+              <p style={styles.subtitle}>{t('platformLogin.subtitle')}</p>
             </div>
 
-            {errorMessage ? <div role="alert" style={styles.error}><strong>Unable to sign in.</strong><span>{errorMessage}</span></div> : null}
+            {errorMessage ? <div role="alert" style={styles.error}><strong>{t('platformLogin.errorTitle')}</strong><span>{errorMessage}</span></div> : null}
 
             <label style={styles.field}>
-              <span style={styles.label}>Email</span>
+              <span style={styles.label}>{t('platformLogin.email')}</span>
               <input
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 style={styles.input}
-                placeholder="operator@company.com"
+                placeholder={t('platformLogin.emailPlaceholder')}
                 autoComplete="email"
                 required
               />
             </label>
 
             <label style={styles.field}>
-              <span style={styles.label}>Password</span>
+              <span style={styles.label}>{t('platformLogin.password')}</span>
               <input
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 style={styles.input}
-                placeholder="Enter your password"
+                placeholder={t('platformLogin.passwordPlaceholder')}
                 autoComplete="current-password"
                 required
               />
             </label>
 
             <button type="submit" disabled={isSubmitting} style={{ ...styles.button, ...(isSubmitting ? styles.buttonDisabled : {}) }}>
-              {isSubmitting ? 'Signing in…' : 'Sign in'}
+              {isSubmitting ? t('platformLogin.signingIn') : t('platformLogin.signIn')}
             </button>
           </form>
         </section>
@@ -182,6 +186,7 @@ const styles: Record<string, CSSProperties> = {
   brandFooter: { marginTop: 'auto', color: 'rgba(255,255,255,.42)', fontSize: 12, fontWeight: 650 },
   loginPanel: { display: 'grid', placeItems: 'center', padding: 48, background: '#fff' },
   card: { width: '100%', maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 17 },
+  languageRow: { display: 'flex', justifyContent: 'flex-end', marginBottom: 2 },
   eyebrow: { color: 'var(--io-primary)', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 },
   title: { margin: 0, fontSize: 28, lineHeight: 1.15, letterSpacing: '-.025em' },
   subtitle: { margin: '10px 0 8px', color: '#64748b', fontSize: 14, lineHeight: 1.55 },

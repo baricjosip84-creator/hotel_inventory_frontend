@@ -1,6 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
@@ -303,7 +305,6 @@ const LIFECYCLE_SECTIONS: LifecycleConfig[] = [
 function formatLabel(value: unknown): string {
   if (value === null || value === undefined || value === '') return 'Not reported';
   const text = String(value);
-  if (DECISION_LABELS[text]) return DECISION_LABELS[text];
   if (!/[_-]/.test(text)) {
     return text.includes(' ') ? text : `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
   }
@@ -312,47 +313,88 @@ function formatLabel(value: unknown): string {
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function formatNumber(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—';
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? new Intl.NumberFormat().format(numeric) : String(value);
+const CANONICAL_LABELS: Record<string, string> = {
+  ...DECISION_LABELS,
+  inventory: 'Inventory',
+  procurement: 'Procurement',
+  reservation: 'Reservation',
+  execution: 'Execution',
+  optimization: 'Optimization',
+  control_tower: 'Control tower',
+  financial: 'Financial',
+  integration: 'Integration',
+  system: 'System',
+  dynamic_replenishment: 'Dynamic replenishment',
+  adaptive_reservation: 'Adaptive reservation',
+  sla_cost_balance: 'SLA / cost balance',
+  labor_allocation: 'Labour allocation',
+  supplier_selection: 'Supplier selection',
+  facility_balancing: 'Facility balancing',
+  working_capital_control: 'Working capital control',
+  integration_throttle: 'Integration throttle',
+  general: 'General',
+  draft: 'Draft',
+  observing: 'Observing',
+  recommendation_ready: 'Recommendation ready',
+  review_required: 'Review required',
+  approved_for_manual_application: 'Approved for manual application',
+  rejected: 'Rejected',
+  retired: 'Retired',
+  tuning_adjustment: 'Tuning adjustment',
+  threshold_adjustment: 'Threshold adjustment',
+  objective_reweighting: 'Objective reweighting',
+  guardrail_tightening: 'Guardrail tightening',
+  guardrail_relaxation: 'Guardrail relaxation',
+  policy_retirement: 'Policy retirement',
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  critical: 'Critical'
+};
+
+function formatCanonicalLabel(value: unknown, ui: (englishText: string) => string): string {
+  if (value === null || value === undefined || value === '') return ui('Not reported');
+  const text = String(value);
+  const canonical = CANONICAL_LABELS[text];
+  return canonical ? ui(canonical) : formatLabel(value);
 }
 
-function formatPercentage(value: unknown): string {
+function formatNumber(value: unknown, locale: Parameters<typeof formatLocalizedNumber>[1]): string {
   if (value === null || value === undefined || value === '') return '—';
   const numeric = Number(value);
-  return Number.isFinite(numeric) ? `${Math.round(numeric)}%` : String(value);
+  return Number.isFinite(numeric) ? formatLocalizedNumber(numeric, locale) : String(value);
 }
 
-function formatStoredConfidence(value: unknown): string {
+function formatPercentage(value: unknown, locale: Parameters<typeof formatLocalizedNumber>[1]): string {
+  if (value === null || value === undefined || value === '') return '—';
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? `${formatLocalizedNumber(Math.round(numeric), locale)}%` : String(value);
+}
+
+function formatStoredConfidence(value: unknown, locale: Parameters<typeof formatLocalizedNumber>[1]): string {
   if (value === null || value === undefined || value === '') return '—';
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return String(value);
   const percentage = numeric >= 0 && numeric <= 1 ? numeric * 100 : numeric;
-  return `${Math.round(percentage)}%`;
+  return `${formatLocalizedNumber(Math.round(percentage), locale)}%`;
 }
 
-function formatDelta(value: unknown): string {
+function formatDelta(value: unknown, locale: Parameters<typeof formatLocalizedNumber>[1]): string {
   if (value === null || value === undefined || value === '') return '—';
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return String(value);
-  return `${numeric > 0 ? '+' : ''}${numeric.toLocaleString()}`;
+  return `${numeric > 0 ? '+' : ''}${formatLocalizedNumber(numeric, locale)}`;
 }
 
-function formatDate(value: unknown): string {
-  if (!value) return '—';
-  const parsed = new Date(String(value));
-  return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleString();
-}
-
-function metricValue(value: unknown, format?: 'number' | 'percent' | 'delta'): string {
-  if (format === 'percent') return formatPercentage(value);
-  if (format === 'delta') return formatDelta(value);
-  return formatNumber(value);
+function metricValue(value: unknown, format: 'number' | 'percent' | 'delta' | undefined, locale: Parameters<typeof formatLocalizedNumber>[1]): string {
+  if (format === 'percent') return formatPercentage(value, locale);
+  if (format === 'delta') return formatDelta(value, locale);
+  return formatNumber(value, locale);
 }
 
 function StatusBadge({ value, tone }: { value: unknown; tone?: 'good' | 'warning' | 'danger' | 'neutral' }) {
-  return <span className={`adaptive-policy-badge adaptive-policy-badge--${tone || 'neutral'}`}>{formatLabel(value)}</span>;
+  const { ui } = useAppTranslation();
+  return <span className={`adaptive-policy-badge adaptive-policy-badge--${tone || 'neutral'}`}>{formatCanonicalLabel(value, ui)}</span>;
 }
 
 function MetricCard({
@@ -368,10 +410,11 @@ function MetricCard({
   iconPath?: string;
   tone?: 'blue' | 'green' | 'amber' | 'violet' | 'slate';
 }) {
+  const { locale, ui } = useAppTranslation();
   return (
     <OperationalWorkspaceStatCard
-      label={label}
-      value={metricValue(value, format)}
+      label={ui(label)}
+      value={metricValue(value, format, locale)}
       iconPath={iconPath}
       tone={tone === 'violet' ? 'blue' : tone}
     />
@@ -379,11 +422,12 @@ function MetricCard({
 }
 
 function CheckList({ title, items, kind }: { title: string; items: CheckItem[] | BlockerItem[]; kind: 'checks' | 'blockers' }) {
+  const { locale, ui } = useAppTranslation();
   return (
     <section className="adaptive-policy-check-card">
-      <h3><span className={`adaptive-policy-heading-icon ${kind === 'blockers' ? 'adaptive-policy-heading-icon--warning' : ''}`}><TenantNavIcon path={kind === 'blockers' ? '/alerts' : '/permissions'} size={15} /></span>{title}</h3>
+      <h3><span className={`adaptive-policy-heading-icon ${kind === 'blockers' ? 'adaptive-policy-heading-icon--warning' : ''}`}><TenantNavIcon path={kind === 'blockers' ? '/alerts' : '/permissions'} size={15} /></span>{ui(title)}</h3>
       {!items.length ? (
-        <p className="adaptive-policy-muted">No items require attention in this section.</p>
+        <p className="adaptive-policy-muted">{ui('No items require attention in this section.')}</p>
       ) : (
         <div className="adaptive-policy-check-list">
           {items.map((item, index) => {
@@ -393,9 +437,9 @@ function CheckList({ title, items, kind }: { title: string; items: CheckItem[] |
             return (
               <article className="adaptive-policy-check-item" key={`${title}-${check.check_id || blocker.blocker_id || index}`}>
                 <div className="adaptive-policy-check-item__heading">
-                  <strong>{check.label ? formatLabel(check.label) : blocker.summary || 'Review item'}</strong>
+                  <strong>{check.label ? formatLabel(check.label) : blocker.summary || ui('Review item')}</strong>
                   {kind === 'checks' ? (
-                    <StatusBadge value={passed ? 'Passed' : 'Needs attention'} tone={passed ? 'good' : 'warning'} />
+                    <span className={`adaptive-policy-badge adaptive-policy-badge--${passed ? 'good' : 'warning'}`}>{ui(passed ? 'Passed' : 'Needs attention')}</span>
                   ) : (
                     <StatusBadge value={blocker.severity || 'Review'} tone={blocker.severity === 'high' ? 'danger' : 'warning'} />
                   )}
@@ -403,7 +447,7 @@ function CheckList({ title, items, kind }: { title: string; items: CheckItem[] |
                 {kind === 'checks' && check.required_next_step ? <p>{check.required_next_step}</p> : null}
                 {kind === 'blockers' && blocker.summary ? <p>{blocker.summary}</p> : null}
                 {kind === 'checks' && check.observed_count !== undefined ? (
-                  <span className="adaptive-policy-observed">Evidence records counted: {formatNumber(check.observed_count)}</span>
+                  <span className="adaptive-policy-observed">{ui('Evidence records counted: {count}').replace('{count}', formatLocalizedNumber(check.observed_count, locale))}</span>
                 ) : null}
               </article>
             );
@@ -415,6 +459,7 @@ function CheckList({ title, items, kind }: { title: string; items: CheckItem[] |
 }
 
 function LifecycleCard({ config, section }: { config: LifecycleConfig; section?: LifecycleSection }) {
+  const { ui } = useAppTranslation();
   const score = section?.[config.scoreKey];
   const decision = section?.[config.decisionKey];
   const blockers = (section?.[config.blockersKey] as BlockerItem[] | undefined) || [];
@@ -426,13 +471,13 @@ function LifecycleCard({ config, section }: { config: LifecycleConfig; section?:
         <div className="adaptive-policy-section-heading">
           <span className="adaptive-policy-heading-icon"><TenantNavIcon path={config.iconPath} size={17} /></span>
           <div>
-            <h2>{config.title}</h2>
-            <p className="card__subtext">{config.description}</p>
+            <h2>{ui(config.title)}</h2>
+            <p className="card__subtext">{ui(config.description)}</p>
           </div>
         </div>
         <div className="adaptive-policy-decision">
-          <span>Current assessment</span>
-          <strong>{formatLabel(decision)}</strong>
+          <span>{ui('Current assessment')}</span>
+          <strong>{formatCanonicalLabel(decision, ui)}</strong>
         </div>
       </div>
 
@@ -446,8 +491,8 @@ function LifecycleCard({ config, section }: { config: LifecycleConfig; section?:
       </div>
 
       <div className="adaptive-policy-check-grid">
-        <CheckList title="What needs attention" items={blockers} kind="blockers" />
-        <CheckList title="Evidence checks" items={checks} kind="checks" />
+        <CheckList title={ui('What needs attention')} items={blockers} kind="blockers" />
+        <CheckList title={ui('Evidence checks')} items={checks} kind="checks" />
       </div>
     </section>
   );
@@ -468,25 +513,26 @@ function EvidenceSection({
   headers: string[];
   renderRow: (row: Record<string, unknown>, index: number) => ReactNode;
 }) {
+  const { locale, ui } = useAppTranslation();
   return (
     <section className="card adaptive-policy-evidence-section">
       <div className="card__header">
         <div className="adaptive-policy-section-heading">
           <span className="adaptive-policy-heading-icon"><TenantNavIcon path={iconPath} size={17} /></span>
           <div>
-            <h2>{title}</h2>
-            <p className="card__subtext">{description}</p>
+            <h2>{ui(title)}</h2>
+            <p className="card__subtext">{ui(description)}</p>
           </div>
         </div>
-        <StatusBadge value={`${rows.length} returned`} />
+        <span className="adaptive-policy-badge adaptive-policy-badge--neutral">{ui('{count} returned').replace('{count}', formatLocalizedNumber(rows.length, locale))}</span>
       </div>
       {!rows.length ? (
-        <p className="adaptive-policy-muted">No matching records were returned.</p>
+        <p className="adaptive-policy-muted">{ui('No matching records were returned.')}</p>
       ) : (
         <div className="table-wrap">
           <table className="data-table adaptive-policy-table">
             <thead>
-              <tr>{headers.map((header) => <th key={header}>{header}</th>)}</tr>
+              <tr>{headers.map((header) => <th key={header}>{ui(header)}</th>)}</tr>
             </thead>
             <tbody>{rows.map(renderRow)}</tbody>
           </table>
@@ -497,6 +543,7 @@ function EvidenceSection({
 }
 
 export default function AdaptivePolicyEnginePage() {
+  const { locale, ui } = useAppTranslation();
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
   const [view, setView] = useState<AdaptivePolicyView>('evidence');
   const [filters, setFilters] = useState<AdaptivePolicyFilters>(DEFAULT_FILTERS);
@@ -520,7 +567,7 @@ export default function AdaptivePolicyEnginePage() {
   const measurementCount = data?.governance?.effectiveness_measurement_count ?? data?.effectiveness?.length ?? 0;
   const evidenceCount = policyCount + signalCount + recommendationCount + measurementCount;
   const hasEvidence = evidenceCount > 0;
-  const lastRefreshed = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleString() : 'Not refreshed yet';
+  const lastRefreshed = dataUpdatedAt ? formatLocalizedDateTime(dataUpdatedAt, locale) : ui('Not refreshed yet');
 
   const updateFilter = (key: keyof AdaptivePolicyFilters, value: string) => {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -529,7 +576,7 @@ export default function AdaptivePolicyEnginePage() {
   if (isLoading) {
     return (
       <main className="decision-intelligence-page adaptive-policy-page adaptive-policy-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
-        <section className="card adaptive-policy-state-card"><span className="adaptive-policy-state-icon"><TenantNavIcon path="/adaptive-policy-engine" size={18} /></span><p>Loading adaptive policy evidence…</p></section>
+        <section className="card adaptive-policy-state-card"><span className="adaptive-policy-state-icon"><TenantNavIcon path="/adaptive-policy-engine" size={18} /></span><p>{ui('Loading adaptive policy evidence…')}</p></section>
       </main>
     );
   }
@@ -538,9 +585,9 @@ export default function AdaptivePolicyEnginePage() {
     return (
       <main className="decision-intelligence-page adaptive-policy-page adaptive-policy-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
         <section className="card card--danger adaptive-policy-state-card adaptive-policy-state-card--danger">
-          <span className="adaptive-policy-state-icon adaptive-policy-state-icon--danger"><TenantNavIcon path="/alerts" size={18} /></span><div><h2>Adaptive policy evidence could not be loaded</h2>
-          <p>Check your Decision Intelligence access and try the read-only request again.</p>
-          <button className="button" type="button" onClick={() => void refetch()}><TenantNavIcon path="/adaptive-policy-engine" size={14} />Retry</button></div>
+          <span className="adaptive-policy-state-icon adaptive-policy-state-icon--danger"><TenantNavIcon path="/alerts" size={18} /></span><div><h2>{ui('Adaptive policy evidence could not be loaded')}</h2>
+          <p>{ui('Check your Decision Intelligence access and try the read-only request again.')}</p>
+          <button className="button" type="button" onClick={() => void refetch()}><TenantNavIcon path="/adaptive-policy-engine" size={14} />{ui('Retry')}</button></div>
         </section>
       </main>
     );
@@ -550,85 +597,85 @@ export default function AdaptivePolicyEnginePage() {
     <main className="decision-intelligence-page adaptive-policy-page adaptive-policy-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
       <OperationalWorkspaceHero
         iconPath="/adaptive-policy-engine"
-        eyebrow="Decision intelligence & policy review"
-        title="Adaptive Policy Engine"
-        description="Review stored policy records, observed signals, recommendations, and measured outcomes before people reuse or change a policy. This workspace does not create, approve, apply, promote, roll back, or retire policies."
+        eyebrow={ui('Decision intelligence & policy review')}
+        title={ui('Adaptive Policy Engine')}
+        description={ui('Review stored policy records, observed signals, recommendations, and measured outcomes before people reuse or change a policy. This workspace does not create, approve, apply, promote, roll back, or retire policies.')}
         meta={
           <>
-            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Human-governed decisions</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Read-only evidence</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Human-governed decisions')}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Read-only evidence')}</OperationalWorkspaceMetaPill>
           </>
         }
-        aside={<><OperationalWorkspaceStatus value={formatLabel(data?.governance?.adaptive_policy_posture)} label={`policy review posture · refreshed ${lastRefreshed}`} /><button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/adaptive-policy-engine" size={14} />{isFetching ? 'Refreshing…' : 'Refresh evidence'}</button></>}
+        aside={<><OperationalWorkspaceStatus value={formatCanonicalLabel(data?.governance?.adaptive_policy_posture, ui)} label={`${ui('Policy review posture')} · ${ui('Refreshed')} ${lastRefreshed}`} /><button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/adaptive-policy-engine" size={14} />{ui(isFetching ? 'Refreshing…' : 'Refresh evidence')}</button></>}
       />
 
-<OperationalWorkspaceStats ariaLabel="Adaptive policy evidence summary">
+<OperationalWorkspaceStats ariaLabel={ui('Adaptive policy evidence summary')}>
         <MetricCard label="Policies" value={policyCount} iconPath="/adaptive-policy-engine" tone="blue" />
         <MetricCard label="Signals" value={signalCount} iconPath="/insights" tone="violet" />
         <MetricCard label="Recommendations" value={recommendationCount} iconPath="/intelligence-review" tone="amber" />
         <MetricCard label="Measurements" value={measurementCount} iconPath="/reports" tone="green" />
         <OperationalWorkspaceStatCard
-          label="Current posture"
-          value={formatLabel(data?.governance?.adaptive_policy_posture)}
-          helper="Current evidence and governance posture"
+          label={ui('Current posture')}
+          value={formatCanonicalLabel(data?.governance?.adaptive_policy_posture, ui)}
+          helper={ui('Current evidence and governance posture')}
           iconPath="/permissions"
           tone="slate"
         />
       </OperationalWorkspaceStats>
 
-<OperationalWorkspaceTabs ariaLabel="Adaptive policy page views">
-        <OperationalWorkspaceTab active={view === 'evidence'} iconPath="/adaptive-policy-engine" label="Policy evidence" onClick={() => setView('evidence')} />
-        <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label="Readiness checks" onClick={() => setView('readiness')} />
-        {canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'diagnostics'} iconPath="/admin-system" label="Diagnostics" onClick={() => setView('diagnostics')} /> : null}
+<OperationalWorkspaceTabs ariaLabel={ui('Adaptive policy page views')}>
+        <OperationalWorkspaceTab active={view === 'evidence'} iconPath="/adaptive-policy-engine" label={ui('Policy evidence')} onClick={() => setView('evidence')} />
+        <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label={ui('Readiness checks')} onClick={() => setView('readiness')} />
+        {canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'diagnostics'} iconPath="/admin-system" label={ui('Diagnostics')} onClick={() => setView('diagnostics')} /> : null}
       </OperationalWorkspaceTabs>
 
-      <section className="card adaptive-policy-filters" aria-label="Adaptive policy filters">
+      <section className="card adaptive-policy-filters" aria-label={ui('Adaptive policy filters')}>
         <div className="card__header">
           <div className="adaptive-policy-section-heading">
             <span className="adaptive-policy-heading-icon"><TenantNavIcon path="/system-context" size={17} /></span>
             <div>
-              <h2>Filter the evidence</h2>
-              <p className="card__subtext">Filters apply consistently to policies and their related signals, recommendations, and measurements.</p>
+              <h2>{ui('Filter the evidence')}</h2>
+              <p className="card__subtext">{ui('Filters apply consistently to policies and their related signals, recommendations, and measurements.')}</p>
             </div>
           </div>
           <button className="button button--secondary" type="button" onClick={() => setFilters(DEFAULT_FILTERS)} disabled={JSON.stringify(filters) === JSON.stringify(DEFAULT_FILTERS)}>
-            <TenantNavIcon path="/system-context" size={14} />Clear filters
+            <TenantNavIcon path="/system-context" size={14} />{ui('Clear filters')}
           </button>
         </div>
         <div className="adaptive-policy-filter-grid">
           <label>
-            <span className="form-label">Business area</span>
+            <span className="form-label">{ui('Business area')}</span>
             <select className="input" value={filters.policy_domain} onChange={(event) => updateFilter('policy_domain', event.target.value)}>
-              <option value="">All areas</option>
-              {POLICY_DOMAINS.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
+              <option value="">{ui('All areas')}</option>
+              {POLICY_DOMAINS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
             </select>
           </label>
           <label>
-            <span className="form-label">Policy type</span>
+            <span className="form-label">{ui('Policy type')}</span>
             <select className="input" value={filters.policy_type} onChange={(event) => updateFilter('policy_type', event.target.value)}>
-              <option value="">All policy types</option>
-              {POLICY_TYPES.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
+              <option value="">{ui('All policy types')}</option>
+              {POLICY_TYPES.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
             </select>
           </label>
           <label>
-            <span className="form-label">Policy status</span>
+            <span className="form-label">{ui('Policy status')}</span>
             <select className="input" value={filters.policy_status} onChange={(event) => updateFilter('policy_status', event.target.value)}>
-              <option value="">All policy statuses</option>
-              {POLICY_STATUSES.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
+              <option value="">{ui('All policy statuses')}</option>
+              {POLICY_STATUSES.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
             </select>
           </label>
           <label>
-            <span className="form-label">Recommendation type</span>
+            <span className="form-label">{ui('Recommendation type')}</span>
             <select className="input" value={filters.recommendation_type} onChange={(event) => updateFilter('recommendation_type', event.target.value)}>
-              <option value="">All recommendation types</option>
-              {RECOMMENDATION_TYPES.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
+              <option value="">{ui('All recommendation types')}</option>
+              {RECOMMENDATION_TYPES.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
             </select>
           </label>
           <label>
-            <span className="form-label">Maximum records per evidence list</span>
+            <span className="form-label">{ui('Maximum records per evidence list')}</span>
             <select className="input" value={filters.limit} onChange={(event) => updateFilter('limit', event.target.value)}>
-              {['25', '50', '100', '200'].map((value) => <option key={value} value={value}>{value}</option>)}
+              {['25', '50', '100', '200'].map((value) => <option key={value} value={value}>{formatLocalizedNumber(Number(value), locale)}</option>)}
             </select>
           </label>
         </div>
@@ -640,25 +687,19 @@ export default function AdaptivePolicyEnginePage() {
 
       {!hasEvidence ? (
         <section className="card adaptive-policy-empty-state">
-          <div className="adaptive-policy-section-heading"><span className="adaptive-policy-heading-icon adaptive-policy-heading-icon--slate"><TenantNavIcon path="/adaptive-policy-engine" size={17} /></span><h2>No adaptive policy evidence is available for this tenant and filter set</h2></div>
-          <p>
-            Readiness is not assessed when there are no policy, signal, recommendation, or effectiveness records. Zero records do
-            not mean that policies are safe, approved, or ready for promotion.
-          </p>
-          <p>
-            This page has no policy-creation action. Evidence must first be produced through the supported Decision Intelligence
-            data process before it can be reviewed here.
-          </p>
+          <div className="adaptive-policy-section-heading"><span className="adaptive-policy-heading-icon adaptive-policy-heading-icon--slate"><TenantNavIcon path="/adaptive-policy-engine" size={17} /></span><h2>{ui('No adaptive policy evidence is available for this tenant and filter set')}</h2></div>
+          <p>{ui('Readiness is not assessed when there are no policy, signal, recommendation, or effectiveness records. Zero records do not mean that policies are safe, approved, or ready for promotion.')}</p>
+          <p>{ui('This page has no policy-creation action. Evidence must first be produced through the supported Decision Intelligence data process before it can be reviewed here.')}</p>
         </section>
       ) : null}
 
       {view === 'evidence' ? (
         <>
           <p className="adaptive-policy-limit-note"><TenantNavIcon path="/system-context" size={14} />
-            Lists show up to {filters.limit} matching records in each evidence category. Readiness checks use the same filtered record set.
+            {ui('Lists show up to {limit} matching records in each evidence category. Readiness checks use the same filtered record set.').replace('{limit}', formatLocalizedNumber(Number(filters.limit), locale))}
           </p>
           <EvidenceSection
-            title="Policies"
+            title={ui('Policies')}
             iconPath="/adaptive-policy-engine"
             description="The policy ideas currently being observed or manually reviewed."
             rows={(data?.policies || []) as Array<Record<string, unknown>>}
@@ -668,17 +709,17 @@ export default function AdaptivePolicyEnginePage() {
               return (
                 <tr key={`${policy.policy_key || 'policy'}-${index}`}>
                   <td><strong>{policy.title || formatLabel(policy.policy_key)}</strong>{policy.summary ? <span className="adaptive-policy-table__subtext">{policy.summary}</span> : null}</td>
-                  <td>{formatLabel(policy.policy_domain)}</td>
-                  <td>{formatLabel(policy.policy_type)}</td>
+                  <td>{formatCanonicalLabel(policy.policy_domain, ui)}</td>
+                  <td>{formatCanonicalLabel(policy.policy_type, ui)}</td>
                   <td><StatusBadge value={policy.policy_status} /></td>
-                  <td>{formatStoredConfidence(policy.confidence_score)}</td>
-                  <td>{formatDate(policy.updated_at || policy.created_at)}</td>
+                  <td>{formatStoredConfidence(policy.confidence_score, locale)}</td>
+                  <td>{formatLocalizedDateTime(policy.updated_at || policy.created_at, locale)}</td>
                 </tr>
               );
             }}
           />
           <EvidenceSection
-            title="Observed signals"
+            title={ui('Observed signals')}
             iconPath="/insights"
             description="Measurements or indicators connected to the returned policies."
             rows={(data?.signals || []) as Array<Record<string, unknown>>}
@@ -688,18 +729,18 @@ export default function AdaptivePolicyEnginePage() {
               return (
                 <tr key={`${signal.policy_key || 'signal'}-${index}`}>
                   <td><strong>{formatLabel(signal.policy_key)}</strong></td>
-                  <td>{formatLabel(signal.signal_domain)}</td>
+                  <td>{formatCanonicalLabel(signal.signal_domain, ui)}</td>
                   <td>{formatLabel(signal.signal_type)}</td>
-                  <td>{formatDelta(signal.variance_score)}</td>
-                  <td>{formatNumber(signal.weight)}</td>
-                  <td>{formatStoredConfidence(signal.confidence_score)}</td>
-                  <td>{formatDate(signal.observed_at)}</td>
+                  <td>{formatDelta(signal.variance_score, locale)}</td>
+                  <td>{formatNumber(signal.weight, locale)}</td>
+                  <td>{formatStoredConfidence(signal.confidence_score, locale)}</td>
+                  <td>{formatLocalizedDateTime(signal.observed_at, locale)}</td>
                 </tr>
               );
             }}
           />
           <EvidenceSection
-            title="Policy recommendations"
+            title={ui('Policy recommendations')}
             iconPath="/intelligence-review"
             description="Advisory policy changes that still require human review and manual application."
             rows={(data?.recommendations || []) as Array<Record<string, unknown>>}
@@ -710,17 +751,17 @@ export default function AdaptivePolicyEnginePage() {
                 <tr key={`${recommendation.recommendation_key || 'recommendation'}-${index}`}>
                   <td>{formatLabel(recommendation.policy_key)}</td>
                   <td><strong>{formatLabel(recommendation.recommendation_key)}</strong>{recommendation.explanation_summary ? <span className="adaptive-policy-table__subtext">{recommendation.explanation_summary}</span> : null}</td>
-                  <td>{formatLabel(recommendation.recommendation_type)}</td>
+                  <td>{formatCanonicalLabel(recommendation.recommendation_type, ui)}</td>
                   <td><StatusBadge value={recommendation.recommendation_status} /></td>
                   <td><StatusBadge value={recommendation.risk_level} tone={['high', 'critical'].includes(String(recommendation.risk_level)) ? 'danger' : 'neutral'} /></td>
-                  <td>{formatStoredConfidence(recommendation.confidence_score)}</td>
-                  <td>{formatDate(recommendation.created_at)}</td>
+                  <td>{formatStoredConfidence(recommendation.confidence_score, locale)}</td>
+                  <td>{formatLocalizedDateTime(recommendation.created_at, locale)}</td>
                 </tr>
               );
             }}
           />
           <EvidenceSection
-            title="Effectiveness measurements"
+            title={ui('Effectiveness measurements')}
             iconPath="/reports"
             description="Baseline and observed results used to understand whether a policy helped, harmed, or had no measured change."
             rows={(data?.effectiveness || []) as Array<Record<string, unknown>>}
@@ -732,11 +773,11 @@ export default function AdaptivePolicyEnginePage() {
                   <td>{formatLabel(measurement.policy_key)}</td>
                   <td><strong>{formatLabel(measurement.measurement_key)}</strong></td>
                   <td>{formatLabel(measurement.measurement_type)}</td>
-                  <td>{formatNumber(measurement.baseline_score)}</td>
-                  <td>{formatNumber(measurement.observed_score)}</td>
-                  <td>{formatDelta(measurement.delta_score)}</td>
-                  <td>{formatStoredConfidence(measurement.confidence_score)}</td>
-                  <td>{formatDate(measurement.measured_at)}</td>
+                  <td>{formatNumber(measurement.baseline_score, locale)}</td>
+                  <td>{formatNumber(measurement.observed_score, locale)}</td>
+                  <td>{formatDelta(measurement.delta_score, locale)}</td>
+                  <td>{formatStoredConfidence(measurement.confidence_score, locale)}</td>
+                  <td>{formatLocalizedDateTime(measurement.measured_at, locale)}</td>
                 </tr>
               );
             }}
@@ -750,11 +791,8 @@ export default function AdaptivePolicyEnginePage() {
             <section className="card adaptive-policy-readiness-note">
               <div className="adaptive-policy-section-heading">
                 <span className="adaptive-policy-heading-icon adaptive-policy-heading-icon--amber"><TenantNavIcon path="/reliability-command" size={17} /></span>
-                <div><h2>These checks support a human review; they are not approvals</h2>
-              <p className="card__subtext">
-                A passing check means the returned evidence satisfies that specific rule. It does not automatically approve,
-                apply, promote, roll back, or retire a policy.
-              </p></div>
+                <div><h2>{ui('These checks support a human review; they are not approvals')}</h2>
+              <p className="card__subtext">{ui('A passing check means the returned evidence satisfies that specific rule. It does not automatically approve, apply, promote, roll back, or retire a policy.')}</p></div>
               </div>
             </section>
             {LIFECYCLE_SECTIONS.map((config) => (
@@ -763,8 +801,8 @@ export default function AdaptivePolicyEnginePage() {
           </>
         ) : (
           <section className="card adaptive-policy-not-assessed">
-            <div className="adaptive-policy-section-heading"><span className="adaptive-policy-heading-icon adaptive-policy-heading-icon--slate"><TenantNavIcon path="/reliability-command" size={17} /></span><div><h2>Readiness checks are not assessed</h2>
-            <p>At least one adaptive policy evidence record is required before these checks can produce a meaningful result.</p></div></div>
+            <div className="adaptive-policy-section-heading"><span className="adaptive-policy-heading-icon adaptive-policy-heading-icon--slate"><TenantNavIcon path="/reliability-command" size={17} /></span><div><h2>{ui('Readiness checks are not assessed')}</h2>
+            <p>{ui('At least one adaptive policy evidence record is required before these checks can produce a meaningful result.')}</p></div></div>
           </section>
         )
       ) : null}
@@ -775,8 +813,8 @@ export default function AdaptivePolicyEnginePage() {
             <div className="adaptive-policy-section-heading">
               <span className="adaptive-policy-heading-icon adaptive-policy-heading-icon--slate"><TenantNavIcon path="/admin-system" size={17} /></span>
               <div>
-                <h2>Technical response diagnostics</h2>
-                <p className="card__subtext">Restricted implementation information for users with tenant diagnostics permission.</p>
+                <h2>{ui('Technical response diagnostics')}</h2>
+                <p className="card__subtext">{ui('Restricted implementation information for users with tenant diagnostics permission.')}</p>
               </div>
             </div>
           </div>
@@ -787,7 +825,7 @@ export default function AdaptivePolicyEnginePage() {
             <MetricCard label="Missing response keys" value={data?.response_contract_audit?.missing_response_key_count} />
           </div>
           <details className="adaptive-policy-technical-details">
-            <summary>View restricted response details</summary>
+            <summary>{ui('View restricted response details')}</summary>
             <pre>{JSON.stringify(data, null, 2)}</pre>
           </details>
         </section>

@@ -17,6 +17,9 @@ import {
   getCurrentUserRole,
   hasPermission
 } from '../lib/permissions';
+import { LOCALE_OPTIONS, DEFAULT_LOCALE, type AppLocale } from '../i18n/config';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedDate, formatLocalizedDateTime } from '../i18n/formatters';
 import {
   DEFAULT_INVENTORY_CURRENCY,
   normalizeCurrencyCode,
@@ -39,6 +42,7 @@ type TenantSettingsRow = {
   require_separate_purchase_order_approver?: boolean | null;
   inventory_currency?: string | null;
   inventory_currency_configured_at?: string | null;
+  default_locale?: string | null;
   write_locked?: boolean;
   created_at?: string | null;
   updated_at?: string | null;
@@ -58,6 +62,7 @@ type TenantSettingsFormState = {
   default_purchase_order_payment_terms: string;
   require_separate_purchase_order_approver: boolean;
   inventory_currency: string;
+  default_locale: string;
 };
 
 type TenantPayload = {
@@ -74,6 +79,7 @@ type TenantPayload = {
   default_purchase_order_payment_terms: string | null;
   require_separate_purchase_order_approver: boolean;
   inventory_currency: string;
+  default_locale: string;
   confirm_inventory_currency: boolean;
 };
 
@@ -90,7 +96,8 @@ const emptyFormState: TenantSettingsFormState = {
   tax_id: '',
   default_purchase_order_payment_terms: '',
   require_separate_purchase_order_approver: true,
-  inventory_currency: DEFAULT_INVENTORY_CURRENCY
+  inventory_currency: DEFAULT_INVENTORY_CURRENCY,
+  default_locale: DEFAULT_LOCALE
 };
 
 const INVENTORY_CURRENCY_HELP =
@@ -99,12 +106,12 @@ const INVENTORY_CURRENCY_HELP =
 const LEGACY_CURRENCY_HELP =
   'This tenant existed before currency tracking. Correct the displayed code first if needed, then explicitly confirm the currency that existing inventory standard costs already use. If you change the code, you must confirm the new code before saving. After confirmation, a later currency change is blocked once currency-dependent financial evidence exists so historical amounts are never silently relabelled or converted.';
 
-function readableError(error: unknown): string {
+function readableError(error: unknown, ui: (englishText: string) => string): string {
   if (error instanceof ApiError || error instanceof Error) {
     return error.message;
   }
 
-  return 'Unknown error';
+  return ui('Unknown error');
 }
 
 function normalizeDateInput(value: string | null | undefined): string {
@@ -112,15 +119,13 @@ function normalizeDateInput(value: string | null | undefined): string {
   return String(value).slice(0, 10);
 }
 
-function formatTimestamp(value: string | number | null | undefined): string {
-  if (!value) return '—';
-  const date = typeof value === 'number' ? new Date(value) : new Date(String(value));
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
+function formatTimestamp(value: string | number | null | undefined, locale: AppLocale): string {
+  return formatLocalizedDateTime(value, locale);
 }
 
-function formatOrganizationTypeLabel(value: string | null | undefined): string {
+function formatOrganizationTypeLabel(value: string | null | undefined, ui: (text: string) => string): string {
   const normalized = String(value || 'facility').trim();
-  if (!normalized) return 'Facility';
+  if (!normalized || normalized.toLowerCase() === 'facility') return ui('Facility');
 
   return normalized
     .replace(/[_-]+/g, ' ')
@@ -143,7 +148,8 @@ function createFormState(tenant: TenantSettingsRow | null): TenantSettingsFormSt
     tax_id: tenant.tax_id ?? '',
     default_purchase_order_payment_terms: tenant.default_purchase_order_payment_terms ?? '',
     require_separate_purchase_order_approver: tenant.require_separate_purchase_order_approver !== false,
-    inventory_currency: normalizeCurrencyCode(tenant.inventory_currency)
+    inventory_currency: normalizeCurrencyCode(tenant.inventory_currency),
+    default_locale: tenant.default_locale || DEFAULT_LOCALE
   };
 }
 
@@ -162,6 +168,7 @@ function buildPayload(formState: TenantSettingsFormState, confirmInventoryCurren
     default_purchase_order_payment_terms: formState.default_purchase_order_payment_terms.trim() || null,
     require_separate_purchase_order_approver: formState.require_separate_purchase_order_approver,
     inventory_currency: formState.inventory_currency.trim().toUpperCase(),
+    default_locale: formState.default_locale,
     confirm_inventory_currency: confirmInventoryCurrency
   };
 }
@@ -179,7 +186,8 @@ function sameFormState(left: TenantSettingsFormState, right: TenantSettingsFormS
     && left.tax_id === right.tax_id
     && left.default_purchase_order_payment_terms === right.default_purchase_order_payment_terms
     && left.require_separate_purchase_order_approver === right.require_separate_purchase_order_approver
-    && left.inventory_currency === right.inventory_currency;
+    && left.inventory_currency === right.inventory_currency
+    && left.default_locale === right.default_locale;
 }
 
 async function fetchTenants(): Promise<TenantSettingsRow[]> {
@@ -198,6 +206,7 @@ async function updateTenant(input: {
 
 export default function TenantSettingsPage() {
   const queryClient = useQueryClient();
+  const { locale, ui } = useAppTranslation();
   const role = getCurrentUserRole();
   const canReadTenants = hasPermission(TENANT_PERMISSIONS.TENANT_READ, role);
   const canUpdateTenants = hasPermission(TENANT_PERMISSIONS.TENANT_UPDATE, role);
@@ -282,11 +291,11 @@ export default function TenantSettingsPage() {
       setConfirmInventoryCurrency(false);
       setFormError(null);
       setActiveTenantCurrency(tenant.inventory_currency);
-      setSuccessMessage('Tenant settings saved.');
+      setSuccessMessage(ui('Tenant settings saved.'));
     },
     onError: (error) => {
       setSuccessMessage(null);
-      setFormError(readableError(error));
+      setFormError(readableError(error, ui));
     }
   });
 
@@ -296,7 +305,7 @@ export default function TenantSettingsPage() {
   const canEdit = canUpdateTenants && !isWriteLocked && !isSaving;
   const shouldBlockNavigation = isDirty && !isSaving;
   const blocker = useBlocker(shouldBlockNavigation);
-  const lastRefreshedLabel = formatTimestamp(tenantsQuery.dataUpdatedAt);
+  const lastRefreshedLabel = formatTimestamp(tenantsQuery.dataUpdatedAt, locale);
 
   useEffect(() => {
     if (!shouldBlockNavigation) return undefined;
@@ -313,10 +322,10 @@ export default function TenantSettingsPage() {
   useEffect(() => {
     if (blocker.state !== 'blocked') return;
 
-    const shouldDiscard = window.confirm('Discard unsaved tenant settings and leave this page?');
+    const shouldDiscard = window.confirm(ui('Discard unsaved tenant settings and leave this page?'));
     if (shouldDiscard) blocker.proceed();
     else blocker.reset();
-  }, [blocker]);
+  }, [blocker, ui]);
 
   const updateField = <K extends keyof TenantSettingsFormState>(field: K, value: TenantSettingsFormState[K]) => {
     setFormState((current) => ({
@@ -330,7 +339,7 @@ export default function TenantSettingsPage() {
   const handleRefresh = async () => {
     if (isDirty) {
       setSuccessMessage(null);
-      setFormError('Save or reset your unsaved changes before refreshing tenant settings.');
+      setFormError(ui('Save or reset your unsaved changes before refreshing tenant settings.'));
       return;
     }
 
@@ -340,11 +349,11 @@ export default function TenantSettingsPage() {
     const result = await tenantsQuery.refetch();
 
     if (result.error) {
-      setFormError(readableError(result.error));
+      setFormError(readableError(result.error, ui));
       return;
     }
 
-    setSuccessMessage('Tenant settings refreshed.');
+    setSuccessMessage(ui('Tenant settings refreshed.'));
   };
 
   const handleResetForm = () => {
@@ -362,49 +371,49 @@ export default function TenantSettingsPage() {
 
     if (!normalizedName) {
       setSuccessMessage(null);
-      setFormError('Tenant name is required.');
+      setFormError(ui('Tenant name is required.'));
       return null;
     }
 
     if (normalizedName.length > 160) {
       setSuccessMessage(null);
-      setFormError('Tenant name must be 160 characters or fewer.');
+      setFormError(ui('Tenant name must be 160 characters or fewer.'));
       return null;
     }
 
     if (formState.location.trim().length > 255) {
       setSuccessMessage(null);
-      setFormError('Location must be 255 characters or fewer.');
+      setFormError(ui('Location must be 255 characters or fewer.'));
       return null;
     }
 
     if (!normalizedOrganizationType || normalizedOrganizationType.length > 80) {
       setSuccessMessage(null);
-      setFormError('Organization type is required and must be 80 characters or fewer.');
+      setFormError(ui('Organization type is required and must be 80 characters or fewer.'));
       return null;
     }
 
     if (businessEmailInvalid) {
       setSuccessMessage(null);
-      setFormError('Business email must be a valid email address.');
+      setFormError(ui('Business email must be a valid email address.'));
       return null;
     }
 
     if (!currencyCodeValid) {
       setSuccessMessage(null);
-      setFormError('Inventory currency must be a 3-letter ISO currency code, for example EUR, USD, or GBP.');
+      setFormError(ui('Inventory currency must be a 3-letter ISO currency code, for example EUR, USD, or GBP.'));
       return null;
     }
 
     if (legacyCurrencyChangeNeedsConfirmation) {
       setSuccessMessage(null);
-      setFormError('Confirm the inventory currency before saving this currency change.');
+      setFormError(ui('Confirm the inventory currency before saving this currency change.'));
       return null;
     }
 
     if (dateRangeInvalid) {
       setSuccessMessage(null);
-      setFormError('Season start must be on or before season end.');
+      setFormError(ui('Season start must be on or before season end.'));
       return null;
     }
 
@@ -424,19 +433,19 @@ export default function TenantSettingsPage() {
 
     if (!currentTenant) {
       setSuccessMessage(null);
-      setFormError('Tenant settings are not available. Refresh the page and try again.');
+      setFormError(ui('Tenant settings are not available. Refresh the page and try again.'));
       return;
     }
 
     if (!canUpdateTenants) {
       setSuccessMessage(null);
-      setFormError('Your current role cannot update tenant settings.');
+      setFormError(ui('Your current role cannot update tenant settings.'));
       return;
     }
 
     if (isWriteLocked) {
       setSuccessMessage(null);
-      setFormError('This tenant is write-locked by the platform. Settings cannot be changed until the lock is removed.');
+      setFormError(ui('This tenant is write-locked by the platform. Settings cannot be changed until the lock is removed.'));
       return;
     }
 
@@ -454,39 +463,41 @@ export default function TenantSettingsPage() {
   const seasonStatus = !currentTenant
     ? '—'
     : currentTenant.season_start && currentTenant.season_end
-      ? 'Configured'
+      ? ui('Configured')
       : currentTenant.season_start || currentTenant.season_end
-        ? 'Partial'
-        : 'Not set';
+        ? ui('Partial')
+        : ui('Not set');
   const seasonHelper = currentTenant?.season_start || currentTenant?.season_end
-    ? `${normalizeDateInput(currentTenant.season_start) || 'No start'} → ${normalizeDateInput(currentTenant.season_end) || 'No end'}`
-    : 'Optional operating-season window';
+    ? ui('From {start} to {end}')
+      .replace('{start}', currentTenant.season_start ? formatLocalizedDate(`${currentTenant.season_start}T00:00:00`, locale) : ui('No start'))
+      .replace('{end}', currentTenant.season_end ? formatLocalizedDate(`${currentTenant.season_end}T00:00:00`, locale) : ui('No end'))
+    : ui('Optional operating-season window');
   const draftSeasonStatus = formState.season_start && formState.season_end
-    ? 'Configured'
+    ? ui('Configured')
     : formState.season_start || formState.season_end
-      ? 'Partial'
-      : 'Not set';
+      ? ui('Partial')
+      : ui('Not set');
   const approvalSeparationEnabled = currentTenant?.require_separate_purchase_order_approver !== false;
   const tenantStatus = !currentTenant
-    ? 'Unavailable'
+    ? ui('Unavailable')
     : isWriteLocked
-      ? 'Write locked'
+      ? ui('Write locked')
       : canUpdateTenants
-        ? 'Tenant-managed'
-        : 'Read only';
+        ? ui('Tenant-managed')
+        : ui('Read only');
 
   if (!canReadTenants) {
     return (
       <div className="tenant-settings-page io-operational-page io-workspace-page" id="tenant-settings-workspace-top">
         <OperationalWorkspaceHero
           iconPath="/tenant-settings"
-          eyebrow="Administration & policy"
-          title="Tenant settings"
-          description="Manage tenant-owned company profile, purchasing identity, operating-season, and inventory accounting context."
-          meta={<OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>}
-          aside={<OperationalWorkspaceStatus value="Read blocked" label="tenant settings access" />}
+          eyebrow={ui('Administration & policy')}
+          title={ui('Tenant settings')}
+          description={ui('Manage tenant-owned company profile, purchasing identity, operating-season, and inventory accounting context.')}
+          meta={<OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>}
+          aside={<OperationalWorkspaceStatus value={ui('Read blocked')} label={ui('tenant settings access')} />}
         />
-        <div className="app-error-state tenant-settings-message">Your current role cannot read tenant settings.</div>
+        <div className="app-error-state tenant-settings-message">{ui('Your current role cannot read tenant settings.')}</div>
       </div>
     );
   }
@@ -495,52 +506,52 @@ export default function TenantSettingsPage() {
     <div className="tenant-settings-page io-operational-page io-workspace-page" id="tenant-settings-workspace-top">
       <OperationalWorkspaceHero
         iconPath="/tenant-settings"
-        eyebrow="Administration & policy"
-        title="Tenant settings"
-        description="Maintain the current tenant's company profile, supplier-facing document details, operating-season, and inventory accounting context. Platform-owned creation, deletion, locking, billing, and plan controls stay outside this page."
+        eyebrow={ui('Administration & policy')}
+        title={ui('Tenant settings')}
+        description={ui("Maintain the current tenant's company profile, supplier-facing document details, operating-season, and inventory accounting context. Platform-owned creation, deletion, locking, billing, and plan controls stay outside this page.")}
         meta={
           <>
-            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Supplier document identity</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Currency safety protected</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Tenant settings only</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Supplier document identity')}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Currency safety protected')}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Tenant settings only')}</OperationalWorkspaceMetaPill>
           </>
         }
         aside={
           <div className="tenant-settings-hero-actions">
-            <OperationalWorkspaceStatus value={tenantStatus} label="tenant configuration status" />
+            <OperationalWorkspaceStatus value={tenantStatus} label={ui('tenant configuration status')} />
             <button
               type="button"
               className="app-button app-button--secondary"
               onClick={handleRefresh}
               disabled={tenantsQuery.isFetching || isDirty}
-              title={isDirty ? 'Save or reset your unsaved changes before refreshing.' : undefined}
+              title={isDirty ? ui('Save or reset your unsaved changes before refreshing.') : undefined}
             >
-              {isRefreshing ? 'Refreshing…' : 'Refresh'}
+              {isRefreshing ? ui('Refreshing…') : ui('Refresh')}
             </button>
           </div>
         }
       />
 
-      <OperationalWorkspaceStats ariaLabel="Tenant settings overview">
+      <OperationalWorkspaceStats ariaLabel={ui('Tenant settings overview')}>
         <OperationalWorkspaceStatCard
-          label="Inventory currency"
+          label={ui('Inventory currency')}
           value={currentTenant ? normalizeCurrencyCode(currentTenant.inventory_currency) : '—'}
-          helper="Tenant-base costing and valuation"
+          helper={ui('Tenant-base costing and valuation')}
           tone="blue"
           iconPath="/reports"
           loading={tenantsQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="PO approval separation"
-          value={currentTenant ? (approvalSeparationEnabled ? 'Required' : 'Self-approval') : '—'}
-          helper={approvalSeparationEnabled ? 'Creator and approver must differ' : 'Creator may approve when permitted'}
+          label={ui('PO approval separation')}
+          value={currentTenant ? (approvalSeparationEnabled ? ui('Required') : ui('Self-approval')) : '—'}
+          helper={approvalSeparationEnabled ? ui('Creator and approver must differ') : ui('Creator may approve when permitted')}
           tone={approvalSeparationEnabled ? 'good' : 'warn'}
           iconPath="/permissions"
           loading={tenantsQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Operating season"
+          label={ui('Operating season')}
           value={seasonStatus}
           helper={seasonHelper}
           tone={seasonStatus === 'Partial' ? 'warn' : 'neutral'}
@@ -548,9 +559,9 @@ export default function TenantSettingsPage() {
           loading={tenantsQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Last updated"
-          value={currentTenant ? formatTimestamp(currentTenant.updated_at) : '—'}
-          helper={`Settings data refreshed ${lastRefreshedLabel}`}
+          label={ui('Last updated')}
+          value={currentTenant ? formatTimestamp(currentTenant.updated_at, locale) : '—'}
+          helper={ui('Settings data refreshed {date}').replace('{date}', lastRefreshedLabel)}
           tone="neutral"
           iconPath="/audit"
           loading={tenantsQuery.isLoading}
@@ -558,66 +569,66 @@ export default function TenantSettingsPage() {
         />
       </OperationalWorkspaceStats>
 
-      {tenantsQuery.isLoading ? <div className="app-empty-state tenant-settings-message">Loading tenant settings…</div> : null}
-      {tenantsQuery.error ? <div className="app-error-state tenant-settings-message">Failed to load tenant settings: {readableError(tenantsQuery.error)}</div> : null}
+      {tenantsQuery.isLoading ? <div className="app-empty-state tenant-settings-message">{ui('Loading tenant settings…')}</div> : null}
+      {tenantsQuery.error ? <div className="app-error-state tenant-settings-message">{ui('Failed to load tenant settings: {error}').replace('{error}', readableError(tenantsQuery.error, ui))}</div> : null}
       {formError ? <div className="app-error-state tenant-settings-message" role="alert">{formError}</div> : null}
       {successMessage ? <div className="app-success-state tenant-settings-message" role="status">{successMessage}</div> : null}
       {isWriteLocked ? (
         <div className="app-warning-state tenant-settings-message">
-          <strong>Tenant write lock is active.</strong> These settings are read-only until a platform administrator removes the lock.
+          <strong>{ui('Tenant write lock is active.')}</strong> {ui('These settings are read-only until a platform administrator removes the lock.')}
         </div>
       ) : null}
 
       {!tenantsQuery.isLoading && !tenantsQuery.error && !currentTenant ? (
-        <div className="app-error-state tenant-settings-message">The backend did not return the current tenant.</div>
+        <div className="app-error-state tenant-settings-message">{ui('The backend did not return the current tenant.')}</div>
       ) : null}
 
       {currentTenant ? (
         <form className="app-panel tenant-settings-panel tenant-settings-form" onSubmit={handleSubmit} noValidate>
           <OperationalSectionHeader
             iconPath="/tenant-settings"
-            title="Tenant configuration"
-            description="Edit only tenant-owned settings. Changes are validated before they can be saved and apply only to the current tenant."
-            actions={isDirty ? <span className="tenant-settings-badge tenant-settings-badge--unsaved">UNSAVED CHANGES</span> : <span className="tenant-settings-badge tenant-settings-badge--saved">SAVED</span>}
+            title={ui('Tenant configuration')}
+            description={ui('Edit only tenant-owned settings. Changes are validated before they can be saved and apply only to the current tenant.')}
+            actions={isDirty ? <span className="tenant-settings-badge tenant-settings-badge--unsaved">{ui('UNSAVED CHANGES')}</span> : <span className="tenant-settings-badge tenant-settings-badge--saved">{ui('SAVED')}</span>}
           />
 
-          <section className="tenant-settings-record" aria-label="Current tenant record">
+          <section className="tenant-settings-record" aria-label={ui('Current tenant record')}>
             <div className="tenant-settings-current-card">
               <div className="tenant-settings-current-card__topline">
-                <span className="tenant-settings-current-card__eyebrow">Current Tenant</span>
+                <span className="tenant-settings-current-card__eyebrow">{ui('Current Tenant')}</span>
                 <span className={`tenant-settings-badge ${isWriteLocked ? 'tenant-settings-badge--locked' : 'tenant-settings-badge--open'}`}>
-                  {isWriteLocked ? 'WRITE LOCKED' : 'OPEN'}
+                  {isWriteLocked ? ui('WRITE LOCKED') : ui('OPEN')}
                 </span>
               </div>
               <strong>{currentTenant.name}</strong>
-              <span>{currentTenant.location || 'No location configured'}</span>
-              <span className="tenant-settings-current-card__organization-type">{formatOrganizationTypeLabel(currentTenant.organization_type)}</span>
+              <span>{currentTenant.location || ui('No location configured')}</span>
+              <span className="tenant-settings-current-card__organization-type">{formatOrganizationTypeLabel(currentTenant.organization_type, ui)}</span>
             </div>
             <div className="tenant-settings-record-item tenant-settings-record-item--id">
-              <span>Tenant ID</span>
+              <span>{ui('Tenant ID')}</span>
               <strong>{currentTenant.id}</strong>
             </div>
             <div className="tenant-settings-record-item">
-              <span>Created</span>
-              <strong>{formatTimestamp(currentTenant.created_at)}</strong>
+              <span>{ui('Created')}</span>
+              <strong>{formatTimestamp(currentTenant.created_at, locale)}</strong>
             </div>
             <div className="tenant-settings-record-item">
-              <span>Last updated</span>
-              <strong>{formatTimestamp(currentTenant.updated_at)}</strong>
+              <span>{ui('Last updated')}</span>
+              <strong>{formatTimestamp(currentTenant.updated_at, locale)}</strong>
             </div>
           </section>
 
           <section className="tenant-settings-form-group">
             <div className="tenant-settings-form-group__heading">
               <div>
-                <h4>Organization profile</h4>
-                <p>Core tenant identity shown throughout the operational workspace.</p>
+                <h4>{ui('Organization profile')}</h4>
+                <p>{ui('Core tenant identity shown throughout the operational workspace.')}</p>
               </div>
-              <span className="tenant-settings-form-group__tag">Profile</span>
+              <span className="tenant-settings-form-group__tag">{ui('Profile')}</span>
             </div>
             <div className="tenant-settings-grid tenant-settings-grid--three">
               <label className="tenant-settings-field">
-                <span>Name</span>
+                <span>{ui('Name')}</span>
                 <input
                   className={nameInvalid ? 'is-invalid' : undefined}
                   value={formState.name}
@@ -627,22 +638,22 @@ export default function TenantSettingsPage() {
                   required
                   aria-invalid={nameInvalid}
                 />
-                {nameInvalid ? <small className="tenant-settings-field-error">Company name is required.</small> : null}
+                {nameInvalid ? <small className="tenant-settings-field-error">{ui('Company name is required.')}</small> : null}
               </label>
 
               <label className="tenant-settings-field">
-                <span>Location</span>
+                <span>{ui('Location')}</span>
                 <input
                   value={formState.location}
                   onChange={(event) => updateField('location', event.target.value)}
                   disabled={!canEdit}
                   maxLength={255}
-                  placeholder="Optional"
+                  placeholder={ui('Optional')}
                 />
               </label>
 
               <label className="tenant-settings-field">
-                <span>Organization type</span>
+                <span>{ui('Organization type')}</span>
                 <input
                   className={`tenant-settings-organization-type-input${organizationTypeInvalid ? ' is-invalid' : ''}`}
                   value={formState.organization_type}
@@ -652,7 +663,21 @@ export default function TenantSettingsPage() {
                   required
                   aria-invalid={organizationTypeInvalid}
                 />
-                {organizationTypeInvalid ? <small className="tenant-settings-field-error">Organization type is required.</small> : null}
+                {organizationTypeInvalid ? <small className="tenant-settings-field-error">{ui('Organization type is required.')}</small> : null}
+              </label>
+
+              <label className="tenant-settings-field">
+                <span>{ui('Default application language')}</span>
+                <select
+                  value={formState.default_locale}
+                  onChange={(event) => updateField('default_locale', event.target.value)}
+                  disabled={!canEdit}
+                >
+                  {LOCALE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <small>{ui('Used for tenant users who have not selected a personal language preference.')}</small>
               </label>
             </div>
           </section>
@@ -660,25 +685,25 @@ export default function TenantSettingsPage() {
           <section className="tenant-settings-form-group">
             <div className="tenant-settings-form-group__heading">
               <div>
-                <h4>Supplier document identity</h4>
-                <p>Used on Purchase Order / Receiving Reference PDFs and supplier emails. Optional fields fall back safely where applicable.</p>
+                <h4>{ui('Supplier document identity')}</h4>
+                <p>{ui('Used on Purchase Order / Receiving Reference PDFs and supplier emails. Optional fields fall back safely where applicable.')}</p>
               </div>
-              <span className="tenant-settings-form-group__tag">Purchasing</span>
+              <span className="tenant-settings-form-group__tag">{ui('Purchasing')}</span>
             </div>
             <div className="tenant-settings-grid tenant-settings-grid--three">
               <label className="tenant-settings-field">
-                <span>Legal / company name</span>
+                <span>{ui('Legal / company name')}</span>
                 <input
                   value={formState.legal_name}
                   onChange={(event) => updateField('legal_name', event.target.value)}
                   disabled={!canEdit}
                   maxLength={255}
-                  placeholder="Optional; tenant name is used as fallback"
+                  placeholder={ui('Optional; tenant name is used as fallback')}
                 />
               </label>
 
               <label className="tenant-settings-field">
-                <span>Business email</span>
+                <span>{ui('Business email')}</span>
                 <input
                   className={businessEmailInvalid ? 'is-invalid' : undefined}
                   type="email"
@@ -686,55 +711,55 @@ export default function TenantSettingsPage() {
                   onChange={(event) => updateField('business_email', event.target.value)}
                   disabled={!canEdit}
                   maxLength={255}
-                  placeholder="purchasing@company.com"
+                  placeholder={ui('purchasing@company.com')}
                   aria-invalid={businessEmailInvalid}
                 />
-                {businessEmailInvalid ? <small className="tenant-settings-field-error">Enter a valid business email address.</small> : null}
+                {businessEmailInvalid ? <small className="tenant-settings-field-error">{ui('Enter a valid business email address.')}</small> : null}
               </label>
 
               <label className="tenant-settings-field">
-                <span>Business phone</span>
+                <span>{ui('Business phone')}</span>
                 <input
                   value={formState.business_phone}
                   onChange={(event) => updateField('business_phone', event.target.value)}
                   disabled={!canEdit}
                   maxLength={100}
-                  placeholder="Optional"
+                  placeholder={ui('Optional')}
                 />
               </label>
 
               <label className="tenant-settings-field">
-                <span>Tax / VAT ID</span>
+                <span>{ui('Tax / VAT ID')}</span>
                 <input
                   value={formState.tax_id}
                   onChange={(event) => updateField('tax_id', event.target.value)}
                   disabled={!canEdit}
                   maxLength={100}
-                  placeholder="Optional"
+                  placeholder={ui('Optional')}
                 />
               </label>
 
               <label className="tenant-settings-field tenant-settings-field--span-two">
-                <span>Business / delivery address</span>
+                <span>{ui('Business / delivery address')}</span>
                 <textarea
                   value={formState.business_address}
                   onChange={(event) => updateField('business_address', event.target.value)}
                   disabled={!canEdit}
                   maxLength={2000}
-                  placeholder="Street, postal code, city, country"
+                  placeholder={ui('Street, postal code, city, country')}
                 />
               </label>
 
               <label className="tenant-settings-field tenant-settings-field--full">
-                <span>Default purchase order payment terms</span>
+                <span>{ui('Default purchase order payment terms')}</span>
                 <textarea
                   value={formState.default_purchase_order_payment_terms}
                   onChange={(event) => updateField('default_purchase_order_payment_terms', event.target.value)}
                   disabled={!canEdit}
                   maxLength={1000}
-                  placeholder="Example: Net 30 days from invoice date"
+                  placeholder={ui('Example: Net 30 days from invoice date')}
                 />
-                <small>Used as the tenant default when purchase documents need payment terms.</small>
+                <small>{ui('Used as the tenant default when purchase documents need payment terms.')}</small>
               </label>
             </div>
           </section>
@@ -742,21 +767,21 @@ export default function TenantSettingsPage() {
           <section className="tenant-settings-form-group">
             <div className="tenant-settings-form-group__heading">
               <div>
-                <h4>Governance & accounting controls</h4>
-                <p>Controls that affect purchase approvals, inventory valuation context, and seasonal operating dates.</p>
+                <h4>{ui('Governance & accounting controls')}</h4>
+                <p>{ui('Controls that affect purchase approvals, inventory valuation context, and seasonal operating dates.')}</p>
               </div>
-              <span className="tenant-settings-form-group__tag">Controls</span>
+              <span className="tenant-settings-form-group__tag">{ui('Controls')}</span>
             </div>
 
             <div className="tenant-settings-control-grid">
               <div className="tenant-settings-control-card tenant-settings-control-card--approval">
                 <div className="tenant-settings-control-card__heading">
                   <div>
-                    <strong>Purchase order approval separation</strong>
-                    <p>Keep purchasing approval independent from the employee who created the order.</p>
+                    <strong>{ui('Purchase order approval separation')}</strong>
+                    <p>{ui('Keep purchasing approval independent from the employee who created the order.')}</p>
                   </div>
                   <span className={`tenant-settings-badge ${formState.require_separate_purchase_order_approver ? 'tenant-settings-badge--open' : 'tenant-settings-badge--warning'}`}>
-                    {formState.require_separate_purchase_order_approver ? 'REQUIRED' : 'SELF-APPROVAL'}
+                    {formState.require_separate_purchase_order_approver ? ui('REQUIRED') : ui('SELF-APPROVAL')}
                   </span>
                 </div>
                 <label className="tenant-settings-checkbox">
@@ -766,21 +791,21 @@ export default function TenantSettingsPage() {
                     onChange={(event) => updateField('require_separate_purchase_order_approver', event.target.checked)}
                     disabled={!canEdit}
                   />
-                  <span>Require a different employee to approve a purchase order than the employee who created it. Recommended and enabled by default; turn this off only when a small team must allow self-approval.</span>
+                  <span>{ui('Require a different employee to approve a purchase order than the employee who created it. Recommended and enabled by default; turn this off only when a small team must allow self-approval.')}</span>
                 </label>
               </div>
 
               <div className="tenant-settings-control-card tenant-settings-control-card--season">
                 <div className="tenant-settings-control-card__heading">
                   <div>
-                    <strong>Operating season</strong>
-                    <p>Optional date range used as tenant operating context.</p>
+                    <strong>{ui('Operating season')}</strong>
+                    <p>{ui('Optional date range used as tenant operating context.')}</p>
                   </div>
-                  <span className="tenant-settings-badge tenant-settings-badge--neutral">{draftSeasonStatus.toUpperCase()}</span>
+                  <span className="tenant-settings-badge tenant-settings-badge--neutral">{draftSeasonStatus}</span>
                 </div>
                 <div className="tenant-settings-grid tenant-settings-grid--two tenant-settings-grid--compact">
                   <label className="tenant-settings-field">
-                    <span>Season start</span>
+                    <span>{ui('Season start')}</span>
                     <input
                       type="date"
                       value={formState.season_start}
@@ -790,7 +815,7 @@ export default function TenantSettingsPage() {
                   </label>
 
                   <label className="tenant-settings-field">
-                    <span>Season end</span>
+                    <span>{ui('Season end')}</span>
                     <input
                       className={dateRangeInvalid ? 'is-invalid' : undefined}
                       type="date"
@@ -800,7 +825,7 @@ export default function TenantSettingsPage() {
                       min={formState.season_start || undefined}
                       aria-invalid={dateRangeInvalid}
                     />
-                    {dateRangeInvalid ? <small className="tenant-settings-field-error">Season end cannot be before season start.</small> : null}
+                    {dateRangeInvalid ? <small className="tenant-settings-field-error">{ui('Season end cannot be before season start.')}</small> : null}
                   </label>
                 </div>
               </div>
@@ -809,14 +834,14 @@ export default function TenantSettingsPage() {
             <div className="tenant-settings-currency-block">
               <div className="tenant-settings-currency-copy">
                 <div className="tenant-settings-label-row">
-                  <strong>Inventory currency</strong>
-                  <span className="tenant-settings-info-icon" title={INVENTORY_CURRENCY_HELP} aria-label={INVENTORY_CURRENCY_HELP} tabIndex={0}>i</span>
+                  <strong>{ui('Inventory currency')}</strong>
+                  <span className="tenant-settings-info-icon" title={ui(INVENTORY_CURRENCY_HELP)} aria-label={ui(INVENTORY_CURRENCY_HELP)} tabIndex={0}>i</span>
                 </div>
-                <p>Tenant-base costs and valuation. No automatic FX conversion.</p>
+                <p>{ui('Tenant-base costs and valuation. No automatic FX conversion.')}</p>
               </div>
 
               <label className="tenant-settings-field tenant-settings-currency-field">
-                <span>Currency code</span>
+                <span>{ui('Currency code')}</span>
                 <input
                   className={!currencyCodeValid ? 'is-invalid' : undefined}
                   value={formState.inventory_currency}
@@ -831,17 +856,17 @@ export default function TenantSettingsPage() {
                   required
                   aria-invalid={!currencyCodeValid}
                 />
-                {!currencyCodeValid ? <small className="tenant-settings-field-error">Enter a 3-letter currency code such as EUR, USD, or GBP.</small> : null}
+                {!currencyCodeValid ? <small className="tenant-settings-field-error">{ui('Enter a 3-letter currency code such as EUR, USD, or GBP.')}</small> : null}
               </label>
 
               {!currentTenant.inventory_currency_configured_at ? (
                 <div className="tenant-settings-currency-notice">
                   <div className="tenant-settings-notice-heading">
                     <div>
-                      <strong>Legacy currency confirmation required</strong>
-                      <p>Confirm which currency the tenant's existing inventory standard costs already use.</p>
+                      <strong>{ui('Legacy currency confirmation required')}</strong>
+                      <p>{ui("Confirm which currency the tenant's existing inventory standard costs already use.")}</p>
                     </div>
-                    <span className="tenant-settings-info-icon" title={LEGACY_CURRENCY_HELP} aria-label={LEGACY_CURRENCY_HELP} tabIndex={0}>i</span>
+                    <span className="tenant-settings-info-icon" title={ui(LEGACY_CURRENCY_HELP)} aria-label={ui(LEGACY_CURRENCY_HELP)} tabIndex={0}>i</span>
                   </div>
                   <label className="tenant-settings-checkbox">
                     <input
@@ -854,16 +879,16 @@ export default function TenantSettingsPage() {
                       }}
                       disabled={!canEdit}
                     />
-                    <span>Confirm that <strong>{formState.inventory_currency || 'this currency'}</strong> is the currency of existing inventory standard costs</span>
+                    <span>{ui('Confirm that {currency} is the currency of existing inventory standard costs').replace('{currency}', formState.inventory_currency || ui('this currency'))}</span>
                   </label>
                   {legacyCurrencyChangeNeedsConfirmation ? (
-                    <small className="tenant-settings-field-error">You changed the currency. Confirm it above before saving.</small>
+                    <small className="tenant-settings-field-error">{ui('You changed the currency. Confirm it above before saving.')}</small>
                   ) : null}
                 </div>
               ) : (
                 <div className="tenant-settings-currency-status">
-                  <strong>Inventory currency confirmed</strong>
-                  <p>Confirmed {formatTimestamp(currentTenant.inventory_currency_configured_at)}. A later change is blocked if it would relabel existing currency-dependent financial evidence.</p>
+                  <strong>{ui('Inventory currency confirmed')}</strong>
+                  <p>{ui('Confirmed {date}. A later change is blocked if it would relabel existing currency-dependent financial evidence.').replace('{date}', formatTimestamp(currentTenant.inventory_currency_configured_at, locale))}</p>
                 </div>
               )}
             </div>
@@ -871,8 +896,8 @@ export default function TenantSettingsPage() {
 
           <div className="tenant-settings-form-footer">
             <div className="tenant-settings-form-footer__copy">
-              {!canUpdateTenants ? <strong>Your role can read tenant settings but cannot update them.</strong> : <strong>Only saved changes affect tenant operations.</strong>}
-              <span>{isWriteLocked ? 'The platform write lock currently prevents changes.' : isDirty ? 'Review the highlighted settings, then save or reset your changes.' : 'No unsaved tenant-setting changes.'}</span>
+              {!canUpdateTenants ? <strong>{ui('Your role can read tenant settings but cannot update them.')}</strong> : <strong>{ui('Only saved changes affect tenant operations.')}</strong>}
+              <span>{isWriteLocked ? ui('The platform write lock currently prevents changes.') : isDirty ? ui('Review the highlighted settings, then save or reset your changes.') : ui('No unsaved tenant-setting changes.')}</span>
             </div>
             <div className="tenant-settings-form-footer__actions">
               <button
@@ -881,14 +906,14 @@ export default function TenantSettingsPage() {
                 onClick={handleResetForm}
                 disabled={!isDirty || isSaving}
               >
-                Reset changes
+                {ui('Reset changes')}
               </button>
               <button
                 type="submit"
                 className="app-button app-button--primary"
                 disabled={!canUpdateTenants || isWriteLocked || isSaving || !isDirty || !formValid}
               >
-                {isSaving ? 'Saving…' : 'Save tenant settings'}
+                {isSaving ? ui('Saving…') : ui('Save tenant settings')}
               </button>
             </div>
           </div>

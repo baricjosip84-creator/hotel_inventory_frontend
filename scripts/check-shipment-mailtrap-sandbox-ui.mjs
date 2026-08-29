@@ -7,7 +7,7 @@ const source = fs.readFileSync(file, 'utf8');
 const required = [
   'sandbox_capture?: boolean',
   'captured in Mailtrap Sandbox',
-  "? 'Sending...'"
+  "? ui('Sending...')"
 ];
 
 const forbidden = [

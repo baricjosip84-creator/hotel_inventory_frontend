@@ -2,6 +2,7 @@ import type { ProductCostGovernanceHandoffSummaryResponse } from '../../types/in
 import { formatStatusLabel, toNumber } from './productFormatting';
 import { styles } from './productStyles';
 import { StatCard, StatusBadge } from './productSummaryComponents';
+import { useAppTranslation } from '../../i18n/I18nContext';
 
 type CostGovernanceQueryState = {
   isLoading: boolean;
@@ -20,28 +21,29 @@ export function ProductCostGovernanceHandoffPanel({
   costGovernanceHandoffSummary,
   handleExportCostGovernanceHandoffCsv
 }: ProductCostGovernanceHandoffPanelProps) {
+  const { ui } = useAppTranslation();
   return (
     <div style={styles.riskListCard}>
               <div style={styles.packageHeader}>
                 <div>
-                  <h4 style={styles.sectionTitle}>Governance handoff summary</h4>
-                  <p style={styles.panelSubtitle}>Operational ownership handoff for completed costing governance. Derived and read-only.</p>
+                  <h4 style={styles.sectionTitle}>{ui("Governance handoff summary")}</h4>
+                  <p style={styles.panelSubtitle}>{ui("Operational ownership handoff for completed costing governance. Derived and read-only.")}</p>
                 </div>
                 <button type="button" style={styles.secondaryButton} onClick={handleExportCostGovernanceHandoffCsv} disabled={!costGovernanceHandoffSummary?.handoff_rows?.length}>
-                  Export Handoff CSV
+                  {ui("Export Handoff CSV")}
                 </button>
               </div>
               {costGovernanceHandoffQuery.isLoading ? (
-                <div style={styles.rowSubtle}>Loading handoff summary...</div>
+                <div style={styles.rowSubtle}>{ui("Loading handoff summary...")}</div>
               ) : costGovernanceHandoffQuery.isError ? (
-                <div style={styles.errorText}>Unable to load cost governance handoff summary.</div>
+                <div style={styles.errorText}>{ui("Unable to load cost governance handoff summary.")}</div>
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Handoff Status" value={formatStatusLabel(costGovernanceHandoffSummary?.handoff_status)} subtitle={costGovernanceHandoffSummary?.can_handoff ? 'Ready for ownership' : 'Review required'} tone={costGovernanceHandoffSummary?.can_handoff ? 'good' : 'warn'} />
-                    <StatCard title="Evidence Rows" value={toNumber(costGovernanceHandoffSummary?.totals.evidence_rows)} subtitle="Archive + review + audit" />
-                    <StatCard title="Blockers" value={toNumber(costGovernanceHandoffSummary?.totals.blockers)} subtitle="Must be zero" tone={toNumber(costGovernanceHandoffSummary?.totals.blockers) > 0 ? 'bad' : 'good'} />
-                    <StatCard title="Follow-ups" value={toNumber(costGovernanceHandoffSummary?.totals.warnings) + toNumber(costGovernanceHandoffSummary?.totals.remediation_items)} subtitle="Warnings + remediation" tone={toNumber(costGovernanceHandoffSummary?.totals.warnings) + toNumber(costGovernanceHandoffSummary?.totals.remediation_items) > 0 ? 'warn' : 'good'} />
+                    <StatCard title={ui("Handoff Status")} value={ui(formatStatusLabel(costGovernanceHandoffSummary?.handoff_status))} subtitle={costGovernanceHandoffSummary?.can_handoff ? ui('Ready for ownership') : ui('Review required')} tone={costGovernanceHandoffSummary?.can_handoff ? 'good' : 'warn'} />
+                    <StatCard title={ui("Evidence Rows")} value={toNumber(costGovernanceHandoffSummary?.totals.evidence_rows)} subtitle={ui("Archive + review + audit")} />
+                    <StatCard title={ui("Blockers")} value={toNumber(costGovernanceHandoffSummary?.totals.blockers)} subtitle={ui("Must be zero")} tone={toNumber(costGovernanceHandoffSummary?.totals.blockers) > 0 ? 'bad' : 'good'} />
+                    <StatCard title={ui("Follow-ups")} value={toNumber(costGovernanceHandoffSummary?.totals.warnings) + toNumber(costGovernanceHandoffSummary?.totals.remediation_items)} subtitle={ui("Warnings + remediation")} tone={toNumber(costGovernanceHandoffSummary?.totals.warnings) + toNumber(costGovernanceHandoffSummary?.totals.remediation_items) > 0 ? 'warn' : 'good'} />
                   </div>
 
                   <div style={styles.riskGrid}>

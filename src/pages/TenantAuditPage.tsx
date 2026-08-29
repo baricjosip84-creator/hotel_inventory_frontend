@@ -1,5 +1,8 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useAppTranslation } from '../i18n/I18nContext';
+import type { AppLocale } from '../i18n/config';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { ApiError, apiDownloadFile, apiRequest } from '../lib/api';
 import {
   OperationalSectionHeader,
@@ -102,15 +105,13 @@ const PATH_ACTION_LABELS: Record<string, string> = {
   'send-to-supplier': 'Sent to supplier'
 };
 
-function readableError(error: unknown): string {
+function readableError(error: unknown, ui: (englishText: string) => string): string {
   if (error instanceof ApiError || error instanceof Error) return error.message;
-  return 'Unknown error';
+  return ui('Unknown error');
 }
 
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return '-';
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? '-' : parsed.toLocaleString();
+function formatDateTime(value: string | null | undefined, locale: AppLocale): string {
+  return formatLocalizedDateTime(value, locale);
 }
 
 function metadataValue(metadata: Record<string, unknown> | null, key: string): string | null {
@@ -140,7 +141,7 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-function pathOperation(row: TenantAuditRow): string | null {
+function pathOperation(row: TenantAuditRow, ui: (englishText: string) => string): string | null {
   const path = metadataValue(row.metadata, 'path');
   if (!path) return null;
 
@@ -152,23 +153,23 @@ function pathOperation(row: TenantAuditRow): string | null {
   const previous = normalized[normalized.length - 2] || '';
   if (!last || isUuid(last) || !isUuid(previous)) return null;
 
-  return PATH_ACTION_LABELS[last] || formatLabel(last);
+  return PATH_ACTION_LABELS[last] ? ui(PATH_ACTION_LABELS[last]) : formatLabel(last);
 }
 
-function operationLabel(row: TenantAuditRow): string {
+function operationLabel(row: TenantAuditRow, ui: (englishText: string) => string): string {
   if (row.action && !GENERIC_ACTIONS.has(row.action)) return formatLabel(row.action);
 
-  const fromPath = pathOperation(row);
+  const fromPath = pathOperation(row, ui);
   if (fromPath) return fromPath;
 
-  if (row.action === 'create') return 'Created';
-  if (row.action === 'update') return 'Updated';
-  if (row.action === 'delete') return 'Deleted';
-  if (row.action === 'replace') return 'Replaced';
+  if (row.action === 'create') return ui('Created');
+  if (row.action === 'update') return ui('Updated');
+  if (row.action === 'delete') return ui('Deleted');
+  if (row.action === 'replace') return ui('Replaced');
   return formatLabel(row.action);
 }
 
-function actorLabel(row: TenantAuditRow): { primary: string; secondary?: string; support: boolean } {
+function actorLabel(row: TenantAuditRow, ui: (englishText: string) => string): { primary: string; secondary?: string; support: boolean } {
   const actorType = metadataValue(row.metadata, 'actor_type');
 
   if (actorType === 'support_session') {
@@ -177,14 +178,14 @@ function actorLabel(row: TenantAuditRow): { primary: string; secondary?: string;
     const supportSessionId = metadataValue(row.metadata, 'support_session_id');
 
     return {
-      primary: platformName || platformEmail || 'Platform support',
+      primary: platformName || platformEmail || ui('Platform support'),
       secondary: platformEmail && platformName ? platformEmail : supportSessionId || undefined,
       support: true
     };
   }
 
   return {
-    primary: row.user_name || row.user_email || row.user_id || 'Tenant user',
+    primary: row.user_name || row.user_email || row.user_id || ui('Tenant user'),
     secondary: row.user_email && row.user_name ? row.user_email : row.user_id || undefined,
     support: false
   };
@@ -262,6 +263,7 @@ async function fetchAuditDetail(id: string): Promise<TenantAuditRow> {
 }
 
 export default function TenantAuditPage() {
+  const { locale, ui } = useAppTranslation();
   const [draftFilters, setDraftFilters] = useState<AuditFilters>(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<AuditFilters>(DEFAULT_FILTERS);
   const [pageIndex, setPageIndex] = useState(0);
@@ -313,8 +315,8 @@ export default function TenantAuditPage() {
   const hasMore = Boolean(auditQuery.data?.has_more);
   const summary = summaryQuery.data;
   const lastRefreshedText = auditQuery.dataUpdatedAt
-    ? `Last refreshed ${formatDateTime(new Date(auditQuery.dataUpdatedAt).toISOString())}`
-    : 'Not refreshed yet';
+    ? ui('Last refreshed {date}').replace('{date}', formatDateTime(new Date(auditQuery.dataUpdatedAt).toISOString(), locale))
+    : ui('Not refreshed yet');
 
   const filtersChanged = JSON.stringify(draftFilters) !== JSON.stringify(appliedFilters);
   const anyFilterApplied = Boolean(
@@ -331,7 +333,7 @@ export default function TenantAuditPage() {
 
   const applyFilters = () => {
     if (draftDateRangeInvalid) {
-      setFilterError('From date must be before or equal to To date.');
+      setFilterError(ui('From date must be before or equal to To date.'));
       return;
     }
 
@@ -365,11 +367,11 @@ export default function TenantAuditPage() {
     const [listResult, summaryResult] = await Promise.all([auditQuery.refetch(), summaryQuery.refetch()]);
     const error = listResult.error || summaryResult.error;
     if (error) {
-      setRefreshError(readableError(error));
+      setRefreshError(readableError(error, ui));
       return;
     }
 
-    setRefreshMessage('Tenant audit refreshed.');
+    setRefreshMessage(ui('Tenant audit refreshed.'));
   };
 
   const handleExport = async () => {
@@ -381,10 +383,10 @@ export default function TenantAuditPage() {
     try {
       const params = new URLSearchParams(filterParams);
       await apiDownloadFile(`/audit/export.csv?${params.toString()}`, `tenant-audit-${new Date().toISOString().slice(0, 10)}.csv`);
-      setRefreshMessage('Audit CSV export downloaded.');
+      setRefreshMessage(ui('Audit CSV export downloaded.'));
       await Promise.all([auditQuery.refetch(), summaryQuery.refetch()]);
     } catch (error) {
-      setRefreshError(readableError(error));
+      setRefreshError(readableError(error, ui));
     } finally {
       setExporting(false);
     }
@@ -405,28 +407,28 @@ export default function TenantAuditPage() {
     <div className="tenant-audit-page io-operational-page io-workspace-page" id="tenant-audit-workspace-top">
       <OperationalWorkspaceHero
         iconPath="/audit"
-        eyebrow="Accountability & evidence"
-        title="Tenant audit trail"
-        description="Review tenant-scoped business changes and attributed support-session activity. Audit evidence is read-only and remains isolated to the current tenant."
+        eyebrow={ui('Accountability & evidence')}
+        title={ui('Tenant audit trail')}
+        description={ui('Review tenant-scoped business changes and attributed support-session activity. Audit evidence is read-only and remains isolated to the current tenant.')}
         meta={
           <>
-            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Read-only evidence</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Support activity attributed</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>CSV export</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Read-only evidence')}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('Support activity attributed')}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui('CSV export')}</OperationalWorkspaceMetaPill>
           </>
         }
-        aside={<OperationalWorkspaceStatus value={summary?.total_events ?? '—'} label="events matching applied filters" />}
+        aside={<OperationalWorkspaceStatus value={summary ? formatLocalizedNumber(summary.total_events, locale) : '—'} label={ui('events matching applied filters')} />}
       />
 
-      <OperationalWorkspaceStats ariaLabel="Tenant audit overview">
-        <OperationalWorkspaceStatCard label="Matching events" value={summary?.total_events ?? '—'} helper="Across the applied audit filters" tone="blue" iconPath="/audit" loading={summaryQuery.isLoading} />
-        <OperationalWorkspaceStatCard label="Tenant actions" value={summary?.tenant_events ?? '—'} helper="Actions attributed to tenant users or tenant services" tone="neutral" iconPath="/users" loading={summaryQuery.isLoading} />
-        <OperationalWorkspaceStatCard label="Support actions" value={summary?.support_events ?? '—'} helper="Audited platform support-session activity" tone={summary?.support_events ? 'warn' : 'good'} iconPath="/sessions" loading={summaryQuery.isLoading} />
-        <OperationalWorkspaceStatCard label="Unique actors" value={summary?.unique_actors ?? '—'} helper="Distinct tenant or support actors in scope" tone="good" iconPath="/users" loading={summaryQuery.isLoading} />
+      <OperationalWorkspaceStats ariaLabel={ui('Tenant audit overview')}>
+        <OperationalWorkspaceStatCard label={ui('Matching events')} value={summary ? formatLocalizedNumber(summary.total_events, locale) : '—'} helper={ui('Across the applied audit filters')} tone="blue" iconPath="/audit" loading={summaryQuery.isLoading} />
+        <OperationalWorkspaceStatCard label={ui('Tenant actions')} value={summary ? formatLocalizedNumber(summary.tenant_events, locale) : '—'} helper={ui('Actions attributed to tenant users or tenant services')} tone="neutral" iconPath="/users" loading={summaryQuery.isLoading} />
+        <OperationalWorkspaceStatCard label={ui('Support actions')} value={summary ? formatLocalizedNumber(summary.support_events, locale) : '—'} helper={ui('Audited platform support-session activity')} tone={summary?.support_events ? 'warn' : 'good'} iconPath="/sessions" loading={summaryQuery.isLoading} />
+        <OperationalWorkspaceStatCard label={ui('Unique actors')} value={summary ? formatLocalizedNumber(summary.unique_actors, locale) : '—'} helper={ui('Distinct tenant or support actors in scope')} tone="good" iconPath="/users" loading={summaryQuery.isLoading} />
       </OperationalWorkspaceStats>
 
-      {summaryQuery.error ? <div className="app-error-state tenant-audit-message">Audit summary could not be loaded: {readableError(summaryQuery.error)}</div> : null}
+      {summaryQuery.error ? <div className="app-error-state tenant-audit-message">{ui('Audit summary could not be loaded: {error}').replace('{error}', readableError(summaryQuery.error, ui))}</div> : null}
       {filterError ? <div className="app-error-state tenant-audit-message" role="alert">{filterError}</div> : null}
       {refreshError ? <div className="app-error-state tenant-audit-message" role="alert">{refreshError}</div> : null}
       {refreshMessage ? <div className="app-success-state tenant-audit-message" role="status">{refreshMessage}</div> : null}
@@ -434,8 +436,8 @@ export default function TenantAuditPage() {
       <section className="app-panel tenant-audit-panel">
         <OperationalSectionHeader
           iconPath="/audit"
-          title="Audit filters"
-          description="Narrow the audit trail by date, actor or evidence. Filters are applied only when you choose Apply filters."
+          title={ui('Audit filters')}
+          description={ui('Narrow the audit trail by date, actor or evidence. Filters are applied only when you choose Apply filters.')}
           actions={
             <>
               <button
@@ -444,7 +446,7 @@ export default function TenantAuditPage() {
                 onClick={resetFilters}
                 disabled={!anyFilterApplied && !filtersChanged}
               >
-                Reset
+                {ui('Reset')}
               </button>
               <button
                 type="button"
@@ -452,7 +454,7 @@ export default function TenantAuditPage() {
                 onClick={applyFilters}
                 disabled={!filtersChanged || auditQuery.isFetching || draftDateRangeInvalid}
               >
-                Apply filters
+                {ui('Apply filters')}
               </button>
             </>
           }
@@ -460,15 +462,15 @@ export default function TenantAuditPage() {
 
         <div className="tenant-audit-filter-grid">
           <label className="tenant-audit-field tenant-audit-field--search">
-            <span>Search audit history</span>
+            <span>{ui('Search audit history')}</span>
             <input
               value={draftFilters.search}
               onChange={(event) => setDraftFilters((current) => ({ ...current, search: event.target.value }))}
-              placeholder="Actor, action, entity, request ID, or support reason"
+              placeholder={ui('Actor, action, entity, request ID, or support reason')}
             />
           </label>
           <label className="tenant-audit-field">
-            <span>From</span>
+            <span>{ui('From')}</span>
             <input
               type="date"
               value={draftFilters.from}
@@ -478,7 +480,7 @@ export default function TenantAuditPage() {
             />
           </label>
           <label className="tenant-audit-field">
-            <span>To</span>
+            <span>{ui('To')}</span>
             <input
               type="date"
               value={draftFilters.to}
@@ -488,12 +490,12 @@ export default function TenantAuditPage() {
             />
             {draftDateRangeInvalid ? (
               <span id="tenant-audit-date-range-error" className="tenant-audit-field-error" role="alert">
-                From date must be before or equal to To date.
+                {ui('From date must be before or equal to To date.')}
               </span>
             ) : null}
           </label>
           <label className="tenant-audit-field">
-            <span>Events per page</span>
+            <span>{ui('Events per page')}</span>
             <select
               value={draftFilters.limit}
               onChange={(event) => setDraftFilters((current) => ({ ...current, limit: event.target.value as AuditFilters['limit'] }))}
@@ -504,19 +506,19 @@ export default function TenantAuditPage() {
             </select>
           </label>
           <label className="tenant-audit-field">
-            <span>Action code</span>
+            <span>{ui('Action code')}</span>
             <input
               value={draftFilters.action}
               onChange={(event) => setDraftFilters((current) => ({ ...current, action: event.target.value }))}
-              placeholder="Example: shipment.receive"
+              placeholder={ui('Example: shipment.receive')}
             />
           </label>
           <label className="tenant-audit-field">
-            <span>Entity type</span>
+            <span>{ui('Entity type')}</span>
             <input
               value={draftFilters.entityType}
               onChange={(event) => setDraftFilters((current) => ({ ...current, entityType: event.target.value }))}
-              placeholder="Example: shipments"
+              placeholder={ui('Example: shipments')}
             />
           </label>
           <label className="tenant-audit-checkbox">
@@ -525,20 +527,20 @@ export default function TenantAuditPage() {
               checked={draftFilters.supportOnly}
               onChange={(event) => setDraftFilters((current) => ({ ...current, supportOnly: event.target.checked }))}
             />
-            <span>Support-session actions only</span>
+            <span>{ui('Support-session actions only')}</span>
           </label>
-          <div className="tenant-audit-filter-note">CSV export uses the currently applied filters, not unfinished filter edits.</div>
+          <div className="tenant-audit-filter-note">{ui('CSV export uses the currently applied filters, not unfinished filter edits.')}</div>
         </div>
       </section>
 
-      {auditQuery.isLoading ? <div className="app-empty-state">Loading tenant audit…</div> : null}
-      {auditQuery.error ? <div className="app-error-state">Failed to load tenant audit: {readableError(auditQuery.error)}</div> : null}
+      {auditQuery.isLoading ? <div className="app-empty-state">{ui('Loading tenant audit…')}</div> : null}
+      {auditQuery.error ? <div className="app-error-state">{ui('Failed to load tenant audit: {error}').replace('{error}', readableError(auditQuery.error, ui))}</div> : null}
 
       <section className="app-panel tenant-audit-panel tenant-audit-events-panel">
         <OperationalSectionHeader
           iconPath="/audit"
-          title="Audit event log"
-          description={`${lastRefreshedText} · Page ${pageIndex + 1} · ${rows.length} event${rows.length === 1 ? '' : 's'} loaded${auditQuery.isFetching && !auditQuery.isLoading ? ' · Updating…' : ''}`}
+          title={ui('Audit event log')}
+          description={`${lastRefreshedText} · ${ui('Page {page}').replace('{page}', formatLocalizedNumber(pageIndex + 1, locale))} · ${(rows.length === 1 ? ui('{count} event loaded') : ui('{count} events loaded')).replace('{count}', formatLocalizedNumber(rows.length, locale))}${auditQuery.isFetching && !auditQuery.isLoading ? ` · ${ui('Updating…')}` : ''}`}
           actions={
             <>
               <button
@@ -547,7 +549,7 @@ export default function TenantAuditPage() {
                 onClick={() => setShowTechnicalDetails((current) => !current)}
                 aria-pressed={showTechnicalDetails}
               >
-                {showTechnicalDetails ? 'Hide technical details' : 'Show technical details'}
+                {showTechnicalDetails ? ui('Hide technical details') : ui('Show technical details')}
               </button>
               <button
                 type="button"
@@ -555,7 +557,7 @@ export default function TenantAuditPage() {
                 onClick={handleExport}
                 disabled={exporting || auditQuery.isFetching}
               >
-                {exporting ? 'Exporting…' : 'Export CSV'}
+                {exporting ? ui('Exporting…') : ui('Export CSV')}
               </button>
               <button
                 type="button"
@@ -563,7 +565,7 @@ export default function TenantAuditPage() {
                 onClick={handleRefreshAudit}
                 disabled={auditQuery.isFetching}
               >
-                {auditQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+                {auditQuery.isFetching ? ui('Refreshing…') : ui('Refresh')}
               </button>
             </>
           }
@@ -574,34 +576,34 @@ export default function TenantAuditPage() {
             <table className="tenant-audit-table">
               <thead>
                 <tr>
-                  <th>Time</th>
-                  <th>Operation</th>
-                  <th>Actor</th>
-                  <th>Entity</th>
-                  <th>Source</th>
-                  <th>Evidence</th>
+                  <th>{ui('Time')}</th>
+                  <th>{ui('Operation')}</th>
+                  <th>{ui('Actor')}</th>
+                  <th>{ui('Entity')}</th>
+                  <th>{ui('Source')}</th>
+                  <th>{ui('Evidence')}</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => {
-                  const actor = actorLabel(row);
+                  const actor = actorLabel(row, ui);
                   const request = requestSummary(row);
                   const isSelected = selectedAuditId === row.id;
                   return (
                     <Fragment key={row.id}>
                       <tr>
-                        <td className="tenant-audit-time">{formatDateTime(row.created_at)}</td>
+                        <td className="tenant-audit-time">{formatDateTime(row.created_at, locale)}</td>
                         <td>
-                          <div className="tenant-audit-primary">{operationLabel(row)}</div>
+                          <div className="tenant-audit-primary">{operationLabel(row, ui)}</div>
                           {showTechnicalDetails ? <div className="tenant-audit-code">{row.action}</div> : null}
                         </td>
                         <td>
                           <span className={`tenant-audit-badge ${actor.support ? 'tenant-audit-badge--support' : 'tenant-audit-badge--tenant'}`}>
-                            {actor.support ? 'SUPPORT' : 'TENANT'}
+                            {actor.support ? ui('SUPPORT') : ui('TENANT')}
                           </span>
                           <div className="tenant-audit-primary tenant-audit-actor">{actor.primary}</div>
                           {actor.secondary ? <div className="tenant-audit-muted">{actor.secondary}</div> : null}
-                          {showTechnicalDetails && row.user_id ? <div className="tenant-audit-code">User {shortId(row.user_id)}</div> : null}
+                          {showTechnicalDetails && row.user_id ? <div className="tenant-audit-code">{ui('User {id}').replace('{id}', shortId(row.user_id))}</div> : null}
                         </td>
                         <td>
                           <div className="tenant-audit-primary">{formatLabel(row.entity_type)}</div>
@@ -612,12 +614,12 @@ export default function TenantAuditPage() {
                             {request.method ? <span className="tenant-audit-method">{request.method}</span> : null}
                             {request.status ? <span className={`tenant-audit-status tenant-audit-status--${statusTone(request.status)}`}>{request.status}</span> : null}
                             {!request.method && request.source ? <span className="tenant-audit-source-label">{formatLabel(request.source)}</span> : null}
-                            {!request.method && !request.source && actor.support ? <span className="tenant-audit-source-label">Support event</span> : null}
-                            {!request.method && !request.source && !actor.support ? <span className="tenant-audit-source-label">System event</span> : null}
+                            {!request.method && !request.source && actor.support ? <span className="tenant-audit-source-label">{ui('Support event')}</span> : null}
+                            {!request.method && !request.source && !actor.support ? <span className="tenant-audit-source-label">{ui('System event')}</span> : null}
                           </div>
-                          {request.supportReason ? <div className="tenant-audit-support-reason">Reason: {request.supportReason}</div> : null}
+                          {request.supportReason ? <div className="tenant-audit-support-reason">{ui('Reason: {reason}').replace('{reason}', request.supportReason)}</div> : null}
                           {showTechnicalDetails && request.path ? <div className="tenant-audit-path">{request.path}</div> : null}
-                          {showTechnicalDetails && request.requestId ? <div className="tenant-audit-muted">Request {request.requestId}</div> : null}
+                          {showTechnicalDetails && request.requestId ? <div className="tenant-audit-muted">{ui('Request {id}').replace('{id}', request.requestId)}</div> : null}
                         </td>
                         <td>
                           <button
@@ -626,23 +628,23 @@ export default function TenantAuditPage() {
                             onClick={() => setSelectedAuditId(isSelected ? null : row.id)}
                             aria-expanded={isSelected}
                           >
-                            {isSelected ? 'Hide details' : 'View details'}
+                            {isSelected ? ui('Hide details') : ui('View details')}
                           </button>
                         </td>
                       </tr>
                       {isSelected ? (
                         <tr className="tenant-audit-detail-row">
                           <td colSpan={6}>
-                            {detailQuery.isLoading ? <div className="app-empty-state">Loading full audit evidence…</div> : null}
-                            {detailQuery.error ? <div className="app-error-state">Audit evidence could not be loaded: {readableError(detailQuery.error)}</div> : null}
+                            {detailQuery.isLoading ? <div className="app-empty-state">{ui('Loading full audit evidence…')}</div> : null}
+                            {detailQuery.error ? <div className="app-error-state">{ui('Audit evidence could not be loaded: {error}').replace('{error}', readableError(detailQuery.error, ui))}</div> : null}
                             {detailQuery.data?.id === row.id ? (
                               <div className="tenant-audit-detail-panel">
                                 <div className="tenant-audit-detail-heading">
                                   <div>
-                                    <strong>Recorded evidence</strong>
-                                    <p>Business evidence is shown first. Technical identifiers and request metadata stay hidden unless technical details are enabled.</p>
+                                    <strong>{ui('Recorded evidence')}</strong>
+                                    <p>{ui('Business evidence is shown first. Technical identifiers and request metadata stay hidden unless technical details are enabled.')}</p>
                                   </div>
-                                  <span>{formatDateTime(detailQuery.data.created_at)}</span>
+                                  <span>{formatDateTime(detailQuery.data.created_at, locale)}</span>
                                 </div>
 
                                 {visibleEvidenceEntries(detailQuery.data.metadata).length ? (
@@ -654,17 +656,17 @@ export default function TenantAuditPage() {
                                       </div>
                                     ))}
                                   </div>
-                                ) : <div className="tenant-audit-no-extra-evidence">No additional business evidence was recorded for this event.</div>}
+                                ) : <div className="tenant-audit-no-extra-evidence">{ui('No additional business evidence was recorded for this event.')}</div>}
 
                                 {showTechnicalDetails ? (
                                   <>
                                     <div className="tenant-audit-id-grid">
-                                      <div><span>Event ID</span><strong>{detailQuery.data.id}</strong></div>
-                                      <div><span>User ID</span><strong>{detailQuery.data.user_id || '-'}</strong></div>
-                                      <div><span>Entity ID</span><strong>{detailQuery.data.entity_id || '-'}</strong></div>
+                                      <div><span>{ui('Event ID')}</span><strong>{detailQuery.data.id}</strong></div>
+                                      <div><span>{ui('User ID')}</span><strong>{detailQuery.data.user_id || '-'}</strong></div>
+                                      <div><span>{ui('Entity ID')}</span><strong>{detailQuery.data.entity_id || '-'}</strong></div>
                                     </div>
                                     <div>
-                                      <strong className="tenant-audit-raw-title">Raw metadata</strong>
+                                      <strong className="tenant-audit-raw-title">{ui('Raw metadata')}</strong>
                                       <pre className="tenant-audit-metadata-pre">{JSON.stringify(detailQuery.data.metadata || {}, null, 2)}</pre>
                                     </div>
                                   </>
@@ -680,10 +682,10 @@ export default function TenantAuditPage() {
               </tbody>
             </table>
           </div>
-        ) : !auditQuery.isLoading && !auditQuery.error ? <div className="app-empty-state tenant-audit-empty">No tenant audit events match the applied filters.</div> : null}
+        ) : !auditQuery.isLoading && !auditQuery.error ? <div className="app-empty-state tenant-audit-empty">{ui('No tenant audit events match the applied filters.')}</div> : null}
 
         <div className="tenant-audit-pagination">
-          <div className="tenant-audit-pagination-meta">Page {pageIndex + 1}</div>
+          <div className="tenant-audit-pagination-meta">{ui('Page {page}').replace('{page}', formatLocalizedNumber(pageIndex + 1, locale))}</div>
           <div className="tenant-audit-pagination-buttons">
             <button
               type="button"
@@ -691,7 +693,7 @@ export default function TenantAuditPage() {
               onClick={goToPreviousPage}
               disabled={pageIndex === 0 || auditQuery.isFetching}
             >
-              Previous
+              {ui('Previous')}
             </button>
             <button
               type="button"
@@ -699,7 +701,7 @@ export default function TenantAuditPage() {
               onClick={goToNextPage}
               disabled={!hasMore || auditQuery.isFetching}
             >
-              Next
+              {ui('Next')}
             </button>
           </div>
         </div>

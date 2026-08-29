@@ -257,28 +257,28 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
   return `${label} saved successfully.`;
 }
 
-function tenantMutationErrorMessage(error: unknown): string {
+function tenantMutationErrorMessage(error: unknown): { message: string; translateMessage: boolean } {
   if (error instanceof ApiError) {
     if (error.code === 'EMAIL_NOT_CONFIGURED') {
-      return 'Email is not configured for this server. The record was not changed. Configure backend email settings before using supplier email actions.';
+      return { message: 'Email is not configured for this server. The record was not changed. Configure backend email settings before using supplier email actions.', translateMessage: true };
     }
 
     if (error.code === 'PURCHASE_ORDER_COST_REVIEW_REQUIRED') {
-      return 'Commercial cost review is required. Enter positive item costs before submitting or approving this purchase order.';
+      return { message: 'Commercial cost review is required. Enter positive item costs before submitting or approving this purchase order.', translateMessage: true };
     }
 
     if (error.code === 'VALIDATION_SCHEMA_MISSING') {
-      return 'This action is temporarily unavailable because backend validation is not configured for this route.';
+      return { message: 'This action is temporarily unavailable because backend validation is not configured for this route.', translateMessage: true };
     }
 
-    return error.message;
+    return { message: error.message, translateMessage: false };
   }
 
-  if (error instanceof Error) return error.message;
-  return 'Action failed.';
+  if (error instanceof Error) return { message: error.message, translateMessage: false };
+  return { message: 'Action failed.', translateMessage: true };
 }
 
-function dispatchTenantMutationFeedback(detail: { type: 'success' | 'error'; message: string; requestId?: string }): void {
+function dispatchTenantMutationFeedback(detail: { type: 'success' | 'error'; message: string; requestId?: string; translateMessage?: boolean }): void {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent(TENANT_MUTATION_FEEDBACK_EVENT, { detail }));
 }
@@ -323,16 +323,17 @@ export function isVersionConflictError(error: unknown): boolean {
   );
 }
 
-export function getVersionConflictMessage(error: unknown): string {
+export function getVersionConflictMessage(error: unknown, ui?: (englishText: string) => string): string {
   if (isVersionConflictError(error)) {
-    return 'This record was modified by another operation. Refresh the page data and retry your changes.';
+    const message = 'This record was modified by another operation. Refresh the page data and retry your changes.';
+    return ui ? ui(message) : message;
   }
 
   if (error instanceof ApiError || error instanceof Error) {
     return error.message;
   }
 
-  return 'Unknown request failure.';
+  return ui ? ui('Unknown request failure.') : 'Unknown request failure.';
 }
 
 function buildUrl(path: string): string {
@@ -873,7 +874,7 @@ export async function apiDownloadFile(path: string, filename: string): Promise<A
     ({ response, accessTokenUsed } = await performRequest(path, { method: 'GET' }));
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Network error while downloading file';
-    dispatchTenantMutationFeedback({ type: 'error', message });
+    dispatchTenantMutationFeedback({ type: 'error', message, translateMessage: !(error instanceof Error) });
     throw new ApiError(message, 0);
   }
 
@@ -1059,7 +1060,7 @@ export async function apiRequest<T>(
     const result = await parseResponse<T>(response);
     markMutationOutcomeDefinite(logicalMutation.fingerprint, logicalMutation.key);
     if (shouldShowMutationFeedback) {
-      dispatchTenantMutationFeedback({ type: 'success', message: tenantMutationSuccessMessage(path, method, requestOptions.body) });
+      dispatchTenantMutationFeedback({ type: 'success', message: tenantMutationSuccessMessage(path, method, requestOptions.body), translateMessage: true });
     }
     return result;
   } catch (error) {
@@ -1090,9 +1091,11 @@ export async function apiRequest<T>(
     }
 
     if (shouldShowMutationFeedback) {
+      const mutationFeedback = tenantMutationErrorMessage(error);
       dispatchTenantMutationFeedback({
         type: 'error',
-        message: tenantMutationErrorMessage(error),
+        message: mutationFeedback.message,
+        translateMessage: mutationFeedback.translateMessage,
         requestId: error instanceof ApiError && error.code !== 'EMAIL_NOT_CONFIGURED' ? error.requestId : undefined
       });
     }

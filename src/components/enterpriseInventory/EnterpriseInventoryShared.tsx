@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { styles } from './EnterpriseInventoryStyles';
+import { useAppTranslation } from '../../i18n/I18nContext';
+import { formatLocalizedDateTime } from '../../i18n/formatters';
 import {
   OperationalWorkspaceHero,
   OperationalWorkspaceMetaPill,
@@ -84,11 +86,12 @@ export function TextareaField({
 }
 
 export function SelectField({ label, value, onChange, options, required = false, disabled = false }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }>; required?: boolean; disabled?: boolean }) {
+  const { ui } = useAppTranslation();
   return (
     <label style={styles.field}>
       <span style={styles.label}>{label}</span>
       <select style={styles.input} value={value} required={required} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
-        <option value="">{required ? 'Select…' : 'None'}</option>
+        <option value="">{required ? ui('Select…') : ui('None')}</option>
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
     </label>
@@ -106,7 +109,8 @@ export function SectionCard({ title, children }: { title: string; children: Reac
 }
 
 export function DataTable({ loading, empty, headers, rows }: { loading: boolean; empty: string; headers: string[]; rows: string[][] }) {
-  if (loading) return <p style={styles.helper}>Loading…</p>;
+  const { ui } = useAppTranslation();
+  if (loading) return <p style={styles.helper}>{ui('Loading…')}</p>;
   if (!rows.length) return <p style={styles.helper}>{empty}</p>;
 
   return (
@@ -136,19 +140,20 @@ export function EnterpriseInventoryHero({
   canEvaluate: boolean;
   lastRefreshedAt: number | null;
 }) {
+  const { locale, ui } = useAppTranslation();
   return (
     <OperationalWorkspaceHero
       iconPath="/enterprise-inventory"
-      eyebrow="Inventory operations"
-      title="Specialized inventory workflows"
-      description="Manage the inventory controls that do not already have a dedicated tenant page: par levels, cycle counts, supplier returns, approvals, supplier catalogs, invoices, labels, attachments, and notifications."
+      eyebrow={ui('Inventory operations')}
+      title={ui('Specialized inventory workflows')}
+      description={ui('Manage the inventory controls that do not already have a dedicated tenant page: par levels, cycle counts, supplier returns, approvals, supplier catalogs, invoices, labels, attachments, and notifications.')}
       meta={
         <>
-          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>Permission-aware</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui('Permission-aware')}</OperationalWorkspaceMetaPill>
           {lastRefreshedAt ? (
             <OperationalWorkspaceMetaPill>
-              Refreshed {new Date(lastRefreshedAt).toLocaleString()}
+              {ui('Refreshed')} {formatLocalizedDateTime(lastRefreshedAt, locale)}
             </OperationalWorkspaceMetaPill>
           ) : null}
         </>
@@ -160,7 +165,7 @@ export function EnterpriseInventoryHero({
           disabled={evaluating}
           className="app-button app-button--primary"
         >
-          {evaluating ? 'Evaluating…' : 'Evaluate par levels'}
+          {evaluating ? ui('Evaluating…') : ui('Evaluate par levels')}
         </button>
       ) : undefined}
     />

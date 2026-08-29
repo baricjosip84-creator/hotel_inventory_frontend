@@ -7,6 +7,7 @@ import {
 } from './productFormatting';
 import { styles } from './productStyles';
 import { StatCard } from './productSummaryComponents';
+import { useAppTranslation } from '../../i18n/I18nContext';
 
 type CostAlertQueryState = {
   isLoading: boolean;
@@ -25,13 +26,14 @@ export function ProductCostAlertSummaryPanel({
   costAlertSummary,
   onOpenCostHistory
 }: ProductCostAlertSummaryPanelProps) {
+  const { ui, locale } = useAppTranslation();
   return (
     <section style={styles.panel}>
       <div style={styles.packageHeader}>
         <div>
-          <h3 style={styles.panelTitle}>Cost Alerts</h3>
+          <h3 style={styles.panelTitle}>{ui("Cost Alerts")}</h3>
           <p style={styles.panelSubtitle}>
-            Trigger-style costing signals for missing costs, high variance, sudden cost spikes, stale evidence, and inconsistent cost history. Read-only and derived from existing cost data.
+            {ui("Trigger-style costing signals for missing costs, high variance, sudden cost spikes, stale evidence, and inconsistent cost history. Read-only and derived from existing cost data.")}
           </p>
         </div>
         <button
@@ -39,55 +41,55 @@ export function ProductCostAlertSummaryPanel({
           style={styles.secondaryButton}
           onClick={() => costAlertQuery.refetch()}
         >
-          Refresh Alerts
+          {ui("Refresh Alerts")}
         </button>
       </div>
 
       {costAlertQuery.isLoading ? (
-        <div style={styles.emptyCell}>Loading cost alerts...</div>
+        <div style={styles.emptyCell}>{ui("Loading cost alerts...")}</div>
       ) : costAlertQuery.isError ? (
-        <div style={styles.errorBox}>Unable to load cost alerts.</div>
+        <div style={styles.errorBox}>{ui("Unable to load cost alerts.")}</div>
       ) : (
         <>
           <div style={styles.costReadinessGrid}>
             <StatCard
-              title="Total Alerts"
+              title={ui("Total Alerts")}
               value={toNumber(costAlertSummary?.totals.total_alerts)}
-              subtitle="Active derived cost signals"
+              subtitle={ui("Active derived cost signals")}
               tone={toNumber(costAlertSummary?.totals.total_alerts) > 0 ? 'warn' : 'good'}
             />
             <StatCard
-              title="Critical"
+              title={ui("Critical")}
               value={toNumber(costAlertSummary?.totals.critical_alerts)}
-              subtitle="Immediate cost follow-up"
+              subtitle={ui("Immediate cost follow-up")}
               tone={toNumber(costAlertSummary?.totals.critical_alerts) > 0 ? 'bad' : 'good'}
             />
             <StatCard
-              title="Warnings"
+              title={ui("Warnings")}
               value={toNumber(costAlertSummary?.totals.warning_alerts)}
-              subtitle="Review recommended"
+              subtitle={ui("Review recommended")}
               tone={toNumber(costAlertSummary?.totals.warning_alerts) > 0 ? 'warn' : 'good'}
             />
             <StatCard
-              title="Alerted Value"
-              value={formatMoney(costAlertSummary?.totals.alerted_estimated_value)}
-              subtitle="Estimated value under alert"
+              title={ui("Alerted Value")}
+              value={formatMoney(costAlertSummary?.totals.alerted_estimated_value, locale)}
+              subtitle={ui("Estimated value under alert")}
               tone={toNumber(costAlertSummary?.totals.alerted_estimated_value) > 0 ? 'warn' : 'good'}
             />
           </div>
 
           <div style={styles.riskGrid}>
             <div style={styles.riskListCard}>
-              <h4 style={styles.sectionTitle}>Alert groups</h4>
+              <h4 style={styles.sectionTitle}>{ui("Alert groups")}</h4>
               {(costAlertSummary?.alert_groups ?? []).length === 0 ? (
-                <div style={styles.rowSubtle}>No active cost alerts.</div>
+                <div style={styles.rowSubtle}>{ui("No active cost alerts.")}</div>
               ) : (
                 (costAlertSummary?.alert_groups ?? []).map((row) => (
                   <div key={`${row.alert_type}-${row.alert_severity}`} style={styles.riskListItem}>
                     <div>
-                      <div style={styles.rowTitle}>{formatCostAlertType(row.alert_type)}</div>
+                      <div style={styles.rowTitle}>{ui(formatCostAlertType(row.alert_type))}</div>
                       <div style={styles.rowSubtle}>
-                        {formatCostAlertSeverity(row.alert_severity)} • {formatMoney(row.estimated_inventory_value)} alerted value
+                        {ui(formatCostAlertSeverity(row.alert_severity))} • {formatMoney(row.estimated_inventory_value, locale)} {ui("alerted value")}
                       </div>
                       <div style={styles.rowSubtle}>{row.recommended_alert_action}</div>
                     </div>
@@ -98,21 +100,21 @@ export function ProductCostAlertSummaryPanel({
             </div>
 
             <div style={styles.riskListCard}>
-              <h4 style={styles.sectionTitle}>Top alert products</h4>
+              <h4 style={styles.sectionTitle}>{ui("Top alert products")}</h4>
               {(costAlertSummary?.top_alerts ?? []).length === 0 ? (
-                <div style={styles.rowSubtle}>No alert products found.</div>
+                <div style={styles.rowSubtle}>{ui("No alert products found.")}</div>
               ) : (
                 (costAlertSummary?.top_alerts ?? []).map((row) => (
                   <div key={`${row.id}-${row.alert_type || 'alert'}`} style={styles.riskListItem}>
                     <div>
                       <div style={styles.rowTitle}>{row.name}</div>
                       <div style={styles.rowSubtle}>
-                        {formatCostAlertSeverity(row.alert_severity)} • {formatCostAlertType(row.alert_type)} • {formatMoney(row.estimated_inventory_value)}
+                        {ui(formatCostAlertSeverity(row.alert_severity))} • {ui(formatCostAlertType(row.alert_type))} • {formatMoney(row.estimated_inventory_value, locale)}
                       </div>
                       <div style={styles.rowSubtle}>{row.recommended_alert_action}</div>
                     </div>
                     <button type="button" style={styles.secondaryButton} onClick={() => onOpenCostHistory(row)}>
-                      History
+                      {ui("History")}
                     </button>
                   </div>
                 ))

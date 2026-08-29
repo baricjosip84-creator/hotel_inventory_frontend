@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
@@ -200,10 +202,10 @@ function formatIdentifier(value?: string | null, fallback = 'Not specified'): st
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function formatDateTime(value?: string | null): string {
-  if (!value) return 'Not reported';
+function formatDateTime(value: string | null | undefined, locale: Parameters<typeof formatLocalizedDateTime>[1], ui: (englishText: string) => string): string {
+  if (!value) return ui('Not reported');
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? value : formatLocalizedDateTime(date, locale);
 }
 
 function sourceSurfaceToAppPath(sourceSurface?: string | null): string | null {
@@ -214,29 +216,30 @@ function sourceSurfaceToAppPath(sourceSurface?: string | null): string | null {
   return Object.prototype.hasOwnProperty.call(SOURCE_LABELS, sourceSurface) ? sourceSurface : null;
 }
 
-function urgencyLabel(value?: string | null): string {
-  return formatIdentifier(value, 'Unspecified urgency');
+function urgencyLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  const known = value ? URGENCY_FILTERS.find((option) => option.value === value)?.label : null;
+  return known ? ui(known) : value ? formatIdentifier(value) : ui('Unspecified urgency');
 }
 
-function threadTypeLabel(value?: string | null): string {
-  return value ? THREAD_TYPE_LABELS[value] || formatIdentifier(value) : 'Coordination guidance';
+function threadTypeLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  return value ? (THREAD_TYPE_LABELS[value] ? ui(THREAD_TYPE_LABELS[value]) : formatIdentifier(value)) : ui('Coordination guidance');
 }
 
-function domainLabel(value?: string | null): string {
-  return value ? DOMAIN_LABELS[value] || formatIdentifier(value) : 'General operations';
+function domainLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  return value ? (DOMAIN_LABELS[value] ? ui(DOMAIN_LABELS[value]) : formatIdentifier(value)) : ui('General operations');
 }
 
-function roleLabel(value: string): string {
-  return ROLE_LABELS[value] || formatIdentifier(value);
+function roleLabel(value: string, ui: (englishText: string) => string): string {
+  return ROLE_LABELS[value] ? ui(ROLE_LABELS[value]) : formatIdentifier(value);
 }
 
-function topicLabel(value: string): string {
-  return TOPIC_LABELS[value] || formatIdentifier(value);
+function topicLabel(value: string, ui: (englishText: string) => string): string {
+  return TOPIC_LABELS[value] ? ui(TOPIC_LABELS[value]) : formatIdentifier(value);
 }
 
-function cadenceLabel(value?: string | null): string {
-  if (!value) return 'Review when needed';
-  return CADENCE_LABELS[value] || formatIdentifier(value);
+function cadenceLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  if (!value) return ui('Review when needed');
+  return CADENCE_LABELS[value] ? ui(CADENCE_LABELS[value]) : formatIdentifier(value);
 }
 
 async function fetchEnterpriseCollaborationSummary(filters: typeof DEFAULT_FILTERS): Promise<CollaborationResponse> {
@@ -254,12 +257,14 @@ function SummaryCard({ iconPath, label, value, description, tone = 'blue' }: {
   description: string;
   tone?: 'blue' | 'amber' | 'red' | 'slate';
 }) {
+  const { locale, ui } = useAppTranslation();
   return (
-    <OperationalWorkspaceStatCard label={label} value={value} helper={description} tone={tone} iconPath={iconPath} />
+    <OperationalWorkspaceStatCard label={ui(label)} value={typeof value === 'number' ? formatLocalizedNumber(value, locale) : ui(value)} helper={ui(description)} tone={tone} iconPath={iconPath} />
   );
 }
 
 export default function EnterpriseCollaborationPage() {
+  const { locale, ui } = useAppTranslation();
   const canViewIntelligenceReview = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ);
   const [view, setView] = useState<CollaborationView>('recommendations');
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
@@ -295,8 +300,8 @@ export default function EnterpriseCollaborationPage() {
         <section className="card collaboration-state collaboration-state--loading" aria-live="polite">
           <span className="collaboration-state-icon"><TenantNavIcon path="/collaboration" size={22} /></span>
           <div>
-            <h2>Loading coordination recommendations</h2>
-            <p>Preparing the current read-only collaboration snapshot.</p>
+            <h2>{ui('Loading coordination recommendations')}</h2>
+            <p>{ui('Preparing the current read-only collaboration snapshot.')}</p>
           </div>
         </section>
       </div>
@@ -309,13 +314,13 @@ export default function EnterpriseCollaborationPage() {
         <section className="card collaboration-state collaboration-state--error" role="alert">
           <span className="collaboration-state-icon collaboration-state-icon--danger"><TenantNavIcon path="/alerts" size={22} /></span>
           <div className="collaboration-state-copy">
-            <h2>Coordination recommendations could not be loaded</h2>
+            <h2>{ui('Coordination recommendations could not be loaded')}</h2>
             <p>
               {collaborationQuery.error instanceof ApiError
                 ? collaborationQuery.error.message
-                : 'The collaboration summary is temporarily unavailable.'}
+                : ui('The collaboration summary is temporarily unavailable.')}
             </p>
-            <button className="button button--secondary" type="button" onClick={() => collaborationQuery.refetch()}>Retry</button>
+            <button className="button button--secondary" type="button" onClick={() => collaborationQuery.refetch()}>{ui('Retry')}</button>
           </div>
         </section>
       </div>
@@ -326,17 +331,17 @@ export default function EnterpriseCollaborationPage() {
     <div className="io-operational-page io-workspace-page collaboration-page" data-collaboration-refined="true">
       <OperationalWorkspaceHero
         iconPath="/collaboration"
-        eyebrow="Read-only coordination guidance"
-        title="Coordinate work in the source workflow"
-        description="This page turns permitted alerts, tasks, governance reviews, and operational events into suggestions about who should coordinate, what to discuss, and where the real work belongs. It does not create a chat thread, send a message, notify anyone, or record a comment."
+        eyebrow={ui('Read-only coordination guidance')}
+        title={ui('Coordinate work in the source workflow')}
+        description={ui('This page turns permitted alerts, tasks, governance reviews, and operational events into suggestions about who should coordinate, what to discuss, and where the real work belongs. It does not create a chat thread, send a message, notify anyone, or record a comment.')}
         meta={<>
-          <OperationalWorkspaceMetaPill>Source permissions apply</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>Source workflow stays authoritative</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui('Source permissions apply')}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui('Source workflow stays authoritative')}</OperationalWorkspaceMetaPill>
         </>}
         aside={<div style={{ display: 'grid', gap: 8 }}>
-          <OperationalWorkspaceStatus value={threads.length} label={`coordination recommendation${threads.length === 1 ? '' : 's'} · refreshed ${formatDateTime(response?.generated_at)}`} />
+          <OperationalWorkspaceStatus value={formatLocalizedNumber(threads.length, locale)} label={(threads.length === 1 ? ui('{count} coordination recommendation · refreshed {time}') : ui('{count} coordination recommendations · refreshed {time}')).replace('{count}', formatLocalizedNumber(threads.length, locale)).replace('{time}', formatDateTime(response?.generated_at, locale, ui))} />
           <button className="app-button app-button--secondary" type="button" onClick={() => collaborationQuery.refetch()} disabled={collaborationQuery.isFetching}>
-            {collaborationQuery.isFetching ? 'Refreshing…' : 'Refresh recommendations'}
+            {collaborationQuery.isFetching ? ui('Refreshing…') : ui('Refresh recommendations')}
           </button>
         </div>}
       />
@@ -346,44 +351,44 @@ export default function EnterpriseCollaborationPage() {
           <div className="collaboration-section-title">
             <span className="collaboration-heading-icon"><TenantNavIcon path="/collaboration" size={17} /></span>
             <div>
-              <h2 id="collaboration-filter-title">Filter the recommendations</h2>
-              <p className="card__subtext">Filters change only this read-only snapshot. They do not change any alert, task, review, or operational event.</p>
+              <h2 id="collaboration-filter-title">{ui('Filter the recommendations')}</h2>
+              <p className="card__subtext">{ui('Filters change only this read-only snapshot. They do not change any alert, task, review, or operational event.')}</p>
             </div>
           </div>
-          {hasActiveFilters ? <button className="button button--secondary" type="button" onClick={clearFilters}>Clear filters</button> : null}
+          {hasActiveFilters ? <button className="button button--secondary" type="button" onClick={clearFilters}>{ui('Clear filters')}</button> : null}
         </div>
         <div className="collaboration-filter-grid">
           <label>
-            <span>Coordination area</span>
+            <span>{ui('Coordination area')}</span>
             <select value={filters.collaborationDomain} onChange={(event) => setFilters((current) => ({ ...current, collaborationDomain: event.target.value as typeof filters.collaborationDomain }))}>
-              {DOMAIN_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {DOMAIN_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
             </select>
           </label>
           <label>
-            <span>Recommendation type</span>
+            <span>{ui('Recommendation type')}</span>
             <select value={filters.threadType} onChange={(event) => setFilters((current) => ({ ...current, threadType: event.target.value as typeof filters.threadType }))}>
-              {THREAD_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {THREAD_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
             </select>
           </label>
           <label>
-            <span>Urgency</span>
+            <span>{ui('Urgency')}</span>
             <select value={filters.urgency} onChange={(event) => setFilters((current) => ({ ...current, urgency: event.target.value as typeof filters.urgency }))}>
-              {URGENCY_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {URGENCY_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
             </select>
           </label>
           <label>
-            <span>Maximum recommendations</span>
+            <span>{ui('Maximum recommendations')}</span>
             <select value={filters.limit} onChange={(event) => setFilters((current) => ({ ...current, limit: event.target.value as ResultLimit }))}>
-              {LIMIT_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {LIMIT_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
             </select>
           </label>
         </div>
       </section>
 
-      <section className="collaboration-summary-grid io-workspace-stats" aria-label="Collaboration summary">
+      <section className="collaboration-summary-grid io-workspace-stats" aria-label={ui('Collaboration summary')}>
         <SummaryCard
           iconPath="/collaboration"
-          label="Coordination recommendations"
+          label={ui('Coordination recommendations')}
           value={numberValue(summary.total_threads ?? threads.length)}
           description="Suggested human coordination items returned by the current filters."
         />
@@ -404,15 +409,15 @@ export default function EnterpriseCollaborationPage() {
         <SummaryCard
           iconPath="/permissions"
           label="Operating mode"
-          value="Read-only guidance"
+          value={ui('Read-only guidance')}
           description="All actions remain in their source workflows."
           tone="slate"
         />
       </section>
 
-      <OperationalWorkspaceTabs ariaLabel="Collaboration views">
-        <OperationalWorkspaceTab active={view === 'recommendations'} iconPath="/collaboration" label="Coordination recommendations" onClick={() => setView('recommendations')} />
-        <OperationalWorkspaceTab active={view === 'limits'} iconPath="/permissions" label="Safety and limits" onClick={() => setView('limits')} />
+      <OperationalWorkspaceTabs ariaLabel={ui('Collaboration views')}>
+        <OperationalWorkspaceTab active={view === 'recommendations'} iconPath="/collaboration" label={ui('Coordination recommendations')} onClick={() => setView('recommendations')} />
+        <OperationalWorkspaceTab active={view === 'limits'} iconPath="/permissions" label={ui('Safety and limits')} onClick={() => setView('limits')} />
       </OperationalWorkspaceTabs>
 
       {view === 'recommendations' ? (
@@ -421,15 +426,15 @@ export default function EnterpriseCollaborationPage() {
             <div className="collaboration-section-title">
               <span className="collaboration-heading-icon"><TenantNavIcon path="/collaboration" size={17} /></span>
               <div>
-                <h2 id="coordination-recommendations-title">Coordination recommendations</h2>
+                <h2 id="coordination-recommendations-title">{ui('Coordination recommendations')}</h2>
                 <p className="card__subtext">
-                  {guidance.collaboration_guidance || 'Use these suggestions to coordinate people in the appropriate source workflow.'} Showing up to {appliedLimit} items.
+                  {guidance.collaboration_guidance || ui('Use these suggestions to coordinate people in the appropriate source workflow.')} {ui('Showing up to {limit} items.').replace('{limit}', formatLocalizedNumber(appliedLimit, locale))}
                 </p>
               </div>
             </div>
             <div className="collaboration-shortcuts">
-              <Link className="button button--secondary collaboration-link-button" to="/real-time-operations-feed"><TenantNavIcon path="/real-time-operations-feed" size={16} /> Open Operations Feed</Link>
-              {canViewIntelligenceReview ? <Link className="button button--secondary collaboration-link-button" to="/intelligence-review"><TenantNavIcon path="/intelligence-review" size={16} /> Open Intelligence Review</Link> : null}
+              <Link className="button button--secondary collaboration-link-button" to="/real-time-operations-feed"><TenantNavIcon path="/real-time-operations-feed" size={16} /> {ui('Open Operations Feed')}</Link>
+              {canViewIntelligenceReview ? <Link className="button button--secondary collaboration-link-button" to="/intelligence-review"><TenantNavIcon path="/intelligence-review" size={16} /> {ui('Open Intelligence Review')}</Link> : null}
             </div>
           </div>
 
@@ -437,8 +442,8 @@ export default function EnterpriseCollaborationPage() {
             <div className="card collaboration-state collaboration-empty-state">
               <span className="collaboration-state-icon"><TenantNavIcon path="/collaboration" size={22} /></span>
               <div>
-                <h3>No coordination recommendations match the current filters</h3>
-                <p>Clear the filters or confirm that an open alert, task, review, or operational event exists for this tenant.</p>
+                <h3>{ui('No coordination recommendations match the current filters')}</h3>
+                <p>{ui('Clear the filters or confirm that an open alert, task, review, or operational event exists for this tenant.')}</p>
               </div>
             </div>
           ) : (
@@ -454,48 +459,48 @@ export default function EnterpriseCollaborationPage() {
                     <div className="collaboration-thread-card__heading">
                       <span className="collaboration-thread-icon"><TenantNavIcon path={sourcePath || '/collaboration'} size={18} /></span>
                       <div className="collaboration-badges">
-                        <span className={`collaboration-badge collaboration-badge--${String(thread.urgency || 'unknown').toLowerCase()}`}>{urgencyLabel(thread.urgency)}</span>
-                        <span className="collaboration-badge">{threadTypeLabel(thread.thread_type)}</span>
-                        <span className="collaboration-badge">{domainLabel(thread.collaboration_domain)}</span>
-                        {thread.war_room_guidance?.war_room_candidate ? <span className="collaboration-badge collaboration-badge--attention">Active coordination suggested</span> : null}
+                        <span className={`collaboration-badge collaboration-badge--${String(thread.urgency || 'unknown').toLowerCase()}`}>{urgencyLabel(thread.urgency, ui)}</span>
+                        <span className="collaboration-badge">{threadTypeLabel(thread.thread_type, ui)}</span>
+                        <span className="collaboration-badge">{domainLabel(thread.collaboration_domain, ui)}</span>
+                        {thread.war_room_guidance?.war_room_candidate ? <span className="collaboration-badge collaboration-badge--attention">{ui('Active coordination suggested')}</span> : null}
                       </div>
                     </div>
 
                     <div className="collaboration-thread-copy">
-                      <h3>{thread.title || 'Coordination item'}</h3>
-                      <p className="card__subtext">{thread.summary || 'No additional summary was provided.'}</p>
+                      <h3>{thread.title || ui('Coordination item')}</h3>
+                      <p className="card__subtext">{thread.summary || ui('No additional summary was provided.')}</p>
                     </div>
 
                     <dl className="collaboration-facts">
                       <div>
-                        <dt>Suggested participants</dt>
-                        <dd>{suggestedRoles.length ? suggestedRoles.map(roleLabel).join(', ') : 'Source workflow owner and appropriate manager'}</dd>
+                        <dt>{ui('Suggested participants')}</dt>
+                        <dd>{suggestedRoles.length ? suggestedRoles.map((role) => roleLabel(role, ui)).join(', ') : ui('Source workflow owner and appropriate manager')}</dd>
                       </div>
                       <div>
-                        <dt>Review cadence</dt>
-                        <dd>{cadenceLabel(thread.war_room_guidance?.suggested_cadence)}</dd>
+                        <dt>{ui('Review cadence')}</dt>
+                        <dd>{cadenceLabel(thread.war_room_guidance?.suggested_cadence, ui)}</dd>
                       </div>
                       <div>
-                        <dt>Last updated</dt>
-                        <dd>{formatDateTime(thread.updated_at || thread.created_at)}</dd>
+                        <dt>{ui('Last updated')}</dt>
+                        <dd>{formatDateTime(thread.updated_at || thread.created_at, locale, ui)}</dd>
                       </div>
                     </dl>
 
                     <div className="collaboration-guidance-block">
-                      <div className="card__label">Recommended next step</div>
-                      <p>{thread.coordination_context?.recommended_next_step || 'Confirm the owner, current status, blockers, and next safe action in the source workflow.'}</p>
+                      <div className="card__label">{ui('Recommended next step')}</div>
+                      <p>{thread.coordination_context?.recommended_next_step || ui('Confirm the owner, current status, blockers, and next safe action in the source workflow.')}</p>
                     </div>
 
                     {commentTopics.length ? (
                       <div className="collaboration-guidance-block">
-                        <div className="card__label">Topics to cover in the source workflow</div>
-                        <p>{commentTopics.map(topicLabel).join(' · ')}</p>
+                        <div className="card__label">{ui('Topics to cover in the source workflow')}</div>
+                        <p>{commentTopics.map((topic) => topicLabel(topic, ui)).join(' · ')}</p>
                       </div>
                     ) : null}
 
                     <div className="collaboration-card-actions">
-                      {sourcePath && sourceLabel ? <Link className="button button--secondary collaboration-link-button" to={sourcePath}><TenantNavIcon path={sourcePath} size={16} /> {sourceLabel}</Link> : null}
-                      {sourcePath !== '/action-center' ? <Link className="button button--secondary collaboration-link-button" to="/action-center"><TenantNavIcon path="/action-center" size={16} /> Open Action Center</Link> : null}
+                      {sourcePath && sourceLabel ? <Link className="button button--secondary collaboration-link-button" to={sourcePath}><TenantNavIcon path={sourcePath} size={16} /> {ui(sourceLabel)}</Link> : null}
+                      {sourcePath !== '/action-center' ? <Link className="button button--secondary collaboration-link-button" to="/action-center"><TenantNavIcon path="/action-center" size={16} /> {ui('Open Action Center')}</Link> : null}
                     </div>
                   </article>
                 );
@@ -511,34 +516,34 @@ export default function EnterpriseCollaborationPage() {
             <div className="collaboration-section-title">
               <span className="collaboration-heading-icon"><TenantNavIcon path="/permissions" size={17} /></span>
               <div>
-                <h2 id="collaboration-limits-title">Safety and coordination limits</h2>
-                <p className="card__subtext">These rules apply to every recommendation shown on this page.</p>
+                <h2 id="collaboration-limits-title">{ui('Safety and coordination limits')}</h2>
+                <p className="card__subtext">{ui('These rules apply to every recommendation shown on this page.')}</p>
               </div>
             </div>
           </div>
           <article className="card collaboration-limit-card">
             <span className="collaboration-limit-icon"><TenantNavIcon path="/alerts" size={18} /></span>
-            <div><h3>Escalation remains in the source workflow</h3><p className="card__subtext">{guidance.escalation_thread_guidance || 'Use the existing alert, task, Action Center, or governance process for escalation.'}</p></div>
+            <div><h3>{ui('Escalation remains in the source workflow')}</h3><p className="card__subtext">{guidance.escalation_thread_guidance || ui('Use the existing alert, task, Action Center, or governance process for escalation.')}</p></div>
           </article>
           <article className="card collaboration-limit-card">
             <span className="collaboration-limit-icon"><TenantNavIcon path="/collaboration" size={18} /></span>
-            <div><h3>No coordination room is created</h3><p className="card__subtext">{guidance.incident_war_room_guidance || 'Active coordination is a suggestion only. This page does not create a room, channel, meeting, or participant list.'}</p></div>
+            <div><h3>{ui('No coordination room is created')}</h3><p className="card__subtext">{guidance.incident_war_room_guidance || ui('Active coordination is a suggestion only. This page does not create a room, channel, meeting, or participant list.')}</p></div>
           </article>
           <article className="card collaboration-limit-card">
             <span className="collaboration-limit-icon"><TenantNavIcon path="/suppliers" size={18} /></span>
-            <div><h3>No external partner is contacted</h3><p className="card__subtext">{guidance.supplier_coordination_guidance || 'Supplier, carrier, and partner communication remains in the authorized source process.'}</p></div>
+            <div><h3>{ui('No external partner is contacted')}</h3><p className="card__subtext">{guidance.supplier_coordination_guidance || ui('Supplier, carrier, and partner communication remains in the authorized source process.')}</p></div>
           </article>
           <article className="card collaboration-limit-card">
             <span className="collaboration-limit-icon"><TenantNavIcon path="/real-time-operations-feed" size={18} /></span>
-            <div><h3>No messages or comments are recorded</h3><p className="card__subtext">Use the suggested topics in the source workflow. This page does not send messages, notify users, or save comments.</p></div>
+            <div><h3>{ui('No messages or comments are recorded')}</h3><p className="card__subtext">{ui('Use the suggested topics in the source workflow. This page does not send messages, notify users, or save comments.')}</p></div>
           </article>
           <article className="card collaboration-limit-card">
             <span className="collaboration-limit-icon"><TenantNavIcon path="/stock" size={18} /></span>
-            <div><h3>No operational data is changed</h3><p className="card__subtext">Opening or refreshing Collaboration does not change stock, alerts, tasks, approvals, suppliers, shipments, finance, or integrations.</p></div>
+            <div><h3>{ui('No operational data is changed')}</h3><p className="card__subtext">{ui('Opening or refreshing Collaboration does not change stock, alerts, tasks, approvals, suppliers, shipments, finance, or integrations.')}</p></div>
           </article>
           <article className="card collaboration-limit-card">
             <span className="collaboration-limit-icon"><TenantNavIcon path="/permissions" size={18} /></span>
-            <div><h3>Source permissions still apply</h3><p className="card__subtext">Only recommendations supported by records the current user may read are returned. The source page remains authoritative.</p></div>
+            <div><h3>{ui('Source permissions still apply')}</h3><p className="card__subtext">{ui('Only recommendations supported by records the current user may read are returned. The source page remains authoritative.')}</p></div>
           </article>
         </section>
       ) : null}

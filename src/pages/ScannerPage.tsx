@@ -6,6 +6,8 @@ import { apiRequest, ApiError } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { OperationalSectionHeader, OperationalWorkspaceHero, OperationalWorkspaceMetaPill } from '../components/ui/OperationalWorkspace';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedDate, formatLocalizedNumber } from '../i18n/formatters';
 
 /**
  * SUCCESS FEEDBACK (beep + vibration)
@@ -237,6 +239,7 @@ function getFormatsToSupport(mode: ScannerMode): Html5QrcodeSupportedFormats[] {
 }
 
 export default function ScannerPage() {
+  const { locale, ui } = useAppTranslation();
   /*
     REVIEWED SCANNER WORKSPACE
     --------------------------
@@ -265,18 +268,18 @@ export default function ScannerPage() {
   const productModeUnavailableReason = mode !== 'product'
     ? null
     : isProductPermissionMissing
-      ? 'Shipment receive permission is required for the receiving barcode scanner.'
+      ? ui('Shipment receive permission is required for the receiving barcode scanner.')
       : !shipmentId
-        ? 'Select a shipment before opening the receiving barcode scanner.'
+        ? ui('Select a shipment before opening the receiving barcode scanner.')
         : !locationId
-          ? 'Select a default storage location before opening the receiving barcode scanner.'
+          ? ui('Select a default storage location before opening the receiving barcode scanner.')
           : null;
   const secureCameraContext = typeof window === 'undefined' ? true : window.isSecureContext;
   const cameraApiAvailable = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
   const liveCameraUnavailableReason = !secureCameraContext
-    ? 'Live camera scanning requires HTTPS. Manual entry and image upload remain available.'
+    ? ui('Live camera scanning requires HTTPS. Manual entry and image upload remain available.')
     : !cameraApiAvailable
-      ? 'This browser does not provide camera access. Manual entry and image upload remain available.'
+      ? ui('This browser does not provide camera access. Manual entry and image upload remain available.')
       : null;
 
   const [isRunning, setIsRunning] = useState(false);
@@ -407,12 +410,12 @@ export default function ScannerPage() {
     const cleanValue = decodedText.trim();
 
     if (!cleanValue) {
-      setError('The scanned code is empty. Try again or enter the code manually.');
+      setError(ui('The scanned code is empty. Try again or enter the code manually.'));
       return;
     }
 
     if (cleanValue.length > MAX_SCANNED_CODE_LENGTH) {
-      setError(`The scanned code is longer than the supported ${MAX_SCANNED_CODE_LENGTH} characters.`);
+      setError(`${ui('The scanned code is longer than the supported')} ${formatLocalizedNumber(MAX_SCANNED_CODE_LENGTH, locale)} ${ui('characters.')}`);
       return;
     }
 
@@ -434,7 +437,7 @@ export default function ScannerPage() {
         await resolveShipmentCode(cleanValue);
       }
     } catch (err) {
-      setError(scannerResolutionError(err, mode));
+      setError(ui(scannerResolutionError(err, mode)));
     } finally {
       scanInFlightRef.current = false;
       setIsResolving(false);
@@ -459,7 +462,7 @@ export default function ScannerPage() {
       if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError('Failed to process scanned code.');
+        setError(ui('Failed to process scanned code.'));
       }
     } finally {
       cameraDecodeLockRef.current = false;
@@ -535,7 +538,7 @@ export default function ScannerPage() {
     } catch (initialError) {
       if (!shouldRetryWithSoftCameraConstraint(initialError)) {
         await stopScanner();
-        setError(cameraStartError(initialError));
+        setError(ui(cameraStartError(initialError)));
         setIsStartingCamera(false);
         return;
       }
@@ -568,7 +571,7 @@ export default function ScannerPage() {
         setIsRunning(true);
       } catch (err) {
         await stopScanner();
-        setError(cameraStartError(err));
+        setError(ui(cameraStartError(err)));
       }
     } finally {
       setIsStartingCamera(false);
@@ -584,7 +587,7 @@ export default function ScannerPage() {
     }
 
     if (!trimmed) {
-      setError('Enter a code first.');
+      setError(ui('Enter a code first.'));
       return;
     }
 
@@ -609,13 +612,13 @@ export default function ScannerPage() {
     }
 
     if (!file.type.startsWith('image/')) {
-      setError('Choose an image file containing a QR code or barcode.');
+      setError(ui('Choose an image file containing a QR code or barcode.'));
       event.target.value = '';
       return;
     }
 
     if (file.size <= 0 || file.size > MAX_IMAGE_UPLOAD_BYTES) {
-      setError('Choose an image smaller than 10 MB.');
+      setError(ui('Choose an image smaller than 10 MB.'));
       event.target.value = '';
       return;
     }
@@ -635,7 +638,7 @@ export default function ScannerPage() {
       const decodedText = await imageScanner.scanFile(file, true);
       await resolveDecodedValue(decodedText);
     } catch {
-      setError('No supported code could be decoded from this image. Try a sharper image or enter the value manually.');
+      setError(ui('No supported code could be decoded from this image. Try a sharper image or enter the value manually.'));
     } finally {
       if (imageScanner) {
         try {
@@ -660,50 +663,50 @@ export default function ScannerPage() {
     <div className="io-operational-page io-scanner-page io-workspace-page" style={styles.page}>
       <OperationalWorkspaceHero
         iconPath="/scanner"
-        eyebrow="Scanning"
-        title={modeLabel(mode)}
-        description={modeDescription(mode)}
+        eyebrow={ui("Scanning")}
+        title={ui(modeLabel(mode))}
+        description={ui(modeDescription(mode))}
         meta={<>
-          <OperationalWorkspaceMetaPill>{mode === 'product' ? 'Receiving mode' : 'Shipment mode'}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{liveCameraUnavailableReason ? 'Camera unavailable' : 'Camera ready'}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>Manual and image fallback</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{mode === 'product' ? ui("Receiving mode") : ui("Shipment mode")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{liveCameraUnavailableReason ? ui("Camera unavailable") : ui("Camera ready")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Manual and image fallback")}</OperationalWorkspaceMetaPill>
         </>}
       />
 
       <section className="app-panel app-panel--padded" style={styles.heroPanel}>
         <OperationalSectionHeader
           iconPath="/scanner"
-          title="Scan controls"
-          description={mode === 'product' ? 'Scan a product or package barcode inside the selected shipment receiving context.' : 'Scan a shipment QR code to open the matching shipment without changing stock.'}
+          title={ui("Scan controls")}
+          description={mode === 'product' ? ui("Scan a product or package barcode inside the selected shipment receiving context.") : ui("Scan a shipment QR code to open the matching shipment without changing stock.")}
         />
 
         {mode === 'product' ? (
           <div style={styles.contextPanel}>
             <div style={styles.contextGrid}>
               <div style={shipmentId ? styles.contextCard : styles.contextCardWarn}>
-                <div style={styles.contextLabel}>Selected shipment</div>
-                <div style={styles.contextValue}>{shipmentLabel || shipmentId || 'Missing shipment ID'}</div>
+                <div style={styles.contextLabel}>{ui("Selected shipment")}</div>
+                <div style={styles.contextValue}>{shipmentLabel || shipmentId || ui("Missing shipment ID")}</div>
                 {shipmentLabel && shipmentId ? (
-                  <div style={styles.contextMeta}>Shipment ID: {shipmentId}</div>
+                  <div style={styles.contextMeta}>{ui("Shipment ID:")} {shipmentId}</div>
                 ) : null}
               </div>
 
               <div style={locationId ? styles.contextCard : styles.contextCardWarn}>
-                <div style={styles.contextLabel}>Default scan location</div>
-                <div style={styles.contextValue}>{locationName || locationId || 'Missing default location'}</div>
+                <div style={styles.contextLabel}>{ui("Default scan location")}</div>
+                <div style={styles.contextValue}>{locationName || locationId || ui("Missing default location")}</div>
                 {locationName && locationId ? (
-                  <div style={styles.contextMeta}>Location ID: {locationId}</div>
+                  <div style={styles.contextMeta}>{ui("Location ID:")} {locationId}</div>
                 ) : null}
               </div>
 
               <div style={styles.contextCard}>
-                <div style={styles.contextLabel}>Return path</div>
+                <div style={styles.contextLabel}>{ui("Return path")}</div>
                 <button
                   type="button"
                   onClick={() => navigate(shipmentId ? `/shipments?shipmentId=${encodeURIComponent(shipmentId)}` : '/shipments')}
                   style={styles.inlineButton}
                 >
-                  {shipmentId ? 'Open selected shipment' : 'Open shipments'}
+                  {shipmentId ? ui("Open selected shipment") : ui("Open shipments")}
                 </button>
               </div>
             </div>
@@ -712,58 +715,58 @@ export default function ScannerPage() {
 
         {mode === 'product' && productModeUnavailableReason ? (
           <div className="app-warning-state" style={styles.infoBanner}>
-            {productModeUnavailableReason} Open the scanner from the Shipments page to preserve the selected shipment and destination.
+            {productModeUnavailableReason} {ui("Open the scanner from the Shipments page to preserve the selected shipment and destination.")}
           </div>
         ) : null}
 
         <div style={styles.statusStrip}>
           <div style={styles.statusItem}>
-            <span style={styles.statusLabel}>Mode</span>
-            <strong>{mode === 'product' ? 'Receiving barcode' : 'Shipment QR lookup'}</strong>
+            <span style={styles.statusLabel}>{ui("Mode")}</span>
+            <strong>{mode === 'product' ? ui("Receiving barcode") : ui("Shipment QR lookup")}</strong>
           </div>
           <div style={styles.statusItem}>
-            <span style={styles.statusLabel}>Camera</span>
+            <span style={styles.statusLabel}>{ui("Camera")}</span>
             <strong style={liveCameraUnavailableReason ? styles.statusWarnText : styles.statusSuccessText}>
-              {liveCameraUnavailableReason ? 'Unavailable' : 'Ready'}
+              {liveCameraUnavailableReason ? ui("Unavailable") : ui("Ready")}
             </strong>
           </div>
           <div style={styles.statusItem}>
-            <span style={styles.statusLabel}>Fallback</span>
-            <strong>Manual entry or image</strong>
+            <span style={styles.statusLabel}>{ui("Fallback")}</span>
+            <strong>{ui("Manual entry or image")}</strong>
           </div>
         </div>
 
         <div style={mode === 'product' ? styles.operationNoticeWarn : styles.operationNoticeInfo}>
           {mode === 'product'
-            ? 'A successful barcode scan returns to the selected shipment. Standard items are received immediately; tracked items pause for any required serial, lot/batch, or expiry details.'
-            : 'Shipment QR lookup only opens the matching shipment. It does not change stock.'}
+            ? ui("A successful barcode scan returns to the selected shipment. Standard items are received immediately; tracked items pause for any required serial, lot/batch, or expiry details.")
+            : ui("Shipment QR lookup only opens the matching shipment. It does not change stock.")}
         </div>
 
         {mode === 'shipment' ? (
           <div style={styles.receivingHint}>
             <div>
-              <strong>Receiving products by barcode?</strong>
-              <div style={styles.receivingHintText}>Open a shipment, choose the receiving location, then use its Scan Barcode action.</div>
+              <strong>{ui("Receiving products by barcode?")}</strong>
+              <div style={styles.receivingHintText}>{ui("Open a shipment, choose the receiving location, then use its Scan Barcode action.")}</div>
             </div>
             <button type="button" onClick={() => navigate('/shipments')} style={styles.secondaryButton}>
-              Open Shipments
+              {ui("Open Shipments")}
             </button>
           </div>
         ) : null}
 
         <details style={styles.helpDetails}>
-          <summary style={styles.helpSummary}>Scanning help</summary>
+          <summary style={styles.helpSummary}>{ui("Scanning help")}</summary>
           <div style={styles.helpBody}>
             {mode === 'product' ? (
               <>
-                <div>Hold the barcode horizontally inside the wide scan area and avoid glare.</div>
-                <div>Move slightly farther back if a 1D barcode will not focus.</div>
+                <div>{ui("Hold the barcode horizontally inside the wide scan area and avoid glare.")}</div>
+                <div>{ui("Move slightly farther back if a 1D barcode will not focus.")}</div>
               </>
             ) : (
-              <div>Center the shipment QR code inside the square scan area.</div>
+              <div>{ui("Center the shipment QR code inside the square scan area.")}</div>
             )}
-            <div>If live scan fails, use manual entry or image upload below.</div>
-            <div>Live camera scanning requires HTTPS and browser camera permission.</div>
+            <div>{ui("If live scan fails, use manual entry or image upload below.")}</div>
+            <div>{ui("Live camera scanning requires HTTPS and browser camera permission.")}</div>
           </div>
         </details>
 
@@ -777,7 +780,7 @@ export default function ScannerPage() {
               ...(liveScannerDisabled ? styles.disabledButton : {})
             }}
           >
-            {isStartingCamera ? 'Starting Camera...' : isRunning ? 'Scanner Running' : 'Start Camera Scanner'}
+            {isStartingCamera ? ui("Starting Camera...") : isRunning ? ui("Scanner Running") : ui("Start Camera Scanner")}
           </button>
 
           <button
@@ -788,35 +791,35 @@ export default function ScannerPage() {
               ...(!isRunning ? styles.disabledButton : {})
             }}
           >
-            Stop Camera Scanner
+            {ui("Stop Camera Scanner")}
           </button>
         </div>
 
         {error ? (
           <div className="app-error-state" style={styles.errorBanner}>
-            <strong>Error:</strong> {error}
+            <strong>{ui("Error:")}</strong> {error}
           </div>
         ) : null}
 
         {isResolving ? (
           <div className="app-warning-state" style={styles.infoBanner}>
             {mode === 'product'
-              ? 'Resolving barcode in selected shipment...'
-              : 'Resolving shipment from scanned QR code...'}
+              ? ui("Resolving barcode in selected shipment...")
+              : ui("Resolving shipment from scanned QR code...")}
           </div>
         ) : null}
 
         {isDecodingImage ? (
-          <div className="app-warning-state" style={styles.infoBanner}>Decoding image...</div>
+          <div className="app-warning-state" style={styles.infoBanner}>{ui("Decoding image...")}</div>
         ) : null}
 
         <div style={styles.scannerShell}>
           <div style={styles.scannerStatus}>
             {isStartingCamera
-              ? 'Requesting camera access...'
+              ? ui("Requesting camera access...")
               : isRunning
-                ? 'Camera is active. Hold one code inside the highlighted scan area.'
-                : 'Camera preview appears here after Start Camera Scanner.'}
+                ? ui("Camera is active. Hold one code inside the highlighted scan area.")
+                : ui("Camera preview appears here after Start Camera Scanner.")}
           </div>
           <div
             id="scanner-container"
@@ -833,9 +836,9 @@ export default function ScannerPage() {
           <div className="io-section-heading-with-icon" style={styles.panelHeaderText}>
             <span className="io-section-heading-icon"><TenantNavIcon path="/scanner" size={17} /></span>
             <div className="io-section-heading-copy">
-              <h3 style={styles.panelTitle}>Manual Entry or Image</h3>
+              <h3 style={styles.panelTitle}>{ui("Manual Entry or Image")}</h3>
               <p style={styles.panelSubtitle}>
-                Use a typed/scanned code or upload an image when the live camera is not practical.
+                {ui("Use a typed/scanned code or upload an image when the live camera is not practical.")}
               </p>
             </div>
           </div>
@@ -850,7 +853,7 @@ export default function ScannerPage() {
         >
           <div style={styles.formField}>
             <label htmlFor="manual-code-input" style={styles.label}>
-              Enter code manually
+              {ui("Enter code manually")}
             </label>
             <input
               id="manual-code-input"
@@ -861,7 +864,7 @@ export default function ScannerPage() {
               spellCheck={false}
               enterKeyHint="go"
               onChange={(event) => setManualCode(event.target.value)}
-              placeholder={mode === 'product' ? 'Enter product, package, or inventory-label barcode' : 'Enter shipment QR text'}
+              placeholder={mode === 'product' ? ui("Enter product, package, or inventory-label barcode") : ui("Enter shipment QR text")}
               disabled={scannerInputDisabled}
               title={productModeUnavailableReason || undefined}
               style={{
@@ -870,7 +873,7 @@ export default function ScannerPage() {
               }}
             />
             <div style={styles.fieldHelper}>
-              Type or paste the exact value. A USB or Bluetooth handheld scanner can enter the code here and submit with Enter.
+              {ui("Type or paste the exact value. A USB or Bluetooth handheld scanner can enter the code here and submit with Enter.")}
             </div>
           </div>
 
@@ -883,7 +886,7 @@ export default function ScannerPage() {
                 productModeUnavailableReason
                   ? productModeUnavailableReason
                   : !manualCode.trim()
-                    ? 'Enter a barcode first'
+                    ? ui("Enter a barcode first")
                     : undefined
               }
               style={{
@@ -891,7 +894,7 @@ export default function ScannerPage() {
                 ...(manualSubmitDisabled ? styles.disabledButton : {})
               }}
             >
-              Submit Manual Code
+              {ui("Submit Manual Code")}
             </button>
 
             <button
@@ -905,17 +908,17 @@ export default function ScannerPage() {
                 ...(scannerInputDisabled ? styles.disabledButton : {})
               }}
             >
-              Upload Image
+              {ui("Upload Image")}
             </button>
           </div>
-          <div style={styles.fieldHelper}>Image upload is decoded only in this browser. Maximum file size: 10 MB.</div>
+          <div style={styles.fieldHelper}>{ui("Image upload is decoded only in this browser. Maximum file size: 10 MB.")}</div>
         </form>
 
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          style={{ display: 'none' }}
+          style={{ display: "none" }}
           onChange={(event) => {
             void handleImageFileChange(event);
           }}
@@ -928,9 +931,9 @@ export default function ScannerPage() {
             <div className="io-section-heading-with-icon" style={styles.panelHeaderText}>
               <span className="io-section-heading-icon"><TenantNavIcon path="/scanner" size={17} /></span>
               <div className="io-section-heading-copy">
-                <h3 style={styles.panelTitle}>Latest Scan Result</h3>
+                <h3 style={styles.panelTitle}>{ui("Latest Scan Result")}</h3>
                 <p style={styles.panelSubtitle}>
-                  The last decoded value remains visible when resolution fails, so the operator can verify or correct it.
+                  {ui("The last decoded value remains visible when resolution fails, so the operator can verify or correct it.")}
                 </p>
               </div>
             </div>
@@ -939,50 +942,50 @@ export default function ScannerPage() {
           <div style={styles.resultGrid}>
             {result ? (
               <div style={styles.resultCard}>
-                <div style={styles.resultLabel}>Decoded value</div>
+                <div style={styles.resultLabel}>{ui("Decoded value")}</div>
                 <div style={styles.resultValue}>{result}</div>
               </div>
             ) : null}
 
             {resolvedShipmentId ? (
               <div style={styles.resultCardSuccess}>
-                <div style={styles.resultLabel}>Resolved shipment ID</div>
+                <div style={styles.resultLabel}>{ui("Resolved shipment ID")}</div>
                 <div style={styles.resultValue}>{resolvedShipmentId}</div>
               </div>
             ) : null}
 
             {resolvedShipmentItemId ? (
               <div style={styles.resultCardSuccess}>
-                <div style={styles.resultLabel}>Resolved shipment item ID</div>
+                <div style={styles.resultLabel}>{ui("Resolved shipment item ID")}</div>
                 <div style={styles.resultValue}>{resolvedShipmentItemId}</div>
               </div>
             ) : null}
 
             {resolvedProductName ? (
               <div style={styles.resultCardSuccess}>
-                <div style={styles.resultLabel}>Matched product</div>
+                <div style={styles.resultLabel}>{ui("Matched product")}</div>
                 <div style={styles.resultValue}>{resolvedProductName}</div>
               </div>
             ) : null}
 
             {resolvedPackageName ? (
               <div style={styles.resultCardSuccess}>
-                <div style={styles.resultLabel}>Matched package</div>
+                <div style={styles.resultLabel}>{ui("Matched package")}</div>
                 <div style={styles.resultValue}>
                   {resolvedPackageName}
-                  {resolvedUnitsPerPackage ? ` · ${resolvedUnitsPerPackage} units/package` : ''}
+                  {resolvedUnitsPerPackage ? ` · ${formatLocalizedNumber(Number(resolvedUnitsPerPackage), locale)} ${ui('units/package')}` : ''}
                 </div>
               </div>
             ) : null}
 
             {resolvedLabel ? (
               <div style={styles.resultCardSuccess}>
-                <div style={styles.resultLabel}>Matched inventory label</div>
+                <div style={styles.resultLabel}>{ui("Matched inventory label")}</div>
                 <div style={styles.resultValue}>
                   {resolvedLabel.barcode_value}
-                  {resolvedLabel.lot_number ? ` · Lot ${resolvedLabel.lot_number}` : ''}
-                  {resolvedLabel.batch_number ? ` · Batch ${resolvedLabel.batch_number}` : ''}
-                  {resolvedLabel.expiry_date ? ` · Expires ${new Date(resolvedLabel.expiry_date).toLocaleDateString()}` : ''}
+                  {resolvedLabel.lot_number ? ` · ${ui('Lot')} ${resolvedLabel.lot_number}` : ''}
+                  {resolvedLabel.batch_number ? ` · ${ui('Batch')} ${resolvedLabel.batch_number}` : ''}
+                  {resolvedLabel.expiry_date ? ` · ${ui('Expires')} ${formatLocalizedDate(resolvedLabel.expiry_date, locale)}` : ''}
                 </div>
               </div>
             ) : null}

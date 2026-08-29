@@ -9,6 +9,7 @@ import { ProductCostGovernanceAuditSignoffPanel } from './ProductCostGovernanceA
 import { formatStatusLabel, toNumber } from './productFormatting';
 import { styles } from './productStyles';
 import { StatCard, StatusBadge } from './productSummaryComponents';
+import { useAppTranslation } from '../../i18n/I18nContext';
 
 type CostGovernanceQueryState = {
   isLoading: boolean;
@@ -49,6 +50,7 @@ export function ProductCostGovernanceReviewPanel({
   handleExportCostGovernanceClosureCsv,
   handlePrintCostGovernanceAudit
 }: ProductCostGovernanceReviewPanelProps) {
+  const { ui } = useAppTranslation();
   return (
     <>
             <ProductCostGovernanceAuditSignoffPanel
@@ -63,37 +65,37 @@ export function ProductCostGovernanceReviewPanel({
             <div style={styles.riskListCard}>
               <div style={styles.packageHeader}>
                 <div>
-                  <h4 style={styles.sectionTitle}>Governance review queue</h4>
-                  <div style={styles.rowSubtle}>Human-review work queue composed from blockers, warnings, remediation items, and priority products. Read-only.</div>
+                  <h4 style={styles.sectionTitle}>{ui("Governance review queue")}</h4>
+                  <div style={styles.rowSubtle}>{ui("Human-review work queue composed from blockers, warnings, remediation items, and priority products. Read-only.")}</div>
                 </div>
                 <StatusBadge status={costGovernanceReviewQueue?.review_status} />
               </div>
 
               {costGovernanceReviewQueueQuery.isLoading ? (
-                <div style={styles.rowSubtle}>Loading governance review queue...</div>
+                <div style={styles.rowSubtle}>{ui("Loading governance review queue...")}</div>
               ) : costGovernanceReviewQueueQuery.isError ? (
-                <div style={styles.errorBox}>Unable to load governance review queue.</div>
+                <div style={styles.errorBox}>{ui("Unable to load governance review queue.")}</div>
               ) : (
                 <>
                   <div style={styles.costReadinessGrid}>
-                    <StatCard title="Queue Items" value={toNumber(costGovernanceReviewQueue?.totals.queue_items)} subtitle="Review work items" tone={toNumber(costGovernanceReviewQueue?.totals.queue_items) > 0 ? 'warn' : 'good'} />
-                    <StatCard title="Blockers" value={toNumber(costGovernanceReviewQueue?.totals.blockers)} subtitle="Before sign-off" tone={toNumber(costGovernanceReviewQueue?.totals.blockers) > 0 ? 'bad' : 'good'} />
-                    <StatCard title="Warnings" value={toNumber(costGovernanceReviewQueue?.totals.warnings)} subtitle="Conditional review" tone={toNumber(costGovernanceReviewQueue?.totals.warnings) > 0 ? 'warn' : 'good'} />
-                    <StatCard title="Priority Products" value={toNumber(costGovernanceReviewQueue?.totals.priority_products)} subtitle="Product-level review" />
+                    <StatCard title={ui("Queue Items")} value={toNumber(costGovernanceReviewQueue?.totals.queue_items)} subtitle={ui("Review work items")} tone={toNumber(costGovernanceReviewQueue?.totals.queue_items) > 0 ? 'warn' : 'good'} />
+                    <StatCard title={ui("Blockers")} value={toNumber(costGovernanceReviewQueue?.totals.blockers)} subtitle={ui("Before sign-off")} tone={toNumber(costGovernanceReviewQueue?.totals.blockers) > 0 ? 'bad' : 'good'} />
+                    <StatCard title={ui("Warnings")} value={toNumber(costGovernanceReviewQueue?.totals.warnings)} subtitle={ui("Conditional review")} tone={toNumber(costGovernanceReviewQueue?.totals.warnings) > 0 ? 'warn' : 'good'} />
+                    <StatCard title={ui("Priority Products")} value={toNumber(costGovernanceReviewQueue?.totals.priority_products)} subtitle={ui("Product-level review")} />
                   </div>
 
                   <div style={styles.riskGrid}>
                     <div style={styles.riskListCard}>
-                      <h4 style={styles.sectionTitle}>Review queue items</h4>
+                      <h4 style={styles.sectionTitle}>{ui("Review queue items")}</h4>
                       {(costGovernanceReviewQueue?.queue_items ?? []).length === 0 ? (
-                        <div style={styles.rowSubtle}>No governance review queue items found.</div>
+                        <div style={styles.rowSubtle}>{ui("No governance review queue items found.")}</div>
                       ) : (
                         (costGovernanceReviewQueue?.queue_items ?? []).slice(0, 8).map((item, index) => (
                           <div key={`${item.queue_type}-${item.key}-${index}`} style={styles.riskListItem}>
                             <div>
                               <div style={styles.rowTitle}>{item.label}</div>
                               <div style={styles.rowSubtle}>{item.detail}</div>
-                              <div style={styles.rowSubtle}>Owner: {item.owner_hint} • Evidence: {item.evidence}</div>
+                              <div style={styles.rowSubtle}>{ui("Owner:")} {item.owner_hint} {ui("• Evidence:")} {item.evidence}</div>
                             </div>
                             <StatusBadge status={item.priority} />
                           </div>
@@ -102,15 +104,15 @@ export function ProductCostGovernanceReviewPanel({
                     </div>
 
                     <div style={styles.riskListCard}>
-                      <h4 style={styles.sectionTitle}>Reviewer guidance</h4>
+                      <h4 style={styles.sectionTitle}>{ui("Reviewer guidance")}</h4>
                       {(costGovernanceReviewQueue?.reviewer_guidance ?? []).length === 0 ? (
-                        <div style={styles.rowSubtle}>No reviewer guidance needed.</div>
+                        <div style={styles.rowSubtle}>{ui("No reviewer guidance needed.")}</div>
                       ) : (
                         (costGovernanceReviewQueue?.reviewer_guidance ?? []).map((item) => (
                           <div key={item} style={styles.riskListItem}>
                             <div>
                               <div style={styles.rowTitle}>{item}</div>
-                              <div style={styles.rowSubtle}>Use existing audited product and receiving workflows.</div>
+                              <div style={styles.rowSubtle}>{ui("Use existing audited product and receiving workflows.")}</div>
                             </div>
                           </div>
                         ))
@@ -124,25 +126,25 @@ export function ProductCostGovernanceReviewPanel({
             <div style={styles.riskListCard}>
               <div style={styles.packageHeader}>
                 <div>
-                  <h4 style={styles.sectionTitle}>Governance review pack</h4>
-                  <div style={styles.rowSubtle}>Closure-ready bundle combining sign-off, review queue, priority products, and audit evidence. Read-only export only.</div>
+                  <h4 style={styles.sectionTitle}>{ui("Governance review pack")}</h4>
+                  <div style={styles.rowSubtle}>{ui("Closure-ready bundle combining sign-off, review queue, priority products, and audit evidence. Read-only export only.")}</div>
                 </div>
                 <button type="button" style={styles.secondaryButton} onClick={handleExportCostGovernanceReviewPackCsv} disabled={!costGovernanceReviewPack?.review_export_rows?.length}>
-                  Export Review Pack CSV
+                  {ui("Export Review Pack CSV")}
                 </button>
               </div>
 
               {costGovernanceReviewPackQuery.isLoading ? (
-                <div style={styles.rowSubtle}>Loading governance review pack...</div>
+                <div style={styles.rowSubtle}>{ui("Loading governance review pack...")}</div>
               ) : costGovernanceReviewPackQuery.isError ? (
-                <div style={styles.errorBox}>Unable to load governance review pack.</div>
+                <div style={styles.errorBox}>{ui("Unable to load governance review pack.")}</div>
               ) : (
                 <>
                   <div style={styles.costReadinessGrid}>
-                    <StatCard title="Closure Status" value={formatStatusLabel(costGovernanceReviewPack?.closure_status)} subtitle={costGovernanceReviewPack?.can_close_review ? 'Ready to close' : 'Keep review open'} tone={costGovernanceReviewPack?.can_close_review ? 'good' : 'warn'} />
-                    <StatCard title="Review Rows" value={toNumber(costGovernanceReviewPack?.totals.review_export_rows)} subtitle="CSV evidence rows" />
-                    <StatCard title="Queue Items" value={toNumber(costGovernanceReviewPack?.totals.queue_items)} subtitle="Included in pack" tone={toNumber(costGovernanceReviewPack?.totals.queue_items) > 0 ? 'warn' : 'good'} />
-                    <StatCard title="Product Rows" value={toNumber(costGovernanceReviewPack?.product_review_rows.length)} subtitle="Priority products" />
+                    <StatCard title={ui("Closure Status")} value={ui(formatStatusLabel(costGovernanceReviewPack?.closure_status))} subtitle={costGovernanceReviewPack?.can_close_review ? ui('Ready to close') : ui('Keep review open')} tone={costGovernanceReviewPack?.can_close_review ? 'good' : 'warn'} />
+                    <StatCard title={ui("Review Rows")} value={toNumber(costGovernanceReviewPack?.totals.review_export_rows)} subtitle={ui("CSV evidence rows")} />
+                    <StatCard title={ui("Queue Items")} value={toNumber(costGovernanceReviewPack?.totals.queue_items)} subtitle={ui("Included in pack")} tone={toNumber(costGovernanceReviewPack?.totals.queue_items) > 0 ? 'warn' : 'good'} />
+                    <StatCard title={ui("Product Rows")} value={toNumber(costGovernanceReviewPack?.product_review_rows.length)} subtitle={ui("Priority products")} />
                   </div>
 
                   <div style={styles.riskGrid}>
@@ -170,24 +172,24 @@ export function ProductCostGovernanceReviewPanel({
             <div style={styles.riskListCard}>
               <div style={styles.packageHeader}>
                 <div>
-                  <h4 style={styles.sectionTitle}>Governance closure summary</h4>
-                  <p style={styles.panelSubtitle}>Final archive-readiness layer for costing governance. Derived and read-only.</p>
+                  <h4 style={styles.sectionTitle}>{ui("Governance closure summary")}</h4>
+                  <p style={styles.panelSubtitle}>{ui("Final archive-readiness layer for costing governance. Derived and read-only.")}</p>
                 </div>
                 <button type="button" style={styles.secondaryButton} onClick={handleExportCostGovernanceClosureCsv} disabled={!costGovernanceClosureSummary?.archive_rows?.length}>
-                  Export Closure CSV
+                  {ui("Export Closure CSV")}
                 </button>
               </div>
               {costGovernanceClosureQuery.isLoading ? (
-                <div style={styles.rowSubtle}>Loading closure summary...</div>
+                <div style={styles.rowSubtle}>{ui("Loading closure summary...")}</div>
               ) : costGovernanceClosureQuery.isError ? (
-                <div style={styles.errorText}>Unable to load cost governance closure summary.</div>
+                <div style={styles.errorText}>{ui("Unable to load cost governance closure summary.")}</div>
               ) : (
                 <>
                   <div style={styles.summaryGrid}>
-                    <StatCard title="Closure Status" value={formatStatusLabel(costGovernanceClosureSummary?.closure_status)} subtitle={costGovernanceClosureSummary?.can_archive ? 'Ready to archive' : 'Keep open'} tone={costGovernanceClosureSummary?.can_archive ? 'good' : 'warn'} />
-                    <StatCard title="Blockers" value={toNumber(costGovernanceClosureSummary?.totals.blockers)} subtitle="Must be zero" tone={toNumber(costGovernanceClosureSummary?.totals.blockers) > 0 ? 'bad' : 'good'} />
-                    <StatCard title="Archive Rows" value={toNumber(costGovernanceClosureSummary?.totals.archive_rows)} subtitle="Closure evidence rows" />
-                    <StatCard title="Warnings" value={toNumber(costGovernanceClosureSummary?.totals.warnings)} subtitle="Follow-up visibility" tone={toNumber(costGovernanceClosureSummary?.totals.warnings) > 0 ? 'warn' : 'good'} />
+                    <StatCard title={ui("Closure Status")} value={ui(formatStatusLabel(costGovernanceClosureSummary?.closure_status))} subtitle={costGovernanceClosureSummary?.can_archive ? ui('Ready to archive') : ui('Keep open')} tone={costGovernanceClosureSummary?.can_archive ? 'good' : 'warn'} />
+                    <StatCard title={ui("Blockers")} value={toNumber(costGovernanceClosureSummary?.totals.blockers)} subtitle={ui("Must be zero")} tone={toNumber(costGovernanceClosureSummary?.totals.blockers) > 0 ? 'bad' : 'good'} />
+                    <StatCard title={ui("Archive Rows")} value={toNumber(costGovernanceClosureSummary?.totals.archive_rows)} subtitle={ui("Closure evidence rows")} />
+                    <StatCard title={ui("Warnings")} value={toNumber(costGovernanceClosureSummary?.totals.warnings)} subtitle={ui("Follow-up visibility")} tone={toNumber(costGovernanceClosureSummary?.totals.warnings) > 0 ? 'warn' : 'good'} />
                   </div>
 
                   <div style={styles.riskList}>

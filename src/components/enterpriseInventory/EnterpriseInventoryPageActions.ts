@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
+import { useAppTranslation } from "../../i18n/I18nContext";
 import type { useEnterpriseInventoryFormState } from "./EnterpriseInventoryFormState";
 import {
   emptyAlertForm,
@@ -47,6 +48,7 @@ export function useEnterpriseInventoryPageActions({
   setErrorMessage,
   setStatusMessage,
 }: EnterpriseInventoryPageActionsParams) {
+  const { locale, ui } = useAppTranslation();
   const {
     alertForm,
     barcodeLabelForm,
@@ -133,6 +135,8 @@ export function useEnterpriseInventoryPageActions({
 
   const workflowMutations = useEnterpriseInventoryWorkflowMutations({
     mutationFeedback,
+    ui,
+    locale,
     resetApprovalRuleForm: () => setApprovalRuleForm(emptyApprovalRuleForm),
     resetSupplierCatalogForm: () =>
       setSupplierCatalogForm(emptySupplierCatalogForm),
@@ -163,6 +167,7 @@ export function useEnterpriseInventoryPageActions({
     setStatusMessage,
     setProductPackageForm,
     setEditingProductPackageId,
+    ui,
     createParLevelMutation: stockMutations.createParLevelMutation,
     createCycleCountMutation: stockMutations.createCycleCountMutation,
     adjustStockMutation: stockMutations.adjustStockMutation,

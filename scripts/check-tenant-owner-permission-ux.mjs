@@ -63,7 +63,7 @@ for (const signal of [
 for (const signal of [
   "type RoleSelection = '' | UserRole | `custom:${string}`;",
   "roleSelection: '',",
-  '<option value="">Select a role…</option>',
+  '<option value="">{ui("Select a role…")}</option>',
   'form.roleSelection &&',
   'Choose access deliberately.'
 ]) {

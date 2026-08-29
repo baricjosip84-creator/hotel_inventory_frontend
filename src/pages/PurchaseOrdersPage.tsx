@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
+import type { AppLocale } from '../i18n/config';
 import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
 import { getCurrentTenantUserId } from '../lib/auth';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
@@ -9,7 +12,7 @@ import { getRoleCapabilities } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import type { ProductItem, SupplierItem } from '../types/inventory';
 import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
-import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
+import { formatCurrencyAmount, getActiveTenantCurrency, normalizeCurrencyCode } from '../lib/tenantCurrency';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
 import {
   OperationalSectionHeader,
@@ -308,7 +311,7 @@ function pageSizeFromSearchParams(searchParams: URLSearchParams): number {
   return [10, 25, 50, 100].includes(value) ? value : 25;
 }
 
-function sortLabel(sortKey: SortKey): string {
+function sortLabelKey(sortKey: SortKey): string {
   if (sortKey === 'created_asc') return 'Oldest first';
   if (sortKey === 'expected_asc') return 'Expected soonest';
   if (sortKey === 'expected_desc') return 'Expected latest';
@@ -329,9 +332,9 @@ function emptyForm(): PurchaseOrderFormState {
   };
 }
 
-function normalizeError(error: unknown, fallback: string): string {
+function normalizeError(error: unknown, fallback: string, ui: (englishText: string) => string): string {
   if (isVersionConflictError(error)) {
-    return getVersionConflictMessage(error);
+    return getVersionConflictMessage(error, ui);
   }
 
   if (error instanceof ApiError) return error.message;
@@ -339,21 +342,21 @@ function normalizeError(error: unknown, fallback: string): string {
   return fallback;
 }
 
-function formatDate(value: string | null | undefined): string {
+function formatDateForLocale(value: string | null | undefined, locale: AppLocale): string {
   if (!value) return '-';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString();
+  return formatLocalizedDate(date, locale);
 }
 
-function formatDateTime(value: string | null | undefined): string {
+function formatDateTimeForLocale(value: string | null | undefined, locale: AppLocale): string {
   if (!value) return '-';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  return formatLocalizedDateTime(date, locale);
 }
 
-function auditActorLabel(row: TenantAuditRow): string {
+function auditActorLabelKey(row: TenantAuditRow): string {
   const actorType = typeof row.metadata?.actor_type === 'string' ? row.metadata.actor_type : null;
   if (actorType === 'support_session') {
     const platformName = typeof row.metadata?.platform_user_name === 'string' ? row.metadata.platform_user_name : '';
@@ -375,22 +378,27 @@ function auditMetadataSummary(metadata: Record<string, unknown> | null): string 
   return parts.length ? parts.join(' | ') : '-';
 }
 
-function formatNumber(value: number | string | null | undefined): string {
+function formatNumberForLocale(value: number | string | null | undefined, locale: AppLocale): string {
   if (value === null || value === undefined || value === '') return '0';
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return String(value);
-  return parsed.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  return formatLocalizedNumber(parsed, locale, { maximumFractionDigits: 4 });
 }
 
-function formatMoney(value: number | string | null | undefined, currency?: string | null): string {
-  return formatCurrencyAmount(value, currency || getActiveTenantCurrency());
+function formatMoneyForLocale(value: number | string | null | undefined, currency: string | null | undefined, locale: AppLocale): string {
+  if (value === null || value === undefined || value === '') return '-';
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return String(value);
+  const localized = formatLocalizedCurrency(amount, normalizeCurrencyCode(currency || getActiveTenantCurrency()), locale, { maximumFractionDigits: 2 });
+  return localized || formatCurrencyAmount(amount, currency || getActiveTenantCurrency());
 }
 
-function formatAggregateMoney(
+function formatAggregateMoneyForLocale(
   rows: PurchaseOrderListItem[],
-  selector: (row: PurchaseOrderListItem) => number | string | null | undefined
+  selector: (row: PurchaseOrderListItem) => number | string | null | undefined,
+  locale: AppLocale
 ): string {
-  if (!rows.length) return formatMoney(0);
+  if (!rows.length) return formatMoneyForLocale(0, undefined, locale);
   const totals = new Map<string, number>();
   rows.forEach((row) => {
     const code = (row.currency || getActiveTenantCurrency()).toUpperCase();
@@ -398,17 +406,17 @@ function formatAggregateMoney(
   });
   return Array.from(totals.entries())
     .sort(([left], [right]) => left.localeCompare(right))
-    .map(([currency, amount]) => formatMoney(amount, currency))
+    .map(([currency, amount]) => formatMoneyForLocale(amount, currency, locale))
     .join(' + ');
 }
 
-function completionTypeLabel(type?: string | null): string {
+function completionTypeLabelKey(type?: string | null): string {
   if (type === 'fully_received') return 'Fully received';
   if (type === 'manual_close') return 'Manually closed';
   return '-';
 }
 
-function receivingStatusLabel(status: string | null | undefined): string {
+function receivingStatusLabelKey(status: string | null | undefined): string {
   if (status === 'received') return 'Received';
   if (status === 'partially_received') return 'Partial';
   if (status === 'not_started') return 'Not started';
@@ -422,7 +430,7 @@ function receivingBadgeStyle(status: string | null | undefined): CSSProperties {
   return styles.naBadge;
 }
 
-function varianceStatusLabel(status: string | null | undefined): string {
+function varianceStatusLabelKey(status: string | null | undefined): string {
   if (status === 'matched') return 'Matched';
   if (status === 'pending_receipt') return 'Pending receipt';
   if (status === 'open_short') return 'Open short';
@@ -441,7 +449,7 @@ function varianceBadgeStyle(status: string | null | undefined): CSSProperties {
   return styles.naBadge;
 }
 
-function deliveryStatusLabel(status: string | null | undefined): string {
+function deliveryStatusLabelKey(status: string | null | undefined): string {
   if (status === 'overdue') return 'Overdue';
   if (status === 'due_today') return 'Due today';
   if (status === 'upcoming') return 'Upcoming';
@@ -459,7 +467,7 @@ function deliveryBadgeStyle(status: string | null | undefined): CSSProperties {
   return styles.naBadge;
 }
 
-function nextActionLabel(status: string | null | undefined): string {
+function nextActionLabelKey(status: string | null | undefined): string {
   if (status === 'submit_for_approval') return 'Submit for approval';
   if (status === 'approve_or_cancel') return 'Approve or cancel';
   if (status === 'create_shipment') return 'Create shipment';
@@ -481,11 +489,11 @@ function nextActionBadgeStyle(status: string | null | undefined): CSSProperties 
   return styles.naBadge;
 }
 
-function formatPercent(value: number | string | null | undefined): string {
+function formatPercentForLocale(value: number | string | null | undefined, locale: AppLocale): string {
   if (value === null || value === undefined || value === '') return '0%';
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return String(value);
-  return `${parsed.toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
+  return `${formatLocalizedNumber(parsed, locale, { maximumFractionDigits: 1 })}%`;
 }
 
 function escapeCsvCell(value: unknown): string {
@@ -524,7 +532,7 @@ function isPurchaseOrderLocked(status: PurchaseOrderStatus | null | undefined): 
   return Boolean(status && !isPurchaseOrderEditable(status));
 }
 
-function purchaseOrderCostIssue(detail: PurchaseOrderDetail): string | null {
+function purchaseOrderCostIssueKey(detail: PurchaseOrderDetail): string | null {
   if (!detail.items.length) return 'At least one purchase order item is required before submission.';
 
   const missingCostCount = detail.items.filter((item) => {
@@ -769,6 +777,39 @@ function detailToForm(detail: PurchaseOrderDetail): PurchaseOrderFormState {
 }
 
 export default function PurchaseOrdersPage() {
+  const { locale, ui } = useAppTranslation();
+  const sortLabel = (sortKey: SortKey) => ui(sortLabelKey(sortKey));
+  const formatDate = useCallback((value: string | null | undefined) => formatDateForLocale(value, locale), [locale]);
+  const formatDateTime = (value: string | null | undefined) => formatDateTimeForLocale(value, locale);
+  const formatNumber = (value: number | string | null | undefined) => formatNumberForLocale(value, locale);
+  const formatMoney = (value: number | string | null | undefined, currency?: string | null) => formatMoneyForLocale(value, currency, locale);
+  const formatAggregateMoney = (rows: PurchaseOrderListItem[], selector: (row: PurchaseOrderListItem) => number | string | null | undefined) => formatAggregateMoneyForLocale(rows, selector, locale);
+  const completionTypeLabel = (type?: string | null) => ui(completionTypeLabelKey(type));
+  const receivingStatusLabel = useCallback((status: string | null | undefined) => ui(receivingStatusLabelKey(status)), [ui]);
+  const varianceStatusLabel = useCallback((status: string | null | undefined) => ui(varianceStatusLabelKey(status)), [ui]);
+  const deliveryStatusLabel = useCallback((status: string | null | undefined) => ui(deliveryStatusLabelKey(status)), [ui]);
+  const nextActionLabel = useCallback((status: string | null | undefined) => ui(nextActionLabelKey(status)), [ui]);
+  const purchaseOrderStatusLabel = useCallback((status: PurchaseOrderStatus | null | undefined) => {
+    const key = status === 'draft' ? 'Draft' : status === 'submitted' ? 'Submitted' : status === 'approved' ? 'Approved' : status === 'completed' ? 'Completed' : status === 'cancelled' ? 'Cancelled' : null;
+    return key ? ui(key) : String(status || '—');
+  }, [ui]);
+  const formatPercent = (value: number | string | null | undefined) => formatPercentForLocale(value, locale);
+  const auditActorLabel = useCallback((row: TenantAuditRow) => {
+    const key = auditActorLabelKey(row);
+    return key === 'Platform support' || key === 'Tenant user' ? ui(key) : key;
+  }, [ui]);
+  const purchaseOrderCostIssue = (detail: PurchaseOrderDetail): string | null => {
+    const raw = purchaseOrderCostIssueKey(detail);
+    if (!raw) return null;
+    const pluralMatch = raw.match(/^(\d+) items? missing positive unit cost\. Edit the draft and enter supplier pricing before submitting or approving\.$/);
+    if (pluralMatch) {
+      const count = Number(pluralMatch[1]);
+      return ui(count === 1
+        ? '1 item is missing a positive unit cost. Edit the draft and enter supplier pricing before submitting or approving.'
+        : '{count} items are missing a positive unit cost. Edit the draft and enter supplier pricing before submitting or approving.').replace('{count}', formatNumber(count));
+    }
+    return ui(raw);
+  };
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -829,13 +870,13 @@ export default function PurchaseOrdersPage() {
     if (!selectedDetail) return [];
 
     return [
-      { label: 'Created', value: selectedDetail.created_at, actor: selectedDetail.created_by_user_name },
-      { label: 'Submitted', value: selectedDetail.submitted_at, actor: selectedDetail.submitted_by_user_name },
-      { label: 'Approved', value: selectedDetail.approved_at, actor: selectedDetail.approved_by_user_name },
-      { label: 'Completed', value: selectedDetail.completed_at, actor: selectedDetail.completed_by_user_name },
-      { label: 'Cancelled', value: selectedDetail.cancelled_at, actor: selectedDetail.cancelled_by_user_name }
+      { label: ui('Created'), value: selectedDetail.created_at, actor: selectedDetail.created_by_user_name },
+      { label: ui('Submitted'), value: selectedDetail.submitted_at, actor: selectedDetail.submitted_by_user_name },
+      { label: ui('Approved'), value: selectedDetail.approved_at, actor: selectedDetail.approved_by_user_name },
+      { label: ui('Completed'), value: selectedDetail.completed_at, actor: selectedDetail.completed_by_user_name },
+      { label: ui('Cancelled'), value: selectedDetail.cancelled_at, actor: selectedDetail.cancelled_by_user_name }
     ].filter((event) => Boolean(event.value));
-  }, [selectedDetail]);
+  }, [selectedDetail, ui]);
   const selectedAuditEvents = useMemo(() => {
     const rows = auditQuery.data || [];
     const term = auditSearch.trim().toLowerCase();
@@ -852,7 +893,7 @@ export default function PurchaseOrdersPage() {
       ].join(' ').toLowerCase();
       return haystack.includes(term);
     });
-  }, [auditQuery.data, auditSearch]);
+  }, [auditQuery.data, auditSearch, auditActorLabel]);
 
   const isEditingSelectedDraft = Boolean(editingId && selectedDetail?.status === 'draft');
 
@@ -909,31 +950,31 @@ export default function PurchaseOrdersPage() {
     const suppliers = suppliersQuery.data || [];
     const products = productsQuery.data || [];
 
-    if (filters.search.trim()) chips.push({ key: 'search', label: `Search: ${filters.search.trim()}` });
-    if (filters.status) chips.push({ key: 'status', label: `Status: ${filters.status}` });
-    if (filters.receivingStatus) chips.push({ key: 'receivingStatus', label: `Receiving: ${receivingStatusLabel(filters.receivingStatus)}` });
-    if (filters.varianceStatus) chips.push({ key: 'varianceStatus', label: `Variance: ${varianceStatusLabel(filters.varianceStatus)}` });
-    if (filters.deliveryStatus) chips.push({ key: 'deliveryStatus', label: `Delivery: ${deliveryStatusLabel(filters.deliveryStatus)}` });
-    if (filters.nextActionStatus) chips.push({ key: 'nextActionStatus', label: `Next: ${nextActionLabel(filters.nextActionStatus)}` });
+    if (filters.search.trim()) chips.push({ key: 'search', label: ui('Search: {value}').replace('{value}', filters.search.trim()) });
+    if (filters.status) chips.push({ key: 'status', label: ui('Status: {value}').replace('{value}', purchaseOrderStatusLabel(filters.status)) });
+    if (filters.receivingStatus) chips.push({ key: 'receivingStatus', label: ui('Receiving: {value}').replace('{value}', receivingStatusLabel(filters.receivingStatus)) });
+    if (filters.varianceStatus) chips.push({ key: 'varianceStatus', label: ui('Variance: {value}').replace('{value}', varianceStatusLabel(filters.varianceStatus)) });
+    if (filters.deliveryStatus) chips.push({ key: 'deliveryStatus', label: ui('Delivery: {value}').replace('{value}', deliveryStatusLabel(filters.deliveryStatus)) });
+    if (filters.nextActionStatus) chips.push({ key: 'nextActionStatus', label: ui('Next: {value}').replace('{value}', nextActionLabel(filters.nextActionStatus)) });
     if (filters.supplierId) {
-      chips.push({ key: 'supplierId', label: `Supplier: ${suppliers.find((supplier) => supplier.id === filters.supplierId)?.name || filters.supplierId}` });
+      chips.push({ key: 'supplierId', label: ui('Supplier: {value}').replace('{value}', suppliers.find((supplier) => supplier.id === filters.supplierId)?.name || filters.supplierId) });
     }
     if (filters.productId) {
-      chips.push({ key: 'productId', label: `Product: ${products.find((product) => product.id === filters.productId)?.name || filters.productId}` });
+      chips.push({ key: 'productId', label: ui('Product: {value}').replace('{value}', products.find((product) => product.id === filters.productId)?.name || filters.productId) });
     }
-    if (filters.expectedFrom) chips.push({ key: 'expectedFrom', label: `Expected from: ${formatDate(filters.expectedFrom)}` });
-    if (filters.expectedTo) chips.push({ key: 'expectedTo', label: `Expected to: ${formatDate(filters.expectedTo)}` });
-    if (filters.createdFrom) chips.push({ key: 'createdFrom', label: `Created from: ${formatDate(filters.createdFrom)}` });
-    if (filters.createdTo) chips.push({ key: 'createdTo', label: `Created to: ${formatDate(filters.createdTo)}` });
-    if (filters.approvedFrom) chips.push({ key: 'approvedFrom', label: `Approved from: ${formatDate(filters.approvedFrom)}` });
-    if (filters.approvedTo) chips.push({ key: 'approvedTo', label: `Approved to: ${formatDate(filters.approvedTo)}` });
-    if (filters.completedFrom) chips.push({ key: 'completedFrom', label: `Completed from: ${formatDate(filters.completedFrom)}` });
-    if (filters.completedTo) chips.push({ key: 'completedTo', label: `Completed to: ${formatDate(filters.completedTo)}` });
-    if (filters.cancelledFrom) chips.push({ key: 'cancelledFrom', label: `Cancelled from: ${formatDate(filters.cancelledFrom)}` });
-    if (filters.cancelledTo) chips.push({ key: 'cancelledTo', label: `Cancelled to: ${formatDate(filters.cancelledTo)}` });
+    if (filters.expectedFrom) chips.push({ key: 'expectedFrom', label: ui('Expected from: {date}').replace('{date}', formatDate(filters.expectedFrom)) });
+    if (filters.expectedTo) chips.push({ key: 'expectedTo', label: ui('Expected to: {date}').replace('{date}', formatDate(filters.expectedTo)) });
+    if (filters.createdFrom) chips.push({ key: 'createdFrom', label: ui('Created from: {date}').replace('{date}', formatDate(filters.createdFrom)) });
+    if (filters.createdTo) chips.push({ key: 'createdTo', label: ui('Created to: {date}').replace('{date}', formatDate(filters.createdTo)) });
+    if (filters.approvedFrom) chips.push({ key: 'approvedFrom', label: ui('Approved from: {date}').replace('{date}', formatDate(filters.approvedFrom)) });
+    if (filters.approvedTo) chips.push({ key: 'approvedTo', label: ui('Approved to: {date}').replace('{date}', formatDate(filters.approvedTo)) });
+    if (filters.completedFrom) chips.push({ key: 'completedFrom', label: ui('Completed from: {date}').replace('{date}', formatDate(filters.completedFrom)) });
+    if (filters.completedTo) chips.push({ key: 'completedTo', label: ui('Completed to: {date}').replace('{date}', formatDate(filters.completedTo)) });
+    if (filters.cancelledFrom) chips.push({ key: 'cancelledFrom', label: ui('Cancelled from: {date}').replace('{date}', formatDate(filters.cancelledFrom)) });
+    if (filters.cancelledTo) chips.push({ key: 'cancelledTo', label: ui('Cancelled to: {date}').replace('{date}', formatDate(filters.cancelledTo)) });
 
     return chips;
-  }, [filters, suppliersQuery.data, productsQuery.data]);
+  }, [filters, suppliersQuery.data, productsQuery.data, ui, deliveryStatusLabel, formatDate, nextActionLabel, purchaseOrderStatusLabel, receivingStatusLabel, varianceStatusLabel]);
 
   const applyDatePreset = (preset: 'expected_today' | 'expected_next_7' | 'created_last_7' | 'created_last_30' | 'approved_last_30' | 'completed_last_30' | 'cancelled_last_30') => {
     setFilters((current) => {
@@ -1104,18 +1145,18 @@ export default function PurchaseOrdersPage() {
   });
 
   const validateForm = (): string | null => {
-    if (!form.supplier_id) return 'Supplier is required.';
-    if (!form.items.length) return 'At least one item is required.';
+    if (!form.supplier_id) return ui('Supplier is required.');
+    if (!form.items.length) return ui('At least one item is required.');
     const seen = new Set<string>();
     for (const item of form.items) {
-      if (!item.product_id) return 'Every item needs a product.';
-      if (seen.has(item.product_id)) return 'A product can only appear once per purchase order.';
+      if (!item.product_id) return ui('Every item needs a product.');
+      if (seen.has(item.product_id)) return ui('A product can only appear once per purchase order.');
       seen.add(item.product_id);
       const quantity = Number(item.quantity);
-      if (!Number.isFinite(quantity) || quantity <= 0) return 'Every quantity must be greater than zero.';
+      if (!Number.isFinite(quantity) || quantity <= 0) return ui('Every quantity must be greater than zero.');
       if (item.unit_cost !== '') {
         const cost = Number(item.unit_cost);
-        if (!Number.isFinite(cost) || cost < 0) return 'Unit cost must be zero or greater.';
+        if (!Number.isFinite(cost) || cost < 0) return ui('Unit cost must be zero or greater.');
       }
     }
     return null;
@@ -1239,7 +1280,7 @@ export default function PurchaseOrdersPage() {
 
     const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1100,height=750');
     if (!printWindow) {
-      setFormError('Browser blocked the print window. Allow pop-ups for this site and try again.');
+      setFormError(ui('Browser blocked the print window. Allow pop-ups for this site and try again.'));
       return;
     }
 
@@ -1247,7 +1288,7 @@ export default function PurchaseOrdersPage() {
       <!doctype html>
       <html>
         <head>
-          <title>Purchase Order Audit ${escapeHtml(selectedDetail.po_number)}</title>
+          <title>${escapeHtml(ui('Purchase Order Audit'))} ${escapeHtml(selectedDetail.po_number)}</title>
           <style>
             body { font-family: Arial, sans-serif; color: #0f172a; margin: 32px; }
             h1 { margin-bottom: 4px; }
@@ -1260,21 +1301,21 @@ export default function PurchaseOrdersPage() {
           </style>
         </head>
         <body>
-          <button onclick="window.print()">Print</button>
-          <h1>Purchase Order Audit Events</h1>
-          <p class="meta"><strong>PO Number:</strong> ${escapeHtml(selectedDetail.po_number)}</p>
-          <p class="meta"><strong>Supplier:</strong> ${escapeHtml(selectedDetail.supplier_name)}</p>
-          <p class="meta"><strong>Status:</strong> ${escapeHtml(selectedDetail.status)}</p>
-          <p class="meta"><strong>Events:</strong> ${escapeHtml(rows.length)}${auditSearch.trim() ? ` filtered by &quot;${escapeHtml(auditSearch.trim())}&quot;` : ''}</p>
+          <button onclick="window.print()">${escapeHtml(ui('Print'))}</button>
+          <h1>${escapeHtml(ui('Purchase Order Audit Events'))}</h1>
+          <p class="meta"><strong>${escapeHtml(ui('PO Number'))}:</strong> ${escapeHtml(selectedDetail.po_number)}</p>
+          <p class="meta"><strong>${escapeHtml(ui('Supplier'))}:</strong> ${escapeHtml(selectedDetail.supplier_name)}</p>
+          <p class="meta"><strong>${escapeHtml(ui('Status'))}:</strong> ${escapeHtml(purchaseOrderStatusLabel(selectedDetail.status))}</p>
+          <p class="meta"><strong>${escapeHtml(ui('Events'))}:</strong> ${escapeHtml(rows.length)}${auditSearch.trim() ? ` ${escapeHtml(ui('filtered by'))} &quot;${escapeHtml(auditSearch.trim())}&quot;` : ''}</p>
           <table>
             <thead>
               <tr>
-                <th>Created At</th>
-                <th>Action</th>
-                <th>Actor</th>
-                <th>Entity Type</th>
-                <th>Entity ID</th>
-                <th>Metadata</th>
+                <th>${escapeHtml(ui('Created At'))}</th>
+                <th>${escapeHtml(ui('Action'))}</th>
+                <th>${escapeHtml(ui('Actor'))}</th>
+                <th>${escapeHtml(ui('Entity Type'))}</th>
+                <th>${escapeHtml(ui('Entity ID'))}</th>
+                <th>${escapeHtml(ui('Metadata'))}</th>
               </tr>
             </thead>
             <tbody>${auditRows}</tbody>
@@ -1372,7 +1413,7 @@ export default function PurchaseOrdersPage() {
 
     const filterSummary = activeFilterChips.length
       ? activeFilterChips.map((chip) => chip.label).join(' • ')
-      : 'None';
+      : ui('None');
 
     const rows = rowsToPrint.map((row) => `
       <tr>
@@ -1392,7 +1433,7 @@ export default function PurchaseOrdersPage() {
 
     const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1100,height=750');
     if (!printWindow) {
-      setFormError('Browser blocked the print window. Allow pop-ups for this site and try again.');
+      setFormError(ui('Browser blocked the print window. Allow pop-ups for this site and try again.'));
       return;
     }
 
@@ -1413,26 +1454,26 @@ export default function PurchaseOrdersPage() {
           </style>
         </head>
         <body>
-          <button onclick="window.print()">Print</button>
-          <h1>Purchase Orders</h1>
-          <p class="meta"><strong>Scope:</strong> ${escapeHtml(scopeLabel)}</p>
-          <p class="meta"><strong>Rows:</strong> ${escapeHtml(rowsToPrint.length)}</p>
-          <p class="meta"><strong>Sort:</strong> ${escapeHtml(sortLabel(sortKey))}</p>
-          <p class="meta"><strong>Filters:</strong> ${escapeHtml(filterSummary)}</p>
+          <button onclick="window.print()">${escapeHtml(ui('Print'))}</button>
+          <h1>${escapeHtml(ui('Purchase Orders'))}</h1>
+          <p class="meta"><strong>${escapeHtml(ui('Scope'))}:</strong> ${escapeHtml(scopeLabel)}</p>
+          <p class="meta"><strong>${escapeHtml(ui('Rows'))}:</strong> ${escapeHtml(rowsToPrint.length)}</p>
+          <p class="meta"><strong>${escapeHtml(ui('Sort'))}:</strong> ${escapeHtml(sortLabel(sortKey))}</p>
+          <p class="meta"><strong>${escapeHtml(ui('Filters'))}:</strong> ${escapeHtml(filterSummary)}</p>
           <table>
             <thead>
               <tr>
-                <th>PO Number</th>
-                <th>Supplier</th>
-                <th>Status</th>
-                <th>Expected</th>
-                <th>Delivery</th>
-                <th>Next Action</th>
-                <th>Receiving</th>
-                <th>Received</th>
-                <th>Shipments</th>
-                <th>Estimated Cost</th>
-                <th>Created</th>
+                <th>${escapeHtml(ui('PO Number'))}</th>
+                <th>${escapeHtml(ui('Supplier'))}</th>
+                <th>${escapeHtml(ui('Status'))}</th>
+                <th>${escapeHtml(ui('Expected'))}</th>
+                <th>${escapeHtml(ui('Delivery'))}</th>
+                <th>${escapeHtml(ui('Next Action'))}</th>
+                <th>${escapeHtml(ui('Receiving'))}</th>
+                <th>${escapeHtml(ui('Received'))}</th>
+                <th>${escapeHtml(ui('Shipments'))}</th>
+                <th>${escapeHtml(ui('Estimated Cost'))}</th>
+                <th>${escapeHtml(ui('Created'))}</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -1450,7 +1491,7 @@ export default function PurchaseOrdersPage() {
     const itemRows = selectedDetail.items.map((item) => `
       <tr>
         <td>${escapeHtml(item.product_name)}</td>
-        <td>${escapeHtml(formatNumber(item.entered_quantity ?? item.quantity))} ${escapeHtml(item.uom_code || item.product_unit)}${String(item.uom_code || item.product_unit).toUpperCase() !== String(item.product_unit).toUpperCase() ? `<br /><span class="subtle">${escapeHtml(formatNumber(item.quantity))} ${escapeHtml(item.product_unit)} base</span>` : ''}</td>
+        <td>${escapeHtml(formatNumber(item.entered_quantity ?? item.quantity))} ${escapeHtml(item.uom_code || item.product_unit)}${String(item.uom_code || item.product_unit).toUpperCase() !== String(item.product_unit).toUpperCase() ? `<br /><span class="subtle">${escapeHtml(formatNumber(item.quantity))} ${escapeHtml(item.product_unit)} ${escapeHtml(ui('base'))}</span>` : ''}</td>
         <td>${escapeHtml(formatNumber(item.received_quantity))} ${escapeHtml(item.product_unit)}</td>
         <td>${escapeHtml(formatNumber(item.remaining_quantity))} ${escapeHtml(item.product_unit)}</td>
         <td>${escapeHtml(receivingStatusLabel(item.receiving_status))} (${escapeHtml(formatPercent(item.receiving_percent))})</td>
@@ -1471,11 +1512,11 @@ export default function PurchaseOrdersPage() {
             <td>${escapeHtml(formatDateTime(shipment.created_at))}</td>
           </tr>
         `).join('')
-      : '<tr><td colspan="5">No linked shipments.</td></tr>';
+      : `<tr><td colspan="5">${escapeHtml(ui('No linked shipments.'))}</td></tr>`;
 
     const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1000,height=750');
     if (!printWindow) {
-      setFormError('Browser blocked the print window. Allow pop-ups for this site and try again.');
+      setFormError(ui('Browser blocked the print window. Allow pop-ups for this site and try again.'));
       return;
     }
 
@@ -1483,7 +1524,7 @@ export default function PurchaseOrdersPage() {
       <!doctype html>
       <html>
         <head>
-          <title>Purchase Order ${escapeHtml(selectedDetail.po_number)}</title>
+          <title>${escapeHtml(ui('Purchase Order'))} ${escapeHtml(selectedDetail.po_number)}</title>
           <style>
             body { font-family: Arial, sans-serif; color: #0f172a; margin: 32px; }
             h1 { margin-bottom: 4px; }
@@ -1501,44 +1542,44 @@ export default function PurchaseOrdersPage() {
           </style>
         </head>
         <body>
-          <button onclick="window.print()">Print</button>
-          <h1>Purchase Order</h1>
+          <button onclick="window.print()">${escapeHtml(ui('Print'))}</button>
+          <h1>${escapeHtml(ui('Purchase Order'))}</h1>
           <div class="badge">${escapeHtml(selectedDetail.status.toUpperCase())}</div>
-          <p class="meta"><strong>PO Number:</strong> ${escapeHtml(selectedDetail.po_number)}</p>
-          <p class="meta"><strong>Supplier:</strong> ${escapeHtml(selectedDetail.supplier_name)}</p>
-          <p class="meta"><strong>Expected delivery:</strong> ${escapeHtml(formatDate(selectedDetail.expected_delivery_date))}</p>
+          <p class="meta"><strong>${escapeHtml(ui('PO Number'))}:</strong> ${escapeHtml(selectedDetail.po_number)}</p>
+          <p class="meta"><strong>${escapeHtml(ui('Supplier'))}:</strong> ${escapeHtml(selectedDetail.supplier_name)}</p>
+          <p class="meta"><strong>${escapeHtml(ui('Expected delivery'))}:</strong> ${escapeHtml(formatDate(selectedDetail.expected_delivery_date))}</p>
 
           <div class="grid">
-            <div><span class="label">Receiving status:</span> ${escapeHtml(receivingStatusLabel(selectedDetail.receiving_summary?.receiving_status))}</div>
-            <div><span class="label">Delivery status:</span> ${escapeHtml(deliveryStatusLabel(selectedDetail.delivery_status))}</div>
-            <div><span class="label">Next action:</span> ${escapeHtml(nextActionLabel(selectedDetail.next_action_status))}</div>
-            <div><span class="label">Received:</span> ${escapeHtml(formatNumber(selectedDetail.receiving_summary?.received_quantity))} / ${escapeHtml(formatNumber(selectedDetail.receiving_summary?.ordered_quantity))} (${escapeHtml(formatPercent(selectedDetail.receiving_summary?.receiving_percent))})</div>
-            <div><span class="label">Remaining:</span> ${escapeHtml(formatNumber(selectedDetail.receiving_summary?.remaining_quantity))}</div>
-            <div><span class="label">Linked shipments:</span> ${escapeHtml(formatNumber(selectedDetail.receiving_summary?.linked_shipment_count))} total / ${escapeHtml(formatNumber(selectedDetail.receiving_summary?.open_linked_shipment_count))} open</div>
-            <div><span class="label">Estimated cost:</span> ${escapeHtml(formatMoney(selectedDetail.estimated_total_cost, selectedDetail.currency))}</div>
-            <div><span class="label">Received value:</span> ${escapeHtml(formatMoney(selectedDetail.receiving_summary?.received_estimated_cost ?? selectedDetail.received_estimated_cost, selectedDetail.currency))}</div>
-            <div><span class="label">Remaining value:</span> ${escapeHtml(formatMoney(selectedDetail.receiving_summary?.remaining_estimated_cost ?? selectedDetail.remaining_estimated_cost, selectedDetail.currency))}</div>
-            <div><span class="label">Created:</span> ${escapeHtml(formatDateTime(selectedDetail.created_at))}</div>
-            <div><span class="label">Submitted:</span> ${escapeHtml(formatDateTime(selectedDetail.submitted_at))}</div>
-            <div><span class="label">Approved:</span> ${escapeHtml(formatDateTime(selectedDetail.approved_at))}</div>
-            <div><span class="label">Completed:</span> ${escapeHtml(formatDateTime(selectedDetail.completed_at))}</div>
-            <div><span class="label">Completed by:</span> ${escapeHtml(selectedDetail.completed_by_user_name || '-')}</div>
-            <div><span class="label">Completion type:</span> ${escapeHtml(completionTypeLabel(selectedDetail.completion_type))}</div>
-            <div><span class="label">Completion reason:</span> ${escapeHtml(selectedDetail.completion_reason || '-')}</div>
-            <div><span class="label">Cancelled:</span> ${escapeHtml(formatDateTime(selectedDetail.cancelled_at))}</div>
+            <div><span class="label">${escapeHtml(ui('Receiving status'))}:</span> ${escapeHtml(receivingStatusLabel(selectedDetail.receiving_summary?.receiving_status))}</div>
+            <div><span class="label">${escapeHtml(ui('Delivery status'))}:</span> ${escapeHtml(deliveryStatusLabel(selectedDetail.delivery_status))}</div>
+            <div><span class="label">${escapeHtml(ui('Next action'))}:</span> ${escapeHtml(nextActionLabel(selectedDetail.next_action_status))}</div>
+            <div><span class="label">${escapeHtml(ui('Received'))}:</span> ${escapeHtml(formatNumber(selectedDetail.receiving_summary?.received_quantity))} / ${escapeHtml(formatNumber(selectedDetail.receiving_summary?.ordered_quantity))} (${escapeHtml(formatPercent(selectedDetail.receiving_summary?.receiving_percent))})</div>
+            <div><span class="label">${escapeHtml(ui('Remaining'))}:</span> ${escapeHtml(formatNumber(selectedDetail.receiving_summary?.remaining_quantity))}</div>
+            <div><span class="label">${escapeHtml(ui('Linked shipments'))}:</span> ${escapeHtml(formatNumber(selectedDetail.receiving_summary?.linked_shipment_count))} ${escapeHtml(ui('total'))} / ${escapeHtml(formatNumber(selectedDetail.receiving_summary?.open_linked_shipment_count))} ${escapeHtml(ui('open'))}</div>
+            <div><span class="label">${escapeHtml(ui('Estimated cost'))}:</span> ${escapeHtml(formatMoney(selectedDetail.estimated_total_cost, selectedDetail.currency))}</div>
+            <div><span class="label">${escapeHtml(ui('Received value'))}:</span> ${escapeHtml(formatMoney(selectedDetail.receiving_summary?.received_estimated_cost ?? selectedDetail.received_estimated_cost, selectedDetail.currency))}</div>
+            <div><span class="label">${escapeHtml(ui('Remaining value'))}:</span> ${escapeHtml(formatMoney(selectedDetail.receiving_summary?.remaining_estimated_cost ?? selectedDetail.remaining_estimated_cost, selectedDetail.currency))}</div>
+            <div><span class="label">${escapeHtml(ui('Created'))}:</span> ${escapeHtml(formatDateTime(selectedDetail.created_at))}</div>
+            <div><span class="label">${escapeHtml(ui('Submitted'))}:</span> ${escapeHtml(formatDateTime(selectedDetail.submitted_at))}</div>
+            <div><span class="label">${escapeHtml(ui('Approved'))}:</span> ${escapeHtml(formatDateTime(selectedDetail.approved_at))}</div>
+            <div><span class="label">${escapeHtml(ui('Completed'))}:</span> ${escapeHtml(formatDateTime(selectedDetail.completed_at))}</div>
+            <div><span class="label">${escapeHtml(ui('Completed by'))}:</span> ${escapeHtml(selectedDetail.completed_by_user_name || '-')}</div>
+            <div><span class="label">${escapeHtml(ui('Completion type'))}:</span> ${escapeHtml(completionTypeLabel(selectedDetail.completion_type))}</div>
+            <div><span class="label">${escapeHtml(ui('Completion reason'))}:</span> ${escapeHtml(selectedDetail.completion_reason || '-')}</div>
+            <div><span class="label">${escapeHtml(ui('Cancelled'))}:</span> ${escapeHtml(formatDateTime(selectedDetail.cancelled_at))}</div>
           </div>
 
-          ${selectedDetail.notes ? `<div class="notes"><strong>Notes:</strong><br />${escapeHtml(selectedDetail.notes)}</div>` : ''}
+          ${selectedDetail.notes ? `<div class="notes"><strong>${escapeHtml(ui('Notes'))}:</strong><br />${escapeHtml(selectedDetail.notes)}</div>` : ''}
 
-          <h2>Items</h2>
+          <h2>${escapeHtml(ui('Items'))}</h2>
           <table>
-            <thead><tr><th>Product</th><th>Ordered</th><th>Received</th><th>Remaining</th><th>Status</th><th>Unit Cost</th><th>Total</th><th>Received Value</th><th>Remaining Value</th></tr></thead>
+            <thead><tr><th>${escapeHtml(ui('Product'))}</th><th>${escapeHtml(ui('Ordered'))}</th><th>${escapeHtml(ui('Received'))}</th><th>${escapeHtml(ui('Remaining'))}</th><th>${escapeHtml(ui('Status'))}</th><th>${escapeHtml(ui('Unit Cost'))}</th><th>${escapeHtml(ui('Total'))}</th><th>${escapeHtml(ui('Received Value'))}</th><th>${escapeHtml(ui('Remaining Value'))}</th></tr></thead>
             <tbody>${itemRows}</tbody>
           </table>
 
-          <h2>Linked Shipments</h2>
+          <h2>${escapeHtml(ui('Linked Shipments'))}</h2>
           <table>
-            <thead><tr><th>Shipment</th><th>Status</th><th>Delivery</th><th>Received</th><th>Created</th></tr></thead>
+            <thead><tr><th>${escapeHtml(ui('Shipment'))}</th><th>${escapeHtml(ui('Status'))}</th><th>${escapeHtml(ui('Delivery'))}</th><th>${escapeHtml(ui('Received'))}</th><th>${escapeHtml(ui('Created'))}</th></tr></thead>
             <tbody>${shipmentRows}</tbody>
           </table>
         </body>
@@ -1552,10 +1593,10 @@ export default function PurchaseOrdersPage() {
     try {
       await navigator.clipboard.writeText(window.location.href);
       setFormError(null);
-      showTenantActionSuccess('Current view link copied successfully.');
+      showTenantActionSuccess(ui('Current view link copied successfully.'));
     } catch {
-      setFormError('Could not copy link. Copy the browser address bar instead.');
-      showTenantActionError('Could not copy link. Copy the browser address bar instead.');
+      setFormError(ui('Could not copy link. Copy the browser address bar instead.'));
+      showTenantActionError(ui('Could not copy link. Copy the browser address bar instead.'));
     }
   };
 
@@ -1608,10 +1649,10 @@ export default function PurchaseOrdersPage() {
     }));
   };
 
-  const actionError = normalizeError(actionMutation.error, 'Purchase order action failed.');
-  const createShipmentError = normalizeError(createShipmentMutation.error, 'Creating shipment from purchase order failed.');
-  const createInboundReservationError = normalizeError(createInboundReservationMutation.error, 'Creating inbound reservation from purchase order failed.');
-  const formMutationError = normalizeError(createMutation.error || updateMutation.error, 'Saving purchase order failed.');
+  const actionError = normalizeError(actionMutation.error, ui('Purchase order action failed.'), ui);
+  const createShipmentError = normalizeError(createShipmentMutation.error, ui('Creating shipment from purchase order failed.'), ui);
+  const createInboundReservationError = normalizeError(createInboundReservationMutation.error, ui('Creating inbound reservation from purchase order failed.'), ui);
+  const formMutationError = normalizeError(createMutation.error || updateMutation.error, ui('Saving purchase order failed.'), ui);
 
   const selectedCanEdit = isPurchaseOrderEditable(selectedDetail?.status);
   const selectedIsLocked = isPurchaseOrderLocked(selectedDetail?.status);
@@ -1644,7 +1685,7 @@ export default function PurchaseOrdersPage() {
   const submitSelectedPurchaseOrder = () => {
     if (!selectedDetail) return;
     if (selectedCostIssue) {
-      showTenantActionError(`Submit blocked. ${selectedCostIssue}`);
+      showTenantActionError(ui('Submit blocked. {reason}').replace('{reason}', selectedCostIssue));
       return;
     }
 
@@ -1654,7 +1695,7 @@ export default function PurchaseOrdersPage() {
   const approveSelectedPurchaseOrder = () => {
     if (!selectedDetail) return;
     if (selectedCostIssue) {
-      showTenantActionError(`Approve blocked. ${selectedCostIssue}`);
+      showTenantActionError(ui('Approve blocked. {reason}').replace('{reason}', selectedCostIssue));
       return;
     }
 
@@ -1666,16 +1707,16 @@ export default function PurchaseOrdersPage() {
       <div className="purchase-orders-page io-operational-page io-workspace-page">
         <OperationalWorkspaceHero
           iconPath="/purchase-orders"
-          eyebrow="Procurement"
-          title="Purchase orders"
-          description="Create, approve, and track supplier orders through receiving."
-          meta={<OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>}
+          eyebrow={ui("Procurement")}
+          title={ui("Purchase orders")}
+          description={ui("Create, approve, and track supplier orders through receiving.")}
+          meta={<OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>}
         />
         <section className="app-panel purchase-orders-card">
           <OperationalSectionHeader
             iconPath="/purchase-orders"
-            title="Checking purchase order access"
-            description="Loading tenant plan access and procurement permissions."
+            title={ui("Checking purchase order access")}
+            description={ui("Loading tenant plan access and procurement permissions.")}
           />
         </section>
       </div>
@@ -1687,16 +1728,16 @@ export default function PurchaseOrdersPage() {
       <div className="purchase-orders-page io-operational-page io-workspace-page">
         <OperationalWorkspaceHero
           iconPath="/purchase-orders"
-          eyebrow="Procurement"
-          title="Purchase orders"
-          description="Create, approve, and track supplier orders through receiving."
-          meta={<OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>}
+          eyebrow={ui("Procurement")}
+          title={ui("Purchase orders")}
+          description={ui("Create, approve, and track supplier orders through receiving.")}
+          meta={<OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>}
         />
         <section className="app-panel purchase-orders-card">
           <OperationalSectionHeader
             iconPath="/purchase-orders"
-            title="Purchase orders are not included in this tenant plan"
-            description="This procurement feature is unavailable for the current tenant."
+            title={ui("Purchase orders are not included in this tenant plan")}
+            description={ui("This procurement feature is unavailable for the current tenant.")}
           />
         </section>
       </div>
@@ -1707,14 +1748,14 @@ export default function PurchaseOrdersPage() {
     <div className="purchase-orders-page io-operational-page io-workspace-page" id="purchase-orders-workspace-top">
       <OperationalWorkspaceHero
         iconPath="/purchase-orders"
-        eyebrow="Procurement"
-        title="Purchase orders"
-        description="Create, approve, and track supplier orders from draft through receiving and completion. Stock changes only when linked shipments are received."
+        eyebrow={ui("Procurement")}
+        title={ui("Purchase orders")}
+        description={ui("Create, approve, and track supplier orders from draft through receiving and completion. Stock changes only when linked shipments are received.")}
         meta={
           <>
-            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Approval workflow</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Receiving through shipments</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Approval workflow")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Receiving through shipments")}</OperationalWorkspaceMetaPill>
           </>
         }
         aside={
@@ -1724,14 +1765,14 @@ export default function PurchaseOrdersPage() {
             disabled={!capabilities.canCreatePurchaseOrders}
             onClick={() => navigateWorkspaceSection('create', createRef.current)}
           >
-            Create purchase order
+            {ui("Create purchase order")}
           </button>
         }
       />
 
-      <OperationalWorkspaceStats ariaLabel="Purchase order summary">
+      <OperationalWorkspaceStats ariaLabel={ui("Purchase order summary")}>
         <OperationalWorkspaceStatCard
-          label="Total orders"
+          label={ui("Total orders")}
           value={summary.count}
           helper={`${summary.draft} drafts`}
           tone="slate"
@@ -1739,72 +1780,72 @@ export default function PurchaseOrdersPage() {
           loading={purchaseOrdersQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Awaiting approval"
+          label={ui("Awaiting approval")}
           value={summary.submitted}
-          helper="Submitted orders waiting for a decision"
+          helper={ui("Submitted orders waiting for a decision")}
           tone={summary.submitted > 0 ? 'blue' : 'neutral'}
           iconPath="/execution-requests"
           loading={purchaseOrdersQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Needs action"
+          label={ui("Needs action")}
           value={summary.needsAction}
-          helper="Orders with a current procurement action"
+          helper={ui("Orders with a current procurement action")}
           tone={summary.needsAction > 0 ? 'warn' : 'good'}
           iconPath="/alerts"
           loading={purchaseOrdersQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Overdue"
+          label={ui("Overdue")}
           value={summary.overdue}
-          helper="Expected delivery date has passed"
+          helper={ui("Expected delivery date has passed")}
           tone={summary.overdue > 0 ? 'danger' : 'good'}
           iconPath="/alerts"
           loading={purchaseOrdersQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Open receiving"
+          label={ui("Open receiving")}
           value={summary.openReceiving}
-          helper="Orders with a linked shipment ready to receive"
+          helper={ui("Orders with a linked shipment ready to receive")}
           tone={summary.openReceiving > 0 ? 'blue' : 'neutral'}
           iconPath="/shipments"
           loading={purchaseOrdersQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label="Estimated value"
+          label={ui("Estimated value")}
           value={formatAggregateMoney(purchaseOrdersQuery.data || [], (row) => row.estimated_total_cost)}
-          helper="Value of the currently filtered orders"
+          helper={ui("Value of the currently filtered orders")}
           tone="neutral"
           iconPath="/reports"
           loading={purchaseOrdersQuery.isLoading}
         />
       </OperationalWorkspaceStats>
 
-      <OperationalWorkspaceTabs ariaLabel="Purchase order work areas" hint="Jump to the part of the procurement workflow you need.">
+      <OperationalWorkspaceTabs ariaLabel={ui("Purchase order work areas")} hint={ui("Jump to the part of the procurement workflow you need.")}>
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'overview'}
           iconPath="/dashboard"
-          label="Overview"
+          label={ui("Overview")}
           onClick={() => navigateWorkspaceSection('overview', document.getElementById('purchase-orders-workspace-top'))}
         />
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'registry'}
           iconPath="/purchase-orders"
-          label="Orders"
+          label={ui("Orders")}
           count={displayedPurchaseOrders.length}
           onClick={() => navigateWorkspaceSection('registry', registryRef.current)}
         />
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'create'}
           iconPath="/purchase-orders"
-          label={editingId ? 'Edit draft' : 'Create order'}
+          label={editingId ? ui('Edit draft') : ui('Create order')}
           disabled={!capabilities.canCreatePurchaseOrders && !capabilities.canUpdatePurchaseOrders}
           onClick={() => navigateWorkspaceSection('create', createRef.current)}
         />
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'detail'}
           iconPath="/audit"
-          label="Order detail"
+          label={ui("Order detail")}
           disabled={!selectedId}
           onClick={() => navigateWorkspaceSection('detail', detailRef.current)}
         />
@@ -1814,32 +1855,32 @@ export default function PurchaseOrdersPage() {
         <section className="app-panel purchase-orders-card purchase-orders-section-card">
           <OperationalSectionHeader
             iconPath="/purchase-orders"
-            title="Purchase order registry"
-            description="Find supplier orders, review their current state, and open one for receiving or lifecycle actions."
+            title={ui("Purchase order registry")}
+            description={ui("Find supplier orders, review their current state, and open one for receiving or lifecycle actions.")}
             actions={
               <div className="purchase-orders-header-actions">
-                <button type="button" className="app-button app-button--secondary" onClick={exportVisiblePurchaseOrdersCsv} disabled={!displayedPurchaseOrders.length}>Export CSV</button>
-                <button type="button" className="app-button app-button--secondary" onClick={() => printPurchaseOrderList(displayedPurchaseOrders, 'Filtered purchase orders')} disabled={!displayedPurchaseOrders.length}>Print list</button>
-                <button type="button" className="app-button app-button--secondary" onClick={() => setFilters({ ...EMPTY_FILTERS })}>Clear filters</button>
+                <button type="button" className="app-button app-button--secondary" onClick={exportVisiblePurchaseOrdersCsv} disabled={!displayedPurchaseOrders.length}>{ui("Export CSV")}</button>
+                <button type="button" className="app-button app-button--secondary" onClick={() => printPurchaseOrderList(displayedPurchaseOrders, ui('Filtered purchase orders'))} disabled={!displayedPurchaseOrders.length}>{ui("Print list")}</button>
+                <button type="button" className="app-button app-button--secondary" onClick={() => setFilters({ ...EMPTY_FILTERS })}>{ui("Clear filters")}</button>
               </div>
             }
           />
 
           <div className={`purchase-orders-attention${summary.needsAction > 0 ? ' purchase-orders-attention--active' : ''}`}>
             <div>
-              <strong>{summary.needsAction > 0 ? 'Procurement attention' : 'No urgent purchase order actions'}</strong>
-              <span>{summary.needsAction > 0 ? 'Use a quick filter to focus on orders that need work.' : 'The current filtered orders have no immediate procurement action.'}</span>
+              <strong>{summary.needsAction > 0 ? ui('Procurement attention') : ui('No urgent purchase order actions')}</strong>
+              <span>{summary.needsAction > 0 ? ui('Use a quick filter to focus on orders that need work.') : ui('The current filtered orders have no immediate procurement action.')}</span>
             </div>
             <div className="purchase-orders-attention-actions">
-              <button type="button" onClick={() => setFilters((current) => ({ ...current, deliveryStatus: 'overdue', nextActionStatus: '' }))}>Overdue <span>{summary.overdue}</span></button>
-              <button type="button" onClick={() => setFilters((current) => ({ ...current, deliveryStatus: 'due_today', nextActionStatus: '' }))}>Due today <span>{summary.dueToday}</span></button>
-              <button type="button" onClick={() => setFilters((current) => ({ ...current, nextActionStatus: 'receive_open_shipment', deliveryStatus: '' }))}>Receive <span>{summary.openReceiving}</span></button>
-              <button type="button" onClick={() => setFilters((current) => ({ ...current, nextActionStatus: 'approve_or_cancel', deliveryStatus: '' }))}>Approve <span>{summary.awaitingApproval}</span></button>
+              <button type="button" onClick={() => setFilters((current) => ({ ...current, deliveryStatus: 'overdue', nextActionStatus: '' }))}>{ui("Overdue")} <span>{summary.overdue}</span></button>
+              <button type="button" onClick={() => setFilters((current) => ({ ...current, deliveryStatus: 'due_today', nextActionStatus: '' }))}>{ui("Due today")} <span>{summary.dueToday}</span></button>
+              <button type="button" onClick={() => setFilters((current) => ({ ...current, nextActionStatus: 'receive_open_shipment', deliveryStatus: '' }))}>{ui("Receive")} <span>{summary.openReceiving}</span></button>
+              <button type="button" onClick={() => setFilters((current) => ({ ...current, nextActionStatus: 'approve_or_cancel', deliveryStatus: '' }))}>{ui("Approve")} <span>{summary.awaitingApproval}</span></button>
             </div>
           </div>
 
           {attentionPurchaseOrders.length ? (
-            <div className="purchase-orders-attention-list" aria-label="Purchase orders needing attention">
+            <div className="purchase-orders-attention-list" aria-label={ui("Purchase orders needing attention")}>
               {attentionPurchaseOrders.map((row) => (
                 <button
                   key={row.id}
@@ -1852,7 +1893,7 @@ export default function PurchaseOrdersPage() {
                 >
                   <span><strong>{row.po_number}</strong><small>{row.supplier_name}</small></span>
                   <span style={{ ...styles.badge, ...nextActionBadgeStyle(row.next_action_status) }}>{nextActionLabel(row.next_action_status)}</span>
-                  <small>Expected {formatDate(row.expected_delivery_date)}</small>
+                  <small>{ui("Expected")} {formatDate(row.expected_delivery_date)}</small>
                 </button>
               ))}
             </div>
@@ -1860,121 +1901,121 @@ export default function PurchaseOrdersPage() {
 
           {activeFilterChips.length ? (
             <div className="purchase-orders-active-filters">
-              <span>Active filters</span>
+              <span>{ui("Active filters")}</span>
               {activeFilterChips.map((chip) => (
                 <button
                   key={chip.key}
                   type="button"
                   onClick={() => setFilters((current) => ({ ...current, [chip.key]: '' }))}
-                  title="Remove filter"
+                  title={ui("Remove filter")}
                 >
                   {chip.label} ×
                 </button>
               ))}
-              <button type="button" className="purchase-orders-clear-link" onClick={() => setFilters({ ...EMPTY_FILTERS })}>Clear all</button>
+              <button type="button" className="purchase-orders-clear-link" onClick={() => setFilters({ ...EMPTY_FILTERS })}>{ui("Clear all")}</button>
             </div>
           ) : null}
 
           <div className="purchase-orders-primary-filters">
             <label className="purchase-orders-field purchase-orders-field--search">
-              <span>Search</span>
+              <span>{ui("Search")}</span>
               <input
                 value={filters.search}
                 onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
-                placeholder="PO number, supplier, or notes"
+                placeholder={ui("PO number, supplier, or notes")}
               />
             </label>
             <label className="purchase-orders-field">
-              <span>Status</span>
+              <span>{ui("Status")}</span>
               <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}>
-                <option value="">All statuses</option>
-                <option value="draft">Draft</option>
-                <option value="submitted">Submitted</option>
-                <option value="approved">Approved</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
+                <option value="">{ui("All statuses")}</option>
+                <option value="draft">{ui("Draft")}</option>
+                <option value="submitted">{ui("Submitted")}</option>
+                <option value="approved">{ui("Approved")}</option>
+                <option value="completed">{ui("Completed")}</option>
+                <option value="cancelled">{ui("Cancelled")}</option>
               </select>
             </label>
             <label className="purchase-orders-field">
-              <span>Supplier</span>
+              <span>{ui("Supplier")}</span>
               <select value={filters.supplierId} onChange={(event) => setFilters((current) => ({ ...current, supplierId: event.target.value }))}>
-                <option value="">All suppliers</option>
+                <option value="">{ui("All suppliers")}</option>
                 {(suppliersQuery.data || []).map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
               </select>
             </label>
             <label className="purchase-orders-field">
-              <span>Next action</span>
+              <span>{ui("Next action")}</span>
               <select value={filters.nextActionStatus} onChange={(event) => setFilters((current) => ({ ...current, nextActionStatus: event.target.value }))}>
-                <option value="">All next actions</option>
-                <option value="submit_for_approval">Submit for approval</option>
-                <option value="approve_or_cancel">Approve or cancel</option>
-                <option value="create_shipment">Create shipment</option>
-                <option value="receive_open_shipment">Receive shipment</option>
-                <option value="follow_up_overdue">Follow up overdue</option>
-                <option value="monitor_receiving">Monitor receiving</option>
-                <option value="none_completed">Completed</option>
-                <option value="none_cancelled">Cancelled</option>
-                <option value="none">No action</option>
+                <option value="">{ui("All next actions")}</option>
+                <option value="submit_for_approval">{ui("Submit for approval")}</option>
+                <option value="approve_or_cancel">{ui("Approve or cancel")}</option>
+                <option value="create_shipment">{ui("Create shipment")}</option>
+                <option value="receive_open_shipment">{ui("Receive shipment")}</option>
+                <option value="follow_up_overdue">{ui("Follow up overdue")}</option>
+                <option value="monitor_receiving">{ui("Monitor receiving")}</option>
+                <option value="none_completed">{ui("Completed")}</option>
+                <option value="none_cancelled">{ui("Cancelled")}</option>
+                <option value="none">{ui("No action")}</option>
               </select>
             </label>
           </div>
 
           <details className="purchase-orders-advanced-filters">
-            <summary>Advanced filters and list tools</summary>
+            <summary>{ui("Advanced filters and list tools")}</summary>
             <div className="purchase-orders-advanced-content">
               <div className="purchase-orders-secondary-filters">
                 <label className="purchase-orders-field">
-                  <span>Receiving</span>
+                  <span>{ui("Receiving")}</span>
                   <select value={filters.receivingStatus} onChange={(event) => setFilters((current) => ({ ...current, receivingStatus: event.target.value }))}>
-                    <option value="">All receiving</option>
-                    <option value="not_applicable">N/A</option>
-                    <option value="not_started">Not started</option>
-                    <option value="partially_received">Partial</option>
-                    <option value="received">Received</option>
+                    <option value="">{ui("All receiving")}</option>
+                    <option value="not_applicable">{ui("N/A")}</option>
+                    <option value="not_started">{ui("Not started")}</option>
+                    <option value="partially_received">{ui("Partial")}</option>
+                    <option value="received">{ui("Received")}</option>
                   </select>
                 </label>
                 <label className="purchase-orders-field">
-                  <span>Variance</span>
+                  <span>{ui("Variance")}</span>
                   <select value={filters.varianceStatus} onChange={(event) => setFilters((current) => ({ ...current, varianceStatus: event.target.value }))}>
-                    <option value="">All variance</option>
-                    <option value="not_applicable">N/A</option>
-                    <option value="matched">Matched</option>
-                    <option value="pending_receipt">Pending receipt</option>
-                    <option value="open_short">Open short</option>
-                    <option value="closed_short">Closed short</option>
-                    <option value="over_received">Over received</option>
+                    <option value="">{ui("All variance")}</option>
+                    <option value="not_applicable">{ui("N/A")}</option>
+                    <option value="matched">{ui("Matched")}</option>
+                    <option value="pending_receipt">{ui("Pending receipt")}</option>
+                    <option value="open_short">{ui("Open short")}</option>
+                    <option value="closed_short">{ui("Closed short")}</option>
+                    <option value="over_received">{ui("Over received")}</option>
                   </select>
                 </label>
                 <label className="purchase-orders-field">
-                  <span>Delivery</span>
+                  <span>{ui("Delivery")}</span>
                   <select value={filters.deliveryStatus} onChange={(event) => setFilters((current) => ({ ...current, deliveryStatus: event.target.value }))}>
-                    <option value="">All delivery</option>
-                    <option value="no_date">No date</option>
-                    <option value="upcoming">Upcoming</option>
-                    <option value="due_today">Due today</option>
-                    <option value="overdue">Overdue</option>
-                    <option value="fulfilled">Fulfilled</option>
-                    <option value="cancelled">Cancelled</option>
+                    <option value="">{ui("All delivery")}</option>
+                    <option value="no_date">{ui("No date")}</option>
+                    <option value="upcoming">{ui("Upcoming")}</option>
+                    <option value="due_today">{ui("Due today")}</option>
+                    <option value="overdue">{ui("Overdue")}</option>
+                    <option value="fulfilled">{ui("Fulfilled")}</option>
+                    <option value="cancelled">{ui("Cancelled")}</option>
                   </select>
                 </label>
                 <label className="purchase-orders-field">
-                  <span>Product</span>
+                  <span>{ui("Product")}</span>
                   <select value={filters.productId} onChange={(event) => setFilters((current) => ({ ...current, productId: event.target.value }))}>
-                    <option value="">All products</option>
+                    <option value="">{ui("All products")}</option>
                     {(productsQuery.data || []).map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
                   </select>
                 </label>
                 <label className="purchase-orders-field">
-                  <span>Sort</span>
-                  <select value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)} aria-label="Sort purchase orders">
-                    <option value="created_desc">Newest first</option>
-                    <option value="created_asc">Oldest first</option>
-                    <option value="expected_asc">Expected soonest</option>
-                    <option value="expected_desc">Expected latest</option>
-                    <option value="cost_desc">Highest value</option>
-                    <option value="cost_asc">Lowest value</option>
-                    <option value="received_percent_desc">Most received</option>
-                    <option value="received_percent_asc">Least received</option>
+                  <span>{ui("Sort")}</span>
+                  <select value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)} aria-label={ui("Sort purchase orders")}>
+                    <option value="created_desc">{ui("Newest first")}</option>
+                    <option value="created_asc">{ui("Oldest first")}</option>
+                    <option value="expected_asc">{ui("Expected soonest")}</option>
+                    <option value="expected_desc">{ui("Expected latest")}</option>
+                    <option value="cost_desc">{ui("Highest value")}</option>
+                    <option value="cost_asc">{ui("Lowest value")}</option>
+                    <option value="received_percent_desc">{ui("Most received")}</option>
+                    <option value="received_percent_asc">{ui("Least received")}</option>
                   </select>
                 </label>
               </div>
@@ -1988,48 +2029,48 @@ export default function PurchaseOrdersPage() {
                   ['Cancelled from', 'cancelledFrom'], ['Cancelled to', 'cancelledTo']
                 ] as [string, keyof Filters][]).map(([label, key]) => (
                   <label key={key} className="purchase-orders-field">
-                    <span>{label}</span>
+                    <span>{ui(label)}</span>
                     <input type="date" value={filters[key]} onChange={(event) => setFilters((current) => ({ ...current, [key]: event.target.value }))} />
                   </label>
                 ))}
               </div>
 
               <div className="purchase-orders-date-shortcuts">
-                <span>Date shortcuts</span>
-                <button type="button" onClick={() => applyDatePreset('expected_today')}>Expected today</button>
-                <button type="button" onClick={() => applyDatePreset('expected_next_7')}>Expected next 7 days</button>
-                <button type="button" onClick={() => applyDatePreset('created_last_7')}>Created last 7 days</button>
-                <button type="button" onClick={() => applyDatePreset('created_last_30')}>Created last 30 days</button>
-                <button type="button" onClick={() => applyDatePreset('approved_last_30')}>Approved last 30 days</button>
-                <button type="button" onClick={() => applyDatePreset('completed_last_30')}>Completed last 30 days</button>
-                <button type="button" onClick={() => applyDatePreset('cancelled_last_30')}>Cancelled last 30 days</button>
-                <button type="button" className="purchase-orders-clear-link" onClick={clearOnlyDateFilters}>Clear date filters</button>
+                <span>{ui("Date shortcuts")}</span>
+                <button type="button" onClick={() => applyDatePreset('expected_today')}>{ui("Expected today")}</button>
+                <button type="button" onClick={() => applyDatePreset('expected_next_7')}>{ui("Expected next 7 days")}</button>
+                <button type="button" onClick={() => applyDatePreset('created_last_7')}>{ui("Created last 7 days")}</button>
+                <button type="button" onClick={() => applyDatePreset('created_last_30')}>{ui("Created last 30 days")}</button>
+                <button type="button" onClick={() => applyDatePreset('approved_last_30')}>{ui("Approved last 30 days")}</button>
+                <button type="button" onClick={() => applyDatePreset('completed_last_30')}>{ui("Completed last 30 days")}</button>
+                <button type="button" onClick={() => applyDatePreset('cancelled_last_30')}>{ui("Cancelled last 30 days")}</button>
+                <button type="button" className="purchase-orders-clear-link" onClick={clearOnlyDateFilters}>{ui("Clear date filters")}</button>
               </div>
 
               <div className="purchase-orders-list-tools">
-                <button type="button" className="app-button app-button--secondary" onClick={copyCurrentViewLink}>Copy view link</button>
-                <button type="button" className="app-button app-button--secondary" onClick={exportCurrentPagePurchaseOrdersCsv} disabled={!paginatedPurchaseOrders.length}>Export current page</button>
-                <button type="button" className="app-button app-button--secondary" onClick={() => printPurchaseOrderList(paginatedPurchaseOrders, `Page ${Math.min(Math.max(currentPage, 1), totalPages)} of ${totalPages}`)} disabled={!paginatedPurchaseOrders.length}>Print current page</button>
+                <button type="button" className="app-button app-button--secondary" onClick={copyCurrentViewLink}>{ui("Copy view link")}</button>
+                <button type="button" className="app-button app-button--secondary" onClick={exportCurrentPagePurchaseOrdersCsv} disabled={!paginatedPurchaseOrders.length}>{ui("Export current page")}</button>
+                <button type="button" className="app-button app-button--secondary" onClick={() => printPurchaseOrderList(paginatedPurchaseOrders, ui('Page {page} of {total}').replace('{page}', formatNumber(Math.min(Math.max(currentPage, 1), totalPages))).replace('{total}', formatNumber(totalPages)))} disabled={!paginatedPurchaseOrders.length}>{ui("Print current page")}</button>
               </div>
             </div>
           </details>
 
-          {purchaseOrdersQuery.isLoading ? <p className="purchase-orders-muted">Loading purchase orders…</p> : null}
-          {purchaseOrdersQuery.error ? <p style={styles.error}>{normalizeError(purchaseOrdersQuery.error, 'Failed to load purchase orders.')}</p> : null}
+          {purchaseOrdersQuery.isLoading ? <p className="purchase-orders-muted">{ui("Loading purchase orders…")}</p> : null}
+          {purchaseOrdersQuery.error ? <p style={styles.error}>{normalizeError(purchaseOrdersQuery.error, ui('Failed to load purchase orders.'), ui)}</p> : null}
 
           <div className="purchase-orders-table-wrap">
             <table className="purchase-orders-table">
               <thead>
                 <tr>
-                  <th>Purchase order</th>
-                  <th>Supplier</th>
-                  <th>Status</th>
-                  <th>Expected</th>
-                  <th>Receiving</th>
-                  <th>Variance</th>
-                  <th>Next action</th>
-                  <th>Estimated cost</th>
-                  <th>Actions</th>
+                  <th>{ui("Purchase order")}</th>
+                  <th>{ui("Supplier")}</th>
+                  <th>{ui("Status")}</th>
+                  <th>{ui("Expected")}</th>
+                  <th>{ui("Receiving")}</th>
+                  <th>{ui("Variance")}</th>
+                  <th>{ui("Next action")}</th>
+                  <th>{ui("Estimated cost")}</th>
+                  <th>{ui("Actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -2051,21 +2092,21 @@ export default function PurchaseOrdersPage() {
                       >
                         {row.po_number}
                       </button>
-                      <small>Created {formatDate(row.created_at)}</small>
+                      <small>{ui("Created")} {formatDate(row.created_at)}</small>
                     </td>
                     <td>{row.supplier_name}</td>
-                    <td><span style={{ ...styles.badge, ...badgeStyle(row.status) }}>{row.status}</span></td>
+                    <td><span style={{ ...styles.badge, ...badgeStyle(row.status) }}>{purchaseOrderStatusLabel(row.status)}</span></td>
                     <td>
                       <strong>{formatDate(row.expected_delivery_date)}</strong>
                       <span style={{ ...styles.badge, ...deliveryBadgeStyle(row.delivery_status) }}>{deliveryStatusLabel(row.delivery_status)}</span>
                     </td>
                     <td>
                       <span style={{ ...styles.badge, ...receivingBadgeStyle(row.receiving_status) }}>{receivingStatusLabel(row.receiving_status)}</span>
-                      <small>{formatNumber(row.total_received_quantity)} / {formatNumber(row.total_quantity)} received · {formatNumber(row.linked_shipment_count)} shipment(s)</small>
+                      <small>{formatNumber(row.total_received_quantity)} / {formatNumber(row.total_quantity)} {ui("received ·")} {formatNumber(row.linked_shipment_count)} {ui("shipment(s)")}</small>
                     </td>
                     <td>
                       <span style={{ ...styles.badge, ...varianceBadgeStyle(row.variance_status) }}>{varianceStatusLabel(row.variance_status)}</span>
-                      <small>{formatNumber(row.quantity_variance)} quantity variance</small>
+                      <small>{formatNumber(row.quantity_variance)} {ui("quantity variance")}</small>
                     </td>
                     <td><span style={{ ...styles.badge, ...nextActionBadgeStyle(row.next_action_status) }}>{nextActionLabel(row.next_action_status)}</span></td>
                     <td>{formatMoney(row.estimated_total_cost, row.currency)}</td>
@@ -2079,13 +2120,13 @@ export default function PurchaseOrdersPage() {
                           navigateWorkspaceSection('detail', detailRef.current);
                         }}
                       >
-                        View
+                        {ui("View")}
                       </button>
                     </td>
                   </tr>
                 ))}
                 {!purchaseOrdersQuery.isLoading && !displayedPurchaseOrders.length ? (
-                  <tr><td colSpan={9} className="purchase-orders-empty-cell">No purchase orders found.</td></tr>
+                  <tr><td colSpan={9} className="purchase-orders-empty-cell">{ui("No purchase orders found.")}</td></tr>
                 ) : null}
               </tbody>
             </table>
@@ -2093,30 +2134,30 @@ export default function PurchaseOrdersPage() {
 
           {displayedPurchaseOrders.length ? (
             <details className="purchase-orders-list-analysis">
-              <summary>List analysis <span>Totals and filter breakdowns</span></summary>
+              <summary>{ui("List analysis")} <span>{ui("Totals and filter breakdowns")}</span></summary>
               <div className="purchase-orders-analysis-content">
                 <div className="purchase-orders-list-totals-grid">
-                  <div><span>Filtered POs</span><strong>{formatNumber(filteredTotals.count)}</strong></div>
-                  <div><span>Page POs</span><strong>{formatNumber(pageTotals.count)}</strong></div>
-                  <div><span>Ordered qty</span><strong>{formatNumber(filteredTotals.orderedQuantity)}</strong></div>
-                  <div><span>Received qty</span><strong>{formatNumber(filteredTotals.receivedQuantity)}</strong></div>
-                  <div><span>Remaining qty</span><strong>{formatNumber(filteredTotals.remainingQuantity)}</strong></div>
-                  <div><span>Open shipments</span><strong>{formatNumber(filteredTotals.openLinkedShipmentCount)}</strong></div>
-                  <div><span>Filtered value</span><strong>{formatAggregateMoney(displayedPurchaseOrders, (row) => row.estimated_total_cost)}</strong></div>
-                  <div><span>Remaining value</span><strong>{formatAggregateMoney(displayedPurchaseOrders, (row) => row.remaining_estimated_cost)}</strong></div>
+                  <div><span>{ui("Filtered POs")}</span><strong>{formatNumber(filteredTotals.count)}</strong></div>
+                  <div><span>{ui("Page POs")}</span><strong>{formatNumber(pageTotals.count)}</strong></div>
+                  <div><span>{ui("Ordered qty")}</span><strong>{formatNumber(filteredTotals.orderedQuantity)}</strong></div>
+                  <div><span>{ui("Received qty")}</span><strong>{formatNumber(filteredTotals.receivedQuantity)}</strong></div>
+                  <div><span>{ui("Remaining qty")}</span><strong>{formatNumber(filteredTotals.remainingQuantity)}</strong></div>
+                  <div><span>{ui("Open shipments")}</span><strong>{formatNumber(filteredTotals.openLinkedShipmentCount)}</strong></div>
+                  <div><span>{ui("Filtered value")}</span><strong>{formatAggregateMoney(displayedPurchaseOrders, (row) => row.estimated_total_cost)}</strong></div>
+                  <div><span>{ui("Remaining value")}</span><strong>{formatAggregateMoney(displayedPurchaseOrders, (row) => row.remaining_estimated_cost)}</strong></div>
                 </div>
 
                 <div className="purchase-orders-breakdown-grid">
                   <div>
-                    <strong>Status</strong>
+                    <strong>{ui("Status")}</strong>
                     <div className="purchase-orders-breakdown-chips">
                       {['draft', 'submitted', 'approved', 'completed', 'cancelled'].map((status) => (
-                        <button key={status} type="button" onClick={() => setFilters((current) => ({ ...current, status }))}>{status}: {formatNumber(filteredBreakdowns.statuses[status] || 0)}</button>
+                        <button key={status} type="button" onClick={() => setFilters((current) => ({ ...current, status }))}>{purchaseOrderStatusLabel(status)}: {formatNumber(filteredBreakdowns.statuses[status] || 0)}</button>
                       ))}
                     </div>
                   </div>
                   <div>
-                    <strong>Receiving</strong>
+                    <strong>{ui("Receiving")}</strong>
                     <div className="purchase-orders-breakdown-chips">
                       {['not_applicable', 'not_started', 'partially_received', 'received'].map((status) => (
                         <button key={status} type="button" onClick={() => setFilters((current) => ({ ...current, receivingStatus: status }))}>{receivingStatusLabel(status)}: {formatNumber(filteredBreakdowns.receivingStatuses[status] || 0)}</button>
@@ -2124,7 +2165,7 @@ export default function PurchaseOrdersPage() {
                     </div>
                   </div>
                   <div>
-                    <strong>Delivery</strong>
+                    <strong>{ui("Delivery")}</strong>
                     <div className="purchase-orders-breakdown-chips">
                       {['no_date', 'upcoming', 'due_today', 'overdue', 'fulfilled', 'cancelled'].map((status) => (
                         <button key={status} type="button" onClick={() => setFilters((current) => ({ ...current, deliveryStatus: status }))}>{deliveryStatusLabel(status)}: {formatNumber(filteredBreakdowns.deliveryStatuses[status] || 0)}</button>
@@ -2132,7 +2173,7 @@ export default function PurchaseOrdersPage() {
                     </div>
                   </div>
                   <div>
-                    <strong>Next action</strong>
+                    <strong>{ui("Next action")}</strong>
                     <div className="purchase-orders-breakdown-chips">
                       {['submit_for_approval', 'approve_or_cancel', 'create_shipment', 'receive_open_shipment', 'follow_up_overdue', 'monitor_receiving', 'none_completed', 'none_cancelled', 'none'].map((status) => (
                         <button key={status} type="button" onClick={() => setFilters((current) => ({ ...current, nextActionStatus: status }))}>{nextActionLabel(status)}: {formatNumber(filteredBreakdowns.nextActions[status] || 0)}</button>
@@ -2146,17 +2187,17 @@ export default function PurchaseOrdersPage() {
 
           {displayedPurchaseOrders.length ? (
             <div className="purchase-orders-pagination">
-              <span>Showing {formatNumber((Math.min(Math.max(currentPage, 1), totalPages) - 1) * pageSize + 1)}–{formatNumber(Math.min(Math.min(Math.max(currentPage, 1), totalPages) * pageSize, displayedPurchaseOrders.length))} of {formatNumber(displayedPurchaseOrders.length)} purchase orders</span>
+              <span>{ui("Showing")} {formatNumber((Math.min(Math.max(currentPage, 1), totalPages) - 1) * pageSize + 1)}–{formatNumber(Math.min(Math.min(Math.max(currentPage, 1), totalPages) * pageSize, displayedPurchaseOrders.length))} {ui("of")} {formatNumber(displayedPurchaseOrders.length)} {ui("purchase orders")}</span>
               <div>
-                <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} aria-label="Purchase orders per page">
-                  <option value={10}>10 / page</option>
-                  <option value={25}>25 / page</option>
-                  <option value={50}>50 / page</option>
-                  <option value={100}>100 / page</option>
+                <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} aria-label={ui("Purchase orders per page")}>
+                  <option value={10}>{ui("10 / page")}</option>
+                  <option value={25}>{ui("25 / page")}</option>
+                  <option value={50}>{ui("50 / page")}</option>
+                  <option value={100}>{ui("100 / page")}</option>
                 </select>
-                <button type="button" className="app-button app-button--secondary" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>Previous</button>
-                <strong>Page {formatNumber(Math.min(Math.max(currentPage, 1), totalPages))} of {formatNumber(totalPages)}</strong>
-                <button type="button" className="app-button app-button--secondary" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>Next</button>
+                <button type="button" className="app-button app-button--secondary" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>{ui("Previous")}</button>
+                <strong>{ui("Page")} {formatNumber(Math.min(Math.max(currentPage, 1), totalPages))} {ui("of")} {formatNumber(totalPages)}</strong>
+                <button type="button" className="app-button app-button--secondary" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>{ui("Next")}</button>
               </div>
             </div>
           ) : null}
@@ -2167,62 +2208,62 @@ export default function PurchaseOrdersPage() {
         <form id="purchase-order-form" className="app-panel purchase-orders-card purchase-orders-form-card" onSubmit={submitForm}>
           <OperationalSectionHeader
             iconPath="/purchase-orders"
-            title={editingId ? 'Edit purchase order draft' : 'Create purchase order'}
-            description={editingId ? 'Update the selected draft before it is submitted for approval.' : 'Create a draft supplier order. Submission, approval, shipment creation, and receiving remain separate steps.'}
-            actions={<button type="button" className="app-button app-button--secondary" onClick={addItem}>Add item</button>}
+            title={editingId ? ui('Edit purchase order draft') : ui('Create purchase order')}
+            description={editingId ? ui('Update the selected draft before it is submitted for approval.') : ui('Create a draft supplier order. Submission, approval, shipment creation, and receiving remain separate steps.')}
+            actions={<button type="button" className="app-button app-button--secondary" onClick={addItem}>{ui("Add item")}</button>}
           />
 
           <div className="purchase-orders-form-grid">
             <label className="purchase-orders-field purchase-orders-field--wide">
-              <span>Supplier</span>
+              <span>{ui("Supplier")}</span>
               <select
                 value={form.supplier_id}
                 onChange={(event) => setForm((current) => ({ ...current, supplier_id: event.target.value }))}
                 disabled={!capabilities.canCreatePurchaseOrders && !capabilities.canUpdatePurchaseOrders}
               >
-                <option value="">Select supplier</option>
+                <option value="">{ui("Select supplier")}</option>
                 {(suppliersQuery.data || []).map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
               </select>
             </label>
             <label className="purchase-orders-field">
-              <span>PO number</span>
-              <input value={form.po_number} onChange={(event) => setForm((current) => ({ ...current, po_number: event.target.value }))} placeholder="Auto-generated if empty" />
+              <span>{ui("PO number")}</span>
+              <input value={form.po_number} onChange={(event) => setForm((current) => ({ ...current, po_number: event.target.value }))} placeholder={ui("Auto-generated if empty")} />
             </label>
             <label className="purchase-orders-field">
-              <span>Expected delivery</span>
+              <span>{ui("Expected delivery")}</span>
               <input type="date" value={form.expected_delivery_date} onChange={(event) => setForm((current) => ({ ...current, expected_delivery_date: event.target.value }))} />
             </label>
             <label className="purchase-orders-field purchase-orders-field--full">
-              <span>Internal notes</span>
-              <textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Optional notes for your team" />
+              <span>{ui("Internal notes")}</span>
+              <textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} placeholder={ui("Optional notes for your team")} />
             </label>
           </div>
 
           <div className="purchase-orders-items-heading">
-            <div><strong>Order items</strong><span>Add the products, quantities, ordering units, and commercial cost for this supplier order.</span></div>
+            <div><strong>{ui("Order items")}</strong><span>{ui("Add the products, quantities, ordering units, and commercial cost for this supplier order.")}</span></div>
           </div>
 
           <div className="purchase-orders-item-list">
             {form.items.map((item, index) => (
               <div key={index} className="purchase-orders-item-card">
                 <div className="purchase-orders-item-card-header">
-                  <strong>Item {index + 1}</strong>
-                  <button type="button" className="purchase-orders-remove-button" onClick={() => removeItem(index)} disabled={form.items.length <= 1}>Remove</button>
+                  <strong>{ui("Item")} {index + 1}</strong>
+                  <button type="button" className="purchase-orders-remove-button" onClick={() => removeItem(index)} disabled={form.items.length <= 1}>{ui("Remove")}</button>
                 </div>
                 <div className="purchase-orders-item-grid">
                   <label className="purchase-orders-field purchase-orders-field--wide">
-                    <span>Product</span>
+                    <span>{ui("Product")}</span>
                     <select value={item.product_id} onChange={(event) => updateItem(index, { product_id: event.target.value, uom_code: '' })}>
-                      <option value="">Select product</option>
+                      <option value="">{ui("Select product")}</option>
                       {(productsQuery.data || []).map((product) => <option key={product.id} value={product.id}>{product.name} ({product.unit})</option>)}
                     </select>
                   </label>
                   <label className="purchase-orders-field">
-                    <span>Quantity</span>
+                    <span>{ui("Quantity")}</span>
                     <input type="number" min="0" step="any" value={item.quantity} onChange={(event) => updateItem(index, { quantity: event.target.value })} placeholder="0" />
                   </label>
                   <label className="purchase-orders-field">
-                    <span>Ordering unit</span>
+                    <span>{ui("Ordering unit")}</span>
                     <ProductUomSelect
                       productId={item.product_id}
                       value={item.uom_code}
@@ -2232,12 +2273,12 @@ export default function PurchaseOrdersPage() {
                     />
                   </label>
                   <label className="purchase-orders-field">
-                    <span>Cost per ordering unit</span>
-                    <input type="number" min="0" step="any" value={item.unit_cost} onChange={(event) => updateItem(index, { unit_cost: event.target.value })} placeholder="Required before submit" />
+                    <span>{ui("Cost per ordering unit")}</span>
+                    <input type="number" min="0" step="any" value={item.unit_cost} onChange={(event) => updateItem(index, { unit_cost: event.target.value })} placeholder={ui("Required before submit")} />
                   </label>
                   <label className="purchase-orders-field purchase-orders-field--full">
-                    <span>Item note</span>
-                    <input value={item.notes} onChange={(event) => updateItem(index, { notes: event.target.value })} placeholder="Optional item note" />
+                    <span>{ui("Item note")}</span>
+                    <input value={item.notes} onChange={(event) => updateItem(index, { notes: event.target.value })} placeholder={ui("Optional item note")} />
                   </label>
                 </div>
               </div>
@@ -2248,11 +2289,11 @@ export default function PurchaseOrdersPage() {
           {(createMutation.error || updateMutation.error) ? <p style={styles.error}>{formMutationError}</p> : null}
 
           <div className="purchase-orders-form-footer">
-            <span>Draft purchase orders do not change stock. Stock is received later through linked shipments.</span>
+            <span>{ui("Draft purchase orders do not change stock. Stock is received later through linked shipments.")}</span>
             <div>
-              {editingId ? <button type="button" className="app-button app-button--secondary" onClick={resetForm}>Cancel edit</button> : null}
+              {editingId ? <button type="button" className="app-button app-button--secondary" onClick={resetForm}>{ui("Cancel edit")}</button> : null}
               <button type="submit" className="app-button app-button--primary" disabled={createMutation.isPending || updateMutation.isPending || (!editingId && !capabilities.canCreatePurchaseOrders) || Boolean(editingId && !capabilities.canUpdatePurchaseOrders)}>
-                {editingId ? 'Save draft' : 'Create draft'}
+                {editingId ? ui('Save draft') : ui('Create draft')}
               </button>
             </div>
           </div>
@@ -2263,116 +2304,116 @@ export default function PurchaseOrdersPage() {
         <section className="app-panel purchase-orders-card purchase-orders-detail-card">
           <OperationalSectionHeader
             iconPath="/audit"
-            title={selectedDetail ? selectedDetail.po_number : 'Purchase order detail'}
-            description={selectedDetail ? `${selectedDetail.supplier_name} · review order progress, receiving, and available actions.` : 'Select an order from the registry to review its details and actions.'}
+            title={selectedDetail ? selectedDetail.po_number : ui('Purchase order detail')}
+            description={selectedDetail ? ui('{supplier} · review order progress, receiving, and available actions.').replace('{supplier}', selectedDetail.supplier_name) : ui('Select an order from the registry to review its details and actions.')}
             actions={selectedDetail ? (
               <div className="purchase-orders-header-actions">
-                <button type="button" className="app-button app-button--secondary" onClick={exportSelectedPurchaseOrderCsv}>Export detail</button>
-                <button type="button" className="app-button app-button--secondary" onClick={printSelectedPurchaseOrderDetail}>Print detail</button>
+                <button type="button" className="app-button app-button--secondary" onClick={exportSelectedPurchaseOrderCsv}>{ui("Export detail")}</button>
+                <button type="button" className="app-button app-button--secondary" onClick={printSelectedPurchaseOrderDetail}>{ui("Print detail")}</button>
               </div>
             ) : undefined}
           />
 
-          {!selectedId ? <div className="purchase-orders-empty-state">Choose a purchase order from the registry above to review its status, items, shipments, and next action.</div> : null}
-          {detailQuery.isLoading ? <p className="purchase-orders-muted">Loading purchase order detail…</p> : null}
-          {detailQuery.error ? <p style={styles.error}>{normalizeError(detailQuery.error, 'Failed to load purchase order.')}</p> : null}
+          {!selectedId ? <div className="purchase-orders-empty-state">{ui("Choose a purchase order from the registry above to review its status, items, shipments, and next action.")}</div> : null}
+          {detailQuery.isLoading ? <p className="purchase-orders-muted">{ui("Loading purchase order detail…")}</p> : null}
+          {detailQuery.error ? <p style={styles.error}>{normalizeError(detailQuery.error, ui('Failed to load purchase order.'), ui)}</p> : null}
 
           {selectedDetail ? (
             <>
               <div className="purchase-orders-detail-summary">
-                <div><span>Status</span><strong><span style={{ ...styles.badge, ...badgeStyle(selectedDetail.status) }}>{selectedDetail.status}</span></strong></div>
-                <div><span>Next action</span><strong><span style={{ ...styles.badge, ...nextActionBadgeStyle(selectedDetail.next_action_status) }}>{nextActionLabel(selectedDetail.next_action_status)}</span></strong></div>
-                <div><span>Expected delivery</span><strong>{formatDate(selectedDetail.expected_delivery_date)}</strong></div>
-                <div><span>Estimated cost</span><strong>{formatMoney(selectedDetail.estimated_total_cost, selectedDetail.currency)}</strong></div>
-                <div><span>Receiving</span><strong>{formatNumber(selectedDetail.receiving_summary?.received_quantity)} / {formatNumber(selectedDetail.receiving_summary?.ordered_quantity)}</strong><small>{formatPercent(selectedDetail.receiving_summary?.receiving_percent)} received</small></div>
-                <div><span>Remaining</span><strong>{formatNumber(selectedDetail.receiving_summary?.remaining_quantity)}</strong><small>{formatMoney(selectedDetail.receiving_summary?.remaining_estimated_cost ?? selectedDetail.remaining_estimated_cost, selectedDetail.currency)} remaining value</small></div>
-                <div><span>Variance</span><strong><span style={{ ...styles.badge, ...varianceBadgeStyle(selectedDetail.receiving_summary?.variance_status) }}>{varianceStatusLabel(selectedDetail.receiving_summary?.variance_status)}</span></strong><small>{formatNumber(selectedDetail.receiving_summary?.quantity_variance)} quantity variance</small></div>
-                <div><span>Linked shipments</span><strong>{formatNumber(selectedDetail.receiving_summary?.linked_shipment_count)}</strong><small>{formatNumber(selectedDetail.receiving_summary?.open_linked_shipment_count)} open</small></div>
+                <div><span>{ui("Status")}</span><strong><span style={{ ...styles.badge, ...badgeStyle(selectedDetail.status) }}>{purchaseOrderStatusLabel(selectedDetail.status)}</span></strong></div>
+                <div><span>{ui("Next action")}</span><strong><span style={{ ...styles.badge, ...nextActionBadgeStyle(selectedDetail.next_action_status) }}>{nextActionLabel(selectedDetail.next_action_status)}</span></strong></div>
+                <div><span>{ui("Expected delivery")}</span><strong>{formatDate(selectedDetail.expected_delivery_date)}</strong></div>
+                <div><span>{ui("Estimated cost")}</span><strong>{formatMoney(selectedDetail.estimated_total_cost, selectedDetail.currency)}</strong></div>
+                <div><span>{ui("Receiving")}</span><strong>{formatNumber(selectedDetail.receiving_summary?.received_quantity)} / {formatNumber(selectedDetail.receiving_summary?.ordered_quantity)}</strong><small>{formatPercent(selectedDetail.receiving_summary?.receiving_percent)} {ui("received")}</small></div>
+                <div><span>{ui("Remaining")}</span><strong>{formatNumber(selectedDetail.receiving_summary?.remaining_quantity)}</strong><small>{formatMoney(selectedDetail.receiving_summary?.remaining_estimated_cost ?? selectedDetail.remaining_estimated_cost, selectedDetail.currency)} {ui("remaining value")}</small></div>
+                <div><span>{ui("Variance")}</span><strong><span style={{ ...styles.badge, ...varianceBadgeStyle(selectedDetail.receiving_summary?.variance_status) }}>{varianceStatusLabel(selectedDetail.receiving_summary?.variance_status)}</span></strong><small>{formatNumber(selectedDetail.receiving_summary?.quantity_variance)} {ui("quantity variance")}</small></div>
+                <div><span>{ui("Linked shipments")}</span><strong>{formatNumber(selectedDetail.receiving_summary?.linked_shipment_count)}</strong><small>{formatNumber(selectedDetail.receiving_summary?.open_linked_shipment_count)} {ui("open")}</small></div>
               </div>
 
               <div className="purchase-orders-detail-status-row">
                 <span style={{ ...styles.badge, ...receivingBadgeStyle(selectedDetail.receiving_summary?.receiving_status) }}>{receivingStatusLabel(selectedDetail.receiving_summary?.receiving_status)}</span>
                 <span style={{ ...styles.badge, ...deliveryBadgeStyle(selectedDetail.delivery_status) }}>{deliveryStatusLabel(selectedDetail.delivery_status)}</span>
-                {selectedIsLocked ? <span style={{ ...styles.badge, ...styles.lockedBadge }}>Locked</span> : null}
+                {selectedIsLocked ? <span style={{ ...styles.badge, ...styles.lockedBadge }}>{ui("Locked")}</span> : null}
               </div>
 
-              {selectedDetail.notes ? <div className="purchase-orders-note-box"><strong>Internal notes</strong><p>{selectedDetail.notes}</p></div> : null}
+              {selectedDetail.notes ? <div className="purchase-orders-note-box"><strong>{ui("Internal notes")}</strong><p>{selectedDetail.notes}</p></div> : null}
 
-              {selectedIsLocked ? <p className="purchase-orders-muted">This order is no longer an editable draft. Continue through shipment, receiving, or lifecycle actions instead.</p> : null}
+              {selectedIsLocked ? <p className="purchase-orders-muted">{ui("This order is no longer an editable draft. Continue through shipment, receiving, or lifecycle actions instead.")}</p> : null}
               {actionMutation.error ? <p style={styles.error}>{actionError}</p> : null}
-              {selectedCostIssue ? <div style={styles.commercialWarningBox}><strong>Commercial cost review required.</strong> {selectedCostIssue}</div> : null}
+              {selectedCostIssue ? <div style={styles.commercialWarningBox}><strong>{ui("Commercial cost review required.")}</strong> {selectedCostIssue}</div> : null}
 
               <div className="purchase-orders-primary-actions">
-                {selectedCanEdit && capabilities.canUpdatePurchaseOrders ? <button type="button" className="app-button app-button--secondary" onClick={startEdit}>Edit draft</button> : null}
+                {selectedCanEdit && capabilities.canUpdatePurchaseOrders ? <button type="button" className="app-button app-button--secondary" onClick={startEdit}>{ui("Edit draft")}</button> : null}
                 {selectedCanSubmit && capabilities.canSubmitPurchaseOrders ? (
-                  <button type="button" className={`app-button ${selectedCostIssue ? 'purchase-orders-blocked-action' : 'app-button--primary'}`} disabled={actionMutation.isPending} aria-disabled={Boolean(selectedCostIssue)} title={selectedCostIssue || 'Submit this purchase order for approval'} onClick={submitSelectedPurchaseOrder}>
-                    {actionMutation.isPending ? 'Submitting…' : selectedCostIssue ? 'Submit blocked' : 'Submit for approval'}
+                  <button type="button" className={`app-button ${selectedCostIssue ? 'purchase-orders-blocked-action' : 'app-button--primary'}`} disabled={actionMutation.isPending} aria-disabled={Boolean(selectedCostIssue)} title={selectedCostIssue || ui('Submit this purchase order for approval')} onClick={submitSelectedPurchaseOrder}>
+                    {actionMutation.isPending ? ui('Submitting…') : selectedCostIssue ? ui('Submit blocked') : ui('Submit for approval')}
                   </button>
                 ) : null}
                 {selectedCanApprove && capabilities.canApprovePurchaseOrders ? (
-                  <button type="button" className={`app-button ${selectedCostIssue || selectedSelfApprovalBlocked ? 'purchase-orders-blocked-action' : 'app-button--primary'}`} disabled={actionMutation.isPending || selectedSelfApprovalBlocked} aria-disabled={Boolean(selectedCostIssue || selectedSelfApprovalBlocked)} title={selectedCostIssue || (selectedSelfApprovalBlocked ? 'A different employee must approve this purchase order.' : 'Approve this purchase order')} onClick={approveSelectedPurchaseOrder}>
-                    {actionMutation.isPending ? 'Approving…' : selectedCostIssue ? 'Approve blocked' : selectedSelfApprovalBlocked ? 'Different approver required' : 'Approve order'}
+                  <button type="button" className={`app-button ${selectedCostIssue || selectedSelfApprovalBlocked ? 'purchase-orders-blocked-action' : 'app-button--primary'}`} disabled={actionMutation.isPending || selectedSelfApprovalBlocked} aria-disabled={Boolean(selectedCostIssue || selectedSelfApprovalBlocked)} title={selectedCostIssue || (selectedSelfApprovalBlocked ? ui('A different employee must approve this purchase order.') : ui('Approve this purchase order'))} onClick={approveSelectedPurchaseOrder}>
+                    {actionMutation.isPending ? ui('Approving…') : selectedCostIssue ? ui('Approve blocked') : selectedSelfApprovalBlocked ? ui('Different approver required') : ui('Approve order')}
                   </button>
                 ) : null}
               </div>
 
               {selectedCanCreateShipment && capabilities.canManageShipments ? (
                 <div className="purchase-orders-action-panel">
-                  <div><strong>Create shipment</strong><span>Copy the remaining order quantity into a pending shipment. Stock is not changed until receiving.</span></div>
-                  <label className="purchase-orders-field"><span>Delivery date</span><input type="date" value={shipmentDeliveryDate} onChange={(event) => setShipmentDeliveryDate(event.target.value)} /></label>
-                  <button type="button" className="app-button app-button--primary" disabled={createShipmentMutation.isPending || selectedHasOpenShipment} onClick={() => createShipmentMutation.mutate({ id: selectedDetail.id, deliveryDate: shipmentDeliveryDate || selectedDetail.expected_delivery_date || null, version: selectedDetail.version })}>Create remaining shipment</button>
+                  <div><strong>{ui("Create shipment")}</strong><span>{ui("Copy the remaining order quantity into a pending shipment. Stock is not changed until receiving.")}</span></div>
+                  <label className="purchase-orders-field"><span>{ui("Delivery date")}</span><input type="date" value={shipmentDeliveryDate} onChange={(event) => setShipmentDeliveryDate(event.target.value)} /></label>
+                  <button type="button" className="app-button app-button--primary" disabled={createShipmentMutation.isPending || selectedHasOpenShipment} onClick={() => createShipmentMutation.mutate({ id: selectedDetail.id, deliveryDate: shipmentDeliveryDate || selectedDetail.expected_delivery_date || null, version: selectedDetail.version })}>{ui("Create remaining shipment")}</button>
                   {createShipmentMutation.error ? <p style={styles.error}>{createShipmentError}</p> : null}
                 </div>
               ) : null}
 
               {selectedCanCreateInboundReservation ? (
                 <div className="purchase-orders-action-panel">
-                  <div><strong>Create inbound reservation</strong><span>Track the expected inbound quantity without reserving current on-hand stock.</span></div>
-                  <button type="button" className="app-button app-button--secondary" disabled={createInboundReservationMutation.isPending} onClick={() => createInboundReservationMutation.mutate({ id: selectedDetail.id, version: selectedDetail.version })}>{createInboundReservationMutation.isPending ? 'Creating reservation…' : 'Create inbound reservation'}</button>
+                  <div><strong>{ui("Create inbound reservation")}</strong><span>{ui("Track the expected inbound quantity without reserving current on-hand stock.")}</span></div>
+                  <button type="button" className="app-button app-button--secondary" disabled={createInboundReservationMutation.isPending} onClick={() => createInboundReservationMutation.mutate({ id: selectedDetail.id, version: selectedDetail.version })}>{createInboundReservationMutation.isPending ? ui('Creating reservation…') : ui('Create inbound reservation')}</button>
                   {createInboundReservationMutation.error ? <p style={styles.error}>{createInboundReservationError}</p> : null}
                 </div>
               ) : null}
 
               {selectedCanClose && capabilities.canCancelPurchaseOrders ? (
                 <div className="purchase-orders-action-panel purchase-orders-action-panel--danger">
-                  <div><strong>Close order with remaining quantity</strong><span>Use this when the supplier will not deliver the remaining quantity. Existing stock and shipments are not changed.</span></div>
-                  <label className="purchase-orders-field"><span>Close reason</span><input value={closeReason} onChange={(event) => setCloseReason(event.target.value)} placeholder="Reason required" /></label>
+                  <div><strong>{ui("Close order with remaining quantity")}</strong><span>{ui("Use this when the supplier will not deliver the remaining quantity. Existing stock and shipments are not changed.")}</span></div>
+                  <label className="purchase-orders-field"><span>{ui("Close reason")}</span><input value={closeReason} onChange={(event) => setCloseReason(event.target.value)} placeholder={ui("Reason required")} /></label>
                   <button type="button" className="app-button purchase-orders-danger-button" disabled={actionMutation.isPending} onClick={() => {
-                    if (!closeReason.trim()) { showTenantActionError('Close reason is required.'); return; }
-                    if (window.confirm('Close this purchase order and cancel any remaining undelivered quantity?')) actionMutation.mutate({ id: selectedDetail.id, action: 'close', body: { reason: closeReason }, version: selectedDetail.version });
-                  }}>{actionMutation.isPending ? 'Closing…' : 'Close order'}</button>
+                    if (!closeReason.trim()) { showTenantActionError(ui('Close reason is required.')); return; }
+                    if (window.confirm(ui('Close this purchase order and cancel any remaining undelivered quantity?'))) actionMutation.mutate({ id: selectedDetail.id, action: 'close', body: { reason: closeReason }, version: selectedDetail.version });
+                  }}>{actionMutation.isPending ? ui('Closing…') : ui('Close order')}</button>
                 </div>
               ) : null}
 
               {selectedCanReopen && capabilities.canCancelPurchaseOrders ? (
                 <div className="purchase-orders-action-panel">
-                  <div><strong>Reopen manually closed order</strong><span>Use this only when remaining quantity still needs to be received.</span></div>
-                  <button type="button" className="app-button app-button--secondary" disabled={actionMutation.isPending} onClick={() => { if (window.confirm('Reopen this manually closed purchase order?')) actionMutation.mutate({ id: selectedDetail.id, action: 'reopen', version: selectedDetail.version }); }}>{actionMutation.isPending ? 'Reopening…' : 'Reopen order'}</button>
+                  <div><strong>{ui("Reopen manually closed order")}</strong><span>{ui("Use this only when remaining quantity still needs to be received.")}</span></div>
+                  <button type="button" className="app-button app-button--secondary" disabled={actionMutation.isPending} onClick={() => { if (window.confirm(ui('Reopen this manually closed purchase order?'))) actionMutation.mutate({ id: selectedDetail.id, action: 'reopen', version: selectedDetail.version }); }}>{actionMutation.isPending ? ui('Reopening…') : ui('Reopen order')}</button>
                 </div>
               ) : null}
 
               {selectedCanCancel && capabilities.canCancelPurchaseOrders ? (
                 <div className="purchase-orders-action-panel purchase-orders-action-panel--danger">
-                  <div><strong>Cancel order</strong><span>Available while the order is still draft or submitted.</span></div>
-                  <label className="purchase-orders-field"><span>Cancellation reason</span><input value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Optional reason" /></label>
-                  <button type="button" className="app-button purchase-orders-danger-button" disabled={actionMutation.isPending} onClick={() => { if (window.confirm('Cancel this purchase order?')) actionMutation.mutate({ id: selectedDetail.id, action: 'cancel', body: { reason: cancelReason }, version: selectedDetail.version }); }}>{actionMutation.isPending ? 'Cancelling…' : 'Cancel order'}</button>
+                  <div><strong>{ui("Cancel order")}</strong><span>{ui("Available while the order is still draft or submitted.")}</span></div>
+                  <label className="purchase-orders-field"><span>{ui("Cancellation reason")}</span><input value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder={ui("Optional reason")} /></label>
+                  <button type="button" className="app-button purchase-orders-danger-button" disabled={actionMutation.isPending} onClick={() => { if (window.confirm(ui('Cancel this purchase order?'))) actionMutation.mutate({ id: selectedDetail.id, action: 'cancel', body: { reason: cancelReason }, version: selectedDetail.version }); }}>{actionMutation.isPending ? ui('Cancelling…') : ui('Cancel order')}</button>
                 </div>
               ) : null}
 
-              <div className="purchase-orders-subsection-heading"><strong>Order items</strong><span>Ordered, received, remaining, and estimated value by product.</span></div>
+              <div className="purchase-orders-subsection-heading"><strong>{ui("Order items")}</strong><span>{ui("Ordered, received, remaining, and estimated value by product.")}</span></div>
               <div className="purchase-orders-table-wrap">
                 <table className="purchase-orders-table purchase-orders-table--detail">
-                  <thead><tr><th>Product</th><th>Qty</th><th>Received</th><th>Remaining</th><th>Status</th><th>Variance</th><th>Cost / unit</th><th>Total</th><th>Received value</th><th>Remaining value</th></tr></thead>
+                  <thead><tr><th>{ui("Product")}</th><th>{ui("Qty")}</th><th>{ui("Received")}</th><th>{ui("Remaining")}</th><th>{ui("Status")}</th><th>{ui("Variance")}</th><th>{ui("Cost / unit")}</th><th>{ui("Total")}</th><th>{ui("Received value")}</th><th>{ui("Remaining value")}</th></tr></thead>
                   <tbody>
                     {selectedDetail.items.map((item) => (
                       <tr key={item.id}>
                         <td>{item.product_name}</td>
-                        <td>{formatNumber(item.entered_quantity ?? item.quantity)} {item.uom_code || item.product_unit}{String(item.uom_code || item.product_unit).toUpperCase() !== String(item.product_unit).toUpperCase() ? <small>{formatNumber(item.quantity)} {item.product_unit} base</small> : null}</td>
+                        <td>{formatNumber(item.entered_quantity ?? item.quantity)} {item.uom_code || item.product_unit}{String(item.uom_code || item.product_unit).toUpperCase() !== String(item.product_unit).toUpperCase() ? <small>{formatNumber(item.quantity)} {item.product_unit} {ui("base")}</small> : null}</td>
                         <td>{formatNumber(item.received_quantity)} {item.product_unit}</td>
                         <td>{formatNumber(item.remaining_quantity)} {item.product_unit}</td>
                         <td><span style={{ ...styles.badge, ...receivingBadgeStyle(item.receiving_status) }}>{receivingStatusLabel(item.receiving_status)}</span><small>{formatPercent(item.receiving_percent)}</small></td>
                         <td><span style={{ ...styles.badge, ...varianceBadgeStyle(item.variance_status) }}>{varianceStatusLabel(item.variance_status)}</span><small>{formatNumber(item.quantity_variance)}</small></td>
-                        <td>{formatMoney(item.unit_cost, selectedDetail.currency)}<small>per {item.uom_code || item.product_unit}</small></td>
+                        <td>{formatMoney(item.unit_cost, selectedDetail.currency)}<small>{ui("per")} {item.uom_code || item.product_unit}</small></td>
                         <td>{formatMoney(item.estimated_line_total, selectedDetail.currency)}</td>
                         <td>{formatMoney(item.received_estimated_cost, selectedDetail.currency)}</td>
                         <td>{formatMoney(item.remaining_estimated_cost, selectedDetail.currency)}</td>
@@ -2384,10 +2425,10 @@ export default function PurchaseOrdersPage() {
 
               {(selectedDetail.linked_shipments || []).length ? (
                 <>
-                  <div className="purchase-orders-subsection-heading"><strong>Linked shipments</strong><span>Receiving records created from this purchase order.</span></div>
+                  <div className="purchase-orders-subsection-heading"><strong>{ui("Linked shipments")}</strong><span>{ui("Receiving records created from this purchase order.")}</span></div>
                   <div className="purchase-orders-table-wrap">
                     <table className="purchase-orders-table purchase-orders-table--compact">
-                      <thead><tr><th>Shipment</th><th>Status</th><th>Delivery</th><th>Received</th><th>Action</th></tr></thead>
+                      <thead><tr><th>{ui("Shipment")}</th><th>{ui("Status")}</th><th>{ui("Delivery")}</th><th>{ui("Received")}</th><th>{ui("Action")}</th></tr></thead>
                       <tbody>
                         {(selectedDetail.linked_shipments || []).map((shipment) => (
                           <tr key={shipment.id}>
@@ -2395,7 +2436,7 @@ export default function PurchaseOrdersPage() {
                             <td>{shipment.status}</td>
                             <td>{formatDate(shipment.delivery_date)}</td>
                             <td>{formatNumber(shipment.received_quantity)} / {formatNumber(shipment.ordered_quantity)}</td>
-                            <td><button type="button" className="app-button app-button--secondary" onClick={() => navigate(`/shipments?shipmentId=${encodeURIComponent(shipment.id)}`)}>Open shipment</button></td>
+                            <td><button type="button" className="app-button app-button--secondary" onClick={() => navigate(`/shipments?shipmentId=${encodeURIComponent(shipment.id)}`)}>{ui("Open shipment")}</button></td>
                           </tr>
                         ))}
                       </tbody>
@@ -2404,33 +2445,33 @@ export default function PurchaseOrdersPage() {
                 </>
               ) : null}
 
-              <div className="purchase-orders-subsection-heading"><strong>Lifecycle</strong><span>Who moved this order through its procurement states and when.</span></div>
+              <div className="purchase-orders-subsection-heading"><strong>{ui("Lifecycle")}</strong><span>{ui("Who moved this order through its procurement states and when.")}</span></div>
               <div className="purchase-orders-lifecycle">
                 {selectedLifecycleEvents.map((event) => (
-                  <div key={event.label}><span>{event.label}</span><strong>{formatDateTime(event.value)}</strong>{event.actor ? <small>By {event.actor}</small> : <small>Actor not recorded</small>}</div>
+                  <div key={event.label}><span>{event.label}</span><strong>{formatDateTime(event.value)}</strong>{event.actor ? <small>{ui("By")} {event.actor}</small> : <small>{ui("Actor not recorded")}</small>}</div>
                 ))}
               </div>
 
               {selectedDetail.status === 'completed' ? (
                 <div className="purchase-orders-completion-note">
                   <strong>{completionTypeLabel(selectedDetail.completion_type)}</strong>
-                  <span>{selectedDetail.completion_reason || 'No completion reason recorded.'}</span>
-                  <small>{selectedDetail.completed_by_user_name ? `Completed by ${selectedDetail.completed_by_user_name}` : 'Completing user not recorded'}</small>
+                  <span>{selectedDetail.completion_reason || ui('No completion reason recorded.')}</span>
+                  <small>{selectedDetail.completed_by_user_name ? ui('Completed by {name}').replace('{name}', selectedDetail.completed_by_user_name) : ui('Completing user not recorded')}</small>
                 </div>
               ) : null}
 
               {capabilities.canViewAudit ? (
                 <details className="purchase-orders-audit-details">
-                  <summary>Audit history <span>{(auditQuery.data || []).length} event(s)</span></summary>
+                  <summary>{ui("Audit history")} <span>{(auditQuery.data || []).length} {ui("event(s)")}</span></summary>
                   <div className="purchase-orders-audit-content">
                     <div className="purchase-orders-audit-toolbar">
-                      <label className="purchase-orders-field purchase-orders-field--search"><span>Search audit history</span><input value={auditSearch} onChange={(event) => setAuditSearch(event.target.value)} placeholder="Action, person, or date" /></label>
-                      <button type="button" className="app-button app-button--secondary" onClick={exportSelectedPurchaseOrderAuditCsv} disabled={auditQuery.isLoading || !selectedAuditEvents.length}>Export audit CSV</button>
-                      <button type="button" className="app-button app-button--secondary" onClick={printSelectedPurchaseOrderAudit} disabled={auditQuery.isLoading || !selectedAuditEvents.length}>Print audit</button>
-                      {auditSearch ? <button type="button" className="app-button app-button--secondary" onClick={() => setAuditSearch('')}>Clear search</button> : null}
+                      <label className="purchase-orders-field purchase-orders-field--search"><span>{ui("Search audit history")}</span><input value={auditSearch} onChange={(event) => setAuditSearch(event.target.value)} placeholder={ui("Action, person, or date")} /></label>
+                      <button type="button" className="app-button app-button--secondary" onClick={exportSelectedPurchaseOrderAuditCsv} disabled={auditQuery.isLoading || !selectedAuditEvents.length}>{ui("Export audit CSV")}</button>
+                      <button type="button" className="app-button app-button--secondary" onClick={printSelectedPurchaseOrderAudit} disabled={auditQuery.isLoading || !selectedAuditEvents.length}>{ui("Print audit")}</button>
+                      {auditSearch ? <button type="button" className="app-button app-button--secondary" onClick={() => setAuditSearch('')}>{ui("Clear search")}</button> : null}
                     </div>
-                    {auditQuery.isLoading ? <p className="purchase-orders-muted">Loading audit history…</p> : null}
-                    {auditQuery.error ? <p style={styles.error}>Failed to load purchase order audit history.</p> : null}
+                    {auditQuery.isLoading ? <p className="purchase-orders-muted">{ui("Loading audit history…")}</p> : null}
+                    {auditQuery.error ? <p style={styles.error}>{ui("Failed to load purchase order audit history.")}</p> : null}
                     {selectedAuditEvents.length ? (
                       <div className="purchase-orders-audit-list">
                         {selectedAuditEvents.map((event) => {
@@ -2438,17 +2479,17 @@ export default function PurchaseOrdersPage() {
                           return (
                             <div key={event.id} className="purchase-orders-audit-item">
                               <div><strong>{event.action}</strong><span>{formatDateTime(event.created_at)} · {auditActorLabel(event)}</span></div>
-                              {metadataSummary !== '-' ? <details><summary>Event details</summary><p>{metadataSummary}</p></details> : null}
+                              {metadataSummary !== '-' ? <details><summary>{ui("Event details")}</summary><p>{metadataSummary}</p></details> : null}
                             </div>
                           );
                         })}
                       </div>
-                    ) : !auditQuery.isLoading && !auditQuery.error ? <p className="purchase-orders-muted">No audit events match the current search.</p> : null}
+                    ) : !auditQuery.isLoading && !auditQuery.error ? <p className="purchase-orders-muted">{ui("No audit events match the current search.")}</p> : null}
                   </div>
                 </details>
               ) : null}
 
-              {isEditingSelectedDraft ? <p className="purchase-orders-muted">This draft is currently open in the edit form above.</p> : null}
+              {isEditingSelectedDraft ? <p className="purchase-orders-muted">{ui("This draft is currently open in the edit form above.")}</p> : null}
             </>
           ) : null}
         </section>

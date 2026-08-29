@@ -8,7 +8,8 @@ const files = [
   'src/pages/LoginPage.tsx',
   'src/pages/PlatformProvisioningPresetsPage.tsx',
   'src/layouts/AppLayout.tsx',
-  'src/app/navigationRegistry.ts'
+  'src/app/navigationRegistry.ts',
+  'src/i18n/messages.ts'
 ];
 const joined = files.map((relative) => fs.readFileSync(path.join(root, relative), 'utf8')).join('\n');
 
@@ -27,7 +28,7 @@ for (const forbidden of [
   if (joined.includes(forbidden)) throw new Error(`Generic customer branding contract failed: found legacy customer-facing text ${forbidden}`);
 }
 for (const expected of [
-  'INVENTORY OPERATIONS PLATFORM',
+  "'tenantLogin.aria': 'Inventory Operations platform'",
   'you@company.com',
   '<title>Inventory Operations Platform</title>',
   'placeholder="warehouse-standard"'

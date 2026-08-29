@@ -47,6 +47,7 @@ type BuildProductCostHistoryHandlersParams = {
   costRiskDetails?: ProductCostRiskDetailsResponse;
   setSelectedCostProduct: Dispatch<SetStateAction<ProductItem | ProductCostRiskItem | null>>;
   setCostHistoryFilters: Dispatch<SetStateAction<CostHistoryFilterState>>;
+  ui: (englishText: string) => string;
 };
 
 export function buildProductCostHistoryHandlers({
@@ -63,7 +64,8 @@ export function buildProductCostHistoryHandlers({
   costActionDetails,
   costRiskDetails,
   setSelectedCostProduct,
-  setCostHistoryFilters
+  setCostHistoryFilters,
+  ui
 }: BuildProductCostHistoryHandlersParams) {
   const handleOpenCostHistory = (product: ProductItem | ProductCostRiskItem) => {
     setSelectedCostProduct(product);
@@ -81,19 +83,19 @@ export function buildProductCostHistoryHandlers({
   };
 
   const handleExportCostHistoryCsv = () => {
-    exportCostHistoryCsv(selectedCostProduct, costHistory);
+    exportCostHistoryCsv(selectedCostProduct, costHistory, ui);
   };
 
   const handleExportStandardCostHistoryCsv = () => {
-    exportStandardCostHistoryCsv(selectedCostProduct, standardCostHistory);
+    exportStandardCostHistoryCsv(selectedCostProduct, standardCostHistory, ui);
   };
 
   const handleExportProductsCsv = () => {
-    exportProductsCsv(products);
+    exportProductsCsv(products, ui);
   };
 
   const handleExportCostReportCsv = () => {
-    exportCostReportCsv(costReportSummary);
+    exportCostReportCsv(costReportSummary, ui);
   };
 
   const handlePrintCostReport = () => {
@@ -101,19 +103,19 @@ export function buildProductCostHistoryHandlers({
   };
 
   const handleExportCostGovernanceAuditCsv = () => {
-    exportCostGovernanceAuditCsv(costGovernanceAuditPack);
+    exportCostGovernanceAuditCsv(costGovernanceAuditPack, ui);
   };
 
   const handleExportCostGovernanceReviewPackCsv = () => {
-    exportCostGovernanceReviewPackCsv(costGovernanceReviewPack);
+    exportCostGovernanceReviewPackCsv(costGovernanceReviewPack, ui);
   };
 
   const handleExportCostGovernanceClosureCsv = () => {
-    exportCostGovernanceClosureCsv(costGovernanceClosureSummary);
+    exportCostGovernanceClosureCsv(costGovernanceClosureSummary, ui);
   };
 
   const handleExportCostGovernanceHandoffCsv = () => {
-    exportCostGovernanceHandoffCsv(costGovernanceHandoffSummary);
+    exportCostGovernanceHandoffCsv(costGovernanceHandoffSummary, ui);
   };
 
   const handlePrintCostGovernanceAudit = () => {
@@ -121,15 +123,15 @@ export function buildProductCostHistoryHandlers({
   };
 
   const handleExportCostValuationDetailsCsv = () => {
-    exportCostValuationDetailsCsv(costValuationDetails);
+    exportCostValuationDetailsCsv(costValuationDetails, ui);
   };
 
   const handleExportCostActionDetailsCsv = () => {
-    exportCostActionDetailsCsv(costActionDetails);
+    exportCostActionDetailsCsv(costActionDetails, ui);
   };
 
   const handleExportCostRiskDetailsCsv = () => {
-    exportCostRiskDetailsCsv(costRiskDetails);
+    exportCostRiskDetailsCsv(costRiskDetails, ui);
   };
 
   return {

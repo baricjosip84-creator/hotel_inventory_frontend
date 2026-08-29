@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { useAppTranslation } from '../../i18n/I18nContext';
 import type { ChangeEvent, CSSProperties } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
@@ -29,23 +30,23 @@ type InventoryUsageCameraScannerProps = {
   onDecoded: (barcode: string) => void;
 };
 
-const formatScannerError = (error: unknown): string => {
+const formatScannerError = (error: unknown, ui: (text: string) => string): string => {
   const message = error instanceof Error ? error.message : String(error || '');
   const normalized = message.toLowerCase();
 
   if (normalized.includes('permission') || normalized.includes('notallowederror')) {
-    return 'Camera access was denied. Allow camera access in the browser and try again.';
+    return ui('Camera access was denied. Allow camera access in the browser and try again.');
   }
 
   if (normalized.includes('notfounderror') || normalized.includes('requested device not found')) {
-    return 'No usable camera was found on this device.';
+    return ui('No usable camera was found on this device.');
   }
 
   if (normalized.includes('notreadableerror') || normalized.includes('could not start video source')) {
-    return 'The camera is already in use by another application or browser tab.';
+    return ui('The camera is already in use by another application or browser tab.');
   }
 
-  return message || 'Could not start the camera scanner.';
+  return message || ui('Could not start the camera scanner.');
 };
 
 const playScanFeedback = () => {
@@ -60,6 +61,7 @@ export function InventoryUsageCameraScanner({
   disabled = false,
   onDecoded
 }: InventoryUsageCameraScannerProps) {
+  const { ui } = useAppTranslation();
   const reactId = useId();
   const scannerContainerId = `inventory-usage-camera-${reactId.replace(/:/g, '')}`;
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -208,7 +210,7 @@ export function InventoryUsageCameraScanner({
       startingRef.current = false;
     } catch (scannerError) {
       await stopScanner();
-      setError(formatScannerError(scannerError));
+      setError(formatScannerError(scannerError, ui));
     }
   };
 
@@ -258,7 +260,7 @@ export function InventoryUsageCameraScanner({
       await stopScanner();
       setError(imageError instanceof Error && imageError.message
         ? imageError.message
-        : 'No supported barcode or QR code could be decoded from that image.');
+        : ui('No supported barcode or QR code could be decoded from that image.'));
     } finally {
       setIsDecodingImage(false);
       event.target.value = '';
@@ -282,21 +284,19 @@ export function InventoryUsageCameraScanner({
         }}
         onClick={openAndStartScanner}
         disabled={disabled}
-        title={disabled ? 'Quick-consume permission is required before scanning' : 'Open this device camera and scan a barcode'}
+        title={disabled ? ui('Quick-consume permission is required before scanning') : ui('Open this device camera and scan a barcode')}
       >
-        Scan with camera
-      </button>
+        {ui("Scan with camera")}</button>
 
-      <span style={cameraStyles.fallbackText}>or paste/type the value</span>
+      <span style={cameraStyles.fallbackText}>{ui("or paste/type the value")}</span>
 
       {isOpen ? (
         <div style={cameraStyles.panel}>
           <div style={cameraStyles.header}>
             <div>
-              <strong style={cameraStyles.title}>Camera barcode scanner</strong>
+              <strong style={cameraStyles.title}>{ui("Camera barcode scanner")}</strong>
               <p style={cameraStyles.description}>
-                Use this phone, tablet, or computer camera. No separate scanner is required.
-              </p>
+                {ui("Use this phone, tablet, or computer camera. No separate scanner is required.")}</p>
             </div>
             <button
               type="button"
@@ -304,8 +304,7 @@ export function InventoryUsageCameraScanner({
               style={cameraStyles.secondaryButton}
               onClick={() => void closeScanner()}
             >
-              Close
-            </button>
+              {ui("Close")}</button>
           </div>
 
           <div style={cameraStyles.actions}>
@@ -319,7 +318,7 @@ export function InventoryUsageCameraScanner({
               onClick={() => void startScanner()}
               disabled={isRunning || isStarting || isDecodingImage}
             >
-              {isStarting ? 'Starting camera...' : isRunning ? 'Camera running' : 'Start camera'}
+              {isStarting ? ui('Starting camera...') : isRunning ? ui('Camera running') : ui('Start camera')}
             </button>
             <button
               type="button"
@@ -331,8 +330,7 @@ export function InventoryUsageCameraScanner({
               onClick={() => void stopScanner()}
               disabled={!isRunning}
             >
-              Stop camera
-            </button>
+              {ui("Stop camera")}</button>
             <button
               type="button"
               data-skip-global-action-feedback="true"
@@ -343,7 +341,7 @@ export function InventoryUsageCameraScanner({
               onClick={() => fileInputRef.current?.click()}
               disabled={isStarting || isDecodingImage}
             >
-              {isDecodingImage ? 'Decoding image...' : 'Scan from image'}
+              {isDecodingImage ? ui('Decoding image...') : ui('Scan from image')}
             </button>
           </div>
 
@@ -363,18 +361,15 @@ export function InventoryUsageCameraScanner({
           {error ? <p style={cameraStyles.errorText}>{error}</p> : null}
           {!decodedValue && candidateValue ? (
             <p style={cameraStyles.confirmationText}>
-              Detected <strong>{candidateValue}</strong>. Hold the camera still while the same value is confirmed
-              {' '}({Math.min(confirmationCount, REQUIRED_MATCHING_DECODE_COUNT)}/{REQUIRED_MATCHING_DECODE_COUNT}).
+              {ui("Detected ")}<strong>{candidateValue}</strong>{ui(". Hold the camera still while the same value is confirmed")}{' '}({Math.min(confirmationCount, REQUIRED_MATCHING_DECODE_COUNT)}/{REQUIRED_MATCHING_DECODE_COUNT}).
             </p>
           ) : null}
           {decodedValue ? (
             <p style={cameraStyles.successText}>
-              Barcode captured: <strong>{decodedValue}</strong>. It has been placed in the Barcode field; preview stock impact before recording.
-            </p>
+              {ui("Barcode captured: ")}<strong>{decodedValue}</strong>{ui(". It has been placed in the Barcode field; preview stock impact before recording.")}</p>
           ) : (
             <p style={cameraStyles.helpText}>
-              Fill most of the wide scan area with one Code 128, EAN, UPC, QR, or other supported inventory barcode and hold it still. The scanner accepts a camera result only after the same value is decoded twice. Camera access requires HTTPS or localhost and browser permission.
-            </p>
+              {ui("Fill most of the wide scan area with one Code 128, EAN, UPC, QR, or other supported inventory barcode and hold it still. The scanner accepts a camera result only after the same value is decoded twice. Camera access requires HTTPS or localhost and browser permission.")}</p>
           )}
         </div>
       ) : null}

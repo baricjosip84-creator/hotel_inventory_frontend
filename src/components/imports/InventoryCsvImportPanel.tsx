@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import type { CSSProperties, ChangeEvent } from 'react';
 import { ApiError } from '../../lib/api';
+import { useAppTranslation } from '../../i18n/I18nContext';
+import { formatLocalizedNumber } from '../../i18n/formatters';
 import {
   buildTemplateCsv,
   commitInventoryImport,
@@ -48,6 +50,7 @@ export function InventoryCsvImportPanel({
   disabledReason,
   onCommitted
 }: InventoryCsvImportPanelProps) {
+  const { locale, ui } = useAppTranslation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<Array<Record<string, string>>>([]);
@@ -70,17 +73,17 @@ export function InventoryCsvImportPanel({
     if (!selected) return;
 
     if (!selected.name.toLocaleLowerCase().endsWith('.csv')) {
-      setError('Choose a CSV file.');
+      setError(ui("Choose a CSV file."));
       return;
     }
 
     try {
       const parsed = parseCsv(await selected.text());
-      if (parsed.length > 2000) throw new Error('CSV cannot contain more than 2,000 data rows.');
+      if (parsed.length > 2000) throw new Error(ui('CSV cannot contain more than 2,000 data rows.'));
       setRows(parsed);
-      setMessage(`${parsed.length.toLocaleString()} row${parsed.length === 1 ? '' : 's'} loaded. Validate before committing.`);
+      setMessage(`${formatLocalizedNumber(parsed.length, locale)} ${parsed.length === 1 ? ui('row loaded. Validate before committing.') : ui('rows loaded. Validate before committing.')}`);
     } catch (parseError) {
-      setError(getErrorMessage(parseError, 'Failed to read CSV.'));
+      setError(getErrorMessage(parseError, ui('Failed to read CSV.')));
     }
   };
 
@@ -94,11 +97,11 @@ export function InventoryCsvImportPanel({
       setBatch(preview);
       setMessage(
         preview.status === 'validated'
-          ? `Validation passed for all ${preview.row_count.toLocaleString()} rows. No inventory data has changed yet.`
-          : `Validation found ${preview.invalid_row_count.toLocaleString()} invalid row${preview.invalid_row_count === 1 ? '' : 's'}. Fix the CSV and validate again.`
+          ? `${ui('Validation passed for all')} ${formatLocalizedNumber(preview.row_count, locale)} ${ui('rows. No inventory data has changed yet.')}`
+          : `${ui('Validation found')} ${formatLocalizedNumber(preview.invalid_row_count, locale)} ${preview.invalid_row_count === 1 ? ui('invalid row. Fix the CSV and validate again.') : ui('invalid rows. Fix the CSV and validate again.')}`
       );
     } catch (validationError) {
-      setError(getErrorMessage(validationError, 'Import validation failed.'));
+      setError(getErrorMessage(validationError, ui('Import validation failed.')));
     } finally {
       setBusy(false);
     }
@@ -106,17 +109,17 @@ export function InventoryCsvImportPanel({
 
   const commitCsv = async () => {
     if (!batch || batch.status !== 'validated' || !canImport) return;
-    if (!window.confirm(`Commit ${batch.row_count} validated ${title.toLocaleLowerCase()} row${batch.row_count === 1 ? '' : 's'}? This will change tenant data.`)) return;
+    if (!window.confirm(`${ui('Commit')} ${formatLocalizedNumber(batch.row_count, locale)} ${ui('validated')} ${title.toLocaleLowerCase()} ${batch.row_count === 1 ? ui('row? This will change tenant data.') : ui('rows? This will change tenant data.')}`)) return;
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
       const committed = await commitInventoryImport(batch);
       setBatch(committed);
-      setMessage('Import committed successfully.');
+      setMessage(ui("Import committed successfully."));
       await onCommitted?.(committed);
     } catch (commitError) {
-      setError(getErrorMessage(commitError, 'Import commit failed. Validate the current CSV again before retrying.'));
+      setError(getErrorMessage(commitError, ui('Import commit failed. Validate the current CSV again before retrying.')));
     } finally {
       setBusy(false);
     }
@@ -172,12 +175,12 @@ export function InventoryCsvImportPanel({
       <h3 style={{ margin: 0 }}>{title}</h3>
       <p style={{ margin: '6px 0 0' }}>{description}</p>
       <p style={{ margin: '6px 0 0', fontSize: 13 }}>
-        Template columns: {templateColumns.join(', ')}. Maximum 2,000 data rows per import.
+        {ui("Template columns:")} {templateColumns.join(', ')}{ui(". Maximum 2,000 data rows per import.")}
       </p>
-      {!canImport ? <div style={errorBox}>{disabledReason || 'Your current role cannot perform this import.'}</div> : null}
+      {!canImport ? <div style={errorBox}>{disabledReason || ui("Your current role cannot perform this import.")}</div> : null}
 
       <div style={row}>
-        <button type="button" style={button} onClick={downloadTemplate}>Download CSV Template</button>
+        <button type="button" style={button} onClick={downloadTemplate}>{ui("Download CSV Template")}</button>
         <input
           ref={fileInputRef}
           type="file"
@@ -191,7 +194,7 @@ export function InventoryCsvImportPanel({
           disabled={!canImport || busy || rows.length === 0 || batch?.status === 'committed'}
           onClick={validateCsv}
         >
-          {busy ? 'Working...' : 'Validate CSV'}
+          {busy ? ui('Working...') : ui("Validate CSV")}
         </button>
         <button
           type="button"
@@ -199,10 +202,10 @@ export function InventoryCsvImportPanel({
           disabled={!canImport || busy || batch?.status !== 'validated'}
           onClick={commitCsv}
         >
-          Commit Validated Import
+          {ui("Commit Validated Import")}
         </button>
-        {validationErrors.length ? <button type="button" style={button} onClick={downloadValidationErrors} disabled={busy}>Download Validation Errors</button> : null}
-        {(file || batch) ? <button type="button" style={button} onClick={startOver} disabled={busy}>Start Over</button> : null}
+        {validationErrors.length ? <button type="button" style={button} onClick={downloadValidationErrors} disabled={busy}>{ui("Download Validation Errors")}</button> : null}
+        {(file || batch) ? <button type="button" style={button} onClick={startOver} disabled={busy}>{ui("Start Over")}</button> : null}
       </div>
 
       {message ? <div style={successBox}>{message}</div> : null}
@@ -210,7 +213,7 @@ export function InventoryCsvImportPanel({
 
       {batch ? (
         <div style={{ marginTop: 12, fontSize: 13 }}>
-          <strong>Status:</strong> {batch.status} · <strong>Rows:</strong> {batch.row_count} · <strong>Valid:</strong> {batch.valid_row_count} · <strong>Invalid:</strong> {batch.invalid_row_count} · <strong>Batch version:</strong> v{batch.version}
+          <strong>{ui("Status:")}</strong> {ui(batch.status.charAt(0).toUpperCase() + batch.status.slice(1))} · <strong>{ui("Rows:")}</strong> {formatLocalizedNumber(batch.row_count, locale)} · <strong>{ui("Valid:")}</strong> {formatLocalizedNumber(batch.valid_row_count, locale)} · <strong>{ui("Invalid:")}</strong> {formatLocalizedNumber(batch.invalid_row_count, locale)} · <strong>{ui("Batch version:")}</strong> {ui("v")}{batch.version}
         </div>
       ) : null}
 
@@ -218,19 +221,19 @@ export function InventoryCsvImportPanel({
         <div style={tableWrapper}>
           <table style={table}>
             <thead>
-              <tr><th style={cell}>CSV row</th><th style={cell}>Field</th><th style={cell}>Problem</th></tr>
+              <tr><th style={cell}>{ui("CSV row")}</th><th style={cell}>{ui("Field")}</th><th style={cell}>{ui("Problem")}</th></tr>
             </thead>
             <tbody>
               {validationErrors.slice(0, 100).map((item, index) => (
                 <tr key={`${item.row_number ?? 'batch'}-${item.code}-${index}`}>
-                  <td style={cell}>{item.row_number ?? 'Entire import'}</td>
+                  <td style={cell}>{item.row_number ?? ui("Entire import")}</td>
                   <td style={cell}>{item.field || '-'}</td>
                   <td style={cell}>{item.message}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {validationErrors.length > 100 ? <p>Showing the first 100 validation problems.</p> : null}
+          {validationErrors.length > 100 ? <p>{ui("Showing the first 100 validation problems.")}</p> : null}
         </div>
       ) : null}
     </section>

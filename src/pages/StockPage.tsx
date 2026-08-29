@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
-import { formatCurrencyAmount } from '../lib/tenantCurrency';
+import { getActiveTenantCurrency } from '../lib/tenantCurrency';
 import {
   getCurrentAccessRoleLabel,
   getRoleCapabilities,
@@ -13,6 +13,8 @@ import {
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import './StockPage.css';
 
 type StockItem = {
@@ -265,14 +267,6 @@ function toNumber(value: number | string | null | undefined): number {
   return 0;
 }
 
-function formatDateTime(dateString: string | null | undefined): string {
-  if (!dateString) return '-';
-
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return dateString;
-
-  return date.toLocaleString();
-}
 
 function formatUsageReason(reason: string | null | undefined): string {
   if (!reason) return 'Unassigned';
@@ -283,18 +277,18 @@ function formatUsageReason(reason: string | null | undefined): string {
     .join(' ');
 }
 
-function formatLotReference(lot: InventoryLot): string {
+function formatLotReference(lot: InventoryLot, ui: (text: string) => string): string {
   const lotNumber = (lot.lot_number || '').trim();
   const batchNumber = (lot.batch_number || '').trim();
 
   if (lotNumber === 'LEGACY-UNTRACKED') {
-    return 'Untracked opening balance';
+    return ui('Untracked opening balance');
   }
 
   return [
-    lotNumber ? `Lot ${lotNumber}` : '',
-    batchNumber ? `Batch ${batchNumber}` : ''
-  ].filter(Boolean).join(' · ') || 'No lot / batch reference';
+    lotNumber ? `${ui('Lot')} ${lotNumber}` : '',
+    batchNumber ? `${ui('Batch')} ${batchNumber}` : ''
+  ].filter(Boolean).join(' · ') || ui('No lot / batch reference');
 }
 
 function formatMovementReason(reason: string | null | undefined): string {
@@ -469,12 +463,11 @@ function changeBadgeStyle(value: number): CSSProperties {
   };
 }
 
-function changeDisplay(value: number): string {
-  if (value > 0) {
-    return `+${value}`;
-  }
-
-  return String(value);
+function changeDisplay(value: number, locale: Parameters<typeof formatLocalizedNumber>[1]): string {
+  const formatted = formatLocalizedNumber(Math.abs(value), locale);
+  if (value > 0) return `+${formatted}`;
+  if (value < 0) return `-${formatted}`;
+  return formatted;
 }
 
 function StatCard(props: {
@@ -487,6 +480,7 @@ function StatCard(props: {
 }
 
 export default function StockPage() {
+  const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedProductId = searchParams.get('product_id')?.trim() || '';
@@ -741,7 +735,7 @@ export default function StockPage() {
     mutationFn: () => apiRequest<{ processed_lot_count: number; processed_quantity: number }>('/stock/lots/expire-due', { method: 'POST', body: '{}' }),
     onSuccess: async (response) => {
       setOperationError('');
-      setOperationFeedback(`Expired stock processed: ${response.processed_lot_count} lot(s), ${response.processed_quantity} unit(s) written off.`);
+      setOperationFeedback(`${ui('Expired stock processed:')} ${formatLocalizedNumber(response.processed_lot_count, locale)} ${ui('lots')}, ${formatLocalizedNumber(response.processed_quantity, locale)} ${ui('units written off.')}`);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock'] }),
         queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
@@ -749,14 +743,14 @@ export default function StockPage() {
         queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
       ]);
     },
-    onError: (error) => setOperationError(error instanceof Error ? error.message : 'Failed to process expired stock')
+    onError: (error) => setOperationError(error instanceof Error ? error.message : ui("Failed to process expired stock"))
   });
 
   const releaseQuarantineMutation = useMutation({
     mutationFn: (lotId: string) => apiRequest<InventoryLot>(`/stock/lots/${lotId}/release-quarantine`, { method: 'POST', body: '{}' }),
     onSuccess: async () => {
       setOperationError('');
-      setOperationFeedback('Quarantined lot released to available stock.');
+      setOperationFeedback(ui("Quarantined lot released to available stock."));
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock'] }),
         queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
@@ -764,25 +758,25 @@ export default function StockPage() {
         queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
       ]);
     },
-    onError: (error) => setOperationError(error instanceof Error ? error.message : 'Failed to release quarantined stock')
+    onError: (error) => setOperationError(error instanceof Error ? error.message : ui("Failed to release quarantined stock"))
   });
 
   const holdLotMutation = useMutation({
     mutationFn: ({ lotId, reason }: { lotId: string; reason: string }) => apiRequest<InventoryLot>(`/stock/lots/${lotId}/hold`, { method: 'POST', body: JSON.stringify({ reason }) }),
-    onSuccess: async () => { setOperationError(''); setOperationFeedback('Stock placed on hold and removed from usable quantity.'); await Promise.all([queryClient.invalidateQueries({ queryKey: ['stock'] }),queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),queryClient.invalidateQueries({ queryKey: ['stock-movements'] })]); },
-    onError: (error) => setOperationError(error instanceof Error ? error.message : 'Failed to place stock on hold')
+    onSuccess: async () => { setOperationError(''); setOperationFeedback(ui('Stock placed on hold and removed from usable quantity.')); await Promise.all([queryClient.invalidateQueries({ queryKey: ['stock'] }),queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),queryClient.invalidateQueries({ queryKey: ['stock-movements'] })]); },
+    onError: (error) => setOperationError(error instanceof Error ? error.message : ui("Failed to place stock on hold"))
   });
 
   const releaseHoldMutation = useMutation({
     mutationFn: ({ lotId, reason }: { lotId: string; reason: string }) => apiRequest<InventoryLot>(`/stock/lots/${lotId}/release-hold`, { method: 'POST', body: JSON.stringify({ reason }) }),
-    onSuccess: async () => { setOperationError(''); setOperationFeedback('Held stock released back to available stock.'); await Promise.all([queryClient.invalidateQueries({ queryKey: ['stock'] }),queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),queryClient.invalidateQueries({ queryKey: ['stock-movements'] })]); },
-    onError: (error) => setOperationError(error instanceof Error ? error.message : 'Failed to release held stock')
+    onSuccess: async () => { setOperationError(''); setOperationFeedback(ui("Held stock released back to available stock.")); await Promise.all([queryClient.invalidateQueries({ queryKey: ['stock'] }),queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),queryClient.invalidateQueries({ queryKey: ['stock-movements'] })]); },
+    onError: (error) => setOperationError(error instanceof Error ? error.message : ui("Failed to release held stock"))
   });
 
   const consumeMutation = useMutation({
     mutationFn: async () => {
       if (!selectedRow) {
-        throw new Error('Select a stock position before consuming stock.');
+        throw new Error(ui("Select a stock position before consuming stock."));
       }
 
       return apiRequest<StockMutationResponse>('/stock/consume', {
@@ -802,7 +796,7 @@ export default function StockPage() {
     },
     onSuccess: async (response) => {
       setOperationError('');
-      setOperationFeedback(response.message);
+      setOperationFeedback(ui('Stock consumed successfully.'));
       setLastResult(response);
       setDraft(getDefaultDraft('consume'));
 
@@ -816,7 +810,7 @@ export default function StockPage() {
       ]);
     },
     onError: (error) => {
-      const message = error instanceof Error ? error.message : 'Failed to consume stock';
+      const message = error instanceof Error ? error.message : ui("Failed to consume stock");
       setOperationFeedback('');
       setOperationError(message);
     }
@@ -825,7 +819,7 @@ export default function StockPage() {
   const countMutation = useMutation({
     mutationFn: async () => {
       if (!selectedRow) {
-        throw new Error('Select a stock position before applying a stock count.');
+        throw new Error(ui("Select a stock position before applying a stock count."));
       }
 
       return apiRequest<StockMutationResponse>('/stock/count', {
@@ -845,7 +839,7 @@ export default function StockPage() {
     },
     onSuccess: async (response) => {
       setOperationError('');
-      setOperationFeedback(response.message);
+      setOperationFeedback(ui('Stock count applied successfully.'));
       setLastResult(response);
       setDraft(getDefaultDraft('count'));
 
@@ -857,7 +851,7 @@ export default function StockPage() {
       ]);
     },
     onError: (error) => {
-      const message = error instanceof Error ? error.message : 'Failed to apply stock count';
+      const message = error instanceof Error ? error.message : ui("Failed to apply stock count");
       setOperationFeedback('');
       setOperationError(message);
     }
@@ -866,7 +860,7 @@ export default function StockPage() {
   const adjustMutation = useMutation({
     mutationFn: async () => {
       if (!selectedRow) {
-        throw new Error('Select a stock position before applying an adjustment.');
+        throw new Error(ui("Select a stock position before applying an adjustment."));
       }
 
       return apiRequest<StockMutationResponse>('/stock/adjust', {
@@ -886,7 +880,7 @@ export default function StockPage() {
     },
     onSuccess: async (response) => {
       setOperationError('');
-      setOperationFeedback(response.message);
+      setOperationFeedback(ui('Stock adjustment applied successfully.'));
       setLastResult(response);
       setDraft(getDefaultDraft('adjust'));
 
@@ -898,7 +892,7 @@ export default function StockPage() {
       ]);
     },
     onError: (error) => {
-      const message = error instanceof Error ? error.message : 'Failed to adjust stock';
+      const message = error instanceof Error ? error.message : ui("Failed to adjust stock");
       setOperationFeedback('');
       setOperationError(message);
     }
@@ -916,10 +910,10 @@ export default function StockPage() {
 
   const currentActionBlockedMessage =
     draft.action === 'consume'
-      ? 'Stock consumption requires both stock-consumption and inventory-usage recording access.'
+      ? ui("Stock consumption requires both stock-consumption and inventory-usage recording access.")
       : draft.action === 'count'
-        ? 'Your current access does not allow physical stock counts.'
-        : 'Your current access does not allow manual stock adjustments.';
+        ? ui("Your current access does not allow physical stock counts.")
+        : ui("Your current access does not allow manual stock adjustments.");
 
   const nextQuantityPreview = useMemo(() => {
     if (!selectedRow) {
@@ -960,29 +954,29 @@ export default function StockPage() {
 
   const actionInputValidation = useMemo(() => {
     if (!selectedRow) {
-      return { valid: false, message: 'Select a stock position first.' };
+      return { valid: false, message: ui("Select a stock position first.") };
     }
 
     if (draft.action === 'consume') {
       if (draft.quantity.trim() === '') {
-        return { valid: false, message: 'Enter the quantity to consume.' };
+        return { valid: false, message: ui("Enter the quantity to consume.") };
       }
 
       const quantity = Number(draft.quantity);
 
       if (!Number.isFinite(quantity) || quantity <= 0) {
-        return { valid: false, message: 'Quantity to consume must be greater than zero.' };
+        return { valid: false, message: ui("Quantity to consume must be greater than zero.") };
       }
 
       if (quantity > currentQuantity) {
-        return { valid: false, message: 'Quantity to consume cannot exceed the on-hand quantity.' };
+        return { valid: false, message: ui("Quantity to consume cannot exceed the on-hand quantity.") };
       }
 
       const unreservedQuantity = Math.max(currentProjectedFreeQuantity, 0);
       if (quantity > unreservedQuantity) {
         return {
           valid: false,
-          message: `Only ${unreservedQuantity} unit(s) are unreserved. Release or reallocate the reservation before consuming more.`
+          message: `${ui('Only')} ${formatLocalizedNumber(unreservedQuantity, locale)} ${ui('units are unreserved. Release or reallocate the reservation before consuming more.')}`
         };
       }
 
@@ -991,28 +985,28 @@ export default function StockPage() {
 
     if (draft.action === 'count') {
       if (draft.quantity.trim() === '') {
-        return { valid: false, message: 'Enter the physically counted quantity.' };
+        return { valid: false, message: ui("Enter the physically counted quantity.") };
       }
 
       const quantity = Number(draft.quantity);
 
       if (!Number.isFinite(quantity) || quantity < 0) {
-        return { valid: false, message: 'Counted quantity must be zero or greater.' };
+        return { valid: false, message: ui("Counted quantity must be zero or greater.") };
       }
 
       if (quantity > currentQuantity) {
         if (selectedRow.requires_lot_tracking && !draft.lot_number.trim() && !draft.batch_number.trim()) {
-          return { valid: false, message: 'This product requires a lot or batch number for added stock.' };
+          return { valid: false, message: ui("This product requires a lot or batch number for added stock.") };
         }
         if (selectedRow.requires_expiry_date && !draft.expiry_date) {
-          return { valid: false, message: 'This product requires an expiry date for added stock.' };
+          return { valid: false, message: ui("This product requires an expiry date for added stock.") };
         }
       }
 
       if (createsReservationShortfall && !draft.reservation_shortfall_acknowledged) {
         return {
           valid: false,
-          message: 'Confirm that the physical count creates a shortage against active reservations.'
+          message: ui("Confirm that the physical count creates a shortage against active reservations.")
         };
       }
 
@@ -1020,32 +1014,32 @@ export default function StockPage() {
     }
 
     if (draft.change.trim() === '') {
-      return { valid: false, message: 'Enter a positive or negative adjustment.' };
+      return { valid: false, message: ui("Enter a positive or negative adjustment.") };
     }
 
     const change = Number(draft.change);
 
     if (!Number.isFinite(change) || change === 0) {
-      return { valid: false, message: 'Adjustment must be a non-zero number.' };
+      return { valid: false, message: ui("Adjustment must be a non-zero number.") };
     }
 
     if (currentQuantity + change < 0) {
-      return { valid: false, message: 'Adjustment cannot result in negative stock.' };
+      return { valid: false, message: ui("Adjustment cannot result in negative stock.") };
     }
 
     if (change > 0) {
       if (selectedRow.requires_lot_tracking && !draft.lot_number.trim() && !draft.batch_number.trim()) {
-        return { valid: false, message: 'This product requires a lot or batch number for added stock.' };
+        return { valid: false, message: ui("This product requires a lot or batch number for added stock.") };
       }
       if (selectedRow.requires_expiry_date && !draft.expiry_date) {
-        return { valid: false, message: 'This product requires an expiry date for added stock.' };
+        return { valid: false, message: ui("This product requires an expiry date for added stock.") };
       }
     }
 
     if (createsReservationShortfall && !draft.reservation_shortfall_acknowledged) {
       return {
         valid: false,
-        message: 'Confirm that the adjustment creates a shortage against active reservations.'
+        message: ui("Confirm that the adjustment creates a shortage against active reservations.")
       };
     }
 
@@ -1061,20 +1055,22 @@ export default function StockPage() {
     draft.lot_number,
     draft.batch_number,
     draft.expiry_date,
-    selectedRow
+    locale,
+    selectedRow,
+    ui
   ]);
 
   const operationalRiskLabel = createsReservationShortfall
     ? draft.action === 'consume'
-      ? 'Blocked: this consumption would use stock reserved for active commitments.'
+      ? ui("Blocked: this consumption would use stock reserved for active commitments.")
       : draft.reservation_shortfall_acknowledged
-        ? 'Warning acknowledged: this correction leaves active reservations short.'
+        ? ui("Warning acknowledged: this correction leaves active reservations short.")
         : actionInputValidation.message
     : !actionInputValidation.valid
       ? actionInputValidation.message
       : nextQuantityPreview !== null && nextQuantityPreview < currentMinimum
-        ? 'Warning: this action would leave stock below its minimum level.'
-        : 'Within allowed range';
+        ? ui("Warning: this action would leave stock below its minimum level.")
+        : ui("Within allowed range");
 
   const currentActionDisabled =
     activeMutation ||
@@ -1109,38 +1105,38 @@ export default function StockPage() {
 
   const stockWorkflowSteps = [
     {
-      label: '1. Select Stock Position',
+      label: ui("1. Select Stock Position"),
       detail: selectedRow
-        ? `${selectedRow.product_name || 'Selected product'} is selected for review.`
-        : 'Choose the product and location you want to review or update.',
+        ? `${selectedRow.product_name || ui("Selected product")} ${ui('is selected for review.')}`
+        : ui("Choose the product and location you want to review or update."),
       complete: Boolean(selectedRow)
     },
     {
-      label: '2. Choose Action',
+      label: ui("2. Choose Action"),
       detail: !selectedRow
-        ? 'Select a stock position before choosing an action.'
+        ? ui("Select a stock position before choosing an action.")
         : !currentActionAllowed
           ? currentActionBlockedMessage
           : draft.action === 'consume'
-            ? 'Consume removes stock for day-to-day operational usage.'
+            ? ui('Consume removes stock for day-to-day operational usage.')
             : draft.action === 'count'
-              ? 'Count sets stock to the physically verified quantity.'
-              : 'Adjust applies a positive or negative correction delta.',
+              ? ui("Count sets stock to the physically verified quantity.")
+              : ui("Adjust applies a positive or negative correction delta."),
       complete: Boolean(selectedRow) && currentActionAllowed
     },
     {
-      label: '3. Verify Preview',
+      label: ui("3. Verify Preview"),
       detail:
         nextQuantityPreview === null || !Number.isFinite(nextQuantityPreview)
           ? actionInputValidation.message
-          : `Projected on hand: ${nextQuantityPreview}. Projected available: ${projectedFreeAfterAction}.`,
+          : `${ui('Projected on hand:')} ${formatLocalizedNumber(nextQuantityPreview, locale)}. ${ui('Projected available:')} ${formatLocalizedNumber(projectedFreeAfterAction, locale)}.`,
       complete: nextQuantityPreview !== null && Number.isFinite(nextQuantityPreview)
     },
     {
-      label: '4. Confirm in Ledger',
+      label: ui("4. Confirm in Ledger"),
       detail: lastResult
-        ? 'The action was posted. Verify the result and the refreshed history below.'
-        : 'Post the action, then verify its result and available history.',
+        ? ui("The action was posted. Verify the result and the refreshed history below.")
+        : ui("Post the action, then verify its result and available history."),
       complete: Boolean(lastResult)
     }
   ];
@@ -1150,7 +1146,7 @@ export default function StockPage() {
     setOperationError('');
 
     if (!selectedRow) {
-      setOperationError('Select a stock position before posting a stock action.');
+      setOperationError(ui("Select a stock position before posting a stock action."));
       return;
     }
 
@@ -1223,7 +1219,7 @@ export default function StockPage() {
   if (stockQuery.isLoading) {
     return (
       <div className="app-panel app-panel--padded">
-        <div className="app-empty-state">Loading stock positions...</div>
+        <div className="app-empty-state">{ui("Loading stock positions...")}</div>
       </div>
     );
   }
@@ -1232,7 +1228,7 @@ export default function StockPage() {
     return (
       <div className="app-panel app-panel--padded">
         <div className="app-error-state">
-          Failed to load stock: {(stockQuery.error as Error).message || 'Unknown error'}
+          {ui("Failed to load stock:")} {(stockQuery.error as Error).message || ui("Unknown error")}
         </div>
         <div className="app-actions" style={styles.loadingActions}>
           <button
@@ -1242,7 +1238,7 @@ export default function StockPage() {
               void stockQuery.refetch();
             }}
           >
-            Try Again
+            {ui("Try Again")}
           </button>
         </div>
       </div>
@@ -1253,13 +1249,13 @@ export default function StockPage() {
     <div className="io-operational-page io-stock-page io-workspace-page" style={styles.page}>
       <OperationalWorkspaceHero
         iconPath="/stock"
-        eyebrow="Stock operations"
-        title="Stock workspace"
-        description="Review stock by product and location, see quantities assigned to reservations, and post controlled consumption, count, or adjustment actions."
+        eyebrow={ui("Stock operations")}
+        title={ui("Stock workspace")}
+        description={ui("Review stock by product and location, see quantities assigned to reservations, and post controlled consumption, count, or adjustment actions.")}
         meta={<>
-          <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{canAdjust ? 'Count and adjust access' : 'Stock review access'}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{canConsume ? 'Consumption enabled' : 'Consumption restricted by role'}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{canAdjust ? ui("Count and adjust access") : ui("Stock review access")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{canConsume ? ui("Consumption enabled") : ui("Consumption restricted by role")}</OperationalWorkspaceMetaPill>
         </>}
         aside={canAdjust ? (
           <button
@@ -1267,44 +1263,44 @@ export default function StockPage() {
             className="app-button app-button--secondary"
             onClick={() => setShowOpeningStockImport((current) => !current)}
           >
-            {showOpeningStockImport ? 'Hide opening stock setup' : 'Opening stock setup'}
+            {showOpeningStockImport ? ui("Hide opening stock setup") : ui("Opening stock setup")}
           </button>
         ) : undefined}
       />
 
       <div className="app-grid-stats io-workspace-stats stock-page__summary-stats" style={styles.statsGrid}>
         <StatCard
-          title="Stock Positions"
-          value={summary.totalRows}
-          subtitle="Tracked product and location combinations"
+          title={ui("Stock Positions")}
+          value={formatLocalizedNumber(summary.totalRows, locale)}
+          subtitle={ui("Tracked product and location combinations")}
         />
         <StatCard
-          title="Low Stock"
-          value={summary.lowRows}
-          subtitle="Below configured minimum threshold"
+          title={ui("Low Stock")}
+          value={formatLocalizedNumber(summary.lowRows, locale)}
+          subtitle={ui("Below configured minimum threshold")}
           tone={summary.lowRows > 0 ? 'warn' : 'good'}
         />
         <StatCard
-          title="Availability Risk"
-          value={summary.availabilityRiskRows}
-          subtitle="Available quantity below the minimum after reservations"
+          title={ui("Availability Risk")}
+          value={formatLocalizedNumber(summary.availabilityRiskRows, locale)}
+          subtitle={ui("Available quantity below the minimum after reservations")}
           tone={summary.availabilityRiskRows > 0 ? 'warn' : 'good'}
         />
         <StatCard
-          title="Total On Hand"
-          value={summary.quantityTotal}
-          subtitle="Combined visible quantity across loaded rows"
+          title={ui("Total On Hand")}
+          value={formatLocalizedNumber(summary.quantityTotal, locale)}
+          subtitle={ui("Combined visible quantity across loaded rows")}
         />
         <StatCard
-          title="Reserved"
-          value={summary.reservedTotal}
-          subtitle="Open quantity assigned to active reservations"
+          title={ui("Reserved")}
+          value={formatLocalizedNumber(summary.reservedTotal, locale)}
+          subtitle={ui("Open quantity assigned to active reservations")}
           tone={summary.reservedTotal > 0 ? 'warn' : 'default'}
         />
         <StatCard
-          title="Available"
-          value={summary.projectedFreeTotal}
-          subtitle="On-hand quantity after active reservations"
+          title={ui("Available")}
+          value={formatLocalizedNumber(summary.projectedFreeTotal, locale)}
+          subtitle={ui("On-hand quantity after active reservations")}
           tone={summary.projectedFreeTotal < 0 ? 'warn' : 'good'}
         />
       </div>
@@ -1313,12 +1309,12 @@ export default function StockPage() {
       {canAdjust && showOpeningStockImport ? (
         <InventoryCsvImportPanel
           importType="opening_stock"
-          title="Opening Stock Import"
-          description="Use this only when onboarding a product/location with no prior stock history. Each row becomes an auditable opening-stock movement and lot balance; it is not a bulk adjustment tool."
+          title={ui("Opening Stock Import")}
+          description={ui("Use this only when onboarding a product/location with no prior stock history. Each row becomes an auditable opening-stock movement and lot balance; it is not a bulk adjustment tool.")}
           templateColumns={['product_sku', 'product_name', 'storage_location', 'quantity', 'lot_number', 'batch_number', 'expiry_date', 'manufactured_at', 'unit_cost']}
           templateExample={{ product_sku: 'BEV-COFFEE-001', product_name: '', storage_location: 'Main Warehouse', quantity: '25', lot_number: 'LOT-001', batch_number: '', expiry_date: '2027-12-31', manufactured_at: '2026-08-01', unit_cost: '18.50' }}
           canImport={canAdjust}
-          disabledReason="Stock-adjust permission is required for opening-stock import."
+          disabledReason={ui("Stock-adjust permission is required for opening-stock import.")}
           onCommitted={async () => {
             await Promise.all([
               queryClient.invalidateQueries({ queryKey: ['stock'] }),
@@ -1349,10 +1345,9 @@ export default function StockPage() {
           <div className="io-section-heading-with-icon" style={styles.panelHeaderText}>
             <span className="io-section-heading-icon"><TenantNavIcon path="/stock" size={17} /></span>
             <div className="io-section-heading-copy">
-              <h3 style={styles.panelTitle}>Lot, Expiry & Stock Integrity</h3>
+              <h3 style={styles.panelTitle}>{ui("Lot, Expiry & Stock Integrity")}</h3>
               <p style={styles.panelSubtitle}>
-              Optional detail for lot balances, expiry risk, blocked stock, and reconciliation checks.
-                Load it when you need to investigate expiry or stock-integrity questions.
+              {ui("Optional detail for lot balances, expiry risk, blocked stock, and reconciliation checks. Load it when you need to investigate expiry or stock-integrity questions.")}
               </p>
             </div>
           </div>
@@ -1364,23 +1359,23 @@ export default function StockPage() {
               onClick={() => setShowLotIntegrity((current) => !current)}
             >
               {showLotIntegrity
-                ? 'Hide lot & integrity details'
+                ? ui("Hide lot & integrity details")
                 : (lotsQuery.isFetching || reconciliationQuery.isFetching)
-                  ? 'Loading details...'
-                  : 'Load lot & integrity details'}
+                  ? ui("Loading details...")
+                  : ui("Load lot & integrity details")}
             </button>
             {showLotIntegrity && canAdjust ? (
               <button
                 type="button"
                 style={(processExpiredLotsMutation.isPending || expiredAvailableLots.length === 0) ? styles.secondaryButtonDisabled : styles.secondaryButton}
                 disabled={processExpiredLotsMutation.isPending || expiredAvailableLots.length === 0}
-                title={expiredAvailableLots.length === 0 ? 'No expired available lots currently need processing.' : undefined}
+                title={expiredAvailableLots.length === 0 ? ui("No expired available lots currently need processing.") : undefined}
                 onClick={() => {
-                  if (!window.confirm(`Process ${expiredAvailableLots.length} expired available lot(s) now? This removes their quantities from usable stock and records expiry write-off movements.`)) return;
+                  if (!window.confirm(`${ui('Process')} ${formatLocalizedNumber(expiredAvailableLots.length, locale)} ${ui('expired available lots now? This removes their quantities from usable stock and records expiry write-off movements.')}`)) return;
                   processExpiredLotsMutation.mutate();
                 }}
               >
-                {processExpiredLotsMutation.isPending ? 'Processing...' : `Process Expired Stock (${expiredAvailableLots.length})`}
+                {processExpiredLotsMutation.isPending ? ui("Processing...") : `${ui('Process Expired Stock')} (${formatLocalizedNumber(expiredAvailableLots.length, locale)})`}
               </button>
             ) : null}
           </div>
@@ -1388,52 +1383,52 @@ export default function StockPage() {
 
         {!showLotIntegrity ? (
           <div style={styles.emptyPanel}>
-            Lot and reconciliation details are kept closed by default so the everyday stock workspace can load with less database work.
+            {ui("Lot and reconciliation details are kept closed by default so the everyday stock workspace can load with less database work.")}
           </div>
         ) : lotsQuery.isLoading || reconciliationQuery.isLoading ? (
-          <div style={styles.emptyPanel}>Loading lot and stock-integrity details...</div>
+          <div style={styles.emptyPanel}>{ui("Loading lot and stock-integrity details...")}</div>
         ) : lotsQuery.isError || reconciliationQuery.isError ? (
           <div className="app-error-state">
-            Lot or reconciliation details could not be loaded. Try refreshing this section.
+            {ui("Lot or reconciliation details could not be loaded. Try refreshing this section.")}
           </div>
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-              <label htmlFor="expiry-window" style={{ fontWeight: 700 }}>Expiry overview:</label>
+              <label htmlFor="expiry-window" style={{ fontWeight: 700 }}>{ui("Expiry overview:")}</label>
               <select id="expiry-window" value={expiryWindowDays} onChange={(event) => setExpiryWindowDays(Number(event.target.value))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1' }}>
-                <option value={30}>Next 30 days</option>
-                <option value={60}>Next 60 days</option>
-                <option value={90}>Next 90 days</option>
-                <option value={180}>Next 180 days</option>
+                <option value={30}>{ui("Next 30 days")}</option>
+                <option value={60}>{ui("Next 60 days")}</option>
+                <option value={90}>{ui("Next 90 days")}</option>
+                <option value={180}>{ui("Next 180 days")}</option>
               </select>
             </div>
             <div className="app-grid-stats" style={styles.statsGrid}>
-              <StatCard title="Lot Balances" value={inventoryLots.length} subtitle="Available, held, quarantined, or expired lot-level balances" />
-              <StatCard title={`Expiring ≤ ${expiryWindowDays} days`} value={expiryWindowLots.length} subtitle={`${expiryWindowQuantity} unit(s) in the selected window`} tone={expiryWindowLots.length ? 'warn' : 'good'} />
-              <StatCard title="Expiry Value at Risk" value={formatCurrencyAmount(expiryWindowValue)} subtitle="Estimated from lot unit cost where available" tone={expiryWindowValue > 0 ? 'warn' : 'good'} />
-              <StatCard title="Expired" value={inventoryLots.filter((lot) => lot.operational_status === 'expired').length} subtitle="Expired lot balances requiring or reflecting write-off status" tone={inventoryLots.some((lot) => lot.operational_status === 'expired') ? 'warn' : 'good'} />
-              <StatCard title="Blocked / Held" value={inventoryLots.filter((lot) => lot.condition === 'hold').length} subtitle="Stock manually blocked from use" tone={inventoryLots.some((lot) => lot.condition === 'hold') ? 'warn' : 'good'} />
-              <StatCard title="Quarantine" value={inventoryLots.filter((lot) => lot.condition === 'quarantine').length} subtitle="Stock received into quarantine" tone={inventoryLots.some((lot) => lot.condition === 'quarantine') ? 'warn' : 'good'} />
-              <StatCard title="Ledger Mismatches" value={reconciliationQuery.data?.summary.ledger_mismatch_count ?? '-'} subtitle="Aggregate stock vs canonical movement ledger" tone={(reconciliationQuery.data?.summary.ledger_mismatch_count || 0) > 0 ? 'warn' : 'good'} />
-              <StatCard title="Lot Mismatches" value={reconciliationQuery.data?.summary.lot_mismatch_count ?? '-'} subtitle="Aggregate stock vs available lot balances" tone={(reconciliationQuery.data?.summary.lot_mismatch_count || 0) > 0 ? 'warn' : 'good'} />
+              <StatCard title={ui("Lot Balances")} value={formatLocalizedNumber(inventoryLots.length, locale)} subtitle={ui("Available, held, quarantined, or expired lot-level balances")} />
+              <StatCard title={`${ui('Expiring within')} ${formatLocalizedNumber(expiryWindowDays, locale)} ${ui('days')}`} value={formatLocalizedNumber(expiryWindowLots.length, locale)} subtitle={`${formatLocalizedNumber(expiryWindowQuantity, locale)} ${ui('units in the selected window')}`} tone={expiryWindowLots.length ? 'warn' : 'good'} />
+              <StatCard title={ui("Expiry Value at Risk")} value={formatLocalizedCurrency(expiryWindowValue, getActiveTenantCurrency(), locale, { maximumFractionDigits: 2 })} subtitle={ui("Estimated from lot unit cost where available")} tone={expiryWindowValue > 0 ? 'warn' : 'good'} />
+              <StatCard title={ui("Expired")} value={formatLocalizedNumber(inventoryLots.filter((lot) => lot.operational_status === 'expired').length, locale)} subtitle={ui("Expired lot balances requiring or reflecting write-off status")} tone={inventoryLots.some((lot) => lot.operational_status === 'expired') ? 'warn' : 'good'} />
+              <StatCard title={ui("Blocked / Held")} value={formatLocalizedNumber(inventoryLots.filter((lot) => lot.condition === 'hold').length, locale)} subtitle={ui("Stock manually blocked from use")} tone={inventoryLots.some((lot) => lot.condition === 'hold') ? 'warn' : 'good'} />
+              <StatCard title={ui("Quarantine")} value={formatLocalizedNumber(inventoryLots.filter((lot) => lot.condition === 'quarantine').length, locale)} subtitle={ui("Stock received into quarantine")} tone={inventoryLots.some((lot) => lot.condition === 'quarantine') ? 'warn' : 'good'} />
+              <StatCard title={ui("Ledger Mismatches")} value={reconciliationQuery.data?.summary.ledger_mismatch_count == null ? '-' : formatLocalizedNumber(reconciliationQuery.data.summary.ledger_mismatch_count, locale)} subtitle={ui("Aggregate stock vs canonical movement ledger")} tone={(reconciliationQuery.data?.summary.ledger_mismatch_count || 0) > 0 ? 'warn' : 'good'} />
+              <StatCard title={ui("Lot Mismatches")} value={reconciliationQuery.data?.summary.lot_mismatch_count == null ? '-' : formatLocalizedNumber(reconciliationQuery.data.summary.lot_mismatch_count, locale)} subtitle={ui("Aggregate stock vs available lot balances")} tone={(reconciliationQuery.data?.summary.lot_mismatch_count || 0) > 0 ? 'warn' : 'good'} />
             </div>
 
             {inventoryLots.length === 0 ? (
-              <div style={styles.emptyPanel}>No lot-level balances are currently available for this tenant.</div>
+              <div style={styles.emptyPanel}>{ui("No lot-level balances are currently available for this tenant.")}</div>
             ) : (
               <div style={styles.tableWrapper}>
                 <table style={styles.table}>
-                  <thead><tr><th style={styles.th}>Product</th><th style={styles.th}>Location</th><th style={styles.th}>Lot / Batch</th><th style={styles.th}>Expiry</th><th style={styles.th}>Condition</th><th style={styles.th}>Quantity</th><th style={styles.th}>Action</th></tr></thead>
+                  <thead><tr><th style={styles.th}>{ui("Product")}</th><th style={styles.th}>{ui("Location")}</th><th style={styles.th}>{ui("Lot / Batch")}</th><th style={styles.th}>{ui("Expiry")}</th><th style={styles.th}>{ui("Condition")}</th><th style={styles.th}>{ui("Quantity")}</th><th style={styles.th}>{ui("Action")}</th></tr></thead>
                   <tbody>
                     {inventoryLots.slice(0, 100).map((lot) => (
                       <tr key={lot.id}>
-                        <td style={styles.td}>{lot.product_name || 'Unnamed product'}</td>
-                        <td style={styles.td}>{lot.storage_location_name || 'Unknown location'}</td>
-                        <td style={styles.td}>{formatLotReference(lot)}</td>
-                        <td style={styles.td}>{lot.expiry_date ? formatDateTime(lot.expiry_date).split(',')[0] : '-'}</td>
-                        <td style={styles.td}>{formatUsageReason(lot.operational_status || lot.condition)}</td>
-                        <td style={styles.td}>{toNumber(lot.quantity)} {lot.product_unit || ''}</td>
-                        <td style={styles.td}>{canAdjust ? (lot.condition === 'available' ? <button type="button" style={styles.rowActionButton} disabled={holdLotMutation.isPending} onClick={() => { const reason = window.prompt('Why should this stock be blocked from use?'); if (reason && reason.trim().length >= 3) holdLotMutation.mutate({ lotId: lot.id, reason: reason.trim() }); }}>Block</button> : lot.condition === 'hold' ? <button type="button" style={styles.rowActionButton} disabled={releaseHoldMutation.isPending} onClick={() => { const reason = window.prompt('Why is this stock safe to use again?'); if (reason && reason.trim().length >= 3) releaseHoldMutation.mutate({ lotId: lot.id, reason: reason.trim() }); }}>Unblock</button> : lot.condition === 'quarantine' ? <button type="button" style={styles.rowActionButton} disabled={releaseQuarantineMutation.isPending} onClick={() => { if (window.confirm('Release this quarantined lot into usable stock?')) releaseQuarantineMutation.mutate(lot.id); }}>Release</button> : '-') : '-'}</td>
+                        <td style={styles.td}>{lot.product_name || ui("Unnamed product")}</td>
+                        <td style={styles.td}>{lot.storage_location_name || ui("Unknown location")}</td>
+                        <td style={styles.td}>{formatLotReference(lot, ui)}</td>
+                        <td style={styles.td}>{lot.expiry_date ? formatLocalizedDate(lot.expiry_date, locale) : '-'}</td>
+                        <td style={styles.td}>{ui(formatUsageReason(lot.operational_status || lot.condition))}</td>
+                        <td style={styles.td}>{formatLocalizedNumber(toNumber(lot.quantity), locale)} {lot.product_unit || ''}</td>
+                        <td style={styles.td}>{canAdjust ? (lot.condition === 'available' ? <button type="button" style={styles.rowActionButton} disabled={holdLotMutation.isPending} onClick={() => { const reason = window.prompt(ui("Why should this stock be blocked from use?")); if (reason && reason.trim().length >= 3) holdLotMutation.mutate({ lotId: lot.id, reason: reason.trim() }); }}>{ui("Block")}</button> : lot.condition === 'hold' ? <button type="button" style={styles.rowActionButton} disabled={releaseHoldMutation.isPending} onClick={() => { const reason = window.prompt(ui("Why is this stock safe to use again?")); if (reason && reason.trim().length >= 3) releaseHoldMutation.mutate({ lotId: lot.id, reason: reason.trim() }); }}>{ui("Unblock")}</button> : lot.condition === 'quarantine' ? <button type="button" style={styles.rowActionButton} disabled={releaseQuarantineMutation.isPending} onClick={() => { if (window.confirm(ui("Release this quarantined lot into usable stock?"))) releaseQuarantineMutation.mutate(lot.id); }}>{ui("Release")}</button> : '-') : '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1449,10 +1444,9 @@ export default function StockPage() {
           <div className="io-section-heading-with-icon" style={styles.panelHeaderText}>
             <span className="io-section-heading-icon"><TenantNavIcon path="/stock" size={17} /></span>
             <div className="io-section-heading-copy">
-              <h3 style={styles.panelTitle}>Operational Workbench</h3>
+              <h3 style={styles.panelTitle}>{ui("Operational Workbench")}</h3>
               <p style={styles.panelSubtitle}>
-              Find the correct product and location, review its balance, post an authorized
-                stock action, and verify the result without leaving the page.
+              {ui("Find the correct product and location, review its balance, post an authorized stock action, and verify the result without leaving the page.")}
               </p>
             </div>
           </div>
@@ -1469,11 +1463,11 @@ export default function StockPage() {
                 void refreshStockWorkbench();
               }}
             >
-              {isRefreshingStockWorkbench ? 'Refreshing...' : 'Refresh Stock'}
+              {isRefreshingStockWorkbench ? ui("Refreshing...") : ui("Refresh Stock")}
             </button>
             {canViewMovements ? (
               <Link style={styles.secondaryLinkButton} to="/stock-movements">
-                Open Full Stock Ledger
+                {ui("Open Full Stock Ledger")}
               </Link>
             ) : null}
           </div>
@@ -1481,41 +1475,41 @@ export default function StockPage() {
 
         <div style={styles.roleGrid}>
           <div style={styles.roleCard}>
-            <div style={styles.roleCardTitle}>Current Access Role</div>
-            <div style={styles.roleCardValue}>{accessRoleLabel}</div>
+            <div style={styles.roleCardTitle}>{ui("Current Access Role")}</div>
+            <div style={styles.roleCardValue}>{ui(accessRoleLabel)}</div>
             <div style={styles.roleCardSubtitle}>
-              Actions and history panels follow the permissions assigned to this role.
+              {ui("Actions and history panels follow the permissions assigned to this role.")}
             </div>
           </div>
           <div style={styles.permissionCard}>
             <div style={styles.permissionRow}>
-              <span>Consume</span>
+              <span>{ui("Consume")}</span>
               <span style={canConsume ? styles.permissionAllowed : styles.permissionBlocked}>
-                {canConsume ? 'Allowed' : 'Blocked'}
+                {canConsume ? ui("Allowed") : ui("Blocked")}
               </span>
             </div>
             <div style={styles.permissionRow}>
-              <span>Count</span>
+              <span>{ui("Count")}</span>
               <span style={canCount ? styles.permissionAllowed : styles.permissionBlocked}>
-                {canCount ? 'Allowed' : 'Blocked'}
+                {canCount ? ui("Allowed") : ui("Blocked")}
               </span>
             </div>
             <div style={styles.permissionRow}>
-              <span>Adjust</span>
+              <span>{ui("Adjust")}</span>
               <span style={canAdjust ? styles.permissionAllowed : styles.permissionBlocked}>
-                {canAdjust ? 'Allowed' : 'Blocked'}
+                {canAdjust ? ui("Allowed") : ui("Blocked")}
               </span>
             </div>
             <div style={styles.permissionRow}>
-              <span>Movement history</span>
+              <span>{ui("Movement history")}</span>
               <span style={canViewMovements ? styles.permissionAllowed : styles.permissionBlocked}>
-                {canViewMovements ? 'Available' : 'Blocked'}
+                {canViewMovements ? ui("Available") : ui("Blocked")}
               </span>
             </div>
             <div style={styles.permissionRow}>
-              <span>Usage history</span>
+              <span>{ui("Usage history")}</span>
               <span style={canViewInventoryUsage ? styles.permissionAllowed : styles.permissionBlocked}>
-                {canViewInventoryUsage ? 'Available' : 'Blocked'}
+                {canViewInventoryUsage ? ui("Available") : ui("Blocked")}
               </span>
             </div>
           </div>
@@ -1523,18 +1517,16 @@ export default function StockPage() {
 
         {rows.length === 0 ? (
           <div style={styles.emptyPanel}>
-            No stock positions are available yet. Stock appears here after a product has an
-            on-hand balance at a storage location.
+            {ui("No stock positions are available yet. Stock appears here after a product has an on-hand balance at a storage location.")}
           </div>
         ) : (
           <>
             <div style={styles.selectorPanel}>
               <div style={styles.selectorHeader}>
                 <div>
-                  <h4 style={styles.sectionTitle}>Stock Positions</h4>
+                  <h4 style={styles.sectionTitle}>{ui("Stock Positions")}</h4>
                   <p style={styles.sectionDescription}>
-                    Search and filter product-location balances, then select the position you
-                    want to review or update.
+                    {ui("Search and filter product-location balances, then select the position you want to review or update.")}
                   </p>
                 </div>
               </div>
@@ -1542,7 +1534,7 @@ export default function StockPage() {
               <div style={styles.filterGrid}>
                 <div>
                   <label style={styles.label} htmlFor="stock-position-search">
-                    Search stock
+                    {ui("Search stock")}
                   </label>
                   <input
                     id="stock-position-search"
@@ -1550,12 +1542,12 @@ export default function StockPage() {
                     type="search"
                     value={searchText}
                     onChange={(event) => setSearchText(event.target.value)}
-                    placeholder="Product, category, unit, or location"
+                    placeholder={ui("Product, category, unit, or location")}
                   />
                 </div>
                 <div>
                   <label style={styles.label} htmlFor="stock-location-filter">
-                    Storage location
+                    {ui("Storage location")}
                   </label>
                   <select
                     id="stock-location-filter"
@@ -1563,7 +1555,7 @@ export default function StockPage() {
                     value={locationFilter}
                     onChange={(event) => setLocationFilter(event.target.value)}
                   >
-                    <option value="all">All locations</option>
+                    <option value="all">{ui("All locations")}</option>
                     {locationOptions.map(([id, name]) => (
                       <option key={id} value={id}>{name}</option>
                     ))}
@@ -1571,7 +1563,7 @@ export default function StockPage() {
                 </div>
                 <div>
                   <label style={styles.label} htmlFor="stock-category-filter">
-                    Category
+                    {ui("Category")}
                   </label>
                   <select
                     id="stock-category-filter"
@@ -1579,7 +1571,7 @@ export default function StockPage() {
                     value={categoryFilter}
                     onChange={(event) => setCategoryFilter(event.target.value)}
                   >
-                    <option value="all">All categories</option>
+                    <option value="all">{ui("All categories")}</option>
                     {categoryOptions.map((category) => (
                       <option key={category} value={category}>{category}</option>
                     ))}
@@ -1587,7 +1579,7 @@ export default function StockPage() {
                 </div>
                 <div>
                   <label style={styles.label} htmlFor="stock-status-filter">
-                    Status
+                    {ui("Status")}
                   </label>
                   <select
                     id="stock-status-filter"
@@ -1597,18 +1589,18 @@ export default function StockPage() {
                       setStatusFilter(event.target.value as typeof statusFilter)
                     }
                   >
-                    <option value="all">All statuses</option>
-                    <option value="low">Low stock</option>
-                    <option value="reserved-risk">Low available after reservations</option>
-                    <option value="healthy">Healthy</option>
+                    <option value="all">{ui("All statuses")}</option>
+                    <option value="low">{ui("Low stock")}</option>
+                    <option value="reserved-risk">{ui("Low available after reservations")}</option>
+                    <option value="healthy">{ui("Healthy")}</option>
                   </select>
                 </div>
               </div>
 
               <div style={styles.selectorFooter}>
                 <span style={styles.resultCount}>
-                  {filteredRows.length} of {rows.length} stock positions shown
-                  {requestedProductId ? ' · Linked product filter active' : ''}
+                  {formatLocalizedNumber(filteredRows.length, locale)} {ui("of")} {formatLocalizedNumber(rows.length, locale)} {ui("stock positions shown")}
+                  {requestedProductId ? ui(" · Linked product filter active") : ''}
                 </span>
                 <button
                   type="button"
@@ -1616,13 +1608,13 @@ export default function StockPage() {
                   disabled={!hasActiveStockFilters}
                   onClick={clearStockFilters}
                 >
-                  Clear Stock Filters
+                  {ui("Clear Stock Filters")}
                 </button>
               </div>
 
               {filteredRows.length === 0 ? (
                 <div style={styles.emptyPanel}>
-                  No stock positions match the current search and filters.
+                  {ui("No stock positions match the current search and filters.")}
                 </div>
               ) : (
                 <>
@@ -1646,9 +1638,9 @@ export default function StockPage() {
                         >
                           <div style={styles.stockCardTopRow}>
                             <div style={styles.stockCardTitleBlock}>
-                              <div style={styles.rowTitle}>{item.product_name || 'Unnamed product'}</div>
+                              <div style={styles.rowTitle}>{item.product_name || ui("Unnamed product")}</div>
                               <div style={styles.rowSubtle}>
-                                {item.storage_location_name || 'Unknown location'}
+                                {item.storage_location_name || ui("Unknown location")}
                               </div>
                             </div>
                             <span
@@ -1661,26 +1653,26 @@ export default function StockPage() {
                               }
                             >
                               {overReserved
-                                ? 'OVER-RESERVED'
+                                ? ui("OVER-RESERVED")
                                 : lowStock
-                                  ? 'LOW STOCK'
+                                  ? ui("LOW STOCK")
                                   : lowAvailable
-                                    ? 'LOW AVAILABLE'
-                                    : 'HEALTHY'}
+                                    ? ui("LOW AVAILABLE")
+                                    : ui("HEALTHY")}
                             </span>
                           </div>
                           <div style={styles.stockCardMetrics}>
                             <div style={styles.stockMetricItem}>
-                              <div style={styles.stockMetricLabel}>On Hand</div>
-                              <div style={styles.stockMetricValue}>{quantity}</div>
+                              <div style={styles.stockMetricLabel}>{ui("On Hand")}</div>
+                              <div style={styles.stockMetricValue}>{formatLocalizedNumber(quantity, locale)}</div>
                             </div>
                             <div style={styles.stockMetricItem}>
-                              <div style={styles.stockMetricLabel}>Reserved</div>
-                              <div style={styles.stockMetricValue}>{reservedQuantity}</div>
+                              <div style={styles.stockMetricLabel}>{ui("Reserved")}</div>
+                              <div style={styles.stockMetricValue}>{formatLocalizedNumber(reservedQuantity, locale)}</div>
                             </div>
                             <div style={styles.stockMetricItem}>
-                              <div style={styles.stockMetricLabel}>Available</div>
-                              <div style={styles.stockMetricValue}>{projectedFreeQuantity}</div>
+                              <div style={styles.stockMetricLabel}>{ui("Available")}</div>
+                              <div style={styles.stockMetricValue}>{formatLocalizedNumber(projectedFreeQuantity, locale)}</div>
                             </div>
                           </div>
                         </button>
@@ -1693,15 +1685,15 @@ export default function StockPage() {
                       <table style={styles.table}>
                         <thead>
                           <tr>
-                            <th style={styles.th}>Select</th>
-                            <th style={styles.th}>Product</th>
-                            <th style={styles.th}>Storage Location</th>
-                            <th style={styles.th}>On Hand</th>
-                            <th style={styles.th}>Reserved</th>
-                            <th style={styles.th}>Available</th>
-                            <th style={styles.th}>Minimum</th>
-                            <th style={styles.th}>Unit</th>
-                            <th style={styles.th}>Status</th>
+                            <th style={styles.th}>{ui("Select")}</th>
+                            <th style={styles.th}>{ui("Product")}</th>
+                            <th style={styles.th}>{ui("Storage Location")}</th>
+                            <th style={styles.th}>{ui("On Hand")}</th>
+                            <th style={styles.th}>{ui("Reserved")}</th>
+                            <th style={styles.th}>{ui("Available")}</th>
+                            <th style={styles.th}>{ui("Minimum")}</th>
+                            <th style={styles.th}>{ui("Unit")}</th>
+                            <th style={styles.th}>{ui("Status")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1723,19 +1715,19 @@ export default function StockPage() {
                                     style={selected ? styles.rowActionButtonSelected : styles.rowActionButton}
                                     onClick={() => selectStockRow(item.id)}
                                   >
-                                    {selected ? 'Selected' : 'Select'}
+                                    {selected ? ui("Selected") : ui("Select")}
                                   </button>
                                 </td>
                                 <td style={styles.td}>
-                                  <div style={styles.rowTitle}>{item.product_name || 'Unnamed product'}</div>
+                                  <div style={styles.rowTitle}>{item.product_name || ui("Unnamed product")}</div>
                                 </td>
                                 <td style={styles.td}>
-                                  {item.storage_location_name || 'Unknown location'}
+                                  {item.storage_location_name || ui("Unknown location")}
                                 </td>
-                                <td style={styles.td}>{quantity}</td>
-                                <td style={styles.td}>{reservedQuantity}</td>
-                                <td style={styles.td}>{projectedFreeQuantity}</td>
-                                <td style={styles.td}>{minQuantity}</td>
+                                <td style={styles.td}>{formatLocalizedNumber(quantity, locale)}</td>
+                                <td style={styles.td}>{formatLocalizedNumber(reservedQuantity, locale)}</td>
+                                <td style={styles.td}>{formatLocalizedNumber(projectedFreeQuantity, locale)}</td>
+                                <td style={styles.td}>{formatLocalizedNumber(minQuantity, locale)}</td>
                                 <td style={styles.td}>{item.product_unit || '-'}</td>
                                 <td style={styles.td}>
                                   <span
@@ -1748,12 +1740,12 @@ export default function StockPage() {
                                     }
                                   >
                                     {overReserved
-                                      ? 'OVER-RESERVED'
+                                      ? ui("OVER-RESERVED")
                                       : lowStock
-                                        ? 'LOW STOCK'
+                                        ? ui("LOW STOCK")
                                         : lowAvailable
-                                          ? 'LOW AVAILABLE'
-                                          : 'HEALTHY'}
+                                          ? ui("LOW AVAILABLE")
+                                          : ui("HEALTHY")}
                                   </span>
                                 </td>
                               </tr>
@@ -1774,14 +1766,14 @@ export default function StockPage() {
                 style={styles.workbenchColumn}
               >
                 <div style={styles.innerPanel}>
-                  <h4 style={styles.sectionTitle}>Selected Stock Position</h4>
+                  <h4 style={styles.sectionTitle}>{ui("Selected Stock Position")}</h4>
 
                   {selectedRow ? (
                     <div style={styles.selectionSummary}>
                       <div style={styles.selectionPrimaryRow}>
                         <div style={styles.selectionPrimaryText}>
                           <div style={styles.selectedTitle}>
-                            {selectedRow.product_name || 'Unnamed product'}
+                            {selectedRow.product_name || ui("Unnamed product")}
                           </div>
                         </div>
                         <span
@@ -1794,52 +1786,52 @@ export default function StockPage() {
                           }
                         >
                           {selectedOverReserved
-                            ? 'OVER-RESERVED'
+                            ? ui("OVER-RESERVED")
                             : selectedLowStock
-                              ? 'LOW STOCK'
+                              ? ui("LOW STOCK")
                               : selectedLowAvailable
-                                ? 'LOW AVAILABLE'
-                                : 'HEALTHY'}
+                                ? ui("LOW AVAILABLE")
+                                : ui("HEALTHY")}
                         </span>
                       </div>
 
                       <div style={styles.selectionGrid}>
                         <div style={styles.selectionItem}>
-                          <div style={styles.selectionLabel}>Storage Location</div>
+                          <div style={styles.selectionLabel}>{ui("Storage Location")}</div>
                           <div style={styles.selectionValue}>
-                            {selectedRow.storage_location_name || 'Unknown location'}
+                            {selectedRow.storage_location_name || ui("Unknown location")}
                           </div>
                         </div>
                         <div style={styles.selectionItem}>
-                          <div style={styles.selectionLabel}>On-Hand Quantity</div>
-                          <div style={styles.selectionValue}>{currentQuantity}</div>
+                          <div style={styles.selectionLabel}>{ui("On-Hand Quantity")}</div>
+                          <div style={styles.selectionValue}>{formatLocalizedNumber(currentQuantity, locale)}</div>
                         </div>
                         <div style={styles.selectionItem}>
-                          <div style={styles.selectionLabel}>Reserved / Allocated</div>
-                          <div style={styles.selectionValue}>{currentReservedQuantity}</div>
+                          <div style={styles.selectionLabel}>{ui("Reserved / Allocated")}</div>
+                          <div style={styles.selectionValue}>{formatLocalizedNumber(currentReservedQuantity, locale)}</div>
                         </div>
                         <div style={styles.selectionItem}>
-                          <div style={styles.selectionLabel}>Available Quantity</div>
-                          <div style={styles.selectionValue}>{currentProjectedFreeQuantity}</div>
+                          <div style={styles.selectionLabel}>{ui("Available Quantity")}</div>
+                          <div style={styles.selectionValue}>{formatLocalizedNumber(currentProjectedFreeQuantity, locale)}</div>
                         </div>
                         <div style={styles.selectionItem}>
-                          <div style={styles.selectionLabel}>Minimum Quantity</div>
-                          <div style={styles.selectionValue}>{currentMinimum}</div>
+                          <div style={styles.selectionLabel}>{ui("Minimum Quantity")}</div>
+                          <div style={styles.selectionValue}>{formatLocalizedNumber(currentMinimum, locale)}</div>
                         </div>
                         <div style={styles.selectionItem}>
-                          <div style={styles.selectionLabel}>Unit</div>
+                          <div style={styles.selectionLabel}>{ui("Unit")}</div>
                           <div style={styles.selectionValue}>
                             {selectedRow.product_unit || '-'}
                           </div>
                         </div>
                         <div style={styles.selectionItem}>
-                          <div style={styles.selectionLabel}>Category</div>
+                          <div style={styles.selectionLabel}>{ui("Category")}</div>
                           <div style={styles.selectionValue}>
                             {selectedRow.product_category || '-'}
                           </div>
                         </div>
                         <div style={styles.selectionItem}>
-                          <div style={styles.selectionLabel}>Temperature Zone</div>
+                          <div style={styles.selectionLabel}>{ui("Temperature Zone")}</div>
                           <div style={styles.selectionValue}>
                             {selectedRow.temperature_zone || '-'}
                           </div>
@@ -1847,23 +1839,23 @@ export default function StockPage() {
                       </div>
                     </div>
                   ) : (
-                    <div style={styles.emptyPanel}>Select a stock position to begin.</div>
+                    <div style={styles.emptyPanel}>{ui("Select a stock position to begin.")}</div>
                   )}
                 </div>
 
                 <div style={styles.innerPanel}>
-                  <h4 style={styles.sectionTitle}>Action Readiness</h4>
+                  <h4 style={styles.sectionTitle}>{ui("Action Readiness")}</h4>
                   <div style={styles.readinessList}>
                     <div style={styles.readinessRow}>
-                      <span>Selected position</span>
-                      <strong>{selectedRow ? 'Ready' : 'Required'}</strong>
+                      <span>{ui("Selected position")}</span>
+                      <strong>{selectedRow ? ui("Ready") : ui("Required")}</strong>
                     </div>
                     <div style={styles.readinessRow}>
-                      <span>Current action</span>
-                      <strong>{getActionLabel(draft.action)}</strong>
+                      <span>{ui("Current action")}</span>
+                      <strong>{ui(getActionLabel(draft.action))}</strong>
                     </div>
                     <div style={styles.readinessRow}>
-                      <span>Projected on hand</span>
+                      <span>{ui("Projected on hand")}</span>
                       <strong>
                         {nextQuantityPreview === null || !Number.isFinite(nextQuantityPreview)
                           ? '-'
@@ -1871,21 +1863,20 @@ export default function StockPage() {
                       </strong>
                     </div>
                     <div style={styles.readinessRow}>
-                      <span>Projected available after reservations</span>
+                      <span>{ui("Projected available after reservations")}</span>
                       <strong>{projectedFreeAfterAction ?? '-'}</strong>
                     </div>
                     <div style={styles.readinessRow}>
-                      <span>Ledger verification</span>
-                      <strong>{lastResult ? 'Posted — verify below' : 'Pending current action'}</strong>
+                      <span>{ui("Ledger verification")}</span>
+                      <strong>{lastResult ? ui("Posted — verify below") : ui("Pending current action")}</strong>
                     </div>
                   </div>
                 </div>
 
                 <div style={styles.innerPanel}>
-                  <h4 style={styles.sectionTitle}>Post Stock Action</h4>
+                  <h4 style={styles.sectionTitle}>{ui("Post Stock Action")}</h4>
                   <p style={styles.sectionDescription}>
-                    Post a controlled stock change against the selected product and location.
-                    The system validates permissions and records the resulting operational history.
+                    {ui("Post a controlled stock change against the selected product and location. The system validates permissions and records the resulting operational history.")}
                   </p>
 
                   <div style={styles.actionSelectorGrid}>
@@ -1907,7 +1898,7 @@ export default function StockPage() {
                         setLastResult(null);
                       }}
                     >
-                      Consume
+                      {ui("Consume")}
                     </button>
                     <button
                       type="button"
@@ -1919,7 +1910,7 @@ export default function StockPage() {
                             : styles.actionTypeButton
                       }
                       disabled={!canCount}
-                      title={!canCount ? 'Your current access role cannot post physical stock counts.' : undefined}
+                      title={!canCount ? ui("Your current access role cannot post physical stock counts.") : undefined}
                       onClick={() => {
                         setDraft(getDefaultDraft('count'));
                         setOperationFeedback('');
@@ -1927,7 +1918,7 @@ export default function StockPage() {
                         setLastResult(null);
                       }}
                     >
-                      Count
+                      {ui("Count")}
                     </button>
                     <button
                       type="button"
@@ -1939,7 +1930,7 @@ export default function StockPage() {
                             : styles.actionTypeButton
                       }
                       disabled={!canAdjust}
-                      title={!canAdjust ? 'Your current access role cannot apply manual stock adjustments.' : undefined}
+                      title={!canAdjust ? ui("Your current access role cannot apply manual stock adjustments.") : undefined}
                       onClick={() => {
                         setDraft(getDefaultDraft('adjust'));
                         setOperationFeedback('');
@@ -1947,31 +1938,30 @@ export default function StockPage() {
                         setLastResult(null);
                       }}
                     >
-                      Adjust
+                      {ui("Adjust")}
                     </button>
                   </div>
 
                   <div style={styles.actionInfoBox}>
-                    <div style={styles.actionInfoTitle}>{getActionLabel(draft.action)}</div>
-                    <div style={styles.actionInfoText}>{getActionHelpText(draft.action)}</div>
+                    <div style={styles.actionInfoTitle}>{ui(getActionLabel(draft.action))}</div>
+                    <div style={styles.actionInfoText}>{ui(getActionHelpText(draft.action))}</div>
                   </div>
 
                   {draft.action === 'consume' && !canConsume ? (
                     <div className="app-warning-state" style={styles.warningBox}>
-                      Stock consumption requires both stock-consumption and inventory-usage
-                      recording access.
+                      {ui("Stock consumption requires both stock-consumption and inventory-usage recording access.")}
                     </div>
                   ) : null}
 
                   {draft.action === 'count' && !canCount ? (
                     <div className="app-warning-state" style={styles.warningBox}>
-                      Your current access role cannot post physical stock counts.
+                      {ui("Your current access role cannot post physical stock counts.")}
                     </div>
                   ) : null}
 
                   {draft.action === 'adjust' && !canAdjust ? (
                     <div className="app-warning-state" style={styles.warningBox}>
-                      Your current access role cannot apply manual stock adjustments.
+                      {ui("Your current access role cannot apply manual stock adjustments.")}
                     </div>
                   ) : null}
 
@@ -1982,7 +1972,7 @@ export default function StockPage() {
                           style={styles.label}
                           htmlFor="stock-action-quantity"
                         >
-                          {draft.action === 'consume' ? 'Quantity to Consume' : 'Counted Quantity'}
+                          {draft.action === 'consume' ? ui("Quantity to Consume") : ui("Counted Quantity")}
                         </label>
                         <input
                           id="stock-action-quantity"
@@ -2005,7 +1995,7 @@ export default function StockPage() {
                     {draft.action === 'adjust' && (
                       <div>
                         <label style={styles.label} htmlFor="stock-adjustment-change">
-                          Adjustment Change
+                          {ui("Adjustment Change")}
                         </label>
                         <input
                           id="stock-adjustment-change"
@@ -2027,27 +2017,27 @@ export default function StockPage() {
                     {actionAddsStock ? (
                       <>
                         <div style={{ gridColumn: '1 / -1', ...styles.actionInfoBox }}>
-                          <div style={styles.actionInfoTitle}>Tracking details for added stock</div>
+                          <div style={styles.actionInfoTitle}>{ui("Tracking details for added stock")}</div>
                           <div style={styles.actionInfoText}>
                             {trackingDetailsNeeded
-                              ? 'This product requires the tracking details shown below before stock can be added.'
-                              : 'Optional. Use these fields when you want the added stock tied to a specific lot/batch or expiry date.'}
+                              ? ui("This product requires the tracking details shown below before stock can be added.")
+                              : ui("Optional. Use these fields when you want the added stock tied to a specific lot/batch or expiry date.")}
                           </div>
                         </div>
                         <div>
-                          <label style={styles.label} htmlFor="stock-action-lot">Lot Number{selectedRow?.requires_lot_tracking ? ' *' : ''}</label>
-                          <input id="stock-action-lot" style={styles.input} type="text" maxLength={255} value={draft.lot_number} onChange={(event) => setDraft((current) => ({ ...current, lot_number: event.target.value }))} placeholder="Optional unless required" />
+                          <label style={styles.label} htmlFor="stock-action-lot">{ui("Lot Number")}{selectedRow?.requires_lot_tracking ? ' *' : ''}</label>
+                          <input id="stock-action-lot" style={styles.input} type="text" maxLength={255} value={draft.lot_number} onChange={(event) => setDraft((current) => ({ ...current, lot_number: event.target.value }))} placeholder={ui("Optional unless required")} />
                         </div>
                         <div>
-                          <label style={styles.label} htmlFor="stock-action-batch">Batch Number{selectedRow?.requires_lot_tracking ? ' *' : ''}</label>
-                          <input id="stock-action-batch" style={styles.input} type="text" maxLength={255} value={draft.batch_number} onChange={(event) => setDraft((current) => ({ ...current, batch_number: event.target.value }))} placeholder="Lot or batch satisfies tracking" />
+                          <label style={styles.label} htmlFor="stock-action-batch">{ui("Batch Number")}{selectedRow?.requires_lot_tracking ? ' *' : ''}</label>
+                          <input id="stock-action-batch" style={styles.input} type="text" maxLength={255} value={draft.batch_number} onChange={(event) => setDraft((current) => ({ ...current, batch_number: event.target.value }))} placeholder={ui("Lot or batch satisfies tracking")} />
                         </div>
                         <div>
-                          <label style={styles.label} htmlFor="stock-action-expiry">Expiry Date{selectedRow?.requires_expiry_date ? ' *' : ''}</label>
+                          <label style={styles.label} htmlFor="stock-action-expiry">{ui("Expiry Date")}{selectedRow?.requires_expiry_date ? ' *' : ''}</label>
                           <input id="stock-action-expiry" style={styles.input} type="date" value={draft.expiry_date} onChange={(event) => setDraft((current) => ({ ...current, expiry_date: event.target.value }))} />
                         </div>
                         <div>
-                          <label style={styles.label} htmlFor="stock-action-manufactured">Manufactured Date</label>
+                          <label style={styles.label} htmlFor="stock-action-manufactured">{ui("Manufactured Date")}</label>
                           <input id="stock-action-manufactured" style={styles.input} type="date" value={draft.manufactured_at} onChange={(event) => setDraft((current) => ({ ...current, manufactured_at: event.target.value }))} />
                         </div>
                       </>
@@ -2056,7 +2046,7 @@ export default function StockPage() {
                     {draft.action !== 'consume' ? (
                       <div>
                         <label style={styles.label} htmlFor="stock-action-reason">
-                          Audit Note
+                          {ui("Audit Note")}
                         </label>
                         <input
                           id="stock-action-reason"
@@ -2070,7 +2060,7 @@ export default function StockPage() {
                               reason: event.target.value
                             }))
                           }
-                          placeholder="Optional explanation for this count or adjustment"
+                          placeholder={ui("Optional explanation for this count or adjustment")}
                         />
                       </div>
                     ) : null}
@@ -2079,7 +2069,7 @@ export default function StockPage() {
                       <>
                         <div>
                           <label style={styles.label} htmlFor="stock-usage-reason">
-                            Usage Reason
+                            {ui("Usage Reason")}
                           </label>
                           <select
                             id="stock-usage-reason"
@@ -2104,7 +2094,7 @@ export default function StockPage() {
 
                         <div>
                           <label style={styles.label} htmlFor="stock-usage-department">
-                            Department / Team
+                            {ui("Department / Team")}
                           </label>
                           <input
                             id="stock-usage-department"
@@ -2118,13 +2108,13 @@ export default function StockPage() {
                                 department: event.target.value
                               }))
                             }
-                            placeholder="Housekeeping, maintenance, kitchen..."
+                            placeholder={ui("Housekeeping, maintenance, kitchen...")}
                           />
                         </div>
 
                         <div>
                           <label style={styles.label} htmlFor="stock-usage-event">
-                            Event / Job Name
+                            {ui("Event / Job Name")}
                           </label>
                           <input
                             id="stock-usage-event"
@@ -2138,13 +2128,13 @@ export default function StockPage() {
                                 event_name: event.target.value
                               }))
                             }
-                            placeholder="Optional event, work order, or service context"
+                            placeholder={ui("Optional event, work order, or service context")}
                           />
                         </div>
 
                         <div>
                           <label style={styles.label} htmlFor="stock-consumed-at">
-                            Consumed At
+                            {ui("Consumed At")}
                           </label>
                           <input
                             id="stock-consumed-at"
@@ -2162,7 +2152,7 @@ export default function StockPage() {
 
                         <div style={styles.fullWidthField}>
                           <label style={styles.label} htmlFor="stock-usage-notes">
-                            Usage Notes
+                            {ui("Usage Notes")}
                           </label>
                           <textarea
                             id="stock-usage-notes"
@@ -2175,7 +2165,7 @@ export default function StockPage() {
                                 notes: event.target.value
                               }))
                             }
-                            placeholder="Optional context for audit, waste, damage, guest issue, event prep, or maintenance usage"
+                            placeholder={ui("Optional context for audit, waste, damage, guest issue, event prep, or maintenance usage")}
                           />
                         </div>
                       </>
@@ -2184,18 +2174,18 @@ export default function StockPage() {
 
                   {draft.action === 'consume' ? (
                     <div style={styles.usageReasonHelpBox}>
-                      <strong>Usage audit context:</strong>{' '}
-                      {USAGE_REASON_OPTIONS.find((option) => option.value === draft.consumption_reason)?.description}
+                      <strong>{ui("Usage audit context:")}</strong>{' '}
+                      {ui(USAGE_REASON_OPTIONS.find((option) => option.value === draft.consumption_reason)?.description || '')}
                     </div>
                   ) : null}
 
                   <div style={styles.previewBox}>
                     <div style={styles.previewRow}>
-                      <span>Current On Hand</span>
-                      <strong>{currentQuantity}</strong>
+                      <span>{ui("Current On Hand")}</span>
+                      <strong>{formatLocalizedNumber(currentQuantity, locale)}</strong>
                     </div>
                     <div style={styles.previewRow}>
-                      <span>Projected On Hand</span>
+                      <span>{ui("Projected On Hand")}</span>
                       <strong>
                         {nextQuantityPreview === null || !Number.isFinite(nextQuantityPreview)
                           ? '-'
@@ -2203,20 +2193,20 @@ export default function StockPage() {
                       </strong>
                     </div>
                     <div style={styles.previewRow}>
-                      <span>Reserved / Allocated</span>
-                      <strong>{currentReservedQuantity}</strong>
+                      <span>{ui("Reserved / Allocated")}</span>
+                      <strong>{formatLocalizedNumber(currentReservedQuantity, locale)}</strong>
                     </div>
                     <div style={styles.previewRow}>
-                      <span>Projected Available</span>
+                      <span>{ui("Projected Available")}</span>
                       <strong>{projectedFreeAfterAction ?? '-'}</strong>
                     </div>
                     <div style={styles.previewRow}>
-                      <span>Minimum Quantity</span>
-                      <strong>{currentMinimum}</strong>
+                      <span>{ui("Minimum Quantity")}</span>
+                      <strong>{formatLocalizedNumber(currentMinimum, locale)}</strong>
                     </div>
                     <div style={styles.previewRow}>
-                      <span>Operational Risk</span>
-                      <strong style={createsReservationShortfall || operationalRiskLabel.startsWith('Warning') ? styles.riskWarning : undefined}>
+                      <span>{ui("Operational Risk")}</span>
+                      <strong style={createsReservationShortfall || operationalRiskLabel.startsWith(ui("Warning")) ? styles.riskWarning : undefined}>
                         {operationalRiskLabel}
                       </strong>
                     </div>
@@ -2247,8 +2237,7 @@ export default function StockPage() {
                         }
                       />
                       <span>
-                        I confirm this physical count or correction is real, even though it leaves less stock than is reserved.
-                        I understand the affected reservations must be reviewed immediately.
+                        {ui("I confirm this physical count or correction is real, even though it leaves less stock than is reserved. I understand the affected reservations must be reviewed immediately.")}
                       </span>
                     </label>
                   ) : null}
@@ -2286,45 +2275,45 @@ export default function StockPage() {
                       }}
                     >
                       {activeMutation
-                        ? 'Submitting...'
+                        ? ui("Submitting...")
                         : !currentActionAllowed
-                          ? `${getActionLabel(draft.action)} blocked`
-                          : getActionLabel(draft.action)}
+                          ? `${ui(getActionLabel(draft.action))} ${ui('blocked')}`
+                          : ui(getActionLabel(draft.action))}
                     </button>
                   </div>
                 </div>
 
                 {lastResult ? (
                   <div style={styles.innerPanel}>
-                    <h4 style={styles.sectionTitle}>Last Operation Result</h4>
+                    <h4 style={styles.sectionTitle}>{ui("Last Operation Result")}</h4>
                     <div style={styles.selectionGrid}>
                       <div style={styles.selectionItem}>
-                        <div style={styles.selectionLabel}>Action</div>
-                        <div style={styles.selectionValue}>{getActionLabel(draft.action)}</div>
+                        <div style={styles.selectionLabel}>{ui("Action")}</div>
+                        <div style={styles.selectionValue}>{ui(getActionLabel(draft.action))}</div>
                       </div>
                       <div style={styles.selectionItem}>
-                        <div style={styles.selectionLabel}>Storage Location</div>
+                        <div style={styles.selectionLabel}>{ui("Storage Location")}</div>
                         <div style={styles.selectionValue}>
-                          {selectedRow?.storage_location_name || 'Unknown location'}
+                          {selectedRow?.storage_location_name || ui("Unknown location")}
                         </div>
                       </div>
                       <div style={styles.selectionItem}>
-                        <div style={styles.selectionLabel}>Previous Quantity</div>
-                        <div style={styles.selectionValue}>{lastResult.stock.previous_quantity}</div>
+                        <div style={styles.selectionLabel}>{ui("Previous Quantity")}</div>
+                        <div style={styles.selectionValue}>{formatLocalizedNumber(lastResult.stock.previous_quantity, locale)}</div>
                       </div>
                       <div style={styles.selectionItem}>
-                        <div style={styles.selectionLabel}>New Quantity</div>
-                        <div style={styles.selectionValue}>{lastResult.stock.new_quantity}</div>
+                        <div style={styles.selectionLabel}>{ui("New Quantity")}</div>
+                        <div style={styles.selectionValue}>{formatLocalizedNumber(lastResult.stock.new_quantity, locale)}</div>
                       </div>
                       <div style={styles.selectionItem}>
-                        <div style={styles.selectionLabel}>Difference</div>
+                        <div style={styles.selectionLabel}>{ui("Difference")}</div>
                         <div style={styles.selectionValue}>
-                          {lastResult.stock.difference ?? lastResult.stock.change ?? '-'}
+                          {lastResult.stock.difference == null && lastResult.stock.change == null ? '-' : formatLocalizedNumber(lastResult.stock.difference ?? lastResult.stock.change ?? 0, locale)}
                         </div>
                       </div>
                       <div style={styles.selectionItem}>
-                        <div style={styles.selectionLabel}>Message</div>
-                        <div style={styles.selectionValue}>{lastResult.message}</div>
+                        <div style={styles.selectionLabel}>{ui("Message")}</div>
+                        <div style={styles.selectionValue}>{operationFeedback || lastResult.message}</div>
                       </div>
                     </div>
                   </div>
@@ -2333,27 +2322,25 @@ export default function StockPage() {
 
               <section style={styles.workbenchColumn}>
                 <div style={styles.innerPanel}>
-                  <h4 style={styles.sectionTitle}>Latest Movement Verification</h4>
+                  <h4 style={styles.sectionTitle}>{ui("Latest Movement Verification")}</h4>
                   <p style={styles.sectionDescription}>
-                    Recent movement history for the selected product. The current movement
-                    ledger is product-wide and may include activity from other storage locations.
+                    {ui("Recent movement history for the selected product. The current movement ledger is product-wide and may include activity from other storage locations.")}
                   </p>
 
                   {!canViewMovements ? (
                     <div style={styles.emptyPanel}>
-                      Movement history is unavailable because this role does not have stock
-                      movement read access.
+                      {ui("Movement history is unavailable because this role does not have stock movement read access.")}
                     </div>
                   ) : movementsQuery.isLoading ? (
-                    <p style={styles.sectionDescription}>Loading stock movements...</p>
+                    <p style={styles.sectionDescription}>{ui("Loading stock movements...")}</p>
                   ) : movementsQuery.isError ? (
                     <div className="app-error-state" style={styles.errorBox}>
-                      Failed to load stock movements:{' '}
-                      {(movementsQuery.error as Error).message || 'Unknown error'}
+                      {ui("Failed to load stock movements:")}{' '}
+                      {(movementsQuery.error as Error).message || ui("Unknown error")}
                     </div>
                   ) : recentMovements.length === 0 ? (
                     <div style={styles.emptyPanel}>
-                      No stock movements found for the selected product yet.
+                      {ui("No stock movements found for the selected product yet.")}
                     </div>
                   ) : (
                     <div style={styles.movementList}>
@@ -2366,22 +2353,22 @@ export default function StockPage() {
                               <div style={styles.movementTitleBlock}>
                                 <div style={styles.movementTitle}>{movement.product_name}</div>
                                 <div style={styles.rowSubtle}>
-                                  {formatDateTime(movement.created_at)}
+                                  {formatLocalizedDateTime(movement.created_at, locale)}
                                 </div>
                               </div>
-                              <span style={changeBadgeStyle(change)}>{changeDisplay(change)}</span>
+                              <span style={changeBadgeStyle(change)}>{changeDisplay(change, locale)}</span>
                             </div>
                             <div style={styles.movementMetaRow}>
                               <span style={reasonBadgeStyle(movement.reason)} title={movement.reason}>
-                                {formatMovementReason(movement.reason)}
+                                {ui(formatMovementReason(movement.reason))}
                               </span>
                               <span style={styles.rowSubtle}>
-                                By {movement.user_name || 'System / unknown user'}
+                                {ui("By")} {movement.user_name || ui("System / unknown user")}
                               </span>
                             </div>
                             {movement.shipment_po_number ? (
                               <div style={styles.rowSubtle}>
-                                Shipment PO: {movement.shipment_po_number}
+                                {ui("Shipment PO:")} {movement.shipment_po_number}
                               </div>
                             ) : null}
                           </div>
@@ -2392,44 +2379,43 @@ export default function StockPage() {
                 </div>
 
                 <div style={styles.innerPanel}>
-                  <h4 style={styles.sectionTitle}>Usage Ledger Snapshot</h4>
+                  <h4 style={styles.sectionTitle}>{ui("Usage Ledger Snapshot")}</h4>
                   <p style={styles.sectionDescription}>
-                    Consumption history for the selected product at{' '}
+                    {ui("Consumption history for the selected product at")}{' '}
                     <strong>
-                      {selectedRow?.storage_location_name || 'the selected location'}
+                      {selectedRow?.storage_location_name || ui("the selected location")}
                     </strong>.
                   </p>
 
                   {!canViewInventoryUsage ? (
                     <div style={styles.emptyPanel}>
-                      Usage history is unavailable because this role does not have inventory
-                      usage read access.
+                      {ui("Usage history is unavailable because this role does not have inventory usage read access.")}
                     </div>
                   ) : usageSummaryQuery.isLoading ? (
-                    <p style={styles.sectionDescription}>Loading usage summary...</p>
+                    <p style={styles.sectionDescription}>{ui("Loading usage summary...")}</p>
                   ) : usageSummaryQuery.isError ? (
                     <div className="app-error-state" style={styles.errorBox}>
-                      Failed to load usage summary:{' '}
-                      {(usageSummaryQuery.error as Error).message || 'Unknown error'}
+                      {ui("Failed to load usage summary:")}{' '}
+                      {(usageSummaryQuery.error as Error).message || ui("Unknown error")}
                     </div>
                   ) : (
                     <div style={styles.selectionGrid}>
                       <div style={styles.selectionItem}>
-                        <div style={styles.selectionLabel}>Usage Events</div>
+                        <div style={styles.selectionLabel}>{ui("Usage Events")}</div>
                         <div style={styles.selectionValue}>
-                          {toNumber(usageSummaryQuery.data?.totals?.usage_count)}
+                          {formatLocalizedNumber(toNumber(usageSummaryQuery.data?.totals?.usage_count), locale)}
                         </div>
                       </div>
                       <div style={styles.selectionItem}>
-                        <div style={styles.selectionLabel}>Total Consumed</div>
+                        <div style={styles.selectionLabel}>{ui("Total Consumed")}</div>
                         <div style={styles.selectionValue}>
-                          {toNumber(usageSummaryQuery.data?.totals?.total_quantity)}
+                          {formatLocalizedNumber(toNumber(usageSummaryQuery.data?.totals?.total_quantity), locale)}
                         </div>
                       </div>
                       <div style={styles.selectionItem}>
-                        <div style={styles.selectionLabel}>Last Consumed</div>
+                        <div style={styles.selectionLabel}>{ui("Last Consumed")}</div>
                         <div style={styles.selectionValue}>
-                          {formatDateTime(usageSummaryQuery.data?.totals?.last_consumed_at)}
+                          {formatLocalizedDateTime(usageSummaryQuery.data?.totals?.last_consumed_at, locale)}
                         </div>
                       </div>
                     </div>
@@ -2440,25 +2426,25 @@ export default function StockPage() {
                       {usageSummaryQuery.data.by_reason.slice(0, 4).map((row) => (
                         <div key={row.consumption_reason} style={styles.usageReasonCard}>
                           <div style={styles.selectionLabel}>
-                            {formatUsageReason(row.consumption_reason)}
+                            {ui(formatUsageReason(row.consumption_reason))}
                           </div>
-                          <div style={styles.selectionValue}>{toNumber(row.total_quantity)}</div>
-                          <div style={styles.rowSubtle}>{toNumber(row.usage_count)} events</div>
+                          <div style={styles.selectionValue}>{formatLocalizedNumber(toNumber(row.total_quantity), locale)}</div>
+                          <div style={styles.rowSubtle}>{formatLocalizedNumber(toNumber(row.usage_count), locale)} {ui("events")}</div>
                         </div>
                       ))}
                     </div>
                   ) : null}
 
                   {!canViewInventoryUsage ? null : usageLogsQuery.isLoading ? (
-                    <p style={styles.sectionDescription}>Loading usage ledger...</p>
+                    <p style={styles.sectionDescription}>{ui("Loading usage ledger...")}</p>
                   ) : usageLogsQuery.isError ? (
                     <div className="app-error-state" style={styles.errorBox}>
-                      Failed to load usage ledger:{' '}
-                      {(usageLogsQuery.error as Error).message || 'Unknown error'}
+                      {ui("Failed to load usage ledger:")}{' '}
+                      {(usageLogsQuery.error as Error).message || ui("Unknown error")}
                     </div>
                   ) : !usageLogsQuery.data?.length ? (
                     <div style={styles.emptyPanel}>
-                      No first-class usage logs found for the selected product yet.
+                      {ui("No first-class usage logs found for the selected product yet.")}
                     </div>
                   ) : (
                     <div style={styles.movementList}>
@@ -2467,29 +2453,29 @@ export default function StockPage() {
                           <div style={styles.movementTopRow}>
                             <div style={styles.movementTitleBlock}>
                               <div style={styles.movementTitle}>
-                                {formatUsageReason(usage.consumption_reason)}
+                                {ui(formatUsageReason(usage.consumption_reason))}
                               </div>
                               <div style={styles.rowSubtle}>
-                                {formatDateTime(usage.consumed_at)}
+                                {formatLocalizedDateTime(usage.consumed_at, locale)}
                               </div>
                             </div>
                             <span style={changeBadgeStyle(-Math.abs(toNumber(usage.quantity)))}>
-                              -{toNumber(usage.quantity)}
+                              -{formatLocalizedNumber(toNumber(usage.quantity), locale)}
                             </span>
                           </div>
                           <div style={styles.movementMetaRow}>
                             <span style={styles.rowSubtle}>
-                              {usage.department || 'No department'}
+                              {usage.department || ui("No department")}
                             </span>
                             <span style={styles.rowSubtle}>
-                              By {usage.created_by_user_name || 'System / unknown user'}
+                              {ui("By")} {usage.created_by_user_name || ui("System / unknown user")}
                             </span>
                           </div>
                           {usage.event_name ? (
-                            <div style={styles.rowSubtle}>Event/job: {usage.event_name}</div>
+                            <div style={styles.rowSubtle}>{ui("Event/job:")} {usage.event_name}</div>
                           ) : null}
                           <div style={styles.rowSubtle}>
-                            Location: {usage.storage_location_name || 'Unknown location'}
+                            {ui("Location:")} {usage.storage_location_name || ui("Unknown location")}
                           </div>
                           {usage.notes ? (
                             <div style={styles.usageNotes}>{usage.notes}</div>

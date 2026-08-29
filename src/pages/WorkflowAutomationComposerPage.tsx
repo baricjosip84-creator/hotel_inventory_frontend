@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { useAppTranslation } from '../i18n/I18nContext';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
+import type { AppLocale } from '../i18n/config';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
@@ -178,6 +181,54 @@ const STEP_LABELS: Record<string, string> = {
   workflow_governance_review: 'The workflow governance owner reviews the plan'
 };
 
+const CANONICAL_LABELS: Record<string, string> = {
+  unknown: 'Unknown',
+  open: 'Open',
+  pending: 'Pending',
+  ready: 'Ready',
+  assigned: 'Assigned',
+  in_progress: 'In progress',
+  blocked: 'Blocked',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  active: 'Active',
+  inactive: 'Inactive',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  resolved: 'Resolved',
+  critical: 'Critical',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+  action_center_item: 'Action Center item',
+  execution_task: 'Execution task',
+  alert: 'Alert',
+  integration_contract: 'Integration contract',
+  operational_action_center: 'Operational Action Center',
+  enterprise_integration: 'Enterprise integration',
+  decision_intelligence: 'Decision intelligence',
+  ai_governance: 'AI governance',
+  control_tower: 'Control tower'
+};
+
+const SAFETY_LABELS: Record<string, string> = {
+  tenant_isolated: 'Tenant isolated',
+  permission_gated: 'Permission gated',
+  audit_traceable_source: 'Audit-traceable source',
+  human_action_only: 'Human action only',
+  approval_gated_when_required: 'Approval gated when required',
+  no_inventory_mutation: 'No direct inventory mutation',
+  no_procurement_mutation: 'No direct procurement mutation',
+  no_execution_mutation: 'No direct execution mutation',
+  no_financial_mutation: 'No direct financial mutation',
+  no_erp_writeback: 'No ERP writeback',
+  no_accounting_writeback: 'No accounting writeback',
+  no_supplier_execution: 'No supplier execution',
+  no_carrier_execution: 'No carrier execution',
+  no_external_workflow_execution: 'No external workflow execution',
+  no_external_ai_callout: 'No external AI callout'
+};
+
 function numberValue(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -188,26 +239,40 @@ function formatLabel(value?: string | null): string {
   return text.replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function formatDateTime(value?: string | null): string {
-  if (!value) return 'Not reported';
+function canonicalLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  const raw = String(value || 'unknown');
+  return ui(CANONICAL_LABELS[raw] || formatLabel(raw));
+}
+
+function workflowDomainLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  const option = WORKFLOW_DOMAINS.find((item) => item.value === value);
+  return option ? ui(option.label) : canonicalLabel(value, ui);
+}
+
+function safetyLabel(value: string, ui: (englishText: string) => string): string {
+  return ui(SAFETY_LABELS[value] || formatLabel(value));
+}
+
+function formatDateTime(value: string | null | undefined, locale: AppLocale, ui: (englishText: string) => string): string {
+  if (!value) return ui('Not reported');
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? value : formatLocalizedDateTime(date, locale);
 }
 
-function plainStep(value: string): string {
-  return STEP_LABELS[value] || formatLabel(value);
+function plainStep(value: string, ui: (englishText: string) => string): string {
+  return ui(STEP_LABELS[value] || formatLabel(value));
 }
 
-function blueprintTypeLabel(value?: string | null): string {
-  if (value === 'approval_gated_review_flow') return 'Approval-required plan';
-  if (value === 'human_operated_triage_flow') return 'Human review plan';
-  if (value === 'external_workflow_visibility_contract') return 'External integration plan';
-  return formatLabel(value);
+function blueprintTypeLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  if (value === 'approval_gated_review_flow') return ui('Approval-required plan');
+  if (value === 'human_operated_triage_flow') return ui('Human review plan');
+  if (value === 'external_workflow_visibility_contract') return ui('External integration plan');
+  return canonicalLabel(value, ui);
 }
 
-function executionModeLabel(value?: string | null): string {
-  if (value === 'read_only_workflow_blueprint_composition') return 'Guidance only';
-  return formatLabel(value);
+function executionModeLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  if (value === 'read_only_workflow_blueprint_composition') return ui('Guidance only');
+  return canonicalLabel(value, ui);
 }
 
 function displayTitleText(value?: string | null): string {
@@ -216,23 +281,21 @@ function displayTitleText(value?: string | null): string {
   return raw.includes('_') || raw === raw.toUpperCase() ? formatLabel(raw) : raw;
 }
 
-function sourceTitle(blueprint: WorkflowBlueprint): string {
-  if (blueprint.source_title) {
-    return displayTitleText(blueprint.source_title);
-  }
+function sourceTitle(blueprint: WorkflowBlueprint, ui: (englishText: string) => string): string {
+  if (blueprint.source_title) return displayTitleText(blueprint.source_title);
   if (blueprint.blueprint_type === 'external_workflow_visibility_contract') {
-    const contractName = blueprint.source_contract_key ? formatLabel(blueprint.source_contract_key) : formatLabel(blueprint.workflow_domain);
-    return `Integration plan: ${contractName}`;
+    const contractName = blueprint.source_contract_key ? formatLabel(blueprint.source_contract_key) : workflowDomainLabel(blueprint.workflow_domain, ui);
+    return `${ui('Integration plan:')} ${contractName}`;
   }
-  return `${formatLabel(blueprint.workflow_domain)} workflow plan`;
+  return `${ui('Workflow plan:')} ${workflowDomainLabel(blueprint.workflow_domain, ui)}`;
 }
 
-function sourceDescription(blueprint: WorkflowBlueprint): string {
+function sourceDescription(blueprint: WorkflowBlueprint, ui: (englishText: string) => string): string {
   if (blueprint.source_summary) return blueprint.source_summary;
   if (blueprint.blueprint_type === 'external_workflow_visibility_contract') {
-    return 'A read-only plan showing how an approved external integration could be reviewed and governed.';
+    return ui('A read-only plan showing how an approved external integration could be reviewed and governed.');
   }
-  return 'A suggested human workflow based on an existing open work item.';
+  return ui('A suggested human workflow based on an existing open work item.');
 }
 
 function urgencyClass(value?: string | null): string {
@@ -361,6 +424,7 @@ async function fetchWorkflowComposer(
 }
 
 export default function WorkflowAutomationComposerPage() {
+  const { locale, ui } = useAppTranslation();
   const [workflowDomain, setWorkflowDomain] = useState<'all' | WorkflowDomain>('all');
   const [urgency, setUrgency] = useState<'all' | BlueprintUrgency>('all');
 
@@ -400,82 +464,82 @@ export default function WorkflowAutomationComposerPage() {
 
   const summaryValue = (value: unknown): number | string => {
     if (composerQuery.isLoading || composerQuery.error) return '—';
-    return numberValue(value);
+    return formatLocalizedNumber(numberValue(value), locale);
   };
 
   return (
     <div className="workflow-composer-page workflow-composer-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
       <OperationalWorkspaceHero
         iconPath="/workflow-composer"
-        eyebrow="Human workflow planning"
-        title="Workflow Composer"
-        description="Read-only suggested workflow plans that explain steps, approvals, and source-page routing. Nothing is published, automated, or executed from this page."
+        eyebrow={ui("Human workflow planning")}
+        title={ui("Workflow Composer")}
+        description={ui("Read-only suggested workflow plans that explain steps, approvals, and source-page routing. Nothing is published, automated, or executed from this page.")}
         meta={
           <>
-            <OperationalWorkspaceMetaPill>Tenant-scoped</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>Human-reviewed</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>No autonomous execution</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("Human-reviewed")}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{ui("No autonomous execution")}</OperationalWorkspaceMetaPill>
           </>
         }
-        aside={<OperationalWorkspaceStatus value="Guidance only" label="source workflows remain authoritative" />}
+        aside={<OperationalWorkspaceStatus value={ui("Guidance only")} label={ui("source workflows remain authoritative")} />}
       />
 
-      <OperationalWorkspaceStats ariaLabel="Workflow Composer overview">
+      <OperationalWorkspaceStats ariaLabel={ui("Workflow Composer overview")}>
         <OperationalWorkspaceStatCard
-          label="Plans shown"
+          label={ui("Plans shown")}
           value={summaryValue(summary.total_blueprints ?? blueprints.length)}
-          helper="Suggested human workflow plans matching current filters"
+          helper={ui("Suggested human workflow plans matching current filters")}
           iconPath="/workflow-composer"
           tone="blue"
         />
         <OperationalWorkspaceStatCard
-          label="Multi-step approval plans"
+          label={ui("Multi-step approval plans")}
           value={summaryValue(summary.approval_chain_blueprints)}
-          helper="Plans suggesting more than one human review or approval step"
+          helper={ui("Plans suggesting more than one human review or approval step")}
           iconPath="/permissions"
           tone="blue"
         />
         <OperationalWorkspaceStatCard
-          label="External integration plans"
+          label={ui("External integration plans")}
           value={summaryValue(summary.integration_routing_blueprints)}
-          helper="Read-only plans connected to permitted integration contracts"
+          helper={ui("Read-only plans connected to permitted integration contracts")}
           iconPath="/system-context"
           tone="warn"
         />
         <OperationalWorkspaceStatCard
-          label="Page mode"
-          value={composerQuery.isLoading || composerQuery.error ? '—' : executionModeLabel(response?.definition?.execution_mode)}
-          helper="This page suggests a process but cannot create or run automation"
+          label={ui("Page mode")}
+          value={composerQuery.isLoading || composerQuery.error ? '—' : executionModeLabel(response?.definition?.execution_mode, ui)}
+          helper={ui("This page suggests a process but cannot create or run automation")}
           iconPath="/workspace"
           tone="neutral"
         />
       </OperationalWorkspaceStats>
 
       <section className="section workflow-composer-page__section">
-        <div className="section__title workflow-composer-page__section-title"><span className="workflow-composer-page__section-icon"><TenantNavIcon path="/workflow-composer" size={16} /></span><span>Suggested workflow plans</span></div>
+        <div className="section__title workflow-composer-page__section-title"><span className="workflow-composer-page__section-icon"><TenantNavIcon path="/workflow-composer" size={16} /></span><span>{ui("Suggested workflow plans")}</span></div>
         <div className="card workflow-composer-page__controls-card">
           <div className="workflow-composer-page__toolbar">
             <label className="workflow-composer-page__field">
-              Work area
+              {ui("Work area")}
               <select
                 className="workflow-composer-page__select"
                 value={workflowDomain}
                 onChange={(event) => setWorkflowDomain(event.target.value as 'all' | WorkflowDomain)}
               >
                 {visibleDomainOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+                  <option key={option.value} value={option.value}>{ui(option.label)}</option>
                 ))}
               </select>
             </label>
             <label className="workflow-composer-page__field">
-              Urgency
+              {ui("Urgency")}
               <select
                 className="workflow-composer-page__select"
                 value={urgency}
                 onChange={(event) => setUrgency(event.target.value as 'all' | BlueprintUrgency)}
               >
                 {URGENCY_FILTERS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+                  <option key={option.value} value={option.value}>{ui(option.label)}</option>
                 ))}
               </select>
             </label>
@@ -485,16 +549,16 @@ export default function WorkflowAutomationComposerPage() {
               onClick={() => composerQuery.refetch()}
               disabled={composerQuery.isFetching}
             >
-              <TenantNavIcon path="/workflow-composer" size={14} />{composerQuery.isFetching ? 'Refreshing…' : 'Refresh plans'}
+              <TenantNavIcon path="/workflow-composer" size={14} />{composerQuery.isFetching ? ui('Refreshing…') : ui('Refresh plans')}
             </button>
           </div>
 
           <div className="workflow-composer-page__intro">
             <span className="workflow-composer-page__intro-icon"><TenantNavIcon path="/workspace" size={17} /></span>
             <div>
-              <strong>How to use this page</strong>
+              <strong>{ui("How to use this page")}</strong>
               <p className="card__subtext">
-                Review a suggested plan, then open its source page to assign, approve, or complete the real work. Nothing is published or executed here.
+                {ui("Review a suggested plan, then open its source page to assign, approve, or complete the real work. Nothing is published or executed here.")}
               </p>
             </div>
           </div>
@@ -502,24 +566,24 @@ export default function WorkflowAutomationComposerPage() {
           {composerQuery.isLoading ? (
             <div className="workflow-composer-page__state" role="status">
               <span className="workflow-composer-page__intro-icon"><TenantNavIcon path="/workflow-composer" size={17} /></span>
-              <div><div className="workflow-composer-page__state-title">Loading workflow plans</div>
-              <p className="card__subtext">Collecting permitted open work and integration plans for the current company.</p></div>
+              <div><div className="workflow-composer-page__state-title">{ui("Loading workflow plans")}</div>
+              <p className="card__subtext">{ui("Collecting permitted open work and integration plans for the current company.")}</p></div>
             </div>
           ) : composerQuery.error ? (
             <div className="workflow-composer-page__state" role="alert">
               <span className="workflow-composer-page__intro-icon workflow-composer-page__intro-icon--danger"><TenantNavIcon path="/alerts" size={17} /></span>
-              <div className="workflow-composer-page__state-copy"><div className="workflow-composer-page__state-title">Workflow plans could not be loaded</div>
+              <div className="workflow-composer-page__state-copy"><div className="workflow-composer-page__state-title">{ui("Workflow plans could not be loaded")}</div>
               <p className="form-error">
-                {composerQuery.error instanceof ApiError ? composerQuery.error.message : 'Unable to load the Workflow Composer.'}
+                {composerQuery.error instanceof ApiError ? composerQuery.error.message : ui('Unable to load the Workflow Composer.')}
               </p>
-              <button className="button button--secondary workflow-composer-page__inline-button" type="button" onClick={() => composerQuery.refetch()}><TenantNavIcon path="/workflow-composer" size={14} />Try again</button>
+              <button className="button button--secondary workflow-composer-page__inline-button" type="button" onClick={() => composerQuery.refetch()}><TenantNavIcon path="/workflow-composer" size={14} />{ui("Try again")}</button>
               </div>
             </div>
           ) : blueprints.length === 0 ? (
             <div className="workflow-composer-page__state">
               <span className="workflow-composer-page__intro-icon"><TenantNavIcon path="/workflow-composer" size={17} /></span>
-              <div><div className="workflow-composer-page__state-title">No matching plans</div>
-              <p className="card__subtext">No suggested workflow plan matched the selected work area and urgency.</p></div>
+              <div><div className="workflow-composer-page__state-title">{ui("No matching plans")}</div>
+              <p className="card__subtext">{ui("No suggested workflow plan matched the selected work area and urgency.")}</p></div>
             </div>
           ) : (
             <div className="workflow-composer-page__blueprint-list">
@@ -539,80 +603,80 @@ export default function WorkflowAutomationComposerPage() {
                           <div className="workflow-composer-page__blueprint-title-copy">
                         <div className="workflow-composer-page__badge-row">
                           <span className="workflow-composer-page__badge workflow-composer-page__badge--neutral">
-                            {formatLabel(blueprint.workflow_domain)}
+                            {workflowDomainLabel(blueprint.workflow_domain, ui)}
                           </span>
                           <span className="workflow-composer-page__badge workflow-composer-page__badge--neutral">
-                            {blueprintTypeLabel(blueprint.blueprint_type)}
+                            {blueprintTypeLabel(blueprint.blueprint_type, ui)}
                           </span>
                           {triggerStatus ? (
                             <span className="workflow-composer-page__badge workflow-composer-page__badge--neutral">
-                              Status: {formatLabel(triggerStatus)}
+                              {ui("Status:")} {canonicalLabel(triggerStatus, ui)}
                             </span>
                           ) : null}
                         </div>
-                        <h3 className="workflow-composer-page__blueprint-title">{sourceTitle(blueprint)}</h3>
+                        <h3 className="workflow-composer-page__blueprint-title">{sourceTitle(blueprint, ui)}</h3>
                           </div>
                         </div>
                       </div>
-                      <span className={urgencyClass(urgencyValue)}>{formatLabel(urgencyValue)}</span>
+                      <span className={urgencyClass(urgencyValue)}>{canonicalLabel(urgencyValue, ui)}</span>
                     </div>
 
-                    <p className="card__subtext workflow-composer-page__blueprint-summary">{sourceDescription(blueprint)}</p>
+                    <p className="card__subtext workflow-composer-page__blueprint-summary">{sourceDescription(blueprint, ui)}</p>
                     <p className="card__subtext workflow-composer-page__updated">
-                      Plan updated {formatDateTime(blueprint.updated_at || blueprint.created_at)}
+                      {ui("Plan updated")} {formatDateTime(blueprint.updated_at || blueprint.created_at, locale, ui)}
                     </p>
 
                     <div className="workflow-composer-page__plan-grid">
                       <div className="workflow-composer-page__plan-panel">
-                        <div className="workflow-composer-page__plan-title"><span className="workflow-composer-page__plan-icon"><TenantNavIcon path="/workflow-composer" size={14} /></span>Suggested steps</div>
+                        <div className="workflow-composer-page__plan-title"><span className="workflow-composer-page__plan-icon"><TenantNavIcon path="/workflow-composer" size={14} /></span>{ui("Suggested steps")}</div>
                         {suggestedSteps.length > 0 ? (
                           <ol className="workflow-composer-page__step-list">
-                            {suggestedSteps.map((step) => <li key={step}>{plainStep(step)}</li>)}
+                            {suggestedSteps.map((step) => <li key={step}>{plainStep(step, ui)}</li>)}
                           </ol>
                         ) : (
-                          <p className="card__subtext">No suggested steps were returned.</p>
+                          <p className="card__subtext">{ui("No suggested steps were returned.")}</p>
                         )}
                       </div>
                       <div className="workflow-composer-page__plan-panel">
-                        <div className="workflow-composer-page__plan-title"><span className="workflow-composer-page__plan-icon workflow-composer-page__plan-icon--violet"><TenantNavIcon path="/permissions" size={14} /></span>Review and approval path</div>
+                        <div className="workflow-composer-page__plan-title"><span className="workflow-composer-page__plan-icon workflow-composer-page__plan-icon--violet"><TenantNavIcon path="/permissions" size={14} /></span>{ui("Review and approval path")}</div>
                         {approvalSteps.length > 0 ? (
                           <ol className="workflow-composer-page__step-list">
-                            {approvalSteps.map((step) => <li key={step}>{plainStep(step)}</li>)}
+                            {approvalSteps.map((step) => <li key={step}>{plainStep(step, ui)}</li>)}
                           </ol>
                         ) : (
-                          <p className="card__subtext">No separate approval step is suggested.</p>
+                          <p className="card__subtext">{ui("No separate approval step is suggested.")}</p>
                         )}
                       </div>
                     </div>
 
                     <div className="workflow-composer-page__routing-note">
                       <span className="workflow-composer-page__routing-icon"><TenantNavIcon path={blueprint.integration_routing_preview?.external_workflow_eligible ? '/system-context' : '/workspace'} size={15} /></span>
-                      <div><strong>Where the work happens:</strong>{' '}
+                      <div><strong>{ui("Where the work happens:")}</strong>{' '}
                       {blueprint.integration_routing_preview?.external_workflow_eligible
-                        ? 'This is an external integration visibility plan. It still requires manual governance and does not run the partner workflow.'
-                        : 'The existing source page remains responsible for the real work and its audit history.'}
+                        ? ui('This is an external integration visibility plan. It still requires manual governance and does not run the partner workflow.')
+                        : ui('The existing source page remains responsible for the real work and its audit history.')}
                       </div>
                     </div>
 
                     <div className="workflow-composer-page__actions">
-                      {sourceLink ? <Link className="button button--secondary workflow-composer-page__source-button" to={sourceLink.to}><TenantNavIcon path={linkIconPath(sourceLink.to)} size={14} />{sourceLink.label}</Link> : null}
+                      {sourceLink ? <Link className="button button--secondary workflow-composer-page__source-button" to={sourceLink.to}><TenantNavIcon path={linkIconPath(sourceLink.to)} size={14} />{ui(sourceLink.label)}</Link> : null}
                       {!sourceLink && blueprint.integration_routing_preview?.external_workflow_eligible ? (
-                        <span className="card__subtext">No tenant working page is currently available for this integration plan.</span>
+                        <span className="card__subtext">{ui("No tenant working page is currently available for this integration plan.")}</span>
                       ) : null}
                     </div>
 
                     {canViewDiagnostics ? (
                       <details className="workflow-composer-page__details">
-                        <summary><TenantNavIcon path="/system-context" size={14} />Technical plan details</summary>
+                        <summary><TenantNavIcon path="/system-context" size={14} />{ui("Technical plan details")}</summary>
                         <dl className="workflow-composer-page__details-grid">
-                          <dt>Plan ID</dt><dd>{blueprint.blueprint_id}</dd>
-                          <dt>Source record ID</dt><dd>{blueprint.trigger_preview?.trigger_reference || blueprint.source_contract_id || 'Not reported'}</dd>
-                          <dt>Source action ID</dt><dd>{blueprint.source_action_id || 'Not reported'}</dd>
-                          <dt>Trigger source</dt><dd>{formatLabel(blueprint.trigger_preview?.trigger_source)}</dd>
-                          <dt>Trigger preview only</dt><dd>{blueprint.trigger_preview?.event_trigger_only_preview ? 'Yes' : 'Not reported'}</dd>
-                          <dt>Escalates when blocked</dt><dd>{blueprint.escalation_policy_preview?.escalate_when_blocked ? 'Yes' : 'No'}</dd>
-                          <dt>Partner automation trigger</dt><dd>{blueprint.integration_routing_preview?.partner_automation_trigger ? 'Yes' : 'No'}</dd>
-                          <dt>External execution</dt><dd>{blueprint.integration_routing_preview?.external_delivery_execution ? 'Yes' : 'No'}</dd>
+                          <dt>{ui("Plan ID")}</dt><dd>{blueprint.blueprint_id}</dd>
+                          <dt>{ui("Source record ID")}</dt><dd>{blueprint.trigger_preview?.trigger_reference || blueprint.source_contract_id || ui('Not reported')}</dd>
+                          <dt>{ui("Source action ID")}</dt><dd>{blueprint.source_action_id || ui('Not reported')}</dd>
+                          <dt>{ui("Trigger source")}</dt><dd>{canonicalLabel(blueprint.trigger_preview?.trigger_source, ui)}</dd>
+                          <dt>{ui("Trigger preview only")}</dt><dd>{ui(blueprint.trigger_preview?.event_trigger_only_preview ? 'Yes' : 'Not reported')}</dd>
+                          <dt>{ui("Escalates when blocked")}</dt><dd>{ui(blueprint.escalation_policy_preview?.escalate_when_blocked ? 'Yes' : 'No')}</dd>
+                          <dt>{ui("Partner automation trigger")}</dt><dd>{ui(blueprint.integration_routing_preview?.partner_automation_trigger ? 'Yes' : 'No')}</dd>
+                          <dt>{ui("External execution")}</dt><dd>{ui(blueprint.integration_routing_preview?.external_delivery_execution ? 'Yes' : 'No')}</dd>
                         </dl>
                       </details>
                     ) : null}
@@ -624,7 +688,7 @@ export default function WorkflowAutomationComposerPage() {
 
           {response?.generated_at ? (
             <p className="card__subtext workflow-composer-page__generated">
-              Plans updated {formatDateTime(response.generated_at)}. Press Refresh plans whenever you need the latest snapshot.
+              {ui("Plans updated")} {formatDateTime(response.generated_at, locale, ui)}. {ui("Press Refresh plans whenever you need the latest snapshot.")}
             </p>
           ) : null}
         </div>
@@ -632,30 +696,30 @@ export default function WorkflowAutomationComposerPage() {
 
       {composerQuery.isLoading || composerQuery.error ? null : (
         <section className="section workflow-composer-page__section">
-          <div className="section__title workflow-composer-page__section-title"><span className="workflow-composer-page__section-icon"><TenantNavIcon path="/intelligence-review" size={16} /></span><span>How to understand the plans</span></div>
+          <div className="section__title workflow-composer-page__section-title"><span className="workflow-composer-page__section-icon"><TenantNavIcon path="/intelligence-review" size={16} /></span><span>{ui("How to understand the plans")}</span></div>
           <div className="workflow-composer-page__guidance-grid">
             <div className="card workflow-composer-page__guidance-card">
               <span className="workflow-composer-page__icon workflow-composer-page__icon--blue"><TenantNavIcon path={workflowDomainIconPath(blueprints[0]?.workflow_domain)} size={17} /></span>
-              <div className="workflow-composer-page__guidance-copy"><div className="card__label">Start with</div>
+              <div className="workflow-composer-page__guidance-copy"><div className="card__label">{ui("Start with")}</div>
               <div className="workflow-composer-page__guidance-value">
-                {guidance.next_blueprint_title ? displayTitleText(guidance.next_blueprint_title) : 'No plan is waiting'}
+                {guidance.next_blueprint_title ? displayTitleText(guidance.next_blueprint_title) : ui('No plan is waiting')}
               </div>
-              <p className="card__subtext">{guidance.composer_guidance || 'Choose a plan and open its source page.'}</p></div>
+              <p className="card__subtext">{guidance.composer_guidance || ui('Choose a plan and open its source page.')}</p></div>
             </div>
             <div className="card workflow-composer-page__guidance-card">
               <span className="workflow-composer-page__icon workflow-composer-page__icon--violet"><TenantNavIcon path="/permissions" size={17} /></span>
-              <div className="workflow-composer-page__guidance-copy"><div className="card__label">Approval rule</div>
-              <p className="card__subtext">{guidance.approval_chain_guidance || 'Approval steps are suggestions and do not approve work.'}</p></div>
+              <div className="workflow-composer-page__guidance-copy"><div className="card__label">{ui("Approval rule")}</div>
+              <p className="card__subtext">{guidance.approval_chain_guidance || ui('Approval steps are suggestions and do not approve work.')}</p></div>
             </div>
             <div className="card workflow-composer-page__guidance-card">
               <span className="workflow-composer-page__icon workflow-composer-page__icon--amber"><TenantNavIcon path="/automation-schedules" size={17} /></span>
-              <div className="workflow-composer-page__guidance-copy"><div className="card__label">Trigger rule</div>
-              <p className="card__subtext">{guidance.event_trigger_guidance || 'Trigger information is for review only.'}</p></div>
+              <div className="workflow-composer-page__guidance-copy"><div className="card__label">{ui("Trigger rule")}</div>
+              <p className="card__subtext">{guidance.event_trigger_guidance || ui('Trigger information is for review only.')}</p></div>
             </div>
             <div className="card workflow-composer-page__guidance-card">
               <span className="workflow-composer-page__icon workflow-composer-page__icon--green"><TenantNavIcon path="/system-context" size={17} /></span>
-              <div className="workflow-composer-page__guidance-copy"><div className="card__label">Integration rule</div>
-              <p className="card__subtext">{guidance.integration_routing_guidance || 'External integrations are not run from this page.'}</p></div>
+              <div className="workflow-composer-page__guidance-copy"><div className="card__label">{ui("Integration rule")}</div>
+              <p className="card__subtext">{guidance.integration_routing_guidance || ui('External integrations are not run from this page.')}</p></div>
             </div>
           </div>
         </section>
@@ -663,29 +727,29 @@ export default function WorkflowAutomationComposerPage() {
 
       {composerQuery.isLoading || composerQuery.error ? null : (
         <section className="section workflow-composer-page__section">
-          <div className="section__title workflow-composer-page__section-title"><span className="workflow-composer-page__section-icon"><TenantNavIcon path="/reliability-command" size={16} /></span><span>Safety and control</span></div>
+          <div className="section__title workflow-composer-page__section-title"><span className="workflow-composer-page__section-icon"><TenantNavIcon path="/reliability-command" size={16} /></span><span>{ui("Safety and control")}</span></div>
           <div className="workflow-composer-page__safety-grid">
             {USER_SAFETY_ITEMS.map((item) => (
               <div className="card workflow-composer-page__safety-card" key={item.title}>
                 <span className="workflow-composer-page__icon workflow-composer-page__icon--green"><TenantNavIcon path={item.iconPath} size={17} /></span>
-                <div className="workflow-composer-page__safety-copy"><div className="workflow-composer-page__safety-title">{item.title}</div>
-                <p className="card__subtext">{item.description}</p></div>
+                <div className="workflow-composer-page__safety-copy"><div className="workflow-composer-page__safety-title">{ui(item.title)}</div>
+                <p className="card__subtext">{ui(item.description)}</p></div>
               </div>
             ))}
           </div>
 
           {canViewDiagnostics && safetyEntries.length > 0 ? (
             <details className="card workflow-composer-page__technical-safety">
-              <summary><TenantNavIcon path="/reliability-command" size={14} />Technical safety contract</summary>
+              <summary><TenantNavIcon path="/reliability-command" size={14} />{ui("Technical safety contract")}</summary>
               <div className="workflow-composer-page__technical-safety-grid">
                 {safetyEntries.map(([key]) => (
                   <span key={key} className="workflow-composer-page__badge workflow-composer-page__badge--neutral">
-                    {formatLabel(key)}
+                    {safetyLabel(key, ui)}
                   </span>
                 ))}
               </div>
               <p className="card__subtext">
-                Non-mutation guarantee: {response?.non_mutation_guarantee ? 'Active' : 'Not reported'}
+                {ui("Non-mutation guarantee:")} {ui(response?.non_mutation_guarantee ? 'Active' : 'Not reported')}
               </p>
             </details>
           ) : null}

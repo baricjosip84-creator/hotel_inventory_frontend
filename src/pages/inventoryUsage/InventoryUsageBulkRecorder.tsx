@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useAppTranslation } from '../../i18n/I18nContext';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../../i18n/formatters';
 import { OperationalSectionHeader } from '../../components/ui/OperationalWorkspace';
 
 import { USAGE_REASON_OPTIONS } from './inventoryUsageConfig';
@@ -6,24 +8,24 @@ import { styles } from './inventoryUsageStyles';
 import type { InventoryUsageBulkLine, InventoryUsageBulkReadinessResponse, InventoryUsageBulkResponse, InventoryUsageTemplate, InventoryUsageProductOption, InventoryUsageStorageLocationOption } from './inventoryUsageTypes';
 import { showTenantActionError, showTenantActionSuccess } from '../../lib/actionFeedback';
 
-const formatBulkReadinessReason = (reason: string): string => {
+const formatBulkReadinessReason = (reason: string, ui: (text: string) => string): string => {
   switch (reason) {
     case 'reserved_stock':
-      return 'Reserved stock is protected';
+      return ui('Reserved stock is protected');
     case 'insufficient_stock':
-      return 'Insufficient on-hand stock';
+      return ui('Insufficient on-hand stock');
     case 'missing_stock_row':
-      return 'No stock exists at this location';
+      return ui('No stock exists at this location');
     case 'critical_alert':
-      return 'A critical alert blocks usage';
+      return ui('A critical alert blocks usage');
     case 'closed_period':
-      return 'The usage period is closed';
+      return ui('The usage period is closed');
     case 'product_not_found':
-      return 'Product not found';
+      return ui('Product not found');
     case 'storage_location_not_found':
-      return 'Storage location not found';
+      return ui('Storage location not found');
     case 'missing_evidence_acknowledgement_required':
-      return 'Missing-evidence acknowledgement required';
+      return ui('Missing-evidence acknowledgement required');
     default:
       return reason.replace(/_/g, ' ');
   }
@@ -91,6 +93,14 @@ export function InventoryUsageBulkRecorder({
   onPreviewBulkUsage,
   onRecordBulkUsage
 }: InventoryUsageBulkRecorderProps) {
+  const { locale, ui } = useAppTranslation();
+  const formatNumber = (value: number | string | null | undefined, maximumFractionDigits = 4) => {
+    if (value === null || value === undefined || value === "") return "—";
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return String(value);
+    return formatLocalizedNumber(numeric, locale, { maximumFractionDigits });
+  };
+  const formatDateTimeLocal = (value: string | null | undefined) => formatLocalizedDateTime(value, locale);
   const [sharedReason, setSharedReason] = useState('internal_use');
   const [sharedDepartment, setSharedDepartment] = useState('');
   const [sharedEventName, setSharedEventName] = useState('');
@@ -181,14 +191,14 @@ export function InventoryUsageBulkRecorder({
     ));
 
     if (!importedLines.length) {
-      setPasteImportError('Paste at least one line with product_id, storage_location_id, and quantity.');
+      setPasteImportError(ui('Paste at least one line with product_id, storage_location_id, and quantity.'));
       return;
     }
 
     const invalidLine = importedLines.find((line) => !line.product_id.trim() || !line.storage_location_id.trim() || Number(line.quantity) <= 0);
 
     if (invalidLine) {
-      setPasteImportError('Every imported line needs product_id, storage_location_id, and a quantity greater than zero.');
+      setPasteImportError(ui('Every imported line needs product_id, storage_location_id, and a quantity greater than zero.'));
       return;
     }
 
@@ -202,14 +212,14 @@ export function InventoryUsageBulkRecorder({
     ));
 
     if (!importedLines.length) {
-      setPasteImportError('Paste at least one line before appending.');
+      setPasteImportError(ui('Paste at least one line before appending.'));
       return;
     }
 
     const validImportedLines = importedLines.filter((line) => line.product_id.trim() && line.storage_location_id.trim() && Number(line.quantity) > 0);
 
     if (!validImportedLines.length) {
-      setPasteImportError('No valid imported lines found. Required columns are product_id, storage_location_id, quantity.');
+      setPasteImportError(ui('No valid imported lines found. Required columns are product_id, storage_location_id, quantity.'));
       return;
     }
 
@@ -233,19 +243,19 @@ export function InventoryUsageBulkRecorder({
     const payload = buildBulkPayload();
 
     if (!payload.items.length) {
-      showTenantActionError('Add at least one valid usage line with product ID, location ID, and quantity.');
+      showTenantActionError(ui('Add at least one valid usage line with product ID, location ID, and quantity.'));
       return;
     }
 
     onPreviewBulkUsage?.(payload);
-    showTenantActionSuccess('Bulk usage preview prepared successfully.');
+    showTenantActionSuccess(ui('Bulk usage preview prepared successfully.'));
   };
 
   const handleSubmit = () => {
     const payload = buildBulkPayload();
 
     if (!payload.items.length) {
-      showTenantActionError('Add at least one valid usage line with product ID, location ID, and quantity.');
+      showTenantActionError(ui('Add at least one valid usage line with product ID, location ID, and quantity.'));
       return;
     }
 
@@ -376,46 +386,38 @@ export function InventoryUsageBulkRecorder({
     <section style={styles.card}>
       <OperationalSectionHeader
         iconPath="/inventory-usage"
-        title="Bulk usage recorder"
+        title={ui("Bulk usage recorder")}
         description={<>
-          Record several consumption lines in one controlled transaction for events, housekeeping carts, maintenance jobs, waste rounds, or department issue sheets.
-          {selectedTemplate ? ` Loaded template: ${selectedTemplate.name}.` : ''}
+          {ui("Record several consumption lines in one controlled transaction for events, housekeeping carts, maintenance jobs, waste rounds, or department issue sheets.")}{selectedTemplate ? ` ${ui("Loaded template:")} ${selectedTemplate.name}.` : ""}
         </>}
-        actions={<span style={styles.filterPill}>{validLineCount} valid lines</span>}
+        actions={<span style={styles.filterPill}>{formatNumber(validLineCount, 0)} {ui("valid lines")}</span>}
       />
 
       <div style={styles.filterGrid}>
         <label style={styles.fieldLabel}>
-          Default reason
-          <select style={styles.input} value={sharedReason} onChange={(event) => setSharedReason(event.target.value)}>
+          {ui("Default reason")}<select style={styles.input} value={sharedReason} onChange={(event) => setSharedReason(event.target.value)}>
             {USAGE_REASON_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
         </label>
         <label style={styles.fieldLabel}>
-          Department / team
-          <input style={styles.input} value={sharedDepartment} onChange={(event) => setSharedDepartment(event.target.value)} placeholder="Housekeeping, kitchen, maintenance..." />
+          {ui("Department / team")}<input style={styles.input} value={sharedDepartment} onChange={(event) => setSharedDepartment(event.target.value)} placeholder={ui("Housekeeping, kitchen, maintenance...")} />
         </label>
         <label style={styles.fieldLabel}>
-          Event / job
-          <input style={styles.input} value={sharedEventName} onChange={(event) => setSharedEventName(event.target.value)} placeholder="Banquet A, Room 204 repair..." />
+          {ui("Event / job")}<input style={styles.input} value={sharedEventName} onChange={(event) => setSharedEventName(event.target.value)} placeholder={ui("Banquet A, Room 204 repair...")} />
         </label>
         <label style={styles.fieldLabel}>
-          Consumed at
-          <input type="datetime-local" style={styles.input} value={consumedAt} onChange={(event) => setConsumedAt(event.target.value)} />
+          {ui("Consumed at")}<input type="datetime-local" style={styles.input} value={consumedAt} onChange={(event) => setConsumedAt(event.target.value)} />
         </label>
         <label style={styles.fieldLabel}>
-          Shared notes
-          <input style={styles.input} value={sharedNotes} onChange={(event) => setSharedNotes(event.target.value)} placeholder="Optional batch/context note" />
+          {ui("Shared notes")}<input style={styles.input} value={sharedNotes} onChange={(event) => setSharedNotes(event.target.value)} placeholder={ui("Optional batch/context note")} />
         </label>
         <label style={styles.fieldLabel}>
-          Reference type
-          <input style={styles.input} value={sharedReferenceType} onChange={(event) => setSharedReferenceType(event.target.value)} placeholder="event, work_order, requisition..." />
+          {ui("Reference type")}<input style={styles.input} value={sharedReferenceType} onChange={(event) => setSharedReferenceType(event.target.value)} placeholder={"event, work_order, requisition..."} />
         </label>
         <label style={styles.fieldLabel}>
-          Reference ID
-          <input style={styles.input} value={sharedReferenceId} onChange={(event) => setSharedReferenceId(event.target.value)} placeholder="Optional linked record UUID" />
+          {ui("Reference ID")}<input style={styles.input} value={sharedReferenceId} onChange={(event) => setSharedReferenceId(event.target.value)} placeholder={ui("Optional linked record UUID")} />
         </label>
         <label style={styles.checkboxRow}>
           <input
@@ -423,30 +425,27 @@ export function InventoryUsageBulkRecorder({
             checked={sharedMissingEvidenceAcknowledged}
             onChange={(event) => setSharedMissingEvidenceAcknowledged(event.target.checked)}
           />
-          Acknowledge damage/waste lines without evidence metadata
-        </label>
+          {ui("Acknowledge damage/waste lines without evidence metadata")}</label>
       </div>
 
 
       <div style={styles.importPanel}>
         <div>
-          <h3 style={styles.subsectionTitle}>Advanced: paste usage lines</h3>
+          <h3 style={styles.subsectionTitle}>{ui("Advanced: paste usage lines")}</h3>
           <p style={styles.sectionDescription}>
-            For system exports or spreadsheet imports, paste rows as product_id, storage_location_id, quantity, reason, department,
-            event_name, notes, reference_type, reference_id, missing_evidence_acknowledged. A header row is optional.
-          </p>
+            {ui("For system exports or spreadsheet imports, paste rows as product_id, storage_location_id, quantity, reason, department, event_name, notes, reference_type, reference_id, missing_evidence_acknowledged. A header row is optional.")}</p>
         </div>
         <textarea
           style={styles.textarea}
           value={pasteImport}
           onChange={(event) => setPasteImport(event.target.value)}
-          placeholder="product_id,storage_location_id,quantity,reason,department,event_name,notes,reference_type,reference_id,missing_evidence_acknowledged"
+          placeholder={"product_id,storage_location_id,quantity,reason,department,event_name,notes,reference_type,reference_id,missing_evidence_acknowledged"}
           rows={4}
         />
         <div style={styles.inlineActions}>
-          <button type="button" style={styles.secondaryButton} onClick={handlePasteImport}>Replace lines from paste</button>
-          <button type="button" style={styles.secondaryButton} onClick={handleAppendPasteImport}>Append valid pasted lines</button>
-          <button type="button" style={styles.secondaryButton} onClick={() => { setPasteImport(''); setPasteImportError(''); }}>Clear paste box</button>
+          <button type="button" style={styles.secondaryButton} onClick={handlePasteImport}>{ui("Replace lines from paste")}</button>
+          <button type="button" style={styles.secondaryButton} onClick={handleAppendPasteImport}>{ui("Append valid pasted lines")}</button>
+          <button type="button" style={styles.secondaryButton} onClick={() => { setPasteImport(''); setPasteImportError(''); }}>{ui("Clear paste box")}</button>
         </div>
         {pasteImportError ? <p style={styles.errorText}>{pasteImportError}</p> : null}
       </div>
@@ -454,47 +453,40 @@ export function InventoryUsageBulkRecorder({
       {lines.map((line, index) => (
         <div key={index} style={styles.bulkLineGrid}>
           <label style={styles.fieldLabel}>
-            Product
-            <select style={styles.input} value={line.product_id} onChange={(event) => updateLine(index, 'product_id', event.target.value)} disabled={optionsLoading}>
-              <option value="">Select product</option>
+            {ui("Product")}<select style={styles.input} value={line.product_id} onChange={(event) => updateLine(index, 'product_id', event.target.value)} disabled={optionsLoading}>
+              <option value="">{ui("Select product")}</option>
               {productOptions.map((product) => (
                 <option key={product.id} value={product.id}>{product.name}{product.unit ? ` · ${product.unit}` : ""}</option>
               ))}
             </select>
           </label>
           <label style={styles.fieldLabel}>
-            Storage location
-            <select style={styles.input} value={line.storage_location_id} onChange={(event) => updateLine(index, 'storage_location_id', event.target.value)} disabled={optionsLoading}>
-              <option value="">Select location</option>
+            {ui("Storage location")}<select style={styles.input} value={line.storage_location_id} onChange={(event) => updateLine(index, 'storage_location_id', event.target.value)} disabled={optionsLoading}>
+              <option value="">{ui("Select location")}</option>
               {storageLocations.map((location) => (
                 <option key={location.id} value={location.id}>{location.name}</option>
               ))}
             </select>
           </label>
           <label style={styles.fieldLabel}>
-            Quantity
-            <input type="number" min="0" step="0.01" style={styles.input} value={line.quantity} onChange={(event) => updateLine(index, 'quantity', event.target.value)} placeholder="0" />
+            {ui("Quantity")}<input type="number" min="0" step="0.01" style={styles.input} value={line.quantity} onChange={(event) => updateLine(index, 'quantity', event.target.value)} placeholder="0" />
           </label>
           <label style={styles.fieldLabel}>
-            Line reason
-            <select style={styles.input} value={line.consumption_reason} onChange={(event) => updateLine(index, 'consumption_reason', event.target.value)}>
-              <option value="">Use default</option>
+            {ui("Line reason")}<select style={styles.input} value={line.consumption_reason} onChange={(event) => updateLine(index, 'consumption_reason', event.target.value)}>
+              <option value="">{ui("Use default")}</option>
               {USAGE_REASON_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           </label>
           <label style={styles.fieldLabel}>
-            Line notes
-            <input style={styles.input} value={line.notes} onChange={(event) => updateLine(index, 'notes', event.target.value)} placeholder="Optional line note" />
+            {ui("Line notes")}<input style={styles.input} value={line.notes} onChange={(event) => updateLine(index, 'notes', event.target.value)} placeholder={ui("Optional line note")} />
           </label>
           <label style={styles.fieldLabel}>
-            Ref type
-            <input style={styles.input} value={line.reference_type} onChange={(event) => updateLine(index, 'reference_type', event.target.value)} placeholder="Use shared" />
+            {ui("Ref type")}<input style={styles.input} value={line.reference_type} onChange={(event) => updateLine(index, 'reference_type', event.target.value)} placeholder={ui("Use shared")} />
           </label>
           <label style={styles.fieldLabel}>
-            Ref ID
-            <input style={styles.input} value={line.reference_id} onChange={(event) => updateLine(index, 'reference_id', event.target.value)} placeholder="Use shared" />
+            {ui("Ref ID")}<input style={styles.input} value={line.reference_id} onChange={(event) => updateLine(index, 'reference_id', event.target.value)} placeholder={ui("Use shared")} />
           </label>
           <label style={styles.checkboxRow}>
             <input
@@ -502,58 +494,55 @@ export function InventoryUsageBulkRecorder({
               checked={Boolean(line.missing_evidence_acknowledged)}
               onChange={(event) => updateLine(index, 'missing_evidence_acknowledged', event.target.checked)}
             />
-            Missing evidence acknowledged
-          </label>
-          <button type="button" style={styles.secondaryButton} onClick={() => removeLine(index)} disabled={lines.length === 1}>Remove</button>
+            {ui("Missing evidence acknowledged")}</label>
+          <button type="button" style={styles.secondaryButton} onClick={() => removeLine(index)} disabled={lines.length === 1}>{ui("Remove")}</button>
         </div>
       ))}
 
       <div style={styles.bulkFooter}>
-        <button type="button" style={styles.secondaryButton} onClick={addLine}>Add line</button>
+        <button type="button" style={styles.secondaryButton} onClick={addLine}>{ui("Add line")}</button>
         <button type="button" style={styles.secondaryButton} onClick={handlePreview} disabled={!onPreviewBulkUsage || previewing || recording || validLineCount === 0}>
-          {previewing ? 'Checking readiness...' : 'Preview readiness'}
+          {previewing ? ui('Checking readiness...') : ui('Preview readiness')}
         </button>
         <button type="button" style={styles.primaryButton} onClick={handleSubmit} disabled={recording || previewResult?.can_record === false || validLineCount === 0}>
-          {recording ? 'Recording bulk usage...' : 'Record bulk usage'}
+          {recording ? ui('Recording bulk usage...') : ui('Record bulk usage')}
         </button>
       </div>
 
-      {previewError ? <p style={styles.errorText}>Bulk readiness failed: {previewError.message}</p> : null}
+      {previewError ? <p style={styles.errorText}>{ui("Bulk readiness failed: ")}{previewError.message}</p> : null}
       {previewResult ? (
         <div style={styles.importPanel}>
           <div style={styles.sectionHeader}>
             <div>
-              <h3 style={styles.subsectionTitle}>Bulk readiness preview</h3>
+              <h3 style={styles.subsectionTitle}>{ui("Bulk readiness preview")}</h3>
               <p style={readinessTone}>
-                {previewResult.message} · {previewResult.recordable_count} recordable · {previewResult.blocked_count} blocked · {previewResult.warning_count} warning(s).
-              </p>
+                {previewResult.message} · {formatNumber(previewResult.recordable_count, 0)} {ui("recordable · ")}{formatNumber(previewResult.blocked_count, 0)} {ui("blocked · ")}{formatNumber(previewResult.warning_count, 0)} {ui("warning(s).")}</p>
             </div>
             <div style={styles.heroActions}>
               {previewResult.lines?.length ? (
                 <button type="button" style={styles.secondaryButton} onClick={handleExportBulkReadinessCsv}>
-                  Export readiness CSV
-                </button>
+                  {ui("Export readiness CSV")}</button>
               ) : null}
-              <span style={previewResult.can_record ? styles.successPill : styles.dangerPill}>{previewResult.can_record ? 'Ready' : 'Blocked'}</span>
+              <span style={previewResult.can_record ? styles.successPill : styles.dangerPill}>{previewResult.can_record ? ui('Ready') : ui('Blocked')}</span>
             </div>
           </div>
           {previewResult.period_open === false && previewResult.period_closure ? (
-            <p style={styles.errorText}>Usage period is closed for this timestamp. Closure: {previewResult.period_closure.id || 'recorded'}.</p>
+            <p style={styles.errorText}>{ui("Usage period is closed for this timestamp. Closure: ")}{previewResult.period_closure.id || ui('recorded')}.</p>
           ) : null}
           {previewResult.lines?.length ? (
             <div style={styles.tableWrap}>
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>Line</th>
-                    <th style={styles.th}>Product</th>
-                    <th style={styles.th}>Location</th>
-                    <th style={styles.th}>Qty</th>
-                    <th style={styles.th}>On Hand → Result</th>
-                    <th style={styles.th}>Reserved</th>
-                    <th style={styles.th}>Available After</th>
-                    <th style={styles.th}>Evidence</th>
-                    <th style={styles.th}>Readiness</th>
+                    <th style={styles.th}>{ui("Line")}</th>
+                    <th style={styles.th}>{ui("Product")}</th>
+                    <th style={styles.th}>{ui("Location")}</th>
+                    <th style={styles.th}>{ui("Qty")}</th>
+                    <th style={styles.th}>{ui("On Hand → Result")}</th>
+                    <th style={styles.th}>{ui("Reserved")}</th>
+                    <th style={styles.th}>{ui("Available After")}</th>
+                    <th style={styles.th}>{ui("Evidence")}</th>
+                    <th style={styles.th}>{ui("Readiness")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -563,44 +552,43 @@ export function InventoryUsageBulkRecorder({
                       <td style={styles.td}>{line.product_name || line.product_id}</td>
                       <td style={styles.td}>{line.storage_location_name || line.storage_location_id}</td>
                       <td style={styles.td}>{line.quantity}</td>
-                      <td style={styles.td}>{line.current_quantity ?? '—'} → {line.resulting_quantity ?? '—'}</td>
-                      <td style={styles.td}>{line.reserved_quantity ?? '—'}</td>
-                      <td style={styles.td}>{line.resulting_available_quantity ?? '—'}</td>
+                      <td style={styles.td}>{formatNumber(line.current_quantity)} → {formatNumber(line.resulting_quantity)}</td>
+                      <td style={styles.td}>{formatNumber(line.reserved_quantity)}</td>
+                      <td style={styles.td}>{formatNumber(line.resulting_available_quantity)}</td>
                       <td style={styles.td}>
                         {line.requires_evidence_or_acknowledgement
-                          ? line.missing_evidence_acknowledged ? 'Acknowledged' : 'Acknowledgement required'
-                          : 'Not required'}
+                          ? line.missing_evidence_acknowledged ? ui('Acknowledged') : ui('Acknowledgement required')
+                          : ui('Not required')}
                       </td>
                       <td style={styles.td}>
                         {line.can_record
-                          ? 'Ready'
-                          : (line.blocking_reasons || []).map(formatBulkReadinessReason).join(', ') || 'Blocked'}
+                          ? ui("Ready")
+                          : (line.blocking_reasons || []).map((reason) => formatBulkReadinessReason(reason, ui)).join(', ') || ui('Blocked')}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {previewResult.lines.length > 10 ? <p style={styles.sectionDescription}>Showing 10 of {previewResult.lines.length} readiness lines.</p> : null}
+              {previewResult.lines.length > 10 ? <p style={styles.sectionDescription}>{ui("Showing 10 of ")}{formatNumber(previewResult.lines.length, 0)} {ui("readiness lines.")}</p> : null}
             </div>
           ) : null}
         </div>
       ) : null}
 
-      {error ? <p style={styles.errorText}>Bulk usage failed: {error.message}</p> : null}
+      {error ? <p style={styles.errorText}>{ui("Bulk usage failed: ")}{error.message}</p> : null}
       {result ? (
         <div style={styles.importPanel}>
           <div style={styles.sectionHeader}>
             <div>
-              <h3 style={styles.subsectionTitle}>Bulk recording result</h3>
-              <p style={styles.successText}>{result.message} · {result.usage_count} usage lines recorded.</p>
+              <h3 style={styles.subsectionTitle}>{ui("Bulk recording result")}</h3>
+              <p style={styles.successText}>{result.message} · {formatNumber(result.usage_count, 0)} {ui("usage lines recorded.")}</p>
             </div>
             <div style={styles.heroActions}>
               {result.items?.length ? (
                 <button type="button" style={styles.secondaryButton} onClick={handleExportBulkResultCsv}>
-                  Export result CSV
-                </button>
+                  {ui("Export result CSV")}</button>
               ) : null}
-              <span style={styles.successPill}>Recorded</span>
+              <span style={styles.successPill}>{ui("Recorded")}</span>
             </div>
           </div>
           {result.items?.length ? (
@@ -608,14 +596,14 @@ export function InventoryUsageBulkRecorder({
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>Line</th>
-                    <th style={styles.th}>Product</th>
-                    <th style={styles.th}>Location</th>
-                    <th style={styles.th}>Qty</th>
-                    <th style={styles.th}>Balance impact</th>
-                    <th style={styles.th}>Usage log</th>
-                    <th style={styles.th}>Reason</th>
-                    <th style={styles.th}>Consumed at</th>
+                    <th style={styles.th}>{ui("Line")}</th>
+                    <th style={styles.th}>{ui("Product")}</th>
+                    <th style={styles.th}>{ui("Location")}</th>
+                    <th style={styles.th}>{ui("Qty")}</th>
+                    <th style={styles.th}>{ui("Balance impact")}</th>
+                    <th style={styles.th}>{ui("Usage log")}</th>
+                    <th style={styles.th}>{ui("Reason")}</th>
+                    <th style={styles.th}>{ui("Consumed at")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -626,11 +614,11 @@ export function InventoryUsageBulkRecorder({
                       <td style={styles.td}>{storageLocations.find((location) => location.id === item.storage_location_id)?.name || item.storage_location_id}</td>
                       <td style={styles.td}>{item.quantity}</td>
                       <td style={styles.td}>
-                        {item.stock?.previous_quantity ?? '—'} → {item.stock?.new_quantity ?? '—'}
+                        {formatNumber(item.stock?.previous_quantity)} → {formatNumber(item.stock?.new_quantity)}
                       </td>
                       <td style={styles.td}>{item.usage?.id || '—'}</td>
                       <td style={styles.td}>{item.usage?.consumption_reason || '—'}</td>
-                      <td style={styles.td}>{item.usage?.consumed_at ? new Date(item.usage.consumed_at).toLocaleString() : '—'}</td>
+                      <td style={styles.td}>{formatDateTimeLocal(item.usage?.consumed_at)}</td>
                     </tr>
                   ))}
                 </tbody>

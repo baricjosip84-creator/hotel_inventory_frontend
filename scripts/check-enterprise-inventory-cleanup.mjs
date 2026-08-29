@@ -65,7 +65,7 @@ if (tabUi.includes('hint=')) throw new Error('Inventory Controls tabs still rese
 if (!pageCss.includes('.inventory-controls-page .io-workspace-tabs__hint')) throw new Error('Inventory Controls tab hint is not defensively hidden.');
 if (!pageCss.includes('flex: 1 1 auto')) throw new Error('Inventory Controls tab list does not use the available width.');
 
-if (parLevels.includes('Legacy reorder quantity') || !parLevels.includes('label="Reorder quantity"')) {
+if (parLevels.includes('Legacy reorder quantity') || !parLevels.includes("label={ui('Reorder quantity')}")) {
   throw new Error('Par-level form still exposes legacy implementation terminology.');
 }
 
@@ -76,10 +76,10 @@ if (stockPanels.includes('stockAdjustmentForm') || stockPanels.includes('adjustS
   throw new Error('Cycle-count panel still wires the duplicate stock adjustment workflow.');
 }
 
-if (!approvals.includes('{entitySupportsScope ? (') || !approvals.includes('{entityUsesAmount ? (')) {
+if (!approvals.includes('{entitySupportsScope ? <>') || !approvals.includes('{entityUsesAmount ? <>')) {
   throw new Error('Approval-rule fields are not conditionally scoped by rule type.');
 }
-if (!approvals.includes("amountBased ? formatCurrency(item.min_amount, item.currency) : '-'")) {
+if (!approvals.includes("amountBased ? money(item.min_amount, item.currency) : '—'")) {
   throw new Error('Scope-based approval rules still present irrelevant amount values in the table.');
 }
 
@@ -98,7 +98,7 @@ if (!supplierCatalogImport.includes("alignItems: 'flex-end'")) {
 }
 
 
-if (!invoices.includes('formatCurrencyAmount(value, currency || getActiveTenantCurrency(), 2)')) {
+if (!invoices.includes('formatLocalizedCurrency(parsed, currency || getActiveTenantCurrency(), locale, { maximumFractionDigits: 2 })')) {
   throw new Error('Invoice money formatting is not normalized to tenant-facing currency precision.');
 }
 if (invoices.includes('className="inventory-controls-grid" style={styles.grid}')) {
@@ -108,17 +108,17 @@ if (invoices.includes('className="inventory-controls-grid" style={styles.grid}')
 if (notifications.includes('Process due deliveries now') || notifications.includes('onProcessNotificationDeliveries')) {
   throw new Error('Background delivery processing is still exposed as a normal tenant action.');
 }
-if (!notifications.includes('humanizeToken') || !notifications.includes('humanizeToken(item.event_type)')) {
-  throw new Error('Notification event codes are still exposed as raw implementation tokens.');
+if (!notifications.includes('displayToken') || !notifications.includes('displayToken(item.event_type, ui)')) {
+  throw new Error('Known notification event codes are not mapped to tenant-facing display labels.');
 }
 
-if (!notifications.includes('tenantFacingNotificationDescription') || !notifications.includes("headers={['Severity', 'Event', 'Description', 'Created']}")) {
+if (!notifications.includes('tenantFacingNotificationDescription') || !notifications.includes("headers={['Severity', 'Event', 'Description', 'Created'].map(ui)}")) {
   throw new Error('Notification events still expose technical message content instead of tenant-facing descriptions.');
 }
 if (notifications.includes("item.message || '-'")) {
   throw new Error('Notification event table still renders raw backend message strings containing internal record IDs.');
 }
-if (!notifications.includes('<section style={styles.stack}>') || !notifications.includes('<h2 style={styles.cardTitle}>Notification events</h2>')) {
+if (!notifications.includes('<section style={styles.stack}>') || !notifications.includes("ui('Notification events')")) {
   throw new Error('Notification controls are not using the cleaned full-width section structure.');
 }
 if (compliancePanels.includes('processNotificationDeliveriesMutation')) {

@@ -1,6 +1,7 @@
 import type { ProductItem } from '../../types/inventory';
 import { formatCostVarianceStatus, formatMoney, formatPercent } from './productFormatting';
 import { styles } from './productStyles';
+import { useAppTranslation } from '../../i18n/I18nContext';
 
 type ProductsQueryState = {
   isLoading: boolean;
@@ -26,11 +27,11 @@ const toNumber = (value: number | string | null | undefined): number => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const formatCostBasis = (source: string | null | undefined): string => {
-  if (source === 'product_standard') return 'Standard fallback';
-  if (source === 'landed_cost') return 'Landed cost';
-  if (source) return 'Received cost';
-  return 'No cost basis';
+const formatCostBasis = (source: string | null | undefined, ui: (englishText: string) => string): string => {
+  if (source === 'product_standard') return ui('Standard fallback');
+  if (source === 'landed_cost') return ui('Landed cost');
+  if (source) return ui('Received cost');
+  return ui('No cost basis');
 };
 
 export function ProductListTablePanel({
@@ -45,12 +46,13 @@ export function ProductListTablePanel({
   onStartEdit,
   onDelete
 }: ProductListTablePanelProps) {
+  const { ui, locale } = useAppTranslation();
   if (productsQuery.isLoading) {
-    return <div style={styles.emptyCell}>Loading products...</div>;
+    return <div style={styles.emptyCell}>{ui("Loading products...")}</div>;
   }
 
   if (productsQuery.isError) {
-    return <div style={styles.errorBox}>Failed to load products: {(productsQuery.error as Error).message || 'Unknown error'}</div>;
+    return <div style={styles.errorBox}>{ui("Failed to load products:")} {(productsQuery.error as Error).message || ui('Unknown error')}</div>;
   }
 
   return (
@@ -58,14 +60,14 @@ export function ProductListTablePanel({
       <table style={styles.table}>
         <thead>
           <tr>
-            <th style={styles.th}>Product</th>
-            <th style={styles.th}>Category / Unit</th>
-            <th style={styles.th}>Supplier</th>
-            <th style={styles.th}>Stock</th>
-            <th style={styles.th}>Default Barcode</th>
-            <th style={styles.th}>Cost</th>
-            <th style={styles.th}>Est. Value</th>
-            <th style={styles.th}>Actions</th>
+            <th style={styles.th}>{ui("Product")}</th>
+            <th style={styles.th}>{ui("Category / Unit")}</th>
+            <th style={styles.th}>{ui("Supplier")}</th>
+            <th style={styles.th}>{ui("Stock")}</th>
+            <th style={styles.th}>{ui("Default Barcode")}</th>
+            <th style={styles.th}>{ui("Cost")}</th>
+            <th style={styles.th}>{ui("Est. Value")}</th>
+            <th style={styles.th}>{ui("Actions")}</th>
           </tr>
         </thead>
         <tbody>
@@ -85,52 +87,52 @@ export function ProductListTablePanel({
                 <tr key={product.id}>
                   <td style={styles.td}>
                     <div style={styles.rowTitle}>{product.name}</div>
-                    <div style={styles.rowSubtle}>SKU: {product.sku || '-'}</div>
+                    <div style={styles.rowSubtle}>{ui("SKU:")} {product.sku || '-'}</div>
                     {product.requires_lot_tracking || product.requires_expiry_date ? (
                       <div style={styles.rowBadgeGroup}>
-                        {product.requires_lot_tracking ? <span style={styles.miniBadge}>Lot / batch</span> : null}
-                        {product.requires_expiry_date ? <span style={styles.miniBadge}>Expiry</span> : null}
+                        {product.requires_lot_tracking ? <span style={styles.miniBadge}>{ui("Lot / batch")}</span> : null}
+                        {product.requires_expiry_date ? <span style={styles.miniBadge}>{ui("Expiry")}</span> : null}
                       </div>
                     ) : null}
                   </td>
                   <td style={styles.td}>
-                    <div style={styles.rowTitle}>{product.category || 'Uncategorized'}</div>
+                    <div style={styles.rowTitle}>{product.category || ui('Uncategorized')}</div>
                     <div style={styles.rowSubtle}>{product.unit}</div>
                   </td>
-                  <td style={styles.td}>{product.supplier_name || 'Not linked'}</td>
+                  <td style={styles.td}>{product.supplier_name || ui('Not linked')}</td>
                   <td style={styles.td}>
                     <div style={belowMinimum ? styles.rowTitleWarn : styles.rowTitle}>
                       {String(product.current_stock_quantity ?? 0)} {product.unit}
                     </div>
-                    <div style={styles.rowSubtle}>Minimum: {String(product.min_stock ?? 0)}</div>
-                    {belowMinimum ? <span style={styles.miniBadgeWarn}>Below minimum</span> : null}
+                    <div style={styles.rowSubtle}>{ui("Minimum:")} {String(product.min_stock ?? 0)}</div>
+                    {belowMinimum ? <span style={styles.miniBadgeWarn}>{ui("Below minimum")}</span> : null}
                   </td>
                   <td style={styles.td}>
-                    {product.barcode ? <span style={styles.barcodeValue}>{product.barcode}</span> : <span style={styles.rowSubtle}>No default barcode</span>}
+                    {product.barcode ? <span style={styles.barcodeValue}>{product.barcode}</span> : <span style={styles.rowSubtle}>{ui("No default barcode")}</span>}
                   </td>
                   <td style={styles.td}>
                     {product.effective_unit_cost !== null && product.effective_unit_cost !== undefined ? (
                       <div>
-                        <div style={styles.rowTitle}>{formatMoney(product.effective_unit_cost)}</div>
-                        <div style={styles.rowSubtle}>{formatCostBasis(product.effective_cost_source)}</div>
-                        <div style={styles.rowSubtle}>Variance: {formatCostVarianceStatus(product.cost_variance_status)}</div>
+                        <div style={styles.rowTitle}>{formatMoney(product.effective_unit_cost, locale)}</div>
+                        <div style={styles.rowSubtle}>{formatCostBasis(product.effective_cost_source, ui)}</div>
+                        <div style={styles.rowSubtle}>{ui("Variance:")} {ui(formatCostVarianceStatus(product.cost_variance_status))}</div>
                         {product.cost_variance_amount !== null && product.cost_variance_amount !== undefined ? (
                           <div style={styles.rowSubtle}>
-                            Δ {formatMoney(product.cost_variance_amount)} ({formatPercent(product.cost_variance_percent)})
+                            Δ {formatMoney(product.cost_variance_amount, locale)} ({formatPercent(product.cost_variance_percent, locale)})
                           </div>
                         ) : null}
                       </div>
                     ) : (
-                      <span style={styles.rowSubtle}>No cost configured</span>
+                      <span style={styles.rowSubtle}>{ui("No cost configured")}</span>
                     )}
                   </td>
                   <td style={styles.td}>
-                    <div style={styles.rowTitle}>{formatMoney(product.estimated_inventory_value)}</div>
+                    <div style={styles.rowTitle}>{formatMoney(product.estimated_inventory_value, locale)}</div>
                   </td>
                   <td style={styles.td}>
                     <div style={styles.actionGroup}>
                       <button type="button" style={styles.secondaryButton} onClick={() => onOpenCostHistory(product)}>
-                        Cost history
+                        {ui("Cost history")}
                       </button>
 
                       <button
@@ -138,9 +140,9 @@ export function ProductListTablePanel({
                         style={!canViewProductPackages ? styles.disabledButton : styles.secondaryButton}
                         onClick={() => onOpenPackages(product)}
                         disabled={!canViewProductPackages}
-                        title={!canViewProductPackages ? 'Product package read permission required' : undefined}
+                        title={!canViewProductPackages ? ui('Product package read permission required') : undefined}
                       >
-                        Packages
+                        {ui("Packages")}
                       </button>
 
                       <button
@@ -148,9 +150,9 @@ export function ProductListTablePanel({
                         style={!canManageProducts ? styles.disabledButton : styles.secondaryButton}
                         onClick={() => onStartEdit(product)}
                         disabled={!canManageProducts}
-                        title={!canManageProducts ? 'Products write permission required' : undefined}
+                        title={!canManageProducts ? ui('Products write permission required') : undefined}
                       >
-                        Edit
+                        {ui("Edit")}
                       </button>
 
                       <button
@@ -158,9 +160,9 @@ export function ProductListTablePanel({
                         style={!canManageProducts ? styles.disabledButton : styles.dangerButton}
                         onClick={() => onDelete(product)}
                         disabled={deleteProductPending || !canManageProducts}
-                        title={!canManageProducts ? 'Products write permission required' : undefined}
+                        title={!canManageProducts ? ui('Products write permission required') : undefined}
                       >
-                        Delete
+                        {ui("Delete")}
                       </button>
                     </div>
                   </td>
