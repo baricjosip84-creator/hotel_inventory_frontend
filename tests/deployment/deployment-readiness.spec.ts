@@ -100,9 +100,10 @@ async function logoutTenant(api: APIRequestContext, csrfToken: string): Promise<
   expect(response.status(), 'Tenant smoke session must log out cleanly').toBe(200);
 }
 
-async function assertPageHasNoRuntimeFailure(page: Page, path: string, heading: RegExp): Promise<void> {
+async function assertPageHasNoRuntimeFailure(page: Page, path: string): Promise<void> {
   await page.goto(path, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: heading }).first()).toBeVisible();
+  await expect.poll(() => new URL(page.url()).pathname).toBe(path);
+  await expect(page.locator('.io-workspace-hero').first()).toBeVisible();
   await expect(page.locator('body')).not.toContainText(/Failed to fetch|Unhandled Runtime Error|Something went wrong/i);
 
   const overflowsHorizontally = await page.evaluate(() =>
@@ -262,23 +263,23 @@ test.describe('deployed service readiness', () => {
     });
 
     await page.goto('/login', { waitUntil: 'domcontentloaded' });
-    await page.getByLabel(/^Email$/i).fill(requiredValue('E2E_EMAIL'));
-    await page.getByLabel(/^Password$/i).fill(requiredValue('E2E_PASSWORD'));
-    await page.getByRole('button', { name: /^(sign in|login)$/i }).click();
+    await page.locator('#login-email').fill(requiredValue('E2E_EMAIL'));
+    await page.locator('#login-password').fill(requiredValue('E2E_PASSWORD'));
+    await page.locator('form[data-auth-form="true"] button[type="submit"]').click();
     await expect(page).toHaveURL(/\/dashboard$/);
 
-    await assertPageHasNoRuntimeFailure(page, '/dashboard', /^Dashboard$/i);
+    await assertPageHasNoRuntimeFailure(page, '/dashboard');
 
     if (booleanSetting('DEPLOYMENT_REQUIRE_DECISION_INTELLIGENCE', true)) {
-      await assertPageHasNoRuntimeFailure(page, '/decision-learning-feedback', /^Learning Feedback$/i);
-      await assertPageHasNoRuntimeFailure(page, '/probabilistic-forecasting', /^Probabilistic Forecasting$/i);
-      await assertPageHasNoRuntimeFailure(page, '/cross-domain-optimization', /^Cross-Domain Optimization$/i);
+      await assertPageHasNoRuntimeFailure(page, '/decision-learning-feedback');
+      await assertPageHasNoRuntimeFailure(page, '/probabilistic-forecasting');
+      await assertPageHasNoRuntimeFailure(page, '/cross-domain-optimization');
     }
 
     expect(serverFailures, 'Critical pages must not receive backend 5xx responses').toEqual([]);
     expect(pageErrors, 'Critical pages must not emit browser runtime errors').toEqual([]);
 
-    await page.getByRole('button', { name: /log out/i }).click();
+    await page.locator('[data-tenant-logout="true"]').click();
     await expect(page).toHaveURL(/\/login$/);
   });
 

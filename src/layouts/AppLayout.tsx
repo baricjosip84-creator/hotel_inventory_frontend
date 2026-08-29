@@ -466,7 +466,7 @@ export default function AppLayout() {
         <div style={styles.sidebarFooter}>
           <LanguageSelector scope="tenant" compact />
           <div style={styles.sidebarIdentity}><div style={styles.sidebarAvatar}>{(accessRoleLabel || 'U').trim().charAt(0).toUpperCase()}</div><div style={styles.sidebarIdentityText}><div style={styles.sidebarIdentityName}>{tenantSubscriptionAccess?.tenant.name || t('common.tenantWorkspace')}</div><div style={styles.sidebarIdentityRole}>{accessRoleLabel || t('common.tenantUser')}</div></div></div>
-          <button type="button" style={styles.logoutButton} onClick={handleLogout} disabled={isLoggingOut}><TenantNavIcon path="/logout" size={17}/><span>{isLoggingOut ? t('common.loggingOut') : supportSession.isSupportSession ? t('common.exitSupportMode') : t('common.logout')}</span></button>
+          <button type="button" data-tenant-logout="true" style={styles.logoutButton} onClick={handleLogout} disabled={isLoggingOut}><TenantNavIcon path="/logout" size={17}/><span>{isLoggingOut ? t('common.loggingOut') : supportSession.isSupportSession ? t('common.exitSupportMode') : t('common.logout')}</span></button>
         </div>
       </aside>
 

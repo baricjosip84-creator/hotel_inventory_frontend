@@ -20,6 +20,7 @@ const requireText = (content, expected, label) => {
 const pkg = JSON.parse(read('package.json') || '{}');
 const config = read('playwright.deployment.config.ts');
 const testSource = read('tests/deployment/deployment-readiness.spec.ts');
+const appLayout = read('src/layouts/AppLayout.tsx');
 const workflow = strictWorkflowValidation ? read('.github/workflows/deployment-readiness.yml') : '';
 const frontendValidationWorkflow = strictWorkflowValidation ? read('.github/workflows/frontend-validation.yml') : '';
 const docs = read('docs/AUTOMATED_DEPLOYMENT_READINESS_GATE.md');
@@ -75,8 +76,25 @@ requireText(pkg.scripts?.['check:ci'] || '', 'check:deployment-readiness-gate', 
   'access-control-allow-origin',
   'inventory_refresh_token=',
   'Refresh token must never be exposed in JSON',
-  'must not overflow horizontally'
+  'must not overflow horizontally',
+  "page.locator('.io-workspace-hero').first()",
+  "page.locator('#login-email')",
+  "page.locator('#login-password')",
+  "form[data-auth-form=\"true\"] button[type=\"submit\"]",
+  "[data-tenant-logout=\"true\"]"
 ].forEach((expected) => requireText(testSource, expected, 'deployment-readiness Playwright test'));
+
+[
+  "getByRole('heading', { name: /^Dashboard$/i })",
+  "getByRole('heading', { name: /^Learning Feedback$/i })",
+  "getByRole('heading', { name: /^Probabilistic Forecasting$/i })",
+  "getByRole('heading', { name: /^Cross-Domain Optimization$/i })",
+  "getByRole('button', { name: /log out/i })"
+].forEach((forbidden) => {
+  if (testSource.includes(forbidden)) errors.push(`deployment-readiness Playwright test must not depend on locale-specific UI text: ${forbidden}`);
+});
+
+requireText(appLayout, 'data-tenant-logout="true"', 'tenant AppLayout deployment-test hook');
 
 if (strictWorkflowValidation) {
   [
