@@ -9,7 +9,7 @@ import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.46: tenant-facing hero meta pills intentionally hidden; keep code available for reversal.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceStatus
@@ -211,6 +211,11 @@ const CANONICAL_LABELS: Record<string, string> = {
   control_tower: 'Control tower'
 };
 
+/*
+ * v3.49.46 — Tenant simplification
+ * Technical safety-contract labels are intentionally retained but commented out because
+ * the Technical safety contract is no longer rendered for tenant users.
+ *
 const SAFETY_LABELS: Record<string, string> = {
   tenant_isolated: 'Tenant isolated',
   permission_gated: 'Permission gated',
@@ -228,6 +233,7 @@ const SAFETY_LABELS: Record<string, string> = {
   no_external_workflow_execution: 'No external workflow execution',
   no_external_ai_callout: 'No external AI callout'
 };
+*/
 
 function numberValue(value: unknown): number {
   const parsed = Number(value);
@@ -249,9 +255,11 @@ function workflowDomainLabel(value: string | null | undefined, ui: (englishText:
   return option ? ui(option.label) : canonicalLabel(value, ui);
 }
 
+/* v3.49.46: retained for easy reversal with the commented Technical safety contract UI.
 function safetyLabel(value: string, ui: (englishText: string) => string): string {
   return ui(SAFETY_LABELS[value] || formatLabel(value));
 }
+*/
 
 function formatDateTime(value: string | null | undefined, locale: AppLocale, ui: (englishText: string) => string): string {
   if (!value) return ui('Not reported');
@@ -452,9 +460,11 @@ export default function WorkflowAutomationComposerPage() {
     return WORKFLOW_DOMAINS.filter((option) => option.value === 'all' || availableDomains.has(option.value));
   }, [availableDomains]);
 
+  /* v3.49.46: retained for easy reversal with the commented Technical safety contract UI.
   const safetyEntries = useMemo(() => {
     return Object.entries(response?.definition?.safety_contract || {}).filter(([, enabled]) => enabled);
   }, [response?.definition?.safety_contract]);
+  */
 
   useEffect(() => {
     if (workflowDomain !== 'all' && !availableDomains.has(workflowDomain)) {
@@ -476,9 +486,15 @@ export default function WorkflowAutomationComposerPage() {
         description={ui("Read-only suggested workflow plans that explain steps, approvals, and source-page routing. Nothing is published, automated, or executed from this page.")}
         meta={
           <>
+            {/*
+              v3.49.46 — Tenant simplification.
+              These hero meta pills are intentionally hidden from tenant users because the
+              page description and guidance already communicate the same information.
+
             <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
             <OperationalWorkspaceMetaPill>{ui("Human-reviewed")}</OperationalWorkspaceMetaPill>
             <OperationalWorkspaceMetaPill>{ui("No autonomous execution")}</OperationalWorkspaceMetaPill>
+            */}
           </>
         }
         aside={<OperationalWorkspaceStatus value={ui("Guidance only")} label={ui("source workflows remain authoritative")} />}
@@ -738,6 +754,12 @@ export default function WorkflowAutomationComposerPage() {
             ))}
           </div>
 
+          {/*
+            v3.49.46 — Tenant simplification.
+            Technical safety-contract diagnostics are intentionally hidden from tenant UI.
+            The plain-language Safety and control cards above remain visible and authoritative
+            for tenant-facing guidance. The original block is preserved here for reversal.
+
           {canViewDiagnostics && safetyEntries.length > 0 ? (
             <details className="card workflow-composer-page__technical-safety">
               <summary><TenantNavIcon path="/reliability-command" size={14} />{ui("Technical safety contract")}</summary>
@@ -753,6 +775,7 @@ export default function WorkflowAutomationComposerPage() {
               </p>
             </details>
           ) : null}
+          */}
         </section>
       )}
     </div>
