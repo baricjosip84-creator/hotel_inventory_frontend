@@ -10,7 +10,7 @@ import { getRoleCapabilities } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // hidden tenant-facing redundancy; keep source for easy restoration
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceStatus,
@@ -74,6 +74,7 @@ const UNIFIED_AI_FRONTEND_PANEL_DOM_ANCHORS = [
 type AIOperationDomain = 'decision_intelligence' | 'ai_governance' | 'remediation' | 'simulation' | 'optimization' | 'multi_domain';
 type ReviewState = 'pending_review' | 'approval_required' | 'escalated' | 'ready_for_human_decision' | 'acknowledged' | 'approved_for_manual_action' | 'rejected' | 'suppressed' | 'execution_request_drafted';
 type ReviewDecision = 'acknowledged' | 'approved_for_manual_action' | 'rejected' | 'suppressed' | 'escalated' | 'reopened';
+type EscalationTargetRole = 'admin' | 'manager' | 'decision_intelligence_reviewer';
 type Urgency = 'critical' | 'high' | 'medium' | 'low';
 
 type IntelligenceProductionBacklogItem = {
@@ -3626,6 +3627,12 @@ type HumanAIReview = {
     reviewer_user_id?: string | null;
     reviewer_role?: string | null;
     execution_request_id?: string | null;
+    execution_request_status?: string | null;
+    execution_request_execution_status?: string | null;
+    escalation_target_role?: EscalationTargetRole | null;
+    escalation_due_at?: string | null;
+    escalation_assigned_at?: string | null;
+    escalation_resolved_at?: string | null;
     first_reviewed_at?: string | null;
     last_reviewed_at?: string | null;
     version?: number | null;
@@ -3663,6 +3670,12 @@ type AIReviewHistoryResponse = {
     actor_user_id?: string | null;
     actor_role?: string | null;
     execution_request_id?: string | null;
+    metadata?: {
+      escalation_target_role?: EscalationTargetRole | null;
+      escalation_due_at?: string | null;
+      resolved_escalation?: { target_role?: EscalationTargetRole | null; due_at?: string | null } | null;
+      reopened_from_execution_request?: { id?: string; status?: string; execution_status?: string | null } | null;
+    } | null;
     created_at?: string | null;
   }>;
   execution_request?: { id?: string; status?: string; request_type?: string };
@@ -3673,6 +3686,8 @@ type ReviewDecisionDraft = {
   reason_category: string;
   reviewer_notes: string;
   override_reason: string;
+  escalation_target_role: '' | EscalationTargetRole;
+  escalation_due_at: string;
 };
 
 type HumanAIReviewResponse = {
@@ -3759,11 +3774,19 @@ const REVIEW_REASON_OPTIONS = [
   'other'
 ] as const;
 
+const ESCALATION_TARGET_OPTIONS: Array<{ value: EscalationTargetRole; label: string }> = [
+  { value: 'admin', label: 'Tenant Admin' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'decision_intelligence_reviewer', label: 'Any Intelligence reviewer' }
+];
+
 const defaultReviewDecisionDraft: ReviewDecisionDraft = {
   decision: 'acknowledged',
   reason_category: '',
   reviewer_notes: '',
-  override_reason: ''
+  override_reason: '',
+  escalation_target_role: '',
+  escalation_due_at: ''
 };
 
 type IntelligenceReviewView = 'recommendations' | 'readiness';
@@ -3815,6 +3838,7 @@ function describeReviewOrigin(review: HumanAIReview, ui: (englishText: string) =
 
 const HUMAN_AI_REVIEW_QUERY_KEY = 'human-in-loop-ai-review';
 const HUMAN_AI_REVIEW_HISTORY_QUERY_KEY = 'human-in-loop-ai-review-history';
+const ACTION_CENTER_QUERY_KEY = 'operational-action-center';
 
 const URGENCY_FILTERS: Array<{ value: 'all' | Urgency; label: string }> = [
   { value: 'all', label: 'All urgency' },
@@ -4351,6 +4375,38 @@ function formatDateTime(value: string | null | undefined, locale: AppLocale, ui:
   return Number.isNaN(date.getTime()) ? value : formatLocalizedDateTime(date, locale);
 }
 
+function escalationTargetLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  const option = ESCALATION_TARGET_OPTIONS.find((item) => item.value === value);
+  return option ? ui(option.label) : ui('Not assigned');
+}
+
+function reviewDecisionMeaning(decision: ReviewDecision | undefined, ui: (englishText: string) => string): string {
+  const meanings: Record<ReviewDecision, string> = {
+    acknowledged: 'Reviewed and noted. No follow-up work is created; the item can still be reconsidered later.',
+    approved_for_manual_action: 'Accept this result for manual follow-up. If the result supports real work, you can create an Execution Request next.',
+    rejected: 'Do not pursue this result. The review is closed unless somebody reopens it.',
+    suppressed: 'Stop active follow-up on this result without saying the result is wrong. The review is closed unless reopened.',
+    escalated: 'Send this review to an assigned higher-review lane. Choose who owns the follow-up and when it is due.',
+    reopened: 'Return this review to Pending review. A linked active or executed Execution Request prevents reopening.'
+  };
+  return decision ? ui(meanings[decision]) : ui('No review decision is currently available for this lifecycle state.');
+}
+
+function reviewLifecycleMeaning(status: string | null | undefined, ui: (englishText: string) => string): string {
+  const meanings: Record<string, string> = {
+    pending_review: 'Waiting for a human review decision.',
+    approval_required: 'Waiting for a human decision because this source requires approval.',
+    ready_for_human_decision: 'Ready for a human to record what should happen next.',
+    acknowledged: 'Reviewed and noted. No follow-up work was created.',
+    approved_for_manual_action: 'Accepted for possible manual follow-up. An Execution Request can be created when the result represents real work.',
+    rejected: 'Rejected and closed unless reopened.',
+    suppressed: 'Removed from active follow-up and closed unless reopened.',
+    escalated: 'Assigned for higher-level follow-up and surfaced in Action Center until another review decision is recorded.',
+    execution_request_drafted: 'Handed off to a linked Execution Request. The request now owns the operational follow-up.'
+  };
+  return ui(meanings[String(status || '')] || 'Current review state is recorded in the lifecycle history.');
+}
+
 function reviewDecisionValidationMessage(decision: ReviewDecision | undefined, draft: ReviewDecisionDraft, ui: (englishText: string) => string): string | null {
   if (!decision) {
     return ui('No review decision is currently available for this lifecycle state.');
@@ -4369,6 +4425,14 @@ function reviewDecisionValidationMessage(decision: ReviewDecision | undefined, d
     && draft.reason_category === 'business_policy_exception'
     && !draft.override_reason.trim()) {
     return ui('Add an override reason for a business policy exception.');
+  }
+
+  if (decision === 'escalated' && !draft.escalation_target_role) {
+    return ui('Choose who should own the escalated review follow-up.');
+  }
+
+  if (decision === 'escalated' && !draft.escalation_due_at) {
+    return ui('Choose a follow-up due date for the escalated review.');
   }
 
   return null;
@@ -4545,7 +4609,8 @@ export default function HumanInLoopAIReviewPage() {
       if (sourceActionId) setSelectedHistorySourceActionId(sourceActionId);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_QUERY_KEY] }),
-        queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_HISTORY_QUERY_KEY] })
+        queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_HISTORY_QUERY_KEY] }),
+        queryClient.invalidateQueries({ queryKey: [ACTION_CENTER_QUERY_KEY] })
       ]);
     },
     onError: (error) => setReviewActionMessage(error instanceof Error ? error.message : ui('Unable to record the intelligence review decision.'))
@@ -4560,7 +4625,8 @@ export default function HumanInLoopAIReviewPage() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_QUERY_KEY] }),
         queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_HISTORY_QUERY_KEY] }),
-        queryClient.invalidateQueries({ queryKey: ['execution-requests'] })
+        queryClient.invalidateQueries({ queryKey: ['execution-requests'] }),
+        queryClient.invalidateQueries({ queryKey: [ACTION_CENTER_QUERY_KEY] })
       ]);
     },
     onError: (error) => setReviewActionMessage(error instanceof Error ? error.message : ui('Unable to create the Execution Request draft.'))
@@ -4940,6 +5006,8 @@ export default function HumanInLoopAIReviewPage() {
         reason_category: draft.reason_category || null,
         reviewer_notes: draft.reviewer_notes || null,
         override_reason: draft.override_reason || null,
+        escalation_target_role: decision === 'escalated' ? draft.escalation_target_role || null : null,
+        escalation_due_at: decision === 'escalated' ? draft.escalation_due_at || null : null,
         expected_version: review.lifecycle?.version || undefined
       }
     });
@@ -4954,9 +5022,10 @@ export default function HumanInLoopAIReviewPage() {
         description={ui("Review actionable recommendations separately from technical readiness and governance checks. Results may come from rules, simulations, optimization logic, governance findings, or optional AI-assisted analysis; human review remains authoritative.")}
         meta={
           <>
-            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Human decision required")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("No recommendation auto-execution")}</OperationalWorkspaceMetaPill>
+            {/* Tenant-facing hero pills intentionally hidden; source preserved for easy restoration. */}
+            {/* <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill> */}
+            {/* <OperationalWorkspaceMetaPill>{ui("Human decision required")}</OperationalWorkspaceMetaPill> */}
+            {/* <OperationalWorkspaceMetaPill>{ui("No recommendation auto-execution")}</OperationalWorkspaceMetaPill> */}
           </>
         }
         aside={<OperationalWorkspaceStatus value={activeView === 'readiness' ? ui('Readiness') : ui('Human review')} label={ui("current intelligence review view")} />}
@@ -8591,10 +8660,23 @@ export default function HumanInLoopAIReviewPage() {
                       <span style={badgeStyle}>{lifecycle?.persisted ? `${ui('Version')} ${formatLocalizedNumber(lifecycle.version || 1, locale)}` : ui('Not yet reviewed')}</span>
                       {lifecycle?.reviewer_role ? <span style={badgeStyle}>{ui("Reviewer:")} {recommendationLabel(lifecycle.reviewer_role, ui)}</span> : null}
                     </div>
+                    <p className="card__subtext" style={{ marginTop: 8 }}>
+                      {reviewLifecycleMeaning(lifecycle?.current_status || review.review_state, ui)}
+                    </p>
+                    {lifecycle?.current_status === 'escalated' ? (
+                      <p className="card__subtext">
+                        <strong>{ui('Escalated to:')}</strong> {escalationTargetLabel(lifecycle.escalation_target_role, ui)}
+                        {lifecycle.escalation_due_at ? ` · ${ui('Follow-up due:')} ${formatDateTime(lifecycle.escalation_due_at, locale, ui)}` : ''}
+                      </p>
+                    ) : null}
                     {lifecycle?.reviewer_notes ? <p className="card__subtext" style={{ marginTop: 8 }}>{ui("Latest notes:")} {lifecycle.reviewer_notes}</p> : null}
                     {lifecycle?.override_reason ? <p className="card__subtext">{ui("Override reason:")} {lifecycle.override_reason}</p> : null}
                     {lifecycle?.execution_request_id ? (
-                      <p className="card__subtext">{ui("Execution Request draft:")} {lifecycle.execution_request_id}</p>
+                      <p className="card__subtext">
+                        {ui("Execution Request draft:")} {lifecycle.execution_request_id}
+                        {lifecycle.execution_request_status ? ` · ${ui('Status:')} ${recommendationLabel(lifecycle.execution_request_status, ui)}` : ''}
+                        {lifecycle.execution_request_execution_status ? ` · ${ui('Execution:')} ${recommendationLabel(lifecycle.execution_request_execution_status, ui)}` : ''}
+                      </p>
                     ) : null}
                   </div>
 
@@ -8624,6 +8706,33 @@ export default function HumanInLoopAIReviewPage() {
                           </select>
                         </label>
                       </div>
+                      <p className="card__subtext ai-review-page__decision-help" role="note" style={{ marginTop: 10 }}>
+                        <strong>{ui('What this decision means:')}</strong> {reviewDecisionMeaning(selectedDecision, ui)}
+                      </p>
+                      {selectedDecision === 'escalated' ? (
+                        <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginTop: 10 }}>
+                          <label>
+                            <span className="card__subtext">{ui('Escalation goes to')}</span>
+                            <select
+                              style={{ ...selectStyle, width: '100%', marginTop: 4 }}
+                              value={decisionDraft.escalation_target_role}
+                              onChange={(event) => updateReviewDecisionDraft(sourceActionId, { escalation_target_role: event.target.value as '' | EscalationTargetRole })}
+                            >
+                              <option value="">{ui('Choose follow-up owner')}</option>
+                              {ESCALATION_TARGET_OPTIONS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
+                            </select>
+                          </label>
+                          <label>
+                            <span className="card__subtext">{ui('Follow-up due date')}</span>
+                            <input
+                              type="date"
+                              style={{ ...selectStyle, width: '100%', marginTop: 4 }}
+                              value={decisionDraft.escalation_due_at}
+                              onChange={(event) => updateReviewDecisionDraft(sourceActionId, { escalation_due_at: event.target.value })}
+                            />
+                          </label>
+                        </div>
+                      ) : null}
                       <label style={{ display: 'block', marginTop: 10 }}>
                         <span className="card__subtext">{ui("Reviewer notes")}</span>
                         <textarea
@@ -8676,6 +8785,15 @@ export default function HumanInLoopAIReviewPage() {
                           <div className="card__subtext">{recommendationLabel(event.from_status, ui)} → {recommendationLabel(event.to_status, ui)} · {formatDateTime(event.created_at, locale, ui)}</div>
                           {event.reason_category ? <div className="card__subtext">{ui("Reason:")} {recommendationLabel(event.reason_category, ui)}</div> : null}
                           {event.reviewer_notes ? <div className="card__subtext">{ui("Notes:")} {event.reviewer_notes}</div> : null}
+                          {event.metadata?.escalation_target_role ? (
+                            <div className="card__subtext">
+                              {ui('Escalated to:')} {escalationTargetLabel(event.metadata.escalation_target_role, ui)}
+                              {event.metadata.escalation_due_at ? ` · ${ui('Due:')} ${formatDateTime(event.metadata.escalation_due_at, locale, ui)}` : ''}
+                            </div>
+                          ) : null}
+                          {event.metadata?.resolved_escalation?.target_role ? (
+                            <div className="card__subtext">{ui('Escalation resolved for:')} {escalationTargetLabel(event.metadata.resolved_escalation.target_role, ui)}</div>
+                          ) : null}
                           {event.execution_request_id ? <div className="card__subtext">{ui("Execution Request:")} {event.execution_request_id}</div> : null}
                         </div>
                       ))}
