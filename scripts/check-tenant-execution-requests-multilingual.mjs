@@ -42,6 +42,7 @@ else pass(`Execution Requests page has ${literalSet.size} catalog-backed literal
 
 const renderStart = pageSource.indexOf('export default function');
 const renderSource = renderStart >= 0 ? pageSource.slice(renderStart) : pageSource;
+const activePageSource = pageSource.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
 const rawText = renderSource.split(/\r?\n/).flatMap((line) => [...line.matchAll(/<(?:h[1-6]|p|th|td|summary|span|option|button|label|dt|dd|strong|small|OperationalWorkspaceMetaPill|div)\b[^>]*>\s*([A-Za-z][^<>{}]*)\s*</g)].map((match) => match[1].trim()).filter(Boolean));
 if (rawText.length) fail(`Raw direct JSX presentation remains in Execution Requests: ${rawText.join(' | ')}`);
 else pass('Execution Requests page has zero raw direct JSX presentation text.');
@@ -160,12 +161,32 @@ for (const required of [
   'Approve this request? Approval does not execute it, but it makes the request eligible for a permitted execution step.',
   'Execute approved request: {adapter}? This is only enabled for controlled product-field updates.',
   'Complete this approved request without changing business data? This records a safe workflow completion only.',
-  'Failed execution prepared for one controlled retry.', 'Security and separation-of-duties review', 'Technical snapshots (advanced)',
+  'Failed execution prepared for one controlled retry.', 'Security and separation-of-duties review',
   'Workflow safeguard status', 'Built-in protections', 'Technical security evidence', 'Technical audit evidence',
   'Before / after evidence', 'No execution requests match the selected filters.',
   'Find new recommendation', 'New recommendation', 'Create minimum-stock request', 'No new recommendation found.',
+  'Why this recommendation', 'Evidence captured when the request was created', '30-day outbound', '90-day outbound',
+  'Daily demand used', 'Demand history days', 'Coverage days', 'Expected demand during coverage', 'Open inbound',
 ]) if (!literalSet.has(required)) fail(`Execution Requests page-completion presentation is not catalog-backed: ${required}`);
-if (!process.exitCode) pass('Execution Requests shell, create/queue/detail/actions, confirmations, safeguards, audit/security, and before/after presentation are catalog-backed.');
+if (!process.exitCode) pass('Execution Requests shell, create/queue/detail/actions, confirmations, safeguards, audit/security, recommendation evidence, and before/after presentation are catalog-backed.');
+
+for (const forbidden of [
+  "<OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>",
+  'description={selected.id}',
+  'onClick={copySelectedId}',
+  "<summary style={styles.detailsSummary}>{ui('Technical snapshots (advanced)')}</summary>",
+]) if (activePageSource.includes(forbidden)) fail(`Execution Requests tenant UI still exposes intentionally hidden technical/meta presentation: ${forbidden}`);
+if (!process.exitCode) pass('Execution Requests hides hero meta pills, the raw selected-request UUID/copy control, and raw technical snapshot JSON from tenant users.');
+
+for (const required of [
+  "request.payload?.source !== 'execution_requests_recommendation_finder'",
+  'request.context_snapshot?.recommendation_candidate',
+  "ui('Why this recommendation')",
+  "ui('Expected demand during coverage')",
+  "ui('Safety stock')",
+  "ui('Confidence')",
+]) if (!activePageSource.includes(required)) fail(`Execution Requests readable recommendation evidence is missing: ${required}`);
+if (!process.exitCode) pass('Execution Requests renders readable captured recommendation evidence for recommendation-finder minimum-stock requests.');
 
 if (process.exitCode) process.exit(process.exitCode);
 pass('Tenant Execution Requests multilingual page-completion checks passed.');

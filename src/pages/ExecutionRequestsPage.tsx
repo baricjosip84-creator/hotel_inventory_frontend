@@ -11,7 +11,7 @@ import { getActiveTenantCurrency } from '../lib/tenantCurrency';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // Tenant-facing hero pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceTab,
@@ -50,9 +50,16 @@ type ExecutionRecommendationCandidate = {
     recommended_min_stock: number;
     direction: 'increase' | 'decrease' | 'keep_current';
     confidence_score: number;
-    inputs?: { selected_daily_demand?: number; effective_coverage_days?: number };
-    calculation?: { safety_stock?: number };
-    operational_context?: { current_stock?: number; unresolved_alert_count?: number };
+    inputs?: {
+      total_outbound_30d?: number;
+      total_outbound_90d?: number;
+      selected_daily_demand?: number;
+      outbound_history_days?: number;
+      effective_coverage_days?: number;
+    };
+    calculation?: { expected_lead_time_demand?: number; safety_stock?: number };
+    operational_context?: { current_stock?: number; visible_open_inbound_quantity?: number; unresolved_alert_count?: number };
+    warnings?: string[];
     formula_version?: string;
     generated_at?: string;
   } | null;
@@ -114,6 +121,19 @@ function workflowSafeguardStatusLabel(value: string | null | undefined, ui: UiFn
   if (value === 'ready_with_watch_items') return ui('Review recommended');
   if (value === 'needs_fix') return ui('Attention required');
   return value ? label(value, ui) : ui('Loading');
+}
+
+type RecommendationEvidenceSnapshot = NonNullable<ExecutionRecommendationCandidate['recommendation']>;
+
+function recordValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function getRecommendationEvidenceSnapshot(request: ExecutionRequest): RecommendationEvidenceSnapshot | null {
+  if (request.request_type !== 'product_min_stock_update' || request.payload?.source !== 'execution_requests_recommendation_finder') return null;
+  const snapshot = recordValue(request.context_snapshot?.recommendation_candidate);
+  if (!snapshot) return null;
+  return snapshot as unknown as RecommendationEvidenceSnapshot;
 }
 
 const beforeAfterFieldLabels: Record<string, string> = {
@@ -742,15 +762,19 @@ export default function ExecutionRequestsPage() {
     }
   };
 
-  const copySelectedId = async () => {
-    if (!selected?.id) return;
-    try {
-      await navigator.clipboard.writeText(selected.id);
-      showTenantActionSuccess(ui('Execution request ID copied successfully.'));
-    } catch {
-      showTenantActionError(ui('Could not copy request ID. Copy it from the detail panel instead.'));
-    }
-  };
+  /*
+   * Raw request UUID copy control intentionally hidden from normal tenant workflow UI.
+   * The stable request id remains available internally for routing, audit records, exports, and API calls.
+   *   const copySelectedId = async () => {
+   *     if (!selected?.id) return;
+   *     try {
+   *       await navigator.clipboard.writeText(selected.id);
+   *       showTenantActionSuccess(ui('Execution request ID copied successfully.'));
+   *     } catch {
+   *       showTenantActionError(ui('Could not copy request ID. Copy it from the detail panel instead.'));
+   *     }
+   *   };
+   */
 
   const clearFilters = () => {
     setStatus('');
@@ -848,6 +872,7 @@ export default function ExecutionRequestsPage() {
   const visibleEnd = Math.min(offset + requests.length, total);
   const canGoPrevious = offset > 0;
   const canGoNext = offset + requests.length < total;
+  const selectedRecommendationEvidence = selected ? getRecommendationEvidenceSnapshot(selected) : null;
 
   return (
     <div
@@ -861,19 +886,12 @@ export default function ExecutionRequestsPage() {
         title={ui('Controlled execution requests')}
         description={ui('Propose, review, approve, and safely apply tightly scoped product changes. Approval never changes a product by itself; execution stays permission-checked, auditable, and protected from duplicate runs.')}
         meta={
-          <>
+          null /*
+            Tenant-facing hero pills intentionally hidden. Preserve the previous presentation here rather than deleting it:
             <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
             <OperationalWorkspaceMetaPill>{ui('Human approval required')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>
-              {canExecuteExecutionRequests
-                ? ui('Execution access')
-                : canReviewExecutionRequests
-                  ? ui('Review access')
-                  : canCreateExecutionRequests
-                    ? ui('Draft creation access')
-                    : ui('Read-only access')}
-            </OperationalWorkspaceMetaPill>
-          </>
+            <OperationalWorkspaceMetaPill>{canExecuteExecutionRequests ? ui('Execution access') : canReviewExecutionRequests ? ui('Review access') : canCreateExecutionRequests ? ui('Draft creation access') : ui('Read-only access')}</OperationalWorkspaceMetaPill>
+          */
         }
         aside={
           <div style={styles.actions}>
@@ -1165,8 +1183,11 @@ export default function ExecutionRequestsPage() {
           <OperationalSectionHeader
             iconPath="/audit"
             title={ui('Selected request')}
-            description={selected.id}
-            actions={<button type="button" className="btn btn-secondary" data-skip-global-action-feedback="true" onClick={copySelectedId}>{ui('Copy ID')}</button>}
+            /*
+              Raw UUID intentionally hidden from tenant users. It remains the internal request identifier.
+              Previous UI: description={selected.id}
+              Previous action: <button type="button" className="btn btn-secondary" data-skip-global-action-feedback="true" onClick={copySelectedId}>{ui('Copy ID')}</button>
+            */
           />
           <div style={styles.detail}>
             <div style={styles.badgeRow}>
@@ -1194,6 +1215,33 @@ export default function ExecutionRequestsPage() {
               <div style={styles.summaryTile}><span style={styles.summaryLabel}>{ui('Requested change')}</span><strong>{selected.request_type === 'cost_standard_update' || selected.request_type === 'product_pricing_update' ? formatLocalizedCurrency(Number(getRequestedValue(selected)), getActiveTenantCurrency(), locale, { maximumFractionDigits: 2 }) : formatUnknown(getRequestedValue(selected), locale, ui)}</strong></div>
               <div style={styles.summaryTile}><span style={styles.summaryLabel}>{ui('Value at request time')}</span><strong>{selected.request_type === 'cost_standard_update' || selected.request_type === 'product_pricing_update' ? formatLocalizedCurrency(Number(getExpectedValue(selected)), getActiveTenantCurrency(), locale, { maximumFractionDigits: 2 }) : formatUnknown(getExpectedValue(selected), locale, ui)}</strong></div>
             </div>
+
+            {selectedRecommendationEvidence ? (
+              <section style={styles.recommendationEvidencePanel}>
+                <div style={styles.recommendationEvidenceHeader}>
+                  <strong>{ui('Why this recommendation')}</strong>
+                  <span style={styles.meta}>{ui('Evidence captured when the request was created')}</span>
+                </div>
+                <div style={styles.metricsGrid}>
+                  <KeyValue label={ui('30-day outbound')} value={formatUnknown(selectedRecommendationEvidence.inputs?.total_outbound_30d, locale, ui)} />
+                  <KeyValue label={ui('90-day outbound')} value={formatUnknown(selectedRecommendationEvidence.inputs?.total_outbound_90d, locale, ui)} />
+                  <KeyValue label={ui('Daily demand used')} value={formatUnknown(selectedRecommendationEvidence.inputs?.selected_daily_demand, locale, ui)} />
+                  <KeyValue label={ui('Demand history days')} value={formatUnknown(selectedRecommendationEvidence.inputs?.outbound_history_days, locale, ui)} />
+                  <KeyValue label={ui('Coverage days')} value={formatUnknown(selectedRecommendationEvidence.inputs?.effective_coverage_days, locale, ui)} />
+                  <KeyValue label={ui('Expected demand during coverage')} value={formatUnknown(selectedRecommendationEvidence.calculation?.expected_lead_time_demand, locale, ui)} />
+                  <KeyValue label={ui('Safety stock')} value={formatUnknown(selectedRecommendationEvidence.calculation?.safety_stock, locale, ui)} />
+                  <KeyValue label={ui('Current stock')} value={formatUnknown(selectedRecommendationEvidence.operational_context?.current_stock, locale, ui)} />
+                  <KeyValue label={ui('Open inbound')} value={formatUnknown(selectedRecommendationEvidence.operational_context?.visible_open_inbound_quantity, locale, ui)} />
+                  <KeyValue label={ui('Confidence')} value={`${formatLocalizedNumber(Number(selectedRecommendationEvidence.confidence_score || 0) * 100, locale, { maximumFractionDigits: 0 })}%`} />
+                </div>
+                <div style={styles.note}>{ui('Recommended minimum = expected demand during coverage + safety stock. Current stock and open inbound show immediate supply position but do not change the threshold calculation.')}</div>
+                {selectedRecommendationEvidence.warnings?.length ? (
+                  <div style={styles.recommendationWarnings}>
+                    {selectedRecommendationEvidence.warnings.map((warning) => <div key={warning} style={styles.note}>{warning}</div>)}
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
 
             <div style={styles.detailFacts}>
               <KeyValue label={ui('Requested by')} value={selected.requested_by_name || selected.requested_by || ui('System/support')} />
@@ -1241,18 +1289,23 @@ export default function ExecutionRequestsPage() {
               <ExecutionReviewPanel request={selected} executionReview={executionReview} />
             </details>
 
-            <details style={styles.detailsPanel}>
-              <summary style={styles.detailsSummary}>{ui('Technical snapshots (advanced)')}</summary>
-              <div style={styles.meta}>{ui('Stored technical evidence is available here when troubleshooting or auditing. Normal workflow decisions should use the readable fields above.')}</div>
-              <h3 style={styles.subheading}>{ui('Payload snapshot')}</h3>
-              <JsonBlock value={selected.payload} />
-              <h3 style={styles.subheading}>{ui('Gate snapshot')}</h3>
-              <JsonBlock value={selected.gate_snapshot} />
-              <h3 style={styles.subheading}>{ui('Context snapshot')}</h3>
-              <JsonBlock value={selected.context_snapshot} />
-              <h3 style={styles.subheading}>{ui('Execution result snapshot')}</h3>
-              <JsonBlock value={selected.execution_result} />
-            </details>
+            {/*
+              Technical snapshots are intentionally hidden from all tenant users.
+              Keep the underlying snapshots in the request for audit/troubleshooting, but do not render raw JSON in the normal UI.
+              Previous UI preserved here instead of being deleted:
+              <details style={styles.detailsPanel}>
+                <summary style={styles.detailsSummary}>{ui('Technical snapshots (advanced)')}</summary>
+                <div style={styles.meta}>{ui('Stored technical evidence is available here when troubleshooting or auditing. Normal workflow decisions should use the readable fields above.')}</div>
+                <h3 style={styles.subheading}>{ui('Payload snapshot')}</h3>
+                <JsonBlock value={selected.payload} />
+                <h3 style={styles.subheading}>{ui('Gate snapshot')}</h3>
+                <JsonBlock value={selected.gate_snapshot} />
+                <h3 style={styles.subheading}>{ui('Context snapshot')}</h3>
+                <JsonBlock value={selected.context_snapshot} />
+                <h3 style={styles.subheading}>{ui('Execution result snapshot')}</h3>
+                <JsonBlock value={selected.execution_result} />
+              </details>
+            */}
           </div>
         </section>
       ) : (
@@ -1584,6 +1637,9 @@ const styles: Record<string, CSSProperties> = {
   error: { marginBottom: 0 },
   warning: { padding: '0.75rem 0.9rem', border: '1px solid #facc15', borderRadius: '12px', background: '#fefce8', color: '#854d0e' },
   actions: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap' },
+  recommendationEvidencePanel: { border: '1px solid #dbeafe', borderRadius: '14px', background: '#f8fbff', padding: '0.9rem', display: 'grid', gap: '0.75rem' },
+  recommendationEvidenceHeader: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' },
+  recommendationWarnings: { display: 'grid', gap: '0.35rem' },
   recommendationPanel: { padding: '1rem', border: '1px solid #bfdbfe', borderRadius: '16px', background: '#eff6ff', display: 'grid', gap: '0.75rem' },
   recommendationHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' },
   summaryPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '16px', background: '#fff', boxShadow: '0 2px 10px rgba(15, 23, 42, 0.035)' },
