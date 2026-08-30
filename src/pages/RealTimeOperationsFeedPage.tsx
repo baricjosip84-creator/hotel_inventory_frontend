@@ -9,7 +9,7 @@ import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // Intentionally hidden from tenant UI: redundant hero metadata.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceStatus
@@ -203,6 +203,7 @@ const CANONICAL_LABELS: Record<string, string> = {
   multi_domain: 'Cross-area'
 };
 
+/*
 const TECHNICAL_SAFETY_LABELS: Record<string, string> = {
   read_only: 'Read only',
   advisory_only: 'Advisory only',
@@ -222,6 +223,7 @@ const TECHNICAL_SAFETY_LABELS: Record<string, string> = {
   no_external_workflow_execution: 'No external workflow execution',
   no_external_ai_callout: 'No external AI callout'
 };
+*/
 
 function formatLabel(value?: string | null): string {
   const text = String(value || 'unknown').replace(/_/g, ' ').trim().toLowerCase();
@@ -233,9 +235,11 @@ function canonicalLabel(value: string | null | undefined, ui: (englishText: stri
   return ui(CANONICAL_LABELS[raw] || formatLabel(raw));
 }
 
+/*
 function technicalSafetyLabel(value: string, ui: (englishText: string) => string): string {
   return ui(TECHNICAL_SAFETY_LABELS[value] || formatLabel(value));
 }
+*/
 
 function formatDateTime(value: string | null | undefined, locale: AppLocale, ui: (englishText: string) => string): string {
   if (!value) return ui('Not reported');
@@ -413,9 +417,11 @@ export default function RealTimeOperationsFeedPage() {
       .filter(([key]) => contract[key] === true)
       .map(([key, content]) => ({ key, ...content }));
   }, [response?.definition?.safety_contract]);
+  /*
   const technicalSafetyEntries = useMemo(() => {
     return Object.entries(response?.definition?.safety_contract || {}).filter(([, enabled]) => enabled);
   }, [response?.definition?.safety_contract]);
+  */
 
   useEffect(() => {
     if (eventDomain !== 'all' && !availableDomains.has(eventDomain)) setEventDomain('all');
@@ -428,6 +434,7 @@ export default function RealTimeOperationsFeedPage() {
         eyebrow={ui("Operational coordination")}
         title={ui("Operations Feed")}
         description={ui("A tenant-scoped coordination feed for current open work, permitted integration events, and disruption follow-up. Review context here and use the authoritative source page for action.")}
+        /*
         meta={
           <>
             <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
@@ -435,6 +442,7 @@ export default function RealTimeOperationsFeedPage() {
             <OperationalWorkspaceMetaPill>{ui("Source workflows linked")}</OperationalWorkspaceMetaPill>
           </>
         }
+        */
         aside={<OperationalWorkspaceStatus value={ui("Snapshot")} label={ui("refresh to load the latest permitted operational events")} />}
       />
 
@@ -581,9 +589,11 @@ export default function RealTimeOperationsFeedPage() {
           ))}
         </div>
 
+        {/*
         {canViewDiagnostics && technicalSafetyEntries.length > 0 ? (
           <details className="operations-feed-page__technical-safety"><summary><TenantNavIcon path="/system-context" size={14} />{ui("Technical safety details")}</summary><div className="operations-feed-page__technical-safety-grid">{technicalSafetyEntries.map(([key]) => <span className="operations-feed-page__badge operations-feed-page__badge--neutral" key={key}>{technicalSafetyLabel(key, ui)}</span>)}</div></details>
         ) : null}
+        */}
       </section>
     </div>
   );
