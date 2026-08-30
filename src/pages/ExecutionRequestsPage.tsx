@@ -35,6 +35,29 @@ type ExecutionStatusFilter = '' | 'not_executed' | 'completed' | 'noop_completed
 type ControlledRequestType = 'cost_standard_update' | 'product_min_stock_update';
 type ExecutionWorkspaceSection = 'overview' | 'create' | 'queue' | 'controls';
 
+type ExecutionRecommendationCandidate = {
+  found: boolean;
+  request_type: 'product_min_stock_update' | null;
+  checked_products: number;
+  duplicate_open_requests_excluded: boolean;
+  generated_at: string;
+  recommendation: {
+    product_id: string;
+    product_name: string;
+    unit?: string | null;
+    recommendation_status: string;
+    current_min_stock: number;
+    recommended_min_stock: number;
+    direction: 'increase' | 'decrease' | 'keep_current';
+    confidence_score: number;
+    inputs?: { selected_daily_demand?: number; effective_coverage_days?: number };
+    calculation?: { safety_stock?: number };
+    operational_context?: { current_stock?: number; unresolved_alert_count?: number };
+    formula_version?: string;
+    generated_at?: string;
+  } | null;
+};
+
 const requestTypes: ExecutionRequest['request_type'][] = [
   'cost_review',
   'cost_standard_update',
@@ -182,6 +205,7 @@ export default function ExecutionRequestsPage() {
   const canExecuteExecutionRequests = capabilities.canExecuteExecutionRequests;
   const canWriteProducts = capabilities.canManageProducts;
   const canViewSystemContext = capabilities.canViewSystemContext;
+  const canViewDecisionIntelligence = capabilities.canViewDecisionIntelligence;
   const [data, setData] = useState<ExecutionRequestListResponse | null>(null);
   const [options, setOptions] = useState<ExecutionRequestOptionsResponse | null>(null);
   const [adapterRegistry, setAdapterRegistry] = useState<ExecutionAdapterRegistryResponse | null>(null);
@@ -204,6 +228,8 @@ export default function ExecutionRequestsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [secondaryWarning, setSecondaryWarning] = useState<string | null>(null);
+  const [recommendationCandidate, setRecommendationCandidate] = useState<ExecutionRecommendationCandidate | null>(null);
+  const [checkingRecommendation, setCheckingRecommendation] = useState(false);
   const [activeWorkspaceSection, setActiveWorkspaceSection] = useState<ExecutionWorkspaceSection>('overview');
 
   const query = useMemo(() => {
@@ -322,27 +348,98 @@ export default function ExecutionRequestsPage() {
     };
   }, [canViewSystemContext]);
 
-  const createSystemRecommendation = async () => {
+  /*
+   * Legacy generic System Context draft creation is intentionally retained but disabled here.
+   * The old button created a generic system_recommendation request without a specific actionable change.
+   *   const createSystemRecommendation = async () => {
+   *     setSaving(true);
+   *     setError(null);
+   *     try {
+   *       const { contextSnapshot, gateSnapshot } = await loadOptionalExecutionContextSnapshots();
+   * 
+   *       const created = await apiRequest<ExecutionRequest>('/execution-requests', {
+   *         method: 'POST',
+   *         body: JSON.stringify({
+   *           request_type: 'system_recommendation',
+   *           payload: {
+   *             source: 'system_context_page',
+   *             requested_action: 'review_system_context_recommendation',
+   *             note: 'Created from the current System Context snapshot. Real execution is only available for approved controlled product-field requests.'
+   *           },
+   *           gate_snapshot: gateSnapshot,
+   *           context_snapshot: contextSnapshot
+   *         })
+   *       });
+   * 
+   *       setSelected(created);
+   *       setAuditPack(null);
+   *       setSecurityAudit(null);
+   *       setExecutionReview(null);
+   *       const nextParams = new URLSearchParams(searchParams);
+   *       nextParams.set('request_id', created.id);
+   *       setSearchParams(nextParams, { replace: true });
+   *       await loadRequests();
+   *       showTenantActionSuccess(ui('Recommendation draft created.'));
+   *     } catch (err) {
+   *       const message = err instanceof ApiError ? err.message : ui('Failed to create execution request');
+   *       setError(message);
+   *       showTenantActionError(message);
+   *     } finally {
+   *       setSaving(false);
+   *     }
+   *   };
+   * 
+   */
+
+  const findNewRecommendation = async () => {
+    setCheckingRecommendation(true);
+    setError(null);
+    try {
+      const result = await apiRequest<ExecutionRecommendationCandidate>('/execution-requests/recommendation-candidate');
+      setRecommendationCandidate(result);
+      if (!result.found) {
+        showTenantActionSuccess(ui('No new recommendation found.'));
+      }
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : ui('Failed to find a new recommendation');
+      setError(message);
+      showTenantActionError(message);
+    } finally {
+      setCheckingRecommendation(false);
+    }
+  };
+
+  const createRecommendationRequest = async () => {
+    const recommendation = recommendationCandidate?.recommendation;
+    if (!recommendation || recommendationCandidate?.request_type !== 'product_min_stock_update') return;
+
     setSaving(true);
     setError(null);
     try {
       const { contextSnapshot, gateSnapshot } = await loadOptionalExecutionContextSnapshots();
-
       const created = await apiRequest<ExecutionRequest>('/execution-requests', {
         method: 'POST',
         body: JSON.stringify({
-          request_type: 'system_recommendation',
+          request_type: 'product_min_stock_update',
           payload: {
-            source: 'system_context_page',
-            requested_action: 'review_system_context_recommendation',
-            note: 'Created from the current System Context snapshot. Real execution is only available for approved controlled product-field requests.'
+            product_id: recommendation.product_id,
+            min_stock: recommendation.recommended_min_stock,
+            reason: 'System-generated minimum-stock recommendation based on recent demand and replenishment evidence.',
+            source: 'execution_requests_recommendation_finder',
+            system_recommended_min_stock: recommendation.recommended_min_stock,
+            recommendation_formula_version: recommendation.formula_version || null,
+            recommendation_confidence_score: recommendation.confidence_score,
+            recommendation_status: recommendation.recommendation_status
           },
           gate_snapshot: gateSnapshot,
           context_snapshot: contextSnapshot
+            ? { ...contextSnapshot, recommendation_candidate: recommendation }
+            : { recommendation_candidate: recommendation }
         })
       });
 
       setSelected(created);
+      setRecommendationCandidate(null);
       setAuditPack(null);
       setSecurityAudit(null);
       setExecutionReview(null);
@@ -350,7 +447,7 @@ export default function ExecutionRequestsPage() {
       nextParams.set('request_id', created.id);
       setSearchParams(nextParams, { replace: true });
       await loadRequests();
-      showTenantActionSuccess(ui('Recommendation draft created.'));
+      showTenantActionSuccess(ui('Minimum-stock request created.'));
     } catch (err) {
       const message = err instanceof ApiError ? err.message : ui('Failed to create execution request');
       setError(message);
@@ -783,14 +880,41 @@ export default function ExecutionRequestsPage() {
             <button type="button" className="btn btn-secondary" onClick={loadRequests} disabled={loading || saving}>
               {loading ? ui('Refreshing…') : ui('Refresh')}
             </button>
-            {canCreateExecutionRequests && canViewSystemContext ? (
-              <button type="button" className="btn btn-secondary" onClick={createSystemRecommendation} disabled={saving}>
-                {ui('Create recommendation draft')}
+            {canCreateExecutionRequests && canViewDecisionIntelligence ? (
+              <button type="button" className="btn btn-secondary" onClick={findNewRecommendation} disabled={saving || checkingRecommendation}>
+                {checkingRecommendation ? ui('Checking…') : ui('Find new recommendation')}
               </button>
             ) : null}
           </div>
         }
       />
+
+      {recommendationCandidate ? (
+        <section className="app-panel" style={styles.recommendationPanel}>
+          {recommendationCandidate.recommendation ? (
+            <>
+              <div style={styles.recommendationHeader}>
+                <div>
+                  <strong>{ui('New recommendation')}</strong>
+                  <div style={styles.meta}>{recommendationCandidate.recommendation.product_name}</div>
+                </div>
+                <button type="button" className="btn btn-primary" onClick={createRecommendationRequest} disabled={saving}>
+                  {saving ? ui('Creating…') : ui('Create minimum-stock request')}
+                </button>
+              </div>
+              <div style={styles.metricsGrid}>
+                <KeyValue label={ui('Current minimum stock')} value={formatUnknown(recommendationCandidate.recommendation.current_min_stock, locale, ui)} />
+                <KeyValue label={ui('Recommended minimum stock')} value={formatUnknown(recommendationCandidate.recommendation.recommended_min_stock, locale, ui)} />
+                <KeyValue label={ui('Current stock')} value={formatUnknown(recommendationCandidate.recommendation.operational_context?.current_stock, locale, ui)} />
+                <KeyValue label={ui('Confidence')} value={formatLocalizedNumber(recommendationCandidate.recommendation.confidence_score * 100, locale, { maximumFractionDigits: 0 }) + '%'} />
+              </div>
+              <div style={styles.note}>{ui('The system found a different minimum-stock threshold from current demand and replenishment evidence. Nothing changes until you create, submit, approve, and execute the request.')}</div>
+            </>
+          ) : (
+            <div className="app-empty-state">{ui('No new recommendation found.')}</div>
+          )}
+        </section>
+      ) : null}
 
       <OperationalWorkspaceStats ariaLabel={ui('Execution request summary')}>
         <OperationalWorkspaceStatCard
@@ -1460,6 +1584,8 @@ const styles: Record<string, CSSProperties> = {
   error: { marginBottom: 0 },
   warning: { padding: '0.75rem 0.9rem', border: '1px solid #facc15', borderRadius: '12px', background: '#fefce8', color: '#854d0e' },
   actions: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap' },
+  recommendationPanel: { padding: '1rem', border: '1px solid #bfdbfe', borderRadius: '16px', background: '#eff6ff', display: 'grid', gap: '0.75rem' },
+  recommendationHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' },
   summaryPanel: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', padding: '1rem', border: '1px solid #e2e8f0', borderRadius: '16px', background: '#fff', boxShadow: '0 2px 10px rgba(15, 23, 42, 0.035)' },
   summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem', marginBottom: '1rem' },
   summaryTile: { display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: 0, padding: '0.8rem', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc' },

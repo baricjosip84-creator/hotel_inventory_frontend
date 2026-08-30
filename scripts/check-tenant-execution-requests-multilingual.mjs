@@ -81,6 +81,7 @@ if (!process.exitCode) pass('Execution Requests route and view/create/submit/can
 for (const required of [
   '`/execution-requests?${query}`',
   "'/execution-requests/options'",
+  "'/execution-requests/recommendation-candidate'",
   "'/execution-requests/adapters'",
   "'/execution-requests/hardening-summary'",
   '`/execution-requests/${requestedRequestId}`',
@@ -106,6 +107,7 @@ for (const required of [
   'capabilities.canExecuteExecutionRequests',
   'capabilities.canManageProducts',
   'capabilities.canViewSystemContext',
+  'capabilities.canViewDecisionIntelligence',
 ]) if (!pageSource.includes(required)) fail(`Execution Requests capability boundary changed or missing: ${required}`);
 if (!process.exitCode) pass('Create/submit/cancel/review/execute/product-write/System Context capability boundaries remain unchanged.');
 
@@ -161,6 +163,7 @@ for (const required of [
   'Failed execution prepared for one controlled retry.', 'Security and separation-of-duties review', 'Technical snapshots (advanced)',
   'Workflow safeguard status', 'Built-in protections', 'Technical security evidence', 'Technical audit evidence',
   'Before / after evidence', 'No execution requests match the selected filters.',
+  'Find new recommendation', 'New recommendation', 'Create minimum-stock request', 'No new recommendation found.',
 ]) if (!literalSet.has(required)) fail(`Execution Requests page-completion presentation is not catalog-backed: ${required}`);
 if (!process.exitCode) pass('Execution Requests shell, create/queue/detail/actions, confirmations, safeguards, audit/security, and before/after presentation are catalog-backed.');
 
