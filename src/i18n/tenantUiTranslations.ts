@@ -10604,6 +10604,17 @@ const rows: readonly TranslationRow[] = [
   ["High-urgency plans", "Pläne mit hoher Dringlichkeit", "Planes de alta urgencia", "Plans à forte urgence", "Planovi visoke hitnosti"],
   ["Critical and high-urgency plans needing attention", "Kritische Pläne und Pläne mit hoher Dringlichkeit, die Aufmerksamkeit erfordern", "Planes críticos y de alta urgencia que requieren atención", "Plans critiques et à forte urgence nécessitant une attention", "Kritični planovi i planovi visoke hitnosti koji zahtijevaju pažnju"],
   ["Suggested escalation when blocked", "Vorgeschlagene Eskalation bei Blockierung", "Escalación sugerida cuando está bloqueado", "Escalade suggérée en cas de blocage", "Predložena eskalacija kada je blokirano"],
+  ["Status unavailable", "Status nicht verfügbar", "Estado no disponible", "Statut indisponible", "Status nije dostupan"],
+  ["Checking how Copilot analysis is currently produced.", "Es wird geprüft, wie die Copilot-Analyse derzeit erzeugt wird.", "Comprobando cómo se genera actualmente el análisis de Copilot.", "Vérification de la manière dont l’analyse Copilot est actuellement produite.", "Provjerava se kako se trenutačno izrađuje analiza Copilota."],
+  ["The Copilot capability status could not be loaded.", "Der Status der Copilot-Funktionen konnte nicht geladen werden.", "No se pudo cargar el estado de las funciones de Copilot.", "L’état des fonctionnalités de Copilot n’a pas pu être chargé.", "Status mogućnosti Copilota nije moguće učitati."],
+  ["This analysis isn't available with your current access.", "Diese Analyse ist mit Ihren aktuellen Zugriffsrechten nicht verfügbar.", "Este análisis no está disponible con su acceso actual.", "Cette analyse n’est pas disponible avec vos droits d’accès actuels.", "Ova analiza nije dostupna s vašim trenutačnim pristupom."],
+  ["Diagnostic details:", "Diagnosedetails:", "Detalles de diagnóstico:", "Détails de diagnostic :", "Dijagnostički detalji:"],
+  ["Search by product name, SKU, or barcode", "Nach Produktname, SKU oder Barcode suchen", "Buscar por nombre de producto, SKU o código de barras", "Rechercher par nom de produit, SKU ou code-barres", "Pretražite prema nazivu proizvoda, SKU-u ili barkodu"],
+  ["Showing up to 25 matching products. Search to narrow the list.", "Es werden bis zu 25 passende Produkte angezeigt. Verwenden Sie die Suche, um die Liste einzugrenzen.", "Se muestran hasta 25 productos coincidentes. Use la búsqueda para reducir la lista.", "Jusqu’à 25 produits correspondants sont affichés. Utilisez la recherche pour affiner la liste.", "Prikazuje se do 25 odgovarajućih proizvoda. Pretraživanjem suzite popis."],
+  ["No matching products found.", "Keine passenden Produkte gefunden.", "No se encontraron productos coincidentes.", "Aucun produit correspondant trouvé.", "Nisu pronađeni odgovarajući proizvodi."],
+  ["Run history pagination", "Seitennavigation des Laufverlaufs", "Paginación del historial de ejecuciones", "Pagination de l’historique des exécutions", "Straničenje povijesti pokretanja"],
+  ["Newer", "Neuere", "Más recientes", "Plus récents", "Novije"],
+  ["Older", "Ältere", "Más antiguos", "Plus anciens", "Starije"],
 ];
 
 const indexes: Record<AppLocale, number> = { 'en-GB': 0, 'de-DE': 1, 'es-ES': 2, 'fr-FR': 3, 'hr-HR': 4 };

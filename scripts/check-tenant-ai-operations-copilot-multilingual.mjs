@@ -55,6 +55,8 @@ const dynamicPresentationKeys = [
   'Built-in rules — no AI model',
   'Built-in rules — external AI unavailable',
   'External AI model',
+  'Checking how Copilot analysis is currently produced.',
+  'The Copilot capability status could not be loaded.',
   'Can read only the current tenant’s permitted data',
   'Cannot choose database queries',
   'Cannot call tools',
@@ -100,9 +102,13 @@ const rawText = pageSource.split(/\r?\n/).flatMap((line) => {
 if (rawText.length) fail(`Raw JSX presentation remains in AI Operations Copilot: ${rawText.join(' | ')}`);
 else pass('AI Operations Copilot has no remaining raw JSX presentation text.');
 
+for (const required of [
+  'ui(intentFallbacks[item.intent]?.label || item.label)',
+  "ui(intentFallbacks[intent]?.description || selectedIntentCapability?.description || '')"
+]) if (!pageSource.includes(required)) fail(`Copilot intent presentation must remain owned by the frontend translation catalog: ${required}`);
+if (!process.exitCode) pass('Copilot intent labels and descriptions stay localized even when capability data loads successfully.');
+
 const backendDataBoundaries = [
-  'selectedIntentCapability?.description || ui(intentFallbacks[intent].description)',
-  'capabilitiesQuery.data?.intents ? item.label : ui(item.label)',
   'capabilitiesQuery.data.run_unavailable_reason',
   'minimumStockRecommendation.formula',
   'minimumStockRecommendation.assumptions.map((item) => <li key={item}>{item}</li>)',
@@ -136,7 +142,9 @@ for (const required of [
   'formatLocalizedDateTime(parsed, locale)',
   "formatLocalizedNumber(value, locale, { style: 'percent'",
   'formatLocalizedNumber(capabilitiesQuery.data.run_limits.user_runs_used, locale)',
-  'formatLocalizedNumber(runRows.length, locale)'
+  'formatLocalizedNumber(historyStart, locale)',
+  'formatLocalizedNumber(historyEnd, locale)',
+  'formatLocalizedNumber(runTotal, locale)'
 ]) if (!pageSource.includes(required)) fail(`Locale-aware Copilot formatting missing: ${required}`);
 if (!process.exitCode) pass('Copilot currency, dates, percentages, counts, and run usage use the selected locale.');
 
@@ -150,10 +158,13 @@ if (!process.exitCode) pass('AI Copilot route and DECISION_INTELLIGENCE_READ per
 for (const required of [
   "return apiRequest<CopilotRun>('/ai-operations-copilot/runs', {",
   "method: 'POST'",
-  "return apiRequest<ProductItem[]>('/products?limit=100');"
+  "return apiRequest<CopilotProductOption[]>(`/ai-operations-copilot/products?${params.toString()}`);",
+  'PRODUCT_SEARCH_LIMIT = 25',
+  'HISTORY_PAGE_SIZE = 50'
 ]) if (!pageSource.includes(required)) fail(`Expected existing Copilot request contract missing: ${required}`);
 for (const forbidden of [
   "apiRequest('/products/",
+  "/products?limit=100",
   "apiRequest('/stock/",
   "apiRequest('/shipments/",
   "method: 'PATCH'",
