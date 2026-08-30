@@ -4,7 +4,7 @@ import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
-import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
+import { formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
 import { getRoleCapabilities } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
@@ -3669,10 +3669,13 @@ type AIReviewHistoryResponse = {
     override_reason?: string | null;
     actor_user_id?: string | null;
     actor_role?: string | null;
+    actor_name?: string | null;
+    actor_email?: string | null;
     execution_request_id?: string | null;
     metadata?: {
       escalation_target_role?: EscalationTargetRole | null;
       escalation_due_at?: string | null;
+      previous_escalation?: { target_role?: EscalationTargetRole | null; due_at?: string | null } | null;
       resolved_escalation?: { target_role?: EscalationTargetRole | null; due_at?: string | null } | null;
       reopened_from_execution_request?: { id?: string; status?: string; execution_status?: string | null } | null;
     } | null;
@@ -3708,6 +3711,7 @@ type HumanAIReviewResponse = {
   };
   summary?: {
     total_reviews?: number;
+    active_reviews?: number;
     approval_required_reviews?: number;
     escalated_reviews?: number;
     by_domain?: Record<string, number>;
@@ -4375,6 +4379,46 @@ function formatDateTime(value: string | null | undefined, locale: AppLocale, ui:
   return Number.isNaN(date.getTime()) ? value : formatLocalizedDateTime(date, locale);
 }
 
+function formatDateOnly(value: string | null | undefined, locale: AppLocale, ui: (englishText: string) => string): string {
+  if (!value) return ui('Not reported');
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : formatLocalizedDate(date, locale);
+}
+
+function dateInputValueFromIso(value: string | null | undefined): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function dateInputEndOfDayIso(value: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 23, 59, 59, 999);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function todayDateInputValue(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function reviewStateIsActive(status: string | null | undefined): boolean {
+  return ['pending_review', 'approval_required', 'escalated', 'ready_for_human_decision'].includes(String(status || ''));
+}
+
+function currentRoleMatchesEscalationTarget(targetRole: EscalationTargetRole | null | undefined, currentRole: string): boolean {
+  if (!targetRole || targetRole === 'decision_intelligence_reviewer') return true;
+  return targetRole === currentRole;
+}
+
 function escalationTargetLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
   const option = ESCALATION_TARGET_OPTIONS.find((item) => item.value === value);
   return option ? ui(option.label) : ui('Not assigned');
@@ -4386,7 +4430,7 @@ function reviewDecisionMeaning(decision: ReviewDecision | undefined, ui: (englis
     approved_for_manual_action: 'Accept this result for manual follow-up. If the result supports real work, you can create an Execution Request next.',
     rejected: 'Do not pursue this result. The review is closed unless somebody reopens it.',
     suppressed: 'Stop active follow-up on this result without saying the result is wrong. The review is closed unless reopened.',
-    escalated: 'Send this review to an assigned higher-review lane. Choose who owns the follow-up and when it is due.',
+    escalated: 'Send this to another reviewer. Choose who should review it and when it is due.',
     reopened: 'Return this review to Pending review. A linked active or executed Execution Request prevents reopening.'
   };
   return decision ? ui(meanings[decision]) : ui('No review decision is currently available for this lifecycle state.');
@@ -4401,7 +4445,7 @@ function reviewLifecycleMeaning(status: string | null | undefined, ui: (englishT
     approved_for_manual_action: 'Accepted for possible manual follow-up. An Execution Request can be created when the result represents real work.',
     rejected: 'Rejected and closed unless reopened.',
     suppressed: 'Removed from active follow-up and closed unless reopened.',
-    escalated: 'Assigned for higher-level follow-up and surfaced in Action Center until another review decision is recorded.',
+    escalated: 'Waiting for the assigned reviewer. It also appears in Action Center until the review is resolved.',
     execution_request_drafted: 'Handed off to a linked Execution Request. The request now owns the operational follow-up.'
   };
   return ui(meanings[String(status || '')] || 'Current review state is recorded in the lifecycle history.');
@@ -4603,10 +4647,17 @@ export default function HumanInLoopAIReviewPage() {
 
   const reviewDecisionMutation = useMutation({
     mutationFn: ({ sourceActionId, body }: { sourceActionId: string; body: Record<string, unknown> }) => recordAIReviewDecision(sourceActionId, body),
-    onSuccess: async (result) => {
+    onSuccess: async (result, variables) => {
       setReviewActionMessage(ui('Intelligence review decision recorded and audit history updated.'));
-      const sourceActionId = result.source?.source_action_id || selectedHistorySourceActionId;
-      if (sourceActionId) setSelectedHistorySourceActionId(sourceActionId);
+      const sourceActionId = result.source?.source_action_id || variables.sourceActionId || selectedHistorySourceActionId;
+      if (sourceActionId) {
+        setSelectedHistorySourceActionId(sourceActionId);
+        setReviewDecisionDrafts((current) => {
+          const next = { ...current };
+          delete next[sourceActionId];
+          return next;
+        });
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_QUERY_KEY] }),
         queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_HISTORY_QUERY_KEY] }),
@@ -5008,7 +5059,9 @@ export default function HumanInLoopAIReviewPage() {
         reviewer_notes: draft.reviewer_notes || null,
         override_reason: draft.override_reason || null,
         escalation_target_role: decision === 'escalated' ? draft.escalation_target_role || null : null,
-        escalation_due_at: decision === 'escalated' ? draft.escalation_due_at || null : null,
+        escalation_due_at: decision === 'escalated' && draft.escalation_due_at
+          ? dateInputEndOfDayIso(draft.escalation_due_at)
+          : null,
         expected_version: review.lifecycle?.version || undefined
       }
     });
@@ -5016,25 +5069,22 @@ export default function HumanInLoopAIReviewPage() {
 
   return (
     <div className="ai-review-page ai-review-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
+      {/* Tenant-facing hero pills intentionally hidden. Original rendering preserved here for restoration:
+          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Human decision required")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("No recommendation auto-execution")}</OperationalWorkspaceMetaPill>
+      */}
       <OperationalWorkspaceHero
         iconPath="/intelligence-review"
         eyebrow={ui("Decision intelligence & governance")}
         title={ui("Intelligence Review")}
         description={ui("Review actionable recommendations separately from technical readiness and governance checks. Results may come from rules, simulations, optimization logic, governance findings, or optional AI-assisted analysis; human review remains authoritative.")}
-        meta={
-          <>
-            {/* Tenant-facing hero pills intentionally hidden; source preserved for easy restoration. */}
-            {/* <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill> */}
-            {/* <OperationalWorkspaceMetaPill>{ui("Human decision required")}</OperationalWorkspaceMetaPill> */}
-            {/* <OperationalWorkspaceMetaPill>{ui("No recommendation auto-execution")}</OperationalWorkspaceMetaPill> */}
-          </>
-        }
         aside={<OperationalWorkspaceStatus value={activeView === 'readiness' ? ui('Readiness') : ui('Human review')} label={ui("current intelligence review view")} />}
       />
 
       {activeView === 'recommendations' ? (
         <OperationalWorkspaceStats ariaLabel={ui("Recommendation review summary")}>
-          <OperationalWorkspaceStatCard label={ui("Recommendation reviews")} value={formatLocalizedNumber(numberValue(summary.total_reviews ?? reviews.length), locale)} helper={ui("Rule-based and optional AI-assisted proposals waiting for human review")} iconPath="/intelligence-review" tone="blue" />
+          <OperationalWorkspaceStatCard label={ui("Open reviews")} value={formatLocalizedNumber(numberValue(summary.active_reviews), locale)} helper={ui("Rule-based and optional AI-assisted proposals waiting for human review")} iconPath="/intelligence-review" tone="blue" />
           <OperationalWorkspaceStatCard label={ui("Approval required")} value={formatLocalizedNumber(numberValue(summary.approval_required_reviews), locale)} helper={ui("Items that remain inside a governed approval workflow")} iconPath="/permissions" tone={numberValue(summary.approval_required_reviews) > 0 ? 'warn' : 'good'} />
           <OperationalWorkspaceStatCard label={ui("Escalated")} value={formatLocalizedNumber(numberValue(summary.escalated_reviews), locale)} helper={ui("High-attention items requiring management or governance follow-up")} iconPath="/alerts" tone={numberValue(summary.escalated_reviews) > 0 ? 'danger' : 'good'} />
           <OperationalWorkspaceStatCard label={ui("Safety rule")} value={ui("Human decision only")} helper={ui("Review decisions never execute the underlying recommendation")} iconPath="/reliability-command" tone="good" />
@@ -5055,14 +5105,15 @@ export default function HumanInLoopAIReviewPage() {
 
       <div className="card ai-review-page__mode-bar">
         <div style={toolbarStyle}>
-          <button className="button button--secondary" type="button" onClick={refreshActiveView} disabled={isRefreshingActiveView}>
-            <TenantNavIcon path="/intelligence-review" size={16} />
-            {isRefreshingActiveView
-              ? activeView === 'readiness' ? ui('Refreshing readiness checks…') : ui('Refreshing recommendation reviews…')
-              : activeView === 'readiness' ? ui('Refresh readiness checks') : ui('Refresh recommendation reviews')}
-          </button>
+          {activeView === 'readiness' ? (
+            <button className="button button--secondary" type="button" onClick={refreshActiveView} disabled={isRefreshingActiveView}>
+              <TenantNavIcon path="/intelligence-review" size={16} />
+              {isRefreshingActiveView ? ui('Refreshing readiness checks…') : ui('Refresh readiness checks')}
+            </button>
+          ) : null}
           <Link className="button button--secondary" to="/action-center"><TenantNavIcon path="/action-center" size={16} />{ui("Open action center")}</Link>
-          <Link className="button button--secondary" to="/workflow-composer"><TenantNavIcon path="/workflow-composer" size={16} />{ui("Open workflow composer")}</Link>
+          {/* Duplicate Workflow Composer action intentionally hidden here; it remains in Recommendation review controls. */}
+          {/* <Link className="button button--secondary" to="/workflow-composer"><TenantNavIcon path="/workflow-composer" size={16} />{ui("Open workflow composer")}</Link> */}
         </div>
         <p className="card__subtext ai-review-page__mode-explanation">
           {activeView === 'readiness'
@@ -5122,6 +5173,9 @@ export default function HumanInLoopAIReviewPage() {
               </div>
 
 
+              <details className="card ai-review-page__readiness-details" style={{ marginTop: 16 }}>
+                <summary>{ui('Governance readiness details')}</summary>
+                <div className="ai-review-page__readiness-details-body">
               <div className="card" style={{ marginTop: 16 }} data-ai-contract-panel="capability_inventory">
                 <div className="card__label">{ui("Intelligence capability inventory")}</div>
                 <p className="card__subtext">
@@ -8515,6 +8569,8 @@ export default function HumanInLoopAIReviewPage() {
                   <p className="card__subtext">{ui("No production backlog reported.")}</p>
                 )}
               </div>
+                </div>
+              </details>
             </>
           )}
         </div>
@@ -8583,9 +8639,25 @@ export default function HumanInLoopAIReviewPage() {
               const reviewOrigin = describeReviewOrigin(review, ui);
               const lifecycle = review.lifecycle;
               const sourceActionId = review.source_action_id || '';
-              const decisionDraft = reviewDecisionDrafts[sourceActionId] || defaultReviewDecisionDraft;
+              const isEscalatedReview = lifecycle?.current_status === 'escalated';
+              const currentRoleOwnsEscalation = !isEscalatedReview
+                || currentRoleMatchesEscalationTarget(lifecycle?.escalation_target_role, capabilities.role);
+              const adminCanReassignEscalation = isEscalatedReview && capabilities.isAdmin && !currentRoleOwnsEscalation;
+              const initialDecisionDraft: ReviewDecisionDraft = isEscalatedReview
+                ? {
+                    ...defaultReviewDecisionDraft,
+                    decision: 'escalated',
+                    escalation_target_role: lifecycle?.escalation_target_role || '',
+                    escalation_due_at: dateInputValueFromIso(lifecycle?.escalation_due_at)
+                  }
+                : defaultReviewDecisionDraft;
+              const decisionDraft = reviewDecisionDrafts[sourceActionId] || initialDecisionDraft;
               const allowedDecisions = lifecycle?.allowed_decisions || [];
-              const visibleDecisionOptions = REVIEW_DECISION_OPTIONS.filter((option) => allowedDecisions.includes(option.value));
+              const visibleDecisionOptions = REVIEW_DECISION_OPTIONS.filter((option) => {
+                if (!allowedDecisions.includes(option.value)) return false;
+                if (!isEscalatedReview || currentRoleOwnsEscalation) return true;
+                return adminCanReassignEscalation && option.value === 'escalated';
+              });
               const selectedDecision = visibleDecisionOptions.some((option) => option.value === decisionDraft.decision)
                 ? decisionDraft.decision
                 : visibleDecisionOptions[0]?.value;
@@ -8597,7 +8669,7 @@ export default function HumanInLoopAIReviewPage() {
                     <span className={`ai-review-page__badge ai-review-page__badge--${review.urgency || 'medium'}`}>{recommendationLabel(review.urgency, ui)}</span>
                     <span className="ai-review-page__badge">{recommendationLabel(review.review_state, ui)}</span>
                     <span className="ai-review-page__badge ai-review-page__badge--violet">{recommendationLabel(review.ai_operation_domain, ui)}</span>
-                    {review.governance_approval_guidance?.approval_required ? <span className="ai-review-page__badge ai-review-page__badge--amber">{ui("Approval required")}</span> : null}
+                    {review.governance_approval_guidance?.approval_required && reviewStateIsActive(lifecycle?.current_status || review.review_state) ? <span className="ai-review-page__badge ai-review-page__badge--amber">{ui("Approval required")}</span> : null}
                   </div>
                   <div className="ai-review-page__review-heading"><span className="ai-review-page__review-icon ai-review-page__icon--violet"><TenantNavIcon path="/intelligence-review" size={18} /></span><h3>{review.title || review.review_id}</h3></div>
                   <p className="card__subtext">{review.summary || ui('No review summary was provided.')}</p>
@@ -8655,7 +8727,7 @@ export default function HumanInLoopAIReviewPage() {
                   ) : null}
 
                   <div className="ai-review-page__lifecycle-panel">
-                    <div className="card__label">{ui("Persisted review lifecycle")}</div>
+                    <div className="card__label">{ui("Review status")}</div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
                       <span style={badgeStyle}>{ui("Status:")} {recommendationLabel(lifecycle?.current_status || review.review_state, ui)}</span>
                       <span style={badgeStyle}>{lifecycle?.persisted ? `${ui('Version')} ${formatLocalizedNumber(lifecycle.version || 1, locale)}` : ui('Not yet reviewed')}</span>
@@ -8666,8 +8738,8 @@ export default function HumanInLoopAIReviewPage() {
                     </p>
                     {lifecycle?.current_status === 'escalated' ? (
                       <p className="card__subtext">
-                        <strong>{ui('Escalated to:')}</strong> {escalationTargetLabel(lifecycle.escalation_target_role, ui)}
-                        {lifecycle.escalation_due_at ? ` · ${ui('Follow-up due:')} ${formatDateTime(lifecycle.escalation_due_at, locale, ui)}` : ''}
+                        <strong>{ui('Assigned to')}</strong>: {escalationTargetLabel(lifecycle.escalation_target_role, ui)}
+                        {lifecycle.escalation_due_at ? ` · ${ui('Due date')}: ${formatDateOnly(lifecycle.escalation_due_at, locale, ui)}` : ''}
                       </p>
                     ) : null}
                     {lifecycle?.reviewer_notes ? <p className="card__subtext" style={{ marginTop: 8 }}>{ui("Latest notes:")} {lifecycle.reviewer_notes}</p> : null}
@@ -8683,7 +8755,7 @@ export default function HumanInLoopAIReviewPage() {
 
                   {capabilities.canGovernDecisionIntelligence && sourceActionId && visibleDecisionOptions.length ? (
                     <div className="ai-review-page__decision-panel">
-                      <div className="card__label ai-review-page__panel-title"><span className="ai-review-page__panel-icon"><TenantNavIcon path="/permissions" size={15} /></span>{ui("Record human decision")}</div>
+                      <div className="card__label ai-review-page__panel-title"><span className="ai-review-page__panel-icon"><TenantNavIcon path="/permissions" size={15} /></span>{ui("Review decision")}</div>
                       <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginTop: 10 }}>
                         <label>
                           <span className="card__subtext">{ui("Decision")}</span>
@@ -8692,7 +8764,11 @@ export default function HumanInLoopAIReviewPage() {
                             value={selectedDecision}
                             onChange={(event) => updateReviewDecisionDraft(sourceActionId, { decision: event.target.value as ReviewDecision })}
                           >
-                            {visibleDecisionOptions.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
+                            {visibleDecisionOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {ui(option.value === 'escalated' && isEscalatedReview ? 'Update escalation' : option.label)}
+                              </option>
+                            ))}
                           </select>
                         </label>
                         <label>
@@ -8713,20 +8789,21 @@ export default function HumanInLoopAIReviewPage() {
                       {selectedDecision === 'escalated' ? (
                         <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginTop: 10 }}>
                           <label>
-                            <span className="card__subtext">{ui('Escalation goes to')}</span>
+                            <span className="card__subtext">{ui('Assigned to')}</span>
                             <select
                               style={{ ...selectStyle, width: '100%', marginTop: 4 }}
                               value={decisionDraft.escalation_target_role}
                               onChange={(event) => updateReviewDecisionDraft(sourceActionId, { escalation_target_role: event.target.value as '' | EscalationTargetRole })}
                             >
-                              <option value="">{ui('Choose follow-up owner')}</option>
+                              <option value="">{ui('Choose reviewer')}</option>
                               {ESCALATION_TARGET_OPTIONS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
                             </select>
                           </label>
                           <label>
-                            <span className="card__subtext">{ui('Follow-up due date')}</span>
+                            <span className="card__subtext">{ui('Due date')}</span>
                             <input
                               type="date"
+                              min={todayDateInputValue()}
                               style={{ ...selectStyle, width: '100%', marginTop: 4 }}
                               value={decisionDraft.escalation_due_at}
                               onChange={(event) => updateReviewDecisionDraft(sourceActionId, { escalation_due_at: event.target.value })}
@@ -8784,13 +8861,17 @@ export default function HumanInLoopAIReviewPage() {
                         <div key={event.id || `${event.event_type}-${event.created_at}`} style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-color, #d9dde5)' }}>
                           <strong>{recommendationLabel(event.event_type, ui)}</strong>
                           <div className="card__subtext">{recommendationLabel(event.from_status, ui)} → {recommendationLabel(event.to_status, ui)} · {formatDateTime(event.created_at, locale, ui)}</div>
+                          <div className="card__subtext">{ui('Reviewed by')} {event.actor_name || (event.actor_role ? recommendationLabel(event.actor_role, ui) : event.actor_email || event.actor_user_id || ui('Not reported'))}</div>
                           {event.reason_category ? <div className="card__subtext">{ui("Reason:")} {recommendationLabel(event.reason_category, ui)}</div> : null}
                           {event.reviewer_notes ? <div className="card__subtext">{ui("Notes:")} {event.reviewer_notes}</div> : null}
                           {event.metadata?.escalation_target_role ? (
                             <div className="card__subtext">
                               {ui('Escalated to:')} {escalationTargetLabel(event.metadata.escalation_target_role, ui)}
-                              {event.metadata.escalation_due_at ? ` · ${ui('Due:')} ${formatDateTime(event.metadata.escalation_due_at, locale, ui)}` : ''}
+                              {event.metadata.escalation_due_at ? ` · ${ui('Due:')} ${formatDateOnly(event.metadata.escalation_due_at, locale, ui)}` : ''}
                             </div>
+                          ) : null}
+                          {event.metadata?.previous_escalation?.target_role ? (
+                            <div className="card__subtext">{ui('Previous')} {ui('Assigned to')}: {escalationTargetLabel(event.metadata.previous_escalation.target_role, ui)}</div>
                           ) : null}
                           {event.metadata?.resolved_escalation?.target_role ? (
                             <div className="card__subtext">{ui('Escalation resolved for:')} {escalationTargetLabel(event.metadata.resolved_escalation.target_role, ui)}</div>
@@ -8802,7 +8883,7 @@ export default function HumanInLoopAIReviewPage() {
                   ) : null}
 
                   <div className="ai-review-page__review-actions">
-                    {sourcePath ? <Link className="button button--secondary" to={sourcePath}><TenantNavIcon path={sourcePath} size={16} />{ui("Open source surface")}</Link> : null}
+                    {sourcePath ? <Link className="button button--secondary" to={sourcePath}><TenantNavIcon path={sourcePath} size={16} />{ui("Open source page")}</Link> : null}
                     <Link className="button button--secondary" to="/action-center"><TenantNavIcon path="/action-center" size={16} />{ui("Open action center")}</Link>
                     {sourceActionId ? (
                       <button

@@ -58,8 +58,8 @@ if (missingDynamic.length) fail(`Intelligence Review dynamic recommendation labe
 else pass(`${dynamicLabels.length} dynamic recommendation/status/reason labels are catalog-backed.`);
 
 const representativeRows = [
-  'Intelligence Review', 'Recommendation reviews', 'Recommendation review controls', 'Review queue', 'Record human decision',
-  'Source confidence', 'How this result was produced', 'Persisted review lifecycle', 'Review history', 'Human decision only'
+  'Intelligence Review', 'Recommendation reviews', 'Recommendation review controls', 'Review queue', 'Review decision',
+  'Source confidence', 'How this result was produced', 'Review status', 'Review history', 'Human decision only'
 ];
 const missingRepresentative = representativeRows.filter((key) => !uniqueKeys.has(key));
 if (missingRepresentative.length) fail(`Missing representative Intelligence Review recommendation translations: ${missingRepresentative.join(' | ')}`);
@@ -68,7 +68,7 @@ else pass(`${representativeRows.length} representative recommendation rows are p
 if (!pageSource.includes('useAppTranslation()')) fail('Intelligence Review must use the shared translation context.');
 if (!pageSource.includes('formatLocalizedDateTime(date, locale)')) fail('Recommendation timestamps must use locale-aware date/time formatting.');
 if (!pageSource.includes('formatLocalizedNumber(Math.round(value * 100), locale)')) fail('Recommendation confidence percentages must use locale-aware number formatting.');
-if (!pageSource.includes('formatLocalizedNumber(numberValue(summary.total_reviews ?? reviews.length), locale)')) fail('Recommendation KPI counts must use locale-aware number formatting.');
+if (!pageSource.includes('formatLocalizedNumber(numberValue(summary.active_reviews), locale)')) fail('Recommendation KPI counts must use locale-aware number formatting.');
 if (pageSource.includes('date.toLocaleString()')) fail('Intelligence Review must not use browser-default timestamp formatting.');
 if (!process.exitCode) pass('Recommendation timestamps, confidence percentages, versions, and shared KPI counts use the selected application locale.');
 
@@ -80,12 +80,28 @@ if (recommendationStart < 0 || recommendationEnd < 0) {
   const recommendationSource = pageSource.slice(recommendationStart, recommendationEnd);
   const forbiddenEnglishPresentation = [
     '>Recommendation review controls<', '>Review queue<', '>Source confidence<', '>Evidence preview<', '>How this result was produced<',
-    '>Persisted review lifecycle<', '>Record human decision<', '>Review history<', "? 'Refreshing…' : 'Refresh review queue'",
-    '>Open source surface<', '>Create Execution Request draft<', 'placeholder="Record the evidence considered and why this decision is appropriate."'
+    '>Review status<', '>Review decision<', '>Review history<', "? 'Refreshing…' : 'Refresh review queue'",
+    '>Open source page<', '>Create Execution Request draft<', 'placeholder="Record the evidence considered and why this decision is appropriate."'
   ];
   for (const pattern of forbiddenEnglishPresentation) if (recommendationSource.includes(pattern)) fail(`Recommendation Reviews still contains English-only presentation: ${pattern}`);
   if (!process.exitCode) pass('Recommendation Reviews presentation is routed through the shared translation contract.');
 }
+
+
+const usabilityContracts = [
+  'formatLocalizedNumber(numberValue(summary.active_reviews), locale)',
+  'reviewStateIsActive(lifecycle?.current_status || review.review_state)',
+  'delete next[sourceActionId]',
+  'dateInputEndOfDayIso(draft.escalation_due_at)',
+  "option.value === 'escalated' && isEscalatedReview ? 'Update escalation' : option.label",
+  'currentRoleOwnsEscalation',
+  'adminCanReassignEscalation',
+  "event.actor_name || (event.actor_role ? recommendationLabel(event.actor_role, ui)",
+  "<summary>{ui(\'Governance readiness details\')}</summary>",
+  '{ui("Open source page")}'
+];
+for (const contract of usabilityContracts) if (!pageSource.includes(contract)) fail(`Intelligence Review usability contract missing: ${contract}`);
+if (!process.exitCode) pass('Intelligence Review KPI, lifecycle, escalation, history, and readiness-detail usability hardening is present.');
 
 const forbiddenTechnicalTranslation = [
   "ui('/intelligence-review')", 'ui("/intelligence-review")',

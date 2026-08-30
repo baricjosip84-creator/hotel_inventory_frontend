@@ -10586,6 +10586,10 @@ const rows: readonly TranslationRow[] = [
   ["Escalation resolved for:", "Eskalation abgeschlossen für:", "Escalación resuelta para:", "Escalade résolue pour :", "Eskalacija riješena za:"],
 
   ["Execution:", "Ausführung:", "Ejecución:", "Exécution :", "Izvršenje:"],
+  ["Update escalation", "Eskalation aktualisieren", "Actualizar escalación", "Mettre à jour l’escalade", "Ažuriraj eskalaciju"],
+  ["Choose reviewer", "Prüfer auswählen", "Elegir revisor", "Choisir un réviseur", "Odaberi pregledavatelja"],
+  ["Send this to another reviewer. Choose who should review it and when it is due.", "Diese Prüfung an einen anderen Prüfer senden. Wählen Sie aus, wer sie prüfen soll und bis wann.", "Enviar esta revisión a otro revisor. Elija quién debe revisarla y para cuándo vence.", "Envoyer cette revue à un autre réviseur. Choisissez qui doit l’examiner et pour quelle échéance.", "Pošalji ovaj pregled drugom pregledavatelju. Odaberite tko ga treba pregledati i do kada."],
+  ["Waiting for the assigned reviewer. It also appears in Action Center until the review is resolved.", "Wartet auf den zugewiesenen Prüfer. Bis zur Klärung erscheint die Prüfung auch im Action Center.", "Esperando al revisor asignado. También aparece en el Centro de acciones hasta que se resuelva la revisión.", "En attente du réviseur assigné. Elle apparaît aussi dans le Centre d’action jusqu’à la résolution de la revue.", "Čeka dodijeljenog pregledavatelja. Također se prikazuje u Akcijskom centru dok se pregled ne riješi."],
 
 ];
 
