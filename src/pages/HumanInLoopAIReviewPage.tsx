@@ -4610,7 +4610,8 @@ export default function HumanInLoopAIReviewPage() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_QUERY_KEY] }),
         queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_HISTORY_QUERY_KEY] }),
-        queryClient.invalidateQueries({ queryKey: [ACTION_CENTER_QUERY_KEY] })
+        queryClient.invalidateQueries({ queryKey: [ACTION_CENTER_QUERY_KEY] }),
+        queryClient.invalidateQueries({ queryKey: ['intelligence-review', 'navigation-attention'] })
       ]);
     },
     onError: (error) => setReviewActionMessage(error instanceof Error ? error.message : ui('Unable to record the intelligence review decision.'))

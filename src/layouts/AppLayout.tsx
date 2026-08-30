@@ -36,6 +36,12 @@ type NavExecutionRequestAttentionSummary = {
   retry_ready_count: number | string;
 };
 
+type NavIntelligenceReviewAttentionSummary = {
+  requires_attention: boolean;
+  actionable_count: number | string;
+  overdue_count: number | string;
+};
+
 function useIsMobile(breakpoint = 960): boolean {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
 
@@ -84,6 +90,22 @@ export default function AppLayout() {
   });
   const hasExecutionRequestAttention = canActOnExecutionRequests
     && executionRequestAttentionQuery.data?.requires_attention === true;
+  const canViewIntelligenceReview = tenantAccess.hasTenantContext
+    && hasPermission(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ)
+    && hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ);
+  const canHandleIntelligenceReviewEscalations = canViewIntelligenceReview
+    && hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
+  const intelligenceReviewAttentionQuery = useQuery({
+    queryKey: ['intelligence-review', 'navigation-attention', tenantAccess.tenantId],
+    queryFn: () => apiRequest<NavIntelligenceReviewAttentionSummary>('/operational-action-center/human-in-loop-ai-reviews/escalation-attention-summary'),
+    enabled: canHandleIntelligenceReviewEscalations,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    retry: 1
+  });
+  const hasIntelligenceReviewAttention = canHandleIntelligenceReviewEscalations
+    && intelligenceReviewAttentionQuery.data?.requires_attention === true;
 
 
   const announcementContextQuery = useQuery({
@@ -485,6 +507,13 @@ export default function AppLayout() {
                         style={styles.alertIndicatorDot}
                         aria-label={t('common.executionRequestsAttention')}
                         title={t('common.executionRequestsAttention')}
+                      />
+                    ) : null}
+                    {item.to === '/intelligence-review' && hasIntelligenceReviewAttention ? (
+                      <span
+                        style={styles.alertIndicatorDot}
+                        aria-label={t('common.intelligenceReviewAttention')}
+                        title={t('common.intelligenceReviewAttention')}
                       />
                     ) : null}
                   </NavLink>
