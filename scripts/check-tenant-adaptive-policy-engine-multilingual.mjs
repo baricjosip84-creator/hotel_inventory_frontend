@@ -64,6 +64,12 @@ for (const match of pageSource.matchAll(/headers=\{\[([^\]]+)\]\}/g)) {
   for (const item of match[1].matchAll(/'([^']+)'/g)) dynamicKeys.add(item[1]);
 }
 for (const match of pageSource.matchAll(/label="([^"]+)"/g)) dynamicKeys.add(match[1]);
+for (const blockName of ['const GENERATED_POLICY_COPY', 'const GENERATED_RECOMMENDATION_COPY']) {
+  const start = pageSource.indexOf(blockName);
+  const end = pageSource.indexOf('};', start + 1);
+  const block = start >= 0 && end > start ? pageSource.slice(start, end) : '';
+  for (const match of block.matchAll(/:\s*'([^']+)'/g)) dynamicKeys.add(match[1]);
+}
 for (const [startToken, endToken] of [
   ['const DECISION_LABELS', 'const LIFECYCLE_SECTIONS'],
   ['const CANONICAL_LABELS', 'function formatCanonicalLabel']
@@ -90,28 +96,37 @@ for (const required of [
 ]) if (!pageSource.includes(required)) fail(`Adaptive Policy Engine locale-aware presentation missing: ${required}`);
 if (!process.exitCode) pass('Counts, limits, confidence, deltas, evidence totals, and timestamps use the tenant locale.');
 
+let serverBoundaryMissing = false;
 for (const required of [
-  'policy.title || formatLabel(policy.policy_key)',
-  'policy.summary ? <span className="adaptive-policy-table__subtext">{policy.summary}</span>',
+  'policyDisplayCopy(policy, ui)',
+  'recommendationDisplaySummary(recommendation, ui)',
   '{formatLabel(signal.signal_type)}',
-  'recommendation.explanation_summary ? <span className="adaptive-policy-table__subtext">{recommendation.explanation_summary}</span>',
   '{formatLabel(measurement.measurement_type)}',
-  'check.label ? formatLabel(check.label)',
-  'check.required_next_step ? <p>{check.required_next_step}</p>',
-  'blocker.summary ? <p>{blocker.summary}</p>',
+  'canViewDiagnostics ? (',
+  "<CheckList title={ui('What needs attention')} items={blockers} kind=\"blockers\" />",
+  "<CheckList title={ui('Evidence checks')} items={checks} kind=\"checks\" />",
   '<pre>{JSON.stringify(data, null, 2)}</pre>'
-]) if (!pageSource.includes(required)) fail(`Adaptive Policy Engine server/technical data boundary changed unexpectedly: ${required}`);
-if (pageSource.includes('ui(formatLabel(')) fail('Adaptive Policy Engine translates arbitrary backend labels through ui(formatLabel(...)).');
-else pass('Backend titles, summaries, signal/measurement types, checks, blockers, next steps, explanations, and technical JSON remain server/technical data.');
+]) {
+  if (!pageSource.includes(required)) {
+    serverBoundaryMissing = true;
+    fail(`Adaptive Policy Engine server/technical data boundary changed unexpectedly: ${required}`);
+  }
+}
+if (!serverBoundaryMissing) pass('Generated policy copy is localized in the frontend while raw readiness diagnostics remain restricted to diagnostic users.');
 
 for (const required of [
   "apiRequest<AdaptivePolicySummary>(`/decision-intelligence/adaptive-policy-engine-summary?${queryString}`)",
+  "'/decision-intelligence/adaptive-policy-engine-refresh'",
+  'TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN',
   'TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ',
-  "ui('Review stored policy records, observed signals, recommendations, and measured outcomes before people reuse or change a policy. This workspace does not create, approve, apply, promote, roll back, or retire policies.')",
+  "ui('Checks real operating results to see whether recurring inventory, reservation, supplier, or execution rules may need human review and adjustment. Nothing is changed automatically.')",
   "ui('These checks support a human review; they are not approvals')",
-  "ui('A passing check means the returned evidence satisfies that specific rule. It does not automatically approve, apply, promote, roll back, or retire a policy.')"
-]) if (!pageSource.includes(required)) fail(`Adaptive Policy Engine read-only/governance contract missing: ${required}`);
-if (/\buseMutation\b/.test(pageSource) || /method:\s*['"](?:POST|PUT|PATCH|DELETE)['"]/.test(pageSource)) fail('Adaptive Policy Engine page unexpectedly contains a mutation path.');
-else pass('Adaptive Policy Engine remains a read-only, human-governed review workspace with diagnostics permission gating.');
+  "ui('A passing check means the returned evidence satisfies that specific rule. It does not automatically approve, apply, promote, roll back, or retire a policy.')",
+  'recommendation.source_action_id',
+  '/intelligence-review?source_action_id='
+]) if (!pageSource.includes(required)) fail(`Adaptive Policy Engine governed refresh/review contract missing: ${required}`);
+if (!/useMutation/.test(pageSource) || !/method:\s*['"]POST['"]/.test(pageSource)) fail('Adaptive Policy Engine governed evidence-refresh action is missing.');
+if (/method:\s*['"](?:PUT|PATCH|DELETE)['"]/.test(pageSource)) fail('Adaptive Policy Engine contains an unexpected direct policy mutation method.');
+else pass('Adaptive Policy Engine supports a DECISION_INTELLIGENCE_GOVERN evidence refresh and Intelligence Review handoff without direct policy application.');
 
 if (!process.exitCode) pass('AdaptivePolicyEnginePage staged multilingual conversion is complete.');

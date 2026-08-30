@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
@@ -7,7 +7,7 @@ import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // Hidden: repetitive tenant-facing technical badge.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceStatus,
@@ -74,6 +74,7 @@ type PolicySignalRecord = {
 };
 
 type PolicyRecommendationRecord = {
+  source_action_id?: string;
   policy_key?: string;
   recommendation_key?: string;
   recommendation_status?: string;
@@ -302,6 +303,46 @@ const LIFECYCLE_SECTIONS: LifecycleConfig[] = [
   }
 ];
 
+
+const GENERATED_POLICY_COPY: Record<string, { title: string; summary: string }> = {
+  'live:inventory:dynamic-replenishment': {
+    title: 'Dynamic replenishment policy',
+    summary: 'Checks whether current minimum-stock and replenishment rules are keeping products above their working thresholds.'
+  },
+  'live:reservation:allocation': {
+    title: 'Reservation allocation policy',
+    summary: 'Checks whether active reservations are being allocated without blocked or partial allocation pressure.'
+  },
+  'live:procurement:supplier-selection': {
+    title: 'Supplier delivery policy',
+    summary: 'Checks recent shipment discrepancies as evidence for supplier-selection and receiving policy review.'
+  },
+  'live:execution:task-flow': {
+    title: 'Execution task flow policy',
+    summary: 'Checks whether active execution work is becoming blocked and may need task-routing or labor-allocation tuning.'
+  }
+};
+
+const GENERATED_RECOMMENDATION_COPY: Record<string, string> = {
+  'live:inventory:dynamic-replenishment:tuning-review': 'Review replenishment thresholds because some products are currently below their working minimum stock.',
+  'live:reservation:allocation:tuning-review': 'Review reservation allocation rules because some active reservations have blocked or partial allocation.',
+  'live:procurement:supplier-selection:tuning-review': 'Review supplier-selection or receiving rules because recent shipments include discrepancies.',
+  'live:execution:task-flow:tuning-review': 'Review execution task-routing or labor-allocation rules because active work is blocked.'
+};
+
+function policyDisplayCopy(policy: AdaptivePolicyRecord, ui: (key: string) => string) {
+  const generated = policy.policy_key ? GENERATED_POLICY_COPY[policy.policy_key] : undefined;
+  return {
+    title: generated ? ui(generated.title) : (policy.title || formatLabel(policy.policy_key)),
+    summary: generated ? ui(generated.summary) : policy.summary
+  };
+}
+
+function recommendationDisplaySummary(recommendation: PolicyRecommendationRecord, ui: (key: string) => string) {
+  const generated = recommendation.recommendation_key ? GENERATED_RECOMMENDATION_COPY[recommendation.recommendation_key] : undefined;
+  return generated ? ui(generated) : recommendation.explanation_summary;
+}
+
 function formatLabel(value: unknown): string {
   if (value === null || value === undefined || value === '') return 'Not reported';
   const text = String(value);
@@ -460,6 +501,7 @@ function CheckList({ title, items, kind }: { title: string; items: CheckItem[] |
 
 function LifecycleCard({ config, section }: { config: LifecycleConfig; section?: LifecycleSection }) {
   const { ui } = useAppTranslation();
+  const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
   const score = section?.[config.scoreKey];
   const decision = section?.[config.decisionKey];
   const blockers = (section?.[config.blockersKey] as BlockerItem[] | undefined) || [];
@@ -490,10 +532,18 @@ function LifecycleCard({ config, section }: { config: LifecycleConfig; section?:
         ))}
       </div>
 
-      <div className="adaptive-policy-check-grid">
-        <CheckList title={ui('What needs attention')} items={blockers} kind="blockers" />
-        <CheckList title={ui('Evidence checks')} items={checks} kind="checks" />
-      </div>
+      {canViewDiagnostics ? (
+        <div className="adaptive-policy-check-grid">
+          <CheckList title={ui('What needs attention')} items={blockers} kind="blockers" />
+          <CheckList title={ui('Evidence checks')} items={checks} kind="checks" />
+        </div>
+      ) : (
+        <p className="adaptive-policy-muted">
+          {blockers.length > 0
+            ? ui('{count} readiness checks need attention. Review the evidence above before changing this policy pattern.').replace('{count}', String(blockers.length))
+            : ui('No readiness blockers are currently reported for this section.')}
+        </p>
+      )}
     </section>
   );
 }
@@ -545,6 +595,7 @@ function EvidenceSection({
 export default function AdaptivePolicyEnginePage() {
   const { locale, ui } = useAppTranslation();
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
+  const canGovern = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
   const [view, setView] = useState<AdaptivePolicyView>('evidence');
   const [filters, setFilters] = useState<AdaptivePolicyFilters>(DEFAULT_FILTERS);
 
@@ -559,6 +610,16 @@ export default function AdaptivePolicyEnginePage() {
   const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: ['adaptive-policy-engine-summary', queryString],
     queryFn: () => apiRequest<AdaptivePolicySummary>(`/decision-intelligence/adaptive-policy-engine-summary?${queryString}`)
+  });
+
+  const refreshAnalysis = useMutation({
+    mutationFn: () => apiRequest<{ refreshed: boolean }>(
+      '/decision-intelligence/adaptive-policy-engine-refresh',
+      { method: 'POST' }
+    ),
+    onSuccess: async () => {
+      await refetch();
+    }
   });
 
   const policyCount = data?.governance?.policy_count ?? data?.policies?.length ?? 0;
@@ -595,20 +656,16 @@ export default function AdaptivePolicyEnginePage() {
 
   return (
     <main className="decision-intelligence-page adaptive-policy-page adaptive-policy-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
+      {/* Hero meta pills remain intentionally hidden: Tenant-scoped / Human-governed decisions / Read-only evidence. */}
       <OperationalWorkspaceHero
         iconPath="/adaptive-policy-engine"
         eyebrow={ui('Decision intelligence & policy review')}
         title={ui('Adaptive Policy Engine')}
-        description={ui('Review stored policy records, observed signals, recommendations, and measured outcomes before people reuse or change a policy. This workspace does not create, approve, apply, promote, roll back, or retire policies.')}
-        meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui('Human-governed decisions')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui('Read-only evidence')}</OperationalWorkspaceMetaPill>
-          </>
-        }
-        aside={<><OperationalWorkspaceStatus value={formatCanonicalLabel(data?.governance?.adaptive_policy_posture, ui)} label={`${ui('Policy review posture')} · ${ui('Refreshed')} ${lastRefreshed}`} /><button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/adaptive-policy-engine" size={14} />{ui(isFetching ? 'Refreshing…' : 'Refresh evidence')}</button></>}
+        description={ui('Checks real operating results to see whether recurring inventory, reservation, supplier, or execution rules may need human review and adjustment. Nothing is changed automatically.')}
+        aside={<><OperationalWorkspaceStatus value={formatCanonicalLabel(data?.governance?.adaptive_policy_posture, ui)} label={`${ui('Policy review posture')} · ${ui('Refreshed')} ${lastRefreshed}`} />{canGovern ? <button className="button button--secondary" type="button" onClick={() => refreshAnalysis.mutate()} disabled={refreshAnalysis.isPending || isFetching}><TenantNavIcon path="/adaptive-policy-engine" size={14} />{ui(refreshAnalysis.isPending ? 'Refreshing analysis…' : 'Refresh policy analysis')}</button> : <button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/adaptive-policy-engine" size={14} />{ui(isFetching ? 'Refreshing…' : 'Refresh page')}</button>}</>}
       />
+      {refreshAnalysis.isError ? <section className="card card--danger adaptive-policy-state-card adaptive-policy-state-card--danger"><p>{ui('Policy analysis could not be refreshed. No operating rule was changed.')}</p></section> : null}
+      {refreshAnalysis.isSuccess ? <p className="adaptive-policy-limit-note">{ui('Policy analysis refreshed from current operating data. Any recommendation still requires human review.')}</p> : null}
 
 <OperationalWorkspaceStats ariaLabel={ui('Adaptive policy evidence summary')}>
         <MetricCard label="Policies" value={policyCount} iconPath="/adaptive-policy-engine" tone="blue" />
@@ -689,14 +746,14 @@ export default function AdaptivePolicyEnginePage() {
         <section className="card adaptive-policy-empty-state">
           <div className="adaptive-policy-section-heading"><span className="adaptive-policy-heading-icon adaptive-policy-heading-icon--slate"><TenantNavIcon path="/adaptive-policy-engine" size={17} /></span><h2>{ui('No adaptive policy evidence is available for this tenant and filter set')}</h2></div>
           <p>{ui('Readiness is not assessed when there are no policy, signal, recommendation, or effectiveness records. Zero records do not mean that policies are safe, approved, or ready for promotion.')}</p>
-          <p>{ui('This page has no policy-creation action. Evidence must first be produced through the supported Decision Intelligence data process before it can be reviewed here.')}</p>
+          <p>{ui('If you can govern Decision Intelligence, use Refresh policy analysis to rebuild this evidence from current operating data.')}</p>
         </section>
       ) : null}
 
       {view === 'evidence' ? (
         <>
           <p className="adaptive-policy-limit-note"><TenantNavIcon path="/system-context" size={14} />
-            {ui('Lists show up to {limit} matching records in each evidence category. Readiness checks use the same filtered record set.').replace('{limit}', formatLocalizedNumber(Number(filters.limit), locale))}
+            {ui('Lists show up to {limit} matching records in each evidence category. Totals and readiness checks use all matching evidence, not only the rows shown here.').replace('{limit}', formatLocalizedNumber(Number(filters.limit), locale))}
           </p>
           <EvidenceSection
             title={ui('Policies')}
@@ -706,9 +763,10 @@ export default function AdaptivePolicyEnginePage() {
             headers={['Policy', 'Area', 'Type', 'Status', 'Confidence', 'Updated']}
             renderRow={(row, index) => {
               const policy = row as AdaptivePolicyRecord;
+              const copy = policyDisplayCopy(policy, ui);
               return (
                 <tr key={`${policy.policy_key || 'policy'}-${index}`}>
-                  <td><strong>{policy.title || formatLabel(policy.policy_key)}</strong>{policy.summary ? <span className="adaptive-policy-table__subtext">{policy.summary}</span> : null}</td>
+                  <td><strong>{copy.title}</strong>{copy.summary ? <span className="adaptive-policy-table__subtext">{copy.summary}</span> : null}</td>
                   <td>{formatCanonicalLabel(policy.policy_domain, ui)}</td>
                   <td>{formatCanonicalLabel(policy.policy_type, ui)}</td>
                   <td><StatusBadge value={policy.policy_status} /></td>
@@ -744,18 +802,20 @@ export default function AdaptivePolicyEnginePage() {
             iconPath="/intelligence-review"
             description="Advisory policy changes that still require human review and manual application."
             rows={(data?.recommendations || []) as Array<Record<string, unknown>>}
-            headers={['Policy', 'Recommendation', 'Type', 'Status', 'Risk', 'Confidence', 'Created']}
+            headers={['Policy', 'Recommendation', 'Type', 'Status', 'Risk', 'Confidence', 'Created', 'Review']}
             renderRow={(row, index) => {
               const recommendation = row as PolicyRecommendationRecord;
+              const recommendationSummary = recommendationDisplaySummary(recommendation, ui);
               return (
                 <tr key={`${recommendation.recommendation_key || 'recommendation'}-${index}`}>
                   <td>{formatLabel(recommendation.policy_key)}</td>
-                  <td><strong>{formatLabel(recommendation.recommendation_key)}</strong>{recommendation.explanation_summary ? <span className="adaptive-policy-table__subtext">{recommendation.explanation_summary}</span> : null}</td>
+                  <td><strong>{formatLabel(recommendation.recommendation_key)}</strong>{recommendationSummary ? <span className="adaptive-policy-table__subtext">{recommendationSummary}</span> : null}</td>
                   <td>{formatCanonicalLabel(recommendation.recommendation_type, ui)}</td>
                   <td><StatusBadge value={recommendation.recommendation_status} /></td>
                   <td><StatusBadge value={recommendation.risk_level} tone={['high', 'critical'].includes(String(recommendation.risk_level)) ? 'danger' : 'neutral'} /></td>
                   <td>{formatStoredConfidence(recommendation.confidence_score, locale)}</td>
                   <td>{formatLocalizedDateTime(recommendation.created_at, locale)}</td>
+                  <td>{recommendation.recommendation_status === 'review_required' && recommendation.source_action_id ? <a className="button button--secondary button--small" href={`/intelligence-review?source_action_id=${encodeURIComponent(recommendation.source_action_id)}`}>{ui('Review')}</a> : ui('No review needed')}</td>
                 </tr>
               );
             }}
