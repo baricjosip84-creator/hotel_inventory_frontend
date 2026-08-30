@@ -28,6 +28,14 @@ import { fetchTenantCurrencyContext, setActiveTenantCurrency, DEFAULT_INVENTORY_
 
 type NavAlertIndicatorRow = { id: string };
 
+type NavExecutionRequestAttentionSummary = {
+  requires_attention: boolean;
+  actionable_count: number | string;
+  pending_review_count: number | string;
+  approved_waiting_execution_count: number | string;
+  retry_ready_count: number | string;
+};
+
 function useIsMobile(breakpoint = 960): boolean {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
 
@@ -61,6 +69,22 @@ export default function AppLayout() {
     retry: 1
   });
   const hasOpenAlerts = canReadAlerts && (openAlertsIndicatorQuery.data?.length ?? 0) > 0;
+  const canViewExecutionRequests = tenantAccess.hasTenantContext && hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW);
+  const canReviewExecutionRequests = canViewExecutionRequests && hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_REVIEW);
+  const canExecuteExecutionRequests = canViewExecutionRequests && hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_EXECUTE);
+  const canActOnExecutionRequests = canReviewExecutionRequests || canExecuteExecutionRequests;
+  const executionRequestAttentionQuery = useQuery({
+    queryKey: ['execution-requests', 'navigation-attention', tenantAccess.tenantId],
+    queryFn: () => apiRequest<NavExecutionRequestAttentionSummary>('/execution-requests/attention-summary'),
+    enabled: canActOnExecutionRequests,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    retry: 1
+  });
+  const hasExecutionRequestAttention = canActOnExecutionRequests
+    && executionRequestAttentionQuery.data?.requires_attention === true;
+
 
   const announcementContextQuery = useQuery({
     queryKey: ['announcement-context', 'current', tenantAccess.tenantId],
@@ -454,6 +478,13 @@ export default function AppLayout() {
                         style={styles.alertIndicatorDot}
                         aria-label={t('common.openAlertsAttention')}
                         title={t('common.openAlertsAttention')}
+                      />
+                    ) : null}
+                    {item.to === '/execution-requests' && hasExecutionRequestAttention ? (
+                      <span
+                        style={styles.alertIndicatorDot}
+                        aria-label={t('common.executionRequestsAttention')}
+                        title={t('common.executionRequestsAttention')}
                       />
                     ) : null}
                   </NavLink>

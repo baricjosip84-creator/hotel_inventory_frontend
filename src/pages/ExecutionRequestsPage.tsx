@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { CSSProperties } from 'react';
 import { useSearchParams } from 'react-router';
 import { useAppTranslation } from '../i18n/I18nContext';
@@ -213,6 +214,7 @@ function downloadCsv(filename: string, rows: string[][]) {
 
 export default function ExecutionRequestsPage() {
   const { locale, ui } = useAppTranslation();
+  const queryClient = useQueryClient();
   const capabilities = getRoleCapabilities();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedRequestId = searchParams.get('request_id');
@@ -251,6 +253,10 @@ export default function ExecutionRequestsPage() {
   const [recommendationCandidate, setRecommendationCandidate] = useState<ExecutionRecommendationCandidate | null>(null);
   const [checkingRecommendation, setCheckingRecommendation] = useState(false);
   const [activeWorkspaceSection, setActiveWorkspaceSection] = useState<ExecutionWorkspaceSection>('overview');
+
+  const refreshNavigationAttention = () => {
+    void queryClient.invalidateQueries({ queryKey: ['execution-requests', 'navigation-attention'] });
+  };
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -546,6 +552,7 @@ export default function ExecutionRequestsPage() {
       });
       setSelected(updated);
       await loadRequests();
+      refreshNavigationAttention();
       showTenantActionSuccess(ui('Execution request submitted for review.'));
     } catch (err) {
       const message = err instanceof ApiError ? err.message : ui('Failed to submit execution request');
@@ -569,6 +576,7 @@ export default function ExecutionRequestsPage() {
       });
       setSelected(updated);
       await loadRequests();
+      refreshNavigationAttention();
       showTenantActionSuccess(ui('Execution request approved.'));
     } catch (err) {
       const message = err instanceof ApiError ? err.message : ui('Failed to approve execution request');
@@ -592,6 +600,7 @@ export default function ExecutionRequestsPage() {
       });
       setSelected(updated);
       await loadRequests();
+      refreshNavigationAttention();
       showTenantActionSuccess(ui('Execution request rejected.'));
     } catch (err) {
       const message = err instanceof ApiError ? err.message : ui('Failed to reject execution request');
@@ -618,6 +627,7 @@ export default function ExecutionRequestsPage() {
       });
       setSelected(updated);
       await loadRequests();
+      refreshNavigationAttention();
       if (updated.execution_status === 'failed') {
         const failureMessage = String(updated.execution_result?.failure_reason || ui('The controlled execution failed. Review the stored failure evidence before deciding the next step.'));
         setError(failureMessage);
@@ -647,6 +657,7 @@ export default function ExecutionRequestsPage() {
       });
       setSelected(updated);
       await loadRequests();
+      refreshNavigationAttention();
       showTenantActionSuccess(ui('Request completed without a business-data change.'));
     } catch (err) {
       const message = err instanceof ApiError ? err.message : ui('Failed to complete request without change');
@@ -729,6 +740,7 @@ export default function ExecutionRequestsPage() {
       });
       setSelected(updated);
       await loadRequests();
+      refreshNavigationAttention();
       showTenantActionSuccess(ui('Failed execution prepared for one controlled retry.'));
     } catch (err) {
       const message = err instanceof ApiError ? err.message : ui('Failed to prepare retry');
@@ -752,6 +764,7 @@ export default function ExecutionRequestsPage() {
       });
       setSelected(updated);
       await loadRequests();
+      refreshNavigationAttention();
       showTenantActionSuccess(ui('Execution request cancelled.'));
     } catch (err) {
       const message = err instanceof ApiError ? err.message : ui('Failed to cancel execution request');
