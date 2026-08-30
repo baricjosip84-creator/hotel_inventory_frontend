@@ -119,14 +119,14 @@ for (const forbidden of [
 ]) if (foundationSlice.includes(forbidden)) fail(`Backend Recommendation Outcome Foundation business text must remain raw: ${forbidden}`);
 if (!process.exitCode) pass('Backend completion definitions, portfolio/domain keys, learning signals, owners, reasons, next-phase text, capability identifiers, blocker text, and manual resolution tasks remain raw.');
 
-if (!pageSource.includes("ui('The latest saved records in this category.')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
+if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');
 
 for (const required of ["path: 'decision-learning-feedback'", 'TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ', '<DecisionLearningFeedbackPage />'])
   if (!routerSource.includes(required)) fail(`Decision Learning Feedback router/permission contract changed: ${required}`);
 if (!process.exitCode) pass('Decision Learning Feedback route and DECISION_INTELLIGENCE_READ permission contract remain unchanged.');
 for (const required of [
-  "apiRequest<ContinuousLearningSummary>('/decision-intelligence/continuous-learning-summary?limit=25')",
+  "continuous-learning-summary?${params.toString()}",
   "apiRequest<Record<string, unknown>>(`/decision-intelligence-feedback/${mode}`, {", "method: 'POST'"
 ]) if (!pageSource.includes(required)) fail(`Existing Decision Learning Feedback request contract missing: ${required}`);
 if (!process.exitCode) pass('Existing summary read and governed feedback-evidence POST contracts remain unchanged.');

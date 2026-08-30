@@ -142,7 +142,7 @@ for (const forbidden of [
 ]) if (pageSource.includes(forbidden)) fail(`Backend audit/compliance data must remain raw: ${forbidden}`);
 if (!process.exitCode) pass('Backend ledger stages/evidence/retention/tasks/blockers/owners and attestation checks/current-required/evidence/tasks remain raw.');
 
-if (!pageSource.includes("ui('The latest saved records in this category.')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
+if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');
 
 for (const required of [
@@ -153,7 +153,7 @@ for (const required of [
 if (!process.exitCode) pass('Decision Learning Feedback route and DECISION_INTELLIGENCE_READ permission contract remain unchanged.');
 
 for (const required of [
-  "apiRequest<ContinuousLearningSummary>('/decision-intelligence/continuous-learning-summary?limit=25')",
+  "continuous-learning-summary?${params.toString()}",
   "apiRequest<Record<string, unknown>>(`/decision-intelligence-feedback/${mode}`, {",
   "method: 'POST'"
 ]) if (!pageSource.includes(required)) fail(`Existing Decision Learning Feedback request contract missing: ${required}`);

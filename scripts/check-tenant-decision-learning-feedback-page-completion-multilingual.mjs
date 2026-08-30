@@ -75,15 +75,18 @@ for (const required of [
   "<th>{ui('Evidence types')}</th>",
   'formatLocalizedNumber(domain.review_item_count ?? 0, locale)',
   'ui(formatLabel(item.status))',
-  '<td>{formatLabel(item.recommended_resolution)}</td>',
-  "item.review_reason || '—'"
+  "const reason = item.review_reason_code ? reviewReasonLabels[item.review_reason_code] : item.review_reason;",
+  "{reason ? ui(reason) : '—'}",
+  "onReview(item.evidence_type || '', item.evidence_key || '', target.status)"
 ]) if (!boardSlice.includes(required)) fail(`Feedback Review Board completion contract missing: ${required}`);
 if (!process.exitCode) pass('Feedback Review Board presentation is localized while backend resolution/reason data stays raw.');
 
 for (const required of [
   '{ui(title)}',
-  "ui('The latest saved records in this category.')",
-  "ui(rows.length === 1 ? 'record shown.' : 'records shown.')",
+  "ui('Loading feedback evidence…')",
+  "ui('Feedback evidence is unavailable.')",
+  "ui('Showing')",
+  "ui('Older')",
   "ui('No feedback evidence has been recorded in this category yet.')",
   "<th>{ui('Score / Error')}</th>",
   "`${ui('Recorded item')} ${formatLocalizedNumber(index + 1, locale)}`",
@@ -101,7 +104,7 @@ for (const required of [
   "{ui('Record feedback evidence')}",
   '{ui(modeLabels[item])}',
   '{ui(formatLabel(status))}',
-  "validateFeedbackForm(mode, form, ui)",
+  "validateFeedbackForm(mode, form, sourceId, ui)",
   "ui('Feedback evidence recorded. The backend stores this as learning evidence only.')",
   "ui('You have read-only access. Decision Intelligence governance permission is required to record feedback.')",
   "ui('What this page can change')",
