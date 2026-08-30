@@ -10,7 +10,7 @@ import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.50: repetitive hero pills intentionally hidden; original rendering retained below.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceStatus
@@ -88,6 +88,8 @@ type OfflineOperation = {
   action: MobileAction;
   note?: string;
   created_at: string;
+  last_error?: string | null;
+  failure_count?: number;
 };
 
 type MobileSyncResponse = {
@@ -163,6 +165,7 @@ const CANONICAL_LABELS: Record<string, string> = {
   offline_capable_task_lifecycle_execution: 'Offline-capable task execution'
 };
 
+/* v3.49.50: retained for easy reversal with the hidden Mobile safety contract.
 const SAFETY_LABELS: Record<string, string> = {
   tenant_isolated: 'Tenant isolated',
   permission_gated: 'Permission gated',
@@ -181,6 +184,7 @@ const SAFETY_LABELS: Record<string, string> = {
   no_external_ai_callout: 'No external AI callout',
   execution_task_lifecycle_mutation_only: 'Execution-task lifecycle changes only'
 };
+*/
 
 
 function numberValue(value: unknown): number {
@@ -197,9 +201,11 @@ function canonicalLabel(value: string | null | undefined, ui: (englishText: stri
   return ui(CANONICAL_LABELS[raw] || formatLabel(raw).replace(/^./, (character) => character.toUpperCase()));
 }
 
+/* v3.49.50: retained for easy reversal with the hidden Mobile safety contract.
 function safetyLabel(value: string, ui: (englishText: string) => string): string {
   return ui(SAFETY_LABELS[value] || formatLabel(value).replace(/^./, (character) => character.toUpperCase()));
 }
+*/
 
 function formatDateTime(value: string | null | undefined, locale: AppLocale, ui: (englishText: string) => string): string {
   if (!value) return ui('Not reported');
@@ -296,13 +302,22 @@ export default function MobileExecutionPage() {
   const [urgency, setUrgency] = useState<'all' | ActionUrgency>('all');
   const [sourceType, setSourceType] = useState<'all' | ExecutionTaskSourceType>('all');
   const [online, setOnline] = useState(() => navigator.onLine);
-  const [cachedResponse, setCachedResponse] = useState<MobileExecutionResponse | null>(() => readStored<MobileExecutionResponse | null>(storageKeys?.cache || null, null));
+  const [cachedResponse, setCachedResponse] = useState<MobileExecutionResponse | null>(() => readStored<MobileExecutionResponse | null>(storageKeys ? `${storageKeys.cache}:all:all` : null, null));
+  const [cachedFilterKey, setCachedFilterKey] = useState('all:all');
   const [pending, setPending] = useState<OfflineOperation[]>(() => readStored<OfflineOperation[]>(storageKeys?.pending || null, []));
   const [syncing, setSyncing] = useState(false);
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
+  const [blockReasonTaskId, setBlockReasonTaskId] = useState<string | null>(null);
+  const [blockReason, setBlockReason] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const canUpdateTasks = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_UPDATE);
+  const canCompleteTasks = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_COMPLETE);
+  const canUseScanner = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ);
+  const canRunAction = (action: MobileAction) => action === 'complete' ? canCompleteTasks : canUpdateTasks;
+  const canRunAnyMobileAction = canUpdateTasks || canCompleteTasks;
+  const currentFilterKey = `${urgency}:${sourceType}`;
+  const currentCacheStorageKey = storageKeys ? `${storageKeys.cache}:${currentFilterKey}` : null;
 
   const mobileExecutionQuery = useQuery({
     queryKey: ['mobile-execution-summary', urgency, sourceType],
@@ -329,24 +344,40 @@ export default function MobileExecutionPage() {
   }, []);
 
   useEffect(() => {
+    const next = readStored<MobileExecutionResponse | null>(currentCacheStorageKey, null);
+    setCachedResponse(next);
+    setCachedFilterKey(currentFilterKey);
+  }, [currentCacheStorageKey, currentFilterKey]);
+
+  useEffect(() => {
     if (!mobileExecutionQuery.data) return;
     setCachedResponse(mobileExecutionQuery.data);
-    if (storageKeys) localStorage.setItem(storageKeys.cache, JSON.stringify(mobileExecutionQuery.data));
-  }, [mobileExecutionQuery.data, storageKeys]);
+    setCachedFilterKey(currentFilterKey);
+    if (currentCacheStorageKey) localStorage.setItem(currentCacheStorageKey, JSON.stringify(mobileExecutionQuery.data));
+  }, [mobileExecutionQuery.data, currentCacheStorageKey, currentFilterKey]);
 
   const persistPending = (operations: OfflineOperation[]) => {
     setPending(operations);
     if (storageKeys) localStorage.setItem(storageKeys.pending, JSON.stringify(operations));
   };
 
-  const response = mobileExecutionQuery.data || cachedResponse || undefined;
+  const removePendingOperation = (operationId: string) => {
+    persistPending(pending.filter((operation) => operation.operation_id !== operationId));
+    setMessage(ui('Queued action removed from this device.'));
+    setActionError(null);
+  };
+
+  const matchingCachedResponse = cachedFilterKey === currentFilterKey ? cachedResponse : null;
+  const response = mobileExecutionQuery.data || matchingCachedResponse || undefined;
   const summary = response?.summary || {};
   const guidance = response?.guidance || {};
   const mobileTasks = response?.mobile_tasks || [];
+  /* v3.49.50: retained for easy reversal with the hidden Mobile safety contract section.
   const safetyEntries = useMemo(() => Object.entries(response?.definition?.safety_contract || {}).filter(([, enabled]) => enabled), [response?.definition?.safety_contract]);
+  */
 
   const replayPending = async () => {
-    if (!online || syncing || pending.length === 0 || !canUpdateTasks) return;
+    if (!online || syncing || pending.length === 0 || !canRunAnyMobileAction) return;
     setSyncing(true);
     setActionError(null);
     try {
@@ -355,7 +386,14 @@ export default function MobileExecutionPage() {
         body: JSON.stringify({ device_id: getDeviceId(), request_id: makeId('sync'), operations: pending })
       });
       const applied = new Set((result.results || []).filter((row) => row.status === 'applied').map((row) => row.operation_id).filter(Boolean));
-      const remaining = pending.filter((operation) => !applied.has(operation.operation_id));
+      const failedByOperationId = new Map((result.results || [])
+        .filter((row) => row.status === 'failed' && row.operation_id)
+        .map((row) => [row.operation_id as string, row.error || ui('The queued action could not be applied.')]));
+      const remaining = pending
+        .filter((operation) => !applied.has(operation.operation_id))
+        .map((operation) => failedByOperationId.has(operation.operation_id)
+          ? { ...operation, last_error: failedByOperationId.get(operation.operation_id) || null, failure_count: (operation.failure_count || 0) + 1 }
+          : operation);
       persistPending(remaining);
       const failed = (result.results || []).filter((row) => row.status === 'failed');
       if (failed.length) {
@@ -372,17 +410,23 @@ export default function MobileExecutionPage() {
   };
 
   useEffect(() => {
-    if (online && pending.length > 0 && canUpdateTasks && !syncing) void replayPending();
+    if (online && pending.length > 0 && canRunAnyMobileAction && !syncing) void replayPending();
     // replayPending intentionally uses the latest render state and should run only when these state gates change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online, pending.length, canUpdateTasks]);
+  }, [online, pending.length, canRunAnyMobileAction]);
 
-  const runAction = async (task: MobileExecutionTask, action: MobileAction) => {
-    if (!task.task_source_id || !canUpdateTasks) return;
+  const runAction = async (task: MobileExecutionTask, action: MobileAction, note?: string) => {
+    if (!task.task_source_id || !canRunAction(action)) return;
+    const normalizedNote = note?.trim() || undefined;
+    if (action === 'block' && !normalizedNote) {
+      setActionError(ui('Enter a reason before blocking this task.'));
+      return;
+    }
     const operation: OfflineOperation = {
       operation_id: makeId('op'),
       task_id: task.task_source_id,
       action,
+      note: normalizedNote,
       created_at: new Date().toISOString()
     };
     setMessage(null);
@@ -391,6 +435,7 @@ export default function MobileExecutionPage() {
     if (!navigator.onLine) {
       persistPending([...pending, operation]);
       setMessage(ui('Task action queued on this device. It will synchronize when online.'));
+      if (action === 'block') { setBlockReasonTaskId(null); setBlockReason(''); }
       return;
     }
 
@@ -403,12 +448,14 @@ export default function MobileExecutionPage() {
       const first = result.results?.[0];
       if (first?.status === 'failed') throw new Error(first.error || ui('The task action could not be applied.'));
       setMessage(ui('Task action applied successfully.'));
+      if (action === 'block') { setBlockReasonTaskId(null); setBlockReason(''); }
       await mobileExecutionQuery.refetch();
     } catch (error) {
       if (!navigator.onLine) {
         persistPending([...pending, operation]);
         setOnline(false);
         setMessage(ui('Task action queued because the device lost its connection.'));
+        if (action === 'block') { setBlockReasonTaskId(null); setBlockReason(''); }
       } else {
         setActionError(error instanceof ApiError ? error.message : error instanceof Error ? error.message : ui('Unable to update the task.'));
       }
@@ -418,22 +465,24 @@ export default function MobileExecutionPage() {
   };
 
   const hasUsableResponse = Boolean(response);
-  const usingOfflineSnapshot = !mobileExecutionQuery.data && Boolean(cachedResponse);
+  const usingOfflineSnapshot = !mobileExecutionQuery.data && Boolean(matchingCachedResponse);
 
   return (
     <div className="mobile-execution-page mobile-execution-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
+      {/*
+        v3.49.50 — Tenant simplification. These repetitive hero pills are intentionally hidden.
+        Original rendering preserved for easy reversal:
+        <OperationalWorkspaceHero meta={<>
+          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Touch-first")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Offline queue protected")}</OperationalWorkspaceMetaPill>
+        </>} />
+      */}
       <OperationalWorkspaceHero
         iconPath="/mobile-execution"
         eyebrow={ui("Mobile & warehouse execution")}
         title={ui("Mobile Execution")}
         description={ui("Touch-first execution queue for permitted warehouse work, with safe offline queuing and audited synchronization when connectivity returns.")}
-        meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Touch-first")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Offline queue protected")}</OperationalWorkspaceMetaPill>
-          </>
-        }
         aside={<OperationalWorkspaceStatus value={ui(online ? 'Online' : 'Offline')} label={countLabel(pending.length, 'queued action awaiting synchronization', 'queued actions awaiting synchronization', locale, ui)} />}
       />
 
@@ -481,11 +530,11 @@ export default function MobileExecutionPage() {
               <TenantNavIcon path="/real-time-operations-feed" size={15} />
               {mobileExecutionQuery.isFetching ? ui('Refreshing…') : ui('Refresh mobile queue')}
             </button>
-            <button className="button button--secondary mobile-execution-control-button" type="button" onClick={() => void replayPending()} disabled={!online || syncing || pending.length === 0 || !canUpdateTasks}>
+            <button className="button button--secondary mobile-execution-control-button" type="button" onClick={() => void replayPending()} disabled={!online || syncing || pending.length === 0 || !canRunAnyMobileAction}>
               <TenantNavIcon path="/mobile-execution" size={15} />
               {syncing ? ui('Synchronizing…') : `${ui('Sync pending')} (${formatLocalizedNumber(pending.length, locale)})`}
             </button>
-            <Link className="button button--secondary mobile-execution-control-button" to="/scanner"><TenantNavIcon path="/scanner" size={15} />{ui("Open scanner")}</Link>
+            {canUseScanner ? <Link className="button button--secondary mobile-execution-control-button" to="/scanner"><TenantNavIcon path="/scanner" size={15} />{ui("Open scanner")}</Link> : null}
             <Link className="button button--secondary mobile-execution-control-button" to="/execution-tasks"><TenantNavIcon path="/execution-tasks" size={15} />{ui("Open execution tasks")}</Link>
           </div>
 
@@ -511,6 +560,29 @@ export default function MobileExecutionPage() {
           ) : null}
         </div>
       </section>
+
+      {pending.length > 0 ? (
+        <section className="section mobile-execution-section">
+          <div className="section__title mobile-execution-section-title">
+            <span className="mobile-execution-section-icon"><TenantNavIcon path="/mobile-execution" size={16} /></span>
+            {ui('Queued offline actions')}
+            <span className="mobile-execution-section-count">{formatLocalizedNumber(pending.length, locale)}</span>
+          </div>
+          <div className="mobile-execution-pending-list">
+            {pending.map((operation) => (
+              <div className="card mobile-execution-pending-row" key={operation.operation_id}>
+                <div>
+                  <div className="mobile-execution-pending-title">{ui(ACTION_LABELS[operation.action])} · {ui('Task')} {operation.task_id}</div>
+                  <div className="card__subtext">{ui('Queued:')} {formatDateTime(operation.created_at, locale, ui)}</div>
+                  {operation.note ? <div className="card__subtext"><strong>{ui('Reason:')}</strong> {operation.note}</div> : null}
+                  {operation.last_error ? <div className="form-error"><strong>{ui('Could not apply:')}</strong> {operation.last_error}</div> : null}
+                </div>
+                <button className="button button--secondary" type="button" onClick={() => removePendingOperation(operation.operation_id)}>{ui('Remove queued action')}</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="section mobile-execution-section">
         <div className="section__title mobile-execution-section-title">
@@ -556,10 +628,47 @@ export default function MobileExecutionPage() {
                     <p className="card__subtext">{formatDateTime(task.updated_at || task.created_at, locale, ui)}</p>
                   </div>
 
+                  {blockReasonTaskId === task.task_source_id ? (
+                    <div className="mobile-execution-block-reason">
+                      <label className="card__label" htmlFor={`mobile-block-reason-${task.task_source_id}`}>{ui('Why is this task blocked?')}</label>
+                      <textarea
+                        id={`mobile-block-reason-${task.task_source_id}`}
+                        className="mobile-execution-block-reason-input"
+                        value={blockReason}
+                        maxLength={1000}
+                        rows={3}
+                        onChange={(event) => setBlockReason(event.target.value)}
+                        placeholder={ui('Enter the reason another person needs to know before this task can continue.')}
+                      />
+                      <div className="mobile-execution-task-actions">
+                        <button className="button mobile-execution-task-button mobile-execution-task-button--primary" type="button" disabled={busyTaskId === task.task_source_id || blockReason.trim().length === 0} onClick={() => void runAction(task, 'block', blockReason)}>{ui('Confirm block')}</button>
+                        <button className="button button--secondary mobile-execution-task-button" type="button" onClick={() => { setBlockReasonTaskId(null); setBlockReason(''); }}>{ui('Cancel')}</button>
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="mobile-execution-task-actions">
-                    {canUpdateTasks && task.task_source_id ? actions.map((action) => <button key={action} className={actionButtonClass(action)} type="button" disabled={busyTaskId === task.task_source_id} onClick={() => void runAction(task, action)}>{ui(ACTION_LABELS[action])}</button>) : null}
+                    {task.task_source_id ? actions.filter((action) => canRunAction(action)).map((action) => (
+                      <button
+                        key={action}
+                        className={actionButtonClass(action)}
+                        type="button"
+                        disabled={busyTaskId === task.task_source_id}
+                        onClick={() => {
+                          if (action === 'block') {
+                            setBlockReasonTaskId(task.task_source_id || null);
+                            setBlockReason('');
+                            setActionError(null);
+                            return;
+                          }
+                          void runAction(task, action);
+                        }}
+                      >
+                        {ui(ACTION_LABELS[action])}
+                      </button>
+                    )) : null}
                     {sourcePath ? <Link className="button button--secondary mobile-execution-source-button" to={sourcePath}><TenantNavIcon path={sourcePath} size={14} />{ui("Open source workflow")}</Link> : null}
-                    {task.barcode_ready ? <Link className="button button--secondary mobile-execution-source-button" to="/scanner"><TenantNavIcon path="/scanner" size={14} />{ui("Scan/verify")}</Link> : null}
+                    {task.barcode_ready && task.execution_task_source_id ? <Link className="button button--secondary mobile-execution-source-button" to={`/scanner?shipmentId=${encodeURIComponent(task.execution_task_source_id)}`}><TenantNavIcon path="/scanner" size={14} />{ui("Scan/verify")}</Link> : null}
                   </div>
                 </article>
               );
@@ -568,6 +677,9 @@ export default function MobileExecutionPage() {
         )}
       </section>
 
+      {/*
+        v3.49.50 — Tenant simplification. The technical Mobile safety contract is intentionally
+        hidden from normal tenant UI. The original rendering remains preserved below.
       <section className="section mobile-execution-section">
         <div className="section__title mobile-execution-section-title">
           <span className="mobile-execution-section-icon"><TenantNavIcon path="/permissions" size={16} /></span>
@@ -577,6 +689,7 @@ export default function MobileExecutionPage() {
           {safetyEntries.length === 0 ? <div className="card mobile-execution-empty-card"><p className="card__subtext">{ui("Safety contract details were not returned by the backend.")}</p></div> : safetyEntries.map(([key]) => <div className="card mobile-execution-safety-card" key={key}><span className="mobile-execution-icon mobile-execution-icon--green"><TenantNavIcon path="/permissions" size={16} /></span><div><div className="card__label">{ui("Enabled guardrail")}</div><div className="mobile-execution-safety-title">{safetyLabel(key, ui)}</div></div></div>)}
         </div>
       </section>
+      */}
     </div>
   );
 }

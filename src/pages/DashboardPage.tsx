@@ -6,7 +6,7 @@ import { apiRequest } from '../lib/api';
 import { getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { fetchTenantSubscriptionAccess, isTenantFeatureAllowed } from '../lib/tenantSubscriptionAccess';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, /* OperationalWorkspaceMetaPill, */ OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 
@@ -32,26 +32,26 @@ import { formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } f
 
 type DashboardSummaryResponse = {
   master_data: {
-    total_products: number;
-    total_suppliers: number;
-    total_storage_locations: number;
+    total_products: number | null;
+    total_suppliers: number | null;
+    total_storage_locations: number | null;
   };
   shipments: {
     total_shipments: number;
     pending_shipments: number;
     partial_shipments: number;
     received_shipments: number;
-  };
+  } | null;
   alerts: {
     total_alerts: number;
     unresolved_alerts: number;
     critical_unresolved_alerts: number;
     unacknowledged_alerts: number;
-  };
+  } | null;
   stock: {
     total_stock_rows: number;
     low_stock_rows: number;
-  };
+  } | null;
 };
 
 type SetupChecklistResponse = {
@@ -463,9 +463,9 @@ function PremiumEmptyState(props: {
   );
 }
 
-function ActionLink(props: { to: string; label: string; iconPath?: string; nowrap?: boolean }) {
+function ActionLink(props: { to: string; label: string; iconPath?: string }) {
   return (
-    <Link to={props.to} style={props.nowrap ? { ...styles.actionLink, ...styles.actionLinkNoWrap } : styles.actionLink}>
+    <Link to={props.to} style={styles.actionLink}>
       {props.iconPath ? <TenantNavIcon path={props.iconPath} size={16} /> : null}
       <span>{props.label}</span>
     </Link>
@@ -510,6 +510,8 @@ export default function DashboardPage() {
   const canViewSuppliers = hasPermission(TENANT_PERMISSIONS.SUPPLIERS_READ);
   const canViewLocations = hasPermission(TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ);
   const canViewOutbound = hasPermission(TENANT_PERMISSIONS.OUTBOUND_ORDERS_READ);
+  const canViewStockMovements = hasPermission(TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ);
+  const canViewSupplierPerformance = canViewSuppliers && canViewShipments;
 
   /*
     WHAT CHANGED
@@ -538,27 +540,32 @@ export default function DashboardPage() {
 
   const lowStockQuery = useQuery({
     queryKey: ['dashboard-low-stock'],
-    queryFn: fetchLowStock
+    queryFn: fetchLowStock,
+    enabled: canViewStock
   });
 
   const overdueShipmentsQuery = useQuery({
     queryKey: ['dashboard-overdue-shipments'],
-    queryFn: fetchOverdueShipments
+    queryFn: fetchOverdueShipments,
+    enabled: canViewShipments
   });
 
   const unresolvedAlertsQuery = useQuery({
     queryKey: ['dashboard-unresolved-alerts'],
-    queryFn: fetchUnresolvedAlerts
+    queryFn: fetchUnresolvedAlerts,
+    enabled: canViewAlerts
   });
 
   const recentActivityQuery = useQuery({
     queryKey: ['dashboard-recent-activity'],
-    queryFn: fetchRecentActivity
+    queryFn: fetchRecentActivity,
+    enabled: canViewStockMovements
   });
 
   const supplierPerformanceQuery = useQuery({
     queryKey: ['dashboard-supplier-performance'],
-    queryFn: fetchSupplierPerformance
+    queryFn: fetchSupplierPerformance,
+    enabled: canViewSupplierPerformance
   });
 
   const depletionRiskQuery = useQuery({
@@ -632,85 +639,99 @@ export default function DashboardPage() {
 
   return (
     <div className="io-operational-page io-dashboard-page io-workspace-page" style={styles.page}>
+      {/*
+        v3.49.50 — Tenant simplification. These hero pills are intentionally hidden.
+        Original rendering preserved for easy reversal:
+        <OperationalWorkspaceHero meta={<>
+          <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui('Permission-aware')}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui('Live operational summary')}</OperationalWorkspaceMetaPill>
+        </>} />
+      */}
       <OperationalWorkspaceHero
         iconPath="/dashboard"
         eyebrow={ui('Operations overview')}
-        title={ui('Operations workspace')}
+        title={ui('Operations Dashboard')}
         description={ui('Monitor stock, shipments, alerts, outbound work, supplier pressure, and operational health from one tenant-level overview.')}
       />
 
       <div className="app-grid-stats io-workspace-stats" style={styles.kpiGrid}>
-        <StatCard
-          title={ui('Products')}
-          iconPath="/products"
-          value={formatNumber(summary.master_data.total_products)}
-          subtitle={ui('Active products')}
-        />
-        <StatCard
-          title={ui('Suppliers')}
-          iconPath="/suppliers"
-          value={formatNumber(summary.master_data.total_suppliers)}
-          subtitle={ui('Active suppliers')}
-        />
-        <StatCard
-          title={ui('Storage Locations')}
-          iconPath="/storage-locations"
-          value={formatNumber(summary.master_data.total_storage_locations)}
-          subtitle={ui('Configured locations')}
-        />
-        <StatCard
-          title={ui('Pending Shipments')}
-          iconPath="/shipments"
-          value={formatNumber(summary.shipments.pending_shipments)}
-          subtitle={ui('Not yet received')}
-          tone={summary.shipments.pending_shipments > 0 ? 'warn' : 'good'}
-        />
-        <StatCard
-          title={ui('Partial Shipments')}
-          iconPath="/shipments"
-          value={formatNumber(summary.shipments.partial_shipments)}
-          subtitle={ui('Partially received')}
-          tone={summary.shipments.partial_shipments > 0 ? 'warn' : 'default'}
-        />
+        {canViewProducts ? (
+          <StatCard title={ui('Products')} iconPath="/products" value={formatNumber(summary.master_data.total_products)} subtitle={ui('Active products')} />
+        ) : null}
+        {canViewSuppliers ? (
+          <StatCard title={ui('Suppliers')} iconPath="/suppliers" value={formatNumber(summary.master_data.total_suppliers)} subtitle={ui('Active suppliers')} />
+        ) : null}
+        {canViewLocations ? (
+          <StatCard title={ui('Storage Locations')} iconPath="/storage-locations" value={formatNumber(summary.master_data.total_storage_locations)} subtitle={ui('Configured locations')} />
+        ) : null}
+        {canViewShipments && summary.shipments ? (
+          <>
+            <StatCard
+              title={ui('Pending Shipments')}
+              iconPath="/shipments"
+              value={formatNumber(summary.shipments.pending_shipments)}
+              subtitle={ui('Not yet received')}
+              tone={summary.shipments.pending_shipments > 0 ? 'warn' : 'good'}
+            />
+            <StatCard
+              title={ui('Partial Shipments')}
+              iconPath="/shipments"
+              value={formatNumber(summary.shipments.partial_shipments)}
+              subtitle={ui('Partially received')}
+              tone={summary.shipments.partial_shipments > 0 ? 'warn' : 'default'}
+            />
+          </>
+        ) : null}
         {canViewOutbound ? (
           <StatCard
             title={ui('Open Outbound Orders')}
             iconPath="/outbound"
-            value={formatNumber(outboundSummaryQuery.data?.open_orders ?? 0)}
-            subtitle={`${ui('Units still waiting')}: ${formatNumber(outboundSummaryQuery.data?.units_waiting ?? 0)}`}
-            tone={(outboundSummaryQuery.data?.packed_orders ?? 0) > 0 ? 'warn' : 'default'}
+            value={outboundSummaryQuery.isLoading || outboundSummaryQuery.isError ? '—' : formatNumber(outboundSummaryQuery.data?.open_orders)}
+            subtitle={outboundSummaryQuery.isLoading
+              ? ui('Loading outbound summary…')
+              : outboundSummaryQuery.isError
+                ? ui('Outbound summary unavailable')
+                : `${ui('Units still waiting')}: ${formatNumber(outboundSummaryQuery.data?.units_waiting)}`}
+            tone={!outboundSummaryQuery.isLoading && !outboundSummaryQuery.isError && (outboundSummaryQuery.data?.packed_orders ?? 0) > 0 ? 'warn' : 'default'}
           />
         ) : null}
-        {canViewOutbound && (outboundSummaryQuery.data?.partially_dispatched_orders ?? 0) > 0 ? (
+        {canViewOutbound && !outboundSummaryQuery.isLoading && !outboundSummaryQuery.isError && (outboundSummaryQuery.data?.partially_dispatched_orders ?? 0) > 0 ? (
           <StatCard
             title={ui('Partial Customer Shipments')}
             iconPath="/outbound"
-            value={formatNumber(outboundSummaryQuery.data?.partially_dispatched_orders ?? 0)}
+            value={formatNumber(outboundSummaryQuery.data?.partially_dispatched_orders)}
             subtitle={ui('Orders with a remainder still reserved')}
             tone="warn"
           />
         ) : null}
-        <StatCard
-          title={ui('Low Stock Rows')}
-          iconPath="/stock"
-          value={formatNumber(summary.stock.low_stock_rows)}
-          subtitle={ui('Below configured minimum')}
-          tone={summary.stock.low_stock_rows > 0 ? 'danger' : 'good'}
-        />
-        <StatCard
-          title={ui('Unresolved Alerts')}
-          iconPath="/alerts"
-          value={formatNumber(summary.alerts.unresolved_alerts)}
-          subtitle={ui('Still requiring attention')}
-          tone={summary.alerts.unresolved_alerts > 0 ? 'danger' : 'good'}
-        />
-        <StatCard
-          title={ui('Critical Alerts')}
-          iconPath="/alerts"
-          value={formatNumber(summary.alerts.critical_unresolved_alerts)}
-          subtitle={ui('Highest priority')}
-          tone={summary.alerts.critical_unresolved_alerts > 0 ? 'danger' : 'good'}
-        />
+        {canViewStock && summary.stock ? (
+          <StatCard
+            title={ui('Low Stock Rows')}
+            iconPath="/stock"
+            value={formatNumber(summary.stock.low_stock_rows)}
+            subtitle={ui('Below configured minimum')}
+            tone={summary.stock.low_stock_rows > 0 ? 'danger' : 'good'}
+          />
+        ) : null}
+        {canViewAlerts && summary.alerts ? (
+          <>
+            <StatCard
+              title={ui('Unresolved Alerts')}
+              iconPath="/alerts"
+              value={formatNumber(summary.alerts.unresolved_alerts)}
+              subtitle={ui('Still requiring attention')}
+              tone={summary.alerts.unresolved_alerts > 0 ? 'danger' : 'good'}
+            />
+            <StatCard
+              title={ui('Critical Alerts')}
+              iconPath="/alerts"
+              value={formatNumber(summary.alerts.critical_unresolved_alerts)}
+              subtitle={ui('Highest priority')}
+              tone={summary.alerts.critical_unresolved_alerts > 0 ? 'danger' : 'good'}
+            />
+          </>
+        ) : null}
       </div>
 
       {setupChecklistQuery.data && !setupChecklistQuery.data.complete ? (
@@ -933,7 +954,7 @@ export default function DashboardPage() {
                   title={ui('No reorder action required')}
                   message={ui("Inventory is currently above the system's reorder thresholds for the evaluated products.")}
                   tone="good"
-                  meta={`${ui('Products evaluated')}: ${formatNumber(summary.master_data.total_products ?? 0)} · ${ui('Lookback window')}: 30 ${ui('days')}`}
+                  meta={canViewProducts ? `${ui('Products evaluated')}: ${formatNumber(summary.master_data.total_products)} · ${ui('Lookback window')}: 30 ${ui('days')}` : `${ui('Lookback window')}: 30 ${ui('days')}`}
                 />
               ) : (
                 topReorderRows.map((row) => (
@@ -983,6 +1004,7 @@ export default function DashboardPage() {
       </div>
 
       <div style={styles.threeColumnGrid}>
+        {canViewStock ? (
         <Section
           title={ui('Low Stock')}
           iconPath="/stock"
@@ -1030,7 +1052,9 @@ export default function DashboardPage() {
             </div>
           )}
         </Section>
+        ) : null}
 
+        {canViewShipments ? (
         <Section
           title={ui('Overdue Shipments')}
           iconPath="/shipments"
@@ -1075,7 +1099,6 @@ export default function DashboardPage() {
                               to={`/shipments?shipmentId=${encodeURIComponent(row.id)}`}
                               label={ui('Open Shipment')}
                               iconPath="/shipments"
-                              nowrap
                             />
                           ) : null}
                         </td>
@@ -1086,7 +1109,6 @@ export default function DashboardPage() {
                               to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`}
                               label={ui('Open Supplier')}
                               iconPath="/suppliers"
-                              nowrap
                             />
                           ) : null}
                         </td>
@@ -1105,7 +1127,9 @@ export default function DashboardPage() {
             </div>
           )}
         </Section>
+        ) : null}
 
+        {canViewAlerts ? (
         <Section
           title={ui('Unresolved Alerts')}
           iconPath="/alerts"
@@ -1166,6 +1190,7 @@ export default function DashboardPage() {
             </div>
           )}
         </Section>
+        ) : null}
       </div>
 
       <div style={styles.threeColumnGrid}>
@@ -1230,6 +1255,7 @@ export default function DashboardPage() {
           )}
         </Section>
 
+        {canViewStockMovements ? (
         <Section
           title={ui('Recent Activity')}
           iconPath="/stock-movements"
@@ -1291,7 +1317,9 @@ export default function DashboardPage() {
             </div>
           )}
         </Section>
+        ) : null}
 
+        {canViewSupplierPerformance ? (
         <Section
           title={ui('Supplier Performance')}
           iconPath="/suppliers"
@@ -1353,6 +1381,7 @@ export default function DashboardPage() {
             </div>
           )}
         </Section>
+        ) : null}
       </div>
     </div>
   );
@@ -1789,9 +1818,5 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
     textAlign: 'center',
     boxShadow: '0 1px 1px rgba(15, 23, 42, 0.02)'
-  },
-  actionLinkNoWrap: {
-    whiteSpace: 'nowrap',
-    flexShrink: 0
   }
 };

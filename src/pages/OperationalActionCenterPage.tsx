@@ -11,7 +11,7 @@ import { useRouteQueryState } from '../lib/useRouteQueryState';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.50: repetitive tenant hero pills intentionally hidden; original rendering retained below.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceStatus
@@ -252,6 +252,7 @@ const URGENCY_FILTERS: Array<{ value: 'all' | ActionUrgency; label: string }> = 
   { value: 'low', label: 'Low' }
 ];
 
+/*
 const USER_FACING_SAFETY_KEYS = new Set([
   'read_only',
   'tenant_isolated',
@@ -260,6 +261,7 @@ const USER_FACING_SAFETY_KEYS = new Set([
   'approval_gated_when_required',
   'no_inventory_mutation'
 ]);
+*/
 
 const cardGridStyle: CSSProperties = {
   gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))'
@@ -444,14 +446,13 @@ function sourceActionLink(action: OperationalAction): SourceActionLink | null {
 }
 
 async function fetchActionCenter(domain: ActionDomain, urgency: 'all' | ActionUrgency, sourceActionId?: string | null): Promise<ActionCenterResponse> {
-  const params = new URLSearchParams({ limit: sourceActionId ? '100' : '50' });
+  const params = new URLSearchParams({ limit: sourceActionId ? '1' : '50' });
 
-  if (domain !== 'all') {
-    params.set('action_domain', domain);
-  }
-
-  if (urgency !== 'all') {
-    params.set('urgency', urgency);
+  if (sourceActionId) {
+    params.set('source_action_id', sourceActionId);
+  } else {
+    if (domain !== 'all') params.set('action_domain', domain);
+    if (urgency !== 'all') params.set('urgency', urgency);
   }
 
   return apiRequest<ActionCenterResponse>(`/operational-action-center/summary?${params.toString()}`);
@@ -516,9 +517,11 @@ export default function OperationalActionCenterPage() {
   const frontendPanelContractDriftCount = CONTROL_TOWER_RENDERED_PANEL_KEYS.filter((key) => {
     return !(routeExposureAudit.frontend_rendered_panels || []).includes(key);
   }).length;
+  /* v3.49.50: retained for easy reversal with the hidden tenant-facing safety-guarantee block.
   const safetyEntries = useMemo(() => {
     return Object.entries(response?.definition?.safety_contract || {}).filter(([, enabled]) => enabled);
   }, [response?.definition?.safety_contract]);
+  */
 
   useEffect(() => {
     if (!selectedSourceAction) return;
@@ -553,18 +556,20 @@ export default function OperationalActionCenterPage() {
 
   return (
     <div className="operational-action-center-page io-operational-page io-workspace-page io-workspace-legacy-normalized">
+      {/*
+        v3.49.50 — Tenant simplification. These repetitive hero pills are intentionally hidden.
+        Original rendering preserved for easy reversal:
+        <OperationalWorkspaceHero meta={<>
+          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Read-only guidance")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Source workflows authoritative")}</OperationalWorkspaceMetaPill>
+        </>} />
+      */}
       <OperationalWorkspaceHero
         iconPath="/action-center"
         eyebrow={ui("Command & prioritization")}
         title={ui("Action Center")}
         description={ui("Prioritized, tenant-scoped operational work gathered from authoritative source workflows. Review what needs attention here, then complete the real work on its source page.")}
-        meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Read-only guidance")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Source workflows authoritative")}</OperationalWorkspaceMetaPill>
-          </>
-        }
         aside={<OperationalWorkspaceStatus value={ui("Read-only")} label={ui("prioritization and routing workspace")} />}
       />
 
@@ -697,18 +702,20 @@ export default function OperationalActionCenterPage() {
                         </Link>
                       ) : null}
                     </div>
-                    <details style={actionMetadataStyle} className="action-center-technical-details">
-                      <summary style={{ cursor: 'pointer', fontWeight: 700 }}>{ui("Technical details")}</summary>
-                      <div className="card__subtext">{ui("Priority score:")} {formatLocalizedNumber(numberValue(action.priority_score), locale)}</div>
-                      <div className="card__subtext">
-                        {ui("Action:")} {action.action_id}{action.source_id ? ` · ${ui('Source:')} ${action.source_id}` : ''}
-                      </div>
-                      {action.explainability?.primary_factors?.length ? (
+                    {canViewTenantDiagnostics ? (
+                      <details style={actionMetadataStyle} className="action-center-technical-details">
+                        <summary style={{ cursor: 'pointer', fontWeight: 700 }}>{ui("Technical details")}</summary>
+                        <div className="card__subtext">{ui("Priority score:")} {formatLocalizedNumber(numberValue(action.priority_score), locale)}</div>
                         <div className="card__subtext">
-                          {ui("Evidence:")} {action.explainability.primary_factors.map((factor) => canonicalLabel(factor, ui)).join(' · ')}
+                          {ui("Action:")} {action.action_id}{action.source_id ? ` · ${ui('Source:')} ${action.source_id}` : ''}
                         </div>
-                      ) : null}
-                    </details>
+                        {action.explainability?.primary_factors?.length ? (
+                          <div className="card__subtext">
+                            {ui("Evidence:")} {action.explainability.primary_factors.map((factor) => canonicalLabel(factor, ui)).join(' · ')}
+                          </div>
+                        ) : null}
+                      </details>
+                    ) : null}
                   </article>
                 );
               })}
@@ -1088,6 +1095,10 @@ export default function OperationalActionCenterPage() {
         </details>
       ) : null}
 
+      {/*
+        v3.49.50 — Tenant simplification. The tenant-facing read-only safety guarantee grid is
+        intentionally hidden because the page explanation already states the same contract.
+        Original rendering preserved below for easy reversal.
       <section className="section">
         <div className="section__title action-center-section-title"><span className="action-center-section-icon"><TenantNavIcon path="/action-center" size={17} /></span><span>{ui("Read-only safety guarantees")}</span></div>
         <div className="card-grid" style={cardGridStyle}>
@@ -1100,6 +1111,7 @@ export default function OperationalActionCenterPage() {
         </div>
         <p className="card__subtext">{ui("Generated at:")} {formatDateTime(response?.generated_at, locale, ui)}</p>
       </section>
+      */}
     </div>
   );
 }

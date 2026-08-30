@@ -462,3 +462,45 @@
     align-items: stretch;
   }
 }
+
+/* v3.49.50 — Block-reason capture and recoverable offline queue controls. */
+.mobile-execution-block-reason {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.mobile-execution-block-reason-input {
+  width: 100%;
+  min-height: 82px;
+  resize: vertical;
+}
+
+.mobile-execution-pending-list {
+  display: grid;
+  gap: 10px;
+}
+
+.mobile-execution-pending-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+}
+
+.mobile-execution-pending-title {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+@media (max-width: 720px) {
+  .mobile-execution-pending-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

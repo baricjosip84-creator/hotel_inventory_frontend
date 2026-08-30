@@ -23,6 +23,10 @@ type WorkflowDomain =
   | 'fulfillment'
   | 'replenishment'
   | 'transfer'
+  | 'alerts'
+  | 'control_tower'
+  | 'decision_intelligence'
+  | 'ai_governance'
   | 'supplier'
   | 'carrier'
   | 'external_partner'
@@ -128,6 +132,10 @@ const WORKFLOW_DOMAINS: Array<{ value: 'all' | WorkflowDomain; label: string }> 
   { value: 'fulfillment', label: 'Shipment fulfilment' },
   { value: 'replenishment', label: 'Replenishment and counts' },
   { value: 'transfer', label: 'Stock transfers' },
+  { value: 'alerts', label: 'Alerts' },
+  { value: 'control_tower', label: 'Control tower' },
+  { value: 'decision_intelligence', label: 'Decision intelligence' },
+  { value: 'ai_governance', label: 'AI governance' },
   { value: 'supplier', label: 'Supplier integrations' },
   { value: 'carrier', label: 'Carrier integrations' },
   { value: 'external_partner', label: 'External partner integrations' },
@@ -278,10 +286,12 @@ function blueprintTypeLabel(value: string | null | undefined, ui: (englishText: 
   return canonicalLabel(value, ui);
 }
 
+/* v3.49.50: retained for easy reversal after replacing the static Page mode KPI.
 function executionModeLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
   if (value === 'read_only_workflow_blueprint_composition') return ui('Guidance only');
   return canonicalLabel(value, ui);
 }
+*/
 
 function displayTitleText(value?: string | null): string {
   const raw = String(value || '').trim();
@@ -401,19 +411,17 @@ function localAvailableDomains(): WorkflowDomain[] {
       .forEach((domain) => available.add(domain as WorkflowDomain));
   }
 
-  if (
-    hasPermission(TENANT_PERMISSIONS.ALERTS_READ)
-    || hasPermission(TENANT_PERMISSIONS.CONTROL_TOWER_READ)
-    || hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ)
-  ) {
+  if (hasPermission(TENANT_PERMISSIONS.ALERTS_READ)) available.add('alerts');
+  if (hasPermission(TENANT_PERMISSIONS.CONTROL_TOWER_READ)) available.add('control_tower');
+  if (hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ)) {
+    available.add('decision_intelligence');
+    available.add('ai_governance');
     available.add('multi_domain');
   }
 
   if (hasPermission(TENANT_PERMISSIONS.ENTERPRISE_INTEGRATIONS_READ)) {
-    WORKFLOW_DOMAINS
-      .map((option) => option.value)
-      .filter((value): value is WorkflowDomain => value !== 'all' && value !== 'multi_domain')
-      .forEach((domain) => available.add(domain));
+    ['execution', 'reservation', 'procurement', 'fulfillment', 'replenishment', 'transfer', 'supplier', 'carrier', 'external_partner']
+      .forEach((domain) => available.add(domain as WorkflowDomain));
   }
 
   return WORKFLOW_DOMAINS
@@ -445,6 +453,7 @@ export default function WorkflowAutomationComposerPage() {
   const summary = response?.summary || {};
   const guidance = response?.guidance || {};
   const blueprints = response?.blueprints || [];
+  const highUrgencyPlans = blueprints.filter((blueprint) => ['critical', 'high'].includes(String(blueprint.escalation_policy_preview?.urgency || ''))).length;
   const canViewDiagnostics = response?.access?.can_view_diagnostics
     ?? hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
 
@@ -479,24 +488,20 @@ export default function WorkflowAutomationComposerPage() {
 
   return (
     <div className="workflow-composer-page workflow-composer-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
+      {/*
+        v3.49.46/v3.49.50 — Tenant simplification. The original hero pills remain
+        commented out, and the empty meta container is no longer rendered.
+        <OperationalWorkspaceHero meta={<>
+          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("Human-reviewed")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{ui("No autonomous execution")}</OperationalWorkspaceMetaPill>
+        </>} />
+      */}
       <OperationalWorkspaceHero
         iconPath="/workflow-composer"
         eyebrow={ui("Human workflow planning")}
         title={ui("Workflow Composer")}
         description={ui("Read-only suggested workflow plans that explain steps, approvals, and source-page routing. Nothing is published, automated, or executed from this page.")}
-        meta={
-          <>
-            {/*
-              v3.49.46 — Tenant simplification.
-              These hero meta pills are intentionally hidden from tenant users because the
-              page description and guidance already communicate the same information.
-
-            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Human-reviewed")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("No autonomous execution")}</OperationalWorkspaceMetaPill>
-            */}
-          </>
-        }
         aside={<OperationalWorkspaceStatus value={ui("Guidance only")} label={ui("source workflows remain authoritative")} />}
       />
 
@@ -523,11 +528,11 @@ export default function WorkflowAutomationComposerPage() {
           tone="warn"
         />
         <OperationalWorkspaceStatCard
-          label={ui("Page mode")}
-          value={composerQuery.isLoading || composerQuery.error ? '—' : executionModeLabel(response?.definition?.execution_mode, ui)}
-          helper={ui("This page suggests a process but cannot create or run automation")}
-          iconPath="/workspace"
-          tone="neutral"
+          label={ui("High-urgency plans")}
+          value={summaryValue(highUrgencyPlans)}
+          helper={ui("Critical and high-urgency plans needing attention")}
+          iconPath="/alerts"
+          tone={highUrgencyPlans > 0 ? 'warn' : 'good'}
         />
       </OperationalWorkspaceStats>
 
@@ -690,7 +695,7 @@ export default function WorkflowAutomationComposerPage() {
                           <dt>{ui("Source action ID")}</dt><dd>{blueprint.source_action_id || ui('Not reported')}</dd>
                           <dt>{ui("Trigger source")}</dt><dd>{canonicalLabel(blueprint.trigger_preview?.trigger_source, ui)}</dd>
                           <dt>{ui("Trigger preview only")}</dt><dd>{ui(blueprint.trigger_preview?.event_trigger_only_preview ? 'Yes' : 'Not reported')}</dd>
-                          <dt>{ui("Escalates when blocked")}</dt><dd>{ui(blueprint.escalation_policy_preview?.escalate_when_blocked ? 'Yes' : 'No')}</dd>
+                          <dt>{ui("Suggested escalation when blocked")}</dt><dd>{ui(blueprint.escalation_policy_preview?.escalate_when_blocked ? 'Yes' : 'No')}</dd>
                           <dt>{ui("Partner automation trigger")}</dt><dd>{ui(blueprint.integration_routing_preview?.partner_automation_trigger ? 'Yes' : 'No')}</dd>
                           <dt>{ui("External execution")}</dt><dd>{ui(blueprint.integration_routing_preview?.external_delivery_execution ? 'Yes' : 'No')}</dd>
                         </dl>
