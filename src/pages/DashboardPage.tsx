@@ -119,6 +119,10 @@ type RecentActivityRow = {
   product_unit: string;
   shipment_id?: string | null;
   shipment_po_number?: string | null;
+  storage_location_id?: string | null;
+  storage_location_name?: string | null;
+  movement_type?: string | null;
+  movement_kind?: string | null;
   change: number | string;
   reason: string;
   user_id?: string | null;
@@ -141,6 +145,7 @@ type DepletionRiskResponse = {
   generated_at: string;
   tenant_id: string;
   lookback_days: number;
+  evidence_quality?: { rows_evaluated: number; incomplete_rows: number; complete: boolean };
   rows: Array<{
     stock_id: string;
     product_id: string;
@@ -154,6 +159,13 @@ type DepletionRiskResponse = {
     configured_min_quantity: number | string;
     recent_outbound_quantity: number | string;
     average_daily_outbound: number | string;
+    recent_consumption_quantity?: number | string;
+    average_daily_consumption?: number | string;
+    observation_days?: number | string;
+    demand_history_complete?: boolean;
+    classification_coverage_pct?: number | string;
+    unclassified_negative_quantity?: number | string;
+    unlocated_negative_quantity?: number | string;
     estimated_days_of_coverage: number | null;
     risk_score: number | string;
     risk_tier: 'critical' | 'high' | 'watch' | 'stable' | string;
@@ -166,6 +178,7 @@ type ReorderRecommendationsResponse = {
   generated_at: string;
   tenant_id: string;
   lookback_days: number;
+  evaluation?: { products_evaluated: number; products_with_incomplete_demand_history: number; demand_history_complete: boolean };
   rows: Array<{
     product_id: string;
     product_name: string;
@@ -173,7 +186,14 @@ type ReorderRecommendationsResponse = {
     current_quantity: number | string;
     min_stock: number | string;
     recent_outbound: number | string;
+    recent_consumption_quantity?: number | string;
     average_daily_usage: number | string;
+    average_daily_consumption?: number | string;
+    observation_days_90d?: number | string;
+    observation_days_30d?: number | string;
+    demand_history_complete?: boolean;
+    classification_coverage_pct?: number | string;
+    unclassified_negative_quantity_90d?: number | string;
     estimated_days_of_coverage: number | null;
     recommended_reorder_quantity: number | string;
     urgency: 'critical' | 'high' | 'medium' | 'low' | string;
@@ -208,6 +228,7 @@ type AnomaliesResponse = {
   tenant_id: string;
   short_window_days: number;
   baseline_window_days: number;
+  evidence_quality?: { products_evaluated: number; incomplete_products: number; complete: boolean };
   rows: Array<{
     product_id: string;
     product_name: string;
@@ -219,6 +240,15 @@ type AnomaliesResponse = {
     baseline_outbound_quantity: number | string;
     recent_daily_outbound: number | string;
     baseline_daily_outbound: number | string;
+    recent_consumption_quantity?: number | string;
+    baseline_consumption_quantity?: number | string;
+    recent_daily_consumption?: number | string;
+    baseline_daily_consumption?: number | string;
+    recent_observation_days?: number | string;
+    baseline_observation_days?: number | string;
+    demand_history_complete?: boolean;
+    classification_coverage_pct?: number | string;
+    unclassified_negative_quantity?: number | string;
     spike_ratio: number | string;
     anomaly_score: number | string;
     anomaly_tier: 'critical' | 'high' | 'watch' | 'normal' | string;
@@ -268,7 +298,7 @@ async function fetchDepletionRisk(): Promise<DepletionRiskResponse> {
 }
 
 async function fetchReorderRecommendations(): Promise<ReorderRecommendationsResponse> {
-  return apiRequest<ReorderRecommendationsResponse>('/reorder-insights/recommendations?lookback_days=30');
+  return apiRequest<ReorderRecommendationsResponse>('/reorder-insights/recommendations?lookback_days=30&sort_by=reorder_quantity_desc&limit=6');
 }
 
 async function fetchOperationalHealth(): Promise<OperationalHealthResponse> {
@@ -291,6 +321,12 @@ function toNumber(value: number | string | null | undefined): number {
   if (typeof value === 'number') return value;
   if (typeof value === 'string' && value.trim() !== '') return Number(value);
   return 0;
+}
+
+function movementDisplayValue(row: RecentActivityRow): string {
+  const specificType = String(row.movement_type || '').trim().toLowerCase();
+  if (specificType && specificType !== 'other') return specificType;
+  return String(row.movement_kind || specificType || 'other');
 }
 
 
@@ -373,19 +409,6 @@ function healthTierLabel(tier: string, ui: UiTranslator): string {
   if (tier === 'good') return ui('Good');
   if (tier === 'watch') return ui('Needs attention');
   return ui('Critical');
-}
-
-function formatActivityReason(reason: string, ui: UiTranslator): string {
-  const formatPart = (value: string) =>
-    value
-      .split('_')
-      .filter(Boolean)
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(' ');
-
-  const [action, detail] = reason.split(':', 2);
-  const actionLabel = ui(formatPart(action || reason));
-  return detail ? `${actionLabel} — ${ui(formatPart(detail))}` : actionLabel;
 }
 
 function dashboardIconToneStyle(tone: 'default' | 'good' | 'warn' | 'danger' = 'default'): CSSProperties {
@@ -502,7 +525,17 @@ export default function DashboardPage() {
   const formatDateTime = (value: string | null | undefined) => formatLocalizedDateTime(value, locale);
   const formatNumber = (value: number | string | null | undefined) =>
     formatLocalizedNumber(toNumber(value), locale, { maximumFractionDigits: 2 });
-  const { canViewReports, canViewInsights, canManageProducts } = getRoleCapabilities();
+  const formatAvailableNumber = (value: number | string | null | undefined) =>
+    value === null || value === undefined ? '—' : formatNumber(value);
+  const {
+    canViewReports,
+    canViewInsights,
+    canManageProducts,
+    canManageUsers,
+    canManageSuppliers,
+    canManageStorageLocations,
+    canAdjustStock
+  } = getRoleCapabilities();
   const canViewStock = hasPermission(TENANT_PERMISSIONS.STOCK_READ);
   const canViewShipments = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ);
   const canViewAlerts = hasPermission(TENANT_PERMISSIONS.ALERTS_READ);
@@ -512,6 +545,7 @@ export default function DashboardPage() {
   const canViewOutbound = hasPermission(TENANT_PERMISSIONS.OUTBOUND_ORDERS_READ);
   const canViewStockMovements = hasPermission(TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ);
   const canViewSupplierPerformance = canViewSuppliers && canViewShipments;
+  const canUseSetupChecklist = canManageUsers || canManageStorageLocations || canManageSuppliers || canManageProducts || canAdjustStock;
 
   /*
     WHAT CHANGED
@@ -527,7 +561,8 @@ export default function DashboardPage() {
   const subscriptionAccessQuery = useQuery({
     queryKey: ['tenant-subscription-access'],
     queryFn: fetchTenantSubscriptionAccess,
-    staleTime: 60_000
+    staleTime: 60_000,
+    enabled: canViewReports
   });
 
   const summaryQuery = useQuery({
@@ -535,7 +570,11 @@ export default function DashboardPage() {
     queryFn: fetchDashboardSummary
   });
 
-  const setupChecklistQuery = useQuery({ queryKey: ['dashboard-setup-checklist'], queryFn: fetchSetupChecklist });
+  const setupChecklistQuery = useQuery({
+    queryKey: ['dashboard-setup-checklist'],
+    queryFn: fetchSetupChecklist,
+    enabled: canUseSetupChecklist
+  });
   const outboundSummaryQuery = useQuery({ queryKey: ['dashboard-outbound-summary'], queryFn: fetchOutboundSummary, enabled: canViewOutbound });
 
   const lowStockQuery = useQuery({
@@ -657,13 +696,13 @@ export default function DashboardPage() {
 
       <div className="app-grid-stats io-workspace-stats" style={styles.kpiGrid}>
         {canViewProducts ? (
-          <StatCard title={ui('Products')} iconPath="/products" value={formatNumber(summary.master_data.total_products)} subtitle={ui('Active products')} />
+          <StatCard title={ui('Products')} iconPath="/products" value={formatAvailableNumber(summary.master_data.total_products)} subtitle={ui('Active products')} />
         ) : null}
         {canViewSuppliers ? (
-          <StatCard title={ui('Suppliers')} iconPath="/suppliers" value={formatNumber(summary.master_data.total_suppliers)} subtitle={ui('Active suppliers')} />
+          <StatCard title={ui('Suppliers')} iconPath="/suppliers" value={formatAvailableNumber(summary.master_data.total_suppliers)} subtitle={ui('Active suppliers')} />
         ) : null}
         {canViewLocations ? (
-          <StatCard title={ui('Storage Locations')} iconPath="/storage-locations" value={formatNumber(summary.master_data.total_storage_locations)} subtitle={ui('Configured locations')} />
+          <StatCard title={ui('Storage Locations')} iconPath="/storage-locations" value={formatAvailableNumber(summary.master_data.total_storage_locations)} subtitle={ui('Configured locations')} />
         ) : null}
         {canViewShipments && summary.shipments ? (
           <>
@@ -734,7 +773,11 @@ export default function DashboardPage() {
         ) : null}
       </div>
 
-      {setupChecklistQuery.data && !setupChecklistQuery.data.complete ? (
+      {canUseSetupChecklist && setupChecklistQuery.isError ? (
+        <section className="app-panel app-panel--padded" style={{ marginBottom: 16 }}>
+          <SectionError message={(setupChecklistQuery.error as Error)?.message || ui('Setup checklist unavailable.')} />
+        </section>
+      ) : setupChecklistQuery.data && !setupChecklistQuery.data.complete ? (
         <section className="app-panel app-panel--padded" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <div><strong>{ui('Getting started')}</strong><div style={{ marginTop: 4, opacity: 0.75 }}>{ui('Complete these basics first.')} {setupChecklistQuery.data.completed_steps}/{setupChecklistQuery.data.total_steps} {ui('done')}.</div></div>
@@ -858,7 +901,7 @@ export default function DashboardPage() {
           title={ui('Depletion Risk')}
           iconPath="/insights"
           iconTone="warn"
-          subtitle={ui('Products and stock rows most at risk of running out soon.')}
+          subtitle={ui('Products and stock rows most at risk of running out soon based on classified consumption.')}
           actionHint={ui('Top risk candidates')}
         >
           {!canViewInsights ? (
@@ -894,6 +937,16 @@ export default function DashboardPage() {
                       <span style={urgencyBadgeStyle(row.risk_tier)}>{enumDisplayLabel(row.risk_tier, ui)}</span>
                     </div>
 
+                    {row.demand_history_complete === false ? (
+                      <div style={styles.dataQualityWarning}>
+                        <strong>{ui('Demand history incomplete')}</strong>
+                        <span>{ui('Classified movement coverage')}: {formatNumber(row.classification_coverage_pct ?? 0)}%</span>
+                        {Number(row.unlocated_negative_quantity ?? 0) > 0 ? (
+                          <span>{ui('Some demand movements are missing storage location context.')}</span>
+                        ) : null}
+                      </div>
+                    ) : null}
+
                     <div style={styles.metricRow}>
                       <span>{ui('Current Qty')}</span>
                       <strong>{formatNumber(row.current_quantity)}</strong>
@@ -905,8 +958,8 @@ export default function DashboardPage() {
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>{ui('Recent Outbound')}</span>
-                      <strong>{formatNumber(row.recent_outbound_quantity)}</strong>
+                      <span>{ui('Recent Consumption')}</span>
+                      <strong>{formatNumber(row.recent_consumption_quantity ?? row.recent_outbound_quantity)}</strong>
                     </div>
 
                     <div style={styles.metricRow}>
@@ -914,7 +967,7 @@ export default function DashboardPage() {
                       <strong>
                         {row.estimated_days_of_coverage === null
                           ? '-'
-                          : toNumber(row.estimated_days_of_coverage)}
+                          : formatNumber(row.estimated_days_of_coverage)}
                       </strong>
                     </div>
 
@@ -933,7 +986,7 @@ export default function DashboardPage() {
           title={ui('Reorder Recommendations')}
           iconPath="/insights"
           iconTone="default"
-          subtitle={ui('Explainable reorder signals based on current stock and recent usage.')}
+          subtitle={ui('Explainable reorder signals based on current stock and classified consumption.')}
           actionHint={ui('Action queue')}
         >
           {!canViewInsights ? (
@@ -951,10 +1004,12 @@ export default function DashboardPage() {
             <div style={styles.list}>
               {topReorderRows.length === 0 ? (
                 <PremiumEmptyState
-                  title={ui('No reorder action required')}
-                  message={ui("Inventory is currently above the system's reorder thresholds for the evaluated products.")}
-                  tone="good"
-                  meta={canViewProducts ? `${ui('Products evaluated')}: ${formatNumber(summary.master_data.total_products)} · ${ui('Lookback window')}: 30 ${ui('days')}` : `${ui('Lookback window')}: 30 ${ui('days')}`}
+                  title={reorderRecommendationsQuery.data?.evaluation?.demand_history_complete === false ? ui('Reorder signal needs review') : ui('No reorder action required')}
+                  message={reorderRecommendationsQuery.data?.evaluation?.demand_history_complete === false
+                    ? ui('Some historical demand movements are still unclassified, so the no-action result is not fully authoritative.')
+                    : ui("Inventory is currently above the system's reorder thresholds for the evaluated products.")}
+                  tone={reorderRecommendationsQuery.data?.evaluation?.demand_history_complete === false ? 'neutral' : 'good'}
+                  meta={`${ui('Products evaluated')}: ${formatNumber(reorderRecommendationsQuery.data?.evaluation?.products_evaluated ?? 0)} · ${ui('Lookback window')}: 30 ${ui('days')}`}
                 />
               ) : (
                 topReorderRows.map((row) => (
@@ -967,6 +1022,13 @@ export default function DashboardPage() {
                       <span style={urgencyBadgeStyle(row.urgency)}>{enumDisplayLabel(row.urgency, ui)}</span>
                     </div>
 
+                    {row.demand_history_complete === false ? (
+                      <div style={styles.dataQualityWarning}>
+                        <strong>{ui('Demand history incomplete')}</strong>
+                        <span>{ui('Classified movement coverage')}: {formatNumber(row.classification_coverage_pct ?? 0)}%</span>
+                      </div>
+                    ) : null}
+
                     <div style={styles.metricRow}>
                       <span>{ui('Current Quantity')}</span>
                       <strong>{formatNumber(row.current_quantity)}</strong>
@@ -978,8 +1040,8 @@ export default function DashboardPage() {
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>{ui('Daily Usage')}</span>
-                      <strong>{formatNumber(row.average_daily_usage)}</strong>
+                      <span>{ui('Daily Consumption')}</span>
+                      <strong>{formatNumber(row.average_daily_consumption ?? row.average_daily_usage)}</strong>
                     </div>
 
                     <div style={styles.metricRow}>
@@ -987,7 +1049,7 @@ export default function DashboardPage() {
                       <strong>
                         {row.estimated_days_of_coverage === null
                           ? '-'
-                          : toNumber(row.estimated_days_of_coverage)}
+                          : formatNumber(row.estimated_days_of_coverage)}
                       </strong>
                     </div>
 
@@ -1198,7 +1260,7 @@ export default function DashboardPage() {
           title={ui('Inventory Anomalies')}
           iconPath="/insights"
           iconTone="good"
-          subtitle={ui('Products with unusually high outbound activity compared to their own baseline.')}
+          subtitle={ui('Products with unusually high classified consumption compared to their own baseline.')}
         >
           {!canViewInsights ? (
             <SectionError message={ui('Your role can view dashboard operations but not anomaly insights.')} />
@@ -1213,7 +1275,7 @@ export default function DashboardPage() {
               {topAnomalies.length === 0 ? (
                 <PremiumEmptyState
                   title={ui('No abnormal consumption patterns')}
-                  message={ui('No significant usage spikes were detected against the current baseline window.')}
+                  message={ui('No significant classified-consumption spikes were detected against the current baseline window.')}
                   tone="good"
                 />
               ) : (
@@ -1229,14 +1291,21 @@ export default function DashboardPage() {
                       <span style={urgencyBadgeStyle(row.anomaly_tier)}>{enumDisplayLabel(row.anomaly_tier, ui)}</span>
                     </div>
 
+                    {row.demand_history_complete === false ? (
+                      <div style={styles.dataQualityWarning}>
+                        <strong>{ui('Demand history incomplete')}</strong>
+                        <span>{ui('Classified movement coverage')}: {formatNumber(row.classification_coverage_pct ?? 0)}%</span>
+                      </div>
+                    ) : null}
+
                     <div style={styles.metricRow}>
-                      <span>{ui('Recent Daily Outbound')}</span>
-                      <strong>{formatNumber(row.recent_daily_outbound)}</strong>
+                      <span>{ui('Recent Daily Consumption')}</span>
+                      <strong>{formatNumber(row.recent_daily_consumption ?? row.recent_daily_outbound)}</strong>
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>{ui('Baseline Daily Outbound')}</span>
-                      <strong>{formatNumber(row.baseline_daily_outbound)}</strong>
+                      <span>{ui('Baseline Daily Consumption')}</span>
+                      <strong>{formatNumber(row.baseline_daily_consumption ?? row.baseline_daily_outbound)}</strong>
                     </div>
 
                     <div style={styles.metricRow}>
@@ -1278,6 +1347,8 @@ export default function DashboardPage() {
                   <tr>
                     <th style={styles.th}>{ui('Created')}</th>
                     <th style={styles.th}>{ui('Product')}</th>
+                    <th style={styles.th}>{ui('Location')}</th>
+                    <th style={styles.th}>{ui('Type')}</th>
                     <th style={styles.th}>{ui('Change')}</th>
                     <th style={styles.th}>{ui('Reason')}</th>
                     <th style={styles.th}>{ui('User')}</th>
@@ -1286,7 +1357,7 @@ export default function DashboardPage() {
                 <tbody>
                   {(recentActivityQuery.data ?? []).length === 0 ? (
                     <tr>
-                      <td style={styles.emptyCell} colSpan={5}>
+                      <td style={styles.emptyCell} colSpan={7}>
                         {ui('No recent activity.')}
                       </td>
                     </tr>
@@ -1301,10 +1372,12 @@ export default function DashboardPage() {
                             <div style={styles.rowTitle}>{row.product_name}</div>
                             <div style={styles.rowSubtle}>{row.product_unit}</div>
                           </td>
+                          <td style={styles.td}>{row.storage_location_name || ui('Location unavailable')}</td>
+                          <td style={styles.td}>{enumDisplayLabel(movementDisplayValue(row), ui)}</td>
                           <td style={styles.td}>
                             <span style={changeBadgeStyle(amount)}>{changeDisplay(amount, locale)}</span>
                           </td>
-                          <td style={styles.td}>{formatActivityReason(row.reason, ui)}</td>
+                          <td style={styles.td}>{row.reason}</td>
                           <td style={styles.td}>
                             {row.user_name || (row.user_id ? ui('User name unavailable') : ui('System'))}
                           </td>
@@ -1705,6 +1778,20 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.5,
     marginBottom: '9px',
     wordBreak: 'break-word'
+  },
+  dataQualityWarning: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '8px',
+    flexWrap: 'wrap',
+    margin: '4px 0 8px',
+    padding: '7px 9px',
+    borderRadius: '8px',
+    border: '1px solid #fed7aa',
+    background: '#fff7ed',
+    color: '#9a3412',
+    fontSize: '11px',
+    lineHeight: 1.4
   },
   metricRow: {
     display: 'flex',
