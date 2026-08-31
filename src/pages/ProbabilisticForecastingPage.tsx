@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
@@ -59,6 +59,7 @@ type ForecastModelRecord = {
 type ForecastIntervalRecord = {
   model_key?: string;
   model_title?: string;
+  model_version?: number | string | null;
   interval_key?: string;
   forecast_period_start?: string;
   forecast_period_end?: string;
@@ -78,6 +79,7 @@ type ForecastIntervalRecord = {
 type ForecastRiskRecord = {
   model_key?: string;
   model_title?: string;
+  model_version?: number | string | null;
   probability_key?: string;
   risk_domain?: string;
   risk_type?: string;
@@ -91,6 +93,7 @@ type ForecastRiskRecord = {
 type ForecastCalibrationRecord = {
   model_key?: string;
   model_title?: string;
+  model_version?: number | string | null;
   calibration_key?: string;
   observation_source?: string;
   calibration_type?: string;
@@ -157,6 +160,21 @@ type ProbabilisticForecastingSummary = {
   forecast_response_contract_audit?: ForecastResponseContractAudit;
   [key: string]: unknown;
 };
+
+
+type FocusedForecastEvidence = {
+  model: ForecastModelRecord;
+  intervals: ForecastIntervalRecord[];
+  risk_probabilities: ForecastRiskRecord[];
+  calibration: ForecastCalibrationRecord[];
+  is_current_lineage_version?: boolean;
+  source_model_id?: string;
+};
+
+function focusedForecastModelId(sourceActionId: string | null): string | null {
+  const match = String(sourceActionId || '').match(/^probabilistic_forecast_model:([0-9a-f-]{36})$/i);
+  return match?.[1] || null;
+}
 
 type LifecycleConfig = {
   key: keyof ProbabilisticForecastingSummary;
@@ -695,6 +713,9 @@ function LifecycleCard({ config, section, diagnostics }: { config: LifecycleConf
 
 export default function ProbabilisticForecastingPage() {
   const { locale, ui } = useAppTranslation();
+  const [searchParams] = useSearchParams();
+  const sourceActionId = searchParams.get('source_action_id');
+  const focusedModelId = focusedForecastModelId(sourceActionId);
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
   const canReadInsights = hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
   const canGovern = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN) && canReadInsights;
@@ -716,6 +737,13 @@ export default function ProbabilisticForecastingPage() {
     queryFn: () => apiRequest<ProbabilisticForecastingSummary>(`/decision-intelligence/probabilistic-forecasting-summary?${queryString}`)
   });
 
+
+  const focusedEvidenceQuery = useQuery({
+    queryKey: ['probabilistic-forecasting-source', focusedModelId],
+    queryFn: () => apiRequest<FocusedForecastEvidence>(`/decision-intelligence/probabilistic-forecasting-source/${focusedModelId}`),
+    enabled: Boolean(focusedModelId)
+  });
+
   const updateFilter = (key: keyof ForecastFilterState, value: string) => {
     setFilters((current) => ({ ...current, [key]: value }));
     setOffsets({ model_offset: 0, interval_offset: 0, risk_offset: 0, calibration_offset: 0 });
@@ -731,6 +759,12 @@ export default function ProbabilisticForecastingPage() {
     setOffsets((current) => ({ ...current, [key]: Math.max(0, current[key] + direction * pageSize) }));
   };
 
+  const focusedEvidence = focusedEvidenceQuery.data;
+  const evidenceModels = focusedEvidence ? [focusedEvidence.model] : (data?.models || []);
+  const evidenceIntervals = focusedEvidence ? focusedEvidence.intervals : (data?.intervals || []);
+  const evidenceRiskProbabilities = focusedEvidence ? focusedEvidence.risk_probabilities : (data?.risk_probabilities || []);
+  const evidenceCalibration = focusedEvidence ? focusedEvidence.calibration : (data?.calibration || []);
+
   const modelCount = data?.governance?.model_count ?? data?.models?.length ?? 0;
   const intervalCount = data?.governance?.interval_count ?? data?.intervals?.length ?? 0;
   const riskCount = data?.governance?.risk_probability_count ?? data?.risk_probabilities?.length ?? 0;
@@ -738,6 +772,7 @@ export default function ProbabilisticForecastingPage() {
   const evidenceCount = modelCount + intervalCount + riskCount + calibrationCount;
   const hasCurrentEvidence = data?.governance?.evidence_available ?? evidenceCount > 0;
   const hasHistoricalEvidence = data?.governance?.historical_evidence_available ?? evidenceCount > 0;
+  const hasVisibleHistoricalEvidence = Boolean(focusedEvidence) || hasHistoricalEvidence;
   const hasActiveFilters = JSON.stringify(filters) !== JSON.stringify(DEFAULT_FILTERS);
   const lastAnalysisRefreshedAt = data?.governance?.last_analysis_refreshed_at;
   const lastRefreshed = lastAnalysisRefreshedAt ? formatLocalizedDateTime(lastAnalysisRefreshedAt, locale) : ui('Not refreshed yet');
@@ -795,6 +830,25 @@ export default function ProbabilisticForecastingPage() {
         <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label={ui('Review checks')} onClick={() => setView('readiness')} />
         {canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'diagnostics'} iconPath="/admin-system" label={ui('Diagnostics')} onClick={() => setView('diagnostics')} /> : null}
       </OperationalWorkspaceTabs>
+
+      {focusedModelId ? (
+        <section className="card forecast-source-focus" aria-label={ui('Focused Intelligence Review evidence')}>
+          <div className="forecast-section-heading">
+            <span className="forecast-heading-icon"><TenantNavIcon path="/intelligence-review" size={17} /></span>
+            <div>
+              <h2>{ui('Focused Intelligence Review evidence')}</h2>
+              {focusedEvidenceQuery.isLoading ? <p>{ui('Loading the exact forecast version referenced by Intelligence Review…')}</p> : null}
+              {focusedEvidenceQuery.error ? <p>{ui('The referenced forecast version could not be loaded. It may no longer be available to this tenant.')}</p> : null}
+              {focusedEvidence ? (
+                <p>{ui('Showing the exact forecast version referenced by Intelligence Review: {model} · Version {version}.')
+                  .replace('{model}', focusedEvidence.model.title || formatLabel(focusedEvidence.model.model_key))
+                  .replace('{version}', formatLocalizedNumber(Number(focusedEvidence.model.version || 1), locale))} {focusedEvidence.is_current_lineage_version === false ? ui('This is a historical superseded version.') : ui('This is the current version.')}</p>
+              ) : null}
+              <Link to="/probabilistic-forecasting">{ui('Clear focused review evidence')}</Link>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="card forecast-filters" aria-label={ui('Probabilistic forecast filters')}>
         <div className="card__header">
@@ -865,14 +919,16 @@ export default function ProbabilisticForecastingPage() {
 
       
 
-      {!hasHistoricalEvidence ? (
+      {!hasVisibleHistoricalEvidence ? (
         <section className="card forecast-empty-state">
           <div className="forecast-section-heading">
             <span className="forecast-heading-icon forecast-heading-icon--slate"><TenantNavIcon path="/probabilistic-forecasting" size={17} /></span>
             <div>
               <h2>{ui('No probabilistic forecast evidence is available for this tenant and filter set')}</h2>
               <p>{ui('Review scores are not assessed when no model, uncertainty range, risk probability, or actual-outcome observation exists. Zero records do not mean that forecasting is accurate, safe, approved, or ready for business use.')}</p>
-              <p>{ui('Use Refresh forecast analysis to rebuild advisory forecast evidence from current operating data. Actual outcome observations can also come from Learning Feedback.')}</p>
+              <p>{canGovern
+                ? ui('Use Refresh forecast analysis to rebuild advisory forecast evidence from current operating data. Actual outcome observations can also come from Learning Feedback.')
+                : ui('An authorized user must refresh forecast analysis to rebuild advisory forecast evidence from current operating data. Actual outcome observations can also come from Learning Feedback.')}</p>
             </div>
           </div>
         </section>
@@ -885,8 +941,8 @@ export default function ProbabilisticForecastingPage() {
             title={ui('Forecast models')}
             iconPath="/probabilistic-forecasting"
             description="Stored forecast definitions and their current human-review status."
-            rows={(data?.models || []) as Array<Record<string, unknown>>}
-            pagination={data?.pagination?.models}
+            rows={evidenceModels as Array<Record<string, unknown>>}
+            pagination={focusedEvidence ? undefined : data?.pagination?.models}
             onPrevious={() => movePage('model_offset', -1)} onNext={() => movePage('model_offset', 1)}
             headers={['Model', 'Area', 'Forecast type', 'Status', 'Method', 'Confidence', 'Updated']}
             renderRow={(row, index) => {
@@ -912,15 +968,18 @@ export default function ProbabilisticForecastingPage() {
             title={ui('Uncertainty ranges')}
             iconPath="/insights"
             description={ui('Expected values and empirical lower-to-upper error bands produced from historical forecast error. These are advisory error bands, not statistical confidence intervals or p10/p90 quantiles.')} 
-            rows={(data?.intervals || []) as Array<Record<string, unknown>>}
-            pagination={data?.pagination?.intervals}
+            rows={evidenceIntervals as Array<Record<string, unknown>>}
+            pagination={focusedEvidence ? undefined : data?.pagination?.intervals}
             onPrevious={() => movePage('interval_offset', -1)} onNext={() => movePage('interval_offset', 1)}
             headers={['Model', 'Range', 'Unit', 'Period starts', 'Period ends', 'Evidence confidence', 'Generated']}
             renderRow={(row, index) => {
               const interval = row as ForecastIntervalRecord;
               return (
                 <tr key={`${interval.interval_key || 'interval'}-${index}`}>
-                  <td><strong>{interval.model_title || formatLabel(interval.model_key || interval.interval_key)}</strong></td>
+                  <td>
+                    <strong>{interval.model_title || formatLabel(interval.model_key || interval.interval_key)}</strong>
+                    {interval.model_version ? <span className="forecast-table__subtext">{ui('Version')} {formatLocalizedNumber(Number(interval.model_version), locale)}</span> : null}
+                  </td>
                   <td>{formatIntervalRange(interval, locale)}</td>
                   <td>{interval.unit || '—'}</td>
                   <td>{formatDate(interval.forecast_period_start, locale)}</td>
@@ -935,15 +994,18 @@ export default function ProbabilisticForecastingPage() {
             title={ui('Risk probabilities')}
             iconPath="/alerts"
             description="Stored estimates of how likely a specific business risk is, together with its possible severity."
-            rows={(data?.risk_probabilities || []) as Array<Record<string, unknown>>}
-            pagination={data?.pagination?.risk_probabilities}
+            rows={evidenceRiskProbabilities as Array<Record<string, unknown>>}
+            pagination={focusedEvidence ? undefined : data?.pagination?.risk_probabilities}
             onPrevious={() => movePage('risk_offset', -1)} onNext={() => movePage('risk_offset', 1)}
             headers={['Model', 'Area', 'Risk', 'Probability', 'Severity', 'Explanation', 'Observed']}
             renderRow={(row, index) => {
               const risk = row as ForecastRiskRecord;
               return (
                 <tr key={`${risk.probability_key || 'risk'}-${index}`}>
-                  <td><strong>{risk.model_title || formatLabel(risk.model_key || risk.probability_key)}</strong></td>
+                  <td>
+                    <strong>{risk.model_title || formatLabel(risk.model_key || risk.probability_key)}</strong>
+                    {risk.model_version ? <span className="forecast-table__subtext">{ui('Version')} {formatLocalizedNumber(Number(risk.model_version), locale)}</span> : null}
+                  </td>
                   <td>{formatCanonicalLabel(risk.risk_domain, ui)}</td>
                   <td>{formatCanonicalLabel(risk.risk_type, ui)}</td>
                   <td>{formatPercentage(risk.probability_score, locale)}</td>
@@ -958,15 +1020,18 @@ export default function ProbabilisticForecastingPage() {
             title={ui('Actual-outcome observations')}
             iconPath="/decision-learning-feedback"
             description="Comparisons between predicted and actual values used to understand forecast error and whether an uncertainty range captured the result."
-            rows={(data?.calibration || []) as Array<Record<string, unknown>>}
-            pagination={data?.pagination?.calibration}
+            rows={evidenceCalibration as Array<Record<string, unknown>>}
+            pagination={focusedEvidence ? undefined : data?.pagination?.calibration}
             onPrevious={() => movePage('calibration_offset', -1)} onNext={() => movePage('calibration_offset', 1)}
             headers={['Model', 'Observation', 'Type', 'Predicted', 'Actual', 'Error', 'Inside range', 'Calibration', 'Measured']}
             renderRow={(row, index) => {
               const observation = row as ForecastCalibrationRecord;
               return (
                 <tr key={`${observation.calibration_key || observation.model_key || observation.measured_at || 'calibration'}-${index}`}>
-                  <td>{observation.model_title || formatLabel(observation.model_key)}</td>
+                  <td>
+                    {observation.model_title || formatLabel(observation.model_key)}
+                    {observation.model_version ? <span className="forecast-table__subtext">{ui('Version')} {formatLocalizedNumber(Number(observation.model_version), locale)}</span> : null}
+                  </td>
                   <td>
                     <strong>{ui(observation.observation_source === 'learning_feedback' ? 'Learning Feedback outcome' : observation.observation_source === 'rolling_backtest' ? '30-day usage backtest' : 'Calibration observation')}</strong>
                     {canViewDiagnostics && observation.calibration_key ? <span className="forecast-table__subtext">{observation.calibration_key}</span> : null}

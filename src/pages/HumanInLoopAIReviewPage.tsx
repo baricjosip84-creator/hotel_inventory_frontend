@@ -4527,6 +4527,9 @@ function sourceReviewToAppPath(review: HumanAIReview): string | null {
       params.set('domain', review.source_action_domain);
     }
   }
+  if (sourceSurface === '/probabilistic-forecasting' && review.source_action_id?.startsWith('probabilistic_forecast_model:') && !params.has('source_action_id')) {
+    params.set('source_action_id', review.source_action_id);
+  }
 
   const query = params.toString();
   return query ? `${sourceSurface}?${query}` : sourceSurface;
@@ -9079,7 +9082,7 @@ export default function HumanInLoopAIReviewPage() {
           </div>
           <div className="card">
             <div className="card__label">{ui("Approval guidance")}</div>
-            <p className="card__subtext">{guidance.approval_guidance || ui("Approvals must be completed in existing governed workflows.")}</p>
+            <p className="card__subtext">{ui(guidance.approval_guidance || "Approvals must be completed in existing governed workflows.")}</p>
           </div>
           <div className="card">
             <div className="card__label">{ui("Safety contract")}</div>
