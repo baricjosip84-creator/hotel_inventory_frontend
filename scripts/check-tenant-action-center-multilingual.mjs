@@ -108,11 +108,12 @@ if (!process.exitCode) pass('Action Center route, query filters, permissions, an
 const serverContentContracts = [
   '{actionTitleLabel(action)}',
   "{action.summary || ui('No summary provided.')}",
-  "{action.recommended_next_step || ui('Review source workflow before acting.')}"
+  '{actionRecommendedNextStep(action, ui)}',
+  'return action.recommended_next_step_key ? ui(text) : text;'
 ];
 for (const contract of serverContentContracts) if (!pageSource.includes(contract)) fail(`Action Center backend-returned content display contract changed: ${contract}`);
 const forbiddenServerContentTranslation = ['ui(action.title)', 'ui(action.summary)', 'ui(action.recommended_next_step)'];
 for (const pattern of forbiddenServerContentTranslation) if (pageSource.includes(pattern)) fail(`Backend-returned Action Center human content must not be blindly translated as a UI key: ${pattern}`);
-if (!process.exitCode) pass('Backend-returned action titles, summaries, and recommended steps remain server content rather than UI translation keys.');
+if (!process.exitCode) pass('Backend-returned titles/summaries and source-owned guidance remain untouched, while keyed system guidance uses the tenant translation catalog.');
 
 if (!process.exitCode) console.log('Tenant Action Center multilingual hardening: PASS');

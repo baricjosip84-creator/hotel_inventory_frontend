@@ -4608,20 +4608,25 @@ async function createAIReviewExecutionRequestDraft(sourceActionId: string): Prom
 async function fetchHumanAIReviewSummary(
   aiOperationDomain: 'all' | AIOperationDomain,
   reviewState: 'all' | ReviewState,
-  urgency: 'all' | Urgency
+  urgency: 'all' | Urgency,
+  sourceActionId?: string | null
 ): Promise<HumanAIReviewResponse> {
-  const params = new URLSearchParams({ limit: '75' });
+  const params = new URLSearchParams({ limit: sourceActionId ? '1' : '75' });
 
-  if (aiOperationDomain !== 'all') {
-    params.set('ai_operation_domain', aiOperationDomain);
-  }
+  if (sourceActionId) {
+    params.set('source_action_id', sourceActionId);
+  } else {
+    if (aiOperationDomain !== 'all') {
+      params.set('ai_operation_domain', aiOperationDomain);
+    }
 
-  if (reviewState !== 'all') {
-    params.set('review_state', reviewState);
-  }
+    if (reviewState !== 'all') {
+      params.set('review_state', reviewState);
+    }
 
-  if (urgency !== 'all') {
-    params.set('urgency', urgency);
+    if (urgency !== 'all') {
+      params.set('urgency', urgency);
+    }
   }
 
   return apiRequest<HumanAIReviewResponse>(`/operational-action-center/human-in-loop-ai-operations-summary?${params.toString()}`);
@@ -4644,8 +4649,8 @@ export default function HumanInLoopAIReviewPage() {
   const lastAutoScrolledSourceActionId = useRef<string | null>(null);
 
   const reviewQuery = useQuery({
-    queryKey: ['human-in-loop-ai-review', aiOperationDomain, reviewState, urgency],
-    queryFn: () => fetchHumanAIReviewSummary(aiOperationDomain, reviewState, urgency),
+    queryKey: ['human-in-loop-ai-review', aiOperationDomain, reviewState, urgency, requestedSourceActionId],
+    queryFn: () => fetchHumanAIReviewSummary(aiOperationDomain, reviewState, urgency, requestedSourceActionId),
     enabled: activeView === 'recommendations'
   });
 

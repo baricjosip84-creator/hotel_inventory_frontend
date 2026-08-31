@@ -19,7 +19,7 @@ import {
 import './OperationalExperiencePages.css';
 
 type ActionUrgency = 'critical' | 'high' | 'medium' | 'low';
-type ActionDomain = 'all' | 'alerts' | 'execution' | 'control_tower' | 'decision_intelligence' | 'ai_governance' | 'multi_domain';
+type ActionDomain = 'all' | 'alerts' | 'execution' | 'control_tower' | 'decision_intelligence' | 'ai_governance';
 
 type OperationalAction = {
   action_id: string;
@@ -33,6 +33,7 @@ type OperationalAction = {
   source_type?: string | null;
   source_id?: string | null;
   recommended_next_step?: string | null;
+  recommended_next_step_key?: string | null;
   required_permission?: string | null;
   approval_required?: boolean;
   escalation_assignment?: {
@@ -194,6 +195,16 @@ type ActionCenterSummary = {
   highest_urgency?: string | null;
 };
 
+type ControlTowerReadinessScope = {
+  assessment_available?: boolean;
+  assessment_scope?: string;
+  inbox_filters_ignored?: boolean;
+  bounded_per_source_limit?: number;
+  required_permissions?: string[];
+  missing_permissions?: string[];
+  permission_scoped?: boolean;
+};
+
 type ActionCenterResponse = {
   definition?: {
     foundation_type?: string;
@@ -214,6 +225,7 @@ type ActionCenterResponse = {
   control_tower_remediation_closure_verification_gate?: ControlTowerRemediationClosureVerificationGate;
   control_tower_remediation_response_contract_audit?: ControlTowerRemediationResponseContractAudit;
   control_tower_route_exposure_audit?: ControlTowerRouteExposureAudit;
+  readiness_scope?: ControlTowerReadinessScope;
   actions?: OperationalAction[];
   non_mutation_guarantee?: boolean;
   generated_at?: string;
@@ -230,7 +242,7 @@ const CONTROL_TOWER_RENDERED_PANEL_KEYS = [
   'control_tower_route_exposure_audit'
 ] as const;
 
-const ACTION_DOMAIN_VALUES = ['all', 'alerts', 'execution', 'control_tower', 'decision_intelligence', 'ai_governance', 'multi_domain'] as const;
+const ACTION_DOMAIN_VALUES = ['all', 'alerts', 'execution', 'control_tower', 'decision_intelligence', 'ai_governance'] as const;
 
 const ACTION_DOMAINS: Array<{ value: ActionDomain; label: string }> = [
   { value: 'all', label: 'All domains' },
@@ -238,8 +250,7 @@ const ACTION_DOMAINS: Array<{ value: ActionDomain; label: string }> = [
   { value: 'execution', label: 'Execution' },
   { value: 'control_tower', label: 'Control tower' },
   { value: 'decision_intelligence', label: 'Decision intelligence' },
-  { value: 'ai_governance', label: 'AI governance' },
-  { value: 'multi_domain', label: 'Multi-domain' }
+  { value: 'ai_governance', label: 'AI governance' }
 ];
 
 const URGENCY_FILTER_VALUES = ['all', 'critical', 'high', 'medium', 'low'] as const;
@@ -405,6 +416,8 @@ function sourceSurfaceToAppPath(sourceSurface?: string): string | null {
     return null;
   }
 
+  if (sourceSurface === '/control-tower') return '/reliability-command';
+
   const tenantRoutes = new Set([
     '/alerts',
     '/execution-tasks',
@@ -415,10 +428,16 @@ function sourceSurfaceToAppPath(sourceSurface?: string): string | null {
     '/inventory-reservations',
     '/inventory-requisitions',
     '/procurement-recommendations',
-    '/reports'
+    '/reports',
+    '/reliability-command'
   ]);
 
   return tenantRoutes.has(sourceSurface) ? sourceSurface : null;
+}
+
+function actionRecommendedNextStep(action: OperationalAction, ui: (englishText: string) => string): string {
+  const text = action.recommended_next_step || 'Review source workflow before acting.';
+  return action.recommended_next_step_key ? ui(text) : text;
 }
 
 type SourceActionLink = { to: string; label: string };
@@ -487,7 +506,6 @@ export default function OperationalActionCenterPage() {
     if (canViewDecisionIntelligence) {
       allowed.add('decision_intelligence');
       allowed.add('ai_governance');
-      allowed.add('multi_domain');
     }
     return ACTION_DOMAINS.filter((option) => allowed.has(option.value));
   }, [canViewAlerts, canViewControlTower, canViewDecisionIntelligence, canViewExecutionTasks]);
@@ -514,6 +532,8 @@ export default function OperationalActionCenterPage() {
   const closureGate = response?.control_tower_remediation_closure_verification_gate || {};
   const contractAudit = response?.control_tower_remediation_response_contract_audit || {};
   const routeExposureAudit = response?.control_tower_route_exposure_audit || {};
+  const readinessScope = response?.readiness_scope || {};
+  const readinessAssessmentAvailable = readinessScope.assessment_available !== false;
   const frontendPanelContractDriftCount = CONTROL_TOWER_RENDERED_PANEL_KEYS.filter((key) => {
     return !(routeExposureAudit.frontend_rendered_panels || []).includes(key);
   }).length;
@@ -621,22 +641,28 @@ export default function OperationalActionCenterPage() {
         </div>
         <div className="card action-center-inbox-shell">
           <div style={toolbarStyle} className="action-center-toolbar">
-            <label className="action-center-filter-field">
-              <span>{ui("Domain")}</span>
-              <select aria-label={ui("Filter by action domain")} style={selectStyle} value={domain} onChange={(event) => setDomain(event.target.value as ActionDomain)}>
-                {availableDomains.map((option) => (
-                  <option key={option.value} value={option.value}>{ui(option.label)}</option>
-                ))}
-              </select>
-            </label>
-            <label className="action-center-filter-field">
-              <span>{ui("Urgency")}</span>
-              <select aria-label={ui("Filter by urgency")} style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>
-                {URGENCY_FILTERS.map((option) => (
-                  <option key={option.value} value={option.value}>{ui(option.label)}</option>
-                ))}
-              </select>
-            </label>
+            {!sourceActionId ? (
+              <>
+                <label className="action-center-filter-field">
+                  <span>{ui("Domain")}</span>
+                  <select aria-label={ui("Filter by action domain")} style={selectStyle} value={domain} onChange={(event) => setDomain(event.target.value as ActionDomain)}>
+                    {availableDomains.map((option) => (
+                      <option key={option.value} value={option.value}>{ui(option.label)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="action-center-filter-field">
+                  <span>{ui("Urgency")}</span>
+                  <select aria-label={ui("Filter by urgency")} style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>
+                    {URGENCY_FILTERS.map((option) => (
+                      <option key={option.value} value={option.value}>{ui(option.label)}</option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            ) : (
+              <span className="card__subtext">{ui('Focused action view')}</span>
+            )}
             <button className="button button--secondary action-center-refresh" type="button" onClick={() => actionCenterQuery.refetch()} disabled={actionCenterQuery.isFetching}>
               {actionCenterQuery.isFetching ? ui('Refreshing…') : ui('Refresh')}
             </button>
@@ -646,7 +672,7 @@ export default function OperationalActionCenterPage() {
             <p className={selectedSourceAction ? 'card__subtext' : 'form-error'}>
               {selectedSourceAction
                 ? ui('The requested action is highlighted below.')
-                : ui('The requested action was not returned by the current filters or is no longer pending.')}
+                : ui('The requested action is not available to your role or is no longer pending.')}
             </p>
           ) : null}
 
@@ -684,7 +710,7 @@ export default function OperationalActionCenterPage() {
 
                     <div className="action-center-action-guidance">
                       <span className="action-center-action-guidance-label">{ui("Recommended next step")}</span>
-                      <span>{action.recommended_next_step || ui('Review source workflow before acting.')}</span>
+                      <span>{actionRecommendedNextStep(action, ui)}</span>
                       {action.escalation_assignment ? (
                         <span className="card__subtext">
                           <strong>{ui('Escalated to:')}</strong> {escalationTargetLabel(action.escalation_assignment.target_role, ui)}
@@ -729,7 +755,13 @@ export default function OperationalActionCenterPage() {
       <details style={{ ...detailsStyle, marginTop: 16 }} className="action-center-details">
         <summary style={detailsSummaryStyle}>{ui("Governance readiness details")}</summary>
         <p className="card__subtext">
-          {ui("Advanced read-only checks showing whether related actions have enough ownership, evidence, review, escalation, and closure information. These scores describe workflow readiness, not the tenant's overall operational health.")}
+          {ui("Advanced read-only checks showing whether related actions have enough ownership, evidence, review, escalation, and closure information. These scores describe a bounded workflow-readiness sample, not the tenant's overall operational health.")}
+        </p>
+        {readinessAssessmentAvailable ? (
+        <>
+        <p className="card__subtext">
+          {ui("These readiness checks use an unfiltered source sample and do not change when you filter the Action inbox.")}
+          {readinessScope.bounded_per_source_limit ? ` ${ui('Maximum source records checked per workflow:')} ${formatLocalizedNumber(readinessScope.bounded_per_source_limit, locale)}.` : ''}
         </p>
 
         <section className="section" style={{ marginTop: 12 }}>
@@ -804,7 +836,7 @@ export default function OperationalActionCenterPage() {
           ) : (
             <p className="card__subtext">{ui("No remediation feedback blockers reported by the backend.")}</p>
           )}
-          <div className="card__subtext">{ui("Recommended next step:")} {remediationFeedback.recommended_next_step || ui('Review source workflows before closing remediation feedback.')}</div>
+          <div className="card__subtext">{ui("Recommended next step:")} {ui(remediationFeedback.recommended_next_step || 'Review source workflows before closing remediation feedback.')}</div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
@@ -854,7 +886,7 @@ export default function OperationalActionCenterPage() {
           ) : (
             <p className="card__subtext">{ui("No effectiveness blockers reported by the backend.")}</p>
           )}
-          <div className="card__subtext">{ui("Recommended next step:")} {effectivenessReview.recommended_next_step || ui('Complete before/after evidence review before closing remediation.')}</div>
+          <div className="card__subtext">{ui("Recommended next step:")} {ui(effectivenessReview.recommended_next_step || 'Complete before/after evidence review before closing remediation.')}</div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
@@ -905,7 +937,7 @@ export default function OperationalActionCenterPage() {
           ) : (
             <p className="card__subtext">{ui("No escalation governance blockers reported by the backend.")}</p>
           )}
-          <div className="card__subtext">{ui("Recommended next step:")} {escalationGovernance.recommended_next_step || ui('Run manual escalation review before closing blocked remediation outcomes.')}</div>
+          <div className="card__subtext">{ui("Recommended next step:")} {ui(escalationGovernance.recommended_next_step || 'Run manual escalation review before closing blocked remediation outcomes.')}</div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
@@ -955,7 +987,7 @@ export default function OperationalActionCenterPage() {
           ) : (
             <p className="card__subtext">{ui("No closure verification blockers reported by the backend.")}</p>
           )}
-          <div className="card__subtext">{ui("Recommended next step:")} {closureGate.recommended_next_step || ui('Run manual closure verification before closing remediation outcomes.')}</div>
+          <div className="card__subtext">{ui("Recommended next step:")} {ui(closureGate.recommended_next_step || 'Run manual closure verification before closing remediation outcomes.')}</div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
@@ -969,6 +1001,15 @@ export default function OperationalActionCenterPage() {
           )}
         </div>
       </section>
+        </>
+        ) : (
+          <div className="card" style={{ marginTop: 12 }}>
+            <div style={{ fontWeight: 800 }}>{ui('Readiness assessment unavailable for this role')}</div>
+            <p className="card__subtext">
+              {ui('This score is not calculated because this role cannot read every source domain required by the readiness model. Hidden domains are not treated as zero or as blockers.')}
+            </p>
+          </div>
+        )}
       </details>
       ) : null}
 
@@ -1013,7 +1054,7 @@ export default function OperationalActionCenterPage() {
           ) : (
             <p className="card__subtext">{ui("No missing Control Tower remediation response objects reported.")}</p>
           )}
-          <div className="card__subtext">{ui("Recommended next step:")} {contractAudit.recommended_next_step || ui('Keep response-contract checks in place before adding more Control Tower panels.')}</div>
+          <div className="card__subtext">{ui("Recommended next step:")} {ui(contractAudit.recommended_next_step || 'Keep response-contract checks in place before adding more Control Tower panels.')}</div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
@@ -1078,7 +1119,7 @@ export default function OperationalActionCenterPage() {
           ) : (
             <p className="card__subtext">{ui("No route exposure blockers reported by the backend.")}</p>
           )}
-          <div className="card__subtext">{ui("Recommended next step:")} {routeExposureAudit.recommended_next_step || ui('Keep route exposure regression checks in place before adding more Control Tower panels.')}</div>
+          <div className="card__subtext">{ui("Recommended next step:")} {ui(routeExposureAudit.recommended_next_step || 'Keep route exposure regression checks in place before adding more Control Tower panels.')}</div>
         </div>
 
         <div className="card" style={{ marginTop: 12 }}>
