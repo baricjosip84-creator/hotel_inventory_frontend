@@ -136,6 +136,7 @@ type ProbabilisticForecastingSummary = {
     calibration_capture_rate?: number | null;
     observed_domains?: string[];
     evidence_available?: boolean;
+    historical_evidence_available?: boolean;
     probabilistic_forecasting_posture?: string;
     [key: string]: unknown;
   };
@@ -693,6 +694,8 @@ export default function ProbabilisticForecastingPage() {
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
   const canReadInsights = hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
   const canGovern = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN) && canReadInsights;
+  const canOpenIntelligenceReview = hasPermission(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ)
+    && hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ);
   const [view, setView] = useState<ForecastView>('evidence');
   const [filters, setFilters] = useState<ForecastFilterState>(DEFAULT_FILTERS);
   const [offsets, setOffsets] = useState<ForecastOffsets>({ model_offset: 0, interval_offset: 0, risk_offset: 0, calibration_offset: 0 });
@@ -729,7 +732,8 @@ export default function ProbabilisticForecastingPage() {
   const riskCount = data?.governance?.risk_probability_count ?? data?.risk_probabilities?.length ?? 0;
   const calibrationCount = data?.governance?.calibration_observation_count ?? data?.calibration?.length ?? 0;
   const evidenceCount = modelCount + intervalCount + riskCount + calibrationCount;
-  const hasEvidence = data?.governance?.evidence_available ?? evidenceCount > 0;
+  const hasCurrentEvidence = data?.governance?.evidence_available ?? evidenceCount > 0;
+  const hasHistoricalEvidence = data?.governance?.historical_evidence_available ?? evidenceCount > 0;
   const hasActiveFilters = JSON.stringify(filters) !== JSON.stringify(DEFAULT_FILTERS);
   const lastAnalysisRefreshedAt = data?.governance?.last_analysis_refreshed_at;
   const lastRefreshed = lastAnalysisRefreshedAt ? formatLocalizedDateTime(lastAnalysisRefreshedAt, locale) : ui('Not refreshed yet');
@@ -857,7 +861,7 @@ export default function ProbabilisticForecastingPage() {
 
       
 
-      {!hasEvidence ? (
+      {!hasHistoricalEvidence ? (
         <section className="card forecast-empty-state">
           <div className="forecast-section-heading">
             <span className="forecast-heading-icon forecast-heading-icon--slate"><TenantNavIcon path="/probabilistic-forecasting" size={17} /></span>
@@ -975,14 +979,14 @@ export default function ProbabilisticForecastingPage() {
       ) : null}
 
       {view === 'readiness' ? (
-        hasEvidence ? (
+        hasCurrentEvidence ? (
           <>
             <section className="card forecast-readiness-note">
               <div className="forecast-section-heading">
                 <span className="forecast-heading-icon forecast-heading-icon--amber"><TenantNavIcon path="/reliability-command" size={17} /></span>
                 <div>
                   <h2>{ui('These are advisory checks, not approvals or automated actions')}</h2>
-                  <p className="card__subtext">{ui('A passing check only means the evidence satisfies that calculation. Models that need a human decision are reviewed in Intelligence Review; approval still does not change inventory or execute business work.')}</p><Link className="button button--secondary" to="/intelligence-review"><TenantNavIcon path="/intelligence-review" size={14} />{ui('Open Intelligence Review')}</Link>
+                  <p className="card__subtext">{ui('A passing check only means the evidence satisfies that calculation. Models that need a human decision are reviewed in Intelligence Review; approval still does not change inventory or execute business work.')}</p>{canOpenIntelligenceReview ? <Link className="button button--secondary" to="/intelligence-review"><TenantNavIcon path="/intelligence-review" size={14} />{ui('Open Intelligence Review')}</Link> : null}
                 </div>
               </div>
             </section>
