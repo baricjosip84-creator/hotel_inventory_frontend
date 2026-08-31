@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
@@ -635,11 +635,11 @@ function EvidenceSection({
   );
 }
 
-function CheckColumn({ title, items, diagnostics }: { title: string; items: Array<Record<string, unknown>>; diagnostics: boolean }) {
+function CheckColumn({ title, items, diagnostics, attention = false }: { title: string; items: Array<Record<string, unknown>>; diagnostics: boolean; attention?: boolean }) {
   const { locale, ui } = useAppTranslation();
   return (
     <section className="forecast-check-card">
-      <h3><span className={`forecast-heading-icon forecast-heading-icon--small ${title === 'Items needing attention' ? 'forecast-heading-icon--warning' : ''}`}><TenantNavIcon path={title === 'Items needing attention' ? '/alerts' : '/permissions'} size={15} /></span>{ui(title)}</h3>
+      <h3><span className={`forecast-heading-icon forecast-heading-icon--small ${attention ? 'forecast-heading-icon--warning' : ''}`}><TenantNavIcon path={attention ? '/alerts' : '/permissions'} size={15} /></span>{ui(title)}</h3>
       {!items.length ? (
         <p className="forecast-muted">{ui('No items were returned for this section.')}</p>
       ) : (
@@ -703,8 +703,8 @@ function LifecycleCard({ config, section, diagnostics }: { config: LifecycleConf
             ))}
           </div>
           <div className="forecast-check-grid">
-            <CheckColumn title={ui('Checks')} items={checks} diagnostics={diagnostics} />
-            <CheckColumn title={ui('Items needing attention')} items={blockers} diagnostics={diagnostics} />
+            <CheckColumn title="Checks" items={checks} diagnostics={diagnostics} />
+            <CheckColumn title="Items needing attention" items={blockers} diagnostics={diagnostics} attention />
           </div>
         </>
       ) : (
@@ -721,6 +721,7 @@ export default function ProbabilisticForecastingPage() {
   const [searchParams] = useSearchParams();
   const sourceActionId = searchParams.get('source_action_id');
   const focusedModelId = focusedForecastModelId(sourceActionId);
+  const focusedMode = Boolean(focusedModelId);
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
   const canReadInsights = hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
   const canGovern = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN) && canReadInsights;
@@ -729,6 +730,13 @@ export default function ProbabilisticForecastingPage() {
   const [view, setView] = useState<ForecastView>('evidence');
   const [filters, setFilters] = useState<ForecastFilterState>(DEFAULT_FILTERS);
   const [offsets, setOffsets] = useState<ForecastOffsets>({ model_offset: 0, interval_offset: 0, risk_offset: 0, calibration_offset: 0 });
+
+  useEffect(() => {
+    if (!focusedModelId) return;
+    setView('evidence');
+    setOffsets({ model_offset: 0, interval_offset: 0, risk_offset: 0, calibration_offset: 0 });
+    setFilters((current) => ({ ...DEFAULT_FILTERS, limit: current.limit }));
+  }, [focusedModelId]);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -739,7 +747,8 @@ export default function ProbabilisticForecastingPage() {
 
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ['probabilistic-forecasting-summary', queryString],
-    queryFn: () => apiRequest<ProbabilisticForecastingSummary>(`/decision-intelligence/probabilistic-forecasting-summary?${queryString}`)
+    queryFn: () => apiRequest<ProbabilisticForecastingSummary>(`/decision-intelligence/probabilistic-forecasting-summary?${queryString}`),
+    enabled: !focusedMode
   });
 
 
@@ -761,9 +770,24 @@ export default function ProbabilisticForecastingPage() {
     setOffsets({ model_offset: 0, interval_offset: 0, risk_offset: 0, calibration_offset: 0 });
   };
 
+  const refreshVisibleEvidence = async () => {
+    if (focusedMode) {
+      await focusedEvidenceQuery.refetch();
+      return;
+    }
+    await refetch();
+  };
+
   const refreshAnalysis = useMutation({
     mutationFn: () => apiRequest('/decision-intelligence/probabilistic-forecasting-refresh', { method: 'POST', body: JSON.stringify({}) }),
-    onSuccess: async () => { setOffsets({ model_offset: 0, interval_offset: 0, risk_offset: 0, calibration_offset: 0 }); await refetch(); }
+    onSuccess: async () => {
+      if (focusedMode) {
+        await focusedEvidenceQuery.refetch();
+        return;
+      }
+      setOffsets({ model_offset: 0, interval_offset: 0, risk_offset: 0, calibration_offset: 0 });
+      await refetch();
+    }
   });
 
   const movePage = (key: keyof ForecastOffsets, direction: -1 | 1) => {
@@ -771,25 +795,39 @@ export default function ProbabilisticForecastingPage() {
     setOffsets((current) => ({ ...current, [key]: Math.max(0, current[key] + direction * pageSize) }));
   };
 
-  const focusedEvidence = focusedEvidenceQuery.data;
-  const evidenceModels = focusedEvidence ? [focusedEvidence.model] : (data?.models || []);
-  const evidenceIntervals = focusedEvidence ? focusedEvidence.intervals : (data?.intervals || []);
-  const evidenceRiskProbabilities = focusedEvidence ? focusedEvidence.risk_probabilities : (data?.risk_probabilities || []);
-  const evidenceCalibration = focusedEvidence ? focusedEvidence.calibration : (data?.calibration || []);
+  const focusedEvidence = focusedMode ? focusedEvidenceQuery.data : undefined;
+  const evidenceModels = focusedMode ? (focusedEvidence ? [focusedEvidence.model] : []) : (data?.models || []);
+  const evidenceIntervals = focusedMode ? (focusedEvidence?.intervals || []) : (data?.intervals || []);
+  const evidenceRiskProbabilities = focusedMode ? (focusedEvidence?.risk_probabilities || []) : (data?.risk_probabilities || []);
+  const evidenceCalibration = focusedMode ? (focusedEvidence?.calibration || []) : (data?.calibration || []);
 
-  const modelCount = data?.governance?.model_count ?? data?.models?.length ?? 0;
-  const intervalCount = data?.governance?.interval_count ?? data?.intervals?.length ?? 0;
-  const riskCount = data?.governance?.risk_probability_count ?? data?.risk_probabilities?.length ?? 0;
-  const calibrationCount = data?.governance?.calibration_observation_count ?? data?.calibration?.length ?? 0;
-  const evidenceCount = modelCount + intervalCount + riskCount + calibrationCount;
-  const hasCurrentEvidence = data?.governance?.evidence_available ?? evidenceCount > 0;
-  const hasHistoricalEvidence = data?.governance?.historical_evidence_available ?? evidenceCount > 0;
-  const hasVisibleHistoricalEvidence = Boolean(focusedEvidence) || hasHistoricalEvidence;
+  const normalModelCount = data?.governance?.model_count ?? data?.models?.length ?? 0;
+  const normalIntervalCount = data?.governance?.interval_count ?? data?.intervals?.length ?? 0;
+  const normalRiskCount = data?.governance?.risk_probability_count ?? data?.risk_probabilities?.length ?? 0;
+  const normalCalibrationCount = data?.governance?.calibration_observation_count ?? data?.calibration?.length ?? 0;
+  const modelCount = focusedMode ? (focusedEvidence ? 1 : undefined) : normalModelCount;
+  const intervalCount = focusedMode ? focusedEvidence?.pagination?.intervals?.total : normalIntervalCount;
+  const riskCount = focusedMode ? focusedEvidence?.pagination?.risk_probabilities?.total : normalRiskCount;
+  const calibrationCount = focusedMode ? focusedEvidence?.pagination?.calibration?.total : normalCalibrationCount;
+  const normalEvidenceCount = normalModelCount + normalIntervalCount + normalRiskCount + normalCalibrationCount;
+  const hasCurrentEvidence = !focusedMode && (data?.governance?.evidence_available ?? normalEvidenceCount > 0);
+  const hasHistoricalEvidence = !focusedMode && (data?.governance?.historical_evidence_available ?? normalEvidenceCount > 0);
   const hasActiveFilters = JSON.stringify(filters) !== JSON.stringify(DEFAULT_FILTERS);
   const lastAnalysisRefreshedAt = data?.governance?.last_analysis_refreshed_at;
   const lastRefreshed = lastAnalysisRefreshedAt ? formatLocalizedDateTime(lastAnalysisRefreshedAt, locale) : ui('Not refreshed yet');
+  const visibleIsFetching = focusedMode ? focusedEvidenceQuery.isFetching : isFetching;
+  const heroStatusValue = focusedMode
+    ? focusedEvidence
+      ? formatCanonicalLabel(focusedEvidence.model.model_status, ui)
+      : focusedEvidenceQuery.error
+        ? ui('Exact version unavailable')
+        : ui('Loading exact version')
+    : formatCanonicalLabel(data?.governance?.probabilistic_forecasting_posture, ui);
+  const heroStatusLabel = focusedMode
+    ? ui('Focused model status')
+    : ui('Forecast analysis last refreshed · {time}').replace('{time}', lastRefreshed);
 
-  if (isLoading) {
+  if (!focusedMode && isLoading) {
     return (
       <main className="decision-intelligence-page io-operational-page io-workspace-page io-workspace-legacy-normalized" data-probabilistic-forecasting-refined="true">
         <section className="card forecast-state-card"><span className="forecast-state-icon"><TenantNavIcon path="/probabilistic-forecasting" size={18} /></span><p>{ui('Loading probabilistic forecast evidence…')}</p></section>
@@ -797,7 +835,7 @@ export default function ProbabilisticForecastingPage() {
     );
   }
 
-  if (error) {
+  if (!focusedMode && error) {
     return (
       <main className="decision-intelligence-page io-operational-page io-workspace-page io-workspace-legacy-normalized" data-probabilistic-forecasting-refined="true">
         <section className="card card--danger forecast-state-card forecast-state-card--error">
@@ -820,7 +858,7 @@ export default function ProbabilisticForecastingPage() {
         eyebrow={ui('Decision intelligence & forecasting')}
         title={ui('Probabilistic Forecasting')}
         description={ui('Build and review advisory demand ranges, stockout risk, and forecast accuracy from the app’s real operating data. Forecasts never change inventory or other business records automatically.')}
-        aside={<><OperationalWorkspaceStatus value={formatCanonicalLabel(data?.governance?.probabilistic_forecasting_posture, ui)} label={ui('Forecast analysis last refreshed · {time}').replace('{time}', lastRefreshed)} />{canGovern ? <button className="button button--secondary" type="button" onClick={() => refreshAnalysis.mutate()} disabled={refreshAnalysis.isPending || isFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />{ui(refreshAnalysis.isPending ? 'Refreshing forecast analysis…' : 'Refresh forecast analysis')}</button> : <button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />{ui(isFetching ? 'Refreshing…' : 'Refresh page')}</button>}</>}
+        aside={<><OperationalWorkspaceStatus value={heroStatusValue} label={heroStatusLabel} />{canGovern ? <button className="button button--secondary" type="button" onClick={() => refreshAnalysis.mutate()} disabled={refreshAnalysis.isPending || visibleIsFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />{ui(refreshAnalysis.isPending ? 'Refreshing forecast analysis…' : 'Refresh forecast analysis')}</button> : <button className="button button--secondary" type="button" onClick={() => void refreshVisibleEvidence()} disabled={visibleIsFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />{ui(visibleIsFetching ? 'Refreshing…' : 'Refresh page')}</button>}</>}
       />
       {refreshAnalysis.isError ? (
         <section className="card card--danger forecast-refresh-error" role="alert">
@@ -829,18 +867,26 @@ export default function ProbabilisticForecastingPage() {
         </section>
       ) : null}
 
-<OperationalWorkspaceStats ariaLabel={ui('Probabilistic forecast evidence summary')}>
+<OperationalWorkspaceStats ariaLabel={ui(focusedMode ? 'Focused forecast evidence summary' : 'Probabilistic forecast evidence summary')}>
         <MetricCard label="Models" value={modelCount} iconPath="/probabilistic-forecasting" tone="blue" />
         <MetricCard label="Uncertainty ranges" value={intervalCount} iconPath="/insights" tone="violet" />
         <MetricCard label="Risk probabilities" value={riskCount} iconPath="/alerts" tone="amber" />
         <MetricCard label="Outcome observations" value={calibrationCount} iconPath="/decision-learning-feedback" tone="green" />
-        <OperationalWorkspaceStatCard label={ui('Current posture')} value={formatCanonicalLabel(data?.governance?.probabilistic_forecasting_posture, ui)} helper={ui('Current evidence and governance posture')} iconPath="/reliability-command" tone="slate" />
+        <OperationalWorkspaceStatCard
+          label={ui(focusedMode ? 'Focused model status' : 'Current posture')}
+          value={focusedMode ? heroStatusValue : formatCanonicalLabel(data?.governance?.probabilistic_forecasting_posture, ui)}
+          helper={focusedMode
+            ? ui(focusedEvidence?.is_current_lineage_version === false ? 'Historical exact version; tenant-wide lifecycle checks are intentionally hidden.' : 'Exact Intelligence Review version only')
+            : ui('Current evidence and governance posture')}
+          iconPath="/reliability-command"
+          tone="slate"
+        />
       </OperationalWorkspaceStats>
 
 <OperationalWorkspaceTabs ariaLabel={ui('Probabilistic forecasting page views')}>
         <OperationalWorkspaceTab active={view === 'evidence'} iconPath="/probabilistic-forecasting" label={ui('Forecast evidence')} onClick={() => setView('evidence')} />
-        <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label={ui('Review checks')} onClick={() => setView('readiness')} />
-        {canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'diagnostics'} iconPath="/admin-system" label={ui('Diagnostics')} onClick={() => setView('diagnostics')} /> : null}
+        {!focusedMode ? <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label={ui('Review checks')} onClick={() => setView('readiness')} /> : null}
+        {!focusedMode && canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'diagnostics'} iconPath="/admin-system" label={ui('Diagnostics')} onClick={() => setView('diagnostics')} /> : null}
       </OperationalWorkspaceTabs>
 
       {focusedModelId ? (
@@ -850,7 +896,7 @@ export default function ProbabilisticForecastingPage() {
             <div>
               <h2>{ui('Focused Intelligence Review evidence')}</h2>
               {focusedEvidenceQuery.isLoading ? <p>{ui('Loading the exact forecast version referenced by Intelligence Review…')}</p> : null}
-              {focusedEvidenceQuery.error ? <p>{ui('The referenced forecast version could not be loaded. It may no longer be available to this tenant.')}</p> : null}
+              {focusedEvidenceQuery.error ? <><p>{ui('The referenced forecast version could not be loaded. It may no longer be available to this tenant.')}</p><button className="button button--secondary" type="button" onClick={() => void focusedEvidenceQuery.refetch()} disabled={focusedEvidenceQuery.isFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />{ui('Retry exact version')}</button></> : null}
               {focusedEvidence ? (
                 <p>{ui('Showing the exact forecast version referenced by Intelligence Review: {model} · Version {version}.')
                   .replace('{model}', focusedEvidence.model.title || formatLabel(focusedEvidence.model.model_key))
@@ -862,76 +908,98 @@ export default function ProbabilisticForecastingPage() {
         </section>
       ) : null}
 
-      <section className="card forecast-filters" aria-label={ui('Probabilistic forecast filters')}>
-        <div className="card__header">
-          <div className="forecast-section-heading">
-            <span className="forecast-heading-icon"><TenantNavIcon path="/system-context" size={17} /></span>
-            <div>
-              <h2>{ui('Filter the evidence')}</h2>
-              <p className="card__subtext">{ui('Filters apply to models and their related ranges, risk probabilities, and outcome observations.')}</p>
+      {focusedMode ? (
+        <section className="card forecast-filters" aria-label={ui('Focused evidence paging')}>
+          <div className="card__header">
+            <div className="forecast-section-heading">
+              <span className="forecast-heading-icon"><TenantNavIcon path="/system-context" size={17} /></span>
+              <div>
+                <h2>{ui('Focused evidence paging')}</h2>
+                <p className="card__subtext">{ui('Tenant-wide forecast filters are disabled while reviewing an exact version. Use the record limit and evidence pagination below.')}</p>
+              </div>
             </div>
           </div>
-          <button className="button button--secondary" type="button" onClick={() => { setFilters(DEFAULT_FILTERS); setOffsets({ model_offset: 0, interval_offset: 0, risk_offset: 0, calibration_offset: 0 }); }} disabled={!hasActiveFilters}>
-            <TenantNavIcon path="/system-context" size={14} />{ui('Clear filters')}
-          </button>
-        </div>
-        <div className="forecast-filter-grid">
-          <label>
-            <span className="form-label">{ui('Business area')}</span>
-            <select className="input" value={filters.forecast_domain} onChange={(event) => updateFilter('forecast_domain', event.target.value)}>
-              <option value="">{ui('All areas')}</option>
-              {FORECAST_DOMAIN_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
-            </select>
-          </label>
-          <label>
-            <span className="form-label">{ui('Forecast type')}</span>
-            <select className="input" value={filters.forecast_type} onChange={(event) => updateFilter('forecast_type', event.target.value)}>
-              <option value="">{ui('All forecast types')}</option>
-              {FORECAST_TYPE_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
-            </select>
-          </label>
-          <label>
-            <span className="form-label">{ui('Model status')}</span>
-            <select className="input" value={filters.model_status} onChange={(event) => updateFilter('model_status', event.target.value)}>
-              <option value="">{ui('All model statuses')}</option>
-              {MODEL_STATUS_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
-            </select>
-          </label>
-          <label>
-            <span className="form-label">{ui('Uncertainty method')}</span>
-            <select className="input" value={filters.uncertainty_method} onChange={(event) => updateFilter('uncertainty_method', event.target.value)}>
-              <option value="">{ui('All methods')}</option>
-              {UNCERTAINTY_METHOD_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
-            </select>
-          </label>
-          <label>
-            <span className="form-label">{ui('Risk type')}</span>
-            <select className="input" value={filters.risk_type} onChange={(event) => updateFilter('risk_type', event.target.value)}>
-              <option value="">{ui('All risk types')}</option>
-              {RISK_TYPE_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
-            </select>
-          </label>
-          <label>
-            <span className="form-label">{ui('Outcome measurement type')}</span>
-            <select className="input" value={filters.calibration_type} onChange={(event) => updateFilter('calibration_type', event.target.value)}>
-              <option value="">{ui('All measurement types')}</option>
-              {CALIBRATION_TYPE_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
-            </select>
-          </label>
-          <label>
-            <span className="form-label">{ui('Maximum records per evidence list')}</span>
-            <select className="input" value={filters.limit} onChange={(event) => updateFilter('limit', event.target.value)}>
-              {['25', '50', '100', '200'].map((value) => <option key={value} value={value}>{value}</option>)}
-            </select>
-          </label>
-        </div>
-      </section>
+          <div className="forecast-filter-grid">
+            <label>
+              <span className="form-label">{ui('Maximum records per evidence list')}</span>
+              <select className="input" value={filters.limit} onChange={(event) => updateFilter('limit', event.target.value)}>
+                {['25', '50', '100', '200'].map((value) => <option key={value} value={value}>{value}</option>)}
+              </select>
+            </label>
+          </div>
+        </section>
+      ) : (
+        <section className="card forecast-filters" aria-label={ui('Probabilistic forecast filters')}>
+          <div className="card__header">
+            <div className="forecast-section-heading">
+              <span className="forecast-heading-icon"><TenantNavIcon path="/system-context" size={17} /></span>
+              <div>
+                <h2>{ui('Filter the evidence')}</h2>
+                <p className="card__subtext">{ui('Filters apply to models and their related ranges, risk probabilities, and outcome observations.')}</p>
+              </div>
+            </div>
+            <button className="button button--secondary" type="button" onClick={() => { setFilters(DEFAULT_FILTERS); setOffsets({ model_offset: 0, interval_offset: 0, risk_offset: 0, calibration_offset: 0 }); }} disabled={!hasActiveFilters}>
+              <TenantNavIcon path="/system-context" size={14} />{ui('Clear filters')}
+            </button>
+          </div>
+          <div className="forecast-filter-grid">
+            <label>
+              <span className="form-label">{ui('Business area')}</span>
+              <select className="input" value={filters.forecast_domain} onChange={(event) => updateFilter('forecast_domain', event.target.value)}>
+                <option value="">{ui('All areas')}</option>
+                {FORECAST_DOMAIN_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">{ui('Forecast type')}</span>
+              <select className="input" value={filters.forecast_type} onChange={(event) => updateFilter('forecast_type', event.target.value)}>
+                <option value="">{ui('All forecast types')}</option>
+                {FORECAST_TYPE_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">{ui('Model status')}</span>
+              <select className="input" value={filters.model_status} onChange={(event) => updateFilter('model_status', event.target.value)}>
+                <option value="">{ui('All model statuses')}</option>
+                {MODEL_STATUS_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">{ui('Uncertainty method')}</span>
+              <select className="input" value={filters.uncertainty_method} onChange={(event) => updateFilter('uncertainty_method', event.target.value)}>
+                <option value="">{ui('All methods')}</option>
+                {UNCERTAINTY_METHOD_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">{ui('Risk type')}</span>
+              <select className="input" value={filters.risk_type} onChange={(event) => updateFilter('risk_type', event.target.value)}>
+                <option value="">{ui('All risk types')}</option>
+                {RISK_TYPE_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">{ui('Outcome measurement type')}</span>
+              <select className="input" value={filters.calibration_type} onChange={(event) => updateFilter('calibration_type', event.target.value)}>
+                <option value="">{ui('All measurement types')}</option>
+                {CALIBRATION_TYPE_OPTIONS.map((value) => <option key={value} value={value}>{formatCanonicalLabel(value, ui)}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">{ui('Maximum records per evidence list')}</span>
+              <select className="input" value={filters.limit} onChange={(event) => updateFilter('limit', event.target.value)}>
+                {['25', '50', '100', '200'].map((value) => <option key={value} value={value}>{value}</option>)}
+              </select>
+            </label>
+          </div>
+        </section>
+      )}
 
       
 
       
 
-      {!hasVisibleHistoricalEvidence ? (
+      {!focusedMode && !hasHistoricalEvidence ? (
         <section className="card forecast-empty-state">
           <div className="forecast-section-heading">
             <span className="forecast-heading-icon forecast-heading-icon--slate"><TenantNavIcon path="/probabilistic-forecasting" size={17} /></span>
@@ -946,9 +1014,9 @@ export default function ProbabilisticForecastingPage() {
         </section>
       ) : null}
 
-      {view === 'evidence' ? (
+      {view === 'evidence' && (!focusedMode || Boolean(focusedEvidence)) ? (
         <>
-          <p className="forecast-limit-note"><TenantNavIcon path="/system-context" size={14} />{ui('Each list is paged for readability. Totals use the full matching history; review checks focus on the current version of each forecast.')}</p>
+          <p className="forecast-limit-note"><TenantNavIcon path="/system-context" size={14} />{ui(focusedMode ? 'Exact-version evidence is isolated from tenant-wide forecast totals and review checks. Each list below belongs only to the version referenced by Intelligence Review.' : 'Each list is paged for readability. Totals use the full matching history; review checks focus on the current version of each forecast.')}</p>
           <EvidenceSection
             title={ui('Forecast models')}
             iconPath="/probabilistic-forecasting"
@@ -1071,7 +1139,7 @@ export default function ProbabilisticForecastingPage() {
         </>
       ) : null}
 
-      {view === 'readiness' ? (
+      {!focusedMode && view === 'readiness' ? (
         hasCurrentEvidence ? (
           <>
             <section className="card forecast-readiness-note">
@@ -1100,7 +1168,7 @@ export default function ProbabilisticForecastingPage() {
         )
       ) : null}
 
-      {view === 'diagnostics' && canViewDiagnostics ? (
+      {!focusedMode && view === 'diagnostics' && canViewDiagnostics ? (
         <section className="card forecast-diagnostics">
           <div className="card__header">
             <div className="forecast-section-heading">
