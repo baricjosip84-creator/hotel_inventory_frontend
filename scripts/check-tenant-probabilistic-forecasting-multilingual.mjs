@@ -81,36 +81,41 @@ else pass(`${dynamicKeys.size} lifecycle, evidence, metric, and canonical displa
 for (const required of [
   'const { locale, ui } = useAppTranslation();',
   'formatLocalizedDateTime(dataUpdatedAt, locale)',
-  'formatLocalizedNumber(Number(filters.limit), locale)',
+  'formatLocalizedNumber(rows.length, locale)',
+  "formatLocalizedNumber((pagination?.offset || 0) + 1, locale)",
+  "formatLocalizedNumber(pagination?.total || rows.length, locale)",
   'formatPercentage(model.confidence_score, locale)',
   'formatDate(model.updated_at || model.created_at, locale)',
   'formatIntervalRange(interval, locale)',
   'formatBoolean(observation.interval_captured_actual, ui)',
-  "ui('{count} returned').replace('{count}', formatLocalizedNumber(rows.length, locale))",
   "ui('Observed: {value}').replace('{value}', formatNumber(observed, locale))"
 ]) if (!pageSource.includes(required)) fail(`Probabilistic Forecasting locale-aware presentation missing: ${required}`);
-if (!process.exitCode) pass('Counts, limits, confidence, ranges, booleans, evidence totals, and timestamps use the tenant locale.');
+if (!process.exitCode) pass('Paged counts, confidence, ranges, booleans, evidence totals, and timestamps use the tenant locale.');
 
 for (const required of [
   'model.title || formatLabel(model.model_key)',
   'model.summary ? <span className="forecast-table__subtext">{model.summary}</span>',
   "{interval.unit || '—'}",
-  "{risk.explanation_summary || '—'}",
-  '<strong>{String(heading)}</strong>',
-  'supportingText && supportingText !== heading ? <p>{String(supportingText)}</p>',
+  "canViewDiagnostics ? (risk.explanation_summary || '—') : ui('Risk is calculated from the current forecast range and available evidence.')",
+  'diagnostics && rawHeading ? String(rawHeading) : genericHeading',
+  'diagnostics && rawSupporting && rawSupporting !== rawHeading ? <p>{String(rawSupporting)}</p> : <p>{genericSupporting}</p>',
   '<pre>{JSON.stringify(data, null, 2)}</pre>'
 ]) if (!pageSource.includes(required)) fail(`Probabilistic Forecasting server/technical data boundary changed unexpectedly: ${required}`);
 if (pageSource.includes('ui(formatLabel(')) fail('Probabilistic Forecasting translates arbitrary backend labels through ui(formatLabel(...)).');
-else pass('Backend titles, summaries, units, explanations, checks, blockers, supporting text, identifiers, and technical JSON remain server/technical data.');
+else pass('Backend titles and units remain source data, while raw risk/check diagnostics are restricted to diagnostics users.');
 
 for (const required of [
   "apiRequest<ProbabilisticForecastingSummary>(`/decision-intelligence/probabilistic-forecasting-summary?${queryString}`)",
+  "apiRequest('/decision-intelligence/probabilistic-forecasting-refresh', { method: 'POST', body: JSON.stringify({}) })",
+  'TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN',
   'TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ',
-  "ui('Review stored forecast models, uncertainty ranges, risk probabilities, and actual outcomes to judge whether a forecast deserves more or less trust. This workspace cannot create forecasts, alter confidence, retire models, or apply predictions to operations.')",
+  "ui('Build and review advisory demand ranges, stockout risk, and forecast accuracy from the app’s real operating data. Forecasts never change inventory or other business records automatically.')",
   "ui('These are advisory checks, not approvals or automated actions')",
-  "ui('A passing check only means that the returned records satisfy that specific calculation. It does not create a forecast, increase confidence, approve business use, open an incident, replace a model, or retire anything.')"
-]) if (!pageSource.includes(required)) fail(`Probabilistic Forecasting read-only/governance contract missing: ${required}`);
-if (/\buseMutation\b/.test(pageSource) || /method:\s*['"](?:POST|PUT|PATCH|DELETE)['"]/.test(pageSource)) fail('Probabilistic Forecasting page unexpectedly contains a mutation path.');
-else pass('Probabilistic Forecasting remains a read-only, human-governed review workspace with diagnostics permission gating.');
+  "ui('A passing check only means the evidence satisfies that calculation. Models that need a human decision are reviewed in Intelligence Review; approval still does not change inventory or execute business work.')",
+  'to="/intelligence-review"'
+]) if (!pageSource.includes(required)) fail(`Probabilistic Forecasting governed refresh/review contract missing: ${required}`);
+const mutationMethods = [...pageSource.matchAll(/method:\s*['"](POST|PUT|PATCH|DELETE)['"]/g)].map((match) => match[1]);
+if (mutationMethods.length !== 1 || mutationMethods[0] !== 'POST') fail(`Probabilistic Forecasting must expose exactly one governed evidence-refresh mutation; found: ${mutationMethods.join(', ') || 'none'}.`);
+else pass('Probabilistic Forecasting keeps operational use advisory-only: one governed evidence-refresh POST, human review handoff, and diagnostics permission gating.');
 
 if (!process.exitCode) pass('ProbabilisticForecastingPage staged multilingual conversion is complete.');

@@ -572,3 +572,17 @@
     width: 100%;
   }
 }
+
+.forecast-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.forecast-pagination > span {
+  font-size: 0.86rem;
+  color: var(--muted-foreground, #667085);
+}

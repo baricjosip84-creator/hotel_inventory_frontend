@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
@@ -7,7 +8,7 @@ import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // intentionally hidden: technical hero badges add no tenant-facing value
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceStatus,
@@ -29,6 +30,16 @@ type ForecastFilterState = {
   limit: string;
 };
 
+type ForecastPagination = {
+  total?: number;
+  offset?: number;
+  limit?: number;
+  has_previous?: boolean;
+  has_next?: boolean;
+};
+
+type ForecastOffsets = { model_offset: number; interval_offset: number; risk_offset: number; calibration_offset: number };
+
 type ForecastModelRecord = {
   model_key?: string;
   model_domain?: string;
@@ -45,6 +56,7 @@ type ForecastModelRecord = {
 
 type ForecastIntervalRecord = {
   model_key?: string;
+  model_title?: string;
   interval_key?: string;
   forecast_period_start?: string;
   forecast_period_end?: string;
@@ -63,6 +75,7 @@ type ForecastIntervalRecord = {
 
 type ForecastRiskRecord = {
   model_key?: string;
+  model_title?: string;
   probability_key?: string;
   risk_domain?: string;
   risk_type?: string;
@@ -75,6 +88,7 @@ type ForecastRiskRecord = {
 
 type ForecastCalibrationRecord = {
   model_key?: string;
+  model_title?: string;
   calibration_key?: string;
   calibration_type?: string;
   predicted_value?: number | string | null;
@@ -105,6 +119,7 @@ type ForecastResponseContractAudit = {
 
 type ProbabilisticForecastingSummary = {
   filters?: Partial<ForecastFilterState> & { limit?: number };
+  pagination?: { models?: ForecastPagination; intervals?: ForecastPagination; risk_probabilities?: ForecastPagination; calibration?: ForecastPagination };
   governance?: {
     model_count?: number;
     interval_count?: number;
@@ -542,7 +557,10 @@ function EvidenceSection({
   description,
   rows,
   headers,
-  renderRow
+  renderRow,
+  pagination,
+  onPrevious,
+  onNext
 }: {
   title: string;
   iconPath: string;
@@ -550,6 +568,9 @@ function EvidenceSection({
   rows: Array<Record<string, unknown>>;
   headers: string[];
   renderRow: (row: Record<string, unknown>, index: number) => ReactNode;
+  pagination?: ForecastPagination;
+  onPrevious?: () => void;
+  onNext?: () => void;
 }) {
   const { locale, ui } = useAppTranslation();
   return (
@@ -562,11 +583,12 @@ function EvidenceSection({
             <p className="card__subtext">{ui(description)}</p>
           </div>
         </div>
-        <StatusBadge value={ui('{count} returned').replace('{count}', formatLocalizedNumber(rows.length, locale))} />
+        <StatusBadge value={ui('{shown} shown · {total} total').replace('{shown}', formatLocalizedNumber(rows.length, locale)).replace('{total}', formatLocalizedNumber(pagination?.total ?? rows.length, locale))} />
       </div>
       {!rows.length ? (
         <p className="forecast-muted">{ui('No matching records were returned.')}</p>
       ) : (
+        <>
         <div className="table-wrap">
           <table className="data-table forecast-table">
             <thead>
@@ -575,12 +597,14 @@ function EvidenceSection({
             <tbody>{rows.map(renderRow)}</tbody>
           </table>
         </div>
+        {(pagination?.has_previous || pagination?.has_next) ? <div className="forecast-pagination"><button className="button button--secondary" type="button" onClick={onPrevious} disabled={!pagination?.has_previous}>{ui('Newer')}</button><span>{ui('Showing {start}–{end} of {total}').replace('{start}', formatLocalizedNumber((pagination?.offset || 0) + 1, locale)).replace('{end}', formatLocalizedNumber((pagination?.offset || 0) + rows.length, locale)).replace('{total}', formatLocalizedNumber(pagination?.total || rows.length, locale))}</span><button className="button button--secondary" type="button" onClick={onNext} disabled={!pagination?.has_next}>{ui('Older')}</button></div> : null}
+        </>
       )}
     </section>
   );
 }
 
-function CheckColumn({ title, items }: { title: string; items: Array<Record<string, unknown>> }) {
+function CheckColumn({ title, items, diagnostics }: { title: string; items: Array<Record<string, unknown>>; diagnostics: boolean }) {
   const { locale, ui } = useAppTranslation();
   return (
     <section className="forecast-check-card">
@@ -591,16 +615,22 @@ function CheckColumn({ title, items }: { title: string; items: Array<Record<stri
         <div className="forecast-check-list">
           {items.map((item, index) => {
             const status = item.status ?? (typeof item.passed === 'boolean' ? (item.passed ? 'passed' : 'blocked') : item.severity);
-            const heading = item.label ?? item.message ?? item.required_resolution ?? ui('Item {number}').replace('{number}', formatLocalizedNumber(index + 1, locale));
-            const supportingText = item.label ? (item.required_resolution ?? item.message) : item.required_resolution;
+            const rawHeading = item.label ?? item.message ?? item.required_resolution;
+            const rawSupporting = item.label ? (item.required_resolution ?? item.message) : item.required_resolution;
             const observed = item.evidence_count ?? item.observed_count ?? item.value ?? item.observed_score;
+            const genericHeading = ui('Review check {number}').replace('{number}', formatLocalizedNumber(index + 1, locale));
+            const genericSupporting = status === 'blocked' || status === 'high' || status === 'critical'
+              ? ui('This check needs human attention.')
+              : status === 'monitor' || status === 'medium'
+                ? ui('This check should continue to be monitored.')
+                : ui('This check currently passes.');
             return (
-              <article className="forecast-check-item" key={`${String(heading)}-${index}`}>
+              <article className="forecast-check-item" key={`${String(item.key || rawHeading || index)}-${index}`}>
                 <div className="forecast-check-item__heading">
-                  <strong>{String(heading)}</strong>
+                  <strong>{diagnostics && rawHeading ? String(rawHeading) : genericHeading}</strong>
                   {status !== undefined ? <StatusBadge value={status} /> : null}
                 </div>
-                {supportingText && supportingText !== heading ? <p>{String(supportingText)}</p> : null}
+                {diagnostics && rawSupporting && rawSupporting !== rawHeading ? <p>{String(rawSupporting)}</p> : <p>{genericSupporting}</p>}
                 {observed !== undefined && observed !== null ? <span className="forecast-observed">{ui('Observed: {value}').replace('{value}', formatNumber(observed, locale))}</span> : null}
               </article>
             );
@@ -611,7 +641,7 @@ function CheckColumn({ title, items }: { title: string; items: Array<Record<stri
   );
 }
 
-function LifecycleCard({ config, section }: { config: LifecycleConfig; section?: ForecastLifecycleSection }) {
+function LifecycleCard({ config, section, diagnostics }: { config: LifecycleConfig; section?: ForecastLifecycleSection; diagnostics: boolean }) {
   const { ui } = useAppTranslation();
   const available = section?.assessment_available !== false;
   const checks = (section?.[config.checksKey] || []) as Array<Record<string, unknown>>;
@@ -642,8 +672,8 @@ function LifecycleCard({ config, section }: { config: LifecycleConfig; section?:
             ))}
           </div>
           <div className="forecast-check-grid">
-            <CheckColumn title={ui('Checks')} items={checks} />
-            <CheckColumn title={ui('Items needing attention')} items={blockers} />
+            <CheckColumn title={ui('Checks')} items={checks} diagnostics={diagnostics} />
+            <CheckColumn title={ui('Items needing attention')} items={blockers} diagnostics={diagnostics} />
           </div>
         </>
       ) : (
@@ -658,16 +688,17 @@ function LifecycleCard({ config, section }: { config: LifecycleConfig; section?:
 export default function ProbabilisticForecastingPage() {
   const { locale, ui } = useAppTranslation();
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
+  const canGovern = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
   const [view, setView] = useState<ForecastView>('evidence');
   const [filters, setFilters] = useState<ForecastFilterState>(DEFAULT_FILTERS);
+  const [offsets, setOffsets] = useState<ForecastOffsets>({ model_offset: 0, interval_offset: 0, risk_offset: 0, calibration_offset: 0 });
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.set(key, value);
-    });
+    Object.entries(filters).forEach(([key, value]) => { if (value) params.set(key, value); });
+    Object.entries(offsets).forEach(([key, value]) => { if (value) params.set(key, String(value)); });
     return params.toString();
-  }, [filters]);
+  }, [filters, offsets]);
 
   const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: ['probabilistic-forecasting-summary', queryString],
@@ -676,6 +707,17 @@ export default function ProbabilisticForecastingPage() {
 
   const updateFilter = (key: keyof ForecastFilterState, value: string) => {
     setFilters((current) => ({ ...current, [key]: value }));
+    setOffsets({ model_offset: 0, interval_offset: 0, risk_offset: 0, calibration_offset: 0 });
+  };
+
+  const refreshAnalysis = useMutation({
+    mutationFn: () => apiRequest('/decision-intelligence/probabilistic-forecasting-refresh', { method: 'POST', body: JSON.stringify({}) }),
+    onSuccess: async () => { setOffsets({ model_offset: 0, interval_offset: 0, risk_offset: 0, calibration_offset: 0 }); await refetch(); }
+  });
+
+  const movePage = (key: keyof ForecastOffsets, direction: -1 | 1) => {
+    const pageSize = Number(filters.limit) || 25;
+    setOffsets((current) => ({ ...current, [key]: Math.max(0, current[key] + direction * pageSize) }));
   };
 
   const modelCount = data?.governance?.model_count ?? data?.models?.length ?? 0;
@@ -710,15 +752,15 @@ export default function ProbabilisticForecastingPage() {
     );
   }
 
+  // Hidden by design: the former Tenant-scoped / Human-reviewed evidence / No automatic business action hero badges remain conceptually preserved but are not rendered.
   return (
     <main className="decision-intelligence-page io-operational-page io-workspace-page io-workspace-legacy-normalized" data-probabilistic-forecasting-refined="true">
       <OperationalWorkspaceHero
         iconPath="/probabilistic-forecasting"
         eyebrow={ui('Decision intelligence & forecasting')}
         title={ui('Probabilistic Forecasting')}
-        description={ui('Review stored forecast models, uncertainty ranges, risk probabilities, and actual outcomes to judge whether a forecast deserves more or less trust. This workspace cannot create forecasts, alter confidence, retire models, or apply predictions to operations.')}
-        meta={<><OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{ui('Human-reviewed evidence')}</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{ui('No automatic business action')}</OperationalWorkspaceMetaPill></>}
-        aside={<><OperationalWorkspaceStatus value={formatCanonicalLabel(data?.governance?.probabilistic_forecasting_posture, ui)} label={ui('Forecast review posture · refreshed {time}').replace('{time}', lastRefreshed)} /><button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />{ui(isFetching ? 'Refreshing…' : 'Refresh evidence')}</button></>}
+        description={ui('Build and review advisory demand ranges, stockout risk, and forecast accuracy from the app’s real operating data. Forecasts never change inventory or other business records automatically.')}
+        aside={<><OperationalWorkspaceStatus value={formatCanonicalLabel(data?.governance?.probabilistic_forecasting_posture, ui)} label={ui('Forecast review posture · refreshed {time}').replace('{time}', lastRefreshed)} />{canGovern ? <button className="button button--secondary" type="button" onClick={() => refreshAnalysis.mutate()} disabled={refreshAnalysis.isPending || isFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />{ui(refreshAnalysis.isPending ? 'Refreshing forecast analysis…' : 'Refresh forecast analysis')}</button> : <button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />{ui(isFetching ? 'Refreshing…' : 'Refresh page')}</button>}</>}
       />
 
 <OperationalWorkspaceStats ariaLabel={ui('Probabilistic forecast evidence summary')}>
@@ -744,7 +786,7 @@ export default function ProbabilisticForecastingPage() {
               <p className="card__subtext">{ui('Filters apply to models and their related ranges, risk probabilities, and outcome observations.')}</p>
             </div>
           </div>
-          <button className="button button--secondary" type="button" onClick={() => setFilters(DEFAULT_FILTERS)} disabled={!hasActiveFilters}>
+          <button className="button button--secondary" type="button" onClick={() => { setFilters(DEFAULT_FILTERS); setOffsets({ model_offset: 0, interval_offset: 0, risk_offset: 0, calibration_offset: 0 }); }} disabled={!hasActiveFilters}>
             <TenantNavIcon path="/system-context" size={14} />{ui('Clear filters')}
           </button>
         </div>
@@ -811,7 +853,7 @@ export default function ProbabilisticForecastingPage() {
             <div>
               <h2>{ui('No probabilistic forecast evidence is available for this tenant and filter set')}</h2>
               <p>{ui('Review scores are not assessed when no model, uncertainty range, risk probability, or actual-outcome observation exists. Zero records do not mean that forecasting is accurate, safe, approved, or ready for business use.')}</p>
-              <p>{ui('This page has no model-creation or outcome-recording action. Evidence must first be produced through the supported forecasting and Learning Feedback data process.')}</p>
+              <p>{ui('Use Refresh forecast analysis to rebuild advisory forecast evidence from current operating data. Actual outcome observations can also come from Learning Feedback.')}</p>
             </div>
           </div>
         </section>
@@ -819,12 +861,14 @@ export default function ProbabilisticForecastingPage() {
 
       {view === 'evidence' ? (
         <>
-          <p className="forecast-limit-note"><TenantNavIcon path="/system-context" size={14} />{ui('Each list shows up to {limit} matching records. Review checks use the same filtered record set.').replace('{limit}', formatLocalizedNumber(Number(filters.limit), locale))}</p>
+          <p className="forecast-limit-note"><TenantNavIcon path="/system-context" size={14} />{ui('Each list is paged for readability. Totals and review checks use the full matching evidence set.')}</p>
           <EvidenceSection
             title={ui('Forecast models')}
             iconPath="/probabilistic-forecasting"
             description="Stored forecast definitions and their current human-review status."
             rows={(data?.models || []) as Array<Record<string, unknown>>}
+            pagination={data?.pagination?.models}
+            onPrevious={() => movePage('model_offset', -1)} onNext={() => movePage('model_offset', 1)}
             headers={['Model', 'Area', 'Forecast type', 'Status', 'Method', 'Confidence', 'Updated']}
             renderRow={(row, index) => {
               const model = row as ForecastModelRecord;
@@ -846,12 +890,14 @@ export default function ProbabilisticForecastingPage() {
             iconPath="/insights"
             description="Expected values and lower-to-upper ranges produced for a forecast period. The three displayed values are lower, expected, and upper."
             rows={(data?.intervals || []) as Array<Record<string, unknown>>}
+            pagination={data?.pagination?.intervals}
+            onPrevious={() => movePage('interval_offset', -1)} onNext={() => movePage('interval_offset', 1)}
             headers={['Model', 'Range', 'Unit', 'Period starts', 'Period ends', 'Confidence level', 'Generated']}
             renderRow={(row, index) => {
               const interval = row as ForecastIntervalRecord;
               return (
                 <tr key={`${interval.interval_key || 'interval'}-${index}`}>
-                  <td><strong>{formatLabel(interval.model_key || interval.interval_key)}</strong></td>
+                  <td><strong>{interval.model_title || formatLabel(interval.model_key || interval.interval_key)}</strong></td>
                   <td>{formatIntervalRange(interval, locale)}</td>
                   <td>{interval.unit || '—'}</td>
                   <td>{formatDate(interval.forecast_period_start, locale)}</td>
@@ -867,17 +913,19 @@ export default function ProbabilisticForecastingPage() {
             iconPath="/alerts"
             description="Stored estimates of how likely a specific business risk is, together with its possible severity."
             rows={(data?.risk_probabilities || []) as Array<Record<string, unknown>>}
+            pagination={data?.pagination?.risk_probabilities}
+            onPrevious={() => movePage('risk_offset', -1)} onNext={() => movePage('risk_offset', 1)}
             headers={['Model', 'Area', 'Risk', 'Probability', 'Severity', 'Explanation', 'Observed']}
             renderRow={(row, index) => {
               const risk = row as ForecastRiskRecord;
               return (
                 <tr key={`${risk.probability_key || 'risk'}-${index}`}>
-                  <td><strong>{formatLabel(risk.model_key || risk.probability_key)}</strong></td>
+                  <td><strong>{risk.model_title || formatLabel(risk.model_key || risk.probability_key)}</strong></td>
                   <td>{formatCanonicalLabel(risk.risk_domain, ui)}</td>
                   <td>{formatCanonicalLabel(risk.risk_type, ui)}</td>
                   <td>{formatPercentage(risk.probability_score, locale)}</td>
                   <td>{formatPercentage(risk.severity_score, locale)}</td>
-                  <td>{risk.explanation_summary || '—'}</td>
+                  <td>{canViewDiagnostics ? (risk.explanation_summary || '—') : ui('Risk is calculated from the current forecast range and available evidence.')}</td>
                   <td>{formatDate(risk.observed_at, locale)}</td>
                 </tr>
               );
@@ -888,12 +936,14 @@ export default function ProbabilisticForecastingPage() {
             iconPath="/decision-learning-feedback"
             description="Comparisons between predicted and actual values used to understand forecast error and whether an uncertainty range captured the result."
             rows={(data?.calibration || []) as Array<Record<string, unknown>>}
+            pagination={data?.pagination?.calibration}
+            onPrevious={() => movePage('calibration_offset', -1)} onNext={() => movePage('calibration_offset', 1)}
             headers={['Model', 'Observation', 'Type', 'Predicted', 'Actual', 'Error', 'Inside range', 'Calibration', 'Measured']}
             renderRow={(row, index) => {
               const observation = row as ForecastCalibrationRecord;
               return (
                 <tr key={`${observation.calibration_key || 'calibration'}-${index}`}>
-                  <td>{formatLabel(observation.model_key)}</td>
+                  <td>{observation.model_title || formatLabel(observation.model_key)}</td>
                   <td><strong>{formatLabel(observation.calibration_key)}</strong></td>
                   <td>{formatCanonicalLabel(observation.calibration_type, ui)}</td>
                   <td>{formatNumber(observation.predicted_value, locale)}</td>
@@ -917,12 +967,12 @@ export default function ProbabilisticForecastingPage() {
                 <span className="forecast-heading-icon forecast-heading-icon--amber"><TenantNavIcon path="/reliability-command" size={17} /></span>
                 <div>
                   <h2>{ui('These are advisory checks, not approvals or automated actions')}</h2>
-                  <p className="card__subtext">{ui('A passing check only means that the returned records satisfy that specific calculation. It does not create a forecast, increase confidence, approve business use, open an incident, replace a model, or retire anything.')}</p>
+                  <p className="card__subtext">{ui('A passing check only means the evidence satisfies that calculation. Models that need a human decision are reviewed in Intelligence Review; approval still does not change inventory or execute business work.')}</p><Link className="button button--secondary" to="/intelligence-review"><TenantNavIcon path="/intelligence-review" size={14} />{ui('Open Intelligence Review')}</Link>
                 </div>
               </div>
             </section>
             {LIFECYCLE_SECTIONS.map((config) => (
-              <LifecycleCard key={String(config.key)} config={config} section={data?.[config.key] as ForecastLifecycleSection | undefined} />
+              <LifecycleCard key={String(config.key)} config={config} section={data?.[config.key] as ForecastLifecycleSection | undefined} diagnostics={canViewDiagnostics} />
             ))}
           </>
         ) : (
