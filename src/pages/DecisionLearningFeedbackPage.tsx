@@ -741,7 +741,9 @@ type ContinuousLearningSummary = {
       review_reason?: string;
       review_reason_code?: string;
       recommended_resolution?: string;
+      source_label?: string;
     }>;
+    pagination?: PageInfo;
     safety_contract?: Record<string, boolean>;
   };
 
@@ -1531,6 +1533,21 @@ function safeJsonObject(value: string): Record<string, unknown> {
   }
 }
 
+function optionalJsonObject(value: string, editing: boolean): Record<string, unknown> | undefined {
+  if (!value.trim() && editing) return undefined;
+  return safeJsonObject(value);
+}
+
+function optionalNumber(value: string, editing: boolean): number | null | undefined {
+  if (!value.trim()) return editing ? undefined : null;
+  return numberOrNull(value);
+}
+
+function optionalScore(value: string, editing: boolean): number | null | undefined {
+  if (!value.trim()) return editing ? undefined : null;
+  return scoreOrNull(value);
+}
+
 function scoreOrNull(value: string): number | null {
   if (value.trim() === '') return null;
   const numeric = Number(value);
@@ -1549,11 +1566,26 @@ function formatLabel(value: unknown): string {
   return String(value).replace(/_/g, ' ');
 }
 
+function formText(value: unknown): string {
+  return value === undefined || value === null ? '' : String(value);
+}
+
+function formBoolean(value: unknown): string {
+  return typeof value === 'boolean' ? String(value) : '';
+}
+
+function formJson(value: unknown): string {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
 function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: string): Record<string, unknown> {
   const reference = safeJsonObject(form.reference);
   const expected = safeJsonObject(form.expected);
   const observed = safeJsonObject(form.observed);
-  const score = scoreOrNull(form.score);
+  const editing = Boolean(form.recordKey);
+  const score = optionalScore(form.score, editing);
 
   if (mode === 'forecast-accuracy') {
     return {
@@ -1563,7 +1595,6 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: str
       calibration_status: form.status,
       accuracy_type: form.subtype || 'forecast_error',
       forecast_reference: reference,
-      confidence_reference: expected,
       observed_value: Number.isFinite(Number(form.observed)) ? Number(form.observed) : undefined,
       predicted_value: Number.isFinite(Number(form.expected)) ? Number(form.expected) : undefined,
       absolute_error: score === null ? undefined : Math.abs(score)
@@ -1581,7 +1612,7 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: str
       baseline_reference: expected,
       measured_result: observed,
       effectiveness_score: score,
-      improvement_score: score
+      improvement_score: editing ? undefined : score
     };
   }
 
@@ -1610,75 +1641,75 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: str
     expected_result: expected,
     observed_result: observed,
     outcome_score: score,
-    business_value_score: scoreOrNull(form.businessValueScore),
-    stock_impact_score: scoreOrNull(form.stockImpactScore),
-    financial_impact_score: scoreOrNull(form.financialImpactScore),
-    waste_impact_score: scoreOrNull(form.wasteImpactScore),
-    service_level_impact_score: scoreOrNull(form.serviceLevelImpactScore),
-    outcome_confidence_score: scoreOrNull(form.outcomeConfidenceScore),
+    business_value_score: optionalScore(form.businessValueScore, editing),
+    stock_impact_score: optionalScore(form.stockImpactScore, editing),
+    financial_impact_score: optionalScore(form.financialImpactScore, editing),
+    waste_impact_score: optionalScore(form.wasteImpactScore, editing),
+    service_level_impact_score: optionalScore(form.serviceLevelImpactScore, editing),
+    outcome_confidence_score: optionalScore(form.outcomeConfidenceScore, editing),
     recommendation_lifecycle_status: form.lifecycleStatus || undefined,
     recommendation_generated_at: form.generatedAt || undefined,
     recommendation_approved_at: form.approvedAt || undefined,
     recommendation_executed_at: form.executedAt || undefined,
     recommendation_measured_at: form.measuredAt || undefined,
     recommendation_scored_at: form.scoredAt || undefined,
-    execution_reference: safeJsonObject(form.executionReference),
-    lifecycle_evidence: safeJsonObject(form.lifecycleEvidence),
+    execution_reference: optionalJsonObject(form.executionReference, editing),
+    lifecycle_evidence: optionalJsonObject(form.lifecycleEvidence, editing),
     recommendation_outcome_classification: form.outcomeClassification || undefined,
     recommendation_outcome_review_required: form.outcomeReviewRequired === '' ? undefined : form.outcomeReviewRequired === 'true',
-    recommendation_outcome_review_reason: safeJsonObject(form.outcomeReviewReason),
-    financial_impact_amount: numberOrNull(form.financialImpactAmount),
+    recommendation_outcome_review_reason: optionalJsonObject(form.outcomeReviewReason, editing),
+    financial_impact_amount: optionalNumber(form.financialImpactAmount, editing),
     financial_impact_currency: form.financialImpactCurrency.trim().toUpperCase() || undefined,
     stockout_prevented: form.stockoutPrevented === '' ? undefined : form.stockoutPrevented === 'true',
     overstock_prevented: form.overstockPrevented === '' ? undefined : form.overstockPrevented === 'true',
-    waste_reduced_quantity: numberOrNull(form.wasteReducedQuantity),
-    service_level_delta_percent: numberOrNull(form.serviceLevelDeltaPercent),
-    recommendation_business_impact_evidence: safeJsonObject(form.businessImpactEvidence),
-    baseline_metric_value: numberOrNull(form.baselineMetricValue),
-    target_metric_value: numberOrNull(form.targetMetricValue),
-    actual_metric_value: numberOrNull(form.actualMetricValue),
+    waste_reduced_quantity: optionalNumber(form.wasteReducedQuantity, editing),
+    service_level_delta_percent: optionalNumber(form.serviceLevelDeltaPercent, editing),
+    recommendation_business_impact_evidence: optionalJsonObject(form.businessImpactEvidence, editing),
+    baseline_metric_value: optionalNumber(form.baselineMetricValue, editing),
+    target_metric_value: optionalNumber(form.targetMetricValue, editing),
+    actual_metric_value: optionalNumber(form.actualMetricValue, editing),
     metric_unit: form.metricUnit.trim() || undefined,
     target_direction: form.targetDirection || undefined,
-    target_tolerance_percent: numberOrNull(form.targetTolerancePercent),
+    target_tolerance_percent: optionalNumber(form.targetTolerancePercent, editing),
     target_met: form.targetMet === '' ? undefined : form.targetMet === 'true',
-    recommendation_target_evidence: safeJsonObject(form.targetEvidence),
+    recommendation_target_evidence: optionalJsonObject(form.targetEvidence, editing),
     recommendation_attribution_method: form.attributionMethod || undefined,
-    recommendation_attribution_confidence_score: numberOrNull(form.attributionConfidenceScore),
-    recommendation_counterfactual_reference: safeJsonObject(form.counterfactualReference),
-    recommendation_attribution_evidence: safeJsonObject(form.attributionEvidence),
+    recommendation_attribution_confidence_score: optionalNumber(form.attributionConfidenceScore, editing),
+    recommendation_counterfactual_reference: optionalJsonObject(form.counterfactualReference, editing),
+    recommendation_attribution_evidence: optionalJsonObject(form.attributionEvidence, editing),
     recommendation_measurement_method: form.measurementMethod.trim() || undefined,
     recommendation_measurement_source: form.measurementSource.trim() || undefined,
     recommendation_measurement_owner: form.measurementOwner.trim() || undefined,
-    recommendation_measurement_sample_size: numberOrNull(form.measurementSampleSize),
-    recommendation_measurement_data_quality_score: numberOrNull(form.measurementDataQualityScore),
-    recommendation_measurement_quality_evidence: safeJsonObject(form.measurementQualityEvidence),
+    recommendation_measurement_sample_size: optionalNumber(form.measurementSampleSize, editing),
+    recommendation_measurement_data_quality_score: optionalNumber(form.measurementDataQualityScore, editing),
+    recommendation_measurement_quality_evidence: optionalJsonObject(form.measurementQualityEvidence, editing),
     recommendation_outcome_review_status: form.reviewStatus || undefined,
     recommendation_outcome_review_owner: form.reviewOwner.trim() || undefined,
     recommendation_outcome_reviewed_at: form.reviewedAt || undefined,
     recommendation_outcome_review_resolution: form.reviewResolution || undefined,
-    recommendation_outcome_review_evidence: safeJsonObject(form.reviewEvidence),
+    recommendation_outcome_review_evidence: optionalJsonObject(form.reviewEvidence, editing),
     recommendation_outcome_evaluation_due_at: form.evaluationDueAt || undefined,
     recommendation_outcome_evaluation_status: form.evaluationStatus || undefined,
     recommendation_outcome_evaluation_owner: form.evaluationOwner.trim() || undefined,
-    recommendation_outcome_evaluation_evidence: safeJsonObject(form.evaluationEvidence),
+    recommendation_outcome_evaluation_evidence: optionalJsonObject(form.evaluationEvidence, editing),
     recommendation_outcome_acceptance_status: form.acceptanceStatus || undefined,
     recommendation_outcome_acceptance_owner: form.acceptanceOwner.trim() || undefined,
     recommendation_outcome_accepted_at: form.acceptedAt || undefined,
-    recommendation_outcome_acceptance_evidence: safeJsonObject(form.acceptanceEvidence),
+    recommendation_outcome_acceptance_evidence: optionalJsonObject(form.acceptanceEvidence, editing),
     recommendation_outcome_corrective_action_status: form.correctiveActionStatus || undefined,
     recommendation_outcome_corrective_action_owner: form.correctiveActionOwner.trim() || undefined,
     recommendation_outcome_corrective_action_due_at: form.correctiveActionDueAt || undefined,
     recommendation_outcome_corrective_action_resolved_at: form.correctiveActionResolvedAt || undefined,
-    recommendation_outcome_corrective_action_evidence: safeJsonObject(form.correctiveActionEvidence),
+    recommendation_outcome_corrective_action_evidence: optionalJsonObject(form.correctiveActionEvidence, editing),
     recommendation_outcome_learning_signal: form.learningSignal || undefined,
     recommendation_outcome_learning_signal_reason: form.learningSignalReason.trim() || undefined,
     recommendation_outcome_recommended_next_action: form.learningSignalNextAction.trim() || undefined,
-    recommendation_outcome_learning_signal_evidence: safeJsonObject(form.learningSignalEvidence),
+    recommendation_outcome_learning_signal_evidence: optionalJsonObject(form.learningSignalEvidence, editing),
     recommendation_outcome_learning_action_status: form.learningActionStatus || undefined,
     recommendation_outcome_learning_action_owner: form.learningActionOwner.trim() || undefined,
     recommendation_outcome_learning_action_due_at: form.learningActionDueAt || undefined,
     recommendation_outcome_learning_action_completed_at: form.learningActionCompletedAt || undefined,
-    recommendation_outcome_learning_action_evidence: safeJsonObject(form.learningActionEvidence)
+    recommendation_outcome_learning_action_evidence: optionalJsonObject(form.learningActionEvidence, editing)
   };
 }
 
@@ -1692,7 +1723,7 @@ function validateNumberRange(value: string, label: string, min: number, max: num
 }
 
 function validateFeedbackForm(mode: FeedbackMode, form: FeedbackFormState, sourceId: string, ui: (value: string) => string): string | null {
-  if (!sourceId && !form.recordKey) return ui('Choose the real source record this feedback belongs to.');
+  if (!sourceId) return ui('Choose the real source record this feedback belongs to.');
   const scoreFields: Array<[string, string, number, number]> = [
     [form.score, 'Score', -1, 1],
     [form.businessValueScore, 'Business value', -1, 1],
@@ -3758,23 +3789,24 @@ const reviewReasonLabels: Record<string, string> = {
 
 const reviewTargets: Record<string, Array<{ status: string; label: string }>> = {
   learning_outcome: [
-    { status: 'validated', label: 'Validate' },
-    { status: 'dismissed', label: 'Dismiss' },
-    { status: 'archived', label: 'Archive' }
+    { status: 'resolved', label: 'Mark reviewed' },
+    { status: 'dismissed', label: 'Dismiss review' },
+    { status: 'archived', label: 'Archive review' }
   ],
   forecast_accuracy: [
-    { status: 'within_tolerance', label: 'Close as within tolerance' },
-    { status: 'archived', label: 'Archive' }
+    { status: 'resolved', label: 'Mark reviewed' },
+    { status: 'dismissed', label: 'Dismiss review' },
+    { status: 'archived', label: 'Archive review' }
   ],
   policy_effectiveness: [
-    { status: 'effective', label: 'Mark effective' },
-    { status: 'retired', label: 'Retire evidence' },
-    { status: 'archived', label: 'Archive' }
+    { status: 'resolved', label: 'Mark reviewed' },
+    { status: 'dismissed', label: 'Dismiss review' },
+    { status: 'archived', label: 'Archive review' }
   ],
   optimization_result: [
-    { status: 'value_confirmed', label: 'Confirm value' },
-    { status: 'value_missed', label: 'Mark value missed' },
-    { status: 'archived', label: 'Archive' }
+    { status: 'resolved', label: 'Mark reviewed' },
+    { status: 'dismissed', label: 'Dismiss review' },
+    { status: 'archived', label: 'Archive review' }
   ]
 };
 
@@ -3782,12 +3814,14 @@ function FeedbackReviewBoard({
   board,
   canGovern,
   reviewing,
-  onReview
+  onReview,
+  onPage
 }: {
   board: ContinuousLearningSummary['feedback_review_board'];
   canGovern: boolean;
   reviewing: boolean;
   onReview: (evidenceType: string, evidenceKey: string, targetStatus: string) => void;
+  onPage: (direction: 'previous' | 'next') => void;
 }) {
   const { locale, ui } = useAppTranslation();
   const domains = board?.domain_review_summary || [];
@@ -3835,7 +3869,7 @@ function FeedbackReviewBoard({
               const targets = reviewTargets[item.evidence_type || ''] || [];
               return (
                 <tr key={`${item.evidence_type || 'evidence'}-${item.evidence_key || index}`}>
-                  <td>{ui(formatLabel(item.evidence_type))} / {formatLabel(item.evidence_key)}</td>
+                  <td>{item.source_label ? String(item.source_label) : `${ui(formatLabel(item.evidence_type))} / ${formatLabel(item.evidence_key)}`}</td>
                   <td>{ui(formatLabel(item.domain))}</td>
                   <td>{ui(formatLabel(item.status))}</td>
                   <td>{reason ? ui(reason) : '—'}</td>
@@ -3846,6 +3880,12 @@ function FeedbackReviewBoard({
               );
             })}</tbody>
           </table>
+        </div>
+      ) : null}
+      {(board?.pagination?.has_previous || board?.pagination?.has_next) ? (
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+          <button className="button button--secondary" type="button" disabled={!board?.pagination?.has_previous || reviewing} onClick={() => onPage('previous')}>{ui('Newer')}</button>
+          <button className="button button--secondary" type="button" disabled={!board?.pagination?.has_next || reviewing} onClick={() => onPage('next')}>{ui('Older')}</button>
         </div>
       ) : null}
     </section>
@@ -4597,7 +4637,7 @@ function EvidenceTable({
                 const score = row.outcome_score ?? row.absolute_error ?? row.effectiveness_score ?? row.realized_value_score;
                 return (
                   <tr key={String(row.id ?? businessKey ?? index)}>
-                    <td>{businessKey ? formatLabel(businessKey) : `${ui('Recorded item')} ${formatLocalizedNumber(index + 1, locale)}`}</td>
+                    <td>{row.source_label ? String(row.source_label) : businessKey ? formatLabel(businessKey) : `${ui('Recorded item')} ${formatLocalizedNumber(index + 1, locale)}`}</td>
                     <td>{ui(formatLabel(row.learning_domain ?? row.forecast_domain ?? row.policy_domain ?? row.result_domain))}</td>
                     <td>{ui(formatLabel(row.outcome_status ?? row.calibration_status ?? row.effectiveness_status ?? row.result_status))}</td>
                     <td>{typeof score === 'number' ? formatLocalizedNumber(score, locale, { maximumFractionDigits: 4 }) : formatLabel(score)}</td>
@@ -4648,17 +4688,22 @@ export default function DecisionLearningFeedbackPage() {
   const [sourceSearch, setSourceSearch] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [pageOffsets, setPageOffsets] = useState<Record<EvidenceBucket, number>>({ outcomes: 0, forecast_accuracy: 0, policy_effectiveness: 0, optimization_results: 0 });
+  const [reviewOffset, setReviewOffset] = useState(0);
   const pageLimit = 25;
+  const reviewLimit = 25;
 
   const summaryQuery = useQuery({
-    queryKey: ['decision-learning-summary', pageOffsets],
+    queryKey: ['decision-learning-summary', pageOffsets, reviewOffset, view, canViewDiagnostics],
     queryFn: () => {
       const params = new URLSearchParams({
         limit: String(pageLimit),
         outcome_offset: String(pageOffsets.outcomes),
         forecast_offset: String(pageOffsets.forecast_accuracy),
         policy_offset: String(pageOffsets.policy_effectiveness),
-        optimization_offset: String(pageOffsets.optimization_results)
+        optimization_offset: String(pageOffsets.optimization_results),
+        review_offset: String(reviewOffset),
+        review_limit: String(reviewLimit),
+        include_diagnostics: String(canViewDiagnostics && view === 'readiness')
       });
       return apiRequest<ContinuousLearningSummary>(`/decision-intelligence/continuous-learning-summary?${params.toString()}`);
     }
@@ -4785,13 +4830,74 @@ export default function DecisionLearningFeedbackPage() {
         observed: typeof observed === 'object' ? JSON.stringify(observed) : String(observed ?? ''),
         recommendationKey: String((full.recommendation_reference as Record<string, unknown> | undefined)?.recommendation_key || sourceKey || ''),
         financialImpactCurrency: String(full.financial_impact_currency || getActiveTenantCurrency()),
-        financialImpactAmount: full.financial_impact_amount === null || full.financial_impact_amount === undefined ? '' : String(full.financial_impact_amount),
-        businessValueScore: full.business_value_score === null || full.business_value_score === undefined ? '' : String(full.business_value_score),
-        stockImpactScore: full.stock_impact_score === null || full.stock_impact_score === undefined ? '' : String(full.stock_impact_score),
-        financialImpactScore: full.financial_impact_score === null || full.financial_impact_score === undefined ? '' : String(full.financial_impact_score),
-        wasteImpactScore: full.waste_impact_score === null || full.waste_impact_score === undefined ? '' : String(full.waste_impact_score),
-        serviceLevelImpactScore: full.service_level_impact_score === null || full.service_level_impact_score === undefined ? '' : String(full.service_level_impact_score),
-        outcomeConfidenceScore: full.outcome_confidence_score === null || full.outcome_confidence_score === undefined ? '' : String(full.outcome_confidence_score)
+        financialImpactAmount: formText(full.financial_impact_amount),
+        businessValueScore: formText(full.business_value_score),
+        stockImpactScore: formText(full.stock_impact_score),
+        financialImpactScore: formText(full.financial_impact_score),
+        wasteImpactScore: formText(full.waste_impact_score),
+        serviceLevelImpactScore: formText(full.service_level_impact_score),
+        outcomeConfidenceScore: formText(full.outcome_confidence_score),
+        lifecycleStatus: formText(full.recommendation_lifecycle_status),
+        generatedAt: formText(full.recommendation_generated_at),
+        approvedAt: formText(full.recommendation_approved_at),
+        executedAt: formText(full.recommendation_executed_at),
+        measuredAt: formText(full.recommendation_measured_at),
+        scoredAt: formText(full.recommendation_scored_at),
+        executionReference: formJson(full.execution_reference),
+        lifecycleEvidence: formJson(full.lifecycle_evidence),
+        outcomeClassification: formText(full.recommendation_outcome_classification),
+        outcomeReviewRequired: formBoolean(full.recommendation_outcome_review_required),
+        outcomeReviewReason: formJson(full.recommendation_outcome_review_reason),
+        stockoutPrevented: formBoolean(full.stockout_prevented),
+        overstockPrevented: formBoolean(full.overstock_prevented),
+        wasteReducedQuantity: formText(full.waste_reduced_quantity),
+        serviceLevelDeltaPercent: formText(full.service_level_delta_percent),
+        businessImpactEvidence: formJson(full.recommendation_business_impact_evidence),
+        baselineMetricValue: formText(full.baseline_metric_value),
+        targetMetricValue: formText(full.target_metric_value),
+        actualMetricValue: formText(full.actual_metric_value),
+        metricUnit: formText(full.metric_unit),
+        targetDirection: formText(full.target_direction),
+        targetTolerancePercent: formText(full.target_tolerance_percent),
+        targetMet: formBoolean(full.target_met),
+        targetEvidence: formJson(full.recommendation_target_evidence),
+        attributionMethod: formText(full.recommendation_attribution_method),
+        attributionConfidenceScore: formText(full.recommendation_attribution_confidence_score),
+        counterfactualReference: formJson(full.recommendation_counterfactual_reference),
+        attributionEvidence: formJson(full.recommendation_attribution_evidence),
+        measurementMethod: formText(full.recommendation_measurement_method),
+        measurementSource: formText(full.recommendation_measurement_source),
+        measurementOwner: formText(full.recommendation_measurement_owner),
+        measurementSampleSize: formText(full.recommendation_measurement_sample_size),
+        measurementDataQualityScore: formText(full.recommendation_measurement_data_quality_score),
+        measurementQualityEvidence: formJson(full.recommendation_measurement_quality_evidence),
+        reviewStatus: formText(full.recommendation_outcome_review_status),
+        reviewOwner: formText(full.recommendation_outcome_review_owner),
+        reviewedAt: formText(full.recommendation_outcome_reviewed_at),
+        reviewResolution: formText(full.recommendation_outcome_review_resolution),
+        reviewEvidence: formJson(full.recommendation_outcome_review_evidence),
+        evaluationDueAt: formText(full.recommendation_outcome_evaluation_due_at),
+        evaluationStatus: formText(full.recommendation_outcome_evaluation_status),
+        evaluationOwner: formText(full.recommendation_outcome_evaluation_owner),
+        evaluationEvidence: formJson(full.recommendation_outcome_evaluation_evidence),
+        acceptanceStatus: formText(full.recommendation_outcome_acceptance_status),
+        acceptanceOwner: formText(full.recommendation_outcome_acceptance_owner),
+        acceptedAt: formText(full.recommendation_outcome_accepted_at),
+        acceptanceEvidence: formJson(full.recommendation_outcome_acceptance_evidence),
+        correctiveActionStatus: formText(full.recommendation_outcome_corrective_action_status),
+        correctiveActionOwner: formText(full.recommendation_outcome_corrective_action_owner),
+        correctiveActionDueAt: formText(full.recommendation_outcome_corrective_action_due_at),
+        correctiveActionResolvedAt: formText(full.recommendation_outcome_corrective_action_resolved_at),
+        correctiveActionEvidence: formJson(full.recommendation_outcome_corrective_action_evidence),
+        learningSignal: formText(full.recommendation_outcome_learning_signal),
+        learningSignalReason: formText(full.recommendation_outcome_learning_signal_reason),
+        learningSignalNextAction: formText(full.recommendation_outcome_recommended_next_action),
+        learningSignalEvidence: formJson(full.recommendation_outcome_learning_signal_evidence),
+        learningActionStatus: formText(full.recommendation_outcome_learning_action_status),
+        learningActionOwner: formText(full.recommendation_outcome_learning_action_owner),
+        learningActionDueAt: formText(full.recommendation_outcome_learning_action_due_at),
+        learningActionCompletedAt: formText(full.recommendation_outcome_learning_action_completed_at),
+        learningActionEvidence: formJson(full.recommendation_outcome_learning_action_evidence)
       });
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setMessage(ui('Editing an existing feedback record. Saving will update that record instead of creating a duplicate.'));
@@ -4802,6 +4908,10 @@ export default function DecisionLearningFeedbackPage() {
 
   const changeEvidencePage = (bucket: EvidenceBucket, direction: 'previous' | 'next') => {
     setPageOffsets((current) => ({ ...current, [bucket]: Math.max(0, current[bucket] + (direction === 'next' ? pageLimit : -pageLimit)) }));
+  };
+
+  const changeReviewPage = (direction: 'previous' | 'next') => {
+    setReviewOffset((current) => Math.max(0, current + (direction === 'next' ? reviewLimit : -reviewLimit)));
   };
 
   const reviewEvidence = (evidenceType: string, evidenceKey: string, targetStatus: string) => {
@@ -4818,7 +4928,7 @@ export default function DecisionLearningFeedbackPage() {
         title={ui('Learning Feedback')}
         description={ui('Record what actually happened after a recommendation, forecast, policy, or optimization result so people can review whether it helped. This page does not change stock, execute work, or train an AI model.')}
         meta={undefined /* v3.49.55: repetitive technical hero pills intentionally hidden; safety/audit behavior remains enforced. */}
-        aside={<><OperationalWorkspaceStatus value={governance?.continuous_learning_posture ? ui(formatLabel(governance.continuous_learning_posture)) : summaryQuery.isLoading ? ui('Loading') : ui('Unknown')} label={`${ui('continuous learning posture')} · ${ui('refreshed')} ${summaryQuery.dataUpdatedAt ? formatLocalizedDateTime(summaryQuery.dataUpdatedAt, locale) : ui('not refreshed yet')}`} /><button className="button button--secondary" type="button" onClick={refreshSummary} disabled={summaryQuery.isFetching}><TenantNavIcon path="/decision-learning-feedback" size={16} />{summaryQuery.isFetching ? ui('Refreshing…') : ui('Refresh summary')}</button></>}
+        aside={<><OperationalWorkspaceStatus value={governance?.continuous_learning_posture ? ui(formatLabel(governance.continuous_learning_posture)) : summaryQuery.isLoading ? ui('Loading') : summaryQuery.isError ? ui('Unavailable') : ui('Unknown')} label={`${ui('continuous learning posture')} · ${ui('refreshed')} ${summaryQuery.dataUpdatedAt ? formatLocalizedDateTime(summaryQuery.dataUpdatedAt, locale) : ui('not refreshed yet')}`} /><button className="button button--secondary" type="button" onClick={refreshSummary} disabled={summaryQuery.isFetching}><TenantNavIcon path="/decision-learning-feedback" size={16} />{summaryQuery.isFetching ? ui('Refreshing…') : ui('Refresh summary')}</button></>}
       />
 
       {summaryQuery.isError ? (
@@ -4834,7 +4944,7 @@ export default function DecisionLearningFeedbackPage() {
       ) : null}
 
       <OperationalWorkspaceStats ariaLabel={ui('Learning feedback summary')}>
-        <LocalizedLearningStatCard label="Posture" value={governance?.continuous_learning_posture || (summaryQuery.isLoading ? 'loading' : 'unknown')} iconPath="/decision-learning-feedback" tone="blue" />
+        <LocalizedLearningStatCard label="Posture" value={governance?.continuous_learning_posture || (summaryQuery.isLoading ? 'loading' : summaryQuery.isError ? 'unavailable' : 'unknown')} iconPath="/decision-learning-feedback" tone="blue" />
         <LocalizedLearningStatCard label="Outcomes" value={summaryQuery.isLoading ? "loading" : summaryQuery.isError ? "unavailable" : governance?.outcome_count ?? 0} iconPath="/intelligence-review" tone="green" />
         <LocalizedLearningStatCard label="Forecast evidence" value={summaryQuery.isLoading ? "loading" : summaryQuery.isError ? "unavailable" : governance?.forecast_accuracy_count ?? 0} iconPath="/probabilistic-forecasting" tone="violet" />
         <LocalizedLearningStatCard label="Policy evidence" value={summaryQuery.isLoading ? "loading" : summaryQuery.isError ? "unavailable" : governance?.policy_effectiveness_count ?? 0} iconPath="/adaptive-policy-engine" tone="amber" />
@@ -5347,7 +5457,7 @@ export default function DecisionLearningFeedbackPage() {
           {!summaryQuery.isLoading && !summaryQuery.isError ? (<>
             <FeedbackActionPlan plan={summaryQuery.data?.feedback_action_plan} />
             <LearningImpactAssessment assessment={summaryQuery.data?.learning_impact_assessment} />
-            <FeedbackReviewBoard board={summaryQuery.data?.feedback_review_board} canGovern={canGovern} reviewing={reviewMutation.isPending} onReview={reviewEvidence} />
+            <FeedbackReviewBoard board={summaryQuery.data?.feedback_review_board} canGovern={canGovern} reviewing={reviewMutation.isPending} onReview={reviewEvidence} onPage={changeReviewPage} />
           </>) : null}
 
           <section className={'card learning-feedback-section learning-feedback-safety-card'}>

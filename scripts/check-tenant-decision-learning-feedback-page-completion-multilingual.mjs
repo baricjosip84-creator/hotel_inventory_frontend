@@ -142,7 +142,7 @@ for (const required of [
   'source_reference: reference',
   'recommendation_key: form.recommendationKey || undefined',
   'recommendation_outcome_learning_signal: form.learningSignal || undefined',
-  'recommendation_outcome_learning_action_evidence: safeJsonObject(form.learningActionEvidence)',
+  'recommendation_outcome_learning_action_evidence: optionalJsonObject(form.learningActionEvidence, editing)',
   "placeholder='\u007b\"source\":\"recommendation-review\"\u007d'",
   "placeholder='\u007b\"execution_request_id\":\"...\"\u007d'"
 ]) if (!pageSource.includes(required)) fail(`Canonical payload/technical-example boundary changed unexpectedly: ${required}`);
