@@ -4424,7 +4424,11 @@ function escalationTargetLabel(value: string | null | undefined, ui: (englishTex
   return option ? ui(option.label) : ui('Not assigned');
 }
 
-function reviewDecisionMeaning(decision: ReviewDecision | undefined, ui: (englishText: string) => string): string {
+function reviewDecisionMeaning(decision: ReviewDecision | undefined, ui: (englishText: string) => string, sourceType?: string): string {
+  if (sourceType === 'probabilistic_forecast_model') {
+    if (decision === 'approved_for_manual_action') return ui('Trust this forecast model for advisory forecasting. This does not create operational work or an Execution Request.');
+    if (decision === 'reopened') return ui('Return this forecast model to review. This changes only the forecast review state and does not create operational work.');
+  }
   const meanings: Record<ReviewDecision, string> = {
     acknowledged: 'Reviewed and noted. No follow-up work is created; the item can still be reconsidered later.',
     approved_for_manual_action: 'Accept this result for manual follow-up. If the result supports real work, you can create an Execution Request next.',
@@ -4436,7 +4440,10 @@ function reviewDecisionMeaning(decision: ReviewDecision | undefined, ui: (englis
   return decision ? ui(meanings[decision]) : ui('No review decision is currently available for this lifecycle state.');
 }
 
-function reviewLifecycleMeaning(status: string | null | undefined, ui: (englishText: string) => string): string {
+function reviewLifecycleMeaning(status: string | null | undefined, ui: (englishText: string) => string, sourceType?: string): string {
+  if (sourceType === 'probabilistic_forecast_model' && status === 'approved_for_manual_action') {
+    return ui('Trusted for advisory forecasting. This approval does not create operational work or an Execution Request.');
+  }
   const meanings: Record<string, string> = {
     pending_review: 'Waiting for a human review decision.',
     approval_required: 'Waiting for a human decision because this source requires approval.',
@@ -8639,6 +8646,7 @@ export default function HumanInLoopAIReviewPage() {
               const reviewOrigin = describeReviewOrigin(review, ui);
               const lifecycle = review.lifecycle;
               const sourceActionId = review.source_action_id || '';
+              const isForecastReview = review.source_reference?.source_type === 'probabilistic_forecast_model';
               const isEscalatedReview = lifecycle?.current_status === 'escalated';
               const currentRoleOwnsEscalation = !isEscalatedReview
                 || currentRoleMatchesEscalationTarget(lifecycle?.escalation_target_role, capabilities.role);
@@ -8729,12 +8737,12 @@ export default function HumanInLoopAIReviewPage() {
                   <div className="ai-review-page__lifecycle-panel">
                     <div className="card__label">{ui("Review status")}</div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-                      <span style={badgeStyle}>{ui("Status:")} {recommendationLabel(lifecycle?.current_status || review.review_state, ui)}</span>
+                      <span style={badgeStyle}>{ui("Status:")} {isForecastReview && (lifecycle?.current_status || review.review_state) === 'approved_for_manual_action' ? ui('Approved for advisory use') : recommendationLabel(lifecycle?.current_status || review.review_state, ui)}</span>
                       <span style={badgeStyle}>{lifecycle?.persisted ? `${ui('Version')} ${formatLocalizedNumber(lifecycle.version || 1, locale)}` : ui('Not yet reviewed')}</span>
                       {lifecycle?.reviewer_role ? <span style={badgeStyle}>{ui("Reviewer:")} {recommendationLabel(lifecycle.reviewer_role, ui)}</span> : null}
                     </div>
                     <p className="card__subtext" style={{ marginTop: 8 }}>
-                      {reviewLifecycleMeaning(lifecycle?.current_status || review.review_state, ui)}
+                      {reviewLifecycleMeaning(lifecycle?.current_status || review.review_state, ui, review.source_reference?.source_type)}
                     </p>
                     {lifecycle?.current_status === 'escalated' ? (
                       <p className="card__subtext">
@@ -8766,7 +8774,7 @@ export default function HumanInLoopAIReviewPage() {
                           >
                             {visibleDecisionOptions.map((option) => (
                               <option key={option.value} value={option.value}>
-                                {ui(option.value === 'escalated' && isEscalatedReview ? 'Update escalation' : option.label)}
+                                {ui(option.value === 'escalated' && isEscalatedReview ? 'Update escalation' : isForecastReview && option.value === 'approved_for_manual_action' ? 'Approve for advisory use' : option.label)}
                               </option>
                             ))}
                           </select>
@@ -8784,7 +8792,7 @@ export default function HumanInLoopAIReviewPage() {
                         </label>
                       </div>
                       <p className="card__subtext ai-review-page__decision-help" role="note" style={{ marginTop: 10 }}>
-                        <strong>{ui('What this decision means:')}</strong> {reviewDecisionMeaning(selectedDecision, ui)}
+                        <strong>{ui('What this decision means:')}</strong> {reviewDecisionMeaning(selectedDecision, ui, review.source_reference?.source_type)}
                       </p>
                       {selectedDecision === 'escalated' ? (
                         <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginTop: 10 }}>

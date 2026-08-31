@@ -49,6 +49,7 @@ type ForecastModelRecord = {
   summary?: string;
   uncertainty_method?: string;
   confidence_score?: number | string | null;
+  version?: number | string | null;
   source_reference?: { version?: number | string | null; [key: string]: unknown };
   created_at?: string;
   updated_at?: string;
@@ -91,6 +92,7 @@ type ForecastCalibrationRecord = {
   model_key?: string;
   model_title?: string;
   calibration_key?: string;
+  observation_source?: string;
   calibration_type?: string;
   predicted_value?: number | string | null;
   actual_value?: number | string | null;
@@ -207,7 +209,8 @@ const MODEL_STATUS_OPTIONS = [
   'calibrating',
   'ready_for_review',
   'approved_for_advisory_use',
-  'retired'
+  'retired',
+  'stale'
 ];
 
 const UNCERTAINTY_METHOD_OPTIONS = [
@@ -303,6 +306,7 @@ const CANONICAL_LABELS: Record<string, string> = {
   ready_for_review: 'Ready for review',
   approved_for_advisory_use: 'Approved for advisory use',
   retired: 'Retired',
+  stale: 'Stale',
   confidence_interval: 'Confidence interval',
   quantile_band: 'Quantile band',
   scenario_distribution: 'Scenario distribution',
@@ -891,7 +895,7 @@ export default function ProbabilisticForecastingPage() {
                 <tr key={`${model.model_key || 'model'}-${index}`}>
                   <td>
                     <strong>{model.title || formatLabel(model.model_key)}</strong>
-                    {model.source_reference?.version ? <span className="forecast-table__subtext">{ui('Version')} {formatLocalizedNumber(Number(model.source_reference.version), locale)}</span> : null}
+                    {(model.version ?? model.source_reference?.version) ? <span className="forecast-table__subtext">{ui('Version')} {formatLocalizedNumber(Number(model.version ?? model.source_reference?.version), locale)}</span> : null}
                     {model.summary ? <span className="forecast-table__subtext">{model.summary}</span> : null}
                   </td>
                   <td>{formatCanonicalLabel(model.model_domain, ui)}</td>
@@ -961,9 +965,12 @@ export default function ProbabilisticForecastingPage() {
             renderRow={(row, index) => {
               const observation = row as ForecastCalibrationRecord;
               return (
-                <tr key={`${observation.calibration_key || 'calibration'}-${index}`}>
+                <tr key={`${observation.calibration_key || observation.model_key || observation.measured_at || 'calibration'}-${index}`}>
                   <td>{observation.model_title || formatLabel(observation.model_key)}</td>
-                  <td><strong>{formatLabel(observation.calibration_key)}</strong></td>
+                  <td>
+                    <strong>{ui(observation.observation_source === 'learning_feedback' ? 'Learning Feedback outcome' : observation.observation_source === 'rolling_backtest' ? '30-day usage backtest' : 'Calibration observation')}</strong>
+                    {canViewDiagnostics && observation.calibration_key ? <span className="forecast-table__subtext">{observation.calibration_key}</span> : null}
+                  </td>
                   <td>{formatCanonicalLabel(observation.calibration_type, ui)}</td>
                   <td>{formatNumber(observation.predicted_value, locale)}</td>
                   <td>{formatNumber(observation.actual_value, locale)}</td>

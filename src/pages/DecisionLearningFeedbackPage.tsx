@@ -4680,6 +4680,7 @@ export default function DecisionLearningFeedbackPage() {
   const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
   const canGovern = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
+  const canReadInsights = hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
   const [view, setView] = useState<LearningFeedbackView>('feedback');
   const [mode, setMode] = useState<FeedbackMode>('learning-outcomes');
@@ -4693,7 +4694,7 @@ export default function DecisionLearningFeedbackPage() {
   const reviewLimit = 25;
 
   const summaryQuery = useQuery({
-    queryKey: ['decision-learning-summary', pageOffsets, reviewOffset, view, canViewDiagnostics],
+    queryKey: ['decision-learning-summary', pageOffsets, reviewOffset, view, canViewDiagnostics, canReadInsights],
     queryFn: () => {
       const params = new URLSearchParams({
         limit: String(pageLimit),
@@ -4711,7 +4712,7 @@ export default function DecisionLearningFeedbackPage() {
 
   const sourceQuery = useQuery({
     queryKey: ['decision-learning-feedback-sources', mode, sourceSearch],
-    enabled: canGovern,
+    enabled: canGovern && (mode !== 'forecast-accuracy' || canReadInsights),
     queryFn: () => {
       const params = new URLSearchParams({ feedback_type: mode, search: sourceSearch, limit: '25' });
       return apiRequest<FeedbackSourceResponse>(`/decision-intelligence/learning-feedback-sources?${params.toString()}`);
@@ -4747,6 +4748,7 @@ export default function DecisionLearningFeedbackPage() {
   });
 
   const governance = summaryQuery.data?.governance;
+  const visibleFeedbackModes = useMemo(() => (Object.keys(modeLabels) as FeedbackMode[]).filter((item) => item !== 'forecast-accuracy' || canReadInsights), [canReadInsights]);
   const activeStatusOptions = useMemo(() => statusOptions[mode], [mode]);
   const activeSubtypeOptions = useMemo(() => subtypeOptions[mode] || [], [mode]);
 
@@ -4755,6 +4757,7 @@ export default function DecisionLearningFeedbackPage() {
   };
 
   const handleModeChange = (nextMode: FeedbackMode) => {
+    if (nextMode === 'forecast-accuracy' && !canReadInsights) return;
     setMode(nextMode);
     setForm({ ...defaultForm, subtype: defaultSubtypeForMode(nextMode), financialImpactCurrency: getActiveTenantCurrency(), status: statusOptions[nextMode][0] || 'observed' });
     setSourceId('');
@@ -4778,6 +4781,10 @@ export default function DecisionLearningFeedbackPage() {
       setMessage(ui('You have read-only access. Decision Intelligence governance permission is required to record feedback.'));
       return;
     }
+    if (mode === 'forecast-accuracy' && !canReadInsights) {
+      setMessage(ui('Insights access is required to view or record forecast feedback.'));
+      return;
+    }
     const validationError = validateFeedbackForm(mode, form, sourceId, ui);
     if (validationError) {
       setMessage(validationError);
@@ -4799,6 +4806,10 @@ export default function DecisionLearningFeedbackPage() {
   };
 
   const editEvidence = async (nextMode: FeedbackMode, row: Record<string, unknown>) => {
+    if (nextMode === 'forecast-accuracy' && !canReadInsights) {
+      setMessage(ui('Insights access is required to view or record forecast feedback.'));
+      return;
+    }
     const evidenceKey = recordKeyForMode(nextMode, row);
     if (!evidenceKey) return;
     setMessage(ui('Loading feedback record…'));
@@ -4946,7 +4957,7 @@ export default function DecisionLearningFeedbackPage() {
       <OperationalWorkspaceStats ariaLabel={ui('Learning feedback summary')}>
         <LocalizedLearningStatCard label="Posture" value={governance?.continuous_learning_posture || (summaryQuery.isLoading ? 'loading' : summaryQuery.isError ? 'unavailable' : 'unknown')} iconPath="/decision-learning-feedback" tone="blue" />
         <LocalizedLearningStatCard label="Outcomes" value={summaryQuery.isLoading ? "loading" : summaryQuery.isError ? "unavailable" : governance?.outcome_count ?? 0} iconPath="/intelligence-review" tone="green" />
-        <LocalizedLearningStatCard label="Forecast evidence" value={summaryQuery.isLoading ? "loading" : summaryQuery.isError ? "unavailable" : governance?.forecast_accuracy_count ?? 0} iconPath="/probabilistic-forecasting" tone="violet" />
+        {canReadInsights ? <LocalizedLearningStatCard label="Forecast evidence" value={summaryQuery.isLoading ? "loading" : summaryQuery.isError ? "unavailable" : governance?.forecast_accuracy_count ?? 0} iconPath="/probabilistic-forecasting" tone="violet" /> : null}
         <LocalizedLearningStatCard label="Policy evidence" value={summaryQuery.isLoading ? "loading" : summaryQuery.isError ? "unavailable" : governance?.policy_effectiveness_count ?? 0} iconPath="/adaptive-policy-engine" tone="amber" />
         <LocalizedLearningStatCard label="Optimization evidence" value={summaryQuery.isLoading ? "loading" : summaryQuery.isError ? "unavailable" : governance?.optimization_result_count ?? 0} iconPath="/cross-domain-optimization" tone="slate" />
       </OperationalWorkspaceStats>
@@ -4984,7 +4995,7 @@ export default function DecisionLearningFeedbackPage() {
           <label>
             <span className="form-label">{ui('Feedback type')}</span>
             <select className="input" value={mode} onChange={(event) => handleModeChange(event.target.value as FeedbackMode)}>
-              {(Object.keys(modeLabels) as FeedbackMode[]).map((item) => <option key={item} value={item}>{ui(modeLabels[item])}</option>)}
+              {visibleFeedbackModes.map((item) => <option key={item} value={item}>{ui(modeLabels[item])}</option>)}
             </select>
           </label>
           <label>
@@ -5471,7 +5482,7 @@ export default function DecisionLearningFeedbackPage() {
           </section>
 
           <EvidenceTable title="Learning outcomes" mode="learning-outcomes" rows={summaryQuery.data?.outcomes || []} pageInfo={summaryQuery.data?.pagination?.outcomes} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('outcomes', direction)} />
-          <EvidenceTable title="Forecast accuracy" mode="forecast-accuracy" rows={summaryQuery.data?.forecast_accuracy || []} pageInfo={summaryQuery.data?.pagination?.forecast_accuracy} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('forecast_accuracy', direction)} />
+          {canReadInsights ? <EvidenceTable title="Forecast accuracy" mode="forecast-accuracy" rows={summaryQuery.data?.forecast_accuracy || []} pageInfo={summaryQuery.data?.pagination?.forecast_accuracy} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('forecast_accuracy', direction)} /> : null}
           <EvidenceTable title="Policy effectiveness" mode="policy-effectiveness" rows={summaryQuery.data?.policy_effectiveness || []} pageInfo={summaryQuery.data?.pagination?.policy_effectiveness} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('policy_effectiveness', direction)} />
           <EvidenceTable title="Optimization results" mode="optimization-results" rows={summaryQuery.data?.optimization_results || []} pageInfo={summaryQuery.data?.pagination?.optimization_results} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('optimization_results', direction)} />
         </>
