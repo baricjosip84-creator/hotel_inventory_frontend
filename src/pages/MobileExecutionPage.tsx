@@ -40,6 +40,7 @@ type MobileExecutionTask = {
   barcode_ready?: boolean;
   offline_safe_snapshot?: boolean;
   recommended_mobile_next_step?: string | null;
+  recommended_mobile_next_step_key?: string | null;
   prohibited_mobile_actions?: string[];
   source_surface?: string;
   created_at?: string | null;
@@ -72,9 +73,13 @@ type MobileExecutionResponse = {
     next_action_id?: string | null;
     next_action_title?: string | null;
     next_action_urgency?: string | null;
+    scan_ready_task_count?: number;
     offline_guidance?: string;
+    offline_guidance_key?: string | null;
     scanner_guidance?: string;
+    scanner_guidance_key?: string | null;
     evidence_guidance?: string;
+    evidence_guidance_key?: string | null;
   };
   mobile_tasks?: MobileExecutionTask[];
   non_mutation_guarantee?: boolean;
@@ -85,6 +90,7 @@ type MobileExecutionResponse = {
 type OfflineOperation = {
   operation_id: string;
   task_id: string;
+  task_label?: string | null;
   action: MobileAction;
   note?: string;
   created_at: string;
@@ -164,6 +170,22 @@ const CANONICAL_LABELS: Record<string, string> = {
   replenishment: 'Replenishment',
   offline_capable_task_lifecycle_execution: 'Offline-capable task execution'
 };
+
+
+const MOBILE_SYSTEM_TEXT: Record<string, string> = {
+  mobile_offline_queue_guidance: 'This page keeps a local task snapshot. Start, complete, block, or unblock actions can be queued offline and are replayed through the normal task workflow when connectivity returns.',
+  mobile_scanner_none: 'None of the current tasks can use the shipment scanner.',
+  mobile_scanner_first_task: 'The first task can open the shipment scanner with the correct shipment already selected.',
+  mobile_scanner_later_tasks: 'Some tasks can use the shipment scanner, but the first task in the queue does not require scanning.',
+  mobile_evidence_source_workflow: 'Photos, voice notes, and other evidence are not uploaded from this page. Add any required evidence in the task’s normal workflow.',
+  mobile_scan_then_execute: 'Scan if needed, then start or complete the execution task here. Offline actions are queued and replayed when connectivity returns.',
+  mobile_execute_task_offline: 'Start, complete, block, or unblock the execution task here. Offline actions are queued and replayed when connectivity returns.'
+};
+
+function localizedMobileSystemText(key: string | null | undefined, fallback: string | null | undefined, ui: (englishText: string) => string): string {
+  const canonical = key ? MOBILE_SYSTEM_TEXT[key] : null;
+  return canonical ? ui(canonical) : (fallback || '');
+}
 
 /* v3.49.50: retained for easy reversal with the hidden Mobile safety contract.
 const SAFETY_LABELS: Record<string, string> = {
@@ -380,30 +402,55 @@ export default function MobileExecutionPage() {
     if (!online || syncing || pending.length === 0 || !canRunAnyMobileAction) return;
     setSyncing(true);
     setActionError(null);
+    setMessage(null);
+
+    const queuedOperations = [...pending];
+    const remaining: OfflineOperation[] = [];
+    let appliedCount = 0;
+    let failedCount = 0;
+    let firstFailure: string | null = null;
+
     try {
-      const result = await apiRequest<MobileSyncResponse>('/inventory-capabilities/mobile-sync', {
-        method: 'POST',
-        body: JSON.stringify({ device_id: getDeviceId(), request_id: makeId('sync'), operations: pending })
-      });
-      const applied = new Set((result.results || []).filter((row) => row.status === 'applied').map((row) => row.operation_id).filter(Boolean));
-      const failedByOperationId = new Map((result.results || [])
-        .filter((row) => row.status === 'failed' && row.operation_id)
-        .map((row) => [row.operation_id as string, row.error || ui('The queued action could not be applied.')]));
-      const remaining = pending
-        .filter((operation) => !applied.has(operation.operation_id))
-        .map((operation) => failedByOperationId.has(operation.operation_id)
-          ? { ...operation, last_error: failedByOperationId.get(operation.operation_id) || null, failure_count: (operation.failure_count || 0) + 1 }
-          : operation);
+      for (let index = 0; index < queuedOperations.length; index += 1) {
+        const operation = queuedOperations[index];
+        try {
+          const result = await apiRequest<MobileSyncResponse>('/inventory-capabilities/mobile-sync', {
+            method: 'POST',
+            body: JSON.stringify({ device_id: getDeviceId(), request_id: operation.operation_id, operations: [operation] })
+          });
+          const row = result.results?.[0];
+          if (row?.status === 'applied') {
+            appliedCount += 1;
+            continue;
+          }
+
+          failedCount += 1;
+          const errorMessage = row?.error || ui('The queued action could not be applied.');
+          if (!firstFailure) firstFailure = errorMessage;
+          remaining.push({ ...operation, last_error: errorMessage, failure_count: (operation.failure_count || 0) + 1 });
+        } catch (error) {
+          const errorMessage = error instanceof ApiError ? error.message : error instanceof Error ? error.message : ui('The queued action could not be applied.');
+          if (!firstFailure) firstFailure = errorMessage;
+          if (error instanceof ApiError) {
+            failedCount += 1;
+            remaining.push({ ...operation, last_error: errorMessage, failure_count: (operation.failure_count || 0) + 1 });
+            continue;
+          }
+          // A transport/response loss is ambiguous: the server may already have committed.
+          // Keep this operation and every later operation queued with the same stable request identity.
+          remaining.push(operation, ...queuedOperations.slice(index + 1));
+          break;
+        }
+      }
+
       persistPending(remaining);
-      const failed = (result.results || []).filter((row) => row.status === 'failed');
-      if (failed.length) {
-        setActionError(`${formatLocalizedNumber(failed.length, locale)} ${ui(failed.length === 1 ? 'queued action could not be applied.' : 'queued actions could not be applied.')} ${failed[0]?.error || ''}`.trim());
+      if (failedCount > 0 || firstFailure) {
+        const failureLabelCount = failedCount || 1;
+        setActionError(`${formatLocalizedNumber(failureLabelCount, locale)} ${ui(failureLabelCount === 1 ? 'queued action could not be applied.' : 'queued actions could not be applied.')} ${firstFailure || ''}`.trim());
       } else {
-        setMessage(countLabel(applied.size, 'offline action synchronized.', 'offline actions synchronized.', locale, ui));
+        setMessage(countLabel(appliedCount, 'offline action synchronized.', 'offline actions synchronized.', locale, ui));
       }
       await mobileExecutionQuery.refetch();
-    } catch (error) {
-      if (error instanceof ApiError) setActionError(error.message);
     } finally {
       setSyncing(false);
     }
@@ -425,6 +472,7 @@ export default function MobileExecutionPage() {
     const operation: OfflineOperation = {
       operation_id: makeId('op'),
       task_id: task.task_source_id,
+      task_label: task.title || null,
       action,
       note: normalizedNote,
       created_at: new Date().toISOString()
@@ -443,21 +491,29 @@ export default function MobileExecutionPage() {
     try {
       const result = await apiRequest<MobileSyncResponse>('/inventory-capabilities/mobile-sync', {
         method: 'POST',
-        body: JSON.stringify({ device_id: getDeviceId(), request_id: makeId('sync'), operations: [operation] })
+        body: JSON.stringify({ device_id: getDeviceId(), request_id: operation.operation_id, operations: [operation] })
       });
       const first = result.results?.[0];
-      if (first?.status === 'failed') throw new Error(first.error || ui('The task action could not be applied.'));
+      if (first?.status === 'failed') {
+        setActionError(first.error || ui('The task action could not be applied.'));
+        return;
+      }
+      if (first?.status !== 'applied') {
+        throw new Error('Mobile synchronization response did not confirm whether the action was applied.');
+      }
       setMessage(ui('Task action applied successfully.'));
       if (action === 'block') { setBlockReasonTaskId(null); setBlockReason(''); }
       await mobileExecutionQuery.refetch();
     } catch (error) {
-      if (!navigator.onLine) {
-        persistPending([...pending, operation]);
-        setOnline(false);
-        setMessage(ui('Task action queued because the device lost its connection.'));
+      if (!(error instanceof ApiError)) {
+        if (!pending.some((queued) => queued.operation_id === operation.operation_id)) {
+          persistPending([...pending, operation]);
+        }
+        if (!navigator.onLine) setOnline(false);
+        setMessage(ui('Task action queued because synchronization could not be confirmed. It will retry safely without repeating a confirmed action.'));
         if (action === 'block') { setBlockReasonTaskId(null); setBlockReason(''); }
       } else {
-        setActionError(error instanceof ApiError ? error.message : error instanceof Error ? error.message : ui('Unable to update the task.'));
+        setActionError(error.message);
       }
     } finally {
       setBusyTaskId(null);
@@ -489,17 +545,17 @@ export default function MobileExecutionPage() {
       <OperationalWorkspaceStats ariaLabel={ui("Mobile execution overview")}>
         <OperationalWorkspaceStatCard
           label={ui("Mobile queue")}
-          value={formatLocalizedNumber(numberValue(summary.total_mobile_tasks ?? mobileTasks.length), locale)}
+          value={hasUsableResponse ? formatLocalizedNumber(numberValue(summary.total_mobile_tasks ?? mobileTasks.length), locale) : ui('Unavailable')}
           helper={ui("Execution tasks prepared for touch-first warehouse work")}
           iconPath="/mobile-execution"
           tone="blue"
         />
         <OperationalWorkspaceStatCard
           label={ui("Critical tasks")}
-          value={formatLocalizedNumber(numberValue(summary.critical_mobile_tasks), locale)}
+          value={hasUsableResponse ? formatLocalizedNumber(numberValue(summary.critical_mobile_tasks), locale) : ui('Unavailable')}
           helper={ui("Highest urgency items requiring operator attention")}
           iconPath="/alerts"
-          tone={numberValue(summary.critical_mobile_tasks) > 0 ? 'danger' : 'good'}
+          tone={!hasUsableResponse ? 'neutral' : numberValue(summary.critical_mobile_tasks) > 0 ? 'danger' : 'good'}
         />
         <OperationalWorkspaceStatCard
           label={ui("Connection")}
@@ -510,7 +566,7 @@ export default function MobileExecutionPage() {
         />
         <OperationalWorkspaceStatCard
           label={ui("Execution mode")}
-          value={canonicalLabel(response?.definition?.execution_mode, ui)}
+          value={hasUsableResponse ? canonicalLabel(response?.definition?.execution_mode, ui) : ui('Unavailable')}
           helper={ui("Only execution-task lifecycle changes are allowed from this surface")}
           iconPath="/execution-tasks"
           tone="neutral"
@@ -538,7 +594,7 @@ export default function MobileExecutionPage() {
             <Link className="button button--secondary mobile-execution-control-button" to="/execution-tasks"><TenantNavIcon path="/execution-tasks" size={15} />{ui("Open execution tasks")}</Link>
           </div>
 
-          {mobileExecutionQuery.isLoading && !cachedResponse ? <p className="card__subtext">{ui("Loading mobile execution queue…")}</p> : null}
+          {mobileExecutionQuery.isLoading && !matchingCachedResponse ? <p className="card__subtext">{ui("Loading mobile execution queue…")}</p> : null}
           {mobileExecutionQuery.error && !hasUsableResponse ? <p className="form-error">{mobileExecutionQuery.error instanceof ApiError ? mobileExecutionQuery.error.message : ui('Unable to load the mobile execution queue.')}</p> : null}
           {usingOfflineSnapshot ? <p className="card__subtext"><strong>{ui("Offline snapshot:")}</strong> {ui("showing the last successfully downloaded queue.")}</p> : null}
           {message ? <p className="form-success">{message}</p> : null}
@@ -553,8 +609,9 @@ export default function MobileExecutionPage() {
                 {pending.length > 0 ? <span className="mobile-execution-pending-pill">{countLabel(pending.length, "queued action", "queued actions", locale, ui)}</span> : null}
               </div>
               <div className="mobile-execution-guidance-grid">
-                <div className="mobile-execution-guidance-item"><span className="mobile-execution-guidance-icon"><TenantNavIcon path="/mobile-execution" size={15} /></span><p>{guidance.offline_guidance}</p></div>
-                <div className="mobile-execution-guidance-item"><span className="mobile-execution-guidance-icon"><TenantNavIcon path="/scanner" size={15} /></span><p>{guidance.scanner_guidance}</p></div>
+                <div className="mobile-execution-guidance-item"><span className="mobile-execution-guidance-icon"><TenantNavIcon path="/mobile-execution" size={15} /></span><p>{localizedMobileSystemText(guidance.offline_guidance_key, guidance.offline_guidance, ui)}</p></div>
+                <div className="mobile-execution-guidance-item"><span className="mobile-execution-guidance-icon"><TenantNavIcon path="/scanner" size={15} /></span><p>{localizedMobileSystemText(guidance.scanner_guidance_key, guidance.scanner_guidance, ui)}</p></div>
+                <div className="mobile-execution-guidance-item"><span className="mobile-execution-guidance-icon"><TenantNavIcon path="/execution-tasks" size={15} /></span><p>{localizedMobileSystemText(guidance.evidence_guidance_key, guidance.evidence_guidance, ui)}</p></div>
               </div>
             </div>
           ) : null}
@@ -572,7 +629,7 @@ export default function MobileExecutionPage() {
             {pending.map((operation) => (
               <div className="card mobile-execution-pending-row" key={operation.operation_id}>
                 <div>
-                  <div className="mobile-execution-pending-title">{ui(ACTION_LABELS[operation.action])} · {ui('Task')} {operation.task_id}</div>
+                  <div className="mobile-execution-pending-title">{ui(ACTION_LABELS[operation.action])} · {operation.task_label || ui('Execution task')}</div>
                   <div className="card__subtext">{ui('Queued:')} {formatDateTime(operation.created_at, locale, ui)}</div>
                   {operation.note ? <div className="card__subtext"><strong>{ui('Reason:')}</strong> {operation.note}</div> : null}
                   {operation.last_error ? <div className="form-error"><strong>{ui('Could not apply:')}</strong> {operation.last_error}</div> : null}
@@ -590,7 +647,7 @@ export default function MobileExecutionPage() {
           {ui("Touch-first task queue")}
           {mobileTasks.length > 0 ? <span className="mobile-execution-section-count">{formatLocalizedNumber(mobileTasks.length, locale)}</span> : null}
         </div>
-        {mobileTasks.length === 0 && !mobileExecutionQuery.isLoading ? <div className="card mobile-execution-empty-card"><span className="mobile-execution-icon mobile-execution-icon--blue"><TenantNavIcon path="/execution-tasks" size={18} /></span><div><div className="mobile-execution-empty-title">{ui("No matching mobile tasks")}</div><p className="card__subtext">{ui("No mobile execution tasks matched the selected filters.")}</p></div></div> : (
+        {!hasUsableResponse ? null : mobileTasks.length === 0 && !mobileExecutionQuery.isLoading ? <div className="card mobile-execution-empty-card"><span className="mobile-execution-icon mobile-execution-icon--blue"><TenantNavIcon path="/execution-tasks" size={18} /></span><div><div className="mobile-execution-empty-title">{ui("No matching mobile tasks")}</div><p className="card__subtext">{ui("No mobile execution tasks matched the selected filters.")}</p></div></div> : (
           <div className="mobile-execution-queue-grid">
             {mobileTasks.map((task) => {
               const sourcePath = sourceSurfaceToAppPath(task.source_surface);
@@ -621,7 +678,7 @@ export default function MobileExecutionPage() {
 
                   <div className="mobile-execution-task-detail">
                     <div className="card__label">{ui("Recommended next step")}</div>
-                    <p className="card__subtext">{task.recommended_mobile_next_step || ui("No recommended next step was provided.")}</p>
+                    <p className="card__subtext">{localizedMobileSystemText(task.recommended_mobile_next_step_key, task.recommended_mobile_next_step, ui) || ui("No recommended next step was provided.")}</p>
                   </div>
                   <div className="mobile-execution-task-detail mobile-execution-task-detail--time">
                     <div className="card__label">{ui("Last updated")}</div>

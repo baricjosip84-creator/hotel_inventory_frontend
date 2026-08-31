@@ -59,7 +59,14 @@ const dynamicLabels = [
   'Execution-task lifecycle changes only',
   'queued action could not be applied.', 'queued actions could not be applied.', 'offline action synchronized.', 'offline actions synchronized.',
   'queued action awaiting synchronization', 'queued actions awaiting synchronization', 'action waiting to synchronize', 'actions waiting to synchronize',
-  'queued action', 'queued actions', 'pending action', 'pending actions'
+  'queued action', 'queued actions', 'pending action', 'pending actions',
+  'This page keeps a local task snapshot. Start, complete, block, or unblock actions can be queued offline and are replayed through the normal task workflow when connectivity returns.',
+  'None of the current tasks can use the shipment scanner.',
+  'The first task can open the shipment scanner with the correct shipment already selected.',
+  'Some tasks can use the shipment scanner, but the first task in the queue does not require scanning.',
+  'Photos, voice notes, and other evidence are not uploaded from this page. Add any required evidence in the task’s normal workflow.',
+  'Scan if needed, then start or complete the execution task here. Offline actions are queued and replayed when connectivity returns.',
+  'Start, complete, block, or unblock the execution task here. Offline actions are queued and replayed when connectivity returns.'
 ];
 const missingDynamic = dynamicLabels.filter((key) => !uniqueKeys.has(key));
 if (missingDynamic.length) fail(`Mobile Execution dynamic display labels are missing translations: ${missingDynamic.join(' | ')}`);
@@ -110,19 +117,33 @@ for (const contract of routerContracts) if (!routerSource.includes(contract)) fa
 if (!process.exitCode) pass('Mobile Execution route, query filters, permissions, sync endpoint, and lifecycle actions remain language-independent.');
 
 const serverContentContracts = [
-  '<p>{guidance.offline_guidance}</p>', '<p>{guidance.scanner_guidance}</p>',
   "{task.title || ui('Untitled mobile task')}", "{task.summary || ui('No task summary was provided.')}",
-  '{task.recommended_mobile_next_step || ui("No recommended next step was provided.")}',
+  'localizedMobileSystemText(guidance.offline_guidance_key, guidance.offline_guidance, ui)',
+  'localizedMobileSystemText(guidance.scanner_guidance_key, guidance.scanner_guidance, ui)',
+  'localizedMobileSystemText(guidance.evidence_guidance_key, guidance.evidence_guidance, ui)',
+  'localizedMobileSystemText(task.recommended_mobile_next_step_key, task.recommended_mobile_next_step, ui)',
   'mobileExecutionQuery.error instanceof ApiError ? mobileExecutionQuery.error.message',
-  "${failed[0]?.error || ''}"
+  "firstFailure || ''"
 ];
 for (const contract of serverContentContracts) if (!pageSource.includes(contract)) fail(`Mobile Execution backend/business content display contract changed: ${contract}`);
 const forbiddenServerContentTranslation = [
-  'ui(guidance.offline_guidance)', 'ui(guidance.scanner_guidance)', 'ui(task.title)', 'ui(task.summary)', 'ui(task.recommended_mobile_next_step)',
-  'ui(mobileExecutionQuery.error.message)', 'ui(failed[0]?.error)'
+  'ui(task.title)', 'ui(task.summary)', 'ui(mobileExecutionQuery.error.message)',
+  'ui(guidance.offline_guidance)', 'ui(guidance.scanner_guidance)', 'ui(task.recommended_mobile_next_step)'
 ];
-for (const pattern of forbiddenServerContentTranslation) if (pageSource.includes(pattern)) fail(`Backend-returned Mobile Execution content must not be blindly translated as a UI key: ${pattern}`);
-if (!process.exitCode) pass('Backend task/guidance/error content remains data while frontend-owned fallbacks and controls are localized.');
+for (const pattern of forbiddenServerContentTranslation) if (pageSource.includes(pattern)) fail(`Backend-returned user/business/error content must not be blindly translated as a UI key: ${pattern}`);
+if (!pageSource.includes('const MOBILE_SYSTEM_TEXT: Record<string, string>')) fail('Mobile Execution must whitelist translatable backend-generated system guidance.');
+if (!pageSource.includes('const canonical = key ? MOBILE_SYSTEM_TEXT[key] : null;')) fail('Mobile Execution system guidance must translate only recognized server guidance keys.');
+if (!process.exitCode) pass('User/business/error content remains data while whitelisted system guidance uses catalog-backed keys.');
+
+const stableRequestIdentityCount = (pageSource.match(/request_id: operation\.operation_id/g) || []).length;
+if (stableRequestIdentityCount < 2) fail('Mobile Execution online and replay synchronization must reuse the stable operation id as the server request identity.');
+if (pageSource.includes("request_id: makeId('sync')")) fail('Mobile Execution must not mint a new server request identity on retry.');
+if (!pageSource.includes('operations: [operation]')) fail('Mobile Execution replay must synchronize each queued operation under its own stable idempotency identity.');
+if (!process.exitCode) pass('Mobile Execution offline retry identity remains stable across online submission and replay.');
+
+if (pageSource.includes("{ui('Task')} {operation.task_id}")) fail('Mobile Execution must not expose raw execution-task UUIDs in the normal offline queue.');
+if (!pageSource.includes("operation.task_label || ui('Execution task')")) fail('Mobile Execution offline queue must use a human task label with a localized fallback.');
+if (!process.exitCode) pass('Mobile Execution keeps synchronization identifiers internal to normal tenant UI.');
 
 if (!pageSource.includes("const actorType = identity.supportSession ? 'support' : 'tenant';")) fail('Mobile Execution tenant/support-scoped local storage isolation contract changed.');
 if (!pageSource.includes('localStorage.removeItem(LEGACY_CACHE_KEY)') || !pageSource.includes('localStorage.removeItem(LEGACY_PENDING_KEY)')) fail('Mobile Execution legacy unscoped cache cleanup must remain intact.');
