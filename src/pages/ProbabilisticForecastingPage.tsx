@@ -49,6 +49,7 @@ type ForecastModelRecord = {
   summary?: string;
   uncertainty_method?: string;
   confidence_score?: number | string | null;
+  source_reference?: { version?: number | string | null; [key: string]: unknown };
   created_at?: string;
   updated_at?: string;
   [key: string]: unknown;
@@ -125,6 +126,8 @@ type ProbabilisticForecastingSummary = {
     interval_count?: number;
     risk_probability_count?: number;
     calibration_observation_count?: number;
+    current_model_count?: number;
+    last_analysis_refreshed_at?: string | null;
     approved_advisory_model_count?: number;
     ready_for_review_model_count?: number;
     calibrating_model_count?: number;
@@ -340,7 +343,7 @@ const LIFECYCLE_SECTIONS: LifecycleConfig[] = [
       { label: 'Intervals', key: 'interval_count' },
       { label: 'Outcome observations', key: 'calibration_observation_count' },
       { label: 'Capture rate', key: 'calibration_capture_rate', format: 'percent' },
-      { label: 'Average error', key: 'average_absolute_error' },
+      { label: 'Average normalized error', key: 'average_normalized_error' },
       { label: 'High-risk forecasts', key: 'high_risk_forecast_count' }
     ]
   },
@@ -688,7 +691,8 @@ function LifecycleCard({ config, section, diagnostics }: { config: LifecycleConf
 export default function ProbabilisticForecastingPage() {
   const { locale, ui } = useAppTranslation();
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
-  const canGovern = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
+  const canReadInsights = hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
+  const canGovern = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN) && canReadInsights;
   const [view, setView] = useState<ForecastView>('evidence');
   const [filters, setFilters] = useState<ForecastFilterState>(DEFAULT_FILTERS);
   const [offsets, setOffsets] = useState<ForecastOffsets>({ model_offset: 0, interval_offset: 0, risk_offset: 0, calibration_offset: 0 });
@@ -700,7 +704,7 @@ export default function ProbabilisticForecastingPage() {
     return params.toString();
   }, [filters, offsets]);
 
-  const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ['probabilistic-forecasting-summary', queryString],
     queryFn: () => apiRequest<ProbabilisticForecastingSummary>(`/decision-intelligence/probabilistic-forecasting-summary?${queryString}`)
   });
@@ -727,7 +731,8 @@ export default function ProbabilisticForecastingPage() {
   const evidenceCount = modelCount + intervalCount + riskCount + calibrationCount;
   const hasEvidence = data?.governance?.evidence_available ?? evidenceCount > 0;
   const hasActiveFilters = JSON.stringify(filters) !== JSON.stringify(DEFAULT_FILTERS);
-  const lastRefreshed = dataUpdatedAt ? formatLocalizedDateTime(dataUpdatedAt, locale) : ui('Not refreshed yet');
+  const lastAnalysisRefreshedAt = data?.governance?.last_analysis_refreshed_at;
+  const lastRefreshed = lastAnalysisRefreshedAt ? formatLocalizedDateTime(lastAnalysisRefreshedAt, locale) : ui('Not refreshed yet');
 
   if (isLoading) {
     return (
@@ -744,7 +749,7 @@ export default function ProbabilisticForecastingPage() {
           <span className="forecast-state-icon forecast-state-icon--danger"><TenantNavIcon path="/alerts" size={18} /></span>
           <div>
             <h2>{ui('Probabilistic forecast evidence could not be loaded')}</h2>
-            <p>{ui('Check your Decision Intelligence access and try the read-only request again.')}</p>
+            <p>{ui('Check your Decision Intelligence and Insights access, then try again.')}</p>
             <button className="button" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />{ui('Retry')}</button>
           </div>
         </section>
@@ -760,8 +765,14 @@ export default function ProbabilisticForecastingPage() {
         eyebrow={ui('Decision intelligence & forecasting')}
         title={ui('Probabilistic Forecasting')}
         description={ui('Build and review advisory demand ranges, stockout risk, and forecast accuracy from the app’s real operating data. Forecasts never change inventory or other business records automatically.')}
-        aside={<><OperationalWorkspaceStatus value={formatCanonicalLabel(data?.governance?.probabilistic_forecasting_posture, ui)} label={ui('Forecast review posture · refreshed {time}').replace('{time}', lastRefreshed)} />{canGovern ? <button className="button button--secondary" type="button" onClick={() => refreshAnalysis.mutate()} disabled={refreshAnalysis.isPending || isFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />{ui(refreshAnalysis.isPending ? 'Refreshing forecast analysis…' : 'Refresh forecast analysis')}</button> : <button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />{ui(isFetching ? 'Refreshing…' : 'Refresh page')}</button>}</>}
+        aside={<><OperationalWorkspaceStatus value={formatCanonicalLabel(data?.governance?.probabilistic_forecasting_posture, ui)} label={ui('Forecast analysis last refreshed · {time}').replace('{time}', lastRefreshed)} />{canGovern ? <button className="button button--secondary" type="button" onClick={() => refreshAnalysis.mutate()} disabled={refreshAnalysis.isPending || isFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />{ui(refreshAnalysis.isPending ? 'Refreshing forecast analysis…' : 'Refresh forecast analysis')}</button> : <button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />{ui(isFetching ? 'Refreshing…' : 'Refresh page')}</button>}</>}
       />
+      {refreshAnalysis.isError ? (
+        <section className="card card--danger forecast-refresh-error" role="alert">
+          <strong>{ui('Forecast analysis could not be refreshed.')}</strong>
+          <span>{ui('Your existing forecast snapshots were not changed. Check your access or source forecast data and try again.')}</span>
+        </section>
+      ) : null}
 
 <OperationalWorkspaceStats ariaLabel={ui('Probabilistic forecast evidence summary')}>
         <MetricCard label="Models" value={modelCount} iconPath="/probabilistic-forecasting" tone="blue" />
@@ -861,7 +872,7 @@ export default function ProbabilisticForecastingPage() {
 
       {view === 'evidence' ? (
         <>
-          <p className="forecast-limit-note"><TenantNavIcon path="/system-context" size={14} />{ui('Each list is paged for readability. Totals and review checks use the full matching evidence set.')}</p>
+          <p className="forecast-limit-note"><TenantNavIcon path="/system-context" size={14} />{ui('Each list is paged for readability. Totals use the full matching history; review checks focus on the current version of each forecast.')}</p>
           <EvidenceSection
             title={ui('Forecast models')}
             iconPath="/probabilistic-forecasting"
@@ -874,7 +885,11 @@ export default function ProbabilisticForecastingPage() {
               const model = row as ForecastModelRecord;
               return (
                 <tr key={`${model.model_key || 'model'}-${index}`}>
-                  <td><strong>{model.title || formatLabel(model.model_key)}</strong>{model.summary ? <span className="forecast-table__subtext">{model.summary}</span> : null}</td>
+                  <td>
+                    <strong>{model.title || formatLabel(model.model_key)}</strong>
+                    {model.source_reference?.version ? <span className="forecast-table__subtext">{ui('Version')} {formatLocalizedNumber(Number(model.source_reference.version), locale)}</span> : null}
+                    {model.summary ? <span className="forecast-table__subtext">{model.summary}</span> : null}
+                  </td>
                   <td>{formatCanonicalLabel(model.model_domain, ui)}</td>
                   <td>{formatCanonicalLabel(model.forecast_type, ui)}</td>
                   <td><StatusBadge value={model.model_status} /></td>
@@ -888,11 +903,11 @@ export default function ProbabilisticForecastingPage() {
           <EvidenceSection
             title={ui('Uncertainty ranges')}
             iconPath="/insights"
-            description="Expected values and lower-to-upper ranges produced for a forecast period. The three displayed values are lower, expected, and upper."
+            description={ui('Expected values and empirical lower-to-upper error bands produced from historical forecast error. These are advisory error bands, not statistical confidence intervals or p10/p90 quantiles.')} 
             rows={(data?.intervals || []) as Array<Record<string, unknown>>}
             pagination={data?.pagination?.intervals}
             onPrevious={() => movePage('interval_offset', -1)} onNext={() => movePage('interval_offset', 1)}
-            headers={['Model', 'Range', 'Unit', 'Period starts', 'Period ends', 'Confidence level', 'Generated']}
+            headers={['Model', 'Range', 'Unit', 'Period starts', 'Period ends', 'Evidence confidence', 'Generated']}
             renderRow={(row, index) => {
               const interval = row as ForecastIntervalRecord;
               return (
@@ -902,7 +917,7 @@ export default function ProbabilisticForecastingPage() {
                   <td>{interval.unit || '—'}</td>
                   <td>{formatDate(interval.forecast_period_start, locale)}</td>
                   <td>{formatDate(interval.forecast_period_end, locale)}</td>
-                  <td>{formatPercentage(interval.confidence_level ?? interval.confidence_score, locale)}</td>
+                  <td>{formatPercentage(interval.confidence_score, locale)}</td>
                   <td>{formatDate(interval.generated_at, locale)}</td>
                 </tr>
               );

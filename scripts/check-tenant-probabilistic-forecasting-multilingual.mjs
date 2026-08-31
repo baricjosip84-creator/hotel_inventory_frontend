@@ -80,7 +80,7 @@ else pass(`${dynamicKeys.size} lifecycle, evidence, metric, and canonical displa
 
 for (const required of [
   'const { locale, ui } = useAppTranslation();',
-  'formatLocalizedDateTime(dataUpdatedAt, locale)',
+  'formatLocalizedDateTime(lastAnalysisRefreshedAt, locale)',
   'formatLocalizedNumber(rows.length, locale)',
   "formatLocalizedNumber((pagination?.offset || 0) + 1, locale)",
   "formatLocalizedNumber(pagination?.total || rows.length, locale)",

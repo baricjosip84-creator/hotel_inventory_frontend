@@ -125,9 +125,10 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/probabilistic-forecasting',
         label: 'Probabilistic Forecasting',
-        description: 'Read-only review of forecast models, uncertainty ranges, risk probabilities, actual outcomes, and manual confidence checks.',
+        description: 'Review versioned forecast snapshots, empirical demand ranges, stockout risk, actual outcomes, and governed confidence checks.',
         section: 'Command',
-        permission: TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
+        permission: TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ,
+        requiredPermissions: [TENANT_PERMISSIONS.INSIGHTS_READ]
       },
       {
         to: '/cross-domain-optimization',

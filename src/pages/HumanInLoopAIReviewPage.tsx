@@ -8897,6 +8897,7 @@ export default function HumanInLoopAIReviewPage() {
                     {capabilities.canGovernDecisionIntelligence
                       && capabilities.canCreateExecutionRequests
                       && lifecycle?.current_status === 'approved_for_manual_action'
+                      && review.source_reference?.source_type !== 'probabilistic_forecast_model'
                       && sourceActionId ? (
                         <button
                           className="button button--primary"
