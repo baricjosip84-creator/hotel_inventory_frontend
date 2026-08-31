@@ -50,6 +50,10 @@ type ForecastModelRecord = {
   uncertainty_method?: string;
   confidence_score?: number | string | null;
   version?: number | string | null;
+  demand_history_complete?: boolean;
+  demand_classification_coverage_ratio?: number | string | null;
+  observation_days?: number | string | null;
+  backtest_history_sufficient?: boolean;
   source_reference?: { version?: number | string | null; [key: string]: unknown };
   created_at?: string;
   updated_at?: string;
@@ -167,6 +171,7 @@ type FocusedForecastEvidence = {
   intervals: ForecastIntervalRecord[];
   risk_probabilities: ForecastRiskRecord[];
   calibration: ForecastCalibrationRecord[];
+  pagination?: { intervals?: ForecastPagination; risk_probabilities?: ForecastPagination; calibration?: ForecastPagination };
   is_current_lineage_version?: boolean;
   source_model_id?: string;
 };
@@ -739,8 +744,15 @@ export default function ProbabilisticForecastingPage() {
 
 
   const focusedEvidenceQuery = useQuery({
-    queryKey: ['probabilistic-forecasting-source', focusedModelId],
-    queryFn: () => apiRequest<FocusedForecastEvidence>(`/decision-intelligence/probabilistic-forecasting-source/${focusedModelId}`),
+    queryKey: ['probabilistic-forecasting-source', focusedModelId, filters.limit, offsets.interval_offset, offsets.risk_offset, offsets.calibration_offset],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      params.set('limit', filters.limit);
+      params.set('interval_offset', String(offsets.interval_offset));
+      params.set('risk_offset', String(offsets.risk_offset));
+      params.set('calibration_offset', String(offsets.calibration_offset));
+      return apiRequest<FocusedForecastEvidence>(`/decision-intelligence/probabilistic-forecasting-source/${focusedModelId}?${params.toString()}`);
+    },
     enabled: Boolean(focusedModelId)
   });
 
@@ -952,6 +964,15 @@ export default function ProbabilisticForecastingPage() {
                   <td>
                     <strong>{model.title || formatLabel(model.model_key)}</strong>
                     {(model.version ?? model.source_reference?.version) ? <span className="forecast-table__subtext">{ui('Version')} {formatLocalizedNumber(Number(model.version ?? model.source_reference?.version), locale)}</span> : null}
+                    {model.demand_history_complete === false ? (
+                      <span className="forecast-table__subtext">
+                        {ui('Demand history is incomplete because some legacy stock reductions are unclassified. This forecast remains in observation until source coverage is sufficient.')}
+                        {model.demand_classification_coverage_ratio !== null && model.demand_classification_coverage_ratio !== undefined
+                          ? ` ${ui('Classification coverage')} ${formatPercentage(model.demand_classification_coverage_ratio, locale)}.`
+                          : ''}
+                      </span>
+                    ) : null}
+                    {model.backtest_history_sufficient === false ? <span className="forecast-table__subtext">{ui('Not enough prior history is available for a reliable backtest. This forecast remains in observation while more real usage history accumulates.')}</span> : null}
                     {model.summary ? <span className="forecast-table__subtext">{model.summary}</span> : null}
                   </td>
                   <td>{formatCanonicalLabel(model.model_domain, ui)}</td>
@@ -969,7 +990,7 @@ export default function ProbabilisticForecastingPage() {
             iconPath="/insights"
             description={ui('Expected values and empirical lower-to-upper error bands produced from historical forecast error. These are advisory error bands, not statistical confidence intervals or p10/p90 quantiles.')} 
             rows={evidenceIntervals as Array<Record<string, unknown>>}
-            pagination={focusedEvidence ? undefined : data?.pagination?.intervals}
+            pagination={focusedEvidence ? focusedEvidence.pagination?.intervals : data?.pagination?.intervals}
             onPrevious={() => movePage('interval_offset', -1)} onNext={() => movePage('interval_offset', 1)}
             headers={['Model', 'Range', 'Unit', 'Period starts', 'Period ends', 'Evidence confidence', 'Generated']}
             renderRow={(row, index) => {
@@ -995,7 +1016,7 @@ export default function ProbabilisticForecastingPage() {
             iconPath="/alerts"
             description="Stored estimates of how likely a specific business risk is, together with its possible severity."
             rows={evidenceRiskProbabilities as Array<Record<string, unknown>>}
-            pagination={focusedEvidence ? undefined : data?.pagination?.risk_probabilities}
+            pagination={focusedEvidence ? focusedEvidence.pagination?.risk_probabilities : data?.pagination?.risk_probabilities}
             onPrevious={() => movePage('risk_offset', -1)} onNext={() => movePage('risk_offset', 1)}
             headers={['Model', 'Area', 'Risk', 'Probability', 'Severity', 'Explanation', 'Observed']}
             renderRow={(row, index) => {
@@ -1021,7 +1042,7 @@ export default function ProbabilisticForecastingPage() {
             iconPath="/decision-learning-feedback"
             description="Comparisons between predicted and actual values used to understand forecast error and whether an uncertainty range captured the result."
             rows={evidenceCalibration as Array<Record<string, unknown>>}
-            pagination={focusedEvidence ? undefined : data?.pagination?.calibration}
+            pagination={focusedEvidence ? focusedEvidence.pagination?.calibration : data?.pagination?.calibration}
             onPrevious={() => movePage('calibration_offset', -1)} onNext={() => movePage('calibration_offset', 1)}
             headers={['Model', 'Observation', 'Type', 'Predicted', 'Actual', 'Error', 'Inside range', 'Calibration', 'Measured']}
             renderRow={(row, index) => {
