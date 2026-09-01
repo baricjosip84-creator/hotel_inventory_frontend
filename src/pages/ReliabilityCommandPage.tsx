@@ -452,7 +452,7 @@ export default function ReliabilityCommandPage() {
 
       <section className="reliability-summary-grid io-workspace-stats" aria-label={ui('Reliability summary')}>
         <ReliabilitySummaryCard iconPath="/reliability-command" label="Advisory reliability score" value={formatScore(overview.reliability_score, locale, ui)} copy="Average of current operational pressure and read-only safety checks—not an uptime percentage." tone="blue" />
-        <ReliabilitySummaryCard iconPath="/action-center" label="Overall posture" value={canonicalStatusLabel(overview.readiness, ui)} copy="Current advisory posture across the nine reliability dimensions." tone="green" status={overview.readiness} />
+        <ReliabilitySummaryCard iconPath="/action-center" label="Overall posture" value={canonicalStatusLabel(overview.readiness, ui)} copy="Current advisory posture across the permitted, assessed operational dimensions." tone="green" status={overview.readiness} />
         <ReliabilitySummaryCard iconPath="/alerts" label="Review risks" value={formatNumber(overview.risk_count ?? risks.length, locale, ui)} copy="Non-ready dimensions matching the selected thresholds." tone="amber" />
         <ReliabilitySummaryCard iconPath="/workflow-composer" label="Manual closure guides" value={formatNumber(overview.closure_review_count, locale, ui)} copy="Generated guidance only. No risk is closed and no signoff is recorded." tone="slate" />
       </section>

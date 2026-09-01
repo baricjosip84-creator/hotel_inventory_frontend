@@ -136,5 +136,8 @@ for(const required of [
   "ui('No incident or notification')",
   "ui('No monitoring activation')"
 ])if(!pageSource.includes(required))fail(`Reliability Command read-only/governance contract missing: ${required}`);
+if(!pageSource.includes('Current advisory posture across the permitted, assessed operational dimensions.'))fail('Reliability Command overall posture copy must describe only permitted, assessed operational dimensions.');
+if(pageSource.includes('Current advisory posture across the nine reliability dimensions.'))fail('Reliability Command must not imply the overall posture scores all nine dimensions when unassessed/meta dimensions are excluded.');
+if(!process.exitCode)pass('Reliability Command overall posture copy matches the actual permitted/assessed scoring contract.');
 if(/\buseMutation\b/.test(pageSource)||/method:\s*['"](?:POST|PUT|PATCH|DELETE)['"]/.test(pageSource))fail('Reliability Command page unexpectedly contains a mutation path.');else pass('Reliability Command remains a read-only manual review workspace with source workflows authoritative.');
 if(!process.exitCode)pass('ReliabilityCommandPage staged multilingual conversion is complete.');
