@@ -123,32 +123,24 @@ const display = [
 for (const value of display) if (!slice.includes(value)) fail(`Localized production enablement/monitoring display mapping missing: ${value}`);
 if (!process.exitCode) pass('Known manifest, monitoring, priority, signoff, validation, and cadence states use localized display mapping.');
 
-const serverData = [
-  'enablementManifestQuery.error.message',
-  'enablementManifest?.global_enablement_rule || ui(',
+const systemPresentation = [
+  'localizedReadinessSystemText(enablementManifest.global_enablement_rule, ui)',
   'enablementSequence.map((item)',
-  'feature.feature_label || formatLabel(feature.feature_key)',
-  'feature.operator_enablement_note',
-  'monitoringContractQuery.error.message',
-  'monitoringContract?.safety_rule || ui(',
+  'localizedReadinessSystemText(item, ui)',
+  'localizedReadinessSystemText(feature.feature_label, ui)',
+  'localizedReadinessSystemText(feature.operator_enablement_note, ui)',
+  'localizedReadinessSystemText(monitoringContract.safety_rule, ui)',
   'monitoringChecks.slice(0, 6).map((check)',
-  'feature.operator_response',
-  'monitoringEscalationRules.slice(0, 4).map((rule)'
+  'localizedReadinessSystemText(check, ui)',
+  'localizedReadinessSystemText(feature.operator_response, ui)',
+  'monitoringEscalationRules.slice(0, 4).map((rule)',
+  'localizedReadinessSystemText(rule, ui)'
 ];
-for (const value of serverData) if (!slice.includes(value)) fail(`Expected backend/business production enablement/monitoring data boundary missing: ${value}`);
-for (const value of [
-  'ui(enablementManifestQuery.error.message)',
-  'ui(enablementManifest?.global_enablement_rule)',
-  'ui(item)',
-  'ui(feature.feature_label)',
-  'ui(feature.operator_enablement_note)',
-  'ui(monitoringContractQuery.error.message)',
-  'ui(monitoringContract?.safety_rule)',
-  'ui(check)',
-  'ui(feature.operator_response)',
-  'ui(rule)'
-]) if (slice.includes(value)) fail(`Backend-returned production enablement/monitoring data must not be blindly translated: ${value}`);
-if (!process.exitCode) pass('Rules, sequences, feature labels, operator notes/responses, monitoring checks, escalation rules, and API errors remain backend/business data.');
+for (const value of systemPresentation) if (!slice.includes(value)) fail(`System-owned enablement/monitoring localization missing: ${value}`);
+const preservedData = ['enablementManifestQuery.error.message', 'monitoringContractQuery.error.message'];
+for (const value of preservedData) if (!slice.includes(value)) fail(`Enablement/monitoring API-error boundary missing: ${value}`);
+for (const value of ['ui(enablementManifestQuery.error.message)', 'ui(monitoringContractQuery.error.message)', 'localizedReadinessSystemText(enablementManifestQuery.error.message', 'localizedReadinessSystemText(monitoringContractQuery.error.message']) if (slice.includes(value)) fail(`API errors must remain untranslated: ${value}`);
+if (!process.exitCode) pass('System-owned enablement/monitoring rules, labels, notes and escalation guidance are localized while API errors remain data.');
 
 const canonical = [
   'production_enablement_blocked',

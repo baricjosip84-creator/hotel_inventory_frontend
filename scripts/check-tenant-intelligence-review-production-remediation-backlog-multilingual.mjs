@@ -124,28 +124,18 @@ const display = [
 for (const value of display) if (!slice.includes(value)) fail(`Localized remediation/backlog display mapping missing: ${value}`);
 if (!process.exitCode) pass('Known remediation statuses, priorities, workstreams, evidence risks, and backlog statuses use localized display mapping.');
 
-const serverData = [
-  'remediationWorkbenchQuery.error.message',
-  '<strong>{action.feature_label}</strong>: {action.gap}',
-  'action.target_endpoints.slice(0, 3).join',
-  'gap.table_name',
-  'action.acceptance_criteria[0].label',
-  'action.suggested_validation.slice(0, 2).join',
-  '<strong>{item.feature_label}</strong>: {item.gap}'
+const systemPresentation = [
+  'localizedReadinessSystemText(action.feature_label, ui)',
+  'localizedReadinessSystemText(action.gap, ui)',
+  'localizedReadinessSystemText(action.acceptance_criteria[0].label, ui)',
+  'localizedReadinessSystemText(item.feature_label, ui)',
+  'localizedReadinessSystemText(item.gap, ui)'
 ];
-for (const value of serverData) if (!slice.includes(value)) fail(`Expected backend/business remediation data boundary missing: ${value}`);
-for (const value of [
-  'ui(remediationWorkbenchQuery.error.message)',
-  'ui(action.feature_label)',
-  'ui(action.gap)',
-  'ui(endpoint)',
-  'ui(gap.table_name)',
-  'ui(action.acceptance_criteria[0].label)',
-  'ui(action.suggested_validation',
-  'ui(item.feature_label)',
-  'ui(item.gap)'
-]) if (slice.includes(value)) fail(`Backend-returned remediation/backlog data must not be blindly translated: ${value}`);
-if (!process.exitCode) pass('Feature labels, gaps, endpoints, evidence-table names, acceptance criteria, validation commands, and API errors remain backend/business data.');
+for (const value of systemPresentation) if (!slice.includes(value)) fail(`System-owned remediation/backlog localization missing: ${value}`);
+const preservedData = ['remediationWorkbenchQuery.error.message', 'action.target_endpoints.slice(0, 3).join', 'gap.table_name', 'action.suggested_validation.slice(0, 2).join'];
+for (const value of preservedData) if (!slice.includes(value)) fail(`Remediation technical/error boundary missing: ${value}`);
+for (const value of ['ui(remediationWorkbenchQuery.error.message)', 'localizedReadinessSystemText(gap.table_name', 'localizedReadinessSystemText(action.suggested_validation']) if (slice.includes(value)) fail(`Endpoints, table names, validation commands, and API errors must remain untranslated: ${value}`);
+if (!process.exitCode) pass('System-owned remediation labels/gaps/acceptance criteria are localized while endpoints, table names, validation commands, and API errors remain data.');
 
 const canonical = [
   'open_remediation_actions',

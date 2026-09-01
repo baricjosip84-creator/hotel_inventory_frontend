@@ -75,9 +75,9 @@ const requiredPresentation = [
   'ui("Override guidance")',
   'ui("Approval guidance")',
   'ui("Safety contract")',
-  'guidance.confidence_guidance || ui("Confidence is advisory only and never authorizes automatic execution.")',
-  'guidance.override_guidance || ui("Overrides must be captured in governed source workflows.")',
-  'guidance.approval_guidance || ui("Approvals must be completed in existing governed workflows.")',
+  `localizedIntelligenceReviewSystemText(guidance.confidence_guidance_key, guidance.confidence_guidance, 'Confidence is advisory only and never authorizes automatic execution.', ui)`,
+  `localizedIntelligenceReviewSystemText(guidance.override_guidance_key, guidance.override_guidance, 'Overrides must be captured in governed source workflows.', ui)`,
+  `localizedIntelligenceReviewSystemText(guidance.approval_guidance_key, guidance.approval_guidance, 'Approvals must be completed in existing governed workflows.', ui)`,
   'safetyEntries.map(([key]) => ui(formatLabel(key))).join(\' · \')',
   'ui("No mutation, execution, approval, or override is performed by this endpoint.")'
 ];
@@ -99,19 +99,19 @@ const forbidden = [
 for (const value of forbidden) if (slice.includes(value)) fail(`English-only Governance and Safety presentation remains: ${value}`);
 if (!process.exitCode) pass('No English-only Governance and Safety presentation remains in the terminal section.');
 
-const serverData = [
-  'guidance.confidence_guidance || ui(',
-  'guidance.override_guidance || ui(',
-  'guidance.approval_guidance || ui(',
+const keyedServerPresentation = [
+  'guidance.confidence_guidance_key',
+  'guidance.override_guidance_key',
+  'guidance.approval_guidance_key',
   'Object.entries(response?.definition?.safety_contract || {}).filter(([, enabled]) => enabled)'
 ];
-for (const value of serverData) if (!pageSource.includes(value)) fail(`Expected backend governance/safety data boundary missing: ${value}`);
+for (const value of keyedServerPresentation) if (!pageSource.includes(value)) fail(`Expected keyed governance/safety contract missing: ${value}`);
 for (const value of [
   'ui(guidance.confidence_guidance)',
   'ui(guidance.override_guidance)',
   'ui(guidance.approval_guidance)'
 ]) if (slice.includes(value)) fail(`Backend-returned governance guidance must not be blindly translated: ${value}`);
-if (!process.exitCode) pass('Backend-returned confidence, override, and approval guidance remain raw server data when present.');
+if (!process.exitCode) pass('System-owned confidence, override, and approval guidance uses explicit backend presentation keys; safety-contract technical keys remain canonical data.');
 
 if (!slice.includes('ui(formatLabel(key))')) fail('Safety-contract technical keys are not localized only at the display-label boundary.');
 else pass('Canonical safety-contract keys remain technical data while their generated display labels are localized.');

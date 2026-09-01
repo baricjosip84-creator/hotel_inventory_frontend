@@ -114,7 +114,7 @@ for (const contract of displayContracts) if (!sliceSource.includes(contract)) fa
 if (!process.exitCode) pass('Known priorities, tiers, closure/prevention states, owner hints, and cadences use localized display mapping.');
 
 const canonicalContracts = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   "'runtime_post_enablement_incident_closure_board'", "'runtime_post_enablement_prevention_verification_backlog'", "'runtime_post_enablement_rollout_resume_authorization_ledger'",
   'incident_closure_blocked_until_runtime_gaps_and_incident_response_controls_are_closed',
   'manual_incident_closure_ready_after_incident_response_queue',

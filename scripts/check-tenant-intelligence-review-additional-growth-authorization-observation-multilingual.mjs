@@ -98,7 +98,7 @@ for (const value of display) if (!slice.includes(value)) fail(`Localized display
 if (!process.exitCode) pass('Known states, owners, and additional-growth cadences use localized display mapping.');
 
 const canonical = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   "'runtime_post_enablement_additional_growth_authorization_board'","'runtime_post_enablement_additional_growth_observation_board'","'runtime_post_enablement_further_growth_exit_criteria_board'",
   'additional_growth_authorization_blocked_until_next_wave_observation_and_runtime_gap_controls_are_closed',
   'manual_additional_growth_authorization_ready_after_next_wave_observation_acceptance',

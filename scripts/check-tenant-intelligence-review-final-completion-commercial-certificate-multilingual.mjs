@@ -98,7 +98,7 @@ for (const value of display) if (!slice.includes(value)) fail(`Localized display
 if (!process.exitCode) pass('Known final-freeze/certificate states and owner hints use localized display mapping.');
 
 const canonical = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   "'final_completion_freeze_manifest'", "'commercial_completion_certificate'", "'contract_freeze_manifest'",
   'final_completion_freeze_blocked_until_final_governance_audit_is_ready',
   'manual_final_completion_freeze_ready_for_owner_acceptance',

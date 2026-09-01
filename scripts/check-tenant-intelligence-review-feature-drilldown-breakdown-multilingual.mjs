@@ -144,40 +144,23 @@ const display = [
 for (const value of display) if (!slice.includes(value)) fail(`Localized feature drilldown/breakdown display mapping missing: ${value}`);
 if (!process.exitCode) pass('Known feature categories, statuses, priorities, workstreams, and evidence states use localized display mapping.');
 
-const serverData = [
-  '<option key={feature.key} value={feature.key}>{feature.label}</option>',
-  'featureDetailQuery.error.message',
-  'selectedFeature?.label',
-  'featureDetail?.operator_summary?.headline',
-  'featureDetail?.operator_summary?.evidence_meaning',
-  'featureDetail?.operator_summary?.next_required_completion',
-  'selectedFeature.implemented_capabilities.map((capability)',
-  '<li key={capability}>{capability}</li>',
-  '<strong>{item.gap}</strong>',
-  '{criterion.label}',
-  '{criterion.verification}',
-  '<td>{table.table_name}</td>',
-  'featureDetail?.operator_summary?.safety_position',
-  '<strong>{feature.label}</strong>',
-  'feature.completion_gaps?.[0]'
+const systemPresentation = [
+  '<option key={feature.key} value={feature.key}>{localizedReadinessSystemText(feature.label, ui)}</option>',
+  'localizedReadinessSystemText(selectedFeature.label, ui)',
+  "ui('{feature}: {status}; {count} tenant evidence rows.')",
+  'localizedReadinessSystemText(featureDetail?.operator_summary?.next_required_completion, ui)',
+  'localizedReadinessSystemText(capability, ui)',
+  'localizedReadinessSystemText(item.gap, ui)',
+  'localizedReadinessSystemText(criterion.label, ui)',
+  'localizedReadinessSystemText(criterion.verification, ui)',
+  'localizedReadinessSystemText(featureDetail?.operator_summary?.safety_position, ui)',
+  'localizedReadinessSystemText(feature.label, ui)'
 ];
-for (const value of serverData) if (!slice.includes(value)) fail(`Expected backend/business feature data boundary missing: ${value}`);
-for (const value of [
-  'ui(feature.label)',
-  'ui(featureDetailQuery.error.message)',
-  'ui(selectedFeature?.label)',
-  'ui(featureDetail?.operator_summary?.headline)',
-  'ui(featureDetail?.operator_summary?.evidence_meaning)',
-  'ui(featureDetail?.operator_summary?.next_required_completion)',
-  'ui(capability)',
-  'ui(item.gap)',
-  'ui(criterion.label)',
-  'ui(criterion.verification)',
-  'ui(table.table_name)',
-  'ui(featureDetail?.operator_summary?.safety_position)',
-  'ui(feature.completion_gaps?.[0])'
-]) if (slice.includes(value)) fail(`Backend-returned feature data must not be blindly translated: ${value}`);
-if (!process.exitCode) pass('Feature labels, capabilities, gaps, acceptance criteria, table names, operator summaries, and API errors remain backend/business data.');
+for (const value of systemPresentation) if (!slice.includes(value)) fail(`System-owned feature drilldown localization missing: ${value}`);
+const preservedData = ['featureDetailQuery.error.message', '<td>{table.table_name}</td>'];
+for (const value of preservedData) if (!slice.includes(value)) fail(`Feature drilldown technical/error boundary missing: ${value}`);
+for (const value of ['ui(featureDetailQuery.error.message)', 'localizedReadinessSystemText(table.table_name']) if (slice.includes(value)) fail(`Table names and API errors must remain untranslated: ${value}`);
+if (!process.exitCode) pass('System-owned feature labels/capabilities/gaps/criteria are localized while evidence table names and API errors remain data.');
 
 const canonical = [
   'tenant_data_present',

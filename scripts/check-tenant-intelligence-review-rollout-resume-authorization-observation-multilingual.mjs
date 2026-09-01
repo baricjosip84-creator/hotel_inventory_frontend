@@ -113,7 +113,7 @@ for (const contract of displayContracts) if (!sliceSource.includes(contract)) fa
 if (!process.exitCode) pass('Known priorities, tiers, authorization/observation states, owner hints, and cadence/window policies use localized display mapping.');
 
 const canonicalContracts = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   "'runtime_post_enablement_rollout_resume_authorization_ledger'", "'runtime_post_enablement_rollout_resume_observation_board'", "'runtime_post_enablement_rollout_scope_expansion_authorization_board'",
   'rollout_resume_authorization_blocked_until_prevention_verification_and_runtime_gap_controls_are_closed',
   'manual_rollout_resume_authorization_ready_after_prevention_verification_backlog',

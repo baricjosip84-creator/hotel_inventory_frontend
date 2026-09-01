@@ -95,7 +95,7 @@ for (const value of display) if (!slice.includes(value)) fail(`Localized display
 if (!process.exitCode) pass('Known states and owners use localized display mapping.');
 
 const canonical = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   "'runtime_post_enablement_further_growth_exit_criteria_board'", "'runtime_post_enablement_steady_state_certification_board'", "'runtime_post_enablement_steady_state_monitoring_cadence_board'",
   'further_growth_exit_blocked_until_additional_growth_observation_and_runtime_gap_controls_are_closed',
   'manual_further_growth_exit_ready_after_additional_growth_observation_acceptance',

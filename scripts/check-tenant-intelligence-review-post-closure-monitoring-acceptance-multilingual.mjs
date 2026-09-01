@@ -108,7 +108,7 @@ for (const contract of displayContracts) if (!sliceSource.includes(contract)) fa
 if (!process.exitCode) pass('Known priorities, tiers, monitoring/acceptance states, owner hints, and monitoring cadence use localized display mapping.');
 
 const canonicalContracts = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   "'runtime_post_closure_monitoring_plan'", "'runtime_post_closure_evidence_acceptance_gate'", "'runtime_broad_release_readiness_board'",
   'monitoring_blocked_until_runtime_gaps_are_closed_or_time_boxed_waiver_is_recorded',
   'post_closure_monitoring_ready_for_operator_execution',

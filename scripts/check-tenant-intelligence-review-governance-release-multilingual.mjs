@@ -89,7 +89,7 @@ for (const contract of localeContracts) if (!sliceSource.includes(contract)) fai
 if (!process.exitCode) pass('Governance/release scores, counts, percentages, and sequence numbers use the selected application locale.');
 
 const canonicalContracts = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   "'governance_dashboard'", "'commercial_release_gate'", "'commercial_release_evidence_dossier'",
   'commercial_enablement_blocked', 'commercial_ai_release_requires_governance_waiver', 'release_evidence_ready_for_operator_review',
   'unified_ai_commercial_release_gate', 'production_release_decision_board'
@@ -104,17 +104,19 @@ const forbiddenTechnicalTranslation = [
 for (const pattern of forbiddenTechnicalTranslation) if (pageSource.includes(pattern)) fail(`Canonical governance/release identifier must remain language-independent: ${pattern}`);
 if (!process.exitCode) pass('Readiness endpoint, panel keys, canonical states, and evidence-source identifiers remain language-independent.');
 
-const serverDataContracts = [
-  '<h3 style={{ marginTop: 0 }}>{action.source_label}</h3>', '<p className="card__subtext">{action.required_resolution}</p>',
-  '<h3 style={{ marginTop: 0 }}>{action.check_label}</h3>',
-  '<h3 style={{ marginTop: 0 }}>{artifact.artifact_label}</h3>', '<p className="card__subtext">{artifact.required_artifact}</p>'
+const localizedSystemContracts = [
+  'localizedReadinessSystemText(action.source_label, ui)',
+  'localizedReadinessSystemText(action.required_resolution, ui)',
+  'localizedReadinessSystemText(action.check_label, ui)',
+  'localizedReadinessSystemText(artifact.artifact_label, ui)',
+  'localizedReadinessSystemText(artifact.required_artifact, ui)'
 ];
-for (const contract of serverDataContracts) if (!sliceSource.includes(contract)) fail(`Backend governance/release-data boundary changed: ${contract}`);
+for (const contract of localizedSystemContracts) if (!sliceSource.includes(contract)) fail(`System-owned governance/release presentation is not localized explicitly: ${contract}`);
 const forbiddenServerTranslation = [
   'ui(action.source_label)', 'ui(action.required_resolution)', 'ui(action.check_label)', 'ui(artifact.artifact_label)', 'ui(artifact.required_artifact)'
 ];
 for (const pattern of forbiddenServerTranslation) if (sliceSource.includes(pattern)) fail(`Backend-returned governance/release content must not be blindly translated: ${pattern}`);
-if (!process.exitCode) pass('Backend action labels/resolutions and release-artifact labels/requirements remain data.');
+if (!process.exitCode) pass('System-owned governance/release labels, resolutions, and artifact requirements use the explicit readiness localization boundary.');
 
 if (!sliceSource.includes('readinessCoreLabel(aiGovernanceDashboard?.governance_state, ui)')) fail('Governance state must use canonical localized display mapping.');
 if (!sliceSource.includes('readinessCoreLabel(aiCommercialReleaseGate?.release_gate_state, ui)')) fail('Release-gate state must use canonical localized display mapping.');

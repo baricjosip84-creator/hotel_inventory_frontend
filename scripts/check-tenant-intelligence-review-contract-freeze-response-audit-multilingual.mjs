@@ -97,7 +97,7 @@ for (const value of display) if (!slice.includes(value)) fail(`Localized display
 if (!process.exitCode) pass('Known contract and runtime-anchor states use localized display mapping.');
 
 const canonical = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   "'contract_freeze_manifest'", "'response_contract_audit'",
   'freeze_drift_detected', 'freeze_manifest_aligned', 'contract_drift_detected', 'contract_frozen_and_aligned',
   'frontend_panel_contract_manifest_aligned', 'frontend_runtime_dom_anchor_manifest_aligned'

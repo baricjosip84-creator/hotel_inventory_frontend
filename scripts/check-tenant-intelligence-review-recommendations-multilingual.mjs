@@ -68,7 +68,7 @@ else pass(`${representativeRows.length} representative recommendation rows are p
 if (!pageSource.includes('useAppTranslation()')) fail('Intelligence Review must use the shared translation context.');
 if (!pageSource.includes('formatLocalizedDateTime(date, locale)')) fail('Recommendation timestamps must use locale-aware date/time formatting.');
 if (!pageSource.includes('formatLocalizedNumber(Math.round(value * 100), locale)')) fail('Recommendation confidence percentages must use locale-aware number formatting.');
-if (!pageSource.includes('formatLocalizedNumber(numberValue(summary.active_reviews), locale)')) fail('Recommendation KPI counts must use locale-aware number formatting.');
+if (!pageSource.includes('if (hasReviewSnapshot) return formatLocalizedNumber(numberValue(value), locale);')) fail('Recommendation KPI counts must use locale-aware number formatting without false zeroes when unavailable.');
 if (pageSource.includes('date.toLocaleString()')) fail('Intelligence Review must not use browser-default timestamp formatting.');
 if (!process.exitCode) pass('Recommendation timestamps, confidence percentages, versions, and shared KPI counts use the selected application locale.');
 
@@ -89,11 +89,12 @@ if (recommendationStart < 0 || recommendationEnd < 0) {
 
 
 const usabilityContracts = [
-  'formatLocalizedNumber(numberValue(summary.active_reviews), locale)',
+  'if (hasReviewSnapshot) return formatLocalizedNumber(numberValue(value), locale);',
   'reviewStateIsActive(lifecycle?.current_status || review.review_state)',
   'delete next[sourceActionId]',
   'dateInputEndOfDayIso(draft.escalation_due_at)',
-  "option.value === 'escalated' && isEscalatedReview ? 'Update escalation' : option.label",
+  "option.value === 'escalated' && isEscalatedReview ? 'Update escalation' : isForecastReview && option.value === 'approved_for_manual_action' ? 'Approve for advisory use' : option.label",
+  'setSelectedHistorySourceActionId(requestedSourceActionId)',
   'currentRoleOwnsEscalation',
   'adminCanReassignEscalation',
   "event.actor_name || (event.actor_role ? recommendationLabel(event.actor_role, ui)",
@@ -113,7 +114,7 @@ const forbiddenTechnicalTranslation = [
 for (const pattern of forbiddenTechnicalTranslation) if (pageSource.includes(pattern)) fail(`Canonical Intelligence Review value must remain language-independent: ${pattern}`);
 
 const apiContracts = [
-  "new URLSearchParams({ limit: '75' })", "params.set('ai_operation_domain', aiOperationDomain)", "params.set('review_state', reviewState)", "params.set('urgency', urgency)",
+  "new URLSearchParams({ limit: sourceActionId ? '1' : '75' })", "params.set('ai_operation_domain', aiOperationDomain)", "params.set('review_state', reviewState)", "params.set('urgency', urgency)",
   'apiRequest<HumanAIReviewResponse>(`/operational-action-center/human-in-loop-ai-operations-summary?${params.toString()}`)',
   '`/operational-action-center/human-in-loop-ai-reviews/${encodeURIComponent(sourceActionId)}/history`',
   '`/operational-action-center/human-in-loop-ai-reviews/${encodeURIComponent(sourceActionId)}/decision`',
@@ -130,8 +131,9 @@ for (const contract of routerContracts) if (!routerSource.includes(contract)) fa
 if (!process.exitCode) pass('Recommendation query filters, lifecycle mutations, route, and permission contracts remain language-independent.');
 
 const serverDataContracts = [
-  '<h3>{review.title || review.review_id}</h3>', "review.summary || ui('No review summary was provided.')", '<p className="card__subtext">{evidencePreview.preview_summary}</p>',
-  "guidance.review_queue_guidance || ui('Review source confidence, explainability, structured evidence, and approval requirements before acting elsewhere.')",
+  "<h3>{review.title || ui('Intelligence review')}</h3>", "review.summary || ui('No review summary was provided.')",
+  'localizedReviewEvidenceSummary(evidencePreview, locale, ui)',
+  "localizedIntelligenceReviewSystemText(guidance.review_queue_guidance_key, guidance.review_queue_guidance, 'Review source confidence, explainability, structured evidence, and approval requirements before acting elsewhere.', ui)",
   "review.explainability_review.primary_factors.map(formatLabel).join(' · ')", 'lifecycle.reviewer_notes', 'lifecycle.override_reason',
   'error instanceof Error ? error.message', 'reviewHistoryQuery.error instanceof Error ? reviewHistoryQuery.error.message'
 ];
@@ -141,7 +143,12 @@ const forbiddenServerTranslation = [
   'ui(lifecycle.reviewer_notes)', 'ui(lifecycle.override_reason)', 'ui(error.message)', 'ui(reviewHistoryQuery.error.message)'
 ];
 for (const pattern of forbiddenServerTranslation) if (pageSource.includes(pattern)) fail(`Backend-returned review/business content must not be blindly translated: ${pattern}`);
-if (!process.exitCode) pass('Backend review titles, summaries, evidence, guidance, notes, override text, and API errors remain data.');
+if (!pageSource.includes('INTELLIGENCE_REVIEW_SYSTEM_TEXT')) fail('Keyed repository-owned Intelligence Review system presentation contract is missing.');
+if (!pageSource.includes('preview.preview_summary_key')) fail('Evidence localization must require an explicit backend presentation key.');
+if (!pageSource.includes('guidance.review_queue_guidance_key')) fail('Guidance localization must require an explicit backend presentation key.');
+if (pageSource.includes('{ui("Execution Request draft:\")} {lifecycle.execution_request_id}')) fail('Normal Intelligence Review lifecycle UI must not expose linked Execution Request UUIDs.');
+if (!pageSource.includes('capabilities.canViewExecutionRequests && lifecycle?.execution_request_id')) fail('Linked Execution Request navigation must be permission-aware.');
+if (!process.exitCode) pass('Business review content and API errors remain raw data while explicitly keyed repository-owned guidance/evidence is localized.');
 
 if (!pageSource.includes("activeView === 'readiness'")) fail('Readiness & Governance view must remain available while multilingual conversion is staged.');
 if (!pageSource.includes('data-ai-contract-panel="governance_dashboard"')) fail('The staged Readiness & Governance surface was unexpectedly removed during later multilingual sub-batches.');

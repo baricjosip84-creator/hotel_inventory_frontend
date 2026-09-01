@@ -130,27 +130,19 @@ const display = [
 for (const value of display) if (!slice.includes(value)) fail(`Localized validation/signoff display mapping missing: ${value}`);
 if (!process.exitCode) pass('Known validation/signoff canonical states use localized display mapping.');
 
-const serverData = [
-  'validationSuite?.safety_rule',
-  '<strong>{item.feature_label}</strong>',
+const systemPresentation = [
+  'localizedReadinessSystemText(validationSuite.safety_rule, ui)',
+  'localizedReadinessSystemText(item.feature_label, ui)',
   'validationGlobalAssertions.map((item)',
-  'validationCommands.map((item)',
-  'signoffChecklist?.release_rule',
-  '<strong>{feature.feature_label}</strong>',
-  'validationSuiteQuery.error.message',
-  'signoffChecklistQuery.error.message'
+  'localizedReadinessSystemText(item, ui)',
+  'localizedReadinessSystemText(signoffChecklist.release_rule, ui)',
+  'localizedReadinessSystemText(feature.feature_label, ui)'
 ];
-for (const value of serverData) if (!slice.includes(value)) fail(`Expected backend/business validation/signoff data boundary missing: ${value}`);
-for (const value of [
-  'ui(validationSuite?.safety_rule)',
-  'ui(item.feature_label)',
-  'ui(item)',
-  'ui(signoffChecklist?.release_rule)',
-  'ui(feature.feature_label)',
-  'ui(validationSuiteQuery.error.message)',
-  'ui(signoffChecklistQuery.error.message)'
-]) if (slice.includes(value)) fail(`Backend-returned validation/signoff data must not be blindly translated: ${value}`);
-if (!process.exitCode) pass('Assertions, commands, feature names, server rules, and API errors remain backend/business data.');
+for (const value of systemPresentation) if (!slice.includes(value)) fail(`System-owned validation/signoff localization missing: ${value}`);
+const preservedData = ['validationCommands.map((item)', 'validationSuiteQuery.error.message', 'signoffChecklistQuery.error.message'];
+for (const value of preservedData) if (!slice.includes(value)) fail(`Validation command/API-error boundary missing: ${value}`);
+for (const value of ['localizedReadinessSystemText(validationCommands', 'ui(validationSuiteQuery.error.message)', 'ui(signoffChecklistQuery.error.message)']) if (slice.includes(value)) fail(`Validation commands and API errors must remain untranslated: ${value}`);
+if (!process.exitCode) pass('System-owned validation/signoff rules and assertions are localized while commands and API errors remain data.');
 
 const canonical = [
   'blocked_by_critical_high_evidence_gaps',

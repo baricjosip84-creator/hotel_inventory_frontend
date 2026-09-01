@@ -100,23 +100,18 @@ const display = [
 for (const value of display) if (!slice.includes(value)) fail(`Localized runbook display mapping missing: ${value}`);
 if (!process.exitCode) pass('Known runbook/release/priority/signoff canonical values use localized display mapping.');
 
-const serverData = [
-  'operationalRunbook?.operator_warning',
+const systemPresentation = [
+  'localizedReadinessSystemText(operationalRunbook.operator_warning, ui)',
   'dailyOperatorSequence.map((item)',
-  '<strong>{action.feature_label}</strong>',
-  'action.operator_sequence[0]',
-  'emergencyStopConditions.map((item)',
-  'operationalRunbookQuery.error.message'
+  'localizedReadinessOperatorInstruction(item, locale, ui)',
+  'localizedReadinessSystemText(action.feature_label, ui)',
+  'localizedReadinessOperatorInstruction(action.operator_sequence[0], locale, ui)',
+  'emergencyStopConditions.map((item)'
 ];
-for (const value of serverData) if (!slice.includes(value)) fail(`Expected backend/business runbook data boundary missing: ${value}`);
-for (const value of [
-  'ui(operationalRunbook?.operator_warning)',
-  'ui(item)',
-  'ui(action.feature_label)',
-  'ui(action.operator_sequence[0])',
-  'ui(operationalRunbookQuery.error.message)'
-]) if (slice.includes(value)) fail(`Backend-returned runbook guidance/business/error text must not be blindly translated: ${value}`);
-if (!process.exitCode) pass('Operator warning/sequence/actions/feature names/emergency conditions/API errors remain backend or business data.');
+for (const value of systemPresentation) if (!slice.includes(value)) fail(`System-owned runbook localization missing: ${value}`);
+if (!slice.includes('operationalRunbookQuery.error.message')) fail('Runbook API-error boundary missing.');
+for (const value of ['ui(operationalRunbookQuery.error.message)', 'localizedReadinessSystemText(operationalRunbookQuery.error.message']) if (slice.includes(value)) fail(`Runbook API errors must remain untranslated: ${value}`);
+if (!process.exitCode) pass('System-owned runbook guidance is localized explicitly while API errors remain data.');
 
 const canonical = [
   'final_test_runbook_ready',

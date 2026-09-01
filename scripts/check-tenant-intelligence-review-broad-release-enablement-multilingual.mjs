@@ -108,7 +108,7 @@ for (const contract of displayContracts) if (!sliceSource.includes(contract)) fa
 if (!process.exitCode) pass('Known priorities, tiers, release/enablement states, and owner hints use localized display mapping.');
 
 const canonicalContracts = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   "'runtime_broad_release_readiness_board'", "'runtime_tenant_enablement_control_queue'", "'runtime_post_enablement_health_watchlist'",
   'broad_release_blocked_until_post_closure_evidence_is_accepted_or_waiver_is_time_boxed',
   'manual_broad_release_review_ready_after_evidence_acceptance',

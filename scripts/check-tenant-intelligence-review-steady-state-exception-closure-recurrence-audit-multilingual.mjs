@@ -101,7 +101,7 @@ for (const value of display) if (!slice.includes(value)) fail(`Localized display
 if (!process.exitCode) pass('Known closure/recurrence states and owners use localized display mapping.');
 
 const canonical = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   "'runtime_post_enablement_steady_state_exception_closure_board'", "'runtime_post_enablement_steady_state_exception_recurrence_audit_board'", "'runtime_post_enablement_steady_state_exception_recurrence_resolution_board'",
   'steady_state_exception_closure_blocked_until_exception_review_and_runtime_gap_controls_are_closed',
   'manual_steady_state_exception_closure_ready_after_exception_review_acceptance',

@@ -107,7 +107,7 @@ for (const contract of displayContracts) if (!sliceSource.includes(contract)) fa
 if (!process.exitCode) pass('Known route/runtime statuses, permission display, priorities, and runtime-gap codes use localized display mapping.');
 
 const canonicalContracts = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   "'route_exposure_audit'", "'runtime_coverage_audit'", "'runtime_remediation_worklist'",
   'route_contract_registered', 'frontend_query_contract_aligned', 'frontend_api_path_contract_aligned',
   'DECISION_INTELLIGENCE_READ', 'runtime_coverage_gaps_detected', 'runtime_coverage_contract_present',
@@ -127,7 +127,7 @@ const technicalDataContracts = [
   '<strong>{row.route_path}</strong>', 'row.controller_export', 'row.frontend_query_key', "row.frontend_api_path || '—'",
   "aiRouteExposureAudit?.frontend_api_base_path || '/intelligence-readiness'",
   "aiRouteExposureAudit.misaligned_frontend_api_paths.join(', ')",
-  '<strong>{row.feature_label}</strong>'
+  'localizedReadinessSystemText(row.feature_label, ui)'
 ];
 for (const contract of technicalDataContracts) if (!sliceSource.includes(contract)) fail(`Route/runtime technical/backend-data boundary changed: ${contract}`);
 const forbiddenDataTranslation = [
@@ -135,7 +135,7 @@ const forbiddenDataTranslation = [
   'ui(aiRouteExposureAudit?.frontend_api_base_path)', 'ui(row.feature_label)'
 ];
 for (const pattern of forbiddenDataTranslation) if (sliceSource.includes(pattern)) fail(`Technical/backend route/runtime data must not be blindly translated: ${pattern}`);
-if (!process.exitCode) pass('Route paths, controller exports, frontend query/API paths, and backend feature labels remain canonical data.');
+if (!process.exitCode) pass('Route paths, controller exports, and frontend query/API paths remain canonical technical data while system-owned feature labels use the readiness localization boundary.');
 
 if (sliceSource.includes('apiRequest<') || sliceSource.includes('method:')) fail('Route/runtime audit slice must remain read-only and must not introduce mutation calls.');
 else pass('Route/runtime audit slice remains presentation-only and read-only.');

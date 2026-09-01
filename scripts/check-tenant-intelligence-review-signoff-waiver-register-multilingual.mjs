@@ -109,7 +109,7 @@ for (const contract of displayContracts) if (!sliceSource.includes(contract)) fa
 if (!process.exitCode) pass('Known priorities, signoff/waiver states, cadence, owner hints, and runtime gap codes use localized display mapping.');
 
 const canonicalContracts = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   "'runtime_signoff_evidence_ledger'", "'runtime_waiver_review_register'", "'runtime_waiver_escalation_matrix'",
   'runtime_evidence_ready_for_operator_signoff', 'blocking_runtime_evidence_or_waiver_required',
   'manual_runtime_signoff_waiver_packet_required', 'waiver_review_required_before_commercial_enablement',
@@ -125,20 +125,29 @@ const forbiddenTechnicalTranslation = [
 for (const pattern of forbiddenTechnicalTranslation) if (pageSource.includes(pattern)) fail(`Canonical runtime signoff/waiver identifier must remain language-independent: ${pattern}`);
 if (!process.exitCode) pass('Readiness endpoint, panel keys, status/cadence/owner identifiers, and backend contracts remain language-independent.');
 
-const serverDataContracts = [
-  '<strong>{row.feature_label}</strong>', '<p className="card__subtext">{row.signoff_evidence_statement}</p>',
-  "row.pass_criteria.join(', ')", '<strong>{row.feature_label || row.feature_key}</strong>',
-  "row.minimum_manual_waiver_fields?.join(', ')", '<p className="card__subtext">{row.release_rule}</p>',
-  'row.expiration_control || ui("Not reported")', 'row.renewal_rule || ui("Not reported")',
-  "row.closure_evidence_required.join(', ')", 'readinessQuery.error instanceof ApiError', '? readinessQuery.error.message'
+const localizedSystemContracts = [
+  'localizedReadinessSystemText(row.feature_label, ui)',
+  'localizedReadinessSystemText(row.signoff_evidence_statement, ui)',
+  'localizedReadinessSystemList(row.pass_criteria, ui)',
+  'localizedReadinessSystemText(row.release_rule, ui)'
 ];
-for (const contract of serverDataContracts) if (!pageSource.includes(contract)) fail(`Backend runtime signoff/waiver data boundary changed: ${contract}`);
+for (const contract of localizedSystemContracts) if (!pageSource.includes(contract)) fail(`System-owned runtime signoff presentation is not localized explicitly: ${contract}`);
+const canonicalDataContracts = [
+  '<strong>{row.feature_label || row.feature_key}</strong>',
+  "row.minimum_manual_waiver_fields?.join(', ')",
+  'row.expiration_control || ui("Not reported")',
+  'row.renewal_rule || ui("Not reported")',
+  "row.closure_evidence_required.join(', ')",
+  'readinessQuery.error instanceof ApiError',
+  '? readinessQuery.error.message'
+];
+for (const contract of canonicalDataContracts) if (!pageSource.includes(contract)) fail(`Expected canonical runtime waiver/API data boundary missing: ${contract}`);
 const forbiddenServerTranslation = [
   'ui(row.feature_label)', 'ui(row.signoff_evidence_statement)', 'ui(row.pass_criteria', 'ui(row.minimum_manual_waiver_fields',
   'ui(row.release_rule)', 'ui(row.expiration_control)', 'ui(row.renewal_rule)', 'ui(row.closure_evidence_required', 'ui(readinessQuery.error.message)'
 ];
 for (const pattern of forbiddenServerTranslation) if (sliceSource.includes(pattern)) fail(`Backend-returned runtime signoff/waiver content must not be blindly translated: ${pattern}`);
-if (!process.exitCode) pass('Backend feature labels, evidence statements, waiver-field/artifact codes, release/expiration/renewal rules, pass criteria, and API errors remain data.');
+if (!process.exitCode) pass('System-owned signoff feature labels, evidence statements, release rules, and pass criteria use the readiness localization boundary; canonical waiver fields/rules and API errors remain data.');
 
 if (sliceSource.includes('apiRequest<') || sliceSource.includes('method:')) fail('Runtime signoff/waiver-register slice must remain presentation-only and must not introduce mutation calls.');
 else pass('Runtime signoff/waiver-register slice remains presentation-only and read-only.');

@@ -94,7 +94,7 @@ for (const contract of localeContracts) if (!coreSource.includes(contract)) fail
 if (!process.exitCode) pass('Readiness-core scores, counts, percentages, and sequence numbers use the selected application locale.');
 
 const canonicalContracts = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   "'capability_inventory'", "'risk_scoring'", "'decision_lineage'", "'rollback_orchestration'", "'maturity_self_audit'",
   "production_candidate_needs_tests_and_hardening", "lineage_ready_for_commercial_review", "rollback_needs_operator_confirmation"
 ];
@@ -107,20 +107,23 @@ const forbiddenTechnicalTranslation = [
 for (const pattern of forbiddenTechnicalTranslation) if (pageSource.includes(pattern)) fail(`Canonical readiness identifier must remain language-independent: ${pattern}`);
 if (!process.exitCode) pass('Readiness endpoint, panel keys, and canonical state identifiers remain language-independent.');
 
-const serverDataContracts = [
-  '<h3 style={{ marginTop: 0 }}>{feature.label}</h3>', 'feature.implemented_capabilities.slice(0, 3).join', 'feature.completion_gaps.slice(0, 3).join',
-  '<h3 style={{ marginTop: 0 }}>{gap.capability_label}</h3>', '<p className="card__subtext">{gap.feature_label}</p>', '<p className="card__subtext">{gap.required_resolution}</p>',
-  '<p className="card__subtext">{feature.required_control}</p>', '<p className="card__subtext">{feature.required_lineage_control}</p>',
-  '<h3 style={{ marginTop: 0 }}>{action.check_label}</h3>', '<p className="card__subtext">{action.required_resolution}</p>',
-  'readinessQuery.error instanceof ApiError', '? readinessQuery.error.message'
+const systemPresentationContracts = [
+  'localizedReadinessSystemText(feature.label, ui)',
+  'localizedReadinessSystemList(feature.implemented_capabilities?.slice(0, 3), ui)',
+  'localizedReadinessSystemList(feature.completion_gaps?.slice(0, 3), ui)',
+  'localizedReadinessSystemText(gap.capability_label, ui)',
+  'localizedReadinessSystemText(gap.feature_label, ui)',
+  'localizedReadinessSystemText(gap.required_resolution, ui)',
+  'localizedReadinessSystemText(feature.required_control, ui)',
+  'localizedReadinessLineageControl(feature, ui)',
+  'localizedReadinessSystemText(action.check_label, ui)',
+  'localizedReadinessSystemText(action.required_resolution, ui)'
 ];
-for (const contract of serverDataContracts) if (!coreSource.includes(contract)) fail(`Backend readiness/business-data boundary changed: ${contract}`);
-const forbiddenServerTranslation = [
-  'ui(feature.label)', 'ui(gap.capability_label)', 'ui(gap.feature_label)', 'ui(gap.required_resolution)', 'ui(feature.required_control)',
-  'ui(feature.required_lineage_control)', 'ui(action.check_label)', 'ui(action.required_resolution)', 'ui(readinessQuery.error.message)'
-];
-for (const pattern of forbiddenServerTranslation) if (coreSource.includes(pattern)) fail(`Backend-returned readiness content must not be blindly translated: ${pattern}`);
-if (!process.exitCode) pass('Backend feature labels, capability/gap text, required controls/resolutions, audit actions, and API errors remain data.');
+for (const contract of systemPresentationContracts) if (!coreSource.includes(contract)) fail(`Readiness system-presentation localization missing: ${contract}`);
+const preservedDataContracts = ['readinessQuery.error instanceof ApiError', '? readinessQuery.error.message'];
+for (const contract of preservedDataContracts) if (!coreSource.includes(contract)) fail(`Readiness API-error boundary changed: ${contract}`);
+for (const pattern of ['ui(readinessQuery.error.message)', 'localizedReadinessSystemText(readinessQuery.error.message']) if (coreSource.includes(pattern)) fail(`API errors must remain untranslated: ${pattern}`);
+if (!process.exitCode) pass('Repository-owned readiness guidance is localized explicitly while API errors remain data.');
 
 const routerContracts = ["path: 'intelligence-review'", 'TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ', 'TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ', '<HumanInLoopAIReviewPage />'];
 for (const contract of routerContracts) if (!routerSource.includes(contract)) fail(`Intelligence Review route/permission contract changed: ${contract}`);

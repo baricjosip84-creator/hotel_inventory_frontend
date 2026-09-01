@@ -101,25 +101,23 @@ const display = [
 for (const value of display) if (!slice.includes(value)) fail(`Localized display mapping missing: ${value}`);
 if (!process.exitCode) pass('Known certification, plan, blocker, priority, status, and workstream values use localized display mapping.');
 
-const serverData = [
-  'blocker.feature_label',
-  "auditPack.missing_evidence_tables.slice(0, 10).join(', ')",
+const systemPresentation = [
   'hardeningPlan.release_gate.required_before_production.map((item)',
-  '<h3 style={{ marginTop: 0 }}>{phase.label}</h3>',
-  '<p className="card__subtext">{phase.description}</p>',
-  '<strong>{item.feature_label}</strong>: {item.gap}',
-  'item.acceptance_criteria[0].label',
-  'hardeningPlanQuery.error.message'
+  'localizedReadinessSystemText(item, ui)',
+  'localizedReadinessSystemText(phase.label, ui)',
+  'localizedReadinessSystemText(phase.description, ui)',
+  'localizedReadinessSystemText(item.feature_label, ui)',
+  'localizedReadinessSystemText(item.gap, ui)',
+  'localizedReadinessSystemText(item.acceptance_criteria[0].label, ui)'
 ];
-for (const value of serverData) if (!slice.includes(value)) fail(`Expected backend/business data boundary missing: ${value}`);
-for (const value of [
-  'ui(blocker.feature_label)', 'ui(item)', 'ui(phase.label)', 'ui(phase.description)',
-  'ui(item.feature_label)', 'ui(item.gap)', 'ui(item.acceptance_criteria[0].label)', 'ui(hardeningPlanQuery.error.message)'
-]) if (slice.includes(value)) fail(`Backend-returned business or error text must not be blindly translated: ${value}`);
-if (!process.exitCode) pass('Feature names, table names, hardening rules/phases/gaps/acceptance criteria, and API errors remain backend/business data.');
+for (const value of systemPresentation) if (!slice.includes(value)) fail(`System-owned audit/hardening localization missing: ${value}`);
+const preservedData = ['blocker.feature_label', "auditPack.missing_evidence_tables.slice(0, 10).join(', ')", 'hardeningPlanQuery.error.message'];
+for (const value of preservedData) if (!slice.includes(value)) fail(`Audit/hardening technical or error boundary missing: ${value}`);
+for (const value of ['ui(hardeningPlanQuery.error.message)', 'localizedReadinessSystemText(hardeningPlanQuery.error.message']) if (slice.includes(value)) fail(`API errors must remain untranslated: ${value}`);
+if (!process.exitCode) pass('System-owned hardening rules/phases/gaps are localized while table names and API errors remain data.');
 
 const canonical = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   'production_candidate_pending_final_tests', 'not_production_ready', 'hardening_required', 'no_open_hardening_items',
   'validation_tests', 'governance_safety', 'operator_experience', 'data_evidence', 'workflow_completion',
   'no_tenant_evidence_rows_found', 'workflow_or_hardening_incomplete'

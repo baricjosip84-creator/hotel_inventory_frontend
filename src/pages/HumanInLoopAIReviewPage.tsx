@@ -6,7 +6,7 @@ import { ApiError, apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
-import { getRoleCapabilities } from '../lib/permissions';
+import { getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
@@ -3601,6 +3601,7 @@ type HumanAIReview = {
   simulation_preview?: {
     preview_available?: boolean;
     preview_kind?: string;
+    preview_summary_key?: string | null;
     preview_summary?: string;
     preview_metrics?: Record<string, number | string | boolean | null>;
     preview_execution_mode?: string;
@@ -3722,9 +3723,13 @@ type HumanAIReviewResponse = {
     next_review_id?: string | null;
     next_source_action_id?: string | null;
     next_review_state?: string | null;
+    review_queue_guidance_key?: string | null;
     review_queue_guidance?: string;
+    confidence_guidance_key?: string | null;
     confidence_guidance?: string;
+    override_guidance_key?: string | null;
     override_guidance?: string;
+    approval_guidance_key?: string | null;
     approval_guidance?: string;
     safety_contract?: Record<string, boolean>;
   };
@@ -4489,6 +4494,141 @@ function reviewDecisionValidationMessage(decision: ReviewDecision | undefined, d
   return null;
 }
 
+const INTELLIGENCE_REVIEW_SYSTEM_TEXT: Record<string, string> = {
+  intelligence_review_queue_review_context: 'Review recommendation context, explanation, source confidence, structured evidence, and governance requirements before taking any source-system action.',
+  intelligence_review_queue_no_match: 'No recommendation review items currently match the requested filters.',
+  intelligence_review_confidence_advisory: 'Source confidence is shown only when the originating record reports it; it is advisory and never authorizes automatic execution.',
+  intelligence_review_override_persisted: 'Override reasons and reviewer notes are persisted in the governed Intelligence Review lifecycle when a permitted reviewer records a decision.',
+  intelligence_review_approval_source_specific: 'Permitted reviewers can record governed review decisions here. Any permitted next step depends on the reviewed source type; no operational change occurs automatically.',
+  intelligence_review_evidence_none: 'No structured outcome or comparison evidence is attached to this review item.',
+  intelligence_review_evidence_workflow_metadata: 'The queue contains workflow metadata and confidence only; no simulated outcome payload is attached to this review item.',
+  intelligence_review_evidence_governance_metadata: 'The queue contains governance metadata and confidence only; detailed policy evidence remains in the governed source data.',
+  intelligence_review_evidence_forecast: 'Forecast range, current risk, and observed outcome evidence are available for human review.',
+  intelligence_review_evidence_adaptive_policy: 'Policy evidence and the proposed tuning direction are available for human review.',
+  intelligence_review_evidence_copilot: 'The governed Copilot proposal and its structured evidence are available for human review.',
+  intelligence_review_evidence_persisted_history: 'Persisted review evidence from the governed decision is available for historical review.'
+};
+
+function localizedIntelligenceReviewSystemText(
+  key: string | null | undefined,
+  value: string | null | undefined,
+  fallback: string,
+  ui: (englishText: string) => string
+): string {
+  const canonical = key ? INTELLIGENCE_REVIEW_SYSTEM_TEXT[key] : null;
+  if (canonical) return ui(canonical);
+  const text = String(value || '').trim();
+  return text || ui(fallback);
+}
+
+
+const READINESS_SYSTEM_TECHNICAL_TEXT: Readonly<Record<string, string>> = {
+  block_release_if_backend_required_panel_anchor_is_not_declared_in_frontend_local_manifest:
+    'Block release if the frontend does not declare the required backend panel anchor.',
+  capture_runtime_evidence_rows_or_schema_probe_result:
+    'Capture runtime evidence rows or the schema-probe result.',
+  do_not_enable_unwaived_commercial_ai_for_this_feature_until_runtime_gaps_are_closed_or_a_manual_time_boxed_waiver_packet_is_recorded_outside_this_read_only_audit:
+    'Do not enable unwaived commercial AI for this feature until runtime gaps are closed or a manual time-boxed waiver is recorded outside this read-only audit.',
+  execute_or_observe_existing_non_mutating_feature_workflow:
+    'Execute or observe the existing non-mutating feature workflow.',
+  frontend_panel_must_render_backend_response_key_without_static_placeholder_only:
+    'The frontend panel must render the backend response key rather than only a static placeholder.',
+  open_live_frontend_surface_and_confirm_backend_response_is_rendered:
+    'Open the live frontend surface and confirm the backend response is rendered.',
+  post_enablement_monitoring_owner_must_be_assigned_before_rollout_scope_expands:
+    'Assign a post-enablement monitoring owner before rollout scope expands.',
+  read_only_advisory_only_no_autonomous_execution:
+    'Read-only and advisory-only; no autonomous execution.',
+  rerun_unified_ai_runtime_coverage_audit_and_confirm_gap_closure:
+    'Rerun the unified AI runtime coverage audit and confirm the gaps are closed.',
+  select_real_tenant_and_real_user_role_for_feature:
+    'Select a real tenant and a real user role for the feature.',
+  tenant_enablement_requires_runtime_validation_sample_and_release_owner_manual_approval:
+    'Tenant enablement requires a runtime validation sample and manual approval from the release owner.',
+};
+
+function localizedReadinessSystemText(
+  value: string | null | undefined,
+  ui: (englishText: string) => string
+): string {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  return ui(READINESS_SYSTEM_TECHNICAL_TEXT[text] || text);
+}
+
+function localizedReadinessSystemList(
+  values: Array<string | null | undefined> | null | undefined,
+  ui: (englishText: string) => string
+): string[] {
+  return (values || []).map((value) => localizedReadinessSystemText(value, ui)).filter(Boolean);
+}
+
+function localizedReadinessOperatorInstruction(
+  value: string | null | undefined,
+  locale: AppLocale,
+  ui: (englishText: string) => string
+): string {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  let match = text.match(/^Review (.+) evidence rows and tenant-scoped table coverage\.$/);
+  if (match) {
+    return ui('Review {feature} evidence rows and tenant-scoped table coverage.')
+      .replace('{feature}', localizedReadinessSystemText(match[1], ui));
+  }
+  match = text.match(/^Close or explicitly waive (\d+) open hardening action\(s\)\.$/);
+  if (match) {
+    return ui('Close or explicitly waive {count} open hardening action(s).')
+      .replace('{count}', formatLocalizedNumber(Number(match[1]), locale));
+  }
+  match = text.match(/^Resolve (\d+) required evidence gap\(s\) before production enablement\.$/);
+  if (match) {
+    return ui('Resolve {count} required evidence gap(s) before production enablement.')
+      .replace('{count}', formatLocalizedNumber(Number(match[1]), locale));
+  }
+  match = text.match(/^Capture final signoff result for (.+) in the existing governance process\.$/);
+  if (match) {
+    return ui('Capture final signoff result for {feature} in the existing governance process.')
+      .replace('{feature}', localizedReadinessSystemText(match[1], ui));
+  }
+  return localizedReadinessSystemText(text, ui);
+}
+
+function localizedReadinessLineageControl(
+  row: { missing_lineage_links?: string[]; required_lineage_control?: string },
+  ui: (englishText: string) => string
+): string {
+  const missing = row.missing_lineage_links || [];
+  if (missing.length) {
+    return ui('Complete missing lineage links before commercial enablement: {links}.')
+      .replace('{links}', missing.map((item) => readinessCoreLabel(item, ui)).join(', '));
+  }
+  return ui('Lineage path is registered from evidence tables through backend endpoints and frontend operator surfaces.');
+}
+
+function localizedReviewEvidenceSummary(
+  preview: HumanAIReview['simulation_preview'] | undefined,
+  locale: AppLocale,
+  ui: (englishText: string) => string
+): string {
+  if (!preview) return '';
+  if (preview.preview_summary_key === 'intelligence_review_evidence_simulation_summary') {
+    const metrics = preview.preview_metrics || {};
+    return ui('{outcomes} projected outcome(s), {comparisons} comparison set(s), highest observed risk {risk}.')
+      .replace('{outcomes}', formatLocalizedNumber(Number(metrics.outcome_count || 0), locale))
+      .replace('{comparisons}', formatLocalizedNumber(Number(metrics.comparison_count || 0), locale))
+      .replace('{risk}', recommendationLabel(String(metrics.highest_risk_level || 'low'), ui));
+  }
+  if (preview.preview_summary_key === 'intelligence_review_evidence_optimization_summary') {
+    const metrics = preview.preview_metrics || {};
+    return ui('{options} option(s), {tradeoffs} tradeoff record(s), {governance} governance-review option(s).')
+      .replace('{options}', formatLocalizedNumber(Number(metrics.option_count || 0), locale))
+      .replace('{tradeoffs}', formatLocalizedNumber(Number(metrics.tradeoff_count || 0), locale))
+      .replace('{governance}', formatLocalizedNumber(Number(metrics.governance_review_option_count || 0), locale));
+  }
+  const canonical = preview.preview_summary_key ? INTELLIGENCE_REVIEW_SYSTEM_TEXT[preview.preview_summary_key] : null;
+  return canonical ? ui(canonical) : String(preview.preview_summary || '');
+}
+
 function sourceReviewToAppPath(review: HumanAIReview): string | null {
   const sourceSurface = review.source_reference?.frontend_route
     || review.explainability_review?.source_surface
@@ -4511,6 +4651,7 @@ function sourceReviewToAppPath(review: HumanAIReview): string | null {
     '/cross-domain-optimization',
     '/probabilistic-forecasting',
     '/decision-learning-feedback',
+    '/adaptive-policy-engine',
     '/ai-copilot'
   ]);
 
@@ -4536,8 +4677,8 @@ function sourceReviewToAppPath(review: HumanAIReview): string | null {
 }
 
 
-async function fetchIntelligenceProductionReadiness(): Promise<IntelligenceProductionReadinessResponse> {
-  return apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary');
+async function fetchIntelligenceProductionReadiness(forceRefresh = false): Promise<IntelligenceProductionReadinessResponse> {
+  return apiRequest<IntelligenceProductionReadinessResponse>(`/intelligence-readiness/production-readiness-summary${forceRefresh ? '?refresh=true' : ''}`);
 }
 
 async function fetchIntelligenceProductionReadinessAuditPack(): Promise<IntelligenceProductionReadinessAuditPackResponse> {
@@ -4642,10 +4783,11 @@ export default function HumanInLoopAIReviewPage() {
   const [aiOperationDomain, setAiOperationDomain] = useState<'all' | AIOperationDomain>('all');
   const [reviewState, setReviewState] = useState<'all' | ReviewState>('all');
   const [urgency, setUrgency] = useState<'all' | Urgency>('all');
-  const [selectedReadinessFeatureKey, setSelectedReadinessFeatureKey] = useState<string>('reorder_recommendations');
+  const [selectedReadinessFeatureKey, setSelectedReadinessFeatureKey] = useState<string>('');
   const [selectedHistorySourceActionId, setSelectedHistorySourceActionId] = useState<string | null>(requestedSourceActionId);
   const [reviewDecisionDrafts, setReviewDecisionDrafts] = useState<Record<string, ReviewDecisionDraft>>({});
   const [reviewActionMessage, setReviewActionMessage] = useState<string | null>(null);
+  const [isForcingReadinessRefresh, setIsForcingReadinessRefresh] = useState(false);
   const lastAutoScrolledSourceActionId = useRef<string | null>(null);
 
   const reviewQuery = useQuery({
@@ -4798,10 +4940,22 @@ export default function HumanInLoopAIReviewPage() {
   ];
 
   const activeViewQueries = activeView === 'readiness' ? readinessQueries : recommendationQueries;
-  const isRefreshingActiveView = activeViewQueries.some((query) => query.isFetching);
+  const isRefreshingActiveView = isForcingReadinessRefresh || activeViewQueries.some((query) => query.isFetching);
 
-  const refreshActiveView = () => {
-    void Promise.all(activeViewQueries.map((query) => query.refetch()));
+  const refreshActiveView = async () => {
+    if (activeView !== 'readiness') {
+      await Promise.all(activeViewQueries.map((query) => query.refetch()));
+      return;
+    }
+
+    setIsForcingReadinessRefresh(true);
+    try {
+      const freshReadiness = await fetchIntelligenceProductionReadiness(true);
+      queryClient.setQueryData(['intelligence-production-readiness-summary'], freshReadiness);
+      await Promise.all(readinessQueries.slice(1).map((query) => query.refetch()));
+    } finally {
+      setIsForcingReadinessRefresh(false);
+    }
   };
 
   const selectView = (view: IntelligenceReviewView) => {
@@ -4816,9 +4970,17 @@ export default function HumanInLoopAIReviewPage() {
 
 
   const response = reviewQuery.data;
+  const hasReviewSnapshot = Boolean(response);
+  const isFocusedReview = activeView === 'recommendations' && Boolean(requestedSourceActionId);
   const summary = response?.summary || {};
   const guidance = response?.guidance || {};
   const reviews = useMemo(() => response?.reviews || [], [response?.reviews]);
+  const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
+
+  useEffect(() => {
+    if (activeView !== 'recommendations') return;
+    setSelectedHistorySourceActionId(requestedSourceActionId);
+  }, [activeView, requestedSourceActionId]);
 
   useEffect(() => {
     if (activeView !== 'recommendations' || !requestedSourceActionId || reviewQuery.isLoading || lastAutoScrolledSourceActionId.current === requestedSourceActionId) {
@@ -4844,9 +5006,16 @@ export default function HumanInLoopAIReviewPage() {
   }, [response?.definition?.safety_contract]);
 
   const readiness = readinessQuery.data;
+  const hasReadinessSnapshot = Boolean(readiness);
   const readinessSummary = readiness?.summary || {};
-  const readinessFeatures = readiness?.features || [];
+  const readinessFeatures = useMemo(() => readiness?.features || [], [readiness?.features]);
   const productionBacklog = readiness?.production_backlog || [];
+
+  useEffect(() => {
+    if (activeView !== 'readiness' || !hasReadinessSnapshot || readinessFeatures.length === 0) return;
+    if (readinessFeatures.some((feature) => feature.key === selectedReadinessFeatureKey)) return;
+    setSelectedReadinessFeatureKey(readinessFeatures[0].key);
+  }, [activeView, hasReadinessSnapshot, readinessFeatures, selectedReadinessFeatureKey]);
   const auditPack = readinessAuditPackQuery.data?.audit_pack || readiness?.audit_pack;
   const capabilityInventory = readiness?.unified_ai_capability_inventory;
   const aiRiskScoring = readiness?.unified_ai_risk_scoring;
@@ -5082,6 +5251,17 @@ export default function HumanInLoopAIReviewPage() {
     });
   };
 
+  const reviewSummaryValue = (value: unknown): string => {
+    if (hasReviewSnapshot) return formatLocalizedNumber(numberValue(value), locale);
+    return reviewQuery.isLoading ? ui('Loading…') : ui('Unavailable');
+  };
+
+  const readinessSummaryValue = (value: unknown, percent = false): string => {
+    if (!hasReadinessSnapshot) return readinessQuery.isLoading ? ui('Loading…') : ui('Unavailable');
+    const formatted = formatLocalizedNumber(numberValue(value), locale);
+    return percent ? `${formatted}%` : formatted;
+  };
+
   return (
     <div className="ai-review-page ai-review-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
       {/* Tenant-facing hero pills intentionally hidden. Original rendering preserved here for restoration:
@@ -5098,18 +5278,20 @@ export default function HumanInLoopAIReviewPage() {
       />
 
       {activeView === 'recommendations' ? (
-        <OperationalWorkspaceStats ariaLabel={ui("Recommendation review summary")}>
-          <OperationalWorkspaceStatCard label={ui("Open reviews")} value={formatLocalizedNumber(numberValue(summary.active_reviews), locale)} helper={ui("Rule-based and optional AI-assisted proposals waiting for human review")} iconPath="/intelligence-review" tone="blue" />
-          <OperationalWorkspaceStatCard label={ui("Approval required")} value={formatLocalizedNumber(numberValue(summary.approval_required_reviews), locale)} helper={ui("Items that remain inside a governed approval workflow")} iconPath="/permissions" tone={numberValue(summary.approval_required_reviews) > 0 ? 'warn' : 'good'} />
-          <OperationalWorkspaceStatCard label={ui("Escalated")} value={formatLocalizedNumber(numberValue(summary.escalated_reviews), locale)} helper={ui("High-attention items requiring management or governance follow-up")} iconPath="/alerts" tone={numberValue(summary.escalated_reviews) > 0 ? 'danger' : 'good'} />
-          <OperationalWorkspaceStatCard label={ui("Safety rule")} value={ui("Human decision only")} helper={ui("Review decisions never execute the underlying recommendation")} iconPath="/reliability-command" tone="good" />
-        </OperationalWorkspaceStats>
+        isFocusedReview ? null : (
+          <OperationalWorkspaceStats ariaLabel={ui("Recommendation review summary")}>
+            <OperationalWorkspaceStatCard label={ui("Open reviews")} value={reviewSummaryValue(summary.active_reviews)} helper={ui("Rule-based and optional AI-assisted proposals waiting for human review")} iconPath="/intelligence-review" tone="blue" />
+            <OperationalWorkspaceStatCard label={ui("Approval required")} value={reviewSummaryValue(summary.approval_required_reviews)} helper={ui("Items that remain inside a governed approval workflow")} iconPath="/permissions" tone={hasReviewSnapshot && numberValue(summary.approval_required_reviews) > 0 ? 'warn' : hasReviewSnapshot ? 'good' : 'neutral'} />
+            <OperationalWorkspaceStatCard label={ui("Escalated")} value={reviewSummaryValue(summary.escalated_reviews)} helper={ui("High-attention items requiring management or governance follow-up")} iconPath="/alerts" tone={hasReviewSnapshot && numberValue(summary.escalated_reviews) > 0 ? 'danger' : hasReviewSnapshot ? 'good' : 'neutral'} />
+            <OperationalWorkspaceStatCard label={ui("Safety rule")} value={ui("Human decision only")} helper={ui("Review decisions never execute the underlying recommendation")} iconPath="/reliability-command" tone="good" />
+          </OperationalWorkspaceStats>
+        )
       ) : (
         <OperationalWorkspaceStats ariaLabel={ui("Intelligence readiness summary")}>
-          <OperationalWorkspaceStatCard label={ui("Tracked intelligence features")} value={formatLocalizedNumber(numberValue(readinessSummary.total_features), locale)} helper={ui("Registered intelligence and AI-assisted modules")} iconPath="/intelligence-review" tone="blue" />
-          <OperationalWorkspaceStatCard label={ui("Production candidates")} value={formatLocalizedNumber(numberValue(readinessSummary.production_candidates), locale)} helper={ui("Implemented features still requiring hardening evidence")} iconPath="/reliability-command" tone="warn" />
-          <OperationalWorkspaceStatCard label={ui("Tenant-data backed")} value={formatLocalizedNumber(numberValue(readinessSummary.tenant_data_backed_features), locale)} helper={ui("Features with current tenant evidence rows")} iconPath="/system-context" tone="blue" />
-          <OperationalWorkspaceStatCard label={ui("Average readiness")} value={`${formatLocalizedNumber(numberValue(readinessSummary.average_readiness_score), locale)}%`} helper={ui("Production-readiness score across tracked features")} iconPath="/reports" tone="neutral" />
+          <OperationalWorkspaceStatCard label={ui("Visible intelligence features")} value={readinessSummaryValue(readinessSummary.total_features)} helper={ui("Registered intelligence and AI-assisted modules available to your role")} iconPath="/intelligence-review" tone="blue" />
+          <OperationalWorkspaceStatCard label={ui("Production candidates")} value={readinessSummaryValue(readinessSummary.production_candidates)} helper={ui("Implemented features still requiring hardening evidence")} iconPath="/reliability-command" tone={hasReadinessSnapshot ? 'warn' : 'neutral'} />
+          <OperationalWorkspaceStatCard label={ui("Tenant-data backed")} value={readinessSummaryValue(readinessSummary.tenant_data_backed_features)} helper={ui("Features with current tenant evidence rows")} iconPath="/system-context" tone="blue" />
+          <OperationalWorkspaceStatCard label={ui("Average readiness")} value={readinessSummaryValue(readinessSummary.average_readiness_score, true)} helper={ui("Production-readiness score across visible features")} iconPath="/reports" tone="neutral" />
         </OperationalWorkspaceStats>
       )}
 
@@ -5121,7 +5303,7 @@ export default function HumanInLoopAIReviewPage() {
       <div className="card ai-review-page__mode-bar">
         <div style={toolbarStyle}>
           {activeView === 'readiness' ? (
-            <button className="button button--secondary" type="button" onClick={refreshActiveView} disabled={isRefreshingActiveView}>
+            <button className="button button--secondary" type="button" onClick={() => { void refreshActiveView(); }} disabled={isRefreshingActiveView}>
               <TenantNavIcon path="/intelligence-review" size={16} />
               {isRefreshingActiveView ? ui('Refreshing readiness checks…') : ui('Refresh readiness checks')}
             </button>
@@ -5167,20 +5349,20 @@ export default function HumanInLoopAIReviewPage() {
                       <span style={badgeStyle}>{readinessCoreLabel(feature.completion_band, ui)}</span>
                       <span style={badgeStyle}>{formatLocalizedNumber(numberValue(feature.readiness_score), locale)}% {ui("ready")}</span>
                     </div>
-                    <h3 style={{ marginTop: 0 }}>{feature.label}</h3>
+                    <h3 style={{ marginTop: 0 }}>{localizedReadinessSystemText(feature.label, ui)}</h3>
                     <p className="card__subtext">
                       {formatLocalizedNumber(numberValue(feature.evidence?.tenant_data_rows), locale)} {ui("tenant evidence rows across")} {formatLocalizedNumber(numberValue(feature.evidence?.existing_table_count), locale)} / {formatLocalizedNumber(numberValue(feature.evidence?.expected_table_count), locale)} {ui("expected evidence tables.")}
                     </p>
                     {feature.implemented_capabilities?.length ? (
                       <div style={{ marginTop: 10 }}>
                         <div className="card__label">{ui("Implemented")}</div>
-                        <p className="card__subtext">{feature.implemented_capabilities.slice(0, 3).join(' · ')}</p>
+                        <p className="card__subtext">{localizedReadinessSystemList(feature.implemented_capabilities?.slice(0, 3), ui).join(' · ')}</p>
                       </div>
                     ) : null}
                     {feature.completion_gaps?.length ? (
                       <div style={{ marginTop: 10 }}>
                         <div className="card__label">{ui("Next gaps")}</div>
-                        <p className="card__subtext">{feature.completion_gaps.slice(0, 3).join(' · ')}</p>
+                        <p className="card__subtext">{localizedReadinessSystemList(feature.completion_gaps?.slice(0, 3), ui).join(' · ')}</p>
                       </div>
                     ) : null}
                   </article>
@@ -5227,9 +5409,9 @@ export default function HumanInLoopAIReviewPage() {
                           <span style={badgeStyle}>{readinessCoreLabel(gap.gap_type, ui)}</span>
                           <span style={badgeStyle}>{formatLocalizedNumber(numberValue(gap.readiness_score), locale)}% {ui("ready")}</span>
                         </div>
-                        <h3 style={{ marginTop: 0 }}>{gap.capability_label}</h3>
-                        <p className="card__subtext">{gap.feature_label}</p>
-                        <p className="card__subtext">{gap.required_resolution}</p>
+                        <h3 style={{ marginTop: 0 }}>{localizedReadinessSystemText(gap.capability_label, ui)}</h3>
+                        <p className="card__subtext">{localizedReadinessSystemText(gap.feature_label, ui)}</p>
+                        <p className="card__subtext">{localizedReadinessSystemText(gap.required_resolution, ui)}</p>
                       </article>
                     ))}
                   </div>
@@ -5274,9 +5456,9 @@ export default function HumanInLoopAIReviewPage() {
                           <span style={badgeStyle}>{formatLocalizedNumber(numberValue(feature.ai_risk_score), locale)} {ui("risk")}</span>
                           <span style={badgeStyle}>{readinessCoreLabel(feature.primary_risk_driver, ui)}</span>
                         </div>
-                        <h3 style={{ marginTop: 0 }}>{feature.feature_label}</h3>
+                        <h3 style={{ marginTop: 0 }}>{localizedReadinessSystemText(feature.feature_label, ui)}</h3>
                         <p className="card__subtext">{readinessCoreLabel(feature.production_priority, ui)} · {formatLocalizedNumber(numberValue(feature.readiness_score), locale)}% {ui("ready")} · {formatLocalizedNumber(numberValue(feature.tenant_evidence_rows), locale)} {ui("tenant evidence rows")}</p>
-                        <p className="card__subtext">{feature.required_control}</p>
+                        <p className="card__subtext">{localizedReadinessSystemText(feature.required_control, ui)}</p>
                       </article>
                     ))}
                   </div>
@@ -5321,14 +5503,14 @@ export default function HumanInLoopAIReviewPage() {
                           <span style={badgeStyle}>{readinessCoreLabel(feature.lineage_state, ui)}</span>
                           <span style={badgeStyle}>{formatLocalizedNumber(numberValue(feature.lineage_completeness_score), locale)}% {ui("lineage")}</span>
                         </div>
-                        <h3 style={{ marginTop: 0 }}>{feature.feature_label}</h3>
+                        <h3 style={{ marginTop: 0 }}>{localizedReadinessSystemText(feature.feature_label, ui)}</h3>
                         <p className="card__subtext">
                           {formatLocalizedNumber(numberValue(feature.evidence_table_count), locale)} {ui("evidence tables")} · {formatLocalizedNumber(numberValue(feature.endpoint_count), locale)} {ui("endpoints")} · {formatLocalizedNumber(numberValue(feature.frontend_surface_count), locale)} {ui("frontend surfaces")} · {formatLocalizedNumber(numberValue(feature.tenant_evidence_rows), locale)} {ui("tenant rows")}
                         </p>
                         {feature.missing_lineage_links?.length ? (
                           <p className="card__subtext">{ui("Missing:")} {feature.missing_lineage_links.map((value) => readinessCoreLabel(value, ui)).join(' · ')}</p>
                         ) : null}
-                        <p className="card__subtext">{feature.required_lineage_control}</p>
+                        <p className="card__subtext">{localizedReadinessLineageControl(feature, ui)}</p>
                       </article>
                     ))}
                   </div>
@@ -5374,7 +5556,7 @@ export default function HumanInLoopAIReviewPage() {
                           <span style={badgeStyle}>{formatLocalizedNumber(numberValue(feature.rollback_score), locale)}% {ui("rollback")}</span>
                           <span style={badgeStyle}>{formatLocalizedNumber(numberValue(feature.ai_risk_score), locale)} {ui("risk")}</span>
                         </div>
-                        <h3 style={{ marginTop: 0 }}>{feature.feature_label}</h3>
+                        <h3 style={{ marginTop: 0 }}>{localizedReadinessSystemText(feature.feature_label, ui)}</h3>
                         <p className="card__subtext">
                           {formatLocalizedNumber(numberValue(feature.lineage_completeness_score), locale)}% {ui("lineage")} · {formatLocalizedNumber(numberValue(feature.readiness_score), locale)}% {ui("ready")} · {readinessCoreLabel(feature.ai_risk_level, ui)}
                         </p>
@@ -5429,8 +5611,8 @@ export default function HumanInLoopAIReviewPage() {
                           <span style={badgeStyle}>{readinessCoreLabel(action.current_status, ui)}</span>
                           <span style={badgeStyle}>{formatLocalizedNumber(numberValue(action.current_score), locale)} {ui("score")}</span>
                         </div>
-                        <h3 style={{ marginTop: 0 }}>{action.check_label}</h3>
-                        <p className="card__subtext">{action.required_resolution}</p>
+                        <h3 style={{ marginTop: 0 }}>{localizedReadinessSystemText(action.check_label, ui)}</h3>
+                        <p className="card__subtext">{localizedReadinessSystemText(action.required_resolution, ui)}</p>
                       </article>
                     ))}
                   </div>
@@ -5480,8 +5662,8 @@ export default function HumanInLoopAIReviewPage() {
                           <span style={badgeStyle}>{readinessCoreLabel(action.current_severity, ui)}</span>
                           <span style={badgeStyle}>{formatLocalizedNumber(numberValue(action.blocker_count), locale)} {ui("blockers")}</span>
                         </div>
-                        <h3 style={{ marginTop: 0 }}>{action.source_label}</h3>
-                        <p className="card__subtext">{action.required_resolution}</p>
+                        <h3 style={{ marginTop: 0 }}>{localizedReadinessSystemText(action.source_label, ui)}</h3>
+                        <p className="card__subtext">{localizedReadinessSystemText(action.required_resolution, ui)}</p>
                       </article>
                     ))}
                   </div>
@@ -5525,8 +5707,8 @@ export default function HumanInLoopAIReviewPage() {
                           <span style={badgeStyle}>#{formatLocalizedNumber(numberValue(action.sequence), locale)}</span>
                           <span style={badgeStyle}>{readinessCoreLabel(action.current_status, ui)}</span>
                         </div>
-                        <h3 style={{ marginTop: 0 }}>{action.check_label}</h3>
-                        <p className="card__subtext">{action.required_resolution}</p>
+                        <h3 style={{ marginTop: 0 }}>{localizedReadinessSystemText(action.check_label, ui)}</h3>
+                        <p className="card__subtext">{localizedReadinessSystemText(action.required_resolution, ui)}</p>
                       </article>
                     ))}
                   </div>
@@ -5572,8 +5754,8 @@ export default function HumanInLoopAIReviewPage() {
                           <span style={badgeStyle}>{readinessCoreLabel(artifact.current_status, ui)}</span>
                           <span style={badgeStyle}>{readinessCoreLabel(artifact.evidence_source, ui)}</span>
                         </div>
-                        <h3 style={{ marginTop: 0 }}>{artifact.artifact_label}</h3>
-                        <p className="card__subtext">{artifact.required_artifact}</p>
+                        <h3 style={{ marginTop: 0 }}>{localizedReadinessSystemText(artifact.artifact_label, ui)}</h3>
+                        <p className="card__subtext">{localizedReadinessSystemText(artifact.required_artifact, ui)}</p>
                       </article>
                     ))}
                   </div>
@@ -5677,7 +5859,7 @@ export default function HumanInLoopAIReviewPage() {
                     <ul style={{ margin: '8px 0 0 18px' }}>
                       {aiHighPriorityRuntimeGaps.slice(0, 5).map((row) => (
                         <li key={row.feature_key} className="card__subtext">
-                          {row.feature_label}: {row.open_runtime_gaps?.map((gap) => readinessCoreLabel(gap, ui)).join(', ') || ui('Runtime gap')}
+                          {localizedReadinessSystemText(row.feature_label, ui)}: {row.open_runtime_gaps?.map((gap) => readinessCoreLabel(gap, ui)).join(', ') || ui('Runtime gap')}
                         </li>
                       ))}
                     </ul>
@@ -5694,7 +5876,7 @@ export default function HumanInLoopAIReviewPage() {
                             <span style={badgeStyle}>{formatLocalizedNumber(numberValue(row.runtime_coverage_score), locale)}% {ui("coverage")}</span>
                             <span style={badgeStyle}>{readinessCoreLabel(row.runtime_coverage_status || 'not_reported', ui)}</span>
                           </div>
-                          <strong>{row.feature_label}</strong>
+                          <strong>{localizedReadinessSystemText(row.feature_label, ui)}</strong>
                           <p className="card__subtext">
                             {formatLocalizedNumber(numberValue(row.backend_endpoint_count), locale)} {ui("endpoints")} · {formatLocalizedNumber(numberValue(row.frontend_consumer_count), locale)} {ui("frontend consumers")} · {formatLocalizedNumber(numberValue(row.tenant_runtime_evidence_rows), locale)} {ui("tenant evidence rows")}.
                           </p>
@@ -5743,7 +5925,7 @@ export default function HumanInLoopAIReviewPage() {
                             <span style={badgeStyle}>{formatLocalizedNumber(numberValue(item.urgency_score), locale)} {ui("Urgency")}</span>
                             <span style={badgeStyle}>{readinessCoreLabel(item.owner_hint || 'unknown', ui)}</span>
                           </div>
-                          <strong>{item.feature_label}</strong>
+                          <strong>{localizedReadinessSystemText(item.feature_label, ui)}</strong>
                           <p className="card__subtext">
                             {ui("Impact")}: {readinessCoreLabel(item.commercial_release_impact || 'not_reported', ui)} · {ui("coverage")} {formatLocalizedNumber(numberValue(item.runtime_coverage_score), locale)}%.
                           </p>
@@ -5796,18 +5978,18 @@ export default function HumanInLoopAIReviewPage() {
                             <span style={badgeStyle}>{formatLocalizedNumber(numberValue(row.urgency_score), locale)} {ui("Urgency")}</span>
                             <span style={badgeStyle}>{readinessCoreLabel(row.drill_status || 'not_reported', ui)}</span>
                           </div>
-                          <strong>{row.feature_label}</strong>
+                          <strong>{localizedReadinessSystemText(row.feature_label, ui)}</strong>
                           <p className="card__subtext">
                             {ui("Current evidence")}: {formatLocalizedNumber(numberValue(row.current_backend_endpoint_count), locale)} {ui("endpoints")} · {formatLocalizedNumber(numberValue(row.current_frontend_consumer_count), locale)} {ui("frontend consumers")} · {formatLocalizedNumber(numberValue(row.current_tenant_runtime_evidence_rows), locale)} {ui("tenant rows")}.
                           </p>
                           {row.required_evidence_artifacts?.length ? (
-                            <p className="card__subtext">{ui("Evidence")}: {row.required_evidence_artifacts.join(', ')}</p>
+                            <p className="card__subtext">{ui("Evidence")}: {localizedReadinessSystemList(row.required_evidence_artifacts, ui).join(', ')}</p>
                           ) : null}
                           {row.pass_criteria?.length ? (
-                            <p className="card__subtext">{ui("Pass criteria")}: {row.pass_criteria.join(', ')}</p>
+                            <p className="card__subtext">{ui("Pass criteria")}: {localizedReadinessSystemList(row.pass_criteria, ui).join(', ')}</p>
                           ) : null}
                           {row.operator_drill_steps?.length ? (
-                            <p className="card__subtext">{ui("Drill steps")}: {row.operator_drill_steps.join(', ')}</p>
+                            <p className="card__subtext">{ui("Drill steps")}: {localizedReadinessSystemList(row.operator_drill_steps, ui).join(', ')}</p>
                           ) : null}
                         </article>
                       ))}
@@ -5857,16 +6039,16 @@ export default function HumanInLoopAIReviewPage() {
                             <span style={badgeStyle}>{formatLocalizedNumber(numberValue(row.runtime_coverage_score), locale)}% {ui("coverage")}</span>
                             <span style={badgeStyle}>{readinessCoreLabel(row.signoff_status || 'not_reported', ui)}</span>
                           </div>
-                          <strong>{row.feature_label}</strong>
+                          <strong>{localizedReadinessSystemText(row.feature_label, ui)}</strong>
                           <p className="card__subtext">
                             {ui("Evidence")}: {formatLocalizedNumber(numberValue(row.backend_endpoint_count), locale)} {ui("endpoints")} · {formatLocalizedNumber(numberValue(row.frontend_consumer_count), locale)} {ui("frontend consumers")} · {formatLocalizedNumber(numberValue(row.tenant_runtime_evidence_rows), locale)} {ui("tenant rows")} · {ui("schema")} {formatLocalizedNumber(numberValue(row.existing_evidence_table_count), locale)}/{formatLocalizedNumber(numberValue(row.expected_evidence_table_count), locale)}.
                           </p>
-                          <p className="card__subtext">{row.signoff_evidence_statement}</p>
+                          <p className="card__subtext">{localizedReadinessSystemText(row.signoff_evidence_statement, ui)}</p>
                           {row.open_runtime_gaps?.length ? (
                             <p className="card__subtext">{ui("Open gaps")}: {row.open_runtime_gaps.map((gap) => readinessCoreLabel(gap, ui)).join(', ')}</p>
                           ) : null}
                           {row.pass_criteria?.length ? (
-                            <p className="card__subtext">{ui("Pass criteria")}: {row.pass_criteria.join(', ')}</p>
+                            <p className="card__subtext">{ui("Pass criteria")}: {localizedReadinessSystemList(row.pass_criteria, ui).join(', ')}</p>
                           ) : null}
                         </article>
                       ))}
@@ -5887,7 +6069,7 @@ export default function HumanInLoopAIReviewPage() {
                         </div>
                         <p className="card__subtext">{ui("Open gaps")}: {row.open_runtime_gaps?.length ? row.open_runtime_gaps.map((gap) => readinessCoreLabel(gap, ui)).join(', ') : ui("None reported")}</p>
                         <p className="card__subtext">{ui("Required waiver fields")}: {row.minimum_manual_waiver_fields?.join(', ') || ui("Not reported")}</p>
-                        <p className="card__subtext">{row.release_rule}</p>
+                        <p className="card__subtext">{localizedReadinessSystemText(row.release_rule, ui)}</p>
                       </div>
                     ))}
                   </div>
@@ -8011,7 +8193,7 @@ export default function HumanInLoopAIReviewPage() {
                         <div className="card__label">{ui("Required before production")}</div>
                         <ol style={{ marginBottom: 0 }}>
                           {hardeningPlan.release_gate.required_before_production.map((item) => (
-                            <li key={item}>{item}</li>
+                            <li key={item}>{localizedReadinessSystemText(item, ui)}</li>
                           ))}
                         </ol>
                       </div>
@@ -8023,18 +8205,18 @@ export default function HumanInLoopAIReviewPage() {
                             <span style={badgeStyle}>{ui("Phase")} {formatLocalizedNumber(numberValue(phase.phase), locale)}</span>
                             <span style={badgeStyle}>{formatLocalizedNumber(numberValue(phase.item_count), locale)} {ui("items")}</span>
                           </div>
-                          <h3 style={{ marginTop: 0 }}>{phase.label}</h3>
-                          <p className="card__subtext">{phase.description}</p>
+                          <h3 style={{ marginTop: 0 }}>{localizedReadinessSystemText(phase.label, ui)}</h3>
+                          <p className="card__subtext">{localizedReadinessSystemText(phase.description, ui)}</p>
                           {phase.items?.length ? (
                             <ol style={{ marginBottom: 0 }}>
                               {phase.items.slice(0, 5).map((item) => (
                                 <li key={`${phase.key}-${item.feature_key}-${item.sequence}`}>
-                                  <strong>{item.feature_label}</strong>: {item.gap}
+                                  <strong>{localizedReadinessSystemText(item.feature_label, ui)}</strong>: {localizedReadinessSystemText(item.gap, ui)}
                                   <div className="card__subtext">
                                     {readinessCoreLabel(item.workstream || 'not_reported', ui)} · {readinessCoreLabel(item.production_priority || 'not_reported', ui)} · {formatLocalizedNumber(numberValue(item.readiness_score), locale)}% {ui("ready")}
                                   </div>
                                   {item.acceptance_criteria?.[0]?.label ? (
-                                    <div className="card__subtext">{ui("Acceptance:")} {item.acceptance_criteria[0].label}</div>
+                                    <div className="card__subtext">{ui("Acceptance:")} {localizedReadinessSystemText(item.acceptance_criteria[0].label, ui)}</div>
                                   ) : null}
                                 </li>
                               ))}
@@ -8081,7 +8263,7 @@ export default function HumanInLoopAIReviewPage() {
                         <ol style={{ marginBottom: 0 }}>
                           {requiredEvidenceGaps.slice(0, 10).map((gap) => (
                             <li key={`${gap.feature_key}-${gap.table_name}`}>
-                              <strong>{gap.feature_label}</strong>: {gap.table_name} — {readinessCoreLabel(gap.evidence_risk, ui)}
+                              <strong>{localizedReadinessSystemText(gap.feature_label, ui)}</strong>: {gap.table_name} — {readinessCoreLabel(gap.evidence_risk, ui)}
                               <div className="card__subtext">
                                 {readinessCoreLabel(gap.production_priority, ui)} · {readinessCoreLabel(gap.evidence_scope, ui)} · {formatLocalizedNumber(numberValue(gap.row_count), locale)} {ui("rows")}
                               </div>
@@ -8124,9 +8306,9 @@ export default function HumanInLoopAIReviewPage() {
                         <ol style={{ marginBottom: 0 }}>
                           {releaseBlockers.slice(0, 10).map((blocker, index) => (
                             <li key={`${blocker.blocker_type}-${blocker.feature_key}-${index}`}>
-                              <strong>{blocker.feature_label || formatLabel(blocker.feature_key)}</strong>: {readinessCoreLabel(blocker.blocker_type, ui)} — {blocker.detail}
+                              <strong>{blocker.feature_label ? localizedReadinessSystemText(blocker.feature_label, ui) : formatLabel(blocker.feature_key)}</strong>: {readinessCoreLabel(blocker.blocker_type, ui)} — {blocker.blocker_type === 'critical_high_feature_blocker' ? readinessCoreLabel(blocker.detail, ui) : blocker.blocker_type === 'failed_signoff_item' ? localizedReadinessSystemText(blocker.detail, ui) : blocker.detail}
                               <div className="card__subtext">
-                                {readinessCoreLabel(blocker.severity, ui)} · {ui("Resolution:")} {blocker.required_resolution}
+                                {readinessCoreLabel(blocker.severity, ui)} · {ui("Resolution:")} {localizedReadinessSystemText(blocker.required_resolution, ui)}
                               </div>
                             </li>
                           ))}
@@ -8140,7 +8322,7 @@ export default function HumanInLoopAIReviewPage() {
                         <div className="card__label">{ui("Required final test evidence")}</div>
                         <ol style={{ marginBottom: 0 }}>
                           {releaseFinalEvidence.map((item) => (
-                            <li key={item}>{item}</li>
+                            <li key={item}>{localizedReadinessSystemText(item, ui)}</li>
                           ))}
                         </ol>
                       </div>
@@ -8168,14 +8350,14 @@ export default function HumanInLoopAIReviewPage() {
                       <span style={badgeStyle}>{ui("Next actions:")} {formatLocalizedNumber(nextOperatorActions.length, locale)}</span>
                     </div>
                     <p className="card__subtext" style={{ marginTop: 12 }}>
-                      {operationalRunbook?.operator_warning || ui('Runbook guidance is read-only and does not execute intelligence and AI-assisted actions.')}
+                      {operationalRunbook?.operator_warning ? localizedReadinessSystemText(operationalRunbook.operator_warning, ui) : ui('Runbook guidance is read-only and does not execute intelligence and AI-assisted actions.')}
                     </p>
                     {dailyOperatorSequence.length ? (
                       <div style={{ marginTop: 14 }}>
                         <div className="card__label">{ui("Daily operator sequence")}</div>
                         <ol style={{ marginBottom: 0 }}>
                           {dailyOperatorSequence.map((item) => (
-                            <li key={item}>{item}</li>
+                            <li key={item}>{localizedReadinessOperatorInstruction(item, locale, ui)}</li>
                           ))}
                         </ol>
                       </div>
@@ -8186,12 +8368,12 @@ export default function HumanInLoopAIReviewPage() {
                         <ol style={{ marginBottom: 0 }}>
                           {nextOperatorActions.slice(0, 8).map((action) => (
                             <li key={action.feature_key || action.feature_label}>
-                              <strong>{action.feature_label}</strong>: {readinessCoreLabel(action.runbook_status, ui)}
+                              <strong>{localizedReadinessSystemText(action.feature_label, ui)}</strong>: {readinessCoreLabel(action.runbook_status, ui)}
                               <div className="card__subtext">
                                 {readinessCoreLabel(action.production_priority, ui)} · {formatLocalizedNumber(numberValue(action.readiness_score), locale)}% {ui("ready")} · {ui("Signoff:")} {readinessCoreLabel(action.signoff_status, ui)}
                               </div>
                               {action.operator_sequence?.[0] ? (
-                                <div className="card__subtext">{ui("First step:")} {action.operator_sequence[0]}</div>
+                                <div className="card__subtext">{ui("First step:")} {localizedReadinessOperatorInstruction(action.operator_sequence[0], locale, ui)}</div>
                               ) : null}
                             </li>
                           ))}
@@ -8205,7 +8387,7 @@ export default function HumanInLoopAIReviewPage() {
                         <div className="card__label">{ui("Emergency stop conditions")}</div>
                         <ol style={{ marginBottom: 0 }}>
                           {emergencyStopConditions.map((item) => (
-                            <li key={item}>{item}</li>
+                            <li key={item}>{localizedReadinessSystemText(item, ui)}</li>
                           ))}
                         </ol>
                       </div>
@@ -8236,7 +8418,7 @@ export default function HumanInLoopAIReviewPage() {
                       <span style={badgeStyle}>{ui("Tenant review:")} {formatLocalizedNumber(numberValue(validationSuite?.totals?.tenant_isolation_review_case_count), locale)}</span>
                     </div>
                     <p className="card__subtext" style={{ marginTop: 12 }}>
-                      {validationSuite?.safety_rule || ui("Validation proves readiness only; it does not execute intelligence and AI-assisted actions.")}
+                      {validationSuite?.safety_rule ? localizedReadinessSystemText(validationSuite.safety_rule, ui) : ui("Validation proves readiness only; it does not execute intelligence and AI-assisted actions.")}
                     </p>
                     {validationBlockedCases.length ? (
                       <div style={{ marginTop: 14 }}>
@@ -8244,7 +8426,7 @@ export default function HumanInLoopAIReviewPage() {
                         <ol style={{ marginBottom: 0 }}>
                           {validationBlockedCases.slice(0, 8).map((item) => (
                             <li key={item.feature_key || item.feature_label}>
-                              <strong>{item.feature_label}</strong>: {readinessCoreLabel(item.validation_status, ui)}
+                              <strong>{localizedReadinessSystemText(item.feature_label, ui)}</strong>: {readinessCoreLabel(item.validation_status, ui)}
                               <div className="card__subtext">
                                 {readinessCoreLabel(item.production_priority, ui)} · {ui("Missing tables:")} {formatLocalizedNumber(numberValue(item.evidence_preconditions?.missing_tables?.length), locale)} · {ui("Empty tenant tables:")} {formatLocalizedNumber(numberValue(item.evidence_preconditions?.empty_tenant_tables?.length), locale)}
                               </div>
@@ -8261,7 +8443,7 @@ export default function HumanInLoopAIReviewPage() {
                         <ol style={{ marginBottom: 0 }}>
                           {validationReviewCases.slice(0, 6).map((item) => (
                             <li key={item.feature_key || item.feature_label}>
-                              <strong>{item.feature_label}</strong>: {formatLocalizedNumber(numberValue(item.evidence_preconditions?.unscoped_tables?.length), locale)} {ui("unscoped evidence table(s)")}
+                              <strong>{localizedReadinessSystemText(item.feature_label, ui)}</strong>: {formatLocalizedNumber(numberValue(item.evidence_preconditions?.unscoped_tables?.length), locale)} {ui("unscoped evidence table(s)")}
                             </li>
                           ))}
                         </ol>
@@ -8272,7 +8454,7 @@ export default function HumanInLoopAIReviewPage() {
                         <div className="card__label">{ui("Required global assertions")}</div>
                         <ol style={{ marginBottom: 0 }}>
                           {validationGlobalAssertions.map((item) => (
-                            <li key={item}>{item}</li>
+                            <li key={item}>{localizedReadinessSystemText(item, ui)}</li>
                           ))}
                         </ol>
                       </div>
@@ -8315,7 +8497,7 @@ export default function HumanInLoopAIReviewPage() {
                       <span style={badgeStyle}>{ui("Blocked features:")} {formatLocalizedNumber(numberValue(signoffChecklist?.totals?.blocked_feature_count), locale)}</span>
                     </div>
                     <p className="card__subtext" style={{ marginTop: 12 }}>
-                      {signoffChecklist?.release_rule || ui("Production signoff requires passing or governance-accepting every intelligence and AI-assisted checklist item.")}
+                      {signoffChecklist?.release_rule ? localizedReadinessSystemText(signoffChecklist.release_rule, ui) : ui("Production signoff requires passing or governance-accepting every intelligence and AI-assisted checklist item.")}
                     </p>
                     {blockedSignoffFeatures.length ? (
                       <div style={{ marginTop: 14 }}>
@@ -8323,7 +8505,7 @@ export default function HumanInLoopAIReviewPage() {
                         <ol style={{ marginBottom: 0 }}>
                           {blockedSignoffFeatures.map((feature) => (
                             <li key={feature.feature_key || feature.feature_label}>
-                              <strong>{feature.feature_label}</strong>: {formatLocalizedNumber(numberValue(feature.failed_item_count), locale)} {ui("failed checklist items")}
+                              <strong>{localizedReadinessSystemText(feature.feature_label, ui)}</strong>: {formatLocalizedNumber(numberValue(feature.failed_item_count), locale)} {ui("failed checklist items")}
                               <div className="card__subtext">
                                 {readinessCoreLabel(feature.production_priority, ui)} · {readinessCoreLabel(feature.production_status, ui)} · {formatLocalizedNumber(numberValue(feature.readiness_score), locale)}% {ui("ready")}
                               </div>
@@ -8340,7 +8522,7 @@ export default function HumanInLoopAIReviewPage() {
                         <ol style={{ marginBottom: 0 }}>
                           {watchSignoffFeatures.map((feature) => (
                             <li key={feature.feature_key || feature.feature_label}>
-                              <strong>{feature.feature_label}</strong>: {formatLocalizedNumber(numberValue(feature.watch_item_count), locale)} {ui("watch checklist items")}
+                              <strong>{localizedReadinessSystemText(feature.feature_label, ui)}</strong>: {formatLocalizedNumber(numberValue(feature.watch_item_count), locale)} {ui("watch checklist items")}
                               <div className="card__subtext">
                                 {readinessCoreLabel(feature.production_priority, ui)} · {readinessCoreLabel(feature.signoff_status, ui)} · {formatLocalizedNumber(numberValue(feature.readiness_score), locale)}% {ui("ready")}
                               </div>
@@ -8363,7 +8545,7 @@ export default function HumanInLoopAIReviewPage() {
                     onChange={(event) => setSelectedReadinessFeatureKey(event.target.value)}
                   >
                     {allReadinessFeatures.map((feature) => (
-                      <option key={feature.key} value={feature.key}>{feature.label}</option>
+                      <option key={feature.key} value={feature.key}>{localizedReadinessSystemText(feature.label, ui)}</option>
                     ))}
                   </select>
                   <button
@@ -8386,7 +8568,7 @@ export default function HumanInLoopAIReviewPage() {
                 ) : (
                   <>
                     <h3 style={{ marginTop: 0 }}>{selectedFeature?.label || ui('Selected feature')}</h3>
-                    <p className="card__subtext">{featureDetail?.operator_summary?.headline}</p>
+                    <p className="card__subtext">{selectedFeature ? ui('{feature}: {status}; {count} tenant evidence rows.').replace('{feature}', localizedReadinessSystemText(selectedFeature.label, ui)).replace('{status}', readinessCoreLabel(selectedFeature.completion_band, ui)).replace('{count}', formatLocalizedNumber(numberValue(featureDetail?.evidence_summary?.tenant_data_rows), locale)) : ''}</p>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
                       <span style={badgeStyle}>{ui("Priority:")} {readinessCoreLabel(selectedFeature?.production_priority, ui)}</span>
                       <span style={badgeStyle}>{ui("Status:")} {readinessCoreLabel(selectedFeature?.production_status, ui)}</span>
@@ -8400,11 +8582,11 @@ export default function HumanInLoopAIReviewPage() {
                       </div>
                       <div className="card">
                         <div className="card__label">{ui("Evidence meaning")}</div>
-                        <p className="card__subtext">{featureDetail?.operator_summary?.evidence_meaning}</p>
+                        <p className="card__subtext">{numberValue(featureDetail?.evidence_summary?.expected_table_count) > 0 ? ui('{existing} of {expected} registered evidence tables exist for this feature.').replace('{existing}', formatLocalizedNumber(numberValue(featureDetail?.evidence_summary?.existing_table_count), locale)).replace('{expected}', formatLocalizedNumber(numberValue(featureDetail?.evidence_summary?.expected_table_count), locale)) : ui('No evidence tables are registered for this feature.')}</p>
                       </div>
                       <div className="card">
                         <div className="card__label">{ui("Next required completion")}</div>
-                        <p className="card__subtext">{featureDetail?.operator_summary?.next_required_completion}</p>
+                        <p className="card__subtext">{localizedReadinessSystemText(featureDetail?.operator_summary?.next_required_completion, ui)}</p>
                       </div>
                     </div>
                     {selectedFeature?.implemented_capabilities?.length ? (
@@ -8412,7 +8594,7 @@ export default function HumanInLoopAIReviewPage() {
                         <div className="card__label">{ui("Implemented capabilities in current code")}</div>
                         <ul style={{ marginBottom: 0 }}>
                           {selectedFeature.implemented_capabilities.map((capability) => (
-                            <li key={capability}>{capability}</li>
+                            <li key={localizedReadinessSystemText(capability, ui)}>{localizedReadinessSystemText(capability, ui)}</li>
                           ))}
                         </ul>
                       </div>
@@ -8423,14 +8605,14 @@ export default function HumanInLoopAIReviewPage() {
                         <ol style={{ marginBottom: 0 }}>
                           {selectedHardeningItems.map((item) => (
                             <li key={`${item.feature_key}-${item.sequence}`}>
-                              <strong>{item.gap}</strong>
+                              <strong>{localizedReadinessSystemText(item.gap, ui)}</strong>
                               <div className="card__subtext">{readinessCoreLabel(item.workstream, ui)} · {readinessCoreLabel(item.production_priority, ui)} · {formatLocalizedNumber(numberValue(item.readiness_score), locale)}% {ui("ready")}</div>
                               {item.acceptance_criteria?.length ? (
                                 <ul>
                                   {item.acceptance_criteria.map((criterion) => (
                                     <li key={criterion.key}>
-                                      {criterion.label}
-                                      <div className="card__subtext">{criterion.verification}</div>
+                                      {localizedReadinessSystemText(criterion.label, ui)}
+                                      <div className="card__subtext">{localizedReadinessSystemText(criterion.verification, ui)}</div>
                                     </li>
                                   ))}
                                 </ul>
@@ -8467,7 +8649,7 @@ export default function HumanInLoopAIReviewPage() {
                         </table>
                       </div>
                     ) : null}
-                    <p className="card__subtext" style={{ marginTop: 14 }}>{featureDetail?.operator_summary?.safety_position}</p>
+                    <p className="card__subtext" style={{ marginTop: 14 }}>{localizedReadinessSystemText(featureDetail?.operator_summary?.safety_position, ui)}</p>
                   </>
                 )}
               </div>
@@ -8490,7 +8672,7 @@ export default function HumanInLoopAIReviewPage() {
                       {allReadinessFeatures.map((feature) => (
                         <tr key={feature.key}>
                           <td>
-                            <strong>{feature.label}</strong>
+                            <strong>{localizedReadinessSystemText(feature.label, ui)}</strong>
                             <div className="card__subtext">{readinessCoreLabel(feature.category, ui)}</div>
                           </td>
                           <td>{readinessCoreLabel(feature.production_priority, ui)}</td>
@@ -8535,8 +8717,8 @@ export default function HumanInLoopAIReviewPage() {
                     {remediationNextActions.length ? (
                       <ol style={{ marginBottom: 0, marginTop: 14 }}>
                         {remediationNextActions.slice(0, 10).map((action) => (
-                          <li key={`${action.feature_key}-${action.sequence}-${action.gap}`}>
-                            <strong>{action.feature_label}</strong>: {action.gap}
+                          <li key={`${action.feature_key}-${action.sequence}-${localizedReadinessSystemText(action.gap, ui)}`}>
+                            <strong>{localizedReadinessSystemText(action.feature_label, ui)}</strong>: {localizedReadinessSystemText(action.gap, ui)}
                             <div className="card__subtext">
                               {readinessCoreLabel(action.production_priority, ui)} · {readinessCoreLabel(action.workstream, ui)} · {formatLocalizedNumber(numberValue(action.readiness_score), locale)}{ui("% ready")}
                             </div>
@@ -8549,7 +8731,7 @@ export default function HumanInLoopAIReviewPage() {
                               </div>
                             ) : null}
                             {action.acceptance_criteria?.[0]?.label ? (
-                              <div className="card__subtext">{ui("Acceptance:")} {action.acceptance_criteria[0].label}</div>
+                              <div className="card__subtext">{ui("Acceptance:")} {localizedReadinessSystemText(action.acceptance_criteria[0].label, ui)}</div>
                             ) : null}
                             {action.suggested_validation?.length ? (
                               <div className="card__subtext">{ui("Validation:")} {action.suggested_validation.slice(0, 2).join(' · ')}</div>
@@ -8573,7 +8755,7 @@ export default function HumanInLoopAIReviewPage() {
                   <ol style={{ marginBottom: 0 }}>
                     {productionBacklog.slice(0, 12).map((item) => (
                       <li key={`${item.feature_key}-${item.sequence}`}>
-                        <strong>{item.feature_label}</strong>: {item.gap}
+                        <strong>{localizedReadinessSystemText(item.feature_label, ui)}</strong>: {localizedReadinessSystemText(item.gap, ui)}
                         <div className="card__subtext">
                           {readinessCoreLabel(item.production_priority, ui)} · {readinessCoreLabel(item.production_status, ui)} · {formatLocalizedNumber(numberValue(item.readiness_score), locale)}{ui("% ready")}
                         </div>
@@ -8603,26 +8785,30 @@ export default function HumanInLoopAIReviewPage() {
         ) : null}
         <div className="card ai-review-page__controls-card">
           <div className="ai-review-page__toolbar" style={toolbarStyle}>
-            <label className="ai-review-page__field"><span>{ui("Review category")}</span><select aria-label={ui("Review category")} style={selectStyle} value={aiOperationDomain} onChange={(event) => setAiOperationDomain(event.target.value as 'all' | AIOperationDomain)}>
-              {DOMAIN_FILTERS.map((option) => (
-                <option key={option.value} value={option.value}>{ui(option.label)}</option>
-              ))}
-            </select></label>
-            <label className="ai-review-page__field"><span>{ui("Review state")}</span><select aria-label={ui("Review state")} style={selectStyle} value={reviewState} onChange={(event) => setReviewState(event.target.value as 'all' | ReviewState)}>
-              {REVIEW_STATE_FILTERS.map((option) => (
-                <option key={option.value} value={option.value}>{ui(option.label)}</option>
-              ))}
-            </select></label>
-            <label className="ai-review-page__field"><span>{ui("Urgency")}</span><select aria-label={ui("Review urgency")} style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | Urgency)}>
-              {URGENCY_FILTERS.map((option) => (
-                <option key={option.value} value={option.value}>{ui(option.label)}</option>
-              ))}
-            </select></label>
+            {!isFocusedReview ? (<>
+              <label className="ai-review-page__field"><span>{ui("Review category")}</span><select aria-label={ui("Review category")} style={selectStyle} value={aiOperationDomain} onChange={(event) => setAiOperationDomain(event.target.value as 'all' | AIOperationDomain)}>
+                {DOMAIN_FILTERS.map((option) => (
+                  <option key={option.value} value={option.value}>{ui(option.label)}</option>
+                ))}
+              </select></label>
+              <label className="ai-review-page__field"><span>{ui("Review state")}</span><select aria-label={ui("Review state")} style={selectStyle} value={reviewState} onChange={(event) => setReviewState(event.target.value as 'all' | ReviewState)}>
+                {REVIEW_STATE_FILTERS.map((option) => (
+                  <option key={option.value} value={option.value}>{ui(option.label)}</option>
+                ))}
+              </select></label>
+              <label className="ai-review-page__field"><span>{ui("Urgency")}</span><select aria-label={ui("Review urgency")} style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | Urgency)}>
+                {URGENCY_FILTERS.map((option) => (
+                  <option key={option.value} value={option.value}>{ui(option.label)}</option>
+                ))}
+              </select></label>
+            </>) : (
+              <span className="card__subtext">{ui('Showing the exact requested Intelligence Review item. Queue filters do not apply in this focused view.')}</span>
+            )}
             <button className="button button--secondary ai-review-page__toolbar-action" type="button" onClick={() => reviewQuery.refetch()} disabled={reviewQuery.isFetching}>
               <TenantNavIcon path="/intelligence-review" size={16} />{reviewQuery.isFetching ? ui('Refreshing…') : ui('Refresh review queue')}
             </button>
             <Link className="button button--secondary ai-review-page__toolbar-action" to="/workflow-composer"><TenantNavIcon path="/workflow-composer" size={16} />{ui("Open workflow composer")}</Link>
-            <Link className="button button--secondary ai-review-page__toolbar-action" to="/system-context"><TenantNavIcon path="/system-context" size={16} />{ui("Open system context")}</Link>
+            {capabilities.canViewSystemContext ? <Link className="button button--secondary ai-review-page__toolbar-action" to="/system-context"><TenantNavIcon path="/system-context" size={16} />{ui("Open system context")}</Link> : null}
           </div>
 
           {reviewQuery.isLoading ? (
@@ -8635,7 +8821,7 @@ export default function HumanInLoopAIReviewPage() {
             </p>
           ) : (
             <p className="card__subtext">
-              {guidance.review_queue_guidance || ui('Review source confidence, explainability, structured evidence, and approval requirements before acting elsewhere.')}
+              {localizedIntelligenceReviewSystemText(guidance.review_queue_guidance_key, guidance.review_queue_guidance, 'Review source confidence, explainability, structured evidence, and approval requirements before acting elsewhere.', ui)}
             </p>
           )}
         </div>
@@ -8643,8 +8829,8 @@ export default function HumanInLoopAIReviewPage() {
 
       <section className="section" id="ai-review-queue" style={{ scrollMarginTop: 16 }}>
         <div className="section__title ai-review-page__section-title"><span className="ai-review-page__section-icon ai-review-page__icon--violet"><TenantNavIcon path="/intelligence-review" size={16} /></span><span>{ui("Review queue")}</span></div>
-        {reviews.length === 0 && !reviewQuery.isLoading ? (
-          <div className="empty-state">{ui("No recommendation review items match the selected filters.")}</div>
+        {reviews.length === 0 && !reviewQuery.isLoading && !reviewQuery.error ? (
+          <div className="empty-state">{ui(requestedSourceActionId ? 'The requested review is not available to your role or is no longer available.' : 'No recommendation review items match the selected filters.')}</div>
         ) : (
           <div style={reviewListStyle}>
             {reviews.map((review) => {
@@ -8687,7 +8873,7 @@ export default function HumanInLoopAIReviewPage() {
                     <span className="ai-review-page__badge ai-review-page__badge--violet">{recommendationLabel(review.ai_operation_domain, ui)}</span>
                     {review.governance_approval_guidance?.approval_required && reviewStateIsActive(lifecycle?.current_status || review.review_state) ? <span className="ai-review-page__badge ai-review-page__badge--amber">{ui("Approval required")}</span> : null}
                   </div>
-                  <div className="ai-review-page__review-heading"><span className="ai-review-page__review-icon ai-review-page__icon--violet"><TenantNavIcon path="/intelligence-review" size={18} /></span><h3>{review.title || review.review_id}</h3></div>
+                  <div className="ai-review-page__review-heading"><span className="ai-review-page__review-icon ai-review-page__icon--violet"><TenantNavIcon path="/intelligence-review" size={18} /></span><h3>{review.title || ui('Intelligence review')}</h3></div>
                   <p className="card__subtext">{review.summary || ui('No review summary was provided.')}</p>
                   <div className="card-grid ai-review-page__evidence-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', marginTop: 12 }}>
                     <div className="ai-review-page__evidence-card">
@@ -8714,11 +8900,11 @@ export default function HumanInLoopAIReviewPage() {
                   {evidencePreview?.preview_summary ? (
                     <div style={{ marginTop: 12 }}>
                       <div className="card__label">{ui("Evidence summary")}</div>
-                      <p className="card__subtext">{evidencePreview.preview_summary}</p>
+                      <p className="card__subtext">{localizedReviewEvidenceSummary(evidencePreview, locale, ui)}</p>
                     </div>
                   ) : null}
 
-                  {review.source_reference?.source_id ? (
+                  {canViewDiagnostics && review.source_reference?.source_id ? (
                     <div style={{ marginTop: 12 }}>
                       <div className="card__label">{ui("Source record")}</div>
                       <p className="card__subtext">{recommendationLabel(review.source_reference.source_type, ui)} · {review.source_reference.source_id}</p>
@@ -8762,7 +8948,7 @@ export default function HumanInLoopAIReviewPage() {
                     {lifecycle?.override_reason ? <p className="card__subtext">{ui("Override reason:")} {lifecycle.override_reason}</p> : null}
                     {lifecycle?.execution_request_id ? (
                       <p className="card__subtext">
-                        {ui("Execution Request draft:")} {lifecycle.execution_request_id}
+                        {ui('A linked Execution Request exists.')}
                         {lifecycle.execution_request_status ? ` · ${ui('Status:')} ${recommendationLabel(lifecycle.execution_request_status, ui)}` : ''}
                         {lifecycle.execution_request_execution_status ? ` · ${ui('Execution:')} ${recommendationLabel(lifecycle.execution_request_execution_status, ui)}` : ''}
                       </p>
@@ -8872,12 +9058,12 @@ export default function HumanInLoopAIReviewPage() {
                       <div className="card__label ai-review-page__panel-title"><span className="ai-review-page__panel-icon"><TenantNavIcon path="/audit" size={15} /></span>{ui("Review history")}</div>
                       {reviewHistoryQuery.isLoading ? <p className="card__subtext">{ui("Loading review history…")}</p> : null}
                       {reviewHistoryQuery.error ? <p className="form-error">{reviewHistoryQuery.error instanceof Error ? reviewHistoryQuery.error.message : ui('Unable to load review history.')}</p> : null}
-                      {!reviewHistoryQuery.isLoading && !(reviewHistoryQuery.data?.events?.length) ? <p className="card__subtext">{ui("No persisted review events yet.")}</p> : null}
+                      {!reviewHistoryQuery.isLoading && !reviewHistoryQuery.error && !(reviewHistoryQuery.data?.events?.length) ? <p className="card__subtext">{ui("No persisted review events yet.")}</p> : null}
                       {(reviewHistoryQuery.data?.events || []).map((event) => (
                         <div key={event.id || `${event.event_type}-${event.created_at}`} style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-color, #d9dde5)' }}>
                           <strong>{recommendationLabel(event.event_type, ui)}</strong>
                           <div className="card__subtext">{recommendationLabel(event.from_status, ui)} → {recommendationLabel(event.to_status, ui)} · {formatDateTime(event.created_at, locale, ui)}</div>
-                          <div className="card__subtext">{ui('Reviewed by')} {event.actor_name || (event.actor_role ? recommendationLabel(event.actor_role, ui) : event.actor_email || event.actor_user_id || ui('Not reported'))}</div>
+                          <div className="card__subtext">{ui('Reviewed by')} {event.actor_name || (event.actor_role ? recommendationLabel(event.actor_role, ui) : event.actor_email || ui('Tenant user'))}</div>
                           {event.reason_category ? <div className="card__subtext">{ui("Reason:")} {recommendationLabel(event.reason_category, ui)}</div> : null}
                           {event.reviewer_notes ? <div className="card__subtext">{ui("Notes:")} {event.reviewer_notes}</div> : null}
                           {event.metadata?.escalation_target_role ? (
@@ -8892,7 +9078,13 @@ export default function HumanInLoopAIReviewPage() {
                           {event.metadata?.resolved_escalation?.target_role ? (
                             <div className="card__subtext">{ui('Escalation resolved for:')} {escalationTargetLabel(event.metadata.resolved_escalation.target_role, ui)}</div>
                           ) : null}
-                          {event.execution_request_id ? <div className="card__subtext">{ui("Execution Request:")} {event.execution_request_id}</div> : null}
+                          {event.execution_request_id ? (
+                            <div className="card__subtext">
+                              {capabilities.canViewExecutionRequests
+                                ? <Link to={`/execution-requests?request_id=${encodeURIComponent(event.execution_request_id)}`}>{ui('Open linked Execution Request')}</Link>
+                                : ui('A linked Execution Request exists.')}
+                            </div>
+                          ) : null}
                         </div>
                       ))}
                     </div>
@@ -8925,7 +9117,7 @@ export default function HumanInLoopAIReviewPage() {
                           <TenantNavIcon path="/execution-requests" size={16} />{executionRequestDraftMutation.isPending ? ui('Creating draft…') : ui('Create Execution Request draft')}
                         </button>
                       ) : null}
-                    {lifecycle?.execution_request_id ? <Link className="button button--secondary" to={`/execution-requests?request_id=${encodeURIComponent(lifecycle.execution_request_id)}`} data-skip-global-action-feedback="true"><TenantNavIcon path="/execution-requests" size={16} />{ui("Open linked Execution Request")}</Link> : null}
+                    {capabilities.canViewExecutionRequests && lifecycle?.execution_request_id ? <Link className="button button--secondary" to={`/execution-requests?request_id=${encodeURIComponent(lifecycle.execution_request_id)}`} data-skip-global-action-feedback="true"><TenantNavIcon path="/execution-requests" size={16} />{ui("Open linked Execution Request")}</Link> : null}
                   </div>
                 </article>
               );
@@ -8958,14 +9150,14 @@ export default function HumanInLoopAIReviewPage() {
                 <span style={badgeStyle}>{ui("Pending:")} {formatLocalizedNumber(numberValue(enablementManifest?.totals?.not_enabled_pending_hardening), locale)}</span>
               </div>
               <p className="card__subtext" style={{ marginTop: 12 }}>
-                {enablementManifest?.global_enablement_rule || ui("Production enablement is blocked until evidence, signoff, validation, and governance rules are satisfied.")}
+                {enablementManifest?.global_enablement_rule ? localizedReadinessSystemText(enablementManifest.global_enablement_rule, ui) : ui("Production enablement is blocked until evidence, signoff, validation, and governance rules are satisfied.")}
               </p>
               {enablementSequence.length ? (
                 <div style={{ marginTop: 14 }}>
                   <div className="card__label">{ui("Enablement sequence")}</div>
                   <ol style={{ marginBottom: 0 }}>
                     {enablementSequence.map((item) => (
-                      <li key={item}>{item}</li>
+                      <li key={item}>{localizedReadinessSystemText(item, ui)}</li>
                     ))}
                   </ol>
                 </div>
@@ -8976,11 +9168,11 @@ export default function HumanInLoopAIReviewPage() {
                   <ol style={{ marginBottom: 0 }}>
                     {enablementBlockedFeatures.slice(0, 10).map((feature) => (
                       <li key={feature.feature_key}>
-                        <strong>{feature.feature_label || formatLabel(feature.feature_key)}</strong>: {readinessCoreLabel(feature.enablement_state, ui)}
+                        <strong>{feature.feature_label ? localizedReadinessSystemText(feature.feature_label, ui) : formatLabel(feature.feature_key)}</strong>: {readinessCoreLabel(feature.enablement_state, ui)}
                         <div className="card__subtext">
                           {readinessCoreLabel(feature.production_priority, ui)} · {ui("Release blockers")} {formatLocalizedNumber(numberValue(feature.release_blocker_count), locale)} · {ui("Evidence gaps:")} {formatLocalizedNumber(numberValue(feature.required_evidence_gap_count), locale)} · {ui("Signoff:")} {readinessCoreLabel(feature.signoff_status, ui)} · {ui("Validation:")} {readinessCoreLabel(feature.validation_status, ui)}
                         </div>
-                        <div className="card__subtext">{feature.operator_enablement_note}</div>
+                        <div className="card__subtext">{localizedReadinessSystemText(feature.operator_enablement_note, ui)}</div>
                       </li>
                     ))}
                   </ol>
@@ -8991,7 +9183,7 @@ export default function HumanInLoopAIReviewPage() {
                   <div className="card__label">{ui("Eligible for controlled final testing")}</div>
                   <ul style={{ marginBottom: 0 }}>
                     {enablementEligibleFeatures.slice(0, 10).map((feature) => (
-                      <li key={feature.feature_key}>{feature.feature_label || formatLabel(feature.feature_key)}</li>
+                      <li key={feature.feature_key}>{feature.feature_label ? localizedReadinessSystemText(feature.feature_label, ui) : formatLabel(feature.feature_key)}</li>
                     ))}
                   </ul>
                 </div>
@@ -9021,14 +9213,14 @@ export default function HumanInLoopAIReviewPage() {
                 <span style={badgeStyle}>{ui("Controlled:")} {formatLocalizedNumber(numberValue(monitoringContract?.totals?.monitor_after_controlled_enablement), locale)}</span>
               </div>
               <p className="card__subtext" style={{ marginTop: 12 }}>
-                {monitoringContract?.safety_rule || ui("Monitoring is read-only and does not execute intelligence and AI-assisted actions.")}
+                {monitoringContract?.safety_rule ? localizedReadinessSystemText(monitoringContract.safety_rule, ui) : ui("Monitoring is read-only and does not execute intelligence and AI-assisted actions.")}
               </p>
               {monitoringChecks.length ? (
                 <div style={{ marginTop: 14 }}>
                   <div className="card__label">{ui("Global monitoring checks")}</div>
                   <ul style={{ marginBottom: 0 }}>
                     {monitoringChecks.slice(0, 6).map((check) => (
-                      <li key={check}>{check}</li>
+                      <li key={check}>{localizedReadinessSystemText(check, ui)}</li>
                     ))}
                   </ul>
                 </div>
@@ -9039,11 +9231,11 @@ export default function HumanInLoopAIReviewPage() {
                   <ol style={{ marginBottom: 0 }}>
                     {monitoringBlockedFeatures.slice(0, 8).map((feature) => (
                       <li key={feature.feature_key}>
-                        <strong>{feature.feature_label || formatLabel(feature.feature_key)}</strong>: {readinessCoreLabel(feature.monitoring_state, ui)}
+                        <strong>{feature.feature_label ? localizedReadinessSystemText(feature.feature_label, ui) : formatLabel(feature.feature_key)}</strong>: {readinessCoreLabel(feature.monitoring_state, ui)}
                         <div className="card__subtext">
                           {ui("Cadence")} {readinessCoreLabel(feature.monitoring_cadence, ui)} · {ui("Blockers:")} {formatLocalizedNumber(numberValue(feature.release_blocker_count), locale)} · {ui("Evidence gaps:")} {formatLocalizedNumber(numberValue(feature.required_evidence_gap_count), locale)} · {ui("Validation:")} {readinessCoreLabel(feature.validation_status, ui)}
                         </div>
-                        <div className="card__subtext">{feature.operator_response}</div>
+                        <div className="card__subtext">{localizedReadinessSystemText(feature.operator_response, ui)}</div>
                       </li>
                     ))}
                   </ol>
@@ -9054,7 +9246,7 @@ export default function HumanInLoopAIReviewPage() {
                   <div className="card__label">{ui("Controlled enablement monitoring")}</div>
                   <ul style={{ marginBottom: 0 }}>
                     {monitoringControlledFeatures.slice(0, 8).map((feature) => (
-                      <li key={feature.feature_key}>{feature.feature_label || formatLabel(feature.feature_key)} · {readinessCoreLabel(feature.monitoring_cadence, ui)}</li>
+                      <li key={feature.feature_key}>{feature.feature_label ? localizedReadinessSystemText(feature.feature_label, ui) : formatLabel(feature.feature_key)} · {readinessCoreLabel(feature.monitoring_cadence, ui)}</li>
                     ))}
                   </ul>
                 </div>
@@ -9064,7 +9256,7 @@ export default function HumanInLoopAIReviewPage() {
                   <div className="card__label">{ui("Escalation rules")}</div>
                   <ul style={{ marginBottom: 0 }}>
                     {monitoringEscalationRules.slice(0, 4).map((rule) => (
-                      <li key={rule}>{rule}</li>
+                      <li key={rule}>{localizedReadinessSystemText(rule, ui)}</li>
                     ))}
                   </ul>
                 </div>
@@ -9079,15 +9271,15 @@ export default function HumanInLoopAIReviewPage() {
         <div className="card-grid" style={gridStyle}>
           <div className="card">
             <div className="card__label">{ui("Confidence guidance")}</div>
-            <p className="card__subtext">{guidance.confidence_guidance || ui("Confidence is advisory only and never authorizes automatic execution.")}</p>
+            <p className="card__subtext">{localizedIntelligenceReviewSystemText(guidance.confidence_guidance_key, guidance.confidence_guidance, 'Confidence is advisory only and never authorizes automatic execution.', ui)}</p>
           </div>
           <div className="card">
             <div className="card__label">{ui("Override guidance")}</div>
-            <p className="card__subtext">{guidance.override_guidance || ui("Overrides must be captured in governed source workflows.")}</p>
+            <p className="card__subtext">{localizedIntelligenceReviewSystemText(guidance.override_guidance_key, guidance.override_guidance, 'Overrides must be captured in governed source workflows.', ui)}</p>
           </div>
           <div className="card">
             <div className="card__label">{ui("Approval guidance")}</div>
-            <p className="card__subtext">{ui(guidance.approval_guidance || "Approvals must be completed in existing governed workflows.")}</p>
+            <p className="card__subtext">{localizedIntelligenceReviewSystemText(guidance.approval_guidance_key, guidance.approval_guidance, 'Approvals must be completed in existing governed workflows.', ui)}</p>
           </div>
           <div className="card">
             <div className="card__label">{ui("Safety contract")}</div>

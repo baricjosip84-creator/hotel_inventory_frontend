@@ -107,7 +107,7 @@ for (const contract of displayContracts) if (!sliceSource.includes(contract)) fa
 if (!process.exitCode) pass('Known priorities, tiers, escalation/closure states, owner hints, and runtime-gap codes use localized display mapping.');
 
 const canonicalContracts = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   "'runtime_waiver_escalation_matrix'", "'runtime_waiver_closure_board'", "'runtime_post_closure_monitoring_plan'",
   'tier_1_executive_escalation', 'tier_2_product_operations_escalation', 'tier_3_owner_followup',
   'escalation_required_before_commercial_ai_enablement', 'closure_blocked_by_open_runtime_gaps'

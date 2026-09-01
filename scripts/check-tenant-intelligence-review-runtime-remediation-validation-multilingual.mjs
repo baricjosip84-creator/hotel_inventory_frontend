@@ -106,7 +106,7 @@ for (const contract of displayContracts) if (!sliceSource.includes(contract)) fa
 if (!process.exitCode) pass('Known runtime priorities, owner hints, release impacts/statuses, drill statuses, and gap codes use localized display mapping.');
 
 const canonicalContracts = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   "'runtime_remediation_worklist'", "'runtime_validation_drill'", "'runtime_signoff_evidence_ledger'",
   'runtime_remediation_required_before_unwaived_commercial_release', 'blocks_or_requires_waiver_for_commercial_ai_release',
   'blocking_runtime_validation_drill_required', 'runtime_validation_drill_required_before_unwaived_commercial_release',
@@ -121,18 +121,21 @@ const forbiddenTechnicalTranslation = [
 for (const pattern of forbiddenTechnicalTranslation) if (pageSource.includes(pattern)) fail(`Canonical runtime remediation/validation identifier must remain language-independent: ${pattern}`);
 if (!process.exitCode) pass('Readiness endpoint, panel keys, owner/status/action identifiers, and backend contracts remain language-independent.');
 
-const serverDataContracts = [
-  '<strong>{item.feature_label}</strong>', "item.recommended_next_actions.join(', ')", '<strong>{row.feature_label}</strong>',
-  "row.required_evidence_artifacts.join(', ')", "row.pass_criteria.join(', ')", "row.operator_drill_steps.join(', ')",
-  'readinessQuery.error instanceof ApiError', '? readinessQuery.error.message'
+const localizedSystemContracts = [
+  'localizedReadinessSystemText(item.feature_label, ui)',
+  'localizedReadinessSystemText(row.feature_label, ui)',
+  'localizedReadinessSystemList(row.required_evidence_artifacts, ui)',
+  'localizedReadinessSystemList(row.pass_criteria, ui)',
+  'localizedReadinessSystemList(row.operator_drill_steps, ui)'
 ];
-for (const contract of serverDataContracts) if (!pageSource.includes(contract)) fail(`Backend runtime remediation/validation data boundary changed: ${contract}`);
+for (const contract of localizedSystemContracts) if (!pageSource.includes(contract)) fail(`System-owned runtime remediation/validation presentation is not localized explicitly: ${contract}`);
+for (const contract of ["item.recommended_next_actions.join(', ')", 'readinessQuery.error instanceof ApiError', '? readinessQuery.error.message']) if (!pageSource.includes(contract)) fail(`Runtime remediation canonical-data/error boundary changed: ${contract}`);
 const forbiddenServerTranslation = [
   'ui(item.feature_label)', 'ui(item.recommended_next_actions', 'ui(row.feature_label)', 'ui(row.required_evidence_artifacts',
   'ui(row.pass_criteria', 'ui(row.operator_drill_steps', 'ui(readinessQuery.error.message)'
 ];
 for (const pattern of forbiddenServerTranslation) if (sliceSource.includes(pattern)) fail(`Backend-returned runtime remediation/validation content must not be blindly translated: ${pattern}`);
-if (!process.exitCode) pass('Backend feature labels, recommended actions, evidence artifact codes, pass criteria, drill steps, and API errors remain data.');
+if (!process.exitCode) pass('System-owned feature labels, evidence instructions, pass criteria, and drill steps use the explicit readiness localization boundary; canonical remediation action codes and API errors remain data.');
 
 if (sliceSource.includes('apiRequest<') || sliceSource.includes('method:')) fail('Runtime remediation/validation slice must remain presentation-only and must not introduce mutation calls.');
 else pass('Runtime remediation/validation slice remains presentation-only and read-only.');

@@ -100,7 +100,7 @@ for (const value of display) if (!slice.includes(value)) fail(`Localized display
 if (!process.exitCode) pass('Known renewal/audit states, owners, and renewal cadence use localized display mapping.');
 
 const canonical = [
-  "apiRequest<IntelligenceProductionReadinessResponse>('/intelligence-readiness/production-readiness-summary')",
+  "production-readiness-summary${forceRefresh ? '?refresh=true' : ''}",
   "'runtime_post_enablement_steady_state_certification_renewal_board'", "'runtime_final_governance_audit_pack'", "'final_completion_freeze_manifest'",
   'steady_state_certification_renewal_blocked_until_resolution_verification_and_runtime_gap_controls_are_closed',
   'manual_steady_state_certification_renewal_ready_after_evidence_refresh',
