@@ -72,6 +72,17 @@ const missingDynamic = dynamicLabels.filter((key) => !uniqueKeys.has(key));
 if (missingDynamic.length) fail(`Workflow Composer dynamic display labels are missing translations: ${missingDynamic.join(' | ')}`);
 else pass(`${dynamicLabels.length} dynamic Workflow Composer labels are catalog-backed.`);
 
+const keyedServerGuidance = [
+  'Review the first suggested plan, then open its source page to review the real work using only actions available to your role.',
+  'No workflow plan currently matches the selected filters.',
+  'Approval steps are suggestions only. This page does not assign approvers or approve work.',
+  'Trigger information explains what could start a workflow. This page does not listen for, publish, replay, or trigger events.',
+  'External integration plans are visibility-only. This page does not call partner systems or run an external workflow.'
+];
+const missingKeyedServerGuidance = keyedServerGuidance.filter((key) => !uniqueKeys.has(key));
+if (missingKeyedServerGuidance.length) fail(`Workflow Composer keyed server guidance is missing five-language rows: ${missingKeyedServerGuidance.join(' | ')}`);
+else pass(`${keyedServerGuidance.length} keyed server-owned Workflow Composer guidance rows are catalog-backed.`);
+
 const representativeRows = [
   'Human workflow planning', 'Workflow Composer', 'Suggested workflow plans', 'Review and approval path', 'Where the work happens:',
   'Technical plan details', 'How to understand the plans', 'Safety and control', 'Technical safety contract', 'No autonomous execution'
@@ -123,23 +134,29 @@ for (const contract of routerContracts) if (!routerSource.includes(contract)) fa
 if (!process.exitCode) pass('Workflow Composer route, query filters, source links, permissions, and blueprint identifiers remain language-independent.');
 
 const serverContentContracts = [
-  'if (blueprint.source_title) return displayTitleText(blueprint.source_title);',
+  "blueprint.source_action_domain === 'alerts' ? displayTitleText(blueprint.source_title) : blueprint.source_title",
+  "return `${ui('Integration plan:')} ${workflowDomainLabel(blueprint.workflow_domain, ui)}`;",
   'if (blueprint.source_summary) return blueprint.source_summary;',
-  "guidance.next_blueprint_title ? displayTitleText(guidance.next_blueprint_title) : ui('No plan is waiting')",
-  "guidance.composer_guidance || ui('Choose a plan and open its source page.')",
-  "guidance.approval_chain_guidance || ui('Approval steps are suggestions and do not approve work.')",
-  "guidance.event_trigger_guidance || ui('Trigger information is for review only.')",
-  "guidance.integration_routing_guidance || ui('External integrations are not run from this page.')",
+  'nextBlueprintTitle(guidance, blueprints, ui)',
+  'localizedGuidance(guidance.composer_guidance_key, guidance.composer_guidance',
+  'localizedGuidance(guidance.approval_chain_guidance_key, guidance.approval_chain_guidance',
+  'localizedGuidance(guidance.event_trigger_guidance_key, guidance.event_trigger_guidance',
+  'localizedGuidance(guidance.integration_routing_guidance_key, guidance.integration_routing_guidance',
+  "if (sourceSurface === '/control-tower') return '/reliability-command';",
+  'const hasSnapshot = Boolean(response);',
+  'composerQuery.error && hasSnapshot',
+  "Showing the last available Workflow Composer snapshot. Refresh again before relying on time-sensitive plan ordering.",
   'composerQuery.error instanceof ApiError ? composerQuery.error.message'
 ];
 for (const contract of serverContentContracts) if (!pageSource.includes(contract)) fail(`Workflow Composer backend/business content display contract changed: ${contract}`);
+if (pageSource.includes('blueprint.source_contract_key ? formatLabel')) fail('Workflow Composer must not use technical contract keys as normal-user plan titles.');
 const forbiddenServerContentTranslation = [
   'ui(blueprint.source_title)', 'ui(blueprint.source_summary)', 'ui(guidance.next_blueprint_title)', 'ui(guidance.composer_guidance)',
   'ui(guidance.approval_chain_guidance)', 'ui(guidance.event_trigger_guidance)', 'ui(guidance.integration_routing_guidance)',
   'ui(composerQuery.error.message)'
 ];
 for (const pattern of forbiddenServerContentTranslation) if (pageSource.includes(pattern)) fail(`Backend-returned Workflow Composer content must not be blindly translated as a UI key: ${pattern}`);
-if (!process.exitCode) pass('Backend titles, summaries, guidance, identifiers, and errors remain data while frontend-owned labels and fallbacks are localized.');
+if (!process.exitCode) pass('Backend business text and errors remain data, while explicitly keyed server-owned guidance is localized and stale snapshots remain truthful.');
 
 if (pageSource.includes('useMutation(') || pageSource.includes("method: 'POST'") || pageSource.includes("method: 'PUT'") || pageSource.includes("method: 'PATCH'") || pageSource.includes("method: 'DELETE'")) {
   fail('Workflow Composer must remain read-only and must not introduce mutation calls.');

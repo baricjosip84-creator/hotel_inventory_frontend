@@ -114,9 +114,13 @@ type WorkflowComposerResponse = {
     next_blueprint_type?: string | null;
     next_blueprint_title?: string | null;
     composer_guidance?: string;
+    composer_guidance_key?: string | null;
     approval_chain_guidance?: string;
+    approval_chain_guidance_key?: string | null;
     event_trigger_guidance?: string;
+    event_trigger_guidance_key?: string | null;
     integration_routing_guidance?: string;
+    integration_routing_guidance_key?: string | null;
     safety_contract?: Record<string, boolean>;
   };
   blueprints?: WorkflowBlueprint[];
@@ -300,10 +304,11 @@ function displayTitleText(value?: string | null): string {
 }
 
 function sourceTitle(blueprint: WorkflowBlueprint, ui: (englishText: string) => string): string {
-  if (blueprint.source_title) return displayTitleText(blueprint.source_title);
+  if (blueprint.source_title) {
+    return blueprint.source_action_domain === 'alerts' ? displayTitleText(blueprint.source_title) : blueprint.source_title;
+  }
   if (blueprint.blueprint_type === 'external_workflow_visibility_contract') {
-    const contractName = blueprint.source_contract_key ? formatLabel(blueprint.source_contract_key) : workflowDomainLabel(blueprint.workflow_domain, ui);
-    return `${ui('Integration plan:')} ${contractName}`;
+    return `${ui('Integration plan:')} ${workflowDomainLabel(blueprint.workflow_domain, ui)}`;
   }
   return `${ui('Workflow plan:')} ${workflowDomainLabel(blueprint.workflow_domain, ui)}`;
 }
@@ -314,6 +319,19 @@ function sourceDescription(blueprint: WorkflowBlueprint, ui: (englishText: strin
     return ui('A read-only plan showing how an approved external integration could be reviewed and governed.');
   }
   return ui('A suggested human workflow based on an existing open work item.');
+}
+
+function localizedGuidance(key: string | null | undefined, value: string | null | undefined, fallback: string, ui: (englishText: string) => string): string {
+  const text = String(value || '').trim();
+  return text ? (key ? ui(text) : text) : ui(fallback);
+}
+
+function nextBlueprintTitle(guidance: WorkflowComposerResponse['guidance'], blueprints: WorkflowBlueprint[], ui: (englishText: string) => string): string {
+  const nextId = String(guidance?.next_blueprint_id || '').trim();
+  const next = nextId ? blueprints.find((blueprint) => blueprint.blueprint_id === nextId) : blueprints[0];
+  if (next) return sourceTitle(next, ui);
+  const fallback = String(guidance?.next_blueprint_title || '').trim();
+  return fallback || ui('No plan is waiting');
 }
 
 function urgencyClass(value?: string | null): string {
@@ -352,6 +370,7 @@ function linkIconPath(to: string): string {
 
 function sourceSurfaceToAppPath(sourceSurface?: string | null): string | null {
   if (!sourceSurface || !sourceSurface.startsWith('/')) return null;
+  if (sourceSurface === '/control-tower') return '/reliability-command';
 
   const tenantRoutes = new Set([
     '/action-center',
@@ -366,7 +385,8 @@ function sourceSurfaceToAppPath(sourceSurface?: string | null): string | null {
     '/inventory-reservations',
     '/inventory-requisitions',
     '/stock-transfers',
-    '/reports'
+    '/reports',
+    '/reliability-command'
   ]);
 
   return tenantRoutes.has(sourceSurface) ? sourceSurface : null;
@@ -450,6 +470,7 @@ export default function WorkflowAutomationComposerPage() {
   });
 
   const response = composerQuery.data;
+  const hasSnapshot = Boolean(response);
   const summary = response?.summary || {};
   const guidance = response?.guidance || {};
   const blueprints = response?.blueprints || [];
@@ -482,8 +503,8 @@ export default function WorkflowAutomationComposerPage() {
   }, [availableDomains, workflowDomain]);
 
   const summaryValue = (value: unknown): number | string => {
-    if (composerQuery.isLoading || composerQuery.error) return '—';
-    return formatLocalizedNumber(numberValue(value), locale);
+    if (hasSnapshot) return formatLocalizedNumber(numberValue(value), locale);
+    return composerQuery.isLoading ? ui('Loading…') : ui('Unavailable');
   };
 
   return (
@@ -579,18 +600,18 @@ export default function WorkflowAutomationComposerPage() {
             <div>
               <strong>{ui("How to use this page")}</strong>
               <p className="card__subtext">
-                {ui("Review a suggested plan, then open its source page to assign, approve, or complete the real work. Nothing is published or executed here.")}
+                {ui("Review a suggested plan, then open its source page and use only the actions available to your role. Nothing is published or executed here.")}
               </p>
             </div>
           </div>
 
-          {composerQuery.isLoading ? (
+          {composerQuery.isLoading && !hasSnapshot ? (
             <div className="workflow-composer-page__state" role="status">
               <span className="workflow-composer-page__intro-icon"><TenantNavIcon path="/workflow-composer" size={17} /></span>
               <div><div className="workflow-composer-page__state-title">{ui("Loading workflow plans")}</div>
               <p className="card__subtext">{ui("Collecting permitted open work and integration plans for the current company.")}</p></div>
             </div>
-          ) : composerQuery.error ? (
+          ) : composerQuery.error && !hasSnapshot ? (
             <div className="workflow-composer-page__state" role="alert">
               <span className="workflow-composer-page__intro-icon workflow-composer-page__intro-icon--danger"><TenantNavIcon path="/alerts" size={17} /></span>
               <div className="workflow-composer-page__state-copy"><div className="workflow-composer-page__state-title">{ui("Workflow plans could not be loaded")}</div>
@@ -707,6 +728,14 @@ export default function WorkflowAutomationComposerPage() {
             </div>
           )}
 
+          {composerQuery.error && hasSnapshot ? (
+            <div className="workflow-composer-page__state" role="status">
+              <span className="workflow-composer-page__intro-icon workflow-composer-page__intro-icon--danger"><TenantNavIcon path="/alerts" size={17} /></span>
+              <div><div className="workflow-composer-page__state-title">{ui('Refresh failed')}</div>
+              <p className="card__subtext">{ui('Showing the last available Workflow Composer snapshot. Refresh again before relying on time-sensitive plan ordering.')}</p></div>
+            </div>
+          ) : null}
+
           {response?.generated_at ? (
             <p className="card__subtext workflow-composer-page__generated">
               {ui("Plans updated")} {formatDateTime(response.generated_at, locale, ui)}. {ui("Press Refresh plans whenever you need the latest snapshot.")}
@@ -715,7 +744,7 @@ export default function WorkflowAutomationComposerPage() {
         </div>
       </section>
 
-      {composerQuery.isLoading || composerQuery.error ? null : (
+      {!hasSnapshot ? null : (
         <section className="section workflow-composer-page__section">
           <div className="section__title workflow-composer-page__section-title"><span className="workflow-composer-page__section-icon"><TenantNavIcon path="/intelligence-review" size={16} /></span><span>{ui("How to understand the plans")}</span></div>
           <div className="workflow-composer-page__guidance-grid">
@@ -723,30 +752,30 @@ export default function WorkflowAutomationComposerPage() {
               <span className="workflow-composer-page__icon workflow-composer-page__icon--blue"><TenantNavIcon path={workflowDomainIconPath(blueprints[0]?.workflow_domain)} size={17} /></span>
               <div className="workflow-composer-page__guidance-copy"><div className="card__label">{ui("Start with")}</div>
               <div className="workflow-composer-page__guidance-value">
-                {guidance.next_blueprint_title ? displayTitleText(guidance.next_blueprint_title) : ui('No plan is waiting')}
+                {nextBlueprintTitle(guidance, blueprints, ui)}
               </div>
-              <p className="card__subtext">{guidance.composer_guidance || ui('Choose a plan and open its source page.')}</p></div>
+              <p className="card__subtext">{localizedGuidance(guidance.composer_guidance_key, guidance.composer_guidance, 'Choose a plan and open its source page.', ui)}</p></div>
             </div>
             <div className="card workflow-composer-page__guidance-card">
               <span className="workflow-composer-page__icon workflow-composer-page__icon--violet"><TenantNavIcon path="/permissions" size={17} /></span>
               <div className="workflow-composer-page__guidance-copy"><div className="card__label">{ui("Approval rule")}</div>
-              <p className="card__subtext">{guidance.approval_chain_guidance || ui('Approval steps are suggestions and do not approve work.')}</p></div>
+              <p className="card__subtext">{localizedGuidance(guidance.approval_chain_guidance_key, guidance.approval_chain_guidance, 'Approval steps are suggestions and do not approve work.', ui)}</p></div>
             </div>
             <div className="card workflow-composer-page__guidance-card">
               <span className="workflow-composer-page__icon workflow-composer-page__icon--amber"><TenantNavIcon path="/automation-schedules" size={17} /></span>
               <div className="workflow-composer-page__guidance-copy"><div className="card__label">{ui("Trigger rule")}</div>
-              <p className="card__subtext">{guidance.event_trigger_guidance || ui('Trigger information is for review only.')}</p></div>
+              <p className="card__subtext">{localizedGuidance(guidance.event_trigger_guidance_key, guidance.event_trigger_guidance, 'Trigger information is for review only.', ui)}</p></div>
             </div>
             <div className="card workflow-composer-page__guidance-card">
               <span className="workflow-composer-page__icon workflow-composer-page__icon--green"><TenantNavIcon path="/system-context" size={17} /></span>
               <div className="workflow-composer-page__guidance-copy"><div className="card__label">{ui("Integration rule")}</div>
-              <p className="card__subtext">{guidance.integration_routing_guidance || ui('External integrations are not run from this page.')}</p></div>
+              <p className="card__subtext">{localizedGuidance(guidance.integration_routing_guidance_key, guidance.integration_routing_guidance, 'External integrations are not run from this page.', ui)}</p></div>
             </div>
           </div>
         </section>
       )}
 
-      {composerQuery.isLoading || composerQuery.error ? null : (
+      {!hasSnapshot ? null : (
         <section className="section workflow-composer-page__section">
           <div className="section__title workflow-composer-page__section-title"><span className="workflow-composer-page__section-icon"><TenantNavIcon path="/reliability-command" size={16} /></span><span>{ui("Safety and control")}</span></div>
           <div className="workflow-composer-page__safety-grid">
