@@ -83,9 +83,33 @@ for (const blockMarker of [
   const block = page.slice(start, end);
   for (const match of block.matchAll(/:\s*'([^']+)'/g)) displayKeys.add(match[1]);
 }
+const systemTextStart = page.indexOf('const INSIGHTS_SYSTEM_TEXT = new Set([');
+const systemTextEnd = systemTextStart >= 0 ? page.indexOf(']);', systemTextStart) : -1;
+const systemTextKeys = new Set();
+if (systemTextStart < 0 || systemTextEnd < 0) {
+  fail('Insights explicit system-owned text catalog boundary is missing or malformed.');
+} else {
+  const block = page.slice(systemTextStart, systemTextEnd);
+  for (const match of block.matchAll(/^\s*'([^']+)'/gm)) systemTextKeys.add(match[1]);
+  for (const key of systemTextKeys) displayKeys.add(key);
+}
+
 const missing = [...displayKeys].filter((key) => !unique.has(key)).sort();
-if (missing.length) fail(`Insights UI keys missing translations: ${missing.join(' | ')}`);
-else pass(`Insights has ${displayKeys.size} catalog-backed literal/dynamic UI keys.`);
+if (missing.length) fail(`Insights UI/system-owned keys missing translations: ${missing.join(' | ')}`);
+else pass(`Insights has ${displayKeys.size} catalog-backed literal/dynamic/system-owned UI keys, including ${systemTextKeys.size} explicit backend-system strings.`);
+
+for (const ownershipAnchor of [
+  'INSIGHTS_SYSTEM_TEXT.has(value) ? ui(value) : value',
+  'localizeSupplierRiskFlag(',
+  'localizeDepletionRootCauseFactor(',
+  "case 'po_overdue':",
+  "case 'shipment_discrepancy':",
+  "case 'below_configured_minimum':",
+  "case 'recent_consumption_pressure':"
+]) {
+  if (!page.includes(ownershipAnchor)) fail(`Insights explicit system-text ownership/localization contract missing: ${ownershipAnchor}`);
+}
+if (!process.exitCode) pass('Insights localizes only explicitly owned backend system guidance and preserves an unknown-value fallback.');
 
 const rawTextPattern = /<(?:h[1-6]|p|th|td|summary|span|option|button|label|strong|small)\b[^>]*>\s*([A-Za-z][^<>{}]*)\s*</g;
 const rawAttributePattern = /\b(?:placeholder|title|ariaLabel|aria-label|label|helper|hint|description|eyebrow)=("[^"]*[A-Za-z][^"]*"|'[^']*[A-Za-z][^']*')/g;
@@ -154,17 +178,19 @@ for (const rawField of [
   'row.supplier_name',
   'row.product_name',
   'row.storage_location_name',
-  'blocker.message',
-  'item.message',
-  'flag.label',
-  'flag.detail',
-  'row.recommended_investigation_steps',
   'toReadableError('
 ]) {
-  if (!page.includes(rawField)) fail(`Insights business/server-data raw boundary changed or missing: ${rawField}`);
+  if (!page.includes(rawField)) fail(`Insights business/API-error raw boundary changed or missing: ${rawField}`);
 }
-if (!page.includes('return label ? ui(label) : value;')) fail('Unknown Insights status/tier values must remain raw rather than being dynamically catalog-populated.');
-else pass('Insights preserves business/server prose and unknown backend values as raw data.');
+for (const unknownFallback of [
+  'return INSIGHTS_SYSTEM_TEXT.has(value) ? ui(value) : value;',
+  'return { ...flag, label, detail: flag.detail };',
+  'return { ...factor, label, detail: localizeInsightsSystemText(factor.detail, ui) };',
+  'return label ? ui(label) : value;'
+]) {
+  if (!page.includes(unknownFallback)) fail(`Insights unknown/business backend value fallback changed or missing: ${unknownFallback}`);
+}
+if (!process.exitCode) pass('Insights preserves business names, API errors, and unknown backend prose as raw data while translating only explicitly owned system guidance.');
 
 for (const accessibilityAnchor of [
   "ui('Remove {filter} filter')",

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -385,12 +385,140 @@ function getRiskFlagStyle(severity: 'high' | 'medium' | 'low'): CSSProperties {
   return styles.riskFlagLow;
 }
 
+const INSIGHTS_SYSTEM_TEXT = new Set([
+  'No stock on hand',
+  'Current quantity is zero or below zero, so this stock row needs immediate operational review.',
+  'Below configured minimum',
+  'Near configured minimum',
+  'Very short coverage',
+  'Limited coverage',
+  'No recent usage baseline',
+  'No recent outbound movement was found in the selected lookback window, so coverage cannot be estimated from consumption.',
+  'High usage velocity',
+  'Recent consumption pressure',
+  'Demand history is incomplete',
+  'Some historical negative stock movements are unclassified or lack location context, so the consumption signal is incomplete.',
+  'No immediate depletion driver',
+  'Stock, minimum threshold, and recent outbound usage do not currently indicate a strong depletion driver.',
+  'Confirm the physical count at the listed storage location before placing or approving replenishment.',
+  'Check whether open shipments, pending purchase orders, or transfer activity already cover this shortage.',
+  'Review recent stock movements and usage events for abnormal consumption, damage, waste, or event-driven demand.',
+  'Compare current usage against upcoming operations before adjusting minimum stock.',
+  'Do not treat this as a demand forecast until more outbound movement history exists.',
+  'Review unclassified or location-missing historical negative movements before relying on this demand signal.',
+  'Keep normal monitoring cadence and re-check after the next stock movement cycle.',
+  'Critical consumption spike',
+  'Recent classified consumption is materially higher than the product baseline and requires same-day human review.',
+  'High consumption spike',
+  'Recent classified consumption is substantially higher than the product baseline.',
+  'Watch-level variance',
+  'Recent classified consumption is above baseline but not yet a critical production blocker.',
+  'No baseline but recent activity exists',
+  'The product has recent classified consumption without meaningful historical baseline evidence.',
+  '3x or higher spike ratio',
+  'Recent daily classified consumption is at least three times the baseline daily consumption rate.',
+  '2x or higher spike ratio',
+  'Recent daily classified consumption is at least twice the baseline daily consumption rate.',
+  'Cold-start anomaly',
+  'The anomaly may be caused by a new product pattern rather than true abnormal consumption.',
+  'Some historical negative stock movements are still unclassified, so the consumption baseline is incomplete and should not be treated as fully authoritative.',
+  'Normal operational variance',
+  'Current movement pattern does not require escalation beyond normal monitoring.',
+  'Review the most recent stock movements for the product and confirm the structured movement types and users responsible for consumption changes.',
+  'Check whether an event, maintenance activity, waste entry, damage entry, or manual adjustment explains the spike.',
+  'Confirm whether this is a new product, new location pattern, or recent onboarding case before treating it as abnormal usage.',
+  'Review unclassified historical negative movements before relying on this anomaly as a complete demand signal.',
+  'Compare recent daily classified consumption with normal par levels and upcoming demand before changing reorder assumptions.',
+  'Continue normal monitoring and review only if the anomaly score increases in the next operating window.',
+  'Do not mutate stock, approve procurement, or suppress alerts from this review without a separate authorized workflow.',
+  'Critical anomaly rows exist and require human operational review before production reliance.',
+  'High anomaly rows should be investigated before managers rely on anomaly output for decisions.',
+  'Tenant operational health is critical, so anomaly output should be reviewed together with alerts, overdue shipments, and low-stock pressure.',
+  'Investigate critical anomaly rows before relying on anomaly output in production decisions.',
+  'Confirm stock movement reason codes and users for critical spike rows.',
+  'Review high anomaly rows and tenant health context before acting.',
+  'Keep anomaly review read-only unless a separate authorized workflow is used.',
+  'Continue controlled monitoring and review anomaly rows during normal operational cadence.',
+  'Overdue open POs',
+  'Closed short',
+  'Open remaining qty',
+  'Low PO fill rate',
+  'High short-close rate',
+  'Overdue shipments',
+  'Partial shipments',
+  'Shipment discrepancies',
+  'Suppliers with high-risk performance factors must be reviewed before their scores support controlled procurement decisions.',
+  'Overdue supplier purchase orders require manual delivery-date verification.',
+  'Medium-risk supplier trust factors should remain on the manager review queue.',
+  'Review suppliers with high-risk factors before relying on trust scores for procurement decisions.',
+  'Keep suppliers without shipment history unrated and review their commitments manually.',
+  'Verify overdue and short-closed purchase orders against supplier commitments.',
+  'Use this review as advisory evidence only; it does not update suppliers, create POs, or approve procurement.'
+]);
+
+function localizeInsightsSystemText(value: string, ui: UiTranslator): string {
+  return INSIGHTS_SYSTEM_TEXT.has(value) ? ui(value) : value;
+}
+
+function localizeSupplierRiskFlag(
+  flag: NonNullable<SupplierTrustResponse['rows'][number]['risk_flags']>[number],
+  row: SupplierTrustResponse['rows'][number],
+  ui: UiTranslator,
+  formatNumber: (value: number | string | null | undefined, digits?: number) => string
+) {
+  const label = localizeInsightsSystemText(flag.label, ui);
+  switch (flag.code) {
+    case 'po_overdue':
+      return { ...flag, label, detail: ui('{count} open PO(s) are past expected delivery.').replace('{count}', formatNumber(row.overdue_open_purchase_orders, 0)) };
+    case 'po_closed_short':
+      return { ...flag, label, detail: ui('{count} PO(s) were manually closed with remaining quantity.').replace('{count}', formatNumber(row.closed_short_purchase_orders, 0)) };
+    case 'po_remaining_quantity':
+      return { ...flag, label, detail: ui('{quantity} ordered units are still not received.').replace('{quantity}', formatNumber(row.po_remaining_quantity)) };
+    case 'po_low_fill_rate':
+      return { ...flag, label, detail: ui('PO fill rate is {rate}%.').replace('{rate}', formatNumber(row.po_fill_rate_pct)) };
+    case 'po_short_close_rate':
+      return { ...flag, label, detail: ui('{rate}% of POs were closed short.').replace('{rate}', formatNumber(row.po_short_close_rate_pct)) };
+    case 'shipment_overdue':
+      return { ...flag, label, detail: ui('{count} shipment(s) are overdue.').replace('{count}', formatNumber(row.overdue_shipments, 0)) };
+    case 'shipment_partial':
+      return { ...flag, label, detail: ui('{count} shipment(s) are partially received.').replace('{count}', formatNumber(row.partial_shipments, 0)) };
+    case 'shipment_discrepancy':
+      return { ...flag, label, detail: ui('{quantity} units are recorded as shipment discrepancy.').replace('{quantity}', formatNumber(row.total_discrepancy_quantity)) };
+    default:
+      return { ...flag, label, detail: flag.detail };
+  }
+}
+
+function localizeDepletionRootCauseFactor(
+  factor: DepletionRiskRootCauseResponse['rows'][number]['root_cause_factors'][number],
+  row: DepletionRiskRootCauseResponse['rows'][number],
+  ui: UiTranslator,
+  formatNumber: (value: number | string | null | undefined, digits?: number) => string
+) {
+  const label = localizeInsightsSystemText(factor.label, ui);
+  switch (factor.code) {
+    case 'below_configured_minimum':
+      return { ...factor, label, detail: ui('Current quantity {current} is below configured minimum {minimum}.').replace('{current}', formatNumber(row.current_quantity)).replace('{minimum}', formatNumber(row.configured_min_quantity)) };
+    case 'near_configured_minimum':
+      return { ...factor, label, detail: ui('Current quantity {current} is close to configured minimum {minimum}.').replace('{current}', formatNumber(row.current_quantity)).replace('{minimum}', formatNumber(row.configured_min_quantity)) };
+    case 'short_coverage_window':
+    case 'limited_coverage_window':
+      return { ...factor, label, detail: ui('Estimated coverage is {days} days at the recent average daily outbound rate.').replace('{days}', formatNumber(row.estimated_days_of_coverage, 2)) };
+    case 'high_usage_velocity_vs_stock':
+      return { ...factor, label, detail: ui('Average daily outbound {outbound} is high compared with current quantity {quantity}.').replace('{outbound}', formatNumber(row.average_daily_outbound)).replace('{quantity}', formatNumber(row.current_quantity)) };
+    case 'recent_consumption_pressure':
+      return { ...factor, label, detail: ui('Recent outbound quantity is {quantity} in the selected lookback window.').replace('{quantity}', formatNumber(row.recent_outbound_quantity)) };
+    default:
+      return { ...factor, label, detail: localizeInsightsSystemText(factor.detail, ui) };
+  }
+}
+
 function getSupplierRecommendedActions(
   row: SupplierTrustResponse['rows'][number],
   locale: AppLocale,
   ui: UiTranslator
-): Array<{ title: string; detail: string; priority: 'high' | 'medium' | 'low' }> {
-  const actions: Array<{ title: string; detail: string; priority: 'high' | 'medium' | 'low' }> = [];
+): Array<{ code: string; title: string; detail: string; priority: 'high' | 'medium' | 'low' }> {
+  const actions: Array<{ code: string; title: string; detail: string; priority: 'high' | 'medium' | 'low' }> = [];
   const riskFlags = row.risk_flags ?? [];
   const displayNumber = (value: number | string | null | undefined, digits = 2) =>
     formatLocalizedNumber(toNumber(value), locale, { maximumFractionDigits: digits });
@@ -409,6 +537,7 @@ function getSupplierRecommendedActions(
 
   if (hasRiskCode('po_overdue', 'overdue_open_purchase_orders')) {
     actions.push({
+      code: 'follow_up_overdue_pos',
       title: ui('Follow up overdue POs'),
       detail: ui('{count} open POs are overdue for this supplier.').replace('{count}', displayNumber(row.overdue_open_purchase_orders, 0)),
       priority: 'high'
@@ -417,6 +546,7 @@ function getSupplierRecommendedActions(
 
   if (hasRiskCode('po_closed_short', 'closed_short_purchase_orders')) {
     actions.push({
+      code: 'review_short_closed_pos',
       title: ui('Review short-closed POs'),
       detail: ui('{count} POs were manually closed short. Confirm whether this is supplier under-delivery or planned cancellation.').replace('{count}', displayNumber(row.closed_short_purchase_orders, 0)),
       priority: 'high'
@@ -425,6 +555,7 @@ function getSupplierRecommendedActions(
 
   if (hasRiskCode('po_low_fill_rate', 'low_po_fill_rate')) {
     actions.push({
+      code: 'check_po_fill_performance',
       title: ui('Check PO fill performance'),
       detail: ui('PO fill rate is {rate}%. Compare ordered vs received quantities before new large orders.').replace('{rate}', displayNumber(row.po_fill_rate_pct)),
       priority: 'medium'
@@ -433,6 +564,7 @@ function getSupplierRecommendedActions(
 
   if (hasRiskCode('po_remaining_quantity')) {
     actions.push({
+      code: 'monitor_remaining_exposure',
       title: ui('Monitor remaining exposure'),
       detail: ui('{quantity} units remain open with estimated value {value}.')
         .replace('{quantity}', displayNumber(row.po_remaining_quantity))
@@ -443,6 +575,7 @@ function getSupplierRecommendedActions(
 
   if (hasRiskCode('shipment_discrepancy', 'shipment_discrepancies')) {
     actions.push({
+      code: 'investigate_shipment_discrepancies',
       title: ui('Investigate shipment discrepancies'),
       detail: ui('Shipment discrepancy rate is {rate}%. Review receiving notes and shipment audits.').replace('{rate}', displayNumber(row.discrepancy_rate_pct)),
       priority: 'medium'
@@ -451,6 +584,7 @@ function getSupplierRecommendedActions(
 
   if (hasRiskCode('shipment_overdue', 'shipment_partial', 'overdue_shipments', 'partial_shipments')) {
     actions.push({
+      code: 'review_shipment_reliability',
       title: ui('Review shipment reliability'),
       detail: ui('Shipment overdue rate is {overdue}% and fill rate is {fill}%.')
         .replace('{overdue}', displayNumber(row.overdue_rate_pct))
@@ -461,6 +595,7 @@ function getSupplierRecommendedActions(
 
   if (row.trust_evidence_status === 'insufficient_history') {
     actions.push({
+      code: 'build_delivery_history',
       title: ui('Build delivery history'),
       detail: ui('Not enough delivery history exists to calculate a trustworthy supplier score. Review open commitments manually until real receiving history is available.'),
       priority: 'medium'
@@ -469,6 +604,7 @@ function getSupplierRecommendedActions(
 
   if (!actions.length) {
     actions.push({
+      code: 'maintain_supplier_cadence',
       title: ui('Maintain supplier cadence'),
       detail: ui('No active supplier risk flags. Keep normal monitoring and periodic review cadence.'),
       priority: 'low'
@@ -606,6 +742,9 @@ export default function InsightsPage() {
   const [supplierPage, setSupplierPage] = useState(() => normalizeSupplierPage(searchParams.get('supplier_page')));
   const [supplierPageSize, setSupplierPageSize] = useState<SupplierPageSize>(() => normalizeSupplierPageSize(searchParams.get('supplier_page_size')));
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(() => searchParams.get('supplier_id'));
+  const lastSyncedSearchParamsRef = useRef(searchParams.toString());
+  const hasMountedSupplierFilterResetRef = useRef(false);
+  const skipNextSupplierFilterResetRef = useRef(false);
 
   const canOpenDashboard = hasPermission(TENANT_PERMISSIONS.DASHBOARD_READ);
   const canOpenProducts = hasPermission(TENANT_PERMISSIONS.PRODUCTS_READ);
@@ -656,6 +795,40 @@ export default function InsightsPage() {
   });
 
   useEffect(() => {
+    const currentSearchParams = searchParams.toString();
+
+    if (currentSearchParams !== lastSyncedSearchParamsRef.current) {
+      const nextLookbackDays = normalizeLookbackDays(searchParams.get('lookback_days'));
+      const nextSupplierSearch = searchParams.get('supplier_search') ?? '';
+      const nextSupplierRiskFilter = normalizeSupplierRiskFilter(searchParams.get('supplier_risk'));
+      const nextSupplierTierFilter = normalizeSupplierTierFilter(searchParams.get('supplier_tier'));
+      const nextSupplierSort = normalizeSupplierSort(searchParams.get('supplier_sort'));
+      const nextSupplierPage = normalizeSupplierPage(searchParams.get('supplier_page'));
+      const nextSupplierPageSize = normalizeSupplierPageSize(searchParams.get('supplier_page_size'));
+      const nextSelectedSupplierId = searchParams.get('supplier_id');
+
+      if (
+        nextSupplierSearch !== supplierSearch
+        || nextSupplierRiskFilter !== supplierRiskFilter
+        || nextSupplierTierFilter !== supplierTierFilter
+        || nextSupplierSort !== supplierSort
+        || nextSupplierPageSize !== supplierPageSize
+      ) {
+        skipNextSupplierFilterResetRef.current = true;
+      }
+
+      setLookbackDays(nextLookbackDays);
+      setSupplierSearch(nextSupplierSearch);
+      setSupplierRiskFilter(nextSupplierRiskFilter);
+      setSupplierTierFilter(nextSupplierTierFilter);
+      setSupplierSort(nextSupplierSort);
+      setSupplierPage(nextSupplierPage);
+      setSupplierPageSize(nextSupplierPageSize);
+      setSelectedSupplierId(nextSelectedSupplierId);
+      lastSyncedSearchParamsRef.current = currentSearchParams;
+      return;
+    }
+
     const nextParams = new URLSearchParams(searchParams);
 
     const setOrDelete = (key: string, value: string | null, defaultValue?: string) => {
@@ -678,42 +851,32 @@ export default function InsightsPage() {
     setOrDelete('supplier_id', selectedSupplierId);
 
     if (nextParams.toString() !== searchParams.toString()) {
+      lastSyncedSearchParamsRef.current = nextParams.toString();
       setSearchParams(nextParams, { replace: true });
     }
   }, [lookbackDays, searchParams, selectedSupplierId, setSearchParams, supplierPage, supplierPageSize, supplierRiskFilter, supplierSearch, supplierSort, supplierTierFilter]);
 
 
   const activeReorderRows = useMemo(
-    () => (reorderQuery.data?.rows ?? []).filter((row) => toNumber(row.recommended_reorder_quantity) > 0),
+    () => (reorderQuery.data?.rows ?? [])
+      .filter((row) => toNumber(row.recommended_reorder_quantity) > 0)
+      .sort((a, b) => {
+        const urgencyRank: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+        return (urgencyRank[b.urgency] ?? 0) - (urgencyRank[a.urgency] ?? 0)
+          || toNumber(b.recommended_reorder_quantity) - toNumber(a.recommended_reorder_quantity)
+          || a.product_name.localeCompare(b.product_name);
+      }),
     [reorderQuery.data?.rows]
   );
 
-  const lastRefreshedAt = useMemo(() => {
-    const timestamps = [
-      depletionRiskQuery.data?.generated_at,
-      depletionRootCauseQuery.data?.generated_at,
-      reorderQuery.data?.generated_at,
-      healthQuery.data?.generated_at,
-      anomaliesQuery.data?.generated_at,
-      anomalyProductionReviewQuery.data?.generated_at,
-      supplierTrustQuery.data?.generated_at,
-      supplierTrustProductionReviewQuery.data?.generated_at
-    ]
-      .filter((value): value is string => Boolean(value))
-      .map((value) => new Date(value).getTime())
-      .filter(Number.isFinite);
-
-    return timestamps.length ? new Date(Math.max(...timestamps)).toISOString() : null;
-  }, [
-    anomaliesQuery.data?.generated_at,
-    anomalyProductionReviewQuery.data?.generated_at,
-    depletionRiskQuery.data?.generated_at,
-    depletionRootCauseQuery.data?.generated_at,
-    healthQuery.data?.generated_at,
-    reorderQuery.data?.generated_at,
-    supplierTrustProductionReviewQuery.data?.generated_at,
-    supplierTrustQuery.data?.generated_at
-  ]);
+  const prioritizedDepletionRows = useMemo(
+    () => [...(depletionRiskQuery.data?.rows ?? [])].sort((a, b) =>
+      toNumber(b.risk_score) - toNumber(a.risk_score)
+      || a.product_name.localeCompare(b.product_name)
+      || a.storage_location_name.localeCompare(b.storage_location_name)
+    ),
+    [depletionRiskQuery.data?.rows]
+  );
 
   const allInsightQueries = [
     depletionRiskQuery,
@@ -726,6 +889,10 @@ export default function InsightsPage() {
     supplierTrustProductionReviewQuery
   ];
   const isRefreshingAll = allInsightQueries.some((query) => query.isFetching);
+  const actionAgendaLoading = [healthQuery, reorderQuery, depletionRiskQuery, anomaliesQuery, supplierTrustQuery]
+    .some((query) => query.isLoading);
+  const actionAgendaUnavailable = [healthQuery, reorderQuery, depletionRiskQuery, anomaliesQuery, supplierTrustQuery]
+    .some((query) => query.isError);
 
   async function refreshAllInsights() {
     try {
@@ -769,7 +936,7 @@ export default function InsightsPage() {
       });
     }
 
-    const depletionTop = depletionRiskQuery.data?.rows?.[0];
+    const depletionTop = prioritizedDepletionRows[0];
     if (depletionTop && canOpenStock) {
       nextActions.push({
         title: ui('Protect depletion-risk stock'),
@@ -814,7 +981,7 @@ export default function InsightsPage() {
     canOpenStock,
     canOpenStockMovements,
     canOpenSuppliers,
-    depletionRiskQuery.data?.rows,
+    prioritizedDepletionRows,
     formatNumber,
     formatReadableStatus,
     formatSupplierTrustScore,
@@ -833,10 +1000,15 @@ export default function InsightsPage() {
         const riskFlags = row.risk_flags ?? [];
 
         if (normalizedSupplierSearch) {
+          const localizedRiskText = riskFlags.flatMap((flag) => {
+            const localizedFlag = localizeSupplierRiskFlag(flag, row, ui, formatNumber);
+            return [localizedFlag.label, localizedFlag.detail, formatReadableStatus(flag.severity)];
+          });
           const searchableText = [
             row.supplier_name,
             row.trust_tier,
-            ...riskFlags.flatMap((flag) => [flag.label, flag.detail, flag.severity])
+            ...riskFlags.flatMap((flag) => [flag.label, flag.detail, flag.severity]),
+            ...localizedRiskText
           ]
             .filter(Boolean)
             .join(' ')
@@ -892,11 +1064,35 @@ export default function InsightsPage() {
 
         return (b.risk_flags?.length ?? 0) - (a.risk_flags?.length ?? 0);
       });
-  }, [supplierRiskFilter, supplierSearch, supplierSort, supplierTierFilter, supplierTrustQuery.data?.rows]);
+  }, [formatNumber, formatReadableStatus, supplierRiskFilter, supplierSearch, supplierSort, supplierTierFilter, supplierTrustQuery.data?.rows, ui]);
 
   const supplierTotalPages = Math.max(1, Math.ceil(visibleSupplierTrustRows.length / supplierPageSize));
   const supplierCurrentPage = Math.min(supplierPage, supplierTotalPages);
   const pagedSupplierTrustRows = visibleSupplierTrustRows.slice((supplierCurrentPage - 1) * supplierPageSize, supplierCurrentPage * supplierPageSize);
+
+  const filteredSupplierTrustSummary = useMemo(() => {
+    return visibleSupplierTrustRows.reduce((summary, row) => {
+      const riskFlags = row.risk_flags ?? [];
+      if (riskFlags.length > 0) summary.suppliers_with_risk += 1;
+      summary.high_risk_flags += riskFlags.filter((flag) => flag.severity === 'high').length;
+      summary.overdue_open_purchase_orders += toNumber(row.overdue_open_purchase_orders);
+      summary.po_remaining_value += toNumber(row.po_remaining_value);
+      if (!summary.currency_code && row.currency_code) summary.currency_code = row.currency_code;
+      return summary;
+    }, {
+      suppliers_with_risk: 0,
+      high_risk_flags: 0,
+      overdue_open_purchase_orders: 0,
+      po_remaining_value: 0,
+      currency_code: supplierTrustQuery.data?.summary?.currency_code ?? null
+    } as {
+      suppliers_with_risk: number;
+      high_risk_flags: number;
+      overdue_open_purchase_orders: number;
+      po_remaining_value: number;
+      currency_code: string | null;
+    });
+  }, [supplierTrustQuery.data?.summary?.currency_code, visibleSupplierTrustRows]);
 
 
   const supplierTrustBreakdown = useMemo(() => {
@@ -925,7 +1121,7 @@ export default function InsightsPage() {
     const rows = supplierTrustQuery.data?.rows ?? [];
     const actionRows = rows.flatMap((row) =>
       getSupplierRecommendedActions(row, locale, ui)
-        .filter((action) => action.title !== 'Maintain supplier cadence')
+        .filter((action) => action.code !== 'maintain_supplier_cadence')
         .map((action) => ({ ...action, supplier: row.supplier_name, supplierId: row.supplier_id }))
     );
 
@@ -942,6 +1138,16 @@ export default function InsightsPage() {
   }, [locale, supplierTrustQuery.data?.rows, ui]);
 
   useEffect(() => {
+    if (!hasMountedSupplierFilterResetRef.current) {
+      hasMountedSupplierFilterResetRef.current = true;
+      return;
+    }
+
+    if (skipNextSupplierFilterResetRef.current) {
+      skipNextSupplierFilterResetRef.current = false;
+      return;
+    }
+
     setSupplierPage(1);
   }, [supplierRiskFilter, supplierSearch, supplierSort, supplierTierFilter, supplierPageSize]);
 
@@ -1131,12 +1337,15 @@ export default function InsightsPage() {
     const riskRowsHtml = riskFlags.length
       ? riskFlags
           .map(
-            (flag) => `
+            (flag) => {
+              const localizedFlag = localizeSupplierRiskFlag(flag, row, ui, formatNumber);
+              return `
               <tr>
                 <td>${escapeHtml(formatReadableStatus(flag.severity))}</td>
-                <td>${escapeHtml(flag.label)}</td>
-                <td>${escapeHtml(flag.detail)}</td>
-              </tr>`
+                <td>${escapeHtml(localizedFlag.label)}</td>
+                <td>${escapeHtml(localizedFlag.detail)}</td>
+              </tr>`;
+            }
           )
           .join('')
       : `<tr><td colspan="3">${escapeHtml(ui('No active supplier risk flags.'))}</td></tr>`;
@@ -1219,7 +1428,7 @@ export default function InsightsPage() {
   }
 
   function printSupplierTrust() {
-    const summary = supplierTrustQuery.data?.summary;
+    const summary = filteredSupplierTrustSummary;
     const printedAt = formatDateTime(new Date().toISOString());
     const filterLabel = [
       ui('Search: {value}').replace('{value}', supplierSearch.trim() || ui('All')),
@@ -1243,7 +1452,10 @@ export default function InsightsPage() {
         const riskFlags = row.risk_flags ?? [];
         const riskText = riskFlags.length
           ? riskFlags
-              .map((flag) => `${escapeHtml(flag.severity.toUpperCase())}: ${escapeHtml(flag.label)} — ${escapeHtml(flag.detail)}`)
+              .map((flag) => {
+                const localizedFlag = localizeSupplierRiskFlag(flag, row, ui, formatNumber);
+                return `${escapeHtml(formatReadableStatus(flag.severity))}: ${escapeHtml(localizedFlag.label)} — ${escapeHtml(localizedFlag.detail)}`;
+              })
               .join('<br />')
           : ui('No risk flags');
 
@@ -1338,7 +1550,7 @@ export default function InsightsPage() {
           <>
             <OperationalWorkspaceStatus
               value={healthQuery.data ? formatNumber(healthQuery.data.health_score, 0) : '—'}
-              label={lastRefreshedAt ? ui('health score · refreshed {time}').replace('{time}', formatDateTime(lastRefreshedAt)) : ui('tenant health score · not loaded yet')}
+              label={healthQuery.data?.generated_at ? ui('health score · refreshed {time}').replace('{time}', formatDateTime(healthQuery.data.generated_at)) : ui('tenant health score · not loaded yet')}
             />
             <button
               type="button"
@@ -1357,7 +1569,7 @@ export default function InsightsPage() {
           title={ui("Operational Health")}
           value={healthQuery.data ? formatNumber(healthQuery.data.health_score, 0) : '-'}
           subtitle={healthQuery.data ? ui('Current tier: {tier}').replace('{tier}', formatReadableStatus(healthQuery.data.health_tier)) : ui('Tenant-level health score.')}
-          tone={healthQuery.data?.health_tier === 'critical' ? 'bad' : healthQuery.data?.health_tier === 'watch' ? 'warn' : 'good'}
+          tone={!healthQuery.data ? 'default' : healthQuery.data.health_tier === 'critical' ? 'bad' : healthQuery.data.health_tier === 'watch' ? 'warn' : 'good'}
           iconPath="/dashboard"
         />
         <StatCard
@@ -1382,27 +1594,39 @@ export default function InsightsPage() {
 
       <Section title={ui("What needs action next")} subtitle={ui("Use these recommendations to move from analytics into operational decisions.")} iconPath="/action-center">
         {actionAgenda.length ? (
-          <div style={styles.actionAgendaGrid}>
-            {actionAgenda.map((item) => (
-              <article
-                key={item.title}
-                className="insights-action-card"
-                data-tone={item.tone}
-                style={item.tone === 'bad' ? styles.actionCardBad : item.tone === 'warn' ? styles.actionCardWarn : styles.actionCardGood}
-              >
-                <div className="insights-action-card__header">
-                  <span className="insights-action-card__icon" aria-hidden="true">
-                    <TenantNavIcon path={item.route} size={18} />
-                  </span>
-                  <div style={styles.actionCardTitle}>{item.title}</div>
-                </div>
-                <div style={styles.actionCardText}>{item.detail}</div>
-                <Link to={item.route} style={styles.actionCardLink}>
-                  {item.linkLabel}
-                </Link>
-              </article>
-            ))}
-          </div>
+          <>
+            {actionAgendaLoading ? (
+              <div className="app-empty-state" style={styles.infoState}>{ui("Some insight sources are still loading, so this action agenda may change.")}</div>
+            ) : null}
+            {actionAgendaUnavailable ? (
+              <div className="app-error-state" style={styles.errorState}>{ui("Some insight sources are unavailable, so this action agenda may be incomplete.")}</div>
+            ) : null}
+            <div style={styles.actionAgendaGrid}>
+              {actionAgenda.map((item) => (
+                <article
+                  key={item.title}
+                  className="insights-action-card"
+                  data-tone={item.tone}
+                  style={item.tone === 'bad' ? styles.actionCardBad : item.tone === 'warn' ? styles.actionCardWarn : styles.actionCardGood}
+                >
+                  <div className="insights-action-card__header">
+                    <span className="insights-action-card__icon" aria-hidden="true">
+                      <TenantNavIcon path={item.route} size={18} />
+                    </span>
+                    <div style={styles.actionCardTitle}>{item.title}</div>
+                  </div>
+                  <div style={styles.actionCardText}>{item.detail}</div>
+                  <Link to={item.route} style={styles.actionCardLink}>
+                    {item.linkLabel}
+                  </Link>
+                </article>
+              ))}
+            </div>
+          </>
+        ) : actionAgendaLoading ? (
+          <div className="app-empty-state" style={styles.infoState}>{ui("Loading action agenda...")}</div>
+        ) : actionAgendaUnavailable ? (
+          <div className="app-error-state" style={styles.errorState}>{ui("The action agenda is unavailable because one or more insight sources could not be loaded.")}</div>
         ) : (
           <div className="app-empty-state" style={styles.infoState}>
             {ui("No urgent action agenda is available yet. As data accumulates, this section will point managers to the next best operational decisions.")}
@@ -1480,21 +1704,21 @@ export default function InsightsPage() {
                   title={ui("Review status")}
                   value={formatReadableStatus(supplierTrustProductionReviewQuery.data.production_status)}
                   subtitle={ui("Advisory status based on delivery history and active risk factors.")}
-                  tone={supplierTrustProductionReviewQuery.data.production_status === 'blocked' ? 'bad' : supplierTrustProductionReviewQuery.data.production_status === 'needs_review' ? 'warn' : 'good'}
+                  tone={supplierTrustProductionReviewQuery.data.summary.total_rows === 0 ? 'default' : supplierTrustProductionReviewQuery.data.production_status === 'blocked' ? 'bad' : supplierTrustProductionReviewQuery.data.production_status === 'needs_review' ? 'warn' : 'good'}
                   iconPath="/suppliers"
                 />
                 <StatCard
                   title={ui("Suppliers needing review")}
                   value={formatNumber(supplierTrustProductionReviewQuery.data.summary.rows_requiring_human_review, 0)}
                   subtitle={ui('{count} suppliers reviewed.').replace('{count}', formatNumber(supplierTrustProductionReviewQuery.data.summary.total_rows, 0))}
-                  tone={supplierTrustProductionReviewQuery.data.summary.rows_requiring_human_review > 0 ? 'warn' : 'good'}
+                  tone={supplierTrustProductionReviewQuery.data.summary.total_rows === 0 ? 'default' : supplierTrustProductionReviewQuery.data.summary.rows_requiring_human_review > 0 ? 'warn' : 'good'}
                   iconPath="/suppliers"
                 />
                 <StatCard
                   title={ui("Blockers")}
                   value={formatNumber(supplierTrustProductionReviewQuery.data.blockers.length, 0)}
                   subtitle={ui("Blocking supplier performance issues requiring human review.")}
-                  tone={supplierTrustProductionReviewQuery.data.blockers.length > 0 ? 'bad' : 'good'}
+                  tone={supplierTrustProductionReviewQuery.data.summary.total_rows === 0 ? 'default' : supplierTrustProductionReviewQuery.data.blockers.length > 0 ? 'bad' : 'good'}
                   iconPath="/suppliers"
                 />
                 <StatCard
@@ -1505,19 +1729,21 @@ export default function InsightsPage() {
                   iconPath="/suppliers"
                 />
               </div>
-              {supplierTrustProductionReviewQuery.data.blockers.length ? (
+              {supplierTrustProductionReviewQuery.data.summary.total_rows === 0 ? (
+                <div className="app-empty-state" style={styles.infoState}>{ui('No supplier rows were available for production review.')}</div>
+              ) : supplierTrustProductionReviewQuery.data.blockers.length || supplierTrustProductionReviewQuery.data.warnings.length ? (
                 <div style={styles.list}>
-                  {supplierTrustProductionReviewQuery.data.blockers.map((blocker) => (
-                    <div key={blocker.code} className="insights-item-card" style={styles.itemCard}>
-                      <div style={styles.itemTitle}>{blocker.message}</div>
-                      <div style={styles.itemMeta}>{ui('Severity {severity} · {count} supplier(s) affected').replace('{severity}', formatReadableStatus(blocker.severity)).replace('{count}', formatNumber(blocker.affected_count, 0))}</div>
+                  {[...supplierTrustProductionReviewQuery.data.blockers, ...supplierTrustProductionReviewQuery.data.warnings].map((reviewItem) => (
+                    <div key={reviewItem.code} className="insights-item-card" style={styles.itemCard}>
+                      <div style={styles.itemTitle}>{localizeInsightsSystemText(reviewItem.message, ui)}</div>
+                      <div style={styles.itemMeta}>{ui('Severity {severity} · {count} supplier(s) affected').replace('{severity}', formatReadableStatus(reviewItem.severity)).replace('{count}', formatNumber(reviewItem.affected_count, 0))}</div>
                     </div>
                   ))}
                 </div>
               ) : null}
-              {supplierTrustProductionReviewQuery.data.next_actions.length ? (
+              {supplierTrustProductionReviewQuery.data.summary.total_rows > 0 && supplierTrustProductionReviewQuery.data.next_actions.length ? (
                 <ul style={styles.compactList}>
-                  {supplierTrustProductionReviewQuery.data.next_actions.map((action) => <li key={action}>{action}</li>)}
+                  {supplierTrustProductionReviewQuery.data.next_actions.map((action) => <li key={action}>{localizeInsightsSystemText(action, ui)}</li>)}
                 </ul>
               ) : null}
             </div>
@@ -1567,7 +1793,11 @@ export default function InsightsPage() {
                     <div style={styles.itemTitle}>{ui("Recommended action summary")}</div>
                     <div style={styles.itemMeta}>
                       {supplierRecommendedActionSummary.total
-                        ? `${supplierRecommendedActionSummary.total} supplier action(s): ${supplierRecommendedActionSummary.high} high · ${supplierRecommendedActionSummary.medium} medium · ${supplierRecommendedActionSummary.low} low`
+                        ? ui('{total} supplier action(s): {high} high · {medium} medium · {low} low')
+                            .replace('{total}', formatNumber(supplierRecommendedActionSummary.total, 0))
+                            .replace('{high}', formatNumber(supplierRecommendedActionSummary.high, 0))
+                            .replace('{medium}', formatNumber(supplierRecommendedActionSummary.medium, 0))
+                            .replace('{low}', formatNumber(supplierRecommendedActionSummary.low, 0))
                         : ui('No supplier follow-up actions are currently recommended.')}
                     </div>
                   </div>
@@ -1582,7 +1812,7 @@ export default function InsightsPage() {
                         onClick={() => setSelectedSupplierId(action.supplierId)}
                       >
                         <span style={action.priority === 'high' ? styles.riskFlagHigh : action.priority === 'medium' ? styles.riskFlagMedium : styles.riskFlagLow}>
-                          {action.priority}
+                          {formatReadableStatus(action.priority)}
                         </span>
                         <span style={styles.supplierActionSummaryText}>
                           <strong>{action.supplier}</strong> · {action.title}
@@ -1776,8 +2006,8 @@ export default function InsightsPage() {
                   {row.risk_flags?.length ? (
                     <div style={styles.riskFlagGroup} aria-label={ui('Supplier risk flags for {supplier}').replace('{supplier}', row.supplier_name)}>
                       {row.risk_flags.map((flag) => (
-                        <span key={flag.code} style={getRiskFlagStyle(flag.severity)} title={flag.detail}>
-                          {flag.label}
+                        <span key={flag.code} style={getRiskFlagStyle(flag.severity)} title={localizeSupplierRiskFlag(flag, row, ui, formatNumber).detail}>
+                          {localizeSupplierRiskFlag(flag, row, ui, formatNumber).label}
                         </span>
                       ))}
                     </div>
@@ -1908,10 +2138,15 @@ export default function InsightsPage() {
                   {selectedSupplierTrustRow.risk_flags?.length ? (
                     <div style={styles.riskFlagDetailList}>
                       {selectedSupplierTrustRow.risk_flags.map((flag) => (
-                        <div key={flag.code} style={styles.riskFlagDetailItem}>
-                          <span style={getRiskFlagStyle(flag.severity)}>{flag.label}</span>
-                          <span style={styles.itemText}>{flag.detail}</span>
-                        </div>
+                        (() => {
+                          const localizedFlag = localizeSupplierRiskFlag(flag, selectedSupplierTrustRow, ui, formatNumber);
+                          return (
+                            <div key={flag.code} style={styles.riskFlagDetailItem}>
+                              <span style={getRiskFlagStyle(flag.severity)}>{localizedFlag.label}</span>
+                              <span style={styles.itemText}>{localizedFlag.detail}</span>
+                            </div>
+                          );
+                        })()
                       ))}
                     </div>
                   ) : (
@@ -1923,7 +2158,7 @@ export default function InsightsPage() {
                       {getSupplierRecommendedActions(selectedSupplierTrustRow, locale, ui).map((action) => (
                         <div key={`${action.priority}-${action.title}`} style={styles.recommendedActionItem}>
                           <span style={action.priority === 'high' ? styles.riskFlagHigh : action.priority === 'medium' ? styles.riskFlagMedium : styles.riskFlagLow}>
-                            {action.priority}
+                            {formatReadableStatus(action.priority)}
                           </span>
                           <div>
                             <div style={styles.itemTitle}>{action.title}</div>
@@ -1942,6 +2177,18 @@ export default function InsightsPage() {
                     ) : null}
                   </div>
                 </article>
+              ) : selectedSupplierId && supplierTrustQuery.data && !supplierTrustQuery.isLoading && !supplierTrustQuery.isError ? (
+                <div className="app-empty-state" style={styles.infoState}>
+                  <div>{ui("The requested supplier detail is not available in the current Insights snapshot.")}</div>
+                  <button
+                    type="button"
+                    className="app-button app-button--secondary"
+                    style={styles.secondaryButton}
+                    onClick={() => setSelectedSupplierId(null)}
+                  >
+                    {ui("Close detail")}
+                  </button>
+                </div>
               ) : null}
               {!visibleSupplierTrustRows.length ? (
                 <div className="app-empty-state" style={styles.infoState}>
@@ -1949,7 +2196,7 @@ export default function InsightsPage() {
                 </div>
               ) : null}
             </>
-          ) : !supplierTrustQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>{ui("No supplier performance rows were returned.")}</div> : null}
+          ) : !supplierTrustQuery.isLoading && !supplierTrustQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No supplier performance rows were returned.")}</div> : null}
         </Section>
       </div>
 
@@ -1957,9 +2204,9 @@ export default function InsightsPage() {
         <Section title={ui("Depletion pressure")} subtitle={ui("Products and locations under the greatest consumption pressure relative to stock on hand.")} iconPath="/stock">
           {depletionRiskQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>{ui("Loading depletion risk...")}</div> : null}
           {depletionRiskQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(depletionRiskQuery.error, ui('Unknown error'))}</div> : null}
-          {depletionRiskQuery.data?.rows.length ? (
+          {prioritizedDepletionRows.length ? (
             <div style={styles.list}>
-              {depletionRiskQuery.data.rows.slice(0, 10).map((row) => (
+              {prioritizedDepletionRows.slice(0, 10).map((row) => (
                 <article key={row.stock_id} className="insights-item-card insights-item-card--stock" style={styles.itemCard}>
                   <div style={styles.itemTitle}>{row.product_name}</div>
                   <div style={styles.itemMeta}>
@@ -1967,7 +2214,6 @@ export default function InsightsPage() {
                   </div>
                   <div style={styles.itemText}>
                     {ui('Qty {quantity} · Min {min} · Coverage {coverage}').replace('{quantity}', formatNumber(row.current_quantity)).replace('{min}', formatNumber(row.configured_min_quantity)).replace('{coverage}', row.estimated_days_of_coverage === null ? ui('Not available') : ui('{days} days').replace('{days}', formatNumber(row.estimated_days_of_coverage, 1)))}
-                    {row.estimated_days_of_coverage == null ? ui('Not available') : ui('{days} days').replace('{days}', formatNumber(row.estimated_days_of_coverage, 1))}
                   </div>
                   {canOpenStock ? (
                     <Link to={`/stock?product_id=${encodeURIComponent(row.product_id)}`} style={styles.inlineActionLink}>{ui("Open in Stock")}</Link>
@@ -1975,7 +2221,7 @@ export default function InsightsPage() {
                 </article>
               ))}
             </div>
-          ) : !depletionRiskQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>{ui("No depletion risk rows returned.")}</div> : null}
+          ) : !depletionRiskQuery.isLoading && !depletionRiskQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No depletion risk rows returned.")}</div> : null}
         </Section>
 
         <Section title={ui("Why stock is under pressure")} subtitle={ui("Explains the current stock and recent usage factors that operators should verify before replenishment decisions.")} iconPath="/stock">
@@ -1996,22 +2242,27 @@ export default function InsightsPage() {
                   </div>
                   <div style={styles.riskFlagDetailList}>
                     {row.root_cause_factors.slice(0, 3).map((factor) => (
-                      <div key={`${row.stock_id}-${factor.code}`} style={styles.riskFlagDetailItem}>
-                        <span style={factor.severity === 'critical' || factor.severity === 'high' ? styles.riskFlagHigh : factor.severity === 'medium' ? styles.riskFlagMedium : styles.riskFlagLow}>
-                          {formatReadableStatus(factor.severity)}
-                        </span>
-                        <div>
-                          <div style={styles.itemTitle}>{factor.label}</div>
-                          <div style={styles.itemText}>{factor.detail}</div>
-                        </div>
-                      </div>
+                      (() => {
+                        const localizedFactor = localizeDepletionRootCauseFactor(factor, row, ui, formatNumber);
+                        return (
+                          <div key={`${row.stock_id}-${factor.code}`} style={styles.riskFlagDetailItem}>
+                            <span style={factor.severity === 'critical' || factor.severity === 'high' ? styles.riskFlagHigh : factor.severity === 'medium' ? styles.riskFlagMedium : styles.riskFlagLow}>
+                              {formatReadableStatus(factor.severity)}
+                            </span>
+                            <div>
+                              <div style={styles.itemTitle}>{localizedFactor.label}</div>
+                              <div style={styles.itemText}>{localizedFactor.detail}</div>
+                            </div>
+                          </div>
+                        );
+                      })()
                     ))}
                   </div>
                   <div className="insights-recommended-action-panel" style={styles.recommendedActionPanel}>
                     <div style={styles.itemTitle}>{ui("Investigation steps")}</div>
                     <ul style={styles.compactList}>
                       {row.recommended_investigation_steps.slice(0, 3).map((step) => (
-                        <li key={`${row.stock_id}-${step}`} style={styles.itemText}>{step}</li>
+                        <li key={`${row.stock_id}-${step}`} style={styles.itemText}>{localizeInsightsSystemText(step, ui)}</li>
                       ))}
                     </ul>
                   </div>
@@ -2021,7 +2272,7 @@ export default function InsightsPage() {
                 </article>
               ))}
             </div>
-          ) : !depletionRootCauseQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>{ui("No depletion root-cause review returned.")}</div> : null}
+          ) : !depletionRootCauseQuery.isLoading && !depletionRootCauseQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No depletion root-cause review returned.")}</div> : null}
         </Section>
 
         <Section title={ui("Reorder recommendations")} subtitle={ui("Explainable reorder quantities based on current stock and recent outbound usage.")} iconPath="/products">
@@ -2042,7 +2293,7 @@ export default function InsightsPage() {
                 </article>
               ))}
             </div>
-          ) : !reorderQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>{ui("No active reorder quantity is currently recommended.")}</div> : null}
+          ) : !reorderQuery.isLoading && !reorderQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No active reorder quantity is currently recommended.")}</div> : null}
         </Section>
       </div>
 
@@ -2058,14 +2309,14 @@ export default function InsightsPage() {
                 title={ui("Review status")}
                 value={formatReadableStatus(anomalyProductionReviewQuery.data.production_status)}
                 subtitle={ui('Health tier: {tier}').replace('{tier}', formatReadableStatus(anomalyProductionReviewQuery.data.operational_health_context.health_tier))}
-                tone={anomalyProductionReviewQuery.data.production_status === 'blocked' ? 'bad' : anomalyProductionReviewQuery.data.production_status === 'needs_review' ? 'warn' : 'good'}
+                tone={anomalyProductionReviewQuery.data.summary.total_rows === 0 ? 'default' : anomalyProductionReviewQuery.data.production_status === 'blocked' ? 'bad' : anomalyProductionReviewQuery.data.production_status === 'needs_review' ? 'warn' : 'good'}
                 iconPath="/reliability-command"
               />
               <StatCard
                 title={ui("Rows needing review")}
                 value={formatNumber(anomalyProductionReviewQuery.data.summary.rows_requiring_human_review, 0)}
                 subtitle={ui('{count} anomaly rows reviewed.').replace('{count}', formatNumber(anomalyProductionReviewQuery.data.summary.total_rows, 0))}
-                tone={anomalyProductionReviewQuery.data.summary.rows_requiring_human_review > 0 ? 'warn' : 'good'}
+                tone={anomalyProductionReviewQuery.data.summary.total_rows === 0 ? 'default' : anomalyProductionReviewQuery.data.summary.rows_requiring_human_review > 0 ? 'warn' : 'good'}
                 iconPath="/reliability-command"
               />
               <StatCard
@@ -2077,11 +2328,13 @@ export default function InsightsPage() {
               />
             </div>
 
-            {anomalyProductionReviewQuery.data.blockers.length || anomalyProductionReviewQuery.data.warnings.length ? (
+            {anomalyProductionReviewQuery.data.summary.total_rows === 0 ? (
+              <div className="app-empty-state" style={styles.infoState}>{ui('No anomaly rows were available for reliability review.')}</div>
+            ) : anomalyProductionReviewQuery.data.blockers.length || anomalyProductionReviewQuery.data.warnings.length ? (
               <div style={styles.list}>
                 {[...anomalyProductionReviewQuery.data.blockers, ...anomalyProductionReviewQuery.data.warnings].map((item) => (
                   <article key={item.code} className="insights-action-card" data-tone={item.severity === 'critical' ? 'bad' : 'warn'} style={item.severity === 'critical' ? styles.actionCardBad : styles.actionCardWarn}>
-                    <div style={styles.actionCardTitle}>{item.message}</div>
+                    <div style={styles.actionCardTitle}>{localizeInsightsSystemText(item.message, ui)}</div>
                     <div style={styles.itemMeta}>{ui('Affected rows: {count} · Severity {severity}').replace('{count}', formatNumber(item.affected_count, 0)).replace('{severity}', formatReadableStatus(item.severity))}</div>
                   </article>
                 ))}
@@ -2090,20 +2343,22 @@ export default function InsightsPage() {
               <div className="app-empty-state" style={styles.infoState}>{ui("No blocking anomaly-review issues were found.")}</div>
             )}
 
-            <div className="insights-item-card" style={styles.itemCard}>
-              <div style={styles.itemTitle}>{ui("Next actions")}</div>
-              <ul style={styles.compactList}>
-                {anomalyProductionReviewQuery.data.next_actions.map((action) => <li key={action}>{action}</li>)}
-              </ul>
-            </div>
+            {anomalyProductionReviewQuery.data.summary.total_rows > 0 ? (
+              <div className="insights-item-card" style={styles.itemCard}>
+                <div style={styles.itemTitle}>{ui("Next actions")}</div>
+                <ul style={styles.compactList}>
+                  {anomalyProductionReviewQuery.data.next_actions.map((action) => <li key={action}>{localizeInsightsSystemText(action, ui)}</li>)}
+                </ul>
+              </div>
+            ) : null}
 
             {anomalyProductionReviewQuery.data.rows.slice(0, 8).map((row) => (
               <article key={row.product_id} className="insights-item-card" style={styles.itemCard}>
                 <div style={styles.itemTitle}>{row.product_name}</div>
                 <div style={styles.itemMeta}>{ui('Anomaly {score} · Tier {tier} · Review severity {severity}').replace('{score}', formatNumber(row.anomaly_score, 0)).replace('{tier}', formatReadableStatus(row.anomaly_tier)).replace('{severity}', formatReadableStatus(row.highest_factor_severity))}</div>
-                <div style={styles.itemText}>{row.review_factors.map((factor) => `${factor.label}: ${factor.detail}`).join(' ')}</div>
+                <div style={styles.itemText}>{row.review_factors.map((factor) => `${localizeInsightsSystemText(factor.label, ui)}: ${localizeInsightsSystemText(factor.detail, ui)}`).join(' ')}</div>
                 <ul style={styles.compactList}>
-                  {row.recommended_investigation_steps.map((step) => <li key={step}>{step}</li>)}
+                  {row.recommended_investigation_steps.map((step) => <li key={step}>{localizeInsightsSystemText(step, ui)}</li>)}
                 </ul>
               </article>
             ))}
@@ -2129,7 +2384,7 @@ export default function InsightsPage() {
               </article>
             ))}
           </div>
-        ) : !anomaliesQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>{ui("No anomaly rows returned.")}</div> : null}
+        ) : !anomaliesQuery.isLoading && !anomaliesQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No anomaly rows returned.")}</div> : null}
       </Section>
     </div>
   );
