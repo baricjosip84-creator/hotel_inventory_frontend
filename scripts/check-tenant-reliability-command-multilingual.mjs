@@ -57,40 +57,65 @@ for(const required of [
 ])if(!pageSource.includes(required))fail(`Reliability Command locale-aware presentation missing: ${required}`);
 if(!process.exitCode)pass('Reliability Command counts, limits, scores, and timestamps use the tenant locale.');
 for(const required of [
+  "const RELIABILITY_SYSTEM_TEXT_CONTRACT = 'platform_reliability_command_system_text_v1';",
+  'response?.presentation?.system_text_contract === RELIABILITY_SYSTEM_TEXT_CONTRACT',
+  'return systemOwned ? ui(normalized) : normalized;',
+  'return systemOwned ? ui(formatted) : formatted;',
   'commandQuery.error.message',
-  '<span>{overview.scoring_note}</span>',
-  "dimension.label || ui('Reliability dimension')",
-  "dimension.recommendation || ui('No recommendation was reported.')",
-  'dimension.evidence.map((item) => <li key={item}>{formatEvidence(item, ui)}</li>)',
-  "risk.label || ui('Reliability review item')",
-  "risk.recommended_next_action || ui('Review the source workflow and capture the human decision there.')",
-  "stage.label || ui('Manual review stage')",
-  '<p>{stage.description}</p>',
-  "item.label || ui('Reliability review item')",
-  'formatIdentifier(item.owner)',
-  'formatIdentifier(item.reviewer)',
-  'item.instructions.map((instruction) => <li key={instruction}>{formatSentence(instruction)}</li>)'
-])if(!pageSource.includes(required))fail(`Reliability Command server-data boundary changed unexpectedly: ${required}`);
+  "systemText(overview.scoring_note, systemOwned, ui, 'Reliability scoring guidance is not available.')",
+  "systemText(dimension.label, systemOwned, ui, 'Reliability dimension')",
+  "systemText(dimension.recommendation, systemOwned, ui, 'No recommendation was reported.')",
+  'formatEvidence(item, locale, ui, systemOwned)',
+  "systemText(risk.label, systemOwned, ui, 'Reliability review item')",
+  "systemText(risk.recommended_next_action, systemOwned, ui, 'Review the source workflow and capture the human decision there.')",
+  'systemIdentifier(risk.recommended_owner, systemOwned, ui)',
+  'systemIdentifier(risk.recommended_runbook, systemOwned, ui)',
+  "systemText(stage.label, systemOwned, ui, 'Manual review stage')",
+  "systemText(stage.description, systemOwned, ui, 'Manual review guidance')",
+  "systemText(item.label, systemOwned, ui, 'Reliability review item')",
+  'systemIdentifier(item.owner, systemOwned, ui)',
+  'systemIdentifier(item.reviewer, systemOwned, ui)',
+  'item.instructions.map((instruction) => <li key={instruction}>{systemText(formatSentence(instruction), systemOwned, ui)}</li>)'
+])if(!pageSource.includes(required))fail(`Reliability Command explicit system-text boundary missing: ${required}`);
 for(const forbidden of [
   'ui(commandQuery.error.message)',
-  'ui(overview.scoring_note)',
-  'ui(dimension.label)',
+  'ui(response?.presentation?.system_text_contract)',
   'ui(dimension.key)',
-  'ui(dimension.recommendation)',
-  'ui(risk.label)',
   'ui(risk.dimension)',
-  'ui(risk.recommended_owner)',
-  'ui(risk.recommended_runbook)',
-  'ui(risk.recommended_next_action)',
-  'ui(stage.label)',
-  'ui(stage.description)',
-  'ui(item.label)',
-  'ui(item.dimension)',
-  'ui(item.owner)',
-  'ui(item.reviewer)',
-  'ui(instruction)'
-])if(pageSource.includes(forbidden))fail(`Reliability Command translates backend/business text unexpectedly: ${forbidden}`);
-if(!process.exitCode)pass('Backend dimension/risk/stage labels, recommendations, owners, runbooks, instructions, evidence, scoring note, and API errors remain server/business data.');
+  'ui(item.dimension)'
+])if(pageSource.includes(forbidden))fail(`Reliability Command translates API/technical data unexpectedly: ${forbidden}`);
+if(!process.exitCode)pass('Repository-owned Reliability Command guidance is translated only under its explicit system-text contract; API errors and technical keys remain outside that boundary.');
+const requiredSystemKeys=[
+  'Operational surface availability',
+  'Action pressure',
+  'Human review readiness',
+  'Event coordination visibility',
+  'Workflow composer safety',
+  'AI governance readiness',
+  'Collaboration readiness',
+  'Digital twin visibility',
+  'Readiness risk triage',
+  'This dimension is not assessed because this role cannot read the required source surface.',
+  'Assessment availability',
+  'Required source access',
+  'Permitted source summaries',
+  'Permission-limited source summaries',
+  'Manual runbook planning',
+  'Acceptance review',
+  'Evidence review',
+  'Signoff review',
+  'Decision review',
+  'Release review',
+  'Monitoring review',
+  'Incident handoff review',
+  'Closure review',
+  'Open the linked source workflow.',
+  'Review the current evidence and reliability posture.',
+  'Record the manual outcome in the authoritative source workflow.',
+  'The score is an advisory average of permitted, assessed operational context and read-only safety checks. Permission-limited dimensions are not scored. It is not an uptime percentage, release approval, or proof that risks are closed.'
+];
+const missingSystemKeys=requiredSystemKeys.filter((key)=>!unique.has(key));
+if(missingSystemKeys.length)fail(`Reliability Command system-owned presentation keys missing translations: ${missingSystemKeys.join(' | ')}`);else pass(`${requiredSystemKeys.length} critical backend-owned Reliability Command presentation keys are catalog-backed.`);
 for(const required of [
   'canonicalStatusLabel(overview.readiness, ui)',
   'canonicalStatusLabel(dimension.readiness, ui)',

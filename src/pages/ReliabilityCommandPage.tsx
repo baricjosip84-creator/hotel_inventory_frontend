@@ -20,6 +20,7 @@ type ReliabilityDimension = {
   label?: string;
   score?: number | null;
   readiness?: string | null;
+  assessment_available?: boolean;
   evidence?: string[];
   recommendation?: string | null;
   source_path?: string | null;
@@ -61,6 +62,9 @@ type ReviewStage = {
 };
 
 type ReliabilityCommandResponse = {
+  presentation?: {
+    system_text_contract?: string;
+  };
   generated_at?: string;
   filters?: {
     limit?: number;
@@ -71,7 +75,10 @@ type ReliabilityCommandResponse = {
     reliability_score?: number | null;
     readiness?: string | null;
     source_surface_count?: number;
+    source_surface_total_count?: number;
+    permission_limited_source_surface_count?: number;
     dimension_count?: number;
+    unassessed_dimension_count?: number;
     risk_count?: number;
     closure_review_count?: number;
     scoring_note?: string;
@@ -110,6 +117,7 @@ const SOURCE_LABELS: Record<string, string> = {
 
 const CANONICAL_STATUS_LABELS: Record<string, string> = {
   ready: 'Ready',
+  not_assessed: 'Not assessed',
   watch: 'Watch',
   degraded: 'Degraded',
   critical: 'Critical',
@@ -203,13 +211,36 @@ function formatSentence(value?: string | null, fallback = 'Not reported'): strin
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function formatEvidence(value: string, ui: (englishText: string) => string): string {
+const RELIABILITY_SYSTEM_TEXT_CONTRACT = 'platform_reliability_command_system_text_v1';
+
+function systemText(value: string | null | undefined, systemOwned: boolean, ui: (englishText: string) => string, fallback = 'Not reported'): string {
+  const normalized = String(value || '').trim();
+  if (!normalized) return ui(fallback);
+  return systemOwned ? ui(normalized) : normalized;
+}
+
+function systemIdentifier(value: string | null | undefined, systemOwned: boolean, ui: (englishText: string) => string, fallback = 'Not reported'): string {
+  const formatted = formatIdentifier(value, ui(fallback));
+  return systemOwned ? ui(formatted) : formatted;
+}
+
+function formatEvidence(
+  value: string,
+  locale: Parameters<typeof formatLocalizedNumber>[1],
+  ui: (englishText: string) => string,
+  systemOwned: boolean
+): string {
   const separatorIndex = value.indexOf(':');
-  if (separatorIndex < 0) return formatSentence(value);
-  const key = value.slice(0, separatorIndex);
-  const raw = value.slice(separatorIndex + 1);
-  const normalizedValue = raw.trim() === 'true' ? ui('Yes') : raw.trim() === 'false' ? ui('No') : formatSentence(raw, raw.trim() || ui('Not reported'));
-  return `${formatIdentifier(key)}: ${normalizedValue}`;
+  if (separatorIndex < 0) return systemText(formatSentence(value), systemOwned, ui);
+  const key = formatIdentifier(value.slice(0, separatorIndex));
+  const raw = value.slice(separatorIndex + 1).trim();
+  let normalizedValue: string;
+  if (raw === 'true') normalizedValue = ui('Yes');
+  else if (raw === 'false') normalizedValue = ui('No');
+  else if (/^-?\d+(?:\.\d+)?$/.test(raw)) normalizedValue = formatLocalizedNumber(Number(raw), locale);
+  else if (CANONICAL_STATUS_LABELS[raw]) normalizedValue = ui(CANONICAL_STATUS_LABELS[raw]);
+  else normalizedValue = systemText(formatSentence(raw, raw || ui('Not reported')), systemOwned, ui);
+  return `${systemOwned ? ui(key) : key}: ${normalizedValue}`;
 }
 
 function sourcePermissionAllows(path?: string | null): boolean {
@@ -346,6 +377,13 @@ export default function ReliabilityCommandPage() {
   const risks = response?.risks || [];
   const reviewPath = response?.review_path || [];
   const safety = response?.safety || {};
+  const systemOwned = response?.presentation?.system_text_contract === RELIABILITY_SYSTEM_TEXT_CONTRACT;
+  const dimensionLabelByKey = new Map(
+    dimensions
+      .filter((dimension) => dimension.key)
+      .map((dimension) => [String(dimension.key), systemText(dimension.label, systemOwned, ui, 'Reliability dimension')])
+  );
+  const unassessedDimensionCount = Number(overview.unassessed_dimension_count || 0);
   const activeFilterCount = Number(readiness !== 'watch') + Number(severity !== 'all') + Number(limit !== '25');
 
   const clearFilters = () => {
@@ -419,7 +457,7 @@ export default function ReliabilityCommandPage() {
         <ReliabilitySummaryCard iconPath="/workflow-composer" label="Manual closure guides" value={formatNumber(overview.closure_review_count, locale, ui)} copy="Generated guidance only. No risk is closed and no signoff is recorded." tone="slate" />
       </section>
 
-      <div className="reliability-scoring-note"><TenantNavIcon path="/reliability-command" size={18} /><span>{overview.scoring_note}</span></div>
+      <div className="reliability-scoring-note"><TenantNavIcon path="/reliability-command" size={18} /><span>{systemText(overview.scoring_note, systemOwned, ui, 'Reliability scoring guidance is not available.')}</span></div>
 
       <OperationalWorkspaceTabs ariaLabel={ui('Reliability Command views')}>
         <OperationalWorkspaceTab active={view === 'posture'} iconPath="/reliability-command" label={ui('Posture and risks')} onClick={() => setView('posture')} />
@@ -452,17 +490,17 @@ export default function ReliabilityCommandPage() {
                     <div className="reliability-card-title">
                       <span className="reliability-card-icon"><TenantNavIcon path={sourcePath || '/reliability-command'} size={17} /></span>
                       <div>
-                        <div className="card__label">{formatIdentifier(dimension.key, ui('Reliability dimension'))}</div>
-                        <h3>{dimension.label || ui('Reliability dimension')}</h3>
+                        <div className="card__label">{ui('Reliability dimension')}</div>
+                        <h3>{systemText(dimension.label, systemOwned, ui, 'Reliability dimension')}</h3>
                       </div>
                     </div>
                     <span className={`reliability-badge ${toneClass(dimension.readiness)}`}>{canonicalStatusLabel(dimension.readiness, ui)}</span>
                   </div>
                   <div className="reliability-score-line"><strong>{formatScore(dimension.score, locale, ui)}</strong><span>{ui('Dimension score')}</span></div>
-                  <p className="card__subtext">{dimension.recommendation || ui('No recommendation was reported.')}</p>
+                  <p className="card__subtext">{systemText(dimension.recommendation, systemOwned, ui, 'No recommendation was reported.')}</p>
                   {dimension.evidence?.length ? (
                     <ul className="reliability-evidence-list">
-                      {dimension.evidence.map((item) => <li key={item}>{formatEvidence(item, ui)}</li>)}
+                      {dimension.evidence.map((item) => <li key={item}>{formatEvidence(item, locale, ui, systemOwned)}</li>)}
                     </ul>
                   ) : null}
                   {sourcePath && sourcePermissionAllows(sourcePath) ? (
@@ -494,8 +532,8 @@ export default function ReliabilityCommandPage() {
                         <div className="reliability-card-title">
                           <span className="reliability-card-icon reliability-card-icon--amber"><TenantNavIcon path={sourcePath || '/alerts'} size={17} /></span>
                           <div>
-                            <h3>{risk.label || ui('Reliability review item')}</h3>
-                            <p>{formatIdentifier(risk.dimension)}</p>
+                            <h3>{systemText(risk.label, systemOwned, ui, 'Reliability review item')}</h3>
+                            <p>{dimensionLabelByKey.get(String(risk.dimension || '')) || ui('Reliability dimension')}</p>
                           </div>
                         </div>
                         <div className="reliability-badge-row">
@@ -503,11 +541,11 @@ export default function ReliabilityCommandPage() {
                           <span className={`reliability-badge ${toneClass(risk.readiness)}`}>{canonicalStatusLabel(risk.readiness, ui)}</span>
                         </div>
                       </div>
-                      <p>{risk.recommended_next_action || ui('Review the source workflow and capture the human decision there.')}</p>
+                      <p>{systemText(risk.recommended_next_action, systemOwned, ui, 'Review the source workflow and capture the human decision there.')}</p>
                       <dl className="reliability-facts">
                         <div><dt>{ui('Score')}</dt><dd>{formatScore(risk.score, locale, ui)}</dd></div>
-                        <div><dt>{ui('Suggested owner')}</dt><dd>{formatIdentifier(risk.recommended_owner)}</dd></div>
-                        <div><dt>{ui('Suggested runbook')}</dt><dd>{formatIdentifier(risk.recommended_runbook)}</dd></div>
+                        <div><dt>{ui('Suggested owner')}</dt><dd>{systemIdentifier(risk.recommended_owner, systemOwned, ui)}</dd></div>
+                        <div><dt>{ui('Suggested runbook')}</dt><dd>{systemIdentifier(risk.recommended_runbook, systemOwned, ui)}</dd></div>
                       </dl>
                       {sourcePath && sourcePermissionAllows(sourcePath) ? (
                         <div className="reliability-card-actions"><ReliabilityNavLink path={sourcePath} /></div>
@@ -518,8 +556,10 @@ export default function ReliabilityCommandPage() {
               </div>
             ) : (
               <div className="reliability-inline-empty">
-                <h3>{ui('No non-ready risks match the current thresholds')}</h3>
-                <p>{ui('All current dimensions are Ready or excluded by the selected threshold. This is not a release approval, uptime guarantee, or proof that every operational issue is closed.')}</p>
+                <h3>{ui(unassessedDimensionCount > 0 ? 'No assessed non-ready risks match the current thresholds' : 'No non-ready risks match the current thresholds')}</h3>
+                <p>{ui(unassessedDimensionCount > 0
+                  ? 'Some dimensions are not assessed because this role cannot read their required source surfaces. Assessed dimensions are Ready or excluded by the selected threshold.'
+                  : 'All current dimensions are Ready or excluded by the selected threshold. This is not a release approval, uptime guarantee, or proof that every operational issue is closed.')}</p>
               </div>
             )}
           </section>
@@ -542,8 +582,8 @@ export default function ReliabilityCommandPage() {
                   <div className="reliability-stage-summary-title">
                     <span className="reliability-card-icon"><TenantNavIcon path={reviewStageIconPath(stage.key)} size={17} /></span>
                     <div>
-                      <h3>{stage.label || ui('Manual review stage')}</h3>
-                      <p>{stage.description}</p>
+                      <h3>{systemText(stage.label, systemOwned, ui, 'Manual review stage')}</h3>
+                      <p>{systemText(stage.description, systemOwned, ui, 'Manual review guidance')}</p>
                     </div>
                   </div>
                   <span>{ui('{count} items').replace('{count}', formatNumber(stage.item_count ?? stage.items?.length ?? 0, locale, ui))}</span>
@@ -556,8 +596,8 @@ export default function ReliabilityCommandPage() {
                         <article className="reliability-stage-item" key={item.item_key || `${stage.key}-${item.label}`}>
                           <div className="reliability-card-heading">
                             <div>
-                              <h4>{item.label || ui('Reliability review item')}</h4>
-                              <p>{formatIdentifier(item.dimension)}</p>
+                              <h4>{systemText(item.label, systemOwned, ui, 'Reliability review item')}</h4>
+                              <p>{dimensionLabelByKey.get(String(item.dimension || '')) || ui('Reliability dimension')}</p>
                             </div>
                             <div className="reliability-badge-row">
                               <span className={`reliability-badge ${toneClass(item.severity)}`}>{canonicalStatusLabel(item.severity, ui)}</span>
@@ -565,12 +605,12 @@ export default function ReliabilityCommandPage() {
                             </div>
                           </div>
                           <dl className="reliability-facts">
-                            <div><dt>{ui('Suggested owner')}</dt><dd>{formatIdentifier(item.owner)}</dd></div>
-                            <div><dt>{ui('Suggested reviewer')}</dt><dd>{formatIdentifier(item.reviewer)}</dd></div>
+                            <div><dt>{ui('Suggested owner')}</dt><dd>{systemIdentifier(item.owner, systemOwned, ui)}</dd></div>
+                            <div><dt>{ui('Suggested reviewer')}</dt><dd>{systemIdentifier(item.reviewer, systemOwned, ui)}</dd></div>
                           </dl>
                           {item.instructions?.length ? (
                             <ol className="reliability-instruction-list">
-                              {item.instructions.map((instruction) => <li key={instruction}>{formatSentence(instruction)}</li>)}
+                              {item.instructions.map((instruction) => <li key={instruction}>{systemText(formatSentence(instruction), systemOwned, ui)}</li>)}
                             </ol>
                           ) : null}
                           {sourcePath && sourcePermissionAllows(sourcePath) ? (
