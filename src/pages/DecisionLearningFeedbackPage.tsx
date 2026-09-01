@@ -22,7 +22,8 @@ import './DecisionLearningFeedbackPage.css';
 type FeedbackMode = 'learning-outcomes' | 'forecast-accuracy' | 'policy-effectiveness' | 'optimization-results';
 type LearningFeedbackView = 'feedback' | 'readiness';
 type EvidenceBucket = 'outcomes' | 'forecast_accuracy' | 'policy_effectiveness' | 'optimization_results';
-type FeedbackSource = { id: string; source_key: string; title: string; domain: string; status: string };
+type FeedbackSourceOption = { id: string; option_key: string; title: string; status: string };
+type FeedbackSource = { id: string; source_key: string; title: string; domain: string; status: string; options?: FeedbackSourceOption[] };
 type FeedbackSourceResponse = { feedback_type: FeedbackMode; sources: FeedbackSource[] };
 type PageInfo = { total?: number; offset?: number; limit?: number; has_previous?: boolean; has_next?: boolean };
 
@@ -1344,6 +1345,7 @@ type FeedbackFormState = {
   status: string;
   score: string;
   reference: string;
+  optimizationOptionId: string;
   expected: string;
   observed: string;
   recommendationKey: string;
@@ -1447,6 +1449,7 @@ const defaultForm: FeedbackFormState = {
   status: 'observed',
   score: '',
   reference: '',
+  optimizationOptionId: '',
   expected: '',
   observed: '',
   recommendationKey: '',
@@ -1587,6 +1590,10 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: str
   const editing = Boolean(form.recordKey);
   const score = optionalScore(form.score, editing);
 
+  if (mode === 'optimization-results' && !form.optimizationOptionId) {
+    return ui('Choose the planning option this outcome belongs to.');
+  }
+
   if (mode === 'forecast-accuracy') {
     return {
       accuracy_key: form.recordKey || undefined,
@@ -1620,6 +1627,7 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: str
     return {
       result_key: form.recordKey || undefined,
       source_id: sourceId,
+      option_id: form.optimizationOptionId,
       result_domain: form.domain,
       result_status: form.status,
       optimization_reference: reference,
@@ -4800,8 +4808,13 @@ export default function DecisionLearningFeedbackPage() {
       setForm((current) => ({
         ...current,
         domain: source.domain || current.domain,
+        optimizationOptionId: mode === 'optimization-results' && (source.options || []).some((option) => option.id === current.optimizationOptionId)
+          ? current.optimizationOptionId
+          : '',
         recommendationKey: mode === 'learning-outcomes' ? source.source_key : current.recommendationKey
       }));
+    } else if (mode === 'optimization-results') {
+      setForm((current) => ({ ...current, optimizationOptionId: '' }));
     }
   };
 
@@ -4837,6 +4850,7 @@ export default function DecisionLearningFeedbackPage() {
         status,
         score: score === null || score === undefined ? '' : String(score),
         reference: typeof reference === 'object' ? JSON.stringify(reference) : String(reference || ''),
+        optimizationOptionId: nextMode === 'optimization-results' && typeof refObject.option_id === 'string' ? refObject.option_id : '',
         expected: typeof expected === 'object' ? JSON.stringify(expected) : String(expected ?? ''),
         observed: typeof observed === 'object' ? JSON.stringify(observed) : String(observed ?? ''),
         recommendationKey: String((full.recommendation_reference as Record<string, unknown> | undefined)?.recommendation_key || sourceKey || ''),
@@ -4990,6 +5004,28 @@ export default function DecisionLearningFeedbackPage() {
             </select>
           </label>
         </div>
+
+        {mode === 'optimization-results' ? (
+          <div className="learning-feedback-source-picker" style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr)', gap: 12, marginBottom: 12 }}>
+            <label>
+              <span className="form-label">{ui('Planning option used in the manual trial')}</span>
+              <select
+                className="input"
+                value={form.optimizationOptionId}
+                onChange={(event) => updateForm('optimizationOptionId', event.target.value)}
+                disabled={!sourceId || sourceQuery.isLoading || sourceQuery.isError}
+              >
+                <option value="">{!sourceId ? ui('Choose an optimization run first') : ui('Choose the planning option this outcome belongs to')}</option>
+                {((sourceQuery.data?.sources || []).find((source) => source.id === sourceId)?.options || []).map((option) => (
+                  <option key={option.id} value={option.id}>{option.title} · {option.option_key} · {ui(formatLabel(option.status))}</option>
+                ))}
+              </select>
+              {sourceId && !sourceQuery.isLoading && !sourceQuery.isError && !((sourceQuery.data?.sources || []).find((source) => source.id === sourceId)?.options || []).length ? (
+                <span className="card__subtext">{ui('No planning options are available for the selected run.')}</span>
+              ) : null}
+            </label>
+          </div>
+        ) : null}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
           <label>
