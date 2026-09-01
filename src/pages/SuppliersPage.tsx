@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
@@ -129,19 +129,6 @@ function emptyForm(): SupplierFormState {
   };
 }
 
-function formatUnknown(
-  value: unknown,
-  locale: Parameters<typeof formatLocalizedNumber>[1],
-  ui: (englishText: string) => string
-): string {
-  if (value === undefined || value === null || value === '') return '-';
-  if (typeof value === 'number') return Number.isFinite(value) ? formatLocalizedNumber(value, locale) : '-';
-  if (typeof value === 'boolean') return value ? ui('Yes') : ui('No');
-  if (Array.isArray(value)) return value.length ? value.join(', ') : '-';
-  if (typeof value === 'object') return JSON.stringify(value);
-  return String(value);
-}
-
 function formatDateOnly(value: string | null | undefined, locale: Parameters<typeof formatLocalizedDate>[1]): string {
   if (!value) return '-';
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
@@ -260,12 +247,13 @@ function StatCard(props: {
 export default function SuppliersPage() {
   const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { canManageSuppliers } = getRoleCapabilities();
   const accessRoleLabel = getCurrentAccessRoleLabel();
 
   const [search, setSearch] = useState(() => searchParams.get('search')?.trim() || '');
+  const lastSyncedSearchParamsRef = useRef(searchParams.toString());
   const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
   const [selectedPerformanceSupplier, setSelectedPerformanceSupplier] = useState<SupplierItem | null>(null);
   const [form, setForm] = useState<SupplierFormState>(emptyForm());
@@ -334,7 +322,7 @@ export default function SuppliersPage() {
     mutationFn: deleteSupplier,
     onSuccess: async () => {
       setFormError(null);
-      setFormMessage(ui("Supplier deleted successfully."));
+      setFormMessage(ui("Supplier archived successfully."));
       if (editingSupplier) {
         setEditingSupplier(null);
         setForm(emptyForm());
@@ -347,7 +335,7 @@ export default function SuppliersPage() {
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
     onError: (error) => {
-      const message = error instanceof ApiError ? error.message : ui('Failed to delete supplier.');
+      const message = error instanceof ApiError ? error.message : ui('Failed to archive supplier.');
       setFormError(message);
       setFormMessage(null);
     }
@@ -424,10 +412,49 @@ export default function SuppliersPage() {
   }), [locale, performanceMetrics, selectedSupplierSlaBreach]);
 
   useEffect(() => {
+    const currentSearchParams = searchParams.toString();
+
+    if (currentSearchParams !== lastSyncedSearchParamsRef.current) {
+      setSearch(searchParams.get('search')?.trim() || '');
+      lastSyncedSearchParamsRef.current = currentSearchParams;
+      return;
+    }
+
+    const nextSearchParams = new URLSearchParams(searchParams);
+    const normalizedSearch = search.trim();
+
+    if (normalizedSearch) {
+      nextSearchParams.set('search', normalizedSearch);
+    } else {
+      nextSearchParams.delete('search');
+    }
+
+    const nextSearchParamsString = nextSearchParams.toString();
+    if (nextSearchParamsString !== currentSearchParams) {
+      lastSyncedSearchParamsRef.current = nextSearchParamsString;
+      setSearchParams(nextSearchParams, { replace: true });
+    }
+  }, [search, searchParams, setSearchParams]);
+
+  useEffect(() => {
     if (selectedPerformanceSupplier?.id) {
       scrollToFormSection('supplier-performance-panel');
     }
   }, [selectedPerformanceSupplier?.id]);
+
+  useEffect(() => {
+    if (!selectedPerformanceSupplier || suppliersQuery.isLoading || suppliersQuery.isError) return;
+
+    const currentSupplier = supplierById.get(selectedPerformanceSupplier.id);
+    if (!currentSupplier) {
+      setSelectedPerformanceSupplier(null);
+      return;
+    }
+
+    if (currentSupplier !== selectedPerformanceSupplier) {
+      setSelectedPerformanceSupplier(currentSupplier);
+    }
+  }, [selectedPerformanceSupplier, supplierById, suppliersQuery.isError, suppliersQuery.isLoading]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -506,13 +533,13 @@ export default function SuppliersPage() {
 
   const handleDelete = (supplier: SupplierItem) => {
     if (!canManageSuppliers) {
-      setFormError(ui("Your current role cannot delete suppliers."));
+      setFormError(ui("Your current role cannot archive suppliers."));
       setFormMessage(null);
       return;
     }
 
     const confirmed = window.confirm(
-      `${ui('Delete supplier')} "${supplier.name}"? ${ui('Deletion is allowed only when no active products or shipments still reference this supplier.')}`
+      `${ui('Archive supplier')} "${supplier.name}"? ${ui('Archive is allowed only after active product assignments, open shipments, active purchase orders, and active supplier catalog items are resolved. Historical received shipments and completed records remain available.')}`
     );
     if (!confirmed) {
       return;
@@ -553,25 +580,25 @@ export default function SuppliersPage() {
           title={ui("Email Ready")}
           value={suppliersQuery.isLoading || suppliersQuery.isError ? '—' : summary.withEmail}
           subtitle={ui("Suppliers with an email address for purchasing communication")}
-          tone={!suppliersQuery.isLoading && summary.total > 0 && summary.withEmail === summary.total ? 'good' : 'warn'}
+          tone={suppliersQuery.isLoading || suppliersQuery.isError || summary.total === 0 ? 'default' : summary.withEmail === summary.total ? 'good' : 'warn'}
         />
         <StatCard
           title={ui("Contact Ready")}
           value={suppliersQuery.isLoading || suppliersQuery.isError ? '—' : summary.withContact}
           subtitle={ui("Suppliers with a phone number or contact notes")}
-          tone={!suppliersQuery.isLoading && summary.total > 0 && summary.withContact === summary.total ? 'good' : 'warn'}
+          tone={suppliersQuery.isLoading || suppliersQuery.isError || summary.total === 0 ? 'default' : summary.withContact === summary.total ? 'good' : 'warn'}
         />
         <StatCard
           title={ui("Late Shipments")}
           value={slaBreachesQuery.isLoading || slaBreachesQuery.isError ? '—' : summary.slaBreaches}
           subtitle={slaBreachesQuery.isError ? ui("Delivery status could not be loaded") : slaBreachesQuery.isLoading ? ui("Checking pending and partially received shipments") : `${summary.slaBreachSuppliers} ${supplierWord} ${ui('need delivery follow-up')}`}
-          tone={!slaBreachesQuery.isLoading && summary.slaBreaches > 0 ? 'bad' : 'good'}
+          tone={slaBreachesQuery.isLoading || slaBreachesQuery.isError || suppliersQuery.isLoading || suppliersQuery.isError || summary.total === 0 ? 'default' : summary.slaBreaches > 0 ? 'bad' : 'good'}
         />
       </div>
 
       {!canManageSuppliers ? (
         <div className="app-warning-state" style={styles.warningBox}>
-          {ui("Current access role:")} {ui(accessRoleLabel)}{ui(". You can review supplier details, delivery status, and performance. Creating, editing, deleting, and bulk importing suppliers requires suppliers.write permission.")}
+          {ui("Current access role:")} {ui(accessRoleLabel)}{ui(". You can review supplier details, delivery status, and performance. Creating, editing, archiving, and bulk importing suppliers requires suppliers.write permission.")}
         </div>
       ) : null}
 
@@ -693,7 +720,7 @@ export default function SuppliersPage() {
                             {formatSlaBreachLateShipments(slaBreachBySupplierId.get(supplier.id) as SupplierSlaBreachItem, locale)} {ui("late")}
                           </span>
                         ) : (
-                          <span style={styles.badgeActive}>{ui("On track")}</span>
+                          <span style={styles.badgeNeutral}>{ui("No overdue shipments.")}</span>
                         )}
                       </td>
                       <td style={styles.td}>
@@ -722,7 +749,7 @@ export default function SuppliersPage() {
                                 onClick={() => handleDelete(supplier)}
                                 disabled={deleteMutation.isPending}
                               >
-                                {deleteMutation.isPending ? ui('Deleting...') : ui('Delete')}
+                                {deleteMutation.isPending ? ui('Archiving...') : ui('Archive')}
                               </button>
                             </>
                           ) : null}
@@ -742,7 +769,7 @@ export default function SuppliersPage() {
       <InventoryCsvImportPanel
           importType="suppliers"
           title={ui("Bulk Supplier Import")}
-          description={ui("Validate supplier master-data rows before committing them. Duplicate active supplier names are rejected instead of overwritten.")}
+          description={ui("Validate supplier master-data rows before committing them. Supplier names already used by current or archived supplier records are rejected instead of overwritten.")}
           templateColumns={['name', 'email', 'contact_info', 'phone', 'address', 'tax_id']}
           templateExample={{ name: 'Metro Wholesale', email: 'orders@example.com', contact_info: 'Account 12345', phone: '+385 51 555 010', address: 'Industrijska 10, Rijeka, Croatia', tax_id: 'HR12345678901' }}
           canImport={canManageSuppliers}
@@ -907,9 +934,15 @@ export default function SuppliersPage() {
             <div className="app-empty-state">{ui("Loading supplier performance...")}</div>
           ) : null}
 
-          {supplierPerformanceQuery.isError ? (
+          {supplierPerformanceQuery.isError && !supplierPerformanceQuery.data ? (
             <div className="app-error-state" style={styles.errorBox}>
               {ui("Failed to load supplier performance:")} {(supplierPerformanceQuery.error as Error).message || ui("Unknown error")}
+            </div>
+          ) : null}
+
+          {supplierPerformanceQuery.isError && supplierPerformanceQuery.data ? (
+            <div className="app-warning-state" style={styles.warningBox}>
+              {ui("Showing the last successful supplier performance because the refresh failed.")} {(supplierPerformanceQuery.error as Error).message || ui("Unknown error")}
             </div>
           ) : null}
 
@@ -919,36 +952,36 @@ export default function SuppliersPage() {
                 <StatCard
                   title={ui("Total Shipments")}
                   value={performanceSummary.total}
-                  subtitle={ui("All active shipment records for this supplier")}
+                  subtitle={ui("All non-archived shipment records for this supplier")}
                 />
                 <StatCard
                   title={ui("Received")}
                   value={performanceSummary.received}
                   subtitle={ui("Shipments fully received")}
-                  tone="good"
+                  tone={performanceSummary.total === 0 ? 'default' : 'good'}
                 />
                 <StatCard
                   title={ui("Pending")}
                   value={performanceSummary.pending}
                   subtitle={ui("Shipments not yet received")}
-                  tone={performanceSummary.pending > 0 ? 'warn' : 'good'}
+                  tone={performanceSummary.total === 0 ? 'default' : performanceSummary.pending > 0 ? 'warn' : 'good'}
                 />
                 <StatCard
                   title={ui("Partially Received")}
                   value={performanceSummary.partial}
                   subtitle={ui("Shipments still awaiting remaining items")}
-                  tone={performanceSummary.partial > 0 ? 'warn' : 'good'}
+                  tone={performanceSummary.total === 0 ? 'default' : performanceSummary.partial > 0 ? 'warn' : 'good'}
                 />
                 <StatCard
                   title={ui("Late Open")}
-                  value={performanceSummary.lateOpen}
-                  subtitle={ui("Past-due pending or partial shipments")}
-                  tone={performanceSummary.lateOpen > 0 ? 'bad' : 'good'}
+                  value={slaBreachesQuery.isLoading || slaBreachesQuery.isError ? '—' : performanceSummary.lateOpen}
+                  subtitle={slaBreachesQuery.isError ? ui("Delivery status could not be loaded") : slaBreachesQuery.isLoading ? ui("Checking pending and partially received shipments") : ui("Past-due pending or partial shipments")}
+                  tone={slaBreachesQuery.isLoading || slaBreachesQuery.isError || performanceSummary.total === 0 ? 'default' : performanceSummary.lateOpen > 0 ? 'bad' : 'good'}
                 />
                 <StatCard
                   title={ui("Latest Scheduled Delivery")}
                   value={performanceSummary.latestScheduledDelivery}
-                  subtitle={ui("Latest delivery date recorded on an active shipment")}
+                  subtitle={ui("Latest delivery date recorded on a non-archived shipment")}
                 />
               </div>
 
@@ -1020,7 +1053,7 @@ export default function SuppliersPage() {
                   slaBreaches.map((breach, index) => (
                     <tr key={`${breach.supplier_id || 'supplier'}-${breach.shipment_id || index}`}>
                       <td style={styles.td}>
-                        <div style={styles.rowTitle}>{formatUnknown(breach.supplier_name || breach.supplier_id, locale, ui)}</div>
+                        <div style={styles.rowTitle}>{breach.supplier_name || ui("Supplier unavailable")}</div>
                         <div style={styles.rowSubtle}>{ui("Delivery follow-up required")}</div>
                       </td>
                       <td style={styles.td}>
@@ -1049,9 +1082,9 @@ export default function SuppliersPage() {
           </div>
         ) : null}
 
-        {slaBreachesQuery.data?.notes?.map((note) => (
+        {!slaBreachesQuery.isError ? slaBreachesQuery.data?.notes?.map((note) => (
           <div key={note} style={styles.note}>{note}</div>
-        ))}
+        )) : null}
       </section>
     </div>
   );
