@@ -5,7 +5,7 @@ import { useAppTranslation } from '../i18n/I18nContext';
 import type { AppLocale } from '../i18n/config';
 import { formatLocalizedCurrency, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { ApiError, apiRequest } from '../lib/api';
-import { getRoleCapabilities } from '../lib/permissions';
+import { getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
@@ -40,11 +40,88 @@ const KNOWN_VALUE_LABELS: Record<string, string> = {
   insufficient_history: 'Insufficient history', inventory: 'Inventory', limited: 'Limited', low: 'Low', medium: 'Medium',
   needs_review: 'Needs review', negative: 'Negative', neutral: 'Neutral', not_timestamped: 'Not timestamped',
   open_for_read_only_use: 'Open for read-only use', positive: 'Positive', procurement: 'Procurement', ready: 'Ready',
-  restricted: 'Restricted', review_recommended: 'Review recommended', stale: 'Stale', stale_sources_present: 'Stale sources present',
+  restricted: 'Restricted', review_recommended: 'Review recommended', review_required: 'Review required', stale: 'Stale', stale_sources_present: 'Stale sources present',
   strong: 'Strong', system_context: 'System Context', unknown: 'Unknown', usable_with_review: 'Usable with review',
   warning: 'Warning', watch: 'Watch', aging: 'Aging', improving: 'Improving', degrading: 'Degrading', stable: 'Stable',
-  clear_for_read_only_use: 'Clear for read-only use'
+  clear_for_read_only_use: 'Clear for read-only use', urgent: 'Urgent', review: 'Review', monitor: 'Monitor',
+  accelerating: 'Accelerating', emerging: 'Emerging', steady: 'Steady', recent: 'Recent',
+  watch_high: 'High watch', watch_medium: 'Medium watch', informational: 'Informational', baseline: 'Baseline',
+  high_volatility_watch: 'High-volatility watch', low_confidence_watch: 'Low-confidence watch',
+  stable_baseline: 'Stable baseline', directional_projection: 'Directional projection',
+  projected_increase: 'Projected increase', projected_decrease: 'Projected decrease', projected_stable: 'Projected stable', forecast_scenarios_ready: 'Forecast scenarios ready'
 };
+
+const SYSTEM_CONTEXT_OWNED_TEXT = new Set([
+  'Critical unresolved alerts exist for this tenant.',
+  'Some stocked products still have no received or standard cost.',
+  'Products with material received-vs-standard cost variance exist.',
+  'Products at or below minimum stock exist.',
+  'Review critical alerts',
+  'Open the alerts queue and resolve or acknowledge critical tenant alerts before automation consumes this context.',
+  'Review low stock thresholds',
+  'Review affected product reorder thresholds and create product_min_stock_update execution requests only after human analysis and approval.',
+  'Complete cost coverage',
+  'Add standard costs or received costs for stocked products with missing cost basis.',
+  'Review cost variance',
+  'Inspect high variance products and update standard cost only after human review.',
+  'Review pricing after cost variance',
+  'Review affected product pricing and create product_pricing_update execution requests only after human analysis and approval.',
+  'Review partial receiving',
+  'Check partial shipments and linked purchase orders for receiving follow-up before creating any supplier or inventory review request.',
+  'Verify audit activity',
+  'Confirm audit logging is active before enabling automation workflows.',
+  'Priority plus suggested approval-gated request type.',
+  'Priority derived from current System Context signals.',
+  'Context quality is strong for read-only summaries and planning.',
+  'Context quality is usable for read-only planning after human review.',
+  'Context quality is limited and should not be used for automation beyond basic summaries.',
+  'Inventory counts, stocked-product exposure, low-stock posture, locations, and supplier shape.',
+  'Open shipment and purchase order workload used to frame automation readiness.',
+  'Cost coverage, valuation, standard-cost gaps, and received-vs-standard variance posture.',
+  'Unresolved, critical, and unacknowledged alert posture.',
+  'Recent audit evidence, including support-session activity.',
+  'Active support-session visibility for access and impersonation awareness.',
+  'Average Intelligence Score',
+  'Forecast Scenario Count',
+  'Repeated Signal Count',
+  'Volatility Signal Count'
+]);
+
+const SYSTEM_CONTEXT_METRIC_LABELS: Record<string, string> = {
+  average_intelligence_score: 'Average Intelligence Score',
+  forecast_scenario_count: 'Forecast Scenario Count',
+  repeated_signal_count: 'Repeated Signal Count',
+  volatility_signal_count: 'Volatility Signal Count'
+};
+
+function formatSystemOwnedText(value: string | null | undefined, ui: UiTranslator): string {
+  if (!value) return '';
+  return SYSTEM_CONTEXT_OWNED_TEXT.has(value) ? ui(value) : value;
+}
+
+function formatFreshnessMessage(
+  item: { section: string; status: string; message: string },
+  ui: UiTranslator
+): string {
+  const section = formatKnownValue(item.section, ui);
+  if (item.status === 'fresh') return ui('{section} context has activity observed within the last 24 hours.').replace('{section}', section);
+  if (item.status === 'aging') return ui('{section} context has activity observed within the last 7 days.').replace('{section}', section);
+  if (item.status === 'stale') return ui('{section} context has not been observed recently and should be reviewed before automation planning.').replace('{section}', section);
+  if (item.status === 'not_timestamped') return ui('{section} context is derived from current-state records and has no event timestamp.').replace('{section}', section);
+  if (item.status === 'unknown') return ui('{section} context has no observable timestamp in this snapshot.').replace('{section}', section);
+  return item.message;
+}
+
+function formatScenarioLabel(
+  scenario: { metric_code: string; label: string },
+  ui: UiTranslator
+): string {
+  const metric = SYSTEM_CONTEXT_METRIC_LABELS[scenario.metric_code];
+  return metric
+    ? ui('{metric} forecast scenario').replace('{metric}', ui(metric))
+    : scenario.label;
+}
+
 
 function readableError(error: unknown, unknownErrorLabel: string): string {
   if (error instanceof ApiError || error instanceof Error) return error.message;
@@ -77,23 +154,33 @@ function formatKnownValue(value: string | null | undefined, ui: UiTranslator): s
   return label ? ui(label) : value;
 }
 
-function sourceRoute(section: string | null | undefined, ui: UiTranslator): { to: string; label: string } {
+function sourceRoute(section: string | null | undefined, ui: UiTranslator): { to: string; label: string } | null {
   switch (String(section || '').toLowerCase()) {
-    case 'alerts': return { to: '/alerts', label: ui('Open Alerts') };
-    case 'inventory': return { to: '/stock', label: ui('Open Stock') };
-    case 'procurement': return { to: '/shipments', label: ui('Open Shipments') };
-    case 'costing': return { to: '/reports', label: ui('Open Reports') };
-    case 'audit': return { to: '/audit', label: ui('Open Audit') };
-    case 'access': return { to: '/sessions', label: ui('Open Sessions') };
-    default: return { to: '/action-center', label: ui('Open Action Center') };
+    case 'alerts':
+      return hasPermission(TENANT_PERMISSIONS.ALERTS_READ) ? { to: '/alerts', label: ui('Open Alerts') } : null;
+    case 'inventory':
+      return hasPermission(TENANT_PERMISSIONS.STOCK_READ) ? { to: '/stock', label: ui('Open Stock') } : null;
+    case 'procurement':
+      return hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ) ? { to: '/shipments', label: ui('Open Shipments') } : null;
+    case 'costing':
+      return hasPermission(TENANT_PERMISSIONS.REPORTS_READ) ? { to: '/reports', label: ui('Open Reports') } : null;
+    case 'audit':
+    case 'access':
+      return hasPermission(TENANT_PERMISSIONS.AUDIT_READ) ? { to: '/audit', label: ui('Open Audit') } : null;
+    default:
+      return hasPermission(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ)
+        ? { to: '/action-center', label: ui('Open Action Center') }
+        : null;
   }
 }
 
-function riskRoute(code: string, ui: UiTranslator): { to: string; label: string } {
-  if (code.includes('alert')) return { to: '/alerts', label: ui('Open Alerts') };
-  if (code.includes('cost') || code.includes('variance')) return { to: '/reports', label: ui('Open Reports') };
-  if (code.includes('stock')) return { to: '/stock', label: ui('Open Stock') };
-  return { to: '/action-center', label: ui('Open Action Center') };
+function riskRoute(code: string, ui: UiTranslator): { to: string; label: string } | null {
+  if (code.includes('alert')) return hasPermission(TENANT_PERMISSIONS.ALERTS_READ) ? { to: '/alerts', label: ui('Open Alerts') } : null;
+  if (code.includes('cost') || code.includes('variance')) return hasPermission(TENANT_PERMISSIONS.REPORTS_READ) ? { to: '/reports', label: ui('Open Reports') } : null;
+  if (code.includes('stock')) return hasPermission(TENANT_PERMISSIONS.STOCK_READ) ? { to: '/stock', label: ui('Open Stock') } : null;
+  return hasPermission(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ)
+    ? { to: '/action-center', label: ui('Open Action Center') }
+    : null;
 }
 
 function toneForStatus(value: string | null | undefined): Tone {
@@ -173,7 +260,7 @@ export default function SystemContextPage() {
   const executionGateQuery = useQuery({
     queryKey: ['system-context-execution-gate'],
     queryFn: () => apiRequest<SystemContextExecutionGateResponse>('/system-context/execution-gate'),
-    enabled: contextQuery.isSuccess
+    enabled: contextQuery.isSuccess && canViewTenantDiagnostics
   });
 
   const activeView: SystemContextView = view === 'diagnostics' && !canViewTenantDiagnostics ? 'overview' : view;
@@ -219,9 +306,21 @@ export default function SystemContextPage() {
   const highPriorityRecommendationCount = data?.recommendations?.filter((item) => item.priority === 'high').length ?? 0;
   const contextQualityScore = toNumber(data?.context_quality?.score);
   const automationReadinessScore = toNumber(data?.automation_readiness?.score);
+  const heroRiskValue = contextQuery.isLoading
+    ? ui('Loading')
+    : contextQuery.isError
+      ? ui('Unavailable')
+      : formatNumber(riskCount, locale);
+  const heroRiskLabel = contextQuery.isLoading
+    ? ui('Risk signals are loading.')
+    : contextQuery.isError
+      ? ui('Risk signals are unavailable because System Context failed to load.')
+      : (riskCount === 1 ? ui('{count} risk signal · refreshed {time}') : ui('{count} risk signals · refreshed {time}'))
+        .replace('{count}', formatNumber(riskCount, locale))
+        .replace('{time}', formatDateTime(contextQuery.dataUpdatedAt || null, locale, ui));
 
   const snapshotChanges = useMemo(
-    () => snapshotComparisonQuery.data?.comparisons.filter((item) => Number(item.delta) !== 0) ?? [],
+    () => snapshotComparisonQuery.data?.comparisons.filter((item) => item.comparable === false || item.delta === null || Number(item.delta) !== 0) ?? [],
     [snapshotComparisonQuery.data]
   );
 
@@ -233,7 +332,11 @@ export default function SystemContextPage() {
     setRefreshingPage(true);
     setRefreshMessage(null);
     try {
-      await invalidateSystemContextQueries();
+      const refreshed = await contextQuery.refetch();
+      if (refreshed.error) throw refreshed.error;
+      await queryClient.invalidateQueries({
+        predicate: (query) => String(query.queryKey[0] ?? '').startsWith('system-context') && query.queryKey[0] !== 'system-context'
+      });
       setRefreshMessage(ui('System Context refreshed. No stock, workflow, or automation changes were made.'));
     } catch (error) {
       setRefreshMessage(ui('Refresh failed: {error}').replace('{error}', readableError(error, ui('Unknown error'))));
@@ -345,12 +448,12 @@ export default function SystemContextPage() {
           <>
             <OperationalWorkspaceMetaPill>{ui('Read-only')}</OperationalWorkspaceMetaPill>
             <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{data ? formatKnownValue(data.status, ui) : ui('Loading')}</OperationalWorkspaceMetaPill>
+            <OperationalWorkspaceMetaPill>{contextQuery.isLoading ? ui('Loading') : contextQuery.isError ? ui('Unavailable') : data ? formatKnownValue(data.status, ui) : ui('Unavailable')}</OperationalWorkspaceMetaPill>
           </>
         }
         aside={
           <>
-            <OperationalWorkspaceStatus value={riskCount} label={(riskCount === 1 ? ui('{count} risk signal · refreshed {time}') : ui('{count} risk signals · refreshed {time}')).replace('{count}', formatNumber(riskCount, locale)).replace('{time}', formatDateTime(contextQuery.dataUpdatedAt || null, locale, ui))} />
+            <OperationalWorkspaceStatus value={heroRiskValue} label={heroRiskLabel} />
             <button className="app-button app-button--secondary" type="button" onClick={refreshSystemContextPage} disabled={refreshingPage}>
               {refreshingPage ? ui('Refreshing…') : ui('Refresh context')}
             </button>
@@ -360,6 +463,7 @@ export default function SystemContextPage() {
 
       {refreshMessage ? <div className="app-info-state">{refreshMessage}</div> : null}
       {contextQuery.error ? <ErrorNotice title={ui('System Context failed to load')} error={contextQuery.error} unknownErrorLabel={ui('Unknown error')} /> : null}
+      {contextQuery.error && data ? <div className="app-info-state">{ui('Showing the last successfully loaded System Context snapshot below. Refresh again before relying on it for a new planning decision.')}</div> : null}
       {contextQuery.isLoading ? <div className="app-empty-state">{ui('Loading system context…')}</div> : null}
 
       {data ? (
@@ -394,11 +498,11 @@ export default function SystemContextPage() {
                           <div className="system-context-action-card__body">
                             <StatusPill tone={tone}>{formatKnownValue(signal.severity, ui)}</StatusPill>
                             <div>
-                              <strong>{signal.message}</strong>
+                              <strong>{formatSystemOwnedText(signal.message, ui)}</strong>
                               <span>{signal.count !== undefined ? (toNumber(signal.count) === 1 ? ui('{count} affected item.') : ui('{count} affected items.')).replace('{count}', formatNumber(signal.count, locale)) : ui('Review the source workflow for current evidence.')}</span>
                             </div>
                           </div>
-                          <Link className="button button--secondary" to={route.to}>{route.label}</Link>
+                          {route ? <Link className="button button--secondary" to={route.to}>{route.label}</Link> : null}
                         </article>
                       );
                     })}
@@ -433,10 +537,10 @@ export default function SystemContextPage() {
                             {item.requires_human_review ? <StatusPill>{ui('Human review')}</StatusPill> : null}
                             {item.executes_actions === false ? <StatusPill tone="good">{ui('Read-only')}</StatusPill> : null}
                           </div>
-                          <h3>{item.title}</h3>
-                          <p>{item.action}</p>
-                          {item.ranking_reason ? <span className="system-context-muted">{ui('Why: {reason}').replace('{reason}', item.ranking_reason)}</span> : null}
-                          <Link to={route.to}>{route.label} →</Link>
+                          <h3>{formatSystemOwnedText(item.title, ui)}</h3>
+                          <p>{formatSystemOwnedText(item.action, ui)}</p>
+                          {item.ranking_reason ? <span className="system-context-muted">{ui('Why: {reason}').replace('{reason}', formatSystemOwnedText(item.ranking_reason, ui))}</span> : null}
+                          {route ? <Link to={route.to}>{route.label} →</Link> : null}
                         </article>
                       );
                     })}
@@ -458,7 +562,9 @@ export default function SystemContextPage() {
                     <div><span>{ui('Unresolved alerts')}</span><strong>{formatNumber(data.context.alerts?.unresolved_alerts, locale)}</strong></div>
                   </div>
                   <div className="system-context-link-row">
-                    <Link to="/stock">{ui('Open Stock')}</Link><Link to="/shipments">{ui('Open Shipments')}</Link><Link to="/reports">{ui('Open Reports')}</Link>
+                    {hasPermission(TENANT_PERMISSIONS.STOCK_READ) ? <Link to="/stock">{ui('Open Stock')}</Link> : null}
+                    {hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ) ? <Link to="/shipments">{ui('Open Shipments')}</Link> : null}
+                    {hasPermission(TENANT_PERMISSIONS.REPORTS_READ) ? <Link to="/reports">{ui('Open Reports')}</Link> : null}
                   </div>
                 </div>
 
@@ -469,11 +575,11 @@ export default function SystemContextPage() {
                     <div><span>{ui('Freshness')}</span><strong>{formatKnownValue(data.context_freshness.status, ui)}</strong><StatusPill tone={toneForStatus(data.context_freshness.status)}>{(toNumber(data.context_freshness.stale_sources) === 1 ? ui('{count} stale source') : ui('{count} stale sources')).replace('{count}', formatNumber(data.context_freshness.stale_sources, locale))}</StatusPill></div>
                     <div><span>{ui('Planning readiness')}</span><strong>{formatPercentScore(data.automation_readiness.score, locale)}</strong><StatusPill tone={toneForStatus(data.automation_readiness.status)}>{formatKnownValue(data.automation_readiness.status, ui)}</StatusPill></div>
                   </div>
-                  <p className="system-context-muted">{data.context_quality.summary}</p>
-                  {toNumber(data.context_freshness.stale_sources) > 0 || toNumber(data.context_freshness.aging_sources) > 0 ? (
+                  <p className="system-context-muted">{formatSystemOwnedText(data.context_quality.summary, ui)}</p>
+                  {toNumber(data.context_freshness.stale_sources) > 0 || toNumber(data.context_freshness.aging_sources) > 0 || toNumber(data.context_freshness.unknown_sources) > 0 ? (
                     <div className="system-context-mini-list">
                       {data.context_freshness.items.filter((item) => ['stale', 'aging', 'unknown'].includes(item.status)).slice(0, 5).map((item) => (
-                        <div key={item.section}><strong>{formatKnownValue(item.section, ui)}</strong><span>{item.message}</span></div>
+                        <div key={item.section}><strong>{formatKnownValue(item.section, ui)}</strong><span>{formatFreshnessMessage(item, ui)}</span></div>
                       ))}
                     </div>
                   ) : <EmptyState>{ui('All reported context sources are current.')}</EmptyState>}
@@ -528,7 +634,7 @@ export default function SystemContextPage() {
                         </button>
                       ))}
                     </div>
-                  ) : !snapshotsQuery.isLoading ? <EmptyState>{ui('No saved snapshots yet.')}</EmptyState> : null}
+                  ) : snapshotsQuery.isSuccess ? <EmptyState>{ui('No saved snapshots yet.')}</EmptyState> : null}
                 </div>
 
                 <div className="app-panel app-panel--padded system-context-panel">
@@ -544,13 +650,13 @@ export default function SystemContextPage() {
                       <div><span>{ui('Context quality')}</span><strong>{selectedSnapshotContext ? formatPercentScore(selectedSnapshotContext.context_quality?.score, locale) : ui('Not stored')}</strong></div>
                       <div><span>{ui('Planning readiness')}</span><strong>{selectedSnapshotContext ? formatPercentScore(selectedSnapshotContext.automation_readiness?.score, locale) : ui('Not stored')}</strong></div>
                     </div>
-                  ) : <EmptyState>{ui('Select a snapshot to review its summary.')}</EmptyState>}
+                  ) : !selectedSnapshotId ? <EmptyState>{ui('Select a snapshot to review its summary.')}</EmptyState> : null}
                 </div>
               </section>
 
               <section className="app-panel app-panel--padded system-context-panel">
                 <PanelHeading iconPath="/insights" title={ui('What changed between the latest snapshots')} subtitle={ui('Only business-facing changes are shown. This comparison is read-only.')} />
-                {(snapshotsQuery.data?.length ?? 0) < 2 ? <EmptyState>{ui('At least two snapshots are needed for comparison.')}</EmptyState> : null}
+                {snapshotsQuery.isSuccess && (snapshotsQuery.data?.length ?? 0) < 2 ? <EmptyState>{ui('At least two snapshots are needed for comparison.')}</EmptyState> : null}
                 {snapshotComparisonQuery.isLoading ? <EmptyState>{ui('Comparing snapshots…')}</EmptyState> : null}
                 {snapshotComparisonQuery.error ? <ErrorNotice title={ui('Snapshot comparison failed')} error={snapshotComparisonQuery.error} unknownErrorLabel={ui('Unknown error')} /> : null}
                 {snapshotComparisonQuery.data && (snapshotsQuery.data?.length ?? 0) >= 2 ? (
@@ -559,7 +665,20 @@ export default function SystemContextPage() {
                     {snapshotChanges.length ? (
                       <div className="system-context-summary-grid">
                         {snapshotChanges.map((item) => (
-                          <div key={item.code}><span>{item.label}</span><strong>{item.delta > 0 ? '+' : ''}{formatNumber(item.delta, locale)}</strong><small>{formatNumber(item.previous, locale)} → {formatNumber(item.current, locale)}</small></div>
+                          <div key={item.code}>
+                            <span>{formatSystemOwnedText(item.label, ui)}</span>
+                            {item.comparable === false || item.delta === null ? (
+                              <>
+                                <strong>{ui('Not comparable')}</strong>
+                                <small>{ui('This metric was not captured in both snapshots.')}</small>
+                              </>
+                            ) : (
+                              <>
+                                <strong>{item.delta > 0 ? '+' : ''}{formatNumber(item.delta, locale)}</strong>
+                                <small>{formatNumber(item.previous, locale)} → {formatNumber(item.current, locale)}</small>
+                              </>
+                            )}
+                          </div>
                         ))}
                       </div>
                     ) : <EmptyState>{ui('No measured values changed between the latest two snapshots.')}</EmptyState>}
@@ -578,14 +697,15 @@ export default function SystemContextPage() {
                     {forecastScenarioQuery.data.forecast_scenarios.slice(0, 8).map((scenario) => (
                       <article className="system-context-recommendation" key={scenario.code}>
                         <div className="system-context-recommendation__top"><StatusPill>{formatKnownValue(scenario.priority, ui)}</StatusPill><StatusPill tone="good">{ui('Read-only')}</StatusPill></div>
-                        <h3>{scenario.label}</h3>
+                        <h3>{formatScenarioLabel(scenario, ui)}</h3>
                         <p>{ui('Direction: {direction} · Projected change: {change}').replace('{direction}', formatKnownValue(scenario.preview_direction, ui)).replace('{change}', formatNumber(scenario.projected_delta, locale))}</p>
                         <span className="system-context-muted">{ui('Confidence {confidence} · Risk {risk}').replace('{confidence}', formatNumber(scenario.confidence_score, locale)).replace('{risk}', formatKnownValue(scenario.risk_classification, ui))}</span>
                       </article>
                     ))}
                   </div>
-                ) : !forecastScenarioQuery.isLoading ? <EmptyState>{ui('No scenario rows are available.')}</EmptyState> : null}
+                ) : forecastScenarioQuery.isSuccess ? <EmptyState>{ui('No scenario rows are available.')}</EmptyState> : null}
 
+                {forecastScenarioHistoryQuery.error ? <ErrorNotice title={ui('Saved scenario history failed to load')} error={forecastScenarioHistoryQuery.error} unknownErrorLabel={ui('Unknown error')} /> : null}
                 {forecastScenarioHistoryQuery.data?.length ? (
                   <details className="system-context-details">
                     <summary>{ui('Saved scenario sets ({count})').replace('{count}', formatNumber(forecastScenarioHistoryQuery.data.length, locale))}</summary>
@@ -646,7 +766,7 @@ export default function SystemContextPage() {
                     return (
                       <article key={source.section}>
                         <div><strong>{formatKnownValue(source.section, ui)}</strong><StatusPill tone={toneForStatus(freshness?.status)}>{formatKnownValue(freshness?.status, ui)}</StatusPill></div>
-                        <p>{source.description}</p>
+                        <p>{formatSystemOwnedText(source.description, ui)}</p>
                         <span>{ui('Quality {quality} · Last observed {time}').replace('{quality}', quality ? formatPercentScore(quality.score, locale) : '—').replace('{time}', formatDateTime(source.last_observed_at, locale, ui))}</span>
                       </article>
                     );

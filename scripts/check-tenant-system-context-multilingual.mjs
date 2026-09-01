@@ -83,6 +83,12 @@ for (const match of page.matchAll(literalPattern)) {
 const mapping = page.match(/const KNOWN_VALUE_LABELS: Record<string, string> = \{([\s\S]*?)\n\};/);
 if (!mapping) fail('System Context known-value display mapping is missing.');
 else for (const match of mapping[1].matchAll(/:\s*'([^']+)'/g)) displayKeys.add(match[1]);
+const ownedSystemText = page.match(/const SYSTEM_CONTEXT_OWNED_TEXT = new Set\(\[([\s\S]*?)\n\]\);/);
+if (!ownedSystemText) fail('System Context owned-system-text localization boundary is missing.');
+else for (const match of ownedSystemText[1].matchAll(/'([^']+)'/g)) displayKeys.add(match[1]);
+const metricLabels = page.match(/const SYSTEM_CONTEXT_METRIC_LABELS: Record<string, string> = \{([\s\S]*?)\n\};/);
+if (!metricLabels) fail('System Context metric-label localization mapping is missing.');
+else for (const match of metricLabels[1].matchAll(/:\s*'([^']+)'/g)) displayKeys.add(match[1]);
 const missing = [...displayKeys].filter((key) => !unique.has(key)).sort();
 if (missing.length) fail(`System Context UI keys missing translations: ${missing.join(' | ')}`);
 else pass(`System Context has ${displayKeys.size} catalog-backed literal/dynamic UI keys.`);
@@ -134,21 +140,39 @@ for (const contract of [
 ]) if (!page.includes(contract)) fail(`System Context operational/payload contract changed or missing: ${contract}`);
 if (!process.exitCode) pass('System Context read, review-request, snapshot, scenario, and capability contracts remain canonical.');
 
-for (const rawField of [
-  '{signal.message}',
-  '<h3>{item.title}</h3>',
-  '<p>{item.action}</p>',
-  'item.ranking_reason',
-  '{data.context_quality.summary}',
-  '<span>{item.message}</span>',
-  '<span>{item.label}</span>',
-  '<h3>{scenario.label}</h3>',
-  '<p>{source.description}</p>',
-  'return label ? ui(label) : value;'
+for (const localizationAnchor of [
+  'formatSystemOwnedText(signal.message, ui)',
+  'formatSystemOwnedText(item.title, ui)',
+  'formatSystemOwnedText(item.action, ui)',
+  'formatSystemOwnedText(item.ranking_reason, ui)',
+  'formatSystemOwnedText(data.context_quality.summary, ui)',
+  'formatFreshnessMessage(item, ui)',
+  'formatSystemOwnedText(item.label, ui)',
+  'formatScenarioLabel(scenario, ui)',
+  'formatSystemOwnedText(source.description, ui)',
+  'return SYSTEM_CONTEXT_OWNED_TEXT.has(value) ? ui(value) : value;',
+  'return item.message;',
+  ': scenario.label;'
 ]) {
-  if (!page.includes(rawField)) fail(`System Context business/server-data raw boundary changed or missing: ${rawField}`);
+  if (!page.includes(localizationAnchor)) fail(`System Context owned-system localization/raw fallback boundary changed or missing: ${localizationAnchor}`);
 }
-if (!process.exitCode) pass('System Context preserves business/server prose, comparison labels, scenario labels, and unknown backend values as raw data.');
+if (!process.exitCode) pass('System Context localizes only explicitly owned backend presentation while preserving unknown server/business prose as raw data.');
+
+for (const permissionAnchor of [
+  'hasPermission(TENANT_PERMISSIONS.ALERTS_READ)',
+  'hasPermission(TENANT_PERMISSIONS.STOCK_READ)',
+  'hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ)',
+  'hasPermission(TENANT_PERMISSIONS.REPORTS_READ)',
+  'hasPermission(TENANT_PERMISSIONS.AUDIT_READ)',
+  'hasPermission(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ)'
+]) {
+  if (!page.includes(permissionAnchor)) fail(`System Context source-workflow link permission gate missing: ${permissionAnchor}`);
+}
+if (!page.includes("case 'access':") || !page.includes("{ to: '/audit', label: ui('Open Audit') }")) {
+  fail('System Context access/support-session evidence no longer routes to tenant Audit when permitted.');
+}
+if (!process.exitCode) pass('System Context aggregate read stays independent while direct source-workflow links fail closed on the destination permission.');
+
 
 if (backendRoute) {
   for (const anchor of [

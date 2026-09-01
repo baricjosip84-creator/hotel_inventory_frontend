@@ -4028,10 +4028,11 @@ export interface SystemContextSnapshotComparison {
   comparisons: Array<{
     code: string;
     label: string;
-    current: number;
-    previous: number;
-    delta: number;
+    current: number | null;
+    previous: number | null;
+    delta: number | null;
     direction: string;
+    comparable?: boolean;
   }>;
   notes: string[];
 }

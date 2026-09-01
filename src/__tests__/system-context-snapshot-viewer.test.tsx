@@ -29,12 +29,12 @@ describe('system context tenant-facing experience', () => {
   test('separates overview, optional planning history, and permission-gated diagnostics', () => {
     expect(pageSource).toContain("type SystemContextView = 'overview' | 'history' | 'diagnostics'");
     expect(pageSource).toContain('canViewTenantDiagnostics');
-    expect(pageSource).toContain("view === 'diagnostics' && canViewTenantDiagnostics");
+    expect(pageSource).toContain("view === 'diagnostics' && !canViewTenantDiagnostics ? 'overview' : view");
     expect(pageSource).toContain('Internal Phase B/C/D step names');
   });
 
   test('does not fetch optional history until the user opens planning history', () => {
-    expect(pageSource).toContain("const historyEnabled = view === 'history'");
+    expect(pageSource).toContain("const historyEnabled = activeView === 'history'");
     expect(pageSource).toContain("enabled: historyEnabled");
     expect(pageSource).toContain("enabled: historyEnabled && Boolean(selectedSnapshotId)");
   });
