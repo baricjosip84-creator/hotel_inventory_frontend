@@ -13,7 +13,7 @@ import './ReliabilityCommandPage.css';
 type ReliabilityView = 'posture' | 'review-path' | 'limits';
 type ReadinessFilter = 'watch' | 'degraded' | 'critical';
 type SeverityFilter = 'all' | 'medium' | 'high' | 'critical';
-type ResultLimit = '25' | '50' | '75' | '100';
+type ResultLimit = '3' | '5' | '9';
 
 type ReliabilityDimension = {
   key?: string;
@@ -103,7 +103,7 @@ const SEVERITY_OPTIONS = [
   { value: 'critical', label: 'Critical only' }
 ] as const satisfies ReadonlyArray<{ value: SeverityFilter; label: string }>;
 
-const LIMIT_OPTIONS = ['25', '50', '75', '100'] as const satisfies readonly ResultLimit[];
+const LIMIT_OPTIONS = ['3', '5', '9'] as const satisfies readonly ResultLimit[];
 
 const SOURCE_LABELS: Record<string, string> = {
   '/action-center': 'Open Action Center',
@@ -332,7 +332,7 @@ export default function ReliabilityCommandPage() {
   });
   const [limit, setLimit] = useRouteQueryState<ResultLimit>({
     paramName: 'limit',
-    defaultValue: '25',
+    defaultValue: '9',
     allowedValues: LIMIT_OPTIONS
   });
 

@@ -6,6 +6,7 @@ const fail=(m)=>{console.error(`FAIL: ${m}`);process.exitCode=1;};
 const pass=(m)=>console.log(`PASS: ${m}`);
 const translationSource=read('src/i18n/tenantUiTranslations.ts');
 const pageSource=read('src/pages/ReliabilityCommandPage.tsx');
+if(!pageSource.includes("type ResultLimit = '3' | '5' | '9';")||!pageSource.includes("const LIMIT_OPTIONS = ['3', '5', '9']")||!pageSource.includes("defaultValue: '9'"))fail('Reliability Command review-item limit must be meaningful for the nine-dimension review surface (3/5/9, default 9).');else pass('Reliability Command review-item limit is meaningful for the nine-dimension review surface.');
 const routerSource=read('src/app/router.tsx');
 const rows=[];
 for(const line of translationSource.split(/\r?\n/)){const t=line.trim();if(!t.startsWith('[')||!t.endsWith(','))continue;try{const r=JSON.parse(t.slice(0,-1));if(Array.isArray(r)&&r.length===5&&r.every((x)=>typeof x==='string'))rows.push(r);}catch{}}
