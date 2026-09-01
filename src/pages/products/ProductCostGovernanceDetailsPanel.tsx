@@ -6,6 +6,7 @@ import { useAppTranslation } from '../../i18n/I18nContext';
 
 type CostGovernanceQueryState = {
   isLoading: boolean;
+  isError: boolean;
 };
 
 type GovernancePriorityProduct = ProductCostGovernanceDetailsResponse['priority_products'][number];
@@ -22,13 +23,20 @@ export function ProductCostGovernanceDetailsPanel({
   handleOpenCostHistory
 }: ProductCostGovernanceDetailsPanelProps) {
   const { ui, locale } = useAppTranslation();
+
+  if (costGovernanceDetailsQuery.isLoading) {
+    return <div style={styles.rowSubtle}>{ui('Loading governance details...')}</div>;
+  }
+
+  if (costGovernanceDetailsQuery.isError) {
+    return <div style={styles.errorBox}>{ui('Unable to load governance details.')}</div>;
+  }
+
   return (
     <div style={styles.riskGrid}>
       <div style={styles.riskListCard}>
         <h4 style={styles.sectionTitle}>{ui("Governance remediation plan")}</h4>
-        {costGovernanceDetailsQuery.isLoading ? (
-          <div style={styles.rowSubtle}>{ui("Loading governance details...")}</div>
-        ) : (costGovernanceDetails?.remediation_plan ?? []).length === 0 ? (
+        {(costGovernanceDetails?.remediation_plan ?? []).length === 0 ? (
           <div style={styles.rowSubtle}>{ui("No detailed remediation steps required.")}</div>
         ) : (
           (costGovernanceDetails?.remediation_plan ?? []).map((item, index) => (

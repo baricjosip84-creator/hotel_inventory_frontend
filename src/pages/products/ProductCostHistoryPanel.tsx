@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { ProductCostHistoryItem, ProductCostHistoryResponse, ProductCostRiskItem, ProductItem, ProductStandardCostHistoryItem } from '../../types/inventory';
 import type { CostHistoryFilterState } from './productCostHistoryApi';
-import { formatDateTime, formatMoney } from './productFormatting';
+import { formatDateTime, formatKnownCostHistorySource, formatMoney } from './productFormatting';
 import { styles } from './productStyles';
 import { StatCard } from './productSummaryComponents';
 import { useAppTranslation } from '../../i18n/I18nContext';
@@ -14,6 +14,8 @@ type CostHistoryQueryState = {
 
 type StandardCostHistoryQueryState = {
   isLoading: boolean;
+  isError: boolean;
+  error: unknown;
 };
 
 type ProductCostHistoryPanelProps = {
@@ -186,6 +188,12 @@ export function ProductCostHistoryPanel({
                       {ui("Loading standard cost changes...")}
                     </td>
                   </tr>
+                ) : standardCostHistoryQuery.isError ? (
+                  <tr>
+                    <td style={styles.emptyCell} colSpan={5}>
+                      {ui('Failed to load standard cost changes:')} {(standardCostHistoryQuery.error as Error)?.message || ui('Unknown error')}
+                    </td>
+                  </tr>
                 ) : standardCostHistory.length === 0 ? (
                   <tr>
                     <td style={styles.emptyCell} colSpan={5}>
@@ -198,8 +206,8 @@ export function ProductCostHistoryPanel({
                       <td style={styles.td}>{formatDateTime(entry.changed_at, locale)}</td>
                       <td style={styles.td}>{formatMoney(entry.previous_standard_unit_cost, locale)}</td>
                       <td style={styles.td}>{formatMoney(entry.new_standard_unit_cost, locale)}</td>
-                      <td style={styles.td}>{entry.changed_by_user_name || entry.changed_by_user_id || '-'}</td>
-                      <td style={styles.td}>{entry.change_source}</td>
+                      <td style={styles.td}>{entry.changed_by_user_name || ui('User unavailable')}</td>
+                      <td style={styles.td}>{formatKnownCostHistorySource(entry.change_source) ? ui(formatKnownCostHistorySource(entry.change_source)!) : entry.change_source || '-'}</td>
                     </tr>
                   ))
                 )}
@@ -238,12 +246,11 @@ export function ProductCostHistoryPanel({
                       </td>
                       <td style={styles.td}>{formatMoney(movement.unit_cost, locale)}</td>
                       <td style={styles.td}>{formatMoney(movement.total_cost, locale)}</td>
-                      <td style={styles.td}>{movement.cost_source || '-'}</td>
+                      <td style={styles.td}>{formatKnownCostHistorySource(movement.cost_source) ? ui(formatKnownCostHistorySource(movement.cost_source)!) : movement.cost_source || '-'}</td>
                       <td style={styles.td}>
                         {movement.shipment_id ? (
                           <div>
                             <div style={styles.rowTitle}>{movement.shipment_po_number || ui('Shipment')}</div>
-                            <div style={styles.rowSubtle}>{movement.shipment_id}</div>
                           </div>
                         ) : (
                           '-'

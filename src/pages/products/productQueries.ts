@@ -53,6 +53,7 @@ export type ProductPageQueryInput = {
   selectedPackageProduct: ProductItem | null;
   selectedCostProduct: ProductItem | ProductCostRiskItem | null;
   canViewProductPackages: boolean;
+  canViewSuppliers: boolean;
   costHistoryFilters: CostHistoryFilterState;
   costValuationDetailFilters: CostValuationDetailFilterState;
   costRiskDetailFilters: CostRiskDetailFilterState;
@@ -69,6 +70,7 @@ export function useProductPageQueries({
   selectedPackageProduct,
   selectedCostProduct,
   canViewProductPackages,
+  canViewSuppliers,
   costHistoryFilters,
   costValuationDetailFilters,
   costRiskDetailFilters,
@@ -136,7 +138,7 @@ export function useProductPageQueries({
   const costActionSupplierQuery = useQuery({
     queryKey: ['product-cost-action-supplier-summary'],
     queryFn: fetchProductCostActionSupplierSummary,
-    enabled: actionsEnabled
+    enabled: actionsEnabled && canViewSuppliers
   });
 
   const costActionSourceQuery = useQuery({
@@ -209,7 +211,8 @@ export function useProductPageQueries({
 
   const suppliersQuery = useQuery({
     queryKey: ['suppliers-available-products-page'],
-    queryFn: fetchSuppliers
+    queryFn: fetchSuppliers,
+    enabled: canViewSuppliers
   });
 
   const packagesQuery = useQuery({

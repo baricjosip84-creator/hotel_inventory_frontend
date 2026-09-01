@@ -10,11 +10,14 @@ type ProductsQueryState = {
   error: unknown;
 };
 
+type SuppliersQueryState = ProductsQueryState;
+
 type ProductListPanelProps = {
   productsQuery: ProductsQueryState;
   products: ProductItem[];
   totalProductsCount: number;
   suppliers: SupplierItem[];
+  suppliersQuery: SuppliersQueryState;
   categoryOptions: string[];
   search: string;
   setSearch: (value: string) => void;
@@ -30,6 +33,7 @@ type ProductListPanelProps = {
   setCostVarianceStatusFilter: (value: string) => void;
   canManageProducts: boolean;
   canViewProductPackages: boolean;
+  canViewSuppliers: boolean;
   deleteProductPending: boolean;
   onExportProductsCsv: () => void;
   onOpenCostHistory: (product: ProductItem) => void;
@@ -43,6 +47,7 @@ export function ProductListPanel({
   products,
   totalProductsCount,
   suppliers,
+  suppliersQuery,
   categoryOptions,
   search,
   setSearch,
@@ -58,6 +63,7 @@ export function ProductListPanel({
   setCostVarianceStatusFilter,
   canManageProducts,
   canViewProductPackages,
+  canViewSuppliers,
   deleteProductPending,
   onExportProductsCsv,
   onOpenCostHistory,
@@ -75,6 +81,8 @@ export function ProductListPanel({
 
       <ProductListFiltersPanel
         suppliers={suppliers}
+        suppliersQuery={suppliersQuery}
+        productsQuery={productsQuery}
         categoryOptions={categoryOptions}
         search={search}
         setSearch={setSearch}
@@ -90,6 +98,7 @@ export function ProductListPanel({
         setCostVarianceStatusFilter={setCostVarianceStatusFilter}
         productsCount={products.length}
         totalProductsCount={totalProductsCount}
+        canViewSuppliers={canViewSuppliers}
         onExportProductsCsv={onExportProductsCsv}
       />
 
@@ -99,6 +108,7 @@ export function ProductListPanel({
         emptyMessage={search.trim() ? ui('No products match the current search and filters.') : ui('No products found for the current filters.')}
         canManageProducts={canManageProducts}
         canViewProductPackages={canViewProductPackages}
+        canViewSuppliers={canViewSuppliers}
         deleteProductPending={deleteProductPending}
         onOpenCostHistory={onOpenCostHistory}
         onOpenPackages={onOpenPackages}

@@ -19,16 +19,16 @@ type UiTranslator = (englishText: string) => string;
 const identityUi: UiTranslator = (englishText) => englishText;
 
 const HEADER_LABELS: Record<string, string> = {
-  movement_id: 'Movement ID', product_id: 'Product ID', product_name: 'Product name', change: 'Change', reason: 'Reason',
-  unit_cost: 'Unit cost', total_cost: 'Total cost', cost_source: 'Cost source', shipment_id: 'Shipment ID', shipment_po_number: 'Shipment PO number',
-  receiving_note: 'Receiving note', user: 'User', created_at: 'Created at', currency_code: 'Currency', history_id: 'History ID',
+  product_name: 'Product name', change: 'Change', reason: 'Reason',
+  unit_cost: 'Unit cost', total_cost: 'Total cost', cost_source: 'Cost source', shipment_po_number: 'Shipment PO number',
+  receiving_note: 'Receiving note', user: 'User', created_at: 'Created at', currency_code: 'Currency',
   previous_standard_unit_cost: 'Previous standard unit cost', new_standard_unit_cost: 'New standard unit cost', changed_by: 'Changed by',
-  changed_at: 'Changed at', change_source: 'Change source', id: 'Product ID', sku: 'SKU', name: 'Product name', category: 'Category',
+  changed_at: 'Changed at', change_source: 'Change source', sku: 'SKU', name: 'Product name', category: 'Category',
   unit: 'Unit', min_stock: 'Minimum stock', supplier: 'Supplier', default_barcode: 'Default barcode', current_stock_quantity: 'Current stock quantity',
   latest_unit_cost: 'Latest unit cost', standard_unit_cost: 'Standard unit cost', effective_unit_cost: 'Effective unit cost',
   effective_cost_source: 'Effective cost source', effective_cost_at: 'Effective cost at', latest_cost_source: 'Latest cost source', latest_cost_at: 'Latest cost at',
   estimated_inventory_value: 'Estimated inventory value', cost_variance_status: 'Cost variance status', cost_variance_amount: 'Cost variance amount',
-  cost_variance_percent: 'Cost variance percent', version: 'Version', valuation_basis: 'Valuation basis', stock_quantity: 'Stock quantity',
+  cost_variance_percent: 'Cost variance percent', valuation_basis: 'Valuation basis', stock_quantity: 'Stock quantity',
   action_type: 'Action type', recommended_action: 'Recommended action', action_priority_score: 'Action priority score',
   cost_history_spread_percent: 'Cost history spread percent', risk_type: 'Risk type', risk_priority_score: 'Risk priority score',
   min_unit_cost: 'Minimum unit cost', max_unit_cost: 'Maximum unit cost'
@@ -47,6 +47,21 @@ function withTenantCurrency<T extends Record<string, unknown>>(row: T): T & { cu
   return { ...row, currency_code: getActiveTenantCurrency() };
 }
 
+function withoutTechnicalIdentifiers(row: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(row).filter(([key]) => !/(^id$|_id$|^version$|_version$)/i.test(key))
+  );
+}
+
+function safeFileToken(value: string): string {
+  const token = value.trim().replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '');
+  return token || 'product';
+}
+
+function productExportToken(product: ProductItem | ProductCostRiskItem): string {
+  return safeFileToken('sku' in product && product.sku ? product.sku : product.name);
+}
+
 export function exportCostHistoryCsv(
   selectedCostProduct: ProductItem | ProductCostRiskItem | null,
   costHistory: ProductCostHistoryItem[],
@@ -55,22 +70,19 @@ export function exportCostHistoryCsv(
   if (!selectedCostProduct || costHistory.length === 0) return;
 
   const rows = costHistory.map((movement) => withTenantCurrency({
-    movement_id: movement.id,
-    product_id: movement.product_id,
     product_name: movement.product_name,
     change: movement.change,
     reason: movement.reason,
     unit_cost: movement.unit_cost ?? '',
     total_cost: movement.total_cost ?? '',
     cost_source: movement.cost_source || '',
-    shipment_id: movement.shipment_id || '',
     shipment_po_number: movement.shipment_po_number || '',
     receiving_note: movement.receiving_note || '',
-    user: movement.user_name || movement.user_id || '',
+    user: movement.user_name || ui('User unavailable'),
     created_at: movement.created_at
   }));
 
-  downloadCsv(`product-cost-history-${selectedCostProduct.id}.csv`, rows.map((row) => withLocalizedHeaders(row, ui)));
+  downloadCsv(`product-cost-history-${productExportToken(selectedCostProduct)}.csv`, rows.map((row) => withLocalizedHeaders(row, ui)));
 }
 
 export function exportStandardCostHistoryCsv(
@@ -81,28 +93,27 @@ export function exportStandardCostHistoryCsv(
   if (!selectedCostProduct || standardCostHistory.length === 0) return;
 
   const rows = standardCostHistory.map((entry) => withTenantCurrency({
-    history_id: entry.id,
-    product_id: entry.product_id,
     product_name: entry.product_name,
     previous_standard_unit_cost: entry.previous_standard_unit_cost ?? '',
     new_standard_unit_cost: entry.new_standard_unit_cost ?? '',
-    changed_by: entry.changed_by_user_name || entry.changed_by_user_id || '',
+    changed_by: entry.changed_by_user_name || ui('User unavailable'),
     changed_at: entry.changed_at,
     change_source: entry.change_source
   }));
 
-  downloadCsv(`product-standard-cost-history-${selectedCostProduct.id}.csv`, rows.map((row) => withLocalizedHeaders(row, ui)));
+  downloadCsv(`product-standard-cost-history-${productExportToken(selectedCostProduct)}.csv`, rows.map((row) => withLocalizedHeaders(row, ui)));
 }
 
 export function exportProductsCsv(products: ProductItem[], ui: UiTranslator = identityUi) {
   const rows = products.map((product) => withTenantCurrency({
-    id: product.id,
     sku: product.sku,
     name: product.name,
     category: product.category || '',
     unit: product.unit,
     min_stock: product.min_stock,
-    supplier: product.supplier_name || '',
+    supplier: Object.prototype.hasOwnProperty.call(product, 'supplier_name')
+      ? product.supplier_name || ''
+      : ui('Unavailable'),
     default_barcode: product.barcode || '',
     current_stock_quantity: product.current_stock_quantity ?? 0,
     latest_unit_cost: product.latest_unit_cost ?? '',
@@ -116,15 +127,14 @@ export function exportProductsCsv(products: ProductItem[], ui: UiTranslator = id
     cost_variance_status: product.cost_variance_status || '',
     cost_variance_amount: product.cost_variance_amount ?? '',
     cost_variance_percent: product.cost_variance_percent ?? '',
-    created_at: product.created_at,
-    version: product.version
+    created_at: product.created_at
   }));
 
   downloadCsv('products-costing.csv', rows.map((row) => withLocalizedHeaders(row, ui)));
 }
 
 export function exportCostReportCsv(costReportSummary: ProductCostReportSummaryResponse | undefined, ui: UiTranslator = identityUi) {
-  const rows = (costReportSummary?.export_rows ?? []).map((row) => withTenantCurrency(row));
+  const rows = (costReportSummary?.export_rows ?? []).map((row) => withTenantCurrency(withoutTechnicalIdentifiers(row)));
   if (rows.length === 0) return;
   downloadCsv('product-cost-report-summary.csv', rows.map((row) => withLocalizedHeaders(row, ui)));
 }
@@ -138,7 +148,7 @@ export function exportCostGovernanceAuditCsv(
   costGovernanceAuditPack: ProductCostGovernanceAuditPackResponse | undefined,
   ui: UiTranslator = identityUi
 ) {
-  const rows = (costGovernanceAuditPack?.audit_rows ?? []).map((row) => withTenantCurrency(row));
+  const rows = (costGovernanceAuditPack?.audit_rows ?? []).map((row) => withTenantCurrency(withoutTechnicalIdentifiers(row)));
   if (rows.length === 0) return;
   downloadCsv('product-cost-governance-audit-pack.csv', rows.map((row) => withLocalizedHeaders(row, ui)));
 }
@@ -147,7 +157,7 @@ export function exportCostGovernanceReviewPackCsv(
   costGovernanceReviewPack: ProductCostGovernanceReviewPackResponse | undefined,
   ui: UiTranslator = identityUi
 ) {
-  const rows = (costGovernanceReviewPack?.review_export_rows ?? []).map((row) => withTenantCurrency(row));
+  const rows = (costGovernanceReviewPack?.review_export_rows ?? []).map((row) => withTenantCurrency(withoutTechnicalIdentifiers(row)));
   if (rows.length === 0) return;
   downloadCsv('product-cost-governance-review-pack.csv', rows.map((row) => withLocalizedHeaders(row, ui)));
 }
@@ -156,7 +166,7 @@ export function exportCostGovernanceClosureCsv(
   costGovernanceClosureSummary: ProductCostGovernanceClosureSummaryResponse | undefined,
   ui: UiTranslator = identityUi
 ) {
-  const rows = (costGovernanceClosureSummary?.archive_rows ?? []).map((row) => withTenantCurrency(row));
+  const rows = (costGovernanceClosureSummary?.archive_rows ?? []).map((row) => withTenantCurrency(withoutTechnicalIdentifiers(row)));
   if (rows.length === 0) return;
   downloadCsv('product-cost-governance-closure-summary.csv', rows.map((row) => withLocalizedHeaders(row, ui)));
 }
@@ -165,7 +175,7 @@ export function exportCostGovernanceHandoffCsv(
   costGovernanceHandoffSummary: ProductCostGovernanceHandoffSummaryResponse | undefined,
   ui: UiTranslator = identityUi
 ) {
-  const rows = (costGovernanceHandoffSummary?.handoff_rows ?? []).map((row) => withTenantCurrency(row));
+  const rows = (costGovernanceHandoffSummary?.handoff_rows ?? []).map((row) => withTenantCurrency(withoutTechnicalIdentifiers(row)));
   if (rows.length === 0) return;
   downloadCsv('product-cost-governance-handoff-summary.csv', rows.map((row) => withLocalizedHeaders(row, ui)));
 }
@@ -182,7 +192,6 @@ export function exportCostValuationDetailsCsv(
   ui: UiTranslator = identityUi
 ) {
   const rows = (costValuationDetails?.rows ?? []).map((row) => withTenantCurrency({
-    product_id: row.id,
     product_name: row.name,
     category: row.category || '',
     valuation_basis: row.valuation_basis,
@@ -205,7 +214,6 @@ export function exportCostActionDetailsCsv(
   ui: UiTranslator = identityUi
 ) {
   const rows = (costActionDetails?.rows ?? []).map((row) => withTenantCurrency({
-    product_id: row.id,
     product_name: row.name,
     category: row.category || '',
     action_type: row.action_type || '',
@@ -226,7 +234,6 @@ export function exportCostActionDetailsCsv(
 
 export function exportCostRiskDetailsCsv(costRiskDetails: ProductCostRiskDetailsResponse | undefined, ui: UiTranslator = identityUi) {
   const rows = (costRiskDetails?.rows ?? []).map((row) => withTenantCurrency({
-    product_id: row.id,
     product_name: row.name,
     category: row.category || '',
     risk_type: row.risk_type || '',

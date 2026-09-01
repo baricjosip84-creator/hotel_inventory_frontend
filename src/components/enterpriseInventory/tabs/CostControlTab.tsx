@@ -208,6 +208,7 @@ export function CostControlTab({
   procurementSpendProductionReviewQuery,
 }: CostControlTabProps) {
   const canReadFinancialIntelligence = hasPermission(TENANT_PERMISSIONS.FINANCIAL_INTELLIGENCE_READ);
+  const canReadSuppliers = hasPermission(TENANT_PERMISSIONS.SUPPLIERS_READ);
   const productCostHardeningReviewRows = toHardeningReviewRows(
     productCostHardeningSummaryQuery.data,
     productCostHardeningFailedChecklist
@@ -591,7 +592,7 @@ export function CostControlTab({
         <p style={styles.helper}>Reads the existing supplier/source cost action summary endpoints.</p>
         <DataTable
           loading={productCostActionSupplierSummaryQuery.isLoading}
-          empty="No supplier action rows returned."
+          empty={canReadSuppliers ? 'No supplier action rows returned.' : `Requires ${TENANT_PERMISSIONS.SUPPLIERS_READ} permission.`}
           headers={['Supplier', 'Products', 'Critical', 'High', 'Estimated value', 'Recommended action']}
           rows={productCostActionSuppliers.map((item: DynamicApiValue) => [
             formatRecordValue(item, 'supplier_name'),

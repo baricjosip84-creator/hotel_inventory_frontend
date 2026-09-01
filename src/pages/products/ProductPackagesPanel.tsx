@@ -177,14 +177,13 @@ export function ProductPackagesPanel({
                   <th style={styles.th}>{ui("Barcode")}</th>
                   <th style={styles.th}>{ui("Units")}</th>
                   <th style={styles.th}>{ui("Default")}</th>
-                  <th style={styles.th}>{ui("Version")}</th>
                   <th style={styles.th}>{ui("Actions")}</th>
                 </tr>
               </thead>
               <tbody>
                 {packages.length === 0 ? (
                   <tr>
-                    <td style={styles.emptyCell} colSpan={6}>
+                    <td style={styles.emptyCell} colSpan={5}>
                       {ui("No packages found for this product.")}
                     </td>
                   </tr>
@@ -193,7 +192,6 @@ export function ProductPackagesPanel({
                     <tr key={packageItem.id}>
                       <td style={styles.td}>
                         <div style={styles.rowTitle}>{packageItem.package_name}</div>
-                        <div style={styles.rowSubtle}>{ui("Package ID:")} {packageItem.id}</div>
                       </td>
                       <td style={styles.td}>
                         <span style={styles.barcodeValue}>{packageItem.barcode}</span>
@@ -205,9 +203,6 @@ export function ProductPackagesPanel({
                         ) : (
                           '-'
                         )}
-                      </td>
-                      <td style={styles.td}>
-                        <span style={styles.badgeVersion}>{ui("v")}{packageItem.version}</span>
                       </td>
                       <td style={styles.td}>
                         <div style={styles.actionGroup}>
@@ -226,7 +221,7 @@ export function ProductPackagesPanel({
                             onClick={() => onDeletePackage(packageItem)}
                             disabled={deletePackagePending || !canManageProductPackages}
                           >
-                            {ui("Delete")}
+                            {ui("Archive")}
                           </button>
                         </div>
                       </td>

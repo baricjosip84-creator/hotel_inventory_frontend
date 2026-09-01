@@ -6,6 +6,8 @@ import { formatLocalizedNumber } from '../../i18n/formatters';
 
 type ProductListFiltersPanelProps = {
   suppliers: SupplierItem[];
+  suppliersQuery: { isLoading: boolean; isError: boolean };
+  productsQuery: { isLoading: boolean; isError: boolean };
   categoryOptions: string[];
   search: string;
   setSearch: (value: string) => void;
@@ -21,11 +23,14 @@ type ProductListFiltersPanelProps = {
   setCostVarianceStatusFilter: (value: string) => void;
   productsCount: number;
   totalProductsCount: number;
+  canViewSuppliers: boolean;
   onExportProductsCsv: () => void;
 };
 
 export function ProductListFiltersPanel({
   suppliers,
+  suppliersQuery,
+  productsQuery,
   categoryOptions,
   search,
   setSearch,
@@ -41,6 +46,7 @@ export function ProductListFiltersPanel({
   setCostVarianceStatusFilter,
   productsCount,
   totalProductsCount,
+  canViewSuppliers,
   onExportProductsCsv
 }: ProductListFiltersPanelProps) {
   const { ui, locale } = useAppTranslation();
@@ -53,6 +59,7 @@ export function ProductListFiltersPanel({
     costVarianceStatusFilter
   );
   const hasActiveFilters = hasTextSearch || hasStructuredFilters;
+  const supplierFilterDisabled = !canViewSuppliers || suppliersQuery.isLoading || suppliersQuery.isError;
 
   const clearFilters = () => {
     setSearch('');
@@ -127,13 +134,17 @@ export function ProductListFiltersPanel({
             value={supplierFilter}
             onChange={(event) => setSupplierFilter(event.target.value)}
             style={styles.searchInput}
+            disabled={supplierFilterDisabled}
           >
-            <option value="">{ui("All suppliers")}</option>
-            {suppliers.map((supplier) => (
+            {!canViewSuppliers ? <option value="">{ui('Supplier filters unavailable for this role')}</option> : null}
+            {canViewSuppliers && suppliersQuery.isLoading ? <option value="">{ui('Loading supplier options...')}</option> : null}
+            {canViewSuppliers && suppliersQuery.isError ? <option value="">{ui('Supplier options unavailable')}</option> : null}
+            {canViewSuppliers && !suppliersQuery.isLoading && !suppliersQuery.isError ? <option value="">{ui("All suppliers")}</option> : null}
+            {canViewSuppliers && !suppliersQuery.isLoading && !suppliersQuery.isError ? suppliers.map((supplier) => (
               <option key={supplier.id} value={supplier.id}>
                 {supplier.name}
               </option>
-            ))}
+            )) : null}
           </select>
         </div>
 
@@ -186,7 +197,7 @@ export function ProductListFiltersPanel({
 
       <div style={styles.filterActionRow}>
         <div style={styles.filterResultText} aria-live="polite">
-          {hasTextSearch ? (
+          {productsQuery.isLoading ? ui('Loading products...') : productsQuery.isError ? ui('Product counts unavailable.') : hasTextSearch ? (
             <>
               {formatLocalizedNumber(Number(productsCount), locale)} {ui('of')} {formatLocalizedNumber(Number(totalProductsCount), locale)}{' '}
               {ui(totalProductsCount === 1 ? 'product' : 'products')} {ui('match the text search')}
@@ -210,9 +221,9 @@ export function ProductListFiltersPanel({
           </button>
           <button
             type="button"
-            style={productsCount === 0 ? styles.disabledButton : styles.secondaryButton}
+            style={productsCount === 0 || productsQuery.isLoading || productsQuery.isError ? styles.disabledButton : styles.secondaryButton}
             onClick={onExportProductsCsv}
-            disabled={productsCount === 0}
+            disabled={productsCount === 0 || productsQuery.isLoading || productsQuery.isError}
           >
             {ui("Export Products CSV")}
           </button>

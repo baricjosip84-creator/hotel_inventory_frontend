@@ -14,13 +14,27 @@ type CostActionSupplierQueryState = {
 type ProductCostActionSupplierPanelProps = {
   costActionSupplierQuery: CostActionSupplierQueryState;
   costActionSupplierSummary?: ProductCostActionSupplierSummaryResponse;
+  canViewSuppliers: boolean;
 };
 
 export function ProductCostActionSupplierPanel({
   costActionSupplierQuery,
-  costActionSupplierSummary
+  costActionSupplierSummary,
+  canViewSuppliers
 }: ProductCostActionSupplierPanelProps) {
   const { ui, locale } = useAppTranslation();
+
+  if (!canViewSuppliers) {
+    return (
+      <section style={styles.panel}>
+        <h3 style={styles.panelTitle}>{ui("Cost Action Suppliers")}</h3>
+        <p style={styles.panelSubtitle}>
+          {ui("Supplier cost action review is unavailable for this role.")}
+        </p>
+      </section>
+    );
+  }
+
   return (
     <section style={styles.panel}>
       <div style={styles.packageHeader}>

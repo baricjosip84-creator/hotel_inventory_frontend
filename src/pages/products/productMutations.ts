@@ -122,14 +122,14 @@ export function useProductMutations({
       setPackageForm(emptyPackageForm());
       setFormError(null);
       setPackageError(null);
-      setFormMessage(ui('Product deleted successfully.'));
+      setFormMessage(ui('Product archived successfully.'));
       await invalidateProductReadModels(queryClient);
     },
     onError: (error) => {
       if (error instanceof ApiError) {
         setFormError(error.message);
       } else {
-        setFormError(ui('Failed to delete product.'));
+        setFormError(ui('Failed to archive product.'));
       }
       setFormMessage(null);
     }
@@ -179,14 +179,14 @@ export function useProductMutations({
       setEditingPackage(null);
       setPackageForm(emptyPackageForm());
       setPackageError(null);
-      setPackageMessage(ui('Package deleted successfully.'));
+      setPackageMessage(ui('Package archived successfully.'));
       await invalidatePackages(queryClient, selectedPackageProduct);
     },
     onError: (error) => {
       if (error instanceof ApiError) {
         setPackageError(error.message);
       } else {
-        setPackageError(ui('Failed to delete package.'));
+        setPackageError(ui('Failed to archive package.'));
       }
       setPackageMessage(null);
     }

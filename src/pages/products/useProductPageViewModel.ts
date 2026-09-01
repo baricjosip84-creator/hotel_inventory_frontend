@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getRoleCapabilities } from '../../lib/permissions';
 import { useProductPageActions } from './useProductPageActions';
@@ -7,20 +8,27 @@ import { useProductPageQueries } from './productQueries';
 
 export function useProductPageViewModel() {
   const queryClient = useQueryClient();
-  const { role, canManageProducts, canViewProductPackages, canManageProductPackages } = getRoleCapabilities();
+  const { role, canManageProducts, canViewProductPackages, canManageProductPackages, canViewSuppliers } = getRoleCapabilities();
 
   const productPageState = useProductPageState();
+
+  useEffect(() => {
+    if (!canViewSuppliers && productPageState.supplierFilter) {
+      productPageState.setSupplierFilter('');
+    }
+  }, [canViewSuppliers, productPageState.supplierFilter, productPageState.setSupplierFilter]);
 
   const queries = useProductPageQueries({
     workspaceView: productPageState.workspaceView,
     categoryFilter: productPageState.categoryFilter,
-    supplierFilter: productPageState.supplierFilter,
+    supplierFilter: canViewSuppliers ? productPageState.supplierFilter : '',
     costStatusFilter: productPageState.costStatusFilter,
     costBasisFilter: productPageState.costBasisFilter,
     costVarianceStatusFilter: productPageState.costVarianceStatusFilter,
     selectedPackageProduct: productPageState.selectedPackageProduct,
     selectedCostProduct: productPageState.selectedCostProduct,
     canViewProductPackages,
+    canViewSuppliers,
     costHistoryFilters: productPageState.costHistoryFilters,
     costValuationDetailFilters: productPageState.costValuationDetailFilters,
     costRiskDetailFilters: productPageState.costRiskDetailFilters,
@@ -34,7 +42,8 @@ export function useProductPageViewModel() {
     productPageState,
     productPageData,
     canManageProducts,
-    canManageProductPackages
+    canManageProductPackages,
+    canViewSuppliers
   });
 
   return {
@@ -86,6 +95,7 @@ export function useProductPageViewModel() {
     handleExportCostRiskDetailsCsv: productPageActions.handleExportCostRiskDetailsCsv,
     canManageProducts,
     canViewProductPackages,
+    canViewSuppliers,
     role,
     isSubmitting: productPageActions.createMutation.isPending || productPageActions.updateMutation.isPending,
     handleSubmit: productPageActions.handleSubmit,
@@ -106,6 +116,7 @@ export function useProductPageViewModel() {
     handleCloseCostHistory: productPageActions.handleCloseCostHistory,
     handleClearCostHistoryFilters: productPageActions.handleClearCostHistoryFilters,
     productsQuery: queries.productsQuery,
+    suppliersQuery: queries.suppliersQuery,
     deleteMutation: productPageActions.deleteMutation,
     handleExportProductsCsv: productPageActions.handleExportProductsCsv,
     handleOpenPackages: productPageActions.handleOpenPackages,

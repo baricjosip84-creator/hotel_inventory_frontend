@@ -45,6 +45,7 @@ export function ProductCostAnalyticsSectionsPanel(props: ProductCostAnalyticsSec
 
         <ProductCostingReadinessPanel
           costingReadiness={props.costingReadiness}
+          productsQuery={props.productsQuery}
           onCategoryFilterChange={props.setCategoryFilter}
         />
 
@@ -115,6 +116,7 @@ export function ProductCostAnalyticsSectionsPanel(props: ProductCostAnalyticsSec
         <ProductCostActionSupplierPanel
           costActionSupplierQuery={props.costActionSupplierQuery}
           costActionSupplierSummary={props.costActionSupplierSummary}
+          canViewSuppliers={props.canViewSuppliers}
         />
 
         <ProductCostActionSourcePanel

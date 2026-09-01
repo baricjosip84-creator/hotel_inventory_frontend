@@ -7,10 +7,24 @@ import { formatLocalizedNumber } from '../../i18n/formatters';
 
 type ProductSummaryStatsPanelProps = {
   summary: ProductSummary;
+  productsQuery: {
+    isLoading: boolean;
+    isError: boolean;
+  };
+  canViewSuppliers: boolean;
 };
 
-export function ProductSummaryStatsPanel({ summary }: ProductSummaryStatsPanelProps) {
+export function ProductSummaryStatsPanel({ summary, productsQuery, canViewSuppliers }: ProductSummaryStatsPanelProps) {
   const { ui, locale } = useAppTranslation();
+
+  if (productsQuery.isLoading) {
+    return <div style={styles.warningBox}>{ui('Loading product summary...')}</div>;
+  }
+
+  if (productsQuery.isError) {
+    return <div style={styles.errorBox}>{ui('Product summary unavailable because products could not be loaded.')}</div>;
+  }
+
   return (
     <div className="io-workspace-stats" style={styles.statsGrid}>
       <OperationalWorkspaceStatCard
@@ -20,9 +34,9 @@ export function ProductSummaryStatsPanel({ summary }: ProductSummaryStatsPanelPr
       />
       <OperationalWorkspaceStatCard
         label={ui("Supplier Linked")}
-        value={formatLocalizedNumber(Number(summary.linkedSupplierCount), locale)}
-        helper={ui("Products already linked to suppliers")}
-        tone="good"
+        value={canViewSuppliers ? formatLocalizedNumber(Number(summary.linkedSupplierCount), locale) : ui('Unavailable')}
+        helper={canViewSuppliers ? ui("Products already linked to suppliers") : ui('Supplier link assessment unavailable for this role')}
+        tone={canViewSuppliers ? 'good' : undefined}
       />
       <OperationalWorkspaceStatCard
         label={ui("Min Stock Set")}

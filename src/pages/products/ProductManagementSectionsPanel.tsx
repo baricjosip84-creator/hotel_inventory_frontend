@@ -12,10 +12,12 @@ type ProductManagementSectionsPanelProps = ReturnType<typeof useProductPageViewM
 export function ProductManagementSectionsPanel({
   canManageProducts,
   canViewProductPackages,
+  canViewSuppliers,
   role,
   editingProduct,
   form,
   suppliers,
+  suppliersQuery,
   isSubmitting,
   formError,
   formMessage,
@@ -60,8 +62,12 @@ export function ProductManagementSectionsPanel({
         importType="products"
         title={ui("Bulk Product Import")}
         description={ui("Validate a CSV first, then commit all rows atomically. Existing records are never silently overwritten.")}
-        templateColumns={['sku', 'name', 'category', 'unit', 'min_stock', 'standard_unit_cost', 'supplier_name', 'barcode', 'requires_lot_tracking', 'requires_expiry_date']}
-        templateExample={{ sku: 'BEV-COFFEE-001', name: 'Coffee Beans Premium', category: 'Beverages', unit: 'kg', min_stock: '10', standard_unit_cost: '18.50', supplier_name: '', barcode: '', requires_lot_tracking: 'false', requires_expiry_date: 'false' }}
+        templateColumns={canViewSuppliers
+          ? ['sku', 'name', 'category', 'unit', 'min_stock', 'standard_unit_cost', 'supplier_name', 'barcode', 'requires_lot_tracking', 'requires_expiry_date']
+          : ['sku', 'name', 'category', 'unit', 'min_stock', 'standard_unit_cost', 'barcode', 'requires_lot_tracking', 'requires_expiry_date']}
+        templateExample={canViewSuppliers
+          ? { sku: 'BEV-COFFEE-001', name: 'Coffee Beans Premium', category: 'Beverages', unit: 'kg', min_stock: '10', standard_unit_cost: '18.50', supplier_name: '', barcode: '', requires_lot_tracking: 'false', requires_expiry_date: 'false' }
+          : { sku: 'BEV-COFFEE-001', name: 'Coffee Beans Premium', category: 'Beverages', unit: 'kg', min_stock: '10', standard_unit_cost: '18.50', barcode: '', requires_lot_tracking: 'false', requires_expiry_date: 'false' }}
         canImport={canManageProducts}
         disabledReason={ui("Products write permission is required for bulk product import.")}
         onCommitted={async () => {
@@ -76,7 +82,9 @@ export function ProductManagementSectionsPanel({
         editingProduct={editingProduct}
         form={form}
         suppliers={suppliers}
+        suppliersQuery={suppliersQuery}
         canManageProducts={canManageProducts}
+        canViewSuppliers={canViewSuppliers}
         isSubmitting={isSubmitting}
         formError={formError}
         formMessage={formMessage}
@@ -90,6 +98,7 @@ export function ProductManagementSectionsPanel({
         products={products}
         totalProductsCount={totalProductsCount}
         suppliers={suppliers}
+        suppliersQuery={suppliersQuery}
         categoryOptions={categoryOptions}
         search={search}
         setSearch={setSearch}
@@ -105,6 +114,7 @@ export function ProductManagementSectionsPanel({
         setCostVarianceStatusFilter={setCostVarianceStatusFilter}
         canManageProducts={canManageProducts}
         canViewProductPackages={canViewProductPackages}
+        canViewSuppliers={canViewSuppliers}
         deleteProductPending={deleteMutation.isPending}
         onExportProductsCsv={handleExportProductsCsv}
         onOpenCostHistory={handleOpenCostHistory}

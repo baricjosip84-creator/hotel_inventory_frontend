@@ -822,6 +822,7 @@ export function getRoleCapabilities(role: UserRole = getCurrentUserRole()) {
     canManageProducts: can(TENANT_PERMISSIONS.PRODUCTS_WRITE),
     canViewProductPackages: can(TENANT_PERMISSIONS.PRODUCT_PACKAGES_READ),
     canManageProductPackages: can(TENANT_PERMISSIONS.PRODUCT_PACKAGES_WRITE),
+    canViewSuppliers: can(TENANT_PERMISSIONS.SUPPLIERS_READ),
     canManageSuppliers: can(TENANT_PERMISSIONS.SUPPLIERS_WRITE),
     canManageStorageLocations: can(TENANT_PERMISSIONS.STORAGE_LOCATIONS_WRITE),
     canManageAlerts: can(TENANT_PERMISSIONS.ALERTS_WRITE),

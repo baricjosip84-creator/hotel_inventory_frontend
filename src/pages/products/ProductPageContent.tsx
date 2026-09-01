@@ -26,6 +26,11 @@ const tabs = [
 export function ProductPageContent(props: ProductPageContentProps) {
   const { ui, locale } = useAppTranslation();
   const activeTab = tabs.find((tab) => tab.view === props.workspaceView) ?? tabs[0];
+  const catalogStatusValue = props.productsQuery.isLoading
+    ? ui('Loading')
+    : props.productsQuery.isError
+      ? ui('Unavailable')
+      : formatLocalizedNumber(Number(props.totalProductsCount), locale);
 
   return (
     <div className="io-operational-page io-products-page io-workspace-page products-workspace-page">
@@ -39,10 +44,10 @@ export function ProductPageContent(props: ProductPageContentProps) {
           <OperationalWorkspaceMetaPill>{props.canManageProducts ? ui('Catalog write access') : ui('Catalog read-only')}</OperationalWorkspaceMetaPill>
           <OperationalWorkspaceMetaPill>{ui("Cost intelligence is read-only")}</OperationalWorkspaceMetaPill>
         </>}
-        aside={<OperationalWorkspaceStatus value={formatLocalizedNumber(Number(props.totalProductsCount), locale)} label={ui("products in the current catalog scope")} />}
+        aside={<OperationalWorkspaceStatus value={catalogStatusValue} label={ui("products in the current catalog scope")} />}
       />
 
-      <ProductSummaryStatsPanel summary={props.summary} />
+      <ProductSummaryStatsPanel summary={props.summary} productsQuery={props.productsQuery} canViewSuppliers={props.canViewSuppliers} />
 
       <OperationalWorkspaceTabs ariaLabel={ui("Product workspace views")} hint={ui(activeTab.hint)}>
         {tabs.map((tab) => (

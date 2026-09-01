@@ -15,6 +15,7 @@ type ProductListTablePanelProps = {
   emptyMessage: string;
   canManageProducts: boolean;
   canViewProductPackages: boolean;
+  canViewSuppliers: boolean;
   deleteProductPending: boolean;
   onOpenCostHistory: (product: ProductItem) => void;
   onOpenPackages: (product: ProductItem) => void;
@@ -40,6 +41,7 @@ export function ProductListTablePanel({
   emptyMessage,
   canManageProducts,
   canViewProductPackages,
+  canViewSuppliers,
   deleteProductPending,
   onOpenCostHistory,
   onOpenPackages,
@@ -99,7 +101,7 @@ export function ProductListTablePanel({
                     <div style={styles.rowTitle}>{product.category || ui('Uncategorized')}</div>
                     <div style={styles.rowSubtle}>{product.unit}</div>
                   </td>
-                  <td style={styles.td}>{product.supplier_name || ui('Not linked')}</td>
+                  <td style={styles.td}>{canViewSuppliers ? (product.supplier_name || ui('Not linked')) : ui('Unavailable')}</td>
                   <td style={styles.td}>
                     <div style={belowMinimum ? styles.rowTitleWarn : styles.rowTitle}>
                       {String(product.current_stock_quantity ?? 0)} {product.unit}
@@ -162,7 +164,7 @@ export function ProductListTablePanel({
                         disabled={deleteProductPending || !canManageProducts}
                         title={!canManageProducts ? ui('Products write permission required') : undefined}
                       >
-                        {ui("Delete")}
+                        {ui("Archive")}
                       </button>
                     </div>
                   </td>

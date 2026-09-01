@@ -12,6 +12,7 @@ type UseProductPageActionsParams = {
   productPageData: ReturnType<typeof useProductPageData>;
   canManageProducts: boolean;
   canManageProductPackages: boolean;
+  canViewSuppliers: boolean;
 };
 
 export function useProductPageActions({
@@ -19,7 +20,8 @@ export function useProductPageActions({
   productPageState,
   productPageData,
   canManageProducts,
-  canManageProductPackages
+  canManageProductPackages,
+  canViewSuppliers
 }: UseProductPageActionsParams) {
   const { ui } = useAppTranslation();
   const {
@@ -49,6 +51,7 @@ export function useProductPageActions({
     ...productPageState,
     canManageProducts,
     canManageProductPackages,
+    canViewSuppliers,
     createMutation,
     updateMutation,
     deleteMutation,

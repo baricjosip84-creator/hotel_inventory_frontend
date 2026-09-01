@@ -9,7 +9,9 @@ type ProductFormPanelProps = {
   editingProduct: ProductItem | null;
   form: ProductFormState;
   suppliers: SupplierItem[];
+  suppliersQuery: { isLoading: boolean; isError: boolean };
   canManageProducts: boolean;
+  canViewSuppliers: boolean;
   isSubmitting: boolean;
   formError: string | null;
   formMessage: string | null;
@@ -22,7 +24,9 @@ export function ProductFormPanel({
   editingProduct,
   form,
   suppliers,
+  suppliersQuery,
   canManageProducts,
+  canViewSuppliers,
   isSubmitting,
   formError,
   formMessage,
@@ -32,6 +36,11 @@ export function ProductFormPanel({
 }: ProductFormPanelProps) {
   const { ui } = useAppTranslation();
   const fieldsDisabled = isSubmitting || !canManageProducts;
+  const supplierFieldDisabled = fieldsDisabled || !canViewSuppliers || suppliersQuery.isLoading || suppliersQuery.isError;
+  const currentSupplierMissing = Boolean(
+    form.supplier_id
+    && !suppliers.some((supplier) => supplier.id === form.supplier_id)
+  );
   const submitDisabled = fieldsDisabled || !form.sku.trim() || !form.name.trim() || !form.unit.trim();
 
   return (
@@ -149,14 +158,29 @@ export function ProductFormPanel({
             onChange={(event) =>
               setForm((current) => ({ ...current, supplier_id: event.target.value }))
             }
-            disabled={fieldsDisabled}
+            disabled={supplierFieldDisabled}
           >
-            <option value="">{ui("No supplier assigned")}</option>
-            {suppliers.map((supplier) => (
+            {!canViewSuppliers ? (
+              <option value={form.supplier_id}>
+                {editingProduct?.supplier_name || (form.supplier_id ? ui('Linked supplier unavailable') : ui('Supplier assignment unavailable for this role'))}
+              </option>
+            ) : suppliersQuery.isLoading ? (
+              <option value={form.supplier_id}>{ui('Loading supplier options...')}</option>
+            ) : suppliersQuery.isError ? (
+              <option value={form.supplier_id}>{editingProduct?.supplier_name || ui('Supplier options unavailable')}</option>
+            ) : (
+              <>
+                <option value="">{ui("No supplier assigned")}</option>
+                {currentSupplierMissing ? (
+                  <option value={form.supplier_id}>{editingProduct?.supplier_name || ui('Linked supplier unavailable')}</option>
+                ) : null}
+                {suppliers.map((supplier) => (
               <option key={supplier.id} value={supplier.id}>
                 {supplier.name}
               </option>
-            ))}
+                ))}
+              </>
+            )}
           </select>
         </div>
 

@@ -12,13 +12,14 @@ type MutationLike<TPayload> = {
 type ProductActionHandlerParams = {
   canManageProducts: boolean;
   canManageProductPackages: boolean;
+  canViewSuppliers: boolean;
   editingProduct: ProductItem | null;
   selectedPackageProduct: ProductItem | null;
   editingPackage: ProductPackageItem | null;
   form: ProductFormState;
   packageForm: PackageFormState;
   createMutation: MutationLike<ProductFormState>;
-  updateMutation: MutationLike<{ product: ProductItem; values: ProductFormState }>;
+  updateMutation: MutationLike<{ product: ProductItem; values: ProductFormState; includeSupplierId?: boolean }>;
   deleteMutation: MutationLike<ProductItem>;
   createPackageMutation: MutationLike<{ productId: string; values: PackageFormState }>;
   updatePackageMutation: MutationLike<{ productId: string; packageItem: ProductPackageItem; values: PackageFormState }>;
@@ -38,6 +39,7 @@ type ProductActionHandlerParams = {
 export function buildProductActionHandlers({
   canManageProducts,
   canManageProductPackages,
+  canViewSuppliers,
   editingProduct,
   selectedPackageProduct,
   editingPackage,
@@ -104,7 +106,8 @@ export function buildProductActionHandlers({
     if (editingProduct) {
       updateMutation.mutate({
         product: editingProduct,
-        values: form
+        values: form,
+        includeSupplierId: canViewSuppliers
       });
       return;
     }
@@ -195,12 +198,12 @@ export function buildProductActionHandlers({
 
   const handleDelete = (product: ProductItem) => {
     if (!canManageProducts) {
-      setFormError(ui('Your current role cannot delete products.'));
+      setFormError(ui('Your current role cannot archive products.'));
       setFormMessage(null);
       return;
     }
 
-    const confirmed = window.confirm(`${ui('Delete product')} "${product.name}"?`);
+    const confirmed = window.confirm(`${ui('Archive product')} "${product.name}"?`);
     if (!confirmed) {
       return;
     }
@@ -254,19 +257,19 @@ export function buildProductActionHandlers({
 
   const handleDeletePackage = (packageItem: ProductPackageItem) => {
     if (!selectedPackageProduct) {
-      setPackageError(ui('Select a product before deleting packages.'));
+      setPackageError(ui('Select a product before archiving packages.'));
       setPackageMessage(null);
       return;
     }
 
     if (!canManageProductPackages) {
-      setPackageError(ui('Your current role cannot delete product packages.'));
+      setPackageError(ui('Your current role cannot archive product packages.'));
       setPackageMessage(null);
       return;
     }
 
     const confirmed = window.confirm(
-      `${ui('Delete package')} "${packageItem.package_name}" ${ui('for')} "${selectedPackageProduct.name}"?`
+      `${ui('Archive package')} "${packageItem.package_name}" ${ui('for')} "${selectedPackageProduct.name}"?`
     );
 
     if (!confirmed) {

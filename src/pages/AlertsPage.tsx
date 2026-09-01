@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -115,7 +115,7 @@ async function fetchAlerts(filters: AlertFilters): Promise<AlertRow[]> {
 }
 
 async function fetchProductOptions(): Promise<ProductOption[]> {
-  return apiRequest<ProductOption[]>('/products?limit=500');
+  return apiRequest<ProductOption[]>('/products');
 }
 
 async function createManualAlert(input: ManualAlertFormState): Promise<AlertRow> {
@@ -195,17 +195,14 @@ function formatAlertType(value: string | null | undefined, ui: (englishText: str
   if (!value) return ui('Alert');
 
   const normalized = value.trim();
+  if (!normalized) return ui('Alert');
+
   const canonicalLabel = CANONICAL_ALERT_TYPE_LABELS[normalized.toUpperCase()];
   if (canonicalLabel) return ui(canonicalLabel);
 
-  const words = normalized
-    .split(/[_-]+|\s+/)
-    .filter(Boolean)
-    .map((word) => word.toLowerCase());
-
-  if (!words.length) return ui('Alert');
-  const text = words.join(' ');
-  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+  // Unknown/manual alert types are tenant business data. Preserve them exactly
+  // instead of humanizing or translating user-defined labels.
+  return normalized;
 }
 
 function severityLabel(severity: AlertSeverity, ui: (englishText: string) => string): string {
@@ -237,11 +234,14 @@ function blocksProtectedOperations(alert: AlertRow): boolean {
 function nextActionLink(alert: AlertRow): { to: string; label: string } | null {
   const type = alert.type.toUpperCase();
 
-  if (alert.product_id && hasPermission(TENANT_PERMISSIONS.STOCK_READ)) {
-    return { to: '/stock', label: 'Open Stock' };
+  // Route known alert families to their authoritative workflow before using
+  // the generic product/stock fallback. Many system alerts are product-linked,
+  // but that product link does not make Stock the source workflow.
+  if (type.includes('SHIPMENT') && hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ)) {
+    return { to: '/shipments', label: 'Open Shipments' };
   }
 
-  if (type.includes('SHIPMENT') && hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ)) {
+  if (type.includes('OVER_RECEIVED') && !type.startsWith('PO_') && hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ)) {
     return { to: '/shipments', label: 'Open Shipments' };
   }
 
@@ -261,7 +261,7 @@ function nextActionLink(alert: AlertRow): { to: string; label: string } | null {
     return { to: '/inventory-usage', label: 'Open Inventory Usage' };
   }
 
-  if ((type.includes('PURCHASE_ORDER') || type.includes('PROCUREMENT')) && hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_READ)) {
+  if ((type.startsWith('PO_') || type.includes('PURCHASE_ORDER') || type.includes('PROCUREMENT')) && hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_READ)) {
     return { to: '/purchase-orders', label: 'Open Purchase Orders' };
   }
 
@@ -271,6 +271,14 @@ function nextActionLink(alert: AlertRow): { to: string; label: string } | null {
 
   if (type.includes('EXECUTION') && hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ)) {
     return { to: '/execution-tasks', label: 'Open Execution Tasks' };
+  }
+
+  if (type === 'SYSTEM_HEALTH_DEGRADED_BLOCKING' && hasPermission(TENANT_PERMISSIONS.SYSTEM_STATUS_READ)) {
+    return { to: '/admin-system', label: 'Open Admin System' };
+  }
+
+  if (alert.product_id && hasPermission(TENANT_PERMISSIONS.STOCK_READ)) {
+    return { to: '/stock', label: 'Open Stock' };
   }
 
   if (hasPermission(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ)) {
@@ -308,6 +316,13 @@ export default function AlertsPage() {
   const [resolutionNoteByAlertId, setResolutionNoteByAlertId] = useState<Record<string, string>>({});
   const [overrideReasonByAlertId, setOverrideReasonByAlertId] = useState<Record<string, string>>({});
   const [manualAlertForm, setManualAlertForm] = useState<ManualAlertFormState>(emptyManualAlertForm);
+  const searchParamsKey = searchParams.toString();
+
+  useEffect(() => {
+    const nextFilters = filtersFromSearchParams(new URLSearchParams(searchParamsKey));
+    setFilters(nextFilters);
+    setFilterForm(nextFilters);
+  }, [searchParamsKey]);
 
   const alertsQuery = useQuery({
     queryKey: ['alerts', filters],
@@ -466,7 +481,7 @@ export default function AlertsPage() {
 
     if (
       manualAlertForm.severity === 'critical'
-      && !window.confirm(ui('Create a Critical alert? Unresolved Critical alerts block protected stock and shipment operations until they are resolved.'))
+      && !window.confirm(ui('Create a Critical alert? Unresolved Critical alerts can block protected stock or shipment operations according to alert scope until they are resolved.'))
     ) {
       return;
     }
@@ -503,7 +518,7 @@ export default function AlertsPage() {
         title={ui('Alert workspace')}
         description={
           <p>
-            {ui("Open the linked source page first, confirm the real condition, acknowledge the alert when somebody takes ownership, then resolve it with a meaningful note. Escalation increases the alert's escalation level but does not notify anyone automatically.")}
+            {ui("Open the linked source page first, confirm the real condition, acknowledge the alert when somebody takes ownership, then resolve it with a meaningful note. Using Increase escalation level raises the alert's escalation level and queues an in-app notification event; it does not send an email or webhook notification.")}
           </p>
         }
         meta={
@@ -526,13 +541,13 @@ export default function AlertsPage() {
       <div className="app-grid-stats io-workspace-stats" style={styles.statsGrid}>
         <OperationalWorkspaceStatCard label={ui('Visible results')} value={summary.total} helper={<>{ui('Up to')} {filters.limit} {ui('alerts matching the applied filters')}</>} tone="blue" iconPath="/alerts" />
         <OperationalWorkspaceStatCard label={ui('Open')} value={summary.unresolved} helper={ui('Still requiring review or action')} tone="amber" iconPath="/action-center" />
-        <OperationalWorkspaceStatCard label={ui('Critical open')} value={summary.critical} helper={ui('Blocks protected stock and shipment operations until resolved')} tone="red" iconPath="/reliability-command" />
+        <OperationalWorkspaceStatCard label={ui('Critical open')} value={summary.critical} helper={ui('Can block protected stock or shipment operations according to alert scope until resolved')} tone="red" iconPath="/reliability-command" />
         <OperationalWorkspaceStatCard label={ui('Unacknowledged open')} value={summary.unacknowledged} helper={ui('No operator has taken ownership yet')} tone="slate" iconPath="/collaboration" />
       </div>
 
       {!canManageAlerts ? (
         <div className="app-warning-state" style={styles.messageBox}>
-          {ui('Current access role:')} {ui(accessRoleLabel)}. {ui('You can review alerts and open permitted source pages, but alert changes require Alerts write permission.')}
+          {ui('Current access role:')} {ui(accessRoleLabel)}. {ui('You can review alerts and open permitted source pages. Creating, acknowledging, resolving, reopening, and escalating alerts requires Alerts write permission. Emergency blocking-alert override is controlled separately by Alerts override permission.')}
         </div>
       ) : null}
 
@@ -574,7 +589,7 @@ export default function AlertsPage() {
                   <option value="critical">{ui('Critical')}</option>
                 </select>
                 {manualAlertForm.severity === 'critical' ? (
-                  <small style={styles.criticalHelp}>{ui('Critical alerts block protected stock and shipment operations until resolved.')}</small>
+                  <small style={styles.criticalHelp}>{ui('Critical alerts can block protected stock or shipment operations according to alert scope until resolved.')}</small>
                 ) : null}
               </label>
 
@@ -719,7 +734,7 @@ export default function AlertsPage() {
                     <div style={styles.cardHeaderText}>
                       <div style={styles.cardTitle}>{alertTitle}</div>
                       <div style={styles.cardMeta}>
-                        {alert.product_name || ui('No product linked')} · {ui('Created')} {formatDateTime(alert.created_at, locale)}
+                        {alert.product_name || (alert.product_id ? ui('Linked product unavailable') : ui('No product linked'))} · {ui('Created')} {formatDateTime(alert.created_at, locale)}
                       </div>
                     </div>
                     <div style={styles.badgeRow} className="alerts-badge-row">
@@ -822,7 +837,7 @@ export default function AlertsPage() {
                       <button
                         style={styles.warnButton}
                         onClick={() => {
-                          if (window.confirm(`${ui('Increase the escalation level for')} ${alertTitle}? ${ui('This does not notify anyone automatically.')}`)) {
+                          if (window.confirm(`${ui('Increase the escalation level for')} ${alertTitle}? ${ui('This queues an in-app notification event but does not send an email or webhook notification.')}`)) {
                             escalateMutation.mutate({ id: alert.id, title: alertTitle });
                           }
                         }}

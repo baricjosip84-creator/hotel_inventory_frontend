@@ -7,14 +7,25 @@ import { formatLocalizedNumber } from '../../i18n/formatters';
 
 type ProductCostingReadinessPanelProps = {
   costingReadiness: CostingReadiness;
+  productsQuery: { isLoading: boolean; isError: boolean };
   onCategoryFilterChange: (category: string) => void;
 };
 
 export function ProductCostingReadinessPanel({
   costingReadiness,
+  productsQuery,
   onCategoryFilterChange
 }: ProductCostingReadinessPanelProps) {
   const { ui, locale } = useAppTranslation();
+
+  if (productsQuery.isLoading) {
+    return <section style={styles.panel}><div style={styles.warningBox}>{ui('Loading costing readiness...')}</div></section>;
+  }
+
+  if (productsQuery.isError) {
+    return <section style={styles.panel}><div style={styles.errorBox}>{ui('Costing readiness unavailable because products could not be loaded.')}</div></section>;
+  }
+
   return (
     <section style={styles.panel}>
       <div style={styles.packageHeader}>

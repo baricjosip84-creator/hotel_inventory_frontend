@@ -88,24 +88,30 @@ export async function createProduct(input: ProductFormState): Promise<ProductIte
 export async function updateProduct(input: {
   product: ProductItem;
   values: ProductFormState;
+  includeSupplierId?: boolean;
 }): Promise<ProductItem> {
+  const body: Record<string, unknown> = {
+    sku: input.values.sku.trim(),
+    name: input.values.name.trim(),
+    category: input.values.category.trim() || null,
+    unit: input.values.unit.trim(),
+    min_stock: Number(input.values.min_stock),
+    standard_unit_cost: input.values.standard_unit_cost.trim() === '' ? null : Number(input.values.standard_unit_cost),
+    barcode: input.values.barcode.trim() || null,
+    requires_lot_tracking: input.values.requires_lot_tracking,
+    requires_expiry_date: input.values.requires_expiry_date
+  };
+
+  if (input.includeSupplierId !== false) {
+    body.supplier_id = input.values.supplier_id || null;
+  }
+
   return apiRequest<ProductItem>(`/products/${input.product.id}`, {
     method: 'PATCH',
     headers: {
       'If-Match-Version': String(input.product.version)
     },
-    body: JSON.stringify({
-      sku: input.values.sku.trim(),
-      name: input.values.name.trim(),
-      category: input.values.category.trim() || null,
-      unit: input.values.unit.trim(),
-      min_stock: Number(input.values.min_stock),
-      standard_unit_cost: input.values.standard_unit_cost.trim() === '' ? null : Number(input.values.standard_unit_cost),
-      supplier_id: input.values.supplier_id || null,
-      barcode: input.values.barcode.trim() || null,
-      requires_lot_tracking: input.values.requires_lot_tracking,
-      requires_expiry_date: input.values.requires_expiry_date
-    })
+    body: JSON.stringify(body)
   });
 }
 

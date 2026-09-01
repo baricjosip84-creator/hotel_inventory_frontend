@@ -75,6 +75,14 @@ export function formatCostSource(costSource?: string | null): string {
   return costSource ? costSource.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ') : '-';
 }
 
+export function formatKnownCostHistorySource(costSource?: string | null): string | null {
+  if (costSource === 'product_standard_cost') return 'Product standard cost';
+  if (costSource === 'shipment_item_unit_cost') return 'Shipment item unit cost';
+  if (costSource === 'landed_cost') return 'Landed cost';
+  if (costSource === 'movement') return 'Received movement cost';
+  return null;
+}
+
 export function formatActionType(actionType?: string | null): string {
   if (actionType === 'capture_missing_cost') return 'Capture missing cost';
   if (actionType === 'review_standard_cost') return 'Review standard cost';

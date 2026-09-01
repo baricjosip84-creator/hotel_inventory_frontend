@@ -61,9 +61,9 @@ if (missingLiterals.length) fail(`Products has ui() literals missing from the fi
 else pass(`Products has ${new Set(literalKeys).size} catalog-backed literal UI keys across ${translatedSourceFiles.length} source files.`);
 
 const representativeRows = [
-  'Products', 'Product List', 'Create Product', 'Update Product', 'Delete product',
-  'Product created successfully.', 'Product updated successfully.', 'Product deleted successfully.',
-  'Packages', 'Package created successfully.', 'Package updated successfully.', 'Package deleted successfully.',
+  'Products', 'Product List', 'Create Product', 'Update Product', 'Archive product',
+  'Product created successfully.', 'Product updated successfully.', 'Product archived successfully.',
+  'Packages', 'Package created successfully.', 'Package updated successfully.', 'Package archived successfully.',
   'Search products', 'Scan barcode', 'Default Barcode', 'Minimum Stock', 'Standard unit cost',
   'Cost intelligence', 'Cost Action Summary', 'Cost Report Summary', 'Cost Governance Summary',
   'Cost Valuation Summary', 'Cost Risk Summary', 'Recommendations', 'Readiness Score', 'Weighted Avg Cost',
@@ -139,7 +139,9 @@ const canonicalContracts = [
   [coreApi, 'standard_unit_cost: input.standard_unit_cost.trim()'],
   [coreApi, 'barcode: input.barcode.trim() || null'],
   [packageApi, '`/products/${input.productId}/packages`'],
-  [management, "templateColumns={['sku', 'name', 'category', 'unit', 'min_stock', 'standard_unit_cost', 'supplier_name', 'barcode', 'requires_lot_tracking', 'requires_expiry_date']}"],
+  [management, 'templateColumns={canViewSuppliers'],
+  [management, "? ['sku', 'name', 'category', 'unit', 'min_stock', 'standard_unit_cost', 'supplier_name', 'barcode', 'requires_lot_tracking', 'requires_expiry_date']"],
+  [management, ": ['sku', 'name', 'category', 'unit', 'min_stock', 'standard_unit_cost', 'barcode', 'requires_lot_tracking', 'requires_expiry_date']"],
   [management, "sku: 'BEV-COFFEE-001'"],
   [management, "requires_lot_tracking: 'false'"],
   [management, "requires_expiry_date: 'false'"]
@@ -153,5 +155,9 @@ const scanner = read('src/pages/products/ProductSearchBarcodeScanner.tsx');
 if (!scanner.includes('setError(ui(formatScannerError(scannerError)))')) fail('Product barcode scanner errors must pass through the translation catalog.');
 const exportsSource = read('src/pages/products/productCsvExports.ts');
 if (!exportsSource.includes('ui(')) fail('Product CSV/export presentation must use translated headers/labels.');
+for (const forbiddenExportId of ['movement_id:', 'product_id:', 'shipment_id:', 'history_id:', 'selectedCostProduct.id', 'changed_by_user_id ||', 'user_id ||']) {
+  if (exportsSource.includes(forbiddenExportId)) fail(`Product CSV exports must not expose technical identifiers: ${forbiddenExportId}`);
+}
+if (!exportsSource.includes('withoutTechnicalIdentifiers(row)')) fail('Backend-owned Product export rows must be stripped of technical identifier fields before download.');
 
 if (!process.exitCode) console.log('Tenant Products multilingual hardening: PASS');
