@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
+import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
+import type { TenantPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './DigitalTwinVisualizationPage.css';
@@ -50,6 +52,8 @@ type TwinOverlay = {
   confidence_score?: number | null;
   title?: string;
   summary?: string | null;
+  title_key?: string | null;
+  summary_key?: string | null;
   source_surface?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -81,9 +85,13 @@ type DigitalTwinResponse = {
   guidance?: {
     recommended_view_mode?: string | null;
     visualization_guidance?: string;
+    visualization_guidance_key?: string | null;
     perspective_guidance?: string;
+    perspective_guidance_key?: string | null;
     congestion_heatmap_guidance?: string;
+    congestion_heatmap_guidance_key?: string | null;
     risk_propagation_guidance?: string;
+    risk_propagation_guidance_key?: string | null;
     [key: string]: unknown;
   };
   nodes?: TwinNode[];
@@ -177,6 +185,105 @@ const OVERLAY_TYPE_LABELS: Record<string, string> = {
   collaboration_context_overlay: 'Collaboration context'
 };
 
+
+const NODE_TYPE_LABELS: Record<string, string> = {
+  item: 'Item',
+  sku: 'SKU',
+  location: 'Location',
+  supplier: 'Supplier',
+  purchase_order: 'Purchase order',
+  shipment: 'Shipment',
+  reservation: 'Reservation',
+  requisition: 'Requisition',
+  execution_task: 'Execution task',
+  facility: 'Facility',
+  operator: 'Operator',
+  cost_center: 'Cost center',
+  budget: 'Budget',
+  integration_connector: 'Integration connector',
+  decision: 'Decision',
+  policy: 'Policy',
+  forecast: 'Forecast',
+  simulation: 'Simulation',
+  remediation_workflow: 'Remediation workflow',
+  risk_signal: 'Risk signal',
+  general: 'General operational entity'
+};
+
+const RELATIONSHIP_LABELS: Record<string, string> = {
+  depends_on: 'Depends on',
+  supplies: 'Supplies',
+  consumes: 'Consumes',
+  fulfills: 'Fulfills',
+  reserves: 'Reserves',
+  allocated_to: 'Allocated to',
+  located_at: 'Located at',
+  owned_by: 'Owned by',
+  costs_against: 'Costs against',
+  drives_risk_for: 'Drives risk for',
+  mitigates_risk_for: 'Mitigates risk for',
+  influences_policy: 'Influences policy',
+  supports_decision: 'Supports decision',
+  feeds_forecast: 'Feeds forecast',
+  triggers_review_for: 'Triggers review for',
+  operational_dependency: 'Operational dependency',
+  supplier_dependency: 'Supplier dependency',
+  execution_dependency: 'Execution dependency',
+  financial_dependency: 'Financial dependency',
+  integration_dependency: 'Integration dependency',
+  risk_dependency: 'Risk dependency',
+  decision_dependency: 'Decision dependency',
+  policy_dependency: 'Policy dependency',
+  general: 'Operational dependency'
+};
+
+const DIGITAL_TWIN_SYSTEM_TEXT: Record<string, string> = {
+  digital_twin_review_highest_priority_context: 'Review the highest-priority operational context, then continue in the governed source workflow.',
+  digital_twin_review_connected_topology: 'Current operational records and stored graph evidence have been connected into a read-only topology. Review the named dependencies, then continue in the source workflow.',
+  digital_twin_no_matching_context: 'No digital-twin context currently matches these filters.',
+  digital_twin_perspective_guidance_only: 'The selected perspective changes review guidance only. It does not create a live simulation, diagram, or automated heatmap.',
+  digital_twin_congestion_advisory_only: 'Congestion review uses returned priorities and dependencies as advisory context and must not directly reassign labor, reserve stock, or mutate task routing.',
+  digital_twin_risk_context_explainable: 'Risk context comes from permitted action records and knowledge-graph risk paths. It remains read-only and explainable.',
+  digital_twin_observed_risk_path_review: 'Observed knowledge-graph risk path. Review the affected source records and mitigation evidence before taking action.',
+  digital_twin_action_source_workflow_only: 'Read-only operational context. Use the source workflow for every human action.',
+  digital_twin_collaboration_read_only_context: 'Read-only coordination context. This endpoint does not create rooms, notify people, or record comments.'
+};
+
+const DIGITAL_TWIN_RISK_TYPE_TEXT: Record<string, string> = {
+  stockout_risk: 'Stockout risk',
+  supplier_disruption_risk: 'Supplier disruption risk',
+  labor_capacity_risk: 'Labor capacity risk',
+  logistics_delay_risk: 'Logistics delay risk',
+  budget_overrun_risk: 'Budget overrun risk',
+  service_level_risk: 'Service level risk',
+  facility_overload_risk: 'Facility overload risk',
+  integration_failure_risk: 'Integration failure risk',
+  policy_drift_risk: 'Policy drift risk',
+  multi_domain_cascade_risk: 'Multi-domain cascade risk',
+  general: 'Risk propagation'
+};
+
+const SOURCE_PERMISSION_BY_PATH: Partial<Record<string, TenantPermission>> = {
+  '/action-center': TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ,
+  '/alerts': TENANT_PERMISSIONS.ALERTS_READ,
+  '/execution-tasks': TENANT_PERMISSIONS.EXECUTION_TASKS_READ,
+  '/real-time-operations-feed': TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ,
+  '/intelligence-review': TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ,
+  '/ai-copilot': TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ,
+  '/inventory-reservations': TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_READ,
+  '/inventory-requisitions': TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_READ,
+  '/procurement-recommendations': TENANT_PERMISSIONS.INSIGHTS_READ,
+  '/shipments': TENANT_PERMISSIONS.SHIPMENTS_READ,
+  '/reports': TENANT_PERMISSIONS.REPORTS_READ,
+  '/collaboration': TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ,
+  '/products': TENANT_PERMISSIONS.PRODUCTS_READ,
+  '/suppliers': TENANT_PERMISSIONS.SUPPLIERS_READ,
+  '/storage-locations': TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ,
+  '/stock': TENANT_PERMISSIONS.STOCK_READ,
+  '/stock-transfers': TENANT_PERMISSIONS.STOCK_TRANSFERS_READ,
+  '/purchase-orders': TENANT_PERMISSIONS.PURCHASE_ORDERS_READ
+};
+
 function numberValue(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -191,10 +298,23 @@ function formatIdentifier(value?: string | null, fallback = 'Not specified'): st
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function readableTitle(value?: string | null, fallback = 'Operational context'): string {
-  const normalized = String(value || '').trim();
-  if (!normalized) return fallback;
-  return /^[A-Z0-9_.-]+$/.test(normalized) ? formatIdentifier(normalized) : normalized;
+function sourceText(value?: string | null, fallback = ''): string {
+  const normalized = String(value ?? '').trim();
+  return normalized || fallback;
+}
+
+function digitalTwinSystemText(key: string | null | undefined, fallback: string | null | undefined, ui: (englishText: string) => string): string {
+  const english = key ? DIGITAL_TWIN_SYSTEM_TEXT[key] : null;
+  return english ? ui(english) : sourceText(fallback, '');
+}
+
+function digitalTwinRiskTitle(key: string | null | undefined, fallback: string | null | undefined, ui: (englishText: string) => string): string {
+  if (key?.startsWith('digital_twin_risk_type:')) {
+    const riskType = key.slice('digital_twin_risk_type:'.length);
+    const english = DIGITAL_TWIN_RISK_TYPE_TEXT[riskType];
+    if (english) return ui(english);
+  }
+  return sourceText(fallback, ui('Operational context'));
 }
 
 function formatDateTime(value: string | null | undefined, locale: Parameters<typeof formatLocalizedDateTime>[1], ui: (englishText: string) => string): string {
@@ -239,10 +359,21 @@ function overlayTypeLabel(value: string | null | undefined, ui: (englishText: st
   return displayLabel(value, OVERLAY_TYPE_LABELS, 'Operational context', ui);
 }
 
+
+function nodeTypeLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  return displayLabel(value, NODE_TYPE_LABELS, 'General operational entity', ui);
+}
+
+function relationshipLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  return displayLabel(value, RELATIONSHIP_LABELS, 'Operational dependency', ui);
+}
+
 function sourceSurfaceToAppPath(sourceSurface?: string | null): string | null {
   if (!sourceSurface) return null;
-  if (sourceSurface === '/operational-action-center/summary' || sourceSurface === '/control-tower') return '/action-center';
-  return Object.prototype.hasOwnProperty.call(SOURCE_LABELS, sourceSurface) ? sourceSurface : null;
+  const normalized = sourceSurface === '/operational-action-center/summary' || sourceSurface === '/control-tower' ? '/action-center' : sourceSurface;
+  if (!Object.prototype.hasOwnProperty.call(SOURCE_LABELS, normalized)) return null;
+  const requiredPermission = SOURCE_PERMISSION_BY_PATH[normalized];
+  return requiredPermission && !hasPermission(requiredPermission) ? null : normalized;
 }
 
 function DigitalTwinSummaryCard({
@@ -444,7 +575,7 @@ export default function DigitalTwinVisualizationPage() {
               <span className="digital-twin-heading-icon"><TenantNavIcon path="/digital-twin" size={17} /></span>
               <div>
                 <h2 id="digital-twin-context-title">{ui('Operational context')}</h2>
-                <p className="card__subtext">{guidance.visualization_guidance || ui('Use this read-only context to understand the situation, then continue in the governed source workflow.')}</p>
+                <p className="card__subtext">{guidance.visualization_guidance_key ? digitalTwinSystemText(guidance.visualization_guidance_key, guidance.visualization_guidance, ui) : (guidance.visualization_guidance || ui('Use this read-only context to understand the situation, then continue in the governed source workflow.'))}</p>
               </div>
             </div>
             <div className="digital-twin-shortcuts">
@@ -491,8 +622,8 @@ export default function DigitalTwinVisualizationPage() {
                               <span className="digital-twin-badge digital-twin-badge--active">{statusLabel(node.status, ui)}</span>
                             </div>
                           </div>
-                          <h4>{readableTitle(node.label, ui('Topology point'))}</h4>
-                          <p className="card__subtext">{node.node_type ? formatIdentifier(node.node_type) : ui('General operational entity')}</p>
+                          <h4>{sourceText(node.label, ui('Topology point'))}</h4>
+                          <p className="card__subtext">{nodeTypeLabel(node.node_type, ui)}</p>
                           <dl className="digital-twin-facts">
                             <div><dt>{ui('Importance')}</dt><dd>{formatScore(node.importance_score, locale, ui)}</dd></div>
                             <div><dt>{ui('Last updated')}</dt><dd>{formatDateTime(node.updated_at || node.observed_at, locale, ui)}</dd></div>
@@ -529,9 +660,9 @@ export default function DigitalTwinVisualizationPage() {
                         <span className="digital-twin-dependency-icon"><TenantNavIcon path="/digital-twin" size={16} /></span>
                         <div className="digital-twin-dependency-copy">
                           <strong>{edge.source_label && edge.target_label
-                            ? `${readableTitle(edge.source_label)} → ${readableTitle(edge.target_label)}`
-                            : edge.relationship ? formatIdentifier(edge.relationship) : ui('Operational dependency')}</strong>
-                          <span>{edge.relationship ? formatIdentifier(edge.relationship) : ui('Operational dependency')} · {domainLabel(edge.twin_domain, ui)} · {statusLabel(edge.status, ui)}</span>
+                            ? `${sourceText(edge.source_label)} → ${sourceText(edge.target_label)}`
+                            : relationshipLabel(edge.relationship, ui)}</strong>
+                          <span>{relationshipLabel(edge.relationship, ui)} · {domainLabel(edge.twin_domain, ui)} · {statusLabel(edge.status, ui)}</span>
                         </div>
                         <div className="digital-twin-dependency-confidence">
                           <span>{ui('Confidence')}</span>
@@ -571,8 +702,8 @@ export default function DigitalTwinVisualizationPage() {
                               <span className="digital-twin-badge">{domainLabel(overlay.twin_domain, ui)}</span>
                             </div>
                           </div>
-                          <h4>{overlay.title ? readableTitle(overlay.title) : ui('Operational context')}</h4>
-                          <p className="card__subtext">{overlay.summary || ui('No additional source summary was provided.')}</p>
+                          <h4>{overlay.title_key ? digitalTwinRiskTitle(overlay.title_key, overlay.title, ui) : sourceText(overlay.title, ui('Operational context'))}</h4>
+                          <p className="card__subtext">{overlay.summary_key ? digitalTwinSystemText(overlay.summary_key, overlay.summary, ui) : (overlay.summary || ui('No additional source summary was provided.'))}</p>
                           <dl className="digital-twin-facts digital-twin-facts--overlay">
                             <div><dt>{ui('Priority')}</dt><dd>{formatScore(overlay.priority_score, locale, ui)}</dd></div>
                             <div><dt>{ui('Confidence')}</dt><dd>{formatPercent(overlay.confidence_score, locale, ui)}</dd></div>
@@ -609,8 +740,8 @@ export default function DigitalTwinVisualizationPage() {
           <article className="card digital-twin-limit-card"><span className="digital-twin-limit-icon"><TenantNavIcon path="/digital-twin" size={18} /></span><div><h3>{ui('Not a live simulation')}</h3><p className="card__subtext">{ui('The page shows a current read-only snapshot. It does not simulate future stock, labor, routes, facilities, or supplier behavior.')}</p></div></article>
           <article className="card digital-twin-limit-card"><span className="digital-twin-limit-icon"><TenantNavIcon path="/stock" size={18} /></span><div><h3>{ui('No automatic operational change')}</h3><p className="card__subtext">{ui('Nothing here can reassign labor, reserve stock, change routing, mutate tasks, or modify source records.')}</p></div></article>
           <article className="card digital-twin-limit-card"><span className="digital-twin-limit-icon"><TenantNavIcon path="/workspace" size={18} /></span><div><h3>{ui('Perspective is guidance only')}</h3><p className="card__subtext">{ui('Topology, flow, risk, congestion, and dependency choices change review guidance. They do not generate a graphical map or measured heatmap.')}</p></div></article>
-          <article className="card digital-twin-limit-card"><span className="digital-twin-limit-icon"><TenantNavIcon path="/intelligence-review" size={18} /></span><div><h3>{ui('Risk context remains explainable')}</h3><p className="card__subtext">{guidance.risk_propagation_guidance || ui('Risk context comes from permitted source records and knowledge-graph evidence.')}</p></div></article>
-          <article className="card digital-twin-limit-card"><span className="digital-twin-limit-icon"><TenantNavIcon path="/action-center" size={18} /></span><div><h3>{ui('Congestion remains advisory')}</h3><p className="card__subtext">{guidance.congestion_heatmap_guidance || ui('Congestion context does not change work allocation or inventory.')}</p></div></article>
+          <article className="card digital-twin-limit-card"><span className="digital-twin-limit-icon"><TenantNavIcon path="/intelligence-review" size={18} /></span><div><h3>{ui('Risk context remains explainable')}</h3><p className="card__subtext">{guidance.risk_propagation_guidance_key ? digitalTwinSystemText(guidance.risk_propagation_guidance_key, guidance.risk_propagation_guidance, ui) : (guidance.risk_propagation_guidance || ui('Risk context comes from permitted source records and knowledge-graph evidence.'))}</p></div></article>
+          <article className="card digital-twin-limit-card"><span className="digital-twin-limit-icon"><TenantNavIcon path="/action-center" size={18} /></span><div><h3>{ui('Congestion remains advisory')}</h3><p className="card__subtext">{guidance.congestion_heatmap_guidance_key ? digitalTwinSystemText(guidance.congestion_heatmap_guidance_key, guidance.congestion_heatmap_guidance, ui) : (guidance.congestion_heatmap_guidance || ui('Congestion context does not change work allocation or inventory.'))}</p></div></article>
           <article className="card digital-twin-limit-card"><span className="digital-twin-limit-icon"><TenantNavIcon path="/permissions" size={18} /></span><div><h3>{ui('Source permissions still apply')}</h3><p className="card__subtext">{ui('Only permitted context is returned. Every source page keeps its own route, role, permission, tenant, and workflow controls.')}</p></div></article>
         </section>
       ) : null}

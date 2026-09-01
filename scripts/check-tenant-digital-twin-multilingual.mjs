@@ -60,28 +60,30 @@ for(const required of [
 if(!process.exitCode)pass('Digital Twin counts, limits, scores, percentages, and timestamps use the tenant locale.');
 for(const required of [
   'digitalTwinQuery.error.message',
-  'guidance.visualization_guidance || ui(',
-  'guidance.risk_propagation_guidance || ui(',
-  'guidance.congestion_heatmap_guidance || ui(',
-  "node.node_type ? formatIdentifier(node.node_type) : ui('General operational entity')",
-  "edge.relationship ? formatIdentifier(edge.relationship) : ui('Operational dependency')",
-  "overlay.title ? readableTitle(overlay.title) : ui('Operational context')",
-  "overlay.summary || ui('No additional source summary was provided.')"
-])if(!pageSource.includes(required))fail(`Digital Twin server-data boundary changed unexpectedly: ${required}`);
+  'function sourceText(',
+  'DIGITAL_TWIN_SYSTEM_TEXT',
+  'DIGITAL_TWIN_RISK_TYPE_TEXT',
+  'guidance.visualization_guidance_key ? digitalTwinSystemText(',
+  'guidance.risk_propagation_guidance_key ? digitalTwinSystemText(',
+  'guidance.congestion_heatmap_guidance_key ? digitalTwinSystemText(',
+  "sourceText(node.label, ui('Topology point'))",
+  'nodeTypeLabel(node.node_type, ui)',
+  'sourceText(edge.source_label)',
+  'sourceText(edge.target_label)',
+  'relationshipLabel(edge.relationship, ui)',
+  'overlay.title_key ? digitalTwinRiskTitle(',
+  'overlay.summary_key ? digitalTwinSystemText('
+])if(!pageSource.includes(required))fail(`Digital Twin localization ownership boundary changed unexpectedly: ${required}`);
 for(const forbidden of [
   'ui(node.label)',
-  'ui(node.node_type)',
-  'ui(edge.relationship)',
   'ui(edge.source_label)',
   'ui(edge.target_label)',
   'ui(overlay.title)',
   'ui(overlay.summary)',
-  'ui(guidance.visualization_guidance)',
-  'ui(guidance.risk_propagation_guidance)',
-  'ui(guidance.congestion_heatmap_guidance)',
-  'ui(digitalTwinQuery.error.message)'
-])if(pageSource.includes(forbidden))fail(`Digital Twin translates backend/business text unexpectedly: ${forbidden}`);
-if(!process.exitCode)pass('Backend node labels/types, relationship values, overlay titles/summaries, guidance, and API errors remain server/business data.');
+  'ui(digitalTwinQuery.error.message)',
+  'function readableTitle('
+])if(pageSource.includes(forbidden))fail(`Digital Twin translates or rewrites source/business text unexpectedly: ${forbidden}`);
+if(!process.exitCode)pass('Source/business labels, summaries, and API errors remain verbatim while explicitly keyed system guidance/types are localized.');
 for(const required of [
   "apiRequest<DigitalTwinResponse>(`/operational-action-center/digital-twin-operational-visualization-summary?${params.toString()}`)",
   "ui('Read-only operational context')",
