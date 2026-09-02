@@ -88,6 +88,7 @@ export type SupplierReturnItem = {
   source_condition: string;
   quantity: number | string;
   unit_cost?: number | string | null;
+  unit_cost_currency?: string | null;
   line_amount: number | string;
   lot_number?: string | null;
   batch_number?: string | null;
@@ -105,6 +106,7 @@ export type SupplierReturn = {
   notes?: string | null;
   currency: string;
   total_amount: number | string;
+  valuation_status?: 'known' | 'unavailable';
   submitted_at?: string | null;
   approved_at?: string | null;
   rejected_at?: string | null;

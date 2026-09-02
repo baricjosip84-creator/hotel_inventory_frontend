@@ -28,8 +28,10 @@ type EligibleReturnLot = {
   condition: 'available' | 'hold' | 'quarantine' | 'damaged' | 'rejected';
   physical_quantity: number | string;
   reserved_return_quantity: number | string;
+  reserved_inventory_quantity?: number | string;
   returnable_quantity: number | string;
   unit_cost?: number | string | null;
+  unit_cost_currency?: string | null;
   received_at?: string | null;
 };
 
@@ -43,6 +45,7 @@ type SupplierReturnItem = {
   source_condition: string;
   quantity: number | string;
   unit_cost?: number | string | null;
+  unit_cost_currency?: string | null;
   line_amount: number | string;
   lot_number?: string | null;
   batch_number?: string | null;
@@ -60,6 +63,7 @@ type SupplierReturn = {
   notes?: string | null;
   currency: string;
   total_amount: number | string;
+  valuation_status?: 'known' | 'unavailable';
   submitted_at?: string | null;
   approved_at?: string | null;
   rejected_at?: string | null;
@@ -143,13 +147,26 @@ export function SupplierReturnsTab() {
   });
 
   const selectedSupplierId = draftItems[0]?.lot.supplier_id ?? null;
+  const draftValuationCurrencies = useMemo(
+    () => [...new Set(draftItems
+      .filter((item) => item.lot.unit_cost !== null && item.lot.unit_cost !== undefined && item.lot.unit_cost_currency)
+      .map((item) => String(item.lot.unit_cost_currency)))],
+    [draftItems],
+  );
+  const selectedDraftCurrency = draftValuationCurrencies.length === 1 ? draftValuationCurrencies[0] : null;
+  const draftCurrencyConflict = draftValuationCurrencies.length > 1;
+  const draftValuationKnown = draftItems.length > 0
+    && !draftCurrencyConflict
+    && draftItems.every((item) => item.lot.unit_cost !== null && item.lot.unit_cost !== undefined && Boolean(item.lot.unit_cost_currency));
   const eligibleLots = useMemo(() => eligibleLotsQuery.data ?? [], [eligibleLotsQuery.data]);
   const availableLotOptions = useMemo(
     () => eligibleLots.filter((lot) => {
       if (draftItems.some((item) => item.inventory_lot_id === lot.inventory_lot_id)) return false;
-      return !selectedSupplierId || lot.supplier_id === selectedSupplierId;
+      if (selectedSupplierId && lot.supplier_id !== selectedSupplierId) return false;
+      if (selectedDraftCurrency && lot.unit_cost !== null && lot.unit_cost !== undefined && lot.unit_cost_currency && lot.unit_cost_currency !== selectedDraftCurrency) return false;
+      return true;
     }),
-    [draftItems, eligibleLots, selectedSupplierId],
+    [draftItems, eligibleLots, selectedDraftCurrency, selectedSupplierId],
   );
 
   const selectedLot = eligibleLots.find((lot) => lot.inventory_lot_id === selectedLotId) ?? null;
@@ -361,8 +378,8 @@ export function SupplierReturnsTab() {
               </div>
               <TextareaField label={ui('Return reason')} value={returnReason} onChange={setReturnReason} required disabled={!canWrite || createReturnMutation.isPending} />
               <TextareaField label={ui('Notes')} value={notes} onChange={setNotes} disabled={!canWrite || createReturnMutation.isPending} />
-              <p style={styles.helper}>{ui('Estimated return value: {value}').replace('{value}', formatMoney(draftTotal))}</p>
-              <button type="button" disabled={!canWrite || !returnReason.trim() || createReturnMutation.isPending} style={!canWrite || !returnReason.trim() || createReturnMutation.isPending ? styles.disabledButton : styles.primaryButton} onClick={() => createReturnMutation.mutate()}>
+              <p style={styles.helper}>{ui('Estimated return value: {value}').replace('{value}', draftValuationKnown ? formatMoney(draftTotal, selectedDraftCurrency) : ui('Not available'))}</p>
+              <button type="button" disabled={!canWrite || !returnReason.trim() || draftCurrencyConflict || createReturnMutation.isPending} style={!canWrite || !returnReason.trim() || draftCurrencyConflict || createReturnMutation.isPending ? styles.disabledButton : styles.primaryButton} onClick={() => createReturnMutation.mutate()}>
                 {createReturnMutation.isPending ? ui('Creating…') : ui('Create return draft')}
               </button>
             </div>
@@ -390,7 +407,7 @@ export function SupplierReturnsTab() {
                       </div>
                     ))}</td>
                     <td style={styles.td}>{item.reason}</td>
-                    <td style={styles.td}>{formatMoney(item.total_amount, item.currency)}</td>
+                    <td style={styles.td}>{item.valuation_status === 'unavailable' ? ui('Not available') : formatMoney(item.total_amount, item.currency)}</td>
                     <td style={styles.td}>{statusLabel(item.status)}</td>
                     <td style={styles.td}>{formatLocalizedDateTime(item.created_at, locale)}</td>
                     <td style={styles.td}>
