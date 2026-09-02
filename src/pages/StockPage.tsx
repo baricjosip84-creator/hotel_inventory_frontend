@@ -43,6 +43,9 @@ type StockItem = {
   product_min_stock?: number | string | null;
   requires_lot_tracking?: boolean;
   requires_expiry_date?: boolean;
+  serial_tracking_enabled?: boolean;
+  serial_required_on_receipt?: boolean;
+  serial_required_on_issue?: boolean;
   updated_at?: string;
   version?: number | string;
 };
@@ -177,6 +180,7 @@ type StockActionDraft = {
   batch_number: string;
   expiry_date: string;
   manufactured_at: string;
+  serial_numbers: string;
 };
 
 type UsageReason =
@@ -293,7 +297,7 @@ function formatLotReference(lot: InventoryLot, ui: (text: string) => string): st
   ].filter(Boolean).join(' · ') || ui('No lot / batch reference');
 }
 
-function getMovementReasonPresentation(movement: StockMovement): { text: string; systemOwned: boolean } {
+function getMovementReasonPresentation(movement: StockMovement): { text: string; systemOwned: boolean; detail?: string } {
   const reason = (movement.reason || '').trim();
   const normalizedReason = reason.toLowerCase();
   const movementType = (movement.movement_type || '').trim().toLowerCase();
@@ -309,6 +313,15 @@ function getMovementReasonPresentation(movement: StockMovement): { text: string;
   if (movementType === 'manual_adjustment') {
     if (normalizedReason === 'manual_adjustment' || !reason) return { text: 'Manual adjustment', systemOwned: true };
     return { text: reason, systemOwned: false };
+  }
+  if (movementType === 'stock_hold' || movementType === 'stock_hold_release') {
+    const detailMatch = reason.match(/^(?:stock_hold|stock_hold_release):[^:]+:(.*)$/i);
+    const detail = detailMatch?.[1]?.trim();
+    return {
+      text: movementType === 'stock_hold' ? 'Stock placed on hold' : 'Stock hold released',
+      systemOwned: true,
+      ...(detail ? { detail } : {})
+    };
   }
 
   const systemLabels: Record<string, string> = {
@@ -341,7 +354,36 @@ function getMovementReasonPresentation(movement: StockMovement): { text: string;
 }
 
 function getEffectiveMinimum(item: StockItem): number {
-  return Math.max(toNumber(item.min_quantity), toNumber(item.product_min_stock));
+  const locationMinimum = toNumber(item.min_quantity);
+  return locationMinimum > 0 ? locationMinimum : toNumber(item.product_min_stock);
+}
+
+function getAvailableLotQuantity(item: StockItem): number {
+  return item.available_lot_quantity === undefined || item.available_lot_quantity === null
+    ? toNumber(item.quantity)
+    : toNumber(item.available_lot_quantity);
+}
+
+function getUsableLotQuantity(item: StockItem): number {
+  return item.usable_lot_quantity === undefined || item.usable_lot_quantity === null
+    ? toNumber(item.quantity)
+    : toNumber(item.usable_lot_quantity);
+}
+
+function hasStockLotDesync(item: StockItem): boolean {
+  return Math.abs(toNumber(item.quantity) - getAvailableLotQuantity(item)) > 0.0000001;
+}
+
+function parseSerialNumbers(value: string): string[] {
+  return value.split(/[\n,]+/).map((serial) => serial.trim()).filter(Boolean);
+}
+
+function getLocalIsoDate(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function getProjectedFreeQuantity(item: StockItem): number {
@@ -376,7 +418,8 @@ function getDefaultDraft(action: StockActionType): StockActionDraft {
       lot_number: '',
       batch_number: '',
       expiry_date: '',
-      manufactured_at: ''
+      manufactured_at: '',
+      serial_numbers: ''
     };
   }
 
@@ -395,7 +438,8 @@ function getDefaultDraft(action: StockActionType): StockActionDraft {
       lot_number: '',
       batch_number: '',
       expiry_date: '',
-      manufactured_at: ''
+      manufactured_at: '',
+      serial_numbers: ''
     };
   }
 
@@ -413,7 +457,8 @@ function getDefaultDraft(action: StockActionType): StockActionDraft {
     lot_number: '',
     batch_number: '',
     expiry_date: '',
-    manufactured_at: ''
+    manufactured_at: '',
+    serial_numbers: ''
   };
 }
 
@@ -555,7 +600,7 @@ export default function StockPage() {
   const [searchText, setSearchText] = useState('');
   const [locationFilter, setLocationFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'healthy' | 'reserved-risk'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'healthy' | 'reserved-risk' | 'integrity-risk'>('all');
   const [expiryWindowDays, setExpiryWindowDays] = useState(30);
   const [lotPage, setLotPage] = useState(0);
   const [countBaseVersion, setCountBaseVersion] = useState<number | null>(null);
@@ -571,7 +616,10 @@ export default function StockPage() {
   }, [lotPageCount]);
 
   const expiryWindowLots = useMemo(() => inventoryLots.filter((lot) => { const days = lot.days_to_expiry === null || lot.days_to_expiry === undefined ? null : Number(lot.days_to_expiry); return lot.quantity && days !== null && Number.isFinite(days) && days >= 0 && days <= expiryWindowDays && !['expired'].includes(lot.operational_status || lot.condition); }), [inventoryLots, expiryWindowDays]);
-  const expiryWindowQuantity = useMemo(() => expiryWindowLots.reduce((sum, lot) => sum + Number(lot.quantity || 0), 0), [expiryWindowLots]);
+  const expiryWindowPositionCount = useMemo(
+    () => new Set(expiryWindowLots.map((lot) => `${lot.product_id}:${lot.storage_location_id}`)).size,
+    [expiryWindowLots]
+  );
   const expiryWindowCostEvidence = useMemo(() => {
     const totals = new Map<string, number>();
     let unknownCurrencyValueRows = 0;
@@ -620,12 +668,12 @@ export default function StockPage() {
       if (!row.storage_location_id) continue;
       values.set(
         row.storage_location_id,
-        row.storage_location_name || row.storage_location_id
+        row.storage_location_name || ui("Unknown location")
       );
     }
 
     return [...values.entries()].sort((left, right) => left[1].localeCompare(right[1]));
-  }, [rows]);
+  }, [rows, ui]);
 
   const categoryOptions = useMemo(() => {
     return [...new Set(
@@ -653,14 +701,17 @@ export default function StockPage() {
         }
 
         const quantity = toNumber(row.quantity);
+        const usableQuantity = Math.min(quantity, getUsableLotQuantity(row));
         const minimum = getEffectiveMinimum(row);
         const projectedFree = getProjectedFreeQuantity(row);
-        const isLow = quantity < minimum;
-        const hasReservationRisk = projectedFree < minimum;
+        const isLow = usableQuantity < minimum;
+        const hasReservationRisk = !isLow && projectedFree < minimum;
+        const hasIntegrityRisk = hasStockLotDesync(row);
 
         if (statusFilter === 'low' && !isLow) return false;
-        if (statusFilter === 'healthy' && (isLow || hasReservationRisk)) return false;
+        if (statusFilter === 'healthy' && (isLow || hasReservationRisk || hasIntegrityRisk)) return false;
         if (statusFilter === 'reserved-risk' && !hasReservationRisk) return false;
+        if (statusFilter === 'integrity-risk' && !hasIntegrityRisk) return false;
 
         if (!search) return true;
 
@@ -697,6 +748,13 @@ export default function StockPage() {
   const [operationFeedback, setOperationFeedback] = useState<string>('');
   const [operationError, setOperationError] = useState<string>('');
   const [lastResult, setLastResult] = useState<StockMutationResponse | null>(null);
+
+  const updateDraft = (updater: (current: StockActionDraft) => StockActionDraft) => {
+    setDraft(updater);
+    setLastResult(null);
+    setOperationFeedback('');
+    setOperationError('');
+  };
 
   useEffect(() => {
     if (!selectedStockId) return;
@@ -755,61 +813,75 @@ export default function StockPage() {
   const summary = useMemo(() => {
     let low = 0;
     let availabilityRisk = 0;
-    let quantityTotal = 0;
-    let reservedTotal = 0;
-    let projectedFreeTotal = 0;
+    let integrityRisk = 0;
+    let onHandPositions = 0;
+    let reservedPositions = 0;
+    let availablePositions = 0;
 
-    for (const item of rows) {
+    for (const item of filteredRows) {
       const quantity = toNumber(item.quantity);
       const reservedQuantity = toNumber(item.reserved_quantity);
       const projectedFreeQuantity = getProjectedFreeQuantity(item);
+      const usableQuantity = Math.min(quantity, getUsableLotQuantity(item));
       const minimum = getEffectiveMinimum(item);
+      const hasIntegrityRisk = hasStockLotDesync(item);
 
-      quantityTotal += quantity;
-      reservedTotal += reservedQuantity;
-      projectedFreeTotal += projectedFreeQuantity;
+      if (quantity > 0) onHandPositions += 1;
+      if (reservedQuantity > 0) reservedPositions += 1;
+      if (projectedFreeQuantity > 0 && !hasIntegrityRisk) availablePositions += 1;
 
-      if (quantity < minimum) {
+      if (usableQuantity < minimum) {
         low += 1;
       }
 
       if (projectedFreeQuantity < minimum) availabilityRisk += 1;
+      if (hasIntegrityRisk) integrityRisk += 1;
     }
 
     return {
-      totalRows: rows.length,
+      totalRows: filteredRows.length,
       lowRows: low,
       availabilityRiskRows: availabilityRisk,
-      quantityTotal,
-      reservedTotal,
-      projectedFreeTotal
+      integrityRiskRows: integrityRisk,
+      onHandPositions,
+      reservedPositions,
+      availablePositions
     };
-  }, [rows]);
+  }, [filteredRows]);
 
   const currentQuantity = selectedRow ? toNumber(selectedRow.quantity) : 0;
   const currentReservedQuantity = selectedRow ? toNumber(selectedRow.reserved_quantity) : 0;
+  const currentUsableLotQuantity = selectedRow ? getUsableLotQuantity(selectedRow) : 0;
   const currentProjectedFreeQuantity = selectedRow
     ? getProjectedFreeQuantity(selectedRow)
     : 0;
   const currentMinimum = selectedRow ? getEffectiveMinimum(selectedRow) : 0;
-  const selectedLowStock = Boolean(selectedRow) && currentQuantity < currentMinimum;
+  const selectedStockLotDesync = Boolean(selectedRow) && hasStockLotDesync(selectedRow);
+  const selectedLowStock = Boolean(selectedRow) && Math.min(currentQuantity, currentUsableLotQuantity) < currentMinimum;
   const selectedOverReserved = Boolean(selectedRow) && currentProjectedFreeQuantity < 0;
   const selectedLowAvailable =
     Boolean(selectedRow) && !selectedLowStock && currentProjectedFreeQuantity < currentMinimum;
+
+  const invalidateStockOperationalQueries = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['stock'] }),
+      queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
+      queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
+      queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
+    ]);
+  };
 
   const processExpiredLotsMutation = useMutation({
     mutationFn: () => apiRequest<{ processed_lot_count: number; processed_quantity: number }>('/stock/lots/expire-due', { method: 'POST', body: '{}' }),
     onSuccess: async (response) => {
       setOperationError('');
-      setOperationFeedback(`${ui('Expired stock processed:')} ${formatLocalizedNumber(response.processed_lot_count, locale)} ${ui('lots')}, ${formatLocalizedNumber(response.processed_quantity, locale)} ${ui('units written off.')}`);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['stock'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
-      ]);
+      setOperationFeedback(`${ui('Expired stock processed:')} ${formatLocalizedNumber(response.processed_lot_count, locale)} ${ui('lots written off.')}`);
+      await invalidateStockOperationalQueries();
     },
-    onError: (error) => setOperationError(error instanceof Error ? error.message : ui("Failed to process expired stock"))
+    onError: async (error) => {
+      setOperationError(error instanceof Error ? error.message : ui("Failed to process expired stock"));
+      await invalidateStockOperationalQueries();
+    }
   });
 
   const releaseQuarantineMutation = useMutation({
@@ -817,26 +889,24 @@ export default function StockPage() {
     onSuccess: async () => {
       setOperationError('');
       setOperationFeedback(ui("Quarantined lot released to available stock."));
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['stock'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
-      ]);
+      await invalidateStockOperationalQueries();
     },
-    onError: (error) => setOperationError(error instanceof Error ? error.message : ui("Failed to release quarantined stock"))
+    onError: async (error) => {
+      setOperationError(error instanceof Error ? error.message : ui("Failed to release quarantined stock"));
+      await invalidateStockOperationalQueries();
+    }
   });
 
   const holdLotMutation = useMutation({
     mutationFn: ({ lotId, reason }: { lotId: string; reason: string }) => apiRequest<InventoryLot>(`/stock/lots/${lotId}/hold`, { method: 'POST', body: JSON.stringify({ reason }) }),
-    onSuccess: async () => { setOperationError(''); setOperationFeedback(ui('Stock placed on hold and removed from usable quantity.')); await Promise.all([queryClient.invalidateQueries({ queryKey: ['stock'] }),queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),queryClient.invalidateQueries({ queryKey: ['stock-movements'] })]); },
-    onError: (error) => setOperationError(error instanceof Error ? error.message : ui("Failed to place stock on hold"))
+    onSuccess: async () => { setOperationError(''); setOperationFeedback(ui('Stock placed on hold and removed from usable quantity.')); await invalidateStockOperationalQueries(); },
+    onError: async (error) => { setOperationError(error instanceof Error ? error.message : ui("Failed to place stock on hold")); await invalidateStockOperationalQueries(); }
   });
 
   const releaseHoldMutation = useMutation({
     mutationFn: ({ lotId, reason }: { lotId: string; reason: string }) => apiRequest<InventoryLot>(`/stock/lots/${lotId}/release-hold`, { method: 'POST', body: JSON.stringify({ reason }) }),
-    onSuccess: async () => { setOperationError(''); setOperationFeedback(ui("Held stock released back to available stock.")); await Promise.all([queryClient.invalidateQueries({ queryKey: ['stock'] }),queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),queryClient.invalidateQueries({ queryKey: ['stock-movements'] })]); },
-    onError: (error) => setOperationError(error instanceof Error ? error.message : ui("Failed to release held stock"))
+    onSuccess: async () => { setOperationError(''); setOperationFeedback(ui("Held stock released back to available stock.")); await invalidateStockOperationalQueries(); },
+    onError: async (error) => { setOperationError(error instanceof Error ? error.message : ui("Failed to release held stock")); await invalidateStockOperationalQueries(); }
   });
 
   const consumeMutation = useMutation({
@@ -856,7 +926,8 @@ export default function StockPage() {
           department: draft.department.trim() || null,
           event_name: draft.event_name.trim() || null,
           notes: draft.notes.trim() || null,
-          consumed_at: draft.consumed_at ? new Date(draft.consumed_at).toISOString() : null
+          consumed_at: draft.consumed_at ? new Date(draft.consumed_at).toISOString() : null,
+          serial_numbers: parseSerialNumbers(draft.serial_numbers)
         })
       });
     },
@@ -867,18 +938,16 @@ export default function StockPage() {
       setDraft(getDefaultDraft('consume'));
 
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['stock'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-movements'] }),
+        invalidateStockOperationalQueries(),
         queryClient.invalidateQueries({ queryKey: ['inventory-usage-logs'] }),
         queryClient.invalidateQueries({ queryKey: ['inventory-usage-summary'] })
       ]);
     },
-    onError: (error) => {
+    onError: async (error) => {
       const message = error instanceof Error ? error.message : ui("Failed to consume stock");
       setOperationFeedback('');
       setOperationError(message);
+      await invalidateStockOperationalQueries();
     }
   });
 
@@ -900,6 +969,7 @@ export default function StockPage() {
           batch_number: Number(draft.quantity) > currentQuantity ? (draft.batch_number.trim() || null) : null,
           expiry_date: Number(draft.quantity) > currentQuantity ? (draft.expiry_date || null) : null,
           manufactured_at: Number(draft.quantity) > currentQuantity ? (draft.manufactured_at || null) : null,
+          serial_numbers: parseSerialNumbers(draft.serial_numbers),
           reservation_shortfall_acknowledged: draft.reservation_shortfall_acknowledged
         })
       });
@@ -911,22 +981,17 @@ export default function StockPage() {
       setDraft(getDefaultDraft('count'));
       setCountBaseVersion(response.stock.version ?? null);
 
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['stock'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
-      ]);
+      await invalidateStockOperationalQueries();
     },
-    onError: (error) => {
+    onError: async (error) => {
       const message = error instanceof Error ? error.message : ui("Failed to apply stock count");
       setOperationFeedback('');
       setOperationError(message);
       if (error instanceof ApiError && error.code === 'VERSION_CONFLICT') {
         setDraft(getDefaultDraft('count'));
         setCountBaseVersion(null);
-        void queryClient.invalidateQueries({ queryKey: ['stock'] });
       }
+      await invalidateStockOperationalQueries();
     }
   });
 
@@ -947,6 +1012,7 @@ export default function StockPage() {
           batch_number: Number(draft.change) > 0 ? (draft.batch_number.trim() || null) : null,
           expiry_date: Number(draft.change) > 0 ? (draft.expiry_date || null) : null,
           manufactured_at: Number(draft.change) > 0 ? (draft.manufactured_at || null) : null,
+          serial_numbers: parseSerialNumbers(draft.serial_numbers),
           reservation_shortfall_acknowledged: draft.reservation_shortfall_acknowledged
         })
       });
@@ -957,17 +1023,13 @@ export default function StockPage() {
       setLastResult(response);
       setDraft(getDefaultDraft('adjust'));
 
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['stock'] }),
-        queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
-      ]);
+      await invalidateStockOperationalQueries();
     },
-    onError: (error) => {
+    onError: async (error) => {
       const message = error instanceof Error ? error.message : ui("Failed to adjust stock");
       setOperationFeedback('');
       setOperationError(message);
+      await invalidateStockOperationalQueries();
     }
   });
 
@@ -1012,7 +1074,7 @@ export default function StockPage() {
 
   const projectedFreeAfterAction = nextQuantityPreview === null
     ? null
-    : nextQuantityPreview - currentReservedQuantity;
+    : currentProjectedFreeQuantity + (nextQuantityPreview - currentQuantity);
   const createsReservationShortfall = projectedFreeAfterAction !== null
     && projectedFreeAfterAction < 0;
 
@@ -1024,13 +1086,32 @@ export default function StockPage() {
   const trackingDetailsNeeded = Boolean(selectedRow) && actionAddsStock && (
     Boolean(selectedRow?.requires_lot_tracking) || Boolean(selectedRow?.requires_expiry_date)
   );
+  const selectedSerialNumbers = useMemo(() => parseSerialNumbers(draft.serial_numbers), [draft.serial_numbers]);
+  const hasDuplicateSelectedSerials = useMemo(
+    () => new Set(selectedSerialNumbers).size !== selectedSerialNumbers.length,
+    [selectedSerialNumbers]
+  );
 
   const actionInputValidation = useMemo(() => {
     if (!selectedRow) {
       return { valid: false, message: ui("Select a stock position first.") };
     }
 
+    if (selectedStockLotDesync) {
+      return { valid: false, message: ui('Stock and available lot balances do not reconcile. Resolve the Stock integrity mismatch before posting an action.') };
+    }
+
+    if (actionAddsStock && draft.expiry_date && draft.expiry_date < getLocalIsoDate()) {
+      return { valid: false, message: ui('Expired stock cannot be added as available inventory. Use the appropriate expired-stock workflow instead.') };
+    }
+    if (actionAddsStock && draft.manufactured_at && draft.expiry_date && draft.manufactured_at > draft.expiry_date) {
+      return { valid: false, message: ui('Manufactured date cannot be after the expiry date.') };
+    }
+
     if (draft.action === 'consume') {
+      if (hasDuplicateSelectedSerials) {
+        return { valid: false, message: ui('Serial numbers entered for one stock action must be unique.') };
+      }
       if (draft.quantity.trim() === '') {
         return { valid: false, message: ui("Enter the quantity to consume.") };
       }
@@ -1049,14 +1130,22 @@ export default function StockPage() {
       if (quantity > unreservedQuantity) {
         return {
           valid: false,
-          message: `${ui('Only')} ${formatLocalizedNumber(unreservedQuantity, locale)} ${ui('units are unreserved. Release or reallocate the reservation before consuming more.')}`
+          message: `${ui('Only')} ${formatLocalizedNumber(unreservedQuantity, locale)} ${selectedRow.product_unit || ''} ${ui('is unreserved. Release or reallocate the reservation before consuming more.')}`.replace(/\s+/g, ' ').trim()
         };
+      }
+
+      if (selectedRow.serial_tracking_enabled && (selectedRow.serial_required_on_issue || selectedSerialNumbers.length > 0)) {
+        if (!Number.isInteger(quantity)) return { valid: false, message: ui('Serial-tracked issue quantity must be a whole number.') };
+        if (selectedSerialNumbers.length !== quantity) return { valid: false, message: ui('Enter exactly one serial number for each unit being consumed.') };
       }
 
       return { valid: true, message: '' };
     }
 
     if (draft.action === 'count') {
+      if (hasDuplicateSelectedSerials) {
+        return { valid: false, message: ui('Serial numbers entered for one stock action must be unique.') };
+      }
       if (draft.quantity.trim() === '') {
         return { valid: false, message: ui("Enter the physically counted quantity.") };
       }
@@ -1065,6 +1154,16 @@ export default function StockPage() {
 
       if (!Number.isFinite(quantity) || quantity < 0) {
         return { valid: false, message: ui("Counted quantity must be zero or greater.") };
+      }
+
+      const removalQuantity = Math.max(currentQuantity - quantity, 0);
+      if (removalQuantity > currentUsableLotQuantity + 0.0000001) {
+        return { valid: false, message: ui('This count would remove more stock than the non-expired available lots can provide. Process expired stock first, then refresh and recount.') };
+      }
+
+      if (selectedRow.serial_tracking_enabled) {
+        if (!Number.isInteger(quantity)) return { valid: false, message: ui('Serial-tracked physical counts must use whole units.') };
+        if (selectedSerialNumbers.length !== quantity) return { valid: false, message: ui('Enter exactly one serial number for every physically counted unit.') };
       }
 
       if (!Number.isInteger(countBaseVersion) || Number(countBaseVersion) < 1) {
@@ -1096,12 +1195,25 @@ export default function StockPage() {
 
     const change = Number(draft.change);
 
+    if (hasDuplicateSelectedSerials) {
+      return { valid: false, message: ui('Serial numbers entered for one stock action must be unique.') };
+    }
+
     if (!Number.isFinite(change) || change === 0) {
       return { valid: false, message: ui("Adjustment must be a non-zero number.") };
     }
 
+    if (selectedRow.serial_tracking_enabled) {
+      if (!Number.isInteger(Math.abs(change))) return { valid: false, message: ui('Serial-tracked adjustments must use whole units.') };
+      if (selectedSerialNumbers.length !== Math.abs(change)) return { valid: false, message: ui('Enter exactly one serial number for every unit in this adjustment.') };
+    }
+
     if (currentQuantity + change < 0) {
       return { valid: false, message: ui("Adjustment cannot result in negative stock.") };
+    }
+
+    if (change < 0 && Math.abs(change) > currentUsableLotQuantity + 0.0000001) {
+      return { valid: false, message: ui('This adjustment would remove more stock than the non-expired available lots can provide. Process expired stock first, then refresh and try again.') };
     }
 
     if (change > 0) {
@@ -1122,10 +1234,12 @@ export default function StockPage() {
 
     return { valid: true, message: '' };
   }, [
+    actionAddsStock,
     countBaseVersion,
     createsReservationShortfall,
     currentProjectedFreeQuantity,
     currentQuantity,
+    currentUsableLotQuantity,
     draft.action,
     draft.change,
     draft.quantity,
@@ -1133,8 +1247,12 @@ export default function StockPage() {
     draft.lot_number,
     draft.batch_number,
     draft.expiry_date,
+    draft.manufactured_at,
+    hasDuplicateSelectedSerials,
     locale,
     selectedRow,
+    selectedSerialNumbers,
+    selectedStockLotDesync,
     ui
   ]);
 
@@ -1146,7 +1264,7 @@ export default function StockPage() {
         : actionInputValidation.message
     : !actionInputValidation.valid
       ? actionInputValidation.message
-      : nextQuantityPreview !== null && nextQuantityPreview < currentMinimum
+      : projectedFreeAfterAction !== null && projectedFreeAfterAction < currentMinimum
         ? ui("Warning: this action would leave stock below its minimum level.")
         : ui("Within allowed range");
 
@@ -1205,10 +1323,10 @@ export default function StockPage() {
     {
       label: ui("3. Verify Preview"),
       detail:
-        nextQuantityPreview === null || !Number.isFinite(nextQuantityPreview)
+        !actionInputValidation.valid || nextQuantityPreview === null || !Number.isFinite(nextQuantityPreview)
           ? actionInputValidation.message
           : `${ui('Projected on hand:')} ${formatLocalizedNumber(nextQuantityPreview, locale)}. ${ui('Projected available:')} ${formatLocalizedNumber(projectedFreeAfterAction, locale)}.`,
-      complete: nextQuantityPreview !== null && Number.isFinite(nextQuantityPreview)
+      complete: actionInputValidation.valid && nextQuantityPreview !== null && Number.isFinite(nextQuantityPreview)
     },
     {
       label: ui("4. Confirm in Ledger"),
@@ -1222,6 +1340,7 @@ export default function StockPage() {
   const submitAction = async () => {
     setOperationFeedback('');
     setOperationError('');
+    setLastResult(null);
 
     if (!selectedRow) {
       setOperationError(ui("Select a stock position before posting a stock action."));
@@ -1333,7 +1452,7 @@ export default function StockPage() {
         description={ui("Review stock by product and location, see quantities assigned to reservations, and post controlled consumption, count, or adjustment actions.")}
         meta={<>
           <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{canAdjust ? ui("Count and adjust access") : ui("Stock review access")}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{canCount && canAdjust ? ui("Count and adjust access") : canCount ? ui('Count access') : canAdjust ? ui('Adjust access') : ui("Stock review access")}</OperationalWorkspaceMetaPill>
           <OperationalWorkspaceMetaPill>{canConsume ? ui("Consumption enabled") : ui("Consumption restricted by role")}</OperationalWorkspaceMetaPill>
         </>}
         aside={canAdjust ? (
@@ -1351,7 +1470,7 @@ export default function StockPage() {
         <StatCard
           title={ui("Stock Positions")}
           value={formatLocalizedNumber(summary.totalRows, locale)}
-          subtitle={ui("Tracked product and location combinations")}
+          subtitle={ui("Tracked product and location combinations in the current view")}
         />
         <StatCard
           title={ui("Low Stock")}
@@ -1366,21 +1485,27 @@ export default function StockPage() {
           tone={summary.totalRows === 0 ? 'default' : summary.availabilityRiskRows > 0 ? 'warn' : 'good'}
         />
         <StatCard
-          title={ui("Total On Hand")}
-          value={formatLocalizedNumber(summary.quantityTotal, locale)}
-          subtitle={ui("Combined visible quantity across loaded rows")}
+          title={ui('Integrity Risk')}
+          value={formatLocalizedNumber(summary.integrityRiskRows, locale)}
+          subtitle={ui('Positions where aggregate Stock and available lot balances do not reconcile')}
+          tone={summary.totalRows === 0 ? 'default' : summary.integrityRiskRows > 0 ? 'warn' : 'good'}
         />
         <StatCard
-          title={ui("Reserved")}
-          value={formatLocalizedNumber(summary.reservedTotal, locale)}
-          subtitle={ui("Open quantity assigned to active reservations")}
-          tone={summary.reservedTotal > 0 ? 'warn' : 'default'}
+          title={ui("On-Hand Positions")}
+          value={formatLocalizedNumber(summary.onHandPositions, locale)}
+          subtitle={ui("Positions with physical stock on hand")}
         />
         <StatCard
-          title={ui("Available")}
-          value={formatLocalizedNumber(summary.projectedFreeTotal, locale)}
-          subtitle={ui("On-hand quantity after active reservations")}
-          tone={summary.totalRows === 0 ? 'default' : summary.projectedFreeTotal < 0 ? 'warn' : 'good'}
+          title={ui("Reserved Positions")}
+          value={formatLocalizedNumber(summary.reservedPositions, locale)}
+          subtitle={ui("Positions with open reservations")}
+          tone={summary.reservedPositions > 0 ? 'warn' : 'default'}
+        />
+        <StatCard
+          title={ui("Available Positions")}
+          value={formatLocalizedNumber(summary.availablePositions, locale)}
+          subtitle={ui("Positions with usable non-expired stock after reservations")}
+          tone={summary.totalRows === 0 ? 'default' : summary.availabilityRiskRows > 0 ? 'warn' : 'good'}
         />
       </div>
 
@@ -1483,7 +1608,7 @@ export default function StockPage() {
             </div>
             <div className="app-grid-stats" style={styles.statsGrid}>
               <StatCard title={ui("Lot Balances")} value={formatLocalizedNumber(inventoryLots.length, locale)} subtitle={ui("Available, held, quarantined, or expired lot-level balances")} />
-              <StatCard title={`${ui('Expiring within')} ${formatLocalizedNumber(expiryWindowDays, locale)} ${ui('days')}`} value={formatLocalizedNumber(expiryWindowLots.length, locale)} subtitle={`${formatLocalizedNumber(expiryWindowQuantity, locale)} ${ui('units in the selected window')}`} tone={inventoryLots.length === 0 ? 'default' : expiryWindowLots.length ? 'warn' : 'good'} />
+              <StatCard title={`${ui('Expiring within')} ${formatLocalizedNumber(expiryWindowDays, locale)} ${ui('days')}`} value={formatLocalizedNumber(expiryWindowLots.length, locale)} subtitle={`${formatLocalizedNumber(expiryWindowPositionCount, locale)} ${ui('product/location positions in the selected window')}`} tone={inventoryLots.length === 0 ? 'default' : expiryWindowLots.length ? 'warn' : 'good'} />
               <StatCard
                 title={ui("Expiry Value at Risk")}
                 value={expiryWindowCostEvidence.unknownCurrencyValueRows > 0
@@ -1522,7 +1647,7 @@ export default function StockPage() {
                         <td style={styles.td}>{lot.expiry_date ? formatLocalizedDate(lot.expiry_date, locale) : '-'}</td>
                         <td style={styles.td}>{ui(formatUsageReason(lot.operational_status || lot.condition))}</td>
                         <td style={styles.td}>{formatLocalizedNumber(toNumber(lot.quantity), locale)} {lot.product_unit || ''}</td>
-                        <td style={styles.td}>{canAdjust ? (lot.condition === 'available' ? <button type="button" style={styles.rowActionButton} disabled={holdLotMutation.isPending} onClick={() => { const reason = window.prompt(ui("Why should this stock be blocked from use?")); if (reason && reason.trim().length >= 3) holdLotMutation.mutate({ lotId: lot.id, reason: reason.trim() }); }}>{ui("Block")}</button> : lot.condition === 'hold' ? <button type="button" style={styles.rowActionButton} disabled={releaseHoldMutation.isPending} onClick={() => { const reason = window.prompt(ui("Why is this stock safe to use again?")); if (reason && reason.trim().length >= 3) releaseHoldMutation.mutate({ lotId: lot.id, reason: reason.trim() }); }}>{ui("Unblock")}</button> : lot.condition === 'quarantine' ? <button type="button" style={styles.rowActionButton} disabled={releaseQuarantineMutation.isPending} onClick={() => { if (window.confirm(ui("Release this quarantined lot into usable stock?"))) releaseQuarantineMutation.mutate(lot.id); }}>{ui("Release")}</button> : '-') : '-'}</td>
+                        <td style={styles.td}>{canAdjust ? (lot.condition === 'available' && lot.operational_status !== 'expired' ? <button type="button" style={styles.rowActionButton} disabled={holdLotMutation.isPending} onClick={() => { const reason = window.prompt(ui("Why should this stock be blocked from use?")); if (reason === null) return; const trimmed = reason.trim(); if (trimmed.length < 3) { setOperationFeedback(''); setOperationError(ui("Please enter at least 3 characters for the reason.")); return; } holdLotMutation.mutate({ lotId: lot.id, reason: trimmed }); }}>{ui("Block")}</button> : lot.condition === 'hold' && lot.operational_status !== 'expired' ? <button type="button" style={styles.rowActionButton} disabled={releaseHoldMutation.isPending} onClick={() => { const reason = window.prompt(ui("Why is this stock safe to use again?")); if (reason === null) return; const trimmed = reason.trim(); if (trimmed.length < 3) { setOperationFeedback(''); setOperationError(ui("Please enter at least 3 characters for the reason.")); return; } releaseHoldMutation.mutate({ lotId: lot.id, reason: trimmed }); }}>{ui("Unblock")}</button> : lot.condition === 'quarantine' && lot.operational_status !== 'expired' ? <button type="button" style={styles.rowActionButton} disabled={releaseQuarantineMutation.isPending} onClick={() => { if (window.confirm(ui("Release this quarantined lot into usable stock?"))) releaseQuarantineMutation.mutate(lot.id); }}>{ui("Release")}</button> : lot.operational_status === 'expired' ? <span style={styles.rowSubtle}>{ui('Expired — cannot release')}</span> : '-') : '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1695,6 +1820,7 @@ export default function StockPage() {
                     <option value="all">{ui("All statuses")}</option>
                     <option value="low">{ui("Low stock")}</option>
                     <option value="reserved-risk">{ui("Low available after reservations")}</option>
+                    <option value="integrity-risk">{ui("Stock / lot mismatch")}</option>
                     <option value="healthy">{ui("Healthy")}</option>
                   </select>
                 </div>
@@ -1727,9 +1853,10 @@ export default function StockPage() {
                       const minQuantity = getEffectiveMinimum(item);
                       const reservedQuantity = toNumber(item.reserved_quantity);
                       const projectedFreeQuantity = getProjectedFreeQuantity(item);
-                      const lowStock = quantity < minQuantity;
+                      const lowStock = Math.min(quantity, getUsableLotQuantity(item)) < minQuantity;
                       const overReserved = projectedFreeQuantity < 0;
                       const lowAvailable = !lowStock && projectedFreeQuantity < minQuantity;
+                      const integrityRisk = hasStockLotDesync(item);
                       const selected = selectedRow?.id === item.id;
 
                       return (
@@ -1748,16 +1875,18 @@ export default function StockPage() {
                             </div>
                             <span
                               style={
-                                overReserved
+                                integrityRisk || overReserved
                                   ? styles.badgeError
                                   : lowStock || lowAvailable
                                     ? styles.badgeWarning
                                     : styles.badgeOk
                               }
                             >
-                              {overReserved
-                                ? ui("OVER-RESERVED")
-                                : lowStock
+                              {integrityRisk
+                                ? ui('STOCK / LOT MISMATCH')
+                                : overReserved
+                                  ? ui("OVER-RESERVED")
+                                  : lowStock
                                   ? ui("LOW STOCK")
                                   : lowAvailable
                                     ? ui("LOW AVAILABLE")
@@ -1805,9 +1934,10 @@ export default function StockPage() {
                             const minQuantity = getEffectiveMinimum(item);
                             const reservedQuantity = toNumber(item.reserved_quantity);
                             const projectedFreeQuantity = getProjectedFreeQuantity(item);
-                            const lowStock = quantity < minQuantity;
+                            const lowStock = Math.min(quantity, getUsableLotQuantity(item)) < minQuantity;
                             const overReserved = projectedFreeQuantity < 0;
                             const lowAvailable = !lowStock && projectedFreeQuantity < minQuantity;
+                            const integrityRisk = hasStockLotDesync(item);
                             const selected = selectedRow?.id === item.id;
 
                             return (
@@ -1835,16 +1965,18 @@ export default function StockPage() {
                                 <td style={styles.td}>
                                   <span
                                     style={
-                                      overReserved
+                                      integrityRisk || overReserved
                                         ? styles.badgeError
                                         : lowStock || lowAvailable
                                           ? styles.badgeWarning
                                           : styles.badgeOk
                                     }
                                   >
-                                    {overReserved
-                                      ? ui("OVER-RESERVED")
-                                      : lowStock
+                                    {integrityRisk
+                                      ? ui('STOCK / LOT MISMATCH')
+                                      : overReserved
+                                        ? ui("OVER-RESERVED")
+                                        : lowStock
                                         ? ui("LOW STOCK")
                                         : lowAvailable
                                           ? ui("LOW AVAILABLE")
@@ -1881,16 +2013,18 @@ export default function StockPage() {
                         </div>
                         <span
                           style={
-                            selectedOverReserved
+                            selectedStockLotDesync || selectedOverReserved
                               ? styles.badgeError
                               : selectedLowStock || selectedLowAvailable
                                 ? styles.badgeWarning
                                 : styles.badgeOk
                           }
                         >
-                          {selectedOverReserved
-                            ? ui("OVER-RESERVED")
-                            : selectedLowStock
+                          {selectedStockLotDesync
+                            ? ui('STOCK / LOT MISMATCH')
+                            : selectedOverReserved
+                              ? ui("OVER-RESERVED")
+                              : selectedLowStock
                               ? ui("LOW STOCK")
                               : selectedLowAvailable
                                 ? ui("LOW AVAILABLE")
@@ -1962,12 +2096,12 @@ export default function StockPage() {
                       <strong>
                         {nextQuantityPreview === null || !Number.isFinite(nextQuantityPreview)
                           ? '-'
-                          : nextQuantityPreview}
+                          : formatLocalizedNumber(nextQuantityPreview, locale)}
                       </strong>
                     </div>
                     <div style={styles.readinessRow}>
                       <span>{ui("Projected available after reservations")}</span>
-                      <strong>{projectedFreeAfterAction ?? '-'}</strong>
+                      <strong>{projectedFreeAfterAction === null ? '-' : formatLocalizedNumber(projectedFreeAfterAction, locale)}</strong>
                     </div>
                     <div style={styles.readinessRow}>
                       <span>{ui("Ledger verification")}</span>
@@ -2086,7 +2220,7 @@ export default function StockPage() {
                           type="number"
                           inputMode="decimal"
                           min={draft.action === 'consume' ? '0.0001' : '0'}
-                          step="0.01"
+                          step={selectedRow?.serial_tracking_enabled ? '1' : '0.01'}
                           value={draft.quantity}
                           onChange={(event) => {
                             const nextValue = event.target.value;
@@ -2094,7 +2228,7 @@ export default function StockPage() {
                               if (!nextValue) setCountBaseVersion(null);
                               else if (!draft.quantity && selectedRow) setCountBaseVersion(Number(selectedRow.version));
                             }
-                            setDraft((current) => ({
+                            updateDraft((current) => ({
                               ...current,
                               quantity: nextValue
                             }));
@@ -2113,10 +2247,10 @@ export default function StockPage() {
                           style={styles.input}
                           type="number"
                           inputMode="decimal"
-                          step="0.01"
+                          step={selectedRow?.serial_tracking_enabled ? '1' : '0.01'}
                           value={draft.change}
                           onChange={(event) =>
-                            setDraft((current) => ({
+                            updateDraft((current) => ({
                               ...current,
                               change: event.target.value
                             }))
@@ -2124,6 +2258,28 @@ export default function StockPage() {
                         />
                       </div>
                     )}
+
+                    {selectedRow?.serial_tracking_enabled ? (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={styles.label} htmlFor="stock-action-serials">{ui('Serial Numbers')}</label>
+                        <textarea
+                          id="stock-action-serials"
+                          style={{ ...styles.input, minHeight: 96, resize: 'vertical' }}
+                          value={draft.serial_numbers}
+                          onChange={(event) => updateDraft((current) => ({ ...current, serial_numbers: event.target.value }))}
+                          placeholder={ui('Enter or scan one serial number per line (commas also accepted)')}
+                        />
+                        <div style={styles.rowSubtle}>
+                          {draft.action === 'count'
+                            ? ui('A serial-tracked physical count requires the exact serial numbers physically present.')
+                            : draft.action === 'adjust'
+                              ? ui('Serial-tracked adjustments require one serial number for every unit added or removed.')
+                              : selectedRow.serial_required_on_issue
+                                ? ui('This product requires one serial number for every unit issued.')
+                                : ui('Serial issue evidence is optional for this product; provide serials when tracking the exact units issued.')}
+                        </div>
+                      </div>
+                    ) : null}
 
                     {actionAddsStock ? (
                       <>
@@ -2137,19 +2293,19 @@ export default function StockPage() {
                         </div>
                         <div>
                           <label style={styles.label} htmlFor="stock-action-lot">{ui("Lot Number")}{selectedRow?.requires_lot_tracking ? ' *' : ''}</label>
-                          <input id="stock-action-lot" style={styles.input} type="text" maxLength={255} value={draft.lot_number} onChange={(event) => setDraft((current) => ({ ...current, lot_number: event.target.value }))} placeholder={ui("Optional unless required")} />
+                          <input id="stock-action-lot" style={styles.input} type="text" maxLength={255} value={draft.lot_number} onChange={(event) => updateDraft((current) => ({ ...current, lot_number: event.target.value }))} placeholder={ui("Optional unless required")} />
                         </div>
                         <div>
                           <label style={styles.label} htmlFor="stock-action-batch">{ui("Batch Number")}{selectedRow?.requires_lot_tracking ? ' *' : ''}</label>
-                          <input id="stock-action-batch" style={styles.input} type="text" maxLength={255} value={draft.batch_number} onChange={(event) => setDraft((current) => ({ ...current, batch_number: event.target.value }))} placeholder={ui("Lot or batch satisfies tracking")} />
+                          <input id="stock-action-batch" style={styles.input} type="text" maxLength={255} value={draft.batch_number} onChange={(event) => updateDraft((current) => ({ ...current, batch_number: event.target.value }))} placeholder={ui("Lot or batch satisfies tracking")} />
                         </div>
                         <div>
                           <label style={styles.label} htmlFor="stock-action-expiry">{ui("Expiry Date")}{selectedRow?.requires_expiry_date ? ' *' : ''}</label>
-                          <input id="stock-action-expiry" style={styles.input} type="date" value={draft.expiry_date} onChange={(event) => setDraft((current) => ({ ...current, expiry_date: event.target.value }))} />
+                          <input id="stock-action-expiry" style={styles.input} type="date" min={getLocalIsoDate()} value={draft.expiry_date} onChange={(event) => updateDraft((current) => ({ ...current, expiry_date: event.target.value }))} />
                         </div>
                         <div>
                           <label style={styles.label} htmlFor="stock-action-manufactured">{ui("Manufactured Date")}</label>
-                          <input id="stock-action-manufactured" style={styles.input} type="date" value={draft.manufactured_at} onChange={(event) => setDraft((current) => ({ ...current, manufactured_at: event.target.value }))} />
+                          <input id="stock-action-manufactured" style={styles.input} type="date" value={draft.manufactured_at} onChange={(event) => updateDraft((current) => ({ ...current, manufactured_at: event.target.value }))} />
                         </div>
                       </>
                     ) : null}
@@ -2166,7 +2322,7 @@ export default function StockPage() {
                           maxLength={1000}
                           value={draft.reason}
                           onChange={(event) =>
-                            setDraft((current) => ({
+                            updateDraft((current) => ({
                               ...current,
                               reason: event.target.value
                             }))
@@ -2188,7 +2344,7 @@ export default function StockPage() {
                             value={draft.consumption_reason}
                             onChange={(event) => {
                               const nextReason = event.target.value as UsageReason;
-                              setDraft((current) => ({
+                              updateDraft((current) => ({
                                 ...current,
                                 consumption_reason: nextReason,
                                 reason: `usage:${nextReason}`
@@ -2214,7 +2370,7 @@ export default function StockPage() {
                             maxLength={255}
                             value={draft.department}
                             onChange={(event) =>
-                              setDraft((current) => ({
+                              updateDraft((current) => ({
                                 ...current,
                                 department: event.target.value
                               }))
@@ -2234,7 +2390,7 @@ export default function StockPage() {
                             maxLength={255}
                             value={draft.event_name}
                             onChange={(event) =>
-                              setDraft((current) => ({
+                              updateDraft((current) => ({
                                 ...current,
                                 event_name: event.target.value
                               }))
@@ -2253,7 +2409,7 @@ export default function StockPage() {
                             type="datetime-local"
                             value={draft.consumed_at}
                             onChange={(event) =>
-                              setDraft((current) => ({
+                              updateDraft((current) => ({
                                 ...current,
                                 consumed_at: event.target.value
                               }))
@@ -2271,7 +2427,7 @@ export default function StockPage() {
                             maxLength={4000}
                             value={draft.notes}
                             onChange={(event) =>
-                              setDraft((current) => ({
+                              updateDraft((current) => ({
                                 ...current,
                                 notes: event.target.value
                               }))
@@ -2300,7 +2456,7 @@ export default function StockPage() {
                       <strong>
                         {nextQuantityPreview === null || !Number.isFinite(nextQuantityPreview)
                           ? '-'
-                          : nextQuantityPreview}
+                          : formatLocalizedNumber(nextQuantityPreview, locale)}
                       </strong>
                     </div>
                     <div style={styles.previewRow}>
@@ -2309,7 +2465,7 @@ export default function StockPage() {
                     </div>
                     <div style={styles.previewRow}>
                       <span>{ui("Projected Available")}</span>
-                      <strong>{projectedFreeAfterAction ?? '-'}</strong>
+                      <strong>{projectedFreeAfterAction === null ? '-' : formatLocalizedNumber(projectedFreeAfterAction, locale)}</strong>
                     </div>
                     <div style={styles.previewRow}>
                       <span>{ui("Minimum Quantity")}</span>
@@ -2317,7 +2473,7 @@ export default function StockPage() {
                     </div>
                     <div style={styles.previewRow}>
                       <span>{ui("Operational Risk")}</span>
-                      <strong style={createsReservationShortfall || operationalRiskLabel.startsWith(ui("Warning")) ? styles.riskWarning : undefined}>
+                      <strong style={createsReservationShortfall || !actionInputValidation.valid || operationalRiskLabel.startsWith(ui("Warning")) ? styles.riskWarning : undefined}>
                         {operationalRiskLabel}
                       </strong>
                     </div>
@@ -2341,7 +2497,7 @@ export default function StockPage() {
                         type="checkbox"
                         checked={draft.reservation_shortfall_acknowledged}
                         onChange={(event) =>
-                          setDraft((current) => ({
+                          updateDraft((current) => ({
                             ...current,
                             reservation_shortfall_acknowledged: event.target.checked
                           }))
@@ -2469,17 +2625,24 @@ export default function StockPage() {
                               </div>
                               <span style={changeBadgeStyle(change)}>{changeDisplay(change, locale)}</span>
                             </div>
-                            <div style={styles.movementMetaRow}>
-                              <span style={reasonBadgeStyle(movement.movement_type || movement.reason)}>
-                                {(() => {
-                                  const presentation = getMovementReasonPresentation(movement);
-                                  return presentation.systemOwned ? ui(presentation.text) : presentation.text;
-                                })()}
-                              </span>
-                              <span style={styles.rowSubtle}>
-                                {ui("By")} {movement.user_name || ui("System / unknown user")}
-                              </span>
-                            </div>
+                            {(() => {
+                              const presentation = getMovementReasonPresentation(movement);
+                              return (
+                                <>
+                                  <div style={styles.movementMetaRow}>
+                                    <span style={reasonBadgeStyle(movement.movement_type || movement.reason)}>
+                                      {presentation.systemOwned ? ui(presentation.text) : presentation.text}
+                                    </span>
+                                    <span style={styles.rowSubtle}>
+                                      {ui("By")} {movement.user_name || ui("System / unknown user")}
+                                    </span>
+                                  </div>
+                                  {presentation.detail ? (
+                                    <div style={styles.rowSubtle}>{presentation.detail}</div>
+                                  ) : null}
+                                </>
+                              );
+                            })()}
                             {movement.shipment_po_number ? (
                               <div style={styles.rowSubtle}>
                                 {ui("Shipment PO:")} {movement.shipment_po_number}

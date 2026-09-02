@@ -402,6 +402,9 @@ export type StockItem = {
   quantity: number | string;
   min_quantity?: number | string | null;
   effective_min_quantity?: number | string | null;
+  available_lot_quantity?: number | string | null;
+  usable_lot_quantity?: number | string | null;
+  usable_free_quantity?: number | string | null;
   reserved_quantity?: number | string | null;
   allocated_quantity?: number | string | null;
   projected_free_quantity?: number | string | null;

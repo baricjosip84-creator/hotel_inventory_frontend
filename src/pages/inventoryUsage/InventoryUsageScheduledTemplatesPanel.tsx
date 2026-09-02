@@ -22,7 +22,7 @@ type Locale = Parameters<typeof formatLocalizedNumber>[1];
 
 const getStatusStyle = (status?: string) => {
   if (status === 'due') return styles.warningPill;
-  if (status === 'insufficient_stock' || status === 'reserved_stock' || status === 'missing_stock' || status === 'missing_evidence_acknowledgement_required' || status === 'empty') return styles.dangerPill;
+  if (status === 'insufficient_stock' || status === 'insufficient_usable_lot_stock' || status === 'stock_lot_desync' || status === 'reserved_stock' || status === 'missing_stock' || status === 'missing_evidence_acknowledgement_required' || status === 'empty') return styles.dangerPill;
   if (status === 'ready_with_warnings') return styles.warningPill;
   if (status === 'scheduled') return styles.successPill;
   return styles.filterPill;
@@ -34,6 +34,10 @@ const formatScheduleStatus = (status: string | null | undefined, ui: Ui): string
       return ui('Blocked by reservations');
     case 'insufficient_stock':
       return ui('Insufficient stock');
+    case 'insufficient_usable_lot_stock':
+      return ui('Not enough usable lot stock');
+    case 'stock_lot_desync':
+      return ui('Stock / lot mismatch');
     case 'missing_stock':
       return ui('Missing stock');
     case 'missing_evidence_acknowledgement_required':
@@ -128,7 +132,13 @@ export function InventoryUsageScheduledTemplatesPanel({ scheduled, loading, erro
       ) : (
         <div style={styles.templateList}>
           {rows.map((row) => {
-            const blockedCount = toNumber(row.insufficient_stock_count) + toNumber(row.reserved_stock_count) + toNumber(row.missing_stock_row_count);
+            const stockLotDesyncCount = toNumber(row.stock_lot_desync_count);
+            const insufficientUsableLotStockCount = toNumber(row.insufficient_usable_lot_stock_count);
+            const blockedCount = toNumber(row.insufficient_stock_count)
+              + stockLotDesyncCount
+              + insufficientUsableLotStockCount
+              + toNumber(row.reserved_stock_count)
+              + toNumber(row.missing_stock_row_count);
             const lineCount = toNumber(row.line_count);
 
             return (
@@ -149,6 +159,12 @@ export function InventoryUsageScheduledTemplatesPanel({ scheduled, loading, erro
                     <span style={styles.dangerPill}>
                       {formatLocalizedNumber(blockedCount, locale)} {ui('blocked lines')}
                     </span>
+                    {stockLotDesyncCount > 0 ? (
+                      <span style={styles.dangerPill}>{formatLocalizedNumber(stockLotDesyncCount, locale)} {ui('Stock / lot mismatch')}</span>
+                    ) : null}
+                    {insufficientUsableLotStockCount > 0 ? (
+                      <span style={styles.dangerPill}>{formatLocalizedNumber(insufficientUsableLotStockCount, locale)} {ui('Not enough usable lot stock')}</span>
+                    ) : null}
                     {toNumber(row.reserved_stock_count) > 0 ? (
                       <span style={styles.dangerPill}>{formatLocalizedNumber(toNumber(row.reserved_stock_count), locale)} {ui('use reserved stock')}</span>
                     ) : null}

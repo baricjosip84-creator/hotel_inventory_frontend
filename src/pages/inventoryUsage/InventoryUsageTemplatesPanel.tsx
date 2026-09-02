@@ -276,8 +276,12 @@ export function InventoryUsageTemplatesPanel({
                 const readiness = templateReadinessById[template.id];
                 const canRecord = readiness?.summary?.can_record !== false;
                 const reservedStockCount = toNumber(readiness?.summary?.reserved_stock_count);
+                const stockLotDesyncCount = toNumber(readiness?.summary?.stock_lot_desync_count);
+                const insufficientUsableLotStockCount = toNumber(readiness?.summary?.insufficient_usable_lot_stock_count);
                 const blockedCount = toNumber(readiness?.summary?.missing_stock_row_count)
                   + toNumber(readiness?.summary?.insufficient_stock_count)
+                  + stockLotDesyncCount
+                  + insufficientUsableLotStockCount
                   + reservedStockCount;
                 const warningCount = toNumber(readiness?.summary?.below_minimum_after_use_count);
                 const evidenceAcknowledgementCount = toNumber(readiness?.summary?.evidence_acknowledgement_required_count);
@@ -300,6 +304,8 @@ export function InventoryUsageTemplatesPanel({
                           {canRecord ? ui('Stock-ready') : ui('Blocked by stock')}
                         </span>
                         {blockedCount > 0 ? <span style={styles.dangerPill}>{formatLocalizedNumber(blockedCount, locale)} {ui('blocked lines')}</span> : null}
+                        {stockLotDesyncCount > 0 ? <span style={styles.dangerPill}>{formatLocalizedNumber(stockLotDesyncCount, locale)} {ui('Stock / lot mismatch')}</span> : null}
+                        {insufficientUsableLotStockCount > 0 ? <span style={styles.dangerPill}>{formatLocalizedNumber(insufficientUsableLotStockCount, locale)} {ui('Not enough usable lot stock')}</span> : null}
                         {reservedStockCount > 0 ? <span style={styles.dangerPill}>{formatLocalizedNumber(reservedStockCount, locale)} {ui('use reserved stock')}</span> : null}
                         {warningCount > 0 ? <span style={styles.warningPill}>{formatLocalizedNumber(warningCount, locale)} {ui('below min after use')}</span> : null}
                         {evidenceAcknowledgementCount > 0 ? <span style={styles.warningPill}>{formatLocalizedNumber(evidenceAcknowledgementCount, locale)} {ui('evidence acknowledgements')}</span> : null}

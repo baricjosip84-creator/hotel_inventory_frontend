@@ -41,14 +41,15 @@ export function buildAlertsSummary(alerts: AlertItem[]) {
 }
 
 export function buildStockRiskSummary(lowStockItems: StockItem[]) {
-  const critical = lowStockItems.filter((item) => toNumber(item.quantity) <= 0).length;
-  const shortageUnits = lowStockItems.reduce((total, item) => {
-    const threshold = toNumber(item.product_min_stock ?? item.min_quantity);
-    const quantity = toNumber(item.quantity);
-    return total + Math.max(threshold - quantity, 0);
-  }, 0);
+  const operationalQuantity = (item: StockItem) => Math.min(
+    toNumber(item.quantity),
+    item.usable_lot_quantity === undefined || item.usable_lot_quantity === null
+      ? toNumber(item.quantity)
+      : toNumber(item.usable_lot_quantity)
+  );
+  const critical = lowStockItems.filter((item) => operationalQuantity(item) <= 0).length;
 
-  return { critical, shortageUnits };
+  return { critical, shortagePositions: lowStockItems.length };
 }
 
 export function buildStockTransferSummary(stockTransfers: StockTransfer[]) {

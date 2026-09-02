@@ -1064,9 +1064,9 @@ export function InventoryUsageDashboard({
                   </strong>
                 </div>
                 <div style={styles.governanceCard}>
-                  <span>{ui("Recommended reorder")}</span>
+                  <span>{ui("Reorder positions")}</span>
                   <strong>
-                    {formatNumber(impact.summary?.recommended_reorder_quantity)}
+                    {formatNumber(impact.summary?.recommended_reorder_position_count, 0)}
                   </strong>
                 </div>
               </div>

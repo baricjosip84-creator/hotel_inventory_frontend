@@ -12,8 +12,12 @@ type BarcodePolicyErrorDetails = {
   storage_location_id?: string | null;
   storage_location_name?: string | null;
   current_quantity?: number | string | null;
+  available_lot_quantity?: number | string | null;
+  usable_lot_quantity?: number | string | null;
+  operational_quantity?: number | string | null;
   reserved_quantity?: number | string | null;
   resulting_quantity?: number | string | null;
+  resulting_usable_lot_quantity?: number | string | null;
   resulting_available_quantity?: number | string | null;
   minimum_quantity?: number | string | null;
   blocking_reasons?: string[];
@@ -93,6 +97,10 @@ const formatPolicyReason = (reason: string, ui: (text: string) => string) => {
       return ui('No stock row exists at the selected location');
     case 'insufficient_stock':
       return ui('The scan would make stock negative');
+    case 'stock_lot_desync':
+      return ui('Aggregate stock and available lot balances do not reconcile');
+    case 'insufficient_usable_lot_stock':
+      return ui('There is not enough non-expired available lot stock');
     case 'reserved_stock':
       return ui('The scan would use stock reserved for active commitments');
     case 'critical_alert':
@@ -369,6 +377,10 @@ export function InventoryUsageQuickConsumePanel({
   );
 
   const insufficientStockBlocksSubmit = previewBlockingReasons.includes('insufficient_stock');
+  const stockLotDesyncBlocksSubmit = previewBlockingReasons.includes('stock_lot_desync');
+  const insufficientUsableLotStockBlocksSubmit = previewBlockingReasons.includes('insufficient_usable_lot_stock');
+  const reservedStockBlocksSubmit = previewBlockingReasons.includes('reserved_stock');
+  const policyBlocksSubmit = previewBlockingReasons.length > 0;
 
   const activePreviewRisk = previewAcknowledgementReasons.includes('stock_risk');
   const previewRequiresEvidenceAcknowledgement = previewAcknowledgementReasons.includes('missing_evidence');
@@ -386,10 +398,7 @@ export function InventoryUsageQuickConsumePanel({
     && packageCount > 0
     && !recording
     && (!requiresFreshPreview || previewMatchesDraft)
-    && !criticalAlertBlocksSubmit
-    && !closedPeriodBlocksSubmit
-    && !missingStockRowBlocksSubmit
-    && !insufficientStockBlocksSubmit
+    && !policyBlocksSubmit
     && (!activePreviewRisk || riskAcknowledged)
     && (!requiresMissingEvidenceAcknowledgement || missingEvidenceAcknowledged)
     && (!previewRequiresEvidenceAcknowledgement || missingEvidenceAcknowledged);
@@ -437,6 +446,18 @@ export function InventoryUsageQuickConsumePanel({
 
     if (insufficientStockBlocksSubmit) {
       return ui('Quick consume is blocked because the requested quantity exceeds available stock.');
+    }
+
+    if (stockLotDesyncBlocksSubmit) {
+      return ui('Quick consume is blocked because aggregate stock and available lot balances do not reconcile.');
+    }
+
+    if (insufficientUsableLotStockBlocksSubmit) {
+      return ui('Quick consume is blocked because there is not enough non-expired available lot stock.');
+    }
+
+    if (reservedStockBlocksSubmit) {
+      return ui('Quick consume is blocked because the requested quantity would use stock reserved for active commitments.');
     }
 
     if ((activePreviewRisk && !riskAcknowledged) || (previewRequiresEvidenceAcknowledgement && !missingEvidenceAcknowledged) || (requiresMissingEvidenceAcknowledgement && !missingEvidenceAcknowledged)) {
@@ -891,12 +912,19 @@ export function InventoryUsageQuickConsumePanel({
             {formatBarcodeTraceability(previewResult.barcode_match, ui, locale) ? ` ${formatBarcodeTraceability(previewResult.barcode_match, ui, locale)}.` : ''}
             {previewResult.preview.storage_location_name ? ` ${ui("Location:")} ${previewResult.preview.storage_location_name}.` : ""}
             {ui("Current stock ")}{formatNumber(previewResult.preview.current_quantity)} {ui("→ projected ")}{formatNumber(previewResult.preview.resulting_quantity)}.
+            {previewResult.preview.usable_lot_quantity !== undefined ? ` ${ui("Usable non-expired lot stock")}: ${formatNumber(previewResult.preview.usable_lot_quantity)}.` : ''}
           </p>
           {missingStockRowBlocksSubmit ? (
             <p style={styles.errorText}>{ui("No stock row exists for this product at ")}{previewResult.preview.storage_location_name || ui('the selected location')}{ui(". Create or receive stock at this location before recording barcode quick consume.")}</p>
           ) : null}
           {insufficientStockBlocksSubmit ? (
             <p style={styles.errorText}>{ui("This scan would make stock negative at the selected location. Receive stock, reduce package count, or choose another location before recording.")}</p>
+          ) : null}
+          {stockLotDesyncBlocksSubmit ? (
+            <p style={styles.errorText}>{ui("Aggregate stock and available lot balances do not reconcile at this location. Reconcile Stock before recording barcode quick consume.")}</p>
+          ) : null}
+          {insufficientUsableLotStockBlocksSubmit ? (
+            <p style={styles.errorText}>{ui("The aggregate quantity includes stock that is not usable for issue, such as expired lots. There is not enough non-expired available lot stock for this scan.")}</p>
           ) : null}
           {hasStalePreview ? (
             <p style={styles.warningText}>{ui("Preview is stale because barcode, location, package count, consumed-at timestamp, reason, or evidence metadata changed. Preview again before recording.")}</p>

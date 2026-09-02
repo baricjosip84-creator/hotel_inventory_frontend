@@ -68,13 +68,13 @@ export function OperationsDashboardTab({
         <DataTable
           loading={currentStockLoading}
           empty="No current stock rows returned."
-          headers={['Product', 'Location', 'On hand', 'Reserved', 'Free', 'Min', 'Updated']}
+          headers={['Product', 'Location', 'On hand', 'Reserved', 'Usable free', 'Min', 'Updated']}
           rows={currentStockRows.map((item) => [
-            item.product_name || item.product_id,
-            item.storage_location_name || item.storage_location_id,
+            item.product_name || '-',
+            item.storage_location_name || '-',
             `${formatNumber(item.quantity)} ${item.product_unit || ''}`.trim(),
             formatNumber(item.reserved_quantity ?? 0),
-            `${formatNumber(item.projected_free_quantity ?? item.quantity)} ${item.product_unit || ''}`.trim(),
+            `${formatNumber(item.usable_free_quantity ?? item.projected_free_quantity ?? item.quantity)} ${item.product_unit || ''}`.trim(),
             formatNumber(item.effective_min_quantity ?? item.min_quantity ?? item.product_min_stock),
             formatDateTime(item.updated_at)
           ])}
@@ -88,8 +88,8 @@ export function OperationsDashboardTab({
             empty="No dashboard low-stock rows."
             headers={['Product', 'Location', 'Qty', 'Min', 'Shortage', 'Updated']}
             rows={lowStockRows.map((item) => [
-              item.product_name || item.product_id,
-              item.storage_location_name || item.storage_location_id,
+              item.product_name || '-',
+              item.storage_location_name || '-',
               formatNumber(item.quantity),
               formatNumber(item.min_stock ?? item.product_min_stock ?? item.min_quantity),
               formatNumber(item.shortage),
