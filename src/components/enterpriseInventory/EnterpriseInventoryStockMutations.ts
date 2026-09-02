@@ -186,6 +186,10 @@ export function useEnterpriseInventoryStockMutations(
       "enterprise-stock-transfers",
       "enterprise-stock-transfer-drafts-all",
       "enterprise-stock-transfer-summary",
+      "enterprise-stock-transfer-location-options",
+      "enterprise-stock-transfer-options",
+      "stock-transfer-uom",
+      "stock-transfer-serials",
       "enterprise-stock-overview",
       "enterprise-low-stock",
       "enterprise-stock-movements",
@@ -197,7 +201,7 @@ export function useEnterpriseInventoryStockMutations(
   const cancelStockTransferMutation = useMutation({
     mutationFn: (input: { id: string; version: number | string }) =>
       postEnterpriseInventoryRequest<StockTransfer>(
-        `/stock-transfers/${input.id}/cancel`,
+        `/stock-transfers/${input.id}/cancel-from-enterprise-inventory`,
         buildStockTransferCancelPayload(input.version),
       ),
     onSuccess: mutationFeedback.invalidating(ui("Transfer cancelled successfully."), [

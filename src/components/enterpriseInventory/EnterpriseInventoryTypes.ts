@@ -1167,6 +1167,8 @@ export type StockTransfer = {
   to_storage_location_name?: string | null;
   status: string;
   notes?: string | null;
+  cancellation_reason?: string | null;
+  cancellation_reason_is_system?: boolean;
   created_by_user_name?: string | null;
   executed_by_user_name?: string | null;
   created_at: string;

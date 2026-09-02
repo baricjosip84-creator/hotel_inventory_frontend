@@ -289,7 +289,7 @@ export function buildAutomationDisablePayload(reason: string): Record<string, un
 }
 
 export function buildStockTransferCancelPayload(version: number | string): Record<string, unknown> {
-  return { version: Number(version), reason: 'cancelled_from_enterprise_inventory_ui' };
+  return { version: Number(version) };
 }
 
 export function buildPurchaseOrderShipmentPayload(input: PurchaseOrderShipmentForm): Record<string, unknown> {

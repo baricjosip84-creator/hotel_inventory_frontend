@@ -14,7 +14,7 @@ import { styles } from "./EnterpriseInventoryStyles";
 import { useAppTranslation } from '../../i18n/I18nContext';
 import { EnterpriseInventoryTabs } from "./EnterpriseInventoryTabs";
 import {
-  enterpriseInventoryPrimaryWritePermissions,
+  enterpriseInventoryActionPermissionGroups,
   enterpriseInventoryTabFeatures,
   enterpriseInventoryTabIconPaths,
   enterpriseInventoryTabs,
@@ -56,8 +56,10 @@ export function EnterpriseInventoryPageLayout({
   const activeConfig = visibleTabs.find(([key]) => key === activeTab);
   const activeKey = activeConfig?.[0] as EnterpriseInventoryTabKey | undefined;
   const activeLabel = ui(activeConfig?.[1] ?? 'None');
-  const activeWritePermission = activeKey ? enterpriseInventoryPrimaryWritePermissions[activeKey] : undefined;
-  const canWriteActiveArea = activeWritePermission ? hasPermission(activeWritePermission) : false;
+  const activeActionPermissionGroups = activeKey ? enterpriseInventoryActionPermissionGroups[activeKey] : undefined;
+  const canWriteActiveArea = activeActionPermissionGroups
+    ? activeActionPermissionGroups.some((group) => group.every((permission) => hasPermission(permission)))
+    : false;
 
   return (
     <div className="inventory-controls-page io-operational-page io-workspace-page" style={styles.page}>

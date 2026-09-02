@@ -3,7 +3,7 @@ import type { CSSProperties, FormEvent } from 'react';
 import { useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
-import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
+import { getCurrentAccessRoleLabel, getRoleCapabilities, hasAllPermissions, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
@@ -22,7 +22,9 @@ type StockTransferListItem = {
   to_storage_location_name?: string | null;
   status: StockTransferStatus;
   notes?: string | null;
+  notes_is_system?: boolean | null;
   cancellation_reason?: string | null;
+  cancellation_reason_is_system?: boolean;
   created_by_user_name?: string | null;
   executed_by_user_name?: string | null;
   cancelled_by_user_name?: string | null;
@@ -45,6 +47,7 @@ type StockTransferDetailItem = {
   product_unit_snapshot?: string | null;
   serial_numbers?: string[];
   serial_tracking_enabled?: boolean | null;
+  serial_tracking_enabled_snapshot?: boolean | null;
 };
 
 type StockTransferDetail = StockTransferListItem & {
@@ -74,6 +77,7 @@ type StockTransferAvailabilityItem = {
   unit_evidence_complete?: boolean;
   unit_changed_since_draft?: boolean;
   locations_active?: boolean;
+  source_location_eligible?: boolean;
   requested_quantity: number | string;
   on_hand_quantity: number | string;
   reserved_quantity: number | string;
@@ -84,9 +88,11 @@ type StockTransferAvailabilityItem = {
   selected_serial_count?: number | string;
   required_serial_count?: number | string;
   serial_evidence_complete?: boolean;
+  serial_tracking_evidence_complete?: boolean;
+  serial_tracking_changed_since_draft?: boolean;
   serials_available?: boolean;
-  available_quantity: number | string;
-  remaining_after_transfer: number | string;
+  available_quantity: number | string | null;
+  remaining_after_transfer: number | string | null;
   sufficient: boolean;
 };
 
@@ -114,6 +120,7 @@ type TransferOptionProduct = {
   on_hand_quantity?: number | string | null;
   reserved_quantity?: number | string | null;
   available_quantity?: number | string | null;
+  stock_lot_reconciled?: boolean | null;
   transferable?: boolean | null;
   serial_tracking_enabled?: boolean;
 };
@@ -178,6 +185,11 @@ function formatNumber(value: number | string | null | undefined, locale: AppLoca
   return formatLocalizedNumber(parsed, locale, { maximumFractionDigits: 4 });
 }
 
+function formatAvailabilityEvidence(value: number | string | null | undefined, locale: AppLocale, ui: (text: string) => string): string {
+  if (value === null || value === undefined || value === '') return ui('Unavailable');
+  return formatNumber(value, locale);
+}
+
 function formatReadableText(value: string | null | undefined): string {
   if (!value) return 'Not recorded';
   return value
@@ -197,15 +209,15 @@ function getMovementTypeLabel(movement: StockTransferMovement): string {
   return formatReadableText(movement.movement_type || 'Transfer movement');
 }
 
-function formatCancellationReason(value: string | null | undefined): string {
+function formatCancellationReason(value: string | null | undefined, isSystemOwned = false): string {
   if (!value) return 'Not recorded';
   const trimmed = value.trim();
-  if (/^cancelled_from_enterprise_inventory_ui$/i.test(trimmed)) return 'Cancelled from Enterprise Inventory';
+  if (isSystemOwned && /^cancelled_from_enterprise_inventory_ui$/i.test(trimmed)) return 'Cancelled from Enterprise Inventory';
   return trimmed;
 }
 
-function displayCancellationReason(value: string | null | undefined, ui: (text: string) => string): string {
-  const reason = formatCancellationReason(value);
+function displayCancellationReason(value: string | null | undefined, isSystemOwned: boolean | undefined, ui: (text: string) => string): string {
+  const reason = formatCancellationReason(value, isSystemOwned === true);
   return reason === 'Cancelled from Enterprise Inventory' ? ui(reason) : reason;
 }
 
@@ -219,6 +231,13 @@ function historicalName(value: string | null | undefined, ui: (text: string) => 
   if (kind === 'product') return ui('Historical product unavailable');
   if (kind === 'unit') return ui('Historical unit unavailable');
   return ui('Historical actor unavailable');
+}
+
+function displayProductCategory(item: StockTransferDetailItem, status: StockTransferStatus, ui: (text: string) => string): string {
+  const category = item.product_category?.trim();
+  if (category) return category;
+  if (status === 'draft' || item.product_name?.trim()) return ui('Not categorized');
+  return ui('Historical category unavailable');
 }
 
 function displayTransferActor(value: string | null | undefined, status: StockTransferStatus, ui: (text: string) => string): string {
@@ -240,6 +259,7 @@ function displayMovementActor(value: string | null | undefined, transferActor: s
 function getAvailabilityItemStatusLabel(item: StockTransferAvailabilityItem, ui: (text: string) => string): string {
   if (item.sufficient) return ui('Ready');
   if (item.locations_active === false) return ui('Location unavailable');
+  if (item.source_location_eligible === false) return ui('Source location not eligible');
   if (item.product_active === false) return ui('Product unavailable');
   if (item.unit_evidence_complete === false || item.unit_changed_since_draft) return ui('Review unit');
   if (item.serial_tracking_evidence_complete === false || item.serial_tracking_changed_since_draft) return ui('Review serial tracking');
@@ -271,23 +291,23 @@ function displayHistoricalSerialEvidence(item: StockTransferDetailItem, ui: (tex
   return serials.length ? serials.join(', ') : ui('Historical serial-tracking evidence unavailable');
 }
 
-function getDisplayNotes(transfer: Pick<StockTransferListItem, 'notes' | 'cancellation_reason'>): string | null {
-  const notes = transfer.notes?.trim();
+function getDisplayNotes(transfer: Pick<StockTransferListItem, 'notes' | 'notes_is_system' | 'cancellation_reason'>): string | null {
+  const notes = String(transfer.notes || '').trim();
   if (!notes) return null;
-
-  const escapedReason = transfer.cancellation_reason
-    ? transfer.cancellation_reason.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const cancellationReason = String(transfer.cancellation_reason || '').trim();
+  const escapedReason = cancellationReason
+    ? cancellationReason.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     : null;
   const withoutCancellation = escapedReason
     ? notes.replace(new RegExp(String.raw`(?:\r?\n)?Cancelled:\s*${escapedReason}\s*$`, 'i'), '').trim()
     : notes;
-  const cleaned = sanitizeKnownSystemTransferNote(withoutCancellation);
+  const cleaned = transfer.notes_is_system ? sanitizeKnownSystemTransferNote(withoutCancellation) : withoutCancellation;
   return cleaned || null;
 }
 
-function displayTransferNotes(transfer: Pick<StockTransferListItem, 'notes' | 'cancellation_reason'>, ui: (text: string) => string): string | null {
+function displayTransferNotes(transfer: Pick<StockTransferListItem, 'notes' | 'notes_is_system' | 'cancellation_reason'>, ui: (text: string) => string): string | null {
   const notes = getDisplayNotes(transfer);
-  return notes === REPLENISHMENT_TRANSFER_NOTE ? ui(notes) : notes;
+  return transfer.notes_is_system && notes === REPLENISHMENT_TRANSFER_NOTE ? ui(notes) : notes;
 }
 
 
@@ -370,6 +390,10 @@ async function fetchTransferOptions(sourceStorageLocationId = ''): Promise<Trans
   return apiRequest<TransferOptions>(`/stock-transfers/options${suffix}`);
 }
 
+async function fetchTransferFilterOptions(): Promise<TransferOptions> {
+  return apiRequest<TransferOptions>('/stock-transfers/filter-options');
+}
+
 async function fetchTransferById(id: string): Promise<StockTransferDetail> {
   return apiRequest<StockTransferDetail>(`/stock-transfers/${id}`);
 }
@@ -449,6 +473,16 @@ export default function StockTransfersPage() {
     canExecuteStockTransfers,
     canCancelStockTransfers
   } = getRoleCapabilities();
+  const hasTransferOperationalReads = hasAllPermissions([
+    TENANT_PERMISSIONS.STOCK_READ,
+    TENANT_PERMISSIONS.PRODUCTS_READ,
+    TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ
+  ]);
+  const canLoadTransferOperationalOptions = hasTransferOperationalReads && (canCreateStockTransfers || canUpdateStockTransfers);
+  const canCreateStockTransfersOperationally = canCreateStockTransfers && hasTransferOperationalReads;
+  const canUpdateStockTransfersOperationally = canUpdateStockTransfers && hasTransferOperationalReads;
+  const canReadCurrentStock = hasPermission(TENANT_PERMISSIONS.STOCK_READ);
+  const canExecuteStockTransfersOperationally = canExecuteStockTransfers && canReadCurrentStock;
   const accessRoleLabel = getCurrentAccessRoleLabel();
 
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') || '');
@@ -547,15 +581,21 @@ export default function StockTransfersPage() {
     queryFn: () => fetchTransferSummary(transferFilters)
   });
 
+  const transferFilterOptionsQuery = useQuery({
+    queryKey: ['stock-transfer-filter-options'],
+    queryFn: fetchTransferFilterOptions
+  });
+
   const transferOptionsQuery = useQuery({
     queryKey: ['stock-transfer-options'],
-    queryFn: () => fetchTransferOptions()
+    queryFn: () => fetchTransferOptions(),
+    enabled: canLoadTransferOperationalOptions
   });
 
   const sourceOptionsQuery = useQuery({
     queryKey: ['stock-transfer-options', form.from_storage_location_id],
     queryFn: () => fetchTransferOptions(form.from_storage_location_id),
-    enabled: Boolean(form.from_storage_location_id)
+    enabled: Boolean(canLoadTransferOperationalOptions && form.from_storage_location_id)
   });
 
   const transferDetailQuery = useQuery({
@@ -573,16 +613,18 @@ export default function StockTransfersPage() {
   const transferAvailabilityQuery = useQuery({
     queryKey: ['stock-transfer-availability', selectedTransferId],
     queryFn: () => fetchTransferAvailability(selectedTransferId as string),
-    enabled: Boolean(selectedTransferId && transferDetailQuery.data?.status === 'draft')
+    enabled: Boolean(selectedTransferId && transferDetailQuery.data?.status === 'draft' && canReadCurrentStock)
   });
 
   const transfers = useMemo(() => transfersQuery.data ?? [], [transfersQuery.data]);
   const options = transferOptionsQuery.data;
   const locations = useMemo(() => options?.locations ?? [], [options]);
   const products = useMemo(() => options?.products ?? [], [options]);
+  const filterLocations = useMemo(() => transferFilterOptionsQuery.data?.locations ?? [], [transferFilterOptionsQuery.data]);
+  const filterProducts = useMemo(() => transferFilterOptionsQuery.data?.products ?? [], [transferFilterOptionsQuery.data]);
   const sourceProducts = useMemo(
-    () => sourceOptionsQuery.data?.products ?? products,
-    [sourceOptionsQuery.data, products]
+    () => form.from_storage_location_id ? (sourceOptionsQuery.data?.products ?? []) : products,
+    [form.from_storage_location_id, sourceOptionsQuery.data, products]
   );
   const sourceProductById = useMemo(
     () => new Map(sourceProducts.map((product) => [product.id, product])),
@@ -598,7 +640,10 @@ export default function StockTransfersPage() {
   const selectedTransfer = transferDetailQuery.data;
   const selectedTransferMovements = transferMovementsQuery.data ?? [];
   const selectedTransferAvailability = transferAvailabilityQuery.data;
-  const canWriteTransferForm = editingTransferId ? canUpdateStockTransfers : canCreateStockTransfers;
+  const selectedTransferAuditExportReady = Boolean(
+    selectedTransfer && (selectedTransfer.status !== 'executed' || transferMovementsQuery.isSuccess)
+  );
+  const canWriteTransferForm = editingTransferId ? canUpdateStockTransfersOperationally : canCreateStockTransfersOperationally;
   const selectedVisible = selectedTransferId ? transfers.some((transfer) => transfer.id === selectedTransferId) : false;
   const hasActiveFilters = Boolean(
     statusFilter || searchInput.trim() || fromLocationFilter || toLocationFilter || productFilter
@@ -617,6 +662,7 @@ export default function StockTransfersPage() {
       setError(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock-transfers'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-transfer-filter-options'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-transfers-summary'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-transfer', transfer.id] })
       ]);
@@ -638,6 +684,7 @@ export default function StockTransfersPage() {
       setError(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock-transfers'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-transfer-filter-options'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-transfers-summary'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-transfer', transfer.id] }),
         queryClient.invalidateQueries({ queryKey: ['stock-transfer-availability', transfer.id] })
@@ -657,6 +704,7 @@ export default function StockTransfersPage() {
       setError(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock-transfers'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-transfer-filter-options'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-transfers-summary'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-transfer', result.transfer.id] }),
         queryClient.invalidateQueries({ queryKey: ['stock-transfer-movements', result.transfer.id] }),
@@ -682,6 +730,7 @@ export default function StockTransfersPage() {
       setError(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock-transfers'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-transfer-filter-options'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-transfers-summary'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-transfer', result.transfer.id] })
       ]);
@@ -747,8 +796,13 @@ export default function StockTransfersPage() {
   const validateForm = (): string | null => {
     if (editingTransferId && !canUpdateStockTransfers) return ui('Your current role cannot update stock transfer drafts.');
     if (!editingTransferId && !canCreateStockTransfers) return ui('Your current role cannot create stock transfers.');
+    if (!hasTransferOperationalReads) return ui('Your current role cannot access the product, location, and stock information required to create or edit stock transfers.');
+    if (transferOptionsQuery.isLoading) return ui('Checking stock transfer locations and products…');
+    if (transferOptionsQuery.isError) return ui('Stock transfer operational information is unavailable. Try again before creating or editing a transfer.');
     if (!form.from_storage_location_id || !form.to_storage_location_id) return ui('Select both source and destination storage locations.');
     if (form.from_storage_location_id === form.to_storage_location_id) return ui('Source and destination storage locations must be different.');
+    if (sourceOptionsQuery.isLoading) return ui('Checking products and stock at the selected source location…');
+    if (sourceOptionsQuery.isError) return ui('Product and stock information is unavailable for the selected source location. Try again before creating or editing a transfer.');
     if (!form.items.length) return ui('Add at least one product to the transfer.');
 
     const usedProducts = new Set<string>();
@@ -761,6 +815,7 @@ export default function StockTransfersPage() {
       if (!Number.isFinite(quantity) || quantity <= 0) return ui('Every transfer item quantity must be greater than zero.');
 
       const sourceProduct = sourceProductById.get(item.product_id);
+      if (sourceProduct?.stock_lot_reconciled === false) return ui('Source stock and lot balances do not reconcile for one or more transfer items');
       const selectedUom = item.uom_code.trim().toUpperCase();
       const baseUom = String(sourceProduct?.unit || '').trim().toUpperCase();
       const quantityIsInBaseUnit = !selectedUom || !baseUom || selectedUom === baseUom;
@@ -820,12 +875,13 @@ export default function StockTransfersPage() {
       const tasks: Array<Promise<unknown>> = [
         transfersQuery.refetch(),
         transferSummaryQuery.refetch(),
-        transferOptionsQuery.refetch()
+        transferFilterOptionsQuery.refetch()
       ];
-      if (form.from_storage_location_id) tasks.push(sourceOptionsQuery.refetch());
+      if (canLoadTransferOperationalOptions) tasks.push(transferOptionsQuery.refetch());
+      if (canLoadTransferOperationalOptions && form.from_storage_location_id) tasks.push(sourceOptionsQuery.refetch());
       if (selectedTransferId) tasks.push(transferDetailQuery.refetch());
       if (selectedTransfer?.status === 'executed') tasks.push(transferMovementsQuery.refetch());
-      if (selectedTransfer?.status === 'draft') tasks.push(transferAvailabilityQuery.refetch());
+      if (selectedTransfer?.status === 'draft' && canReadCurrentStock) tasks.push(transferAvailabilityQuery.refetch());
       await Promise.all(tasks);
       setMessage(ui('Stock transfer information refreshed.'));
     } catch (refreshError) {
@@ -858,7 +914,7 @@ export default function StockTransfersPage() {
         historicalName(transfer.to_storage_location_name, ui, 'location'),
         Number(transfer.item_count ?? 0), transfer.created_at, displayTransferActor(transfer.created_by_user_name, transfer.status, ui),
         transfer.executed_at ?? '', transfer.executed_at ? displayTransferActor(transfer.executed_by_user_name, transfer.status, ui) : '', transfer.cancelled_at ?? '', transfer.cancelled_at ? displayTransferActor(transfer.cancelled_by_user_name, transfer.status, ui) : '',
-        transfer.cancellation_reason ? displayCancellationReason(transfer.cancellation_reason, ui) : '', displayTransferNotes(transfer, ui) ?? ''
+        transfer.cancellation_reason ? displayCancellationReason(transfer.cancellation_reason, transfer.cancellation_reason_is_system, ui) : '', displayTransferNotes(transfer, ui) ?? ''
       ])];
       const stamp = new Date().toISOString().slice(0, 10);
       downloadCsv(`stock-transfers-filtered-${stamp}.csv`, rows);
@@ -903,6 +959,11 @@ export default function StockTransfersPage() {
 
   const exportSelectedTransferDetailCsv = () => {
     if (!selectedTransfer) return;
+    if (selectedTransfer.status === 'executed' && !transferMovementsQuery.isSuccess) {
+      setError(transferMovementsQuery.isError ? ui('Failed to load the transfer movement audit.') : ui('Loading transfer movements…'));
+      setMessage(null);
+      return;
+    }
     const transferRows: unknown[][] = [
       [ui('Status'), ui(formatReadableText(selectedTransfer.status))],
       [ui('From Location'), historicalName(selectedTransfer.from_storage_location_name, ui, 'location')],
@@ -910,24 +971,31 @@ export default function StockTransfersPage() {
       [ui('Created At'), selectedTransfer.created_at], [ui('Created By'), displayTransferActor(selectedTransfer.created_by_user_name, selectedTransfer.status, ui)],
       [ui('Executed At'), selectedTransfer.executed_at ?? ''], [ui('Executed By'), selectedTransfer.executed_at ? displayTransferActor(selectedTransfer.executed_by_user_name, selectedTransfer.status, ui) : ''],
       [ui('Cancelled At'), selectedTransfer.cancelled_at ?? ''], [ui('Cancelled By'), selectedTransfer.cancelled_at ? displayTransferActor(selectedTransfer.cancelled_by_user_name, selectedTransfer.status, ui) : ''],
-      [ui('Cancellation Reason'), selectedTransfer.cancellation_reason ? displayCancellationReason(selectedTransfer.cancellation_reason, ui) : ''],
+      [ui('Cancellation Reason'), selectedTransfer.cancellation_reason ? displayCancellationReason(selectedTransfer.cancellation_reason, selectedTransfer.cancellation_reason_is_system, ui) : ''],
       [ui('Notes'), displayTransferNotes(selectedTransfer, ui) ?? ''], [], [ui('Items')],
       [ui('Product'), ui('Category'), ui('Base quantity'), ui('Base unit'), ui('Entered quantity'), ui('Entered unit'), ui('Serial numbers')],
-      ...selectedTransfer.items.map((item) => [historicalName(item.product_name, ui, 'product'), item.product_category ?? '', Number(item.quantity), historicalName(item.product_unit, ui, 'unit'), item.entered_quantity ?? item.quantity, item.uom_code || item.product_unit || '', (item.serial_numbers || []).join(', ')])
+      ...selectedTransfer.items.map((item) => [historicalName(item.product_name, ui, 'product'), displayProductCategory(item, selectedTransfer.status, ui), Number(item.quantity), historicalName(item.product_unit, ui, 'unit'), item.entered_quantity ?? item.quantity, item.uom_code || item.product_unit || '', (item.serial_numbers || []).join(', ')])
     ];
-    const movementRows: unknown[][] = selectedTransferMovements.length ? [[], [ui('Movement Audit')],
-      [ui('Time'), ui('Product'), ui('Movement Type'), ui('Storage Location'), ui('Change'), ui('Unit'), ui('User')],
-      ...selectedTransferMovements.map((movement) => [movement.created_at, historicalName(movement.product_name, ui, 'product'), ui(getMovementTypeLabel(movement)), historicalName(movement.storage_location_name, ui, 'location'), Number(movement.change), historicalName(movement.product_unit, ui, 'unit'), displayMovementActor(movement.user_name, selectedTransfer.executed_by_user_name, ui)])
-    ] : [];
+    const movementRows: unknown[][] = selectedTransfer.status === 'executed'
+      ? [[], [ui('Movement Audit')], ...(selectedTransferMovements.length
+          ? [[ui('Time'), ui('Product'), ui('Movement Type'), ui('Storage Location'), ui('Change'), ui('Unit'), ui('User')],
+            ...selectedTransferMovements.map((movement) => [movement.created_at, historicalName(movement.product_name, ui, 'product'), ui(getMovementTypeLabel(movement)), historicalName(movement.storage_location_name, ui, 'location'), Number(movement.change), historicalName(movement.product_unit, ui, 'unit'), displayMovementActor(movement.user_name, selectedTransfer.executed_by_user_name, ui)])]
+          : [[ui('No movement audit rows were found for this executed transfer. This requires support review.')]])]
+      : [];
     const stamp = new Date().toISOString().slice(0, 10);
     downloadCsv(`stock-transfer-detail-${stamp}.csv`, [...transferRows, ...movementRows]);
   };
 
   const printSelectedTransferDetail = () => {
     if (!selectedTransfer) return;
+    if (selectedTransfer.status === 'executed' && !transferMovementsQuery.isSuccess) {
+      setError(transferMovementsQuery.isError ? ui('Failed to load the transfer movement audit.') : ui('Loading transfer movements…'));
+      setMessage(null);
+      return;
+    }
 
     const itemRows = selectedTransfer.items.map((item) => `
-      <tr><td>${escapeHtml(historicalName(item.product_name, ui, 'product'))}</td><td>${escapeHtml(item.product_category || '-')}</td><td>${escapeHtml(formatNumber(item.quantity, locale))} ${escapeHtml(historicalName(item.product_unit, ui, 'unit'))}</td><td>${escapeHtml(formatNumber(item.entered_quantity ?? item.quantity, locale))} ${escapeHtml(item.uom_code || item.product_unit || '')}</td><td>${escapeHtml(displayHistoricalSerialEvidence(item, ui))}</td></tr>
+      <tr><td>${escapeHtml(historicalName(item.product_name, ui, 'product'))}</td><td>${escapeHtml(displayProductCategory(item, selectedTransfer.status, ui))}</td><td>${escapeHtml(formatNumber(item.quantity, locale))} ${escapeHtml(historicalName(item.product_unit, ui, 'unit'))}</td><td>${escapeHtml(formatNumber(item.entered_quantity ?? item.quantity, locale))} ${escapeHtml(item.uom_code || item.product_unit || '')}</td><td>${escapeHtml(displayHistoricalSerialEvidence(item, ui))}</td></tr>
     `).join('');
 
     const movementRows = selectedTransferMovements.length
@@ -941,7 +1009,7 @@ export default function StockTransfersPage() {
             <td>${escapeHtml(displayMovementActor(movement.user_name, selectedTransfer.executed_by_user_name, ui))}</td>
           </tr>
         `).join('')
-      : `<tr><td colspan="6">${escapeHtml(ui('No movement audit rows loaded.'))}</td></tr>`;
+      : `<tr><td colspan="6">${escapeHtml(ui('No movement audit rows were found for this executed transfer. This requires support review.'))}</td></tr>`;
 
     const availabilityRows = selectedTransferAvailability?.items?.length
       ? selectedTransferAvailability.items.map((item) => `
@@ -950,8 +1018,8 @@ export default function StockTransfersPage() {
             <td>${escapeHtml(formatNumber(item.requested_quantity, locale))} ${escapeHtml(historicalName(item.product_unit, ui, 'unit'))}</td>
             <td>${escapeHtml(formatNumber(item.on_hand_quantity, locale))} ${escapeHtml(historicalName(item.product_unit, ui, 'unit'))}</td>
             <td>${escapeHtml(formatNumber(item.reserved_quantity, locale))} ${escapeHtml(historicalName(item.product_unit, ui, 'unit'))}</td>
-            <td>${escapeHtml(formatNumber(item.available_quantity, locale))} ${escapeHtml(historicalName(item.product_unit, ui, 'unit'))}</td>
-            <td>${escapeHtml(formatNumber(item.remaining_after_transfer, locale))} ${escapeHtml(historicalName(item.product_unit, ui, 'unit'))}</td>
+            <td>${escapeHtml(formatAvailabilityEvidence(item.available_quantity, locale, ui))} ${escapeHtml(historicalName(item.product_unit, ui, 'unit'))}</td>
+            <td>${escapeHtml(formatAvailabilityEvidence(item.remaining_after_transfer, locale, ui))} ${escapeHtml(historicalName(item.product_unit, ui, 'unit'))}</td>
             <td>${escapeHtml(getAvailabilityItemStatusLabel(item, ui))}</td>
           </tr>
         `).join('')
@@ -983,7 +1051,7 @@ export default function StockTransfersPage() {
         <p class="meta"><strong>${escapeHtml(ui('Created:'))}</strong> ${escapeHtml(formatDateTime(selectedTransfer.created_at, locale, ui))} ${escapeHtml(ui('by'))} ${escapeHtml(displayTransferActor(selectedTransfer.created_by_user_name, selectedTransfer.status, ui))}</p>
         ${selectedTransfer.executed_at ? `<p class="meta"><strong>${escapeHtml(ui('Executed:'))}</strong> ${escapeHtml(formatDateTime(selectedTransfer.executed_at, locale, ui))} ${escapeHtml(ui('by'))} ${escapeHtml(displayTransferActor(selectedTransfer.executed_by_user_name, selectedTransfer.status, ui))}</p>` : ''}
         ${selectedTransfer.cancelled_at ? `<p class="meta"><strong>${escapeHtml(ui('Cancelled:'))}</strong> ${escapeHtml(formatDateTime(selectedTransfer.cancelled_at, locale, ui))} ${escapeHtml(ui('by'))} ${escapeHtml(displayTransferActor(selectedTransfer.cancelled_by_user_name, selectedTransfer.status, ui))}</p>` : ''}
-        ${selectedTransfer.cancellation_reason ? `<p class="meta"><strong>${escapeHtml(ui('Cancellation reason:'))}</strong> ${escapeHtml(displayCancellationReason(selectedTransfer.cancellation_reason, ui))}</p>` : ''}
+        ${selectedTransfer.cancellation_reason ? `<p class="meta"><strong>${escapeHtml(ui('Cancellation reason:'))}</strong> ${escapeHtml(displayCancellationReason(selectedTransfer.cancellation_reason, selectedTransfer.cancellation_reason_is_system, ui))}</p>` : ''}
         ${displayTransferNotes(selectedTransfer, ui) ? `<div class="notes"><strong>${escapeHtml(ui('Notes:'))}</strong><br />${escapeHtml(displayTransferNotes(selectedTransfer, ui))}</div>` : ''}
         <section><h2>${escapeHtml(ui('Items'))}</h2><table><thead><tr><th>${escapeHtml(ui('Product'))}</th><th>${escapeHtml(ui('Category'))}</th><th>${escapeHtml(ui('Base quantity'))}</th><th>${escapeHtml(ui('Entered as'))}</th><th>${escapeHtml(ui('Serial numbers'))}</th></tr></thead><tbody>${itemRows}</tbody></table></section>
         ${availabilityRows ? `<section><h2>${escapeHtml(ui('Execution Check'))}</h2><p class="meta">${escapeHtml(ui(selectedTransferAvailability?.message || ''))}</p><table><thead><tr><th>${escapeHtml(ui('Product'))}</th><th>${escapeHtml(ui('Requested'))}</th><th>${escapeHtml(ui('On Hand'))}</th><th>${escapeHtml(ui('Reserved'))}</th><th>${escapeHtml(ui('Available'))}</th><th>${escapeHtml(ui('After Transfer'))}</th><th>${escapeHtml(ui('Status'))}</th></tr></thead><tbody>${availabilityRows}</tbody></table></section>` : ''}
@@ -995,7 +1063,7 @@ export default function StockTransfersPage() {
   };
 
   const isRefreshingTransfers = Boolean(
-    transfersQuery.isFetching || transferSummaryQuery.isFetching || transferOptionsQuery.isFetching ||
+    transfersQuery.isFetching || transferSummaryQuery.isFetching || transferFilterOptionsQuery.isFetching || transferOptionsQuery.isFetching ||
     sourceOptionsQuery.isFetching || transferDetailQuery.isFetching || transferAvailabilityQuery.isFetching ||
     transferMovementsQuery.isFetching
   );
@@ -1014,7 +1082,7 @@ export default function StockTransfersPage() {
         meta={<>
           <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
           <OperationalWorkspaceMetaPill>{ui("Draft before execution")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{canExecuteStockTransfers ? ui("Execution access") : `${ui(accessRoleLabel)} ${ui('review access')}`}</OperationalWorkspaceMetaPill>
+          <OperationalWorkspaceMetaPill>{canExecuteStockTransfersOperationally ? ui("Execution access") : `${ui(accessRoleLabel)} ${ui('review access')}`}</OperationalWorkspaceMetaPill>
         </>}
         aside={<OperationalWorkspaceStatus value={transferSummaryQuery.isLoading || !summaryAvailable ? '—' : summary?.transfer_count ?? '—'} label={ui("transfers matching the current filters")} />}
       />
@@ -1035,6 +1103,11 @@ export default function StockTransfersPage() {
           {ui("Current access role:")} {ui(accessRoleLabel)}{ui(". The page is available for review, but this role cannot create stock transfer drafts.")}
         </div>
       ) : null}
+      {(canCreateStockTransfers || canUpdateStockTransfers) && !hasTransferOperationalReads ? (
+        <div className="app-warning-state" style={styles.feedbackBox}>
+          {ui('Your current role cannot access the product, location, and stock information required to create or edit stock transfers.')}
+        </div>
+      ) : null}
 
       <section id="stock-transfer-form" className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.sectionHeader}>
@@ -1052,8 +1125,8 @@ export default function StockTransfersPage() {
           {editingTransferId ? <span style={styles.draftBadge}>{ui("EDITING DRAFT")}</span> : null}
         </div>
 
-        {transferOptionsQuery.isError ? (
-          <div className="app-error-state">{ui("Products and storage locations could not be loaded. Refresh before creating a transfer.")}</div>
+        {canLoadTransferOperationalOptions && transferOptionsQuery.isError ? (
+          <div className="app-error-state">{ui("Stock transfer operational information is unavailable. Try again before creating or editing a transfer.")}</div>
         ) : null}
 
         <form onSubmit={handleSubmit} style={styles.formStack}>
@@ -1065,7 +1138,7 @@ export default function StockTransfersPage() {
                 style={styles.input}
                 value={form.from_storage_location_id}
                 onChange={(event) => setForm((current) => ({ ...current, from_storage_location_id: event.target.value }))}
-                disabled={!canWriteTransferForm || transferOptionsQuery.isLoading}
+                disabled={!canWriteTransferForm || transferOptionsQuery.isLoading || transferOptionsQuery.isError}
                 required
               >
                 <option value="">{ui("Select source")}</option>
@@ -1084,7 +1157,7 @@ export default function StockTransfersPage() {
                 style={styles.input}
                 value={form.to_storage_location_id}
                 onChange={(event) => setForm((current) => ({ ...current, to_storage_location_id: event.target.value }))}
-                disabled={!canWriteTransferForm || transferOptionsQuery.isLoading}
+                disabled={!canWriteTransferForm || transferOptionsQuery.isLoading || transferOptionsQuery.isError}
                 required
               >
                 <option value="">{ui("Select destination")}</option>
@@ -1121,11 +1194,17 @@ export default function StockTransfersPage() {
             </button>
           </div>
 
+          {transferOptionsQuery.isLoading ? (
+            <div className="app-empty-state">{ui("Checking stock transfer locations and products…")}</div>
+          ) : null}
+          {transferOptionsQuery.isError ? (
+            <div className="app-warning-state">{ui("Stock transfer operational information is unavailable. Try again before creating or editing a transfer.")}</div>
+          ) : null}
           {form.from_storage_location_id && sourceOptionsQuery.isLoading ? (
-            <div className="app-empty-state">{ui("Checking unreserved source stock…")}</div>
+            <div className="app-empty-state">{ui("Checking products and stock at the selected source location…")}</div>
           ) : null}
           {form.from_storage_location_id && sourceOptionsQuery.isError ? (
-            <div className="app-warning-state">{ui("Source availability preview is unavailable. The backend will still validate the draft before saving.")}</div>
+            <div className="app-warning-state">{ui("Product and stock information is unavailable for the selected source location. Try again before creating or editing a transfer.")}</div>
           ) : null}
 
           <div style={styles.itemRows}>
@@ -1150,7 +1229,7 @@ export default function StockTransfersPage() {
                         style={styles.input}
                         value={item.product_id}
                         onChange={(event) => updateItemRow(index, { product_id: event.target.value })}
-                        disabled={!canWriteTransferForm || transferOptionsQuery.isLoading || sourceOptionsQuery.isLoading}
+                        disabled={!canWriteTransferForm || transferOptionsQuery.isLoading || transferOptionsQuery.isError || sourceOptionsQuery.isLoading || sourceOptionsQuery.isError}
                         required
                       >
                         <option value="">{ui("Select product")}</option>
@@ -1236,7 +1315,7 @@ export default function StockTransfersPage() {
           </div>
 
           <div style={styles.actionsRow}>
-            <button type="submit" style={styles.primaryButton} disabled={!canWriteTransferForm || submitPending || transferOptionsQuery.isError}>
+            <button type="submit" style={styles.primaryButton} disabled={!canWriteTransferForm || submitPending || transferOptionsQuery.isLoading || transferOptionsQuery.isError || sourceOptionsQuery.isLoading || sourceOptionsQuery.isError}>
               {editingTransferId
                 ? (updateMutation.isPending ? ui("Saving…") : ui("Save draft changes"))
                 : (createMutation.isPending ? ui("Creating…") : ui("Create transfer draft"))}
@@ -1272,6 +1351,10 @@ export default function StockTransfersPage() {
           </div>
         </div>
 
+        {transferFilterOptionsQuery.isError ? (
+          <div className="app-warning-state">{ui('Stock transfer filter choices are unavailable. Transfer history can still be reviewed, but location and product filter choices could not be loaded.')}</div>
+        ) : null}
+
         <div className="app-grid-2" style={styles.filterGrid}>
           <div>
             <label htmlFor="transfer-search" style={styles.label}>{ui("Search transfers")}</label>
@@ -1298,25 +1381,25 @@ export default function StockTransfersPage() {
 
           <div>
             <label htmlFor="transfer-from-filter" style={styles.label}>{ui("From location")}</label>
-            <select id="transfer-from-filter" style={styles.input} value={fromLocationFilter} onChange={(event) => setFromLocationFilter(event.target.value)} disabled={transferOptionsQuery.isLoading}>
+            <select id="transfer-from-filter" style={styles.input} value={fromLocationFilter} onChange={(event) => setFromLocationFilter(event.target.value)} disabled={transferFilterOptionsQuery.isLoading || transferFilterOptionsQuery.isError}>
               <option value="">{ui("Any source")}</option>
-              {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+              {filterLocations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
             </select>
           </div>
 
           <div>
             <label htmlFor="transfer-to-filter" style={styles.label}>{ui("To location")}</label>
-            <select id="transfer-to-filter" style={styles.input} value={toLocationFilter} onChange={(event) => setToLocationFilter(event.target.value)} disabled={transferOptionsQuery.isLoading}>
+            <select id="transfer-to-filter" style={styles.input} value={toLocationFilter} onChange={(event) => setToLocationFilter(event.target.value)} disabled={transferFilterOptionsQuery.isLoading || transferFilterOptionsQuery.isError}>
               <option value="">{ui("Any destination")}</option>
-              {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+              {filterLocations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
             </select>
           </div>
 
           <div>
             <label htmlFor="transfer-product-filter" style={styles.label}>{ui("Product")}</label>
-            <select id="transfer-product-filter" style={styles.input} value={productFilter} onChange={(event) => setProductFilter(event.target.value)} disabled={transferOptionsQuery.isLoading}>
+            <select id="transfer-product-filter" style={styles.input} value={productFilter} onChange={(event) => setProductFilter(event.target.value)} disabled={transferFilterOptionsQuery.isLoading || transferFilterOptionsQuery.isError}>
               <option value="">{ui("Any product")}</option>
-              {products.map((product) => <option key={product.id} value={product.id}>{product.name} ({product.unit || ui("unit")})</option>)}
+              {filterProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
             </select>
           </div>
         </div>
@@ -1345,7 +1428,7 @@ export default function StockTransfersPage() {
         {transfersQuery.isLoading ? <div className="app-empty-state">{ui("Loading transfers…")}</div> : null}
         {transfersQuery.isError ? <div className="app-error-state">{ui("Failed to load stock transfers.")}</div> : null}
         {transferSummaryQuery.isError ? <div className="app-warning-state">{ui("Full filtered totals are unavailable. Visible transfer cards can still be reviewed.")}</div> : null}
-        {!transfersQuery.isLoading && transfers.length === 0 ? (
+        {!transfersQuery.isLoading && !transfersQuery.isError && transfers.length === 0 ? (
           <div className="app-empty-state">
             {hasActiveFilters ? ui("No stock transfers match the current filters.") : ui("No stock transfers exist yet.")}
           </div>
@@ -1376,7 +1459,7 @@ export default function StockTransfersPage() {
                 {transfer.status === 'cancelled' && transfer.cancelled_at ? (
                   <div style={styles.transferMeta}>{ui("Cancelled")} {formatDateTime(transfer.cancelled_at, locale, ui)}{` ${ui('by')} ${displayTransferActor(transfer.cancelled_by_user_name, transfer.status, ui)}`}</div>
                 ) : null}
-                {transfer.cancellation_reason ? <div style={styles.cancelReason}>{ui("Cancellation:")} {displayCancellationReason(transfer.cancellation_reason, ui)}</div> : null}
+                {transfer.cancellation_reason ? <div style={styles.cancelReason}>{ui("Cancellation:")} {displayCancellationReason(transfer.cancellation_reason, transfer.cancellation_reason_is_system, ui)}</div> : null}
                 {displayNotes ? <div style={styles.transferNotes}>{displayNotes}</div> : null}
               </button>
             );
@@ -1421,14 +1504,14 @@ export default function StockTransfersPage() {
                   {selectedTransfer.cancelled_at ? <div style={styles.transferMeta}>{ui("Cancelled")} {formatDateTime(selectedTransfer.cancelled_at, locale, ui)} {ui("by")} {displayTransferActor(selectedTransfer.cancelled_by_user_name, selectedTransfer.status, ui)}</div> : null}
                 </div>
                 <div style={styles.detailHeaderActions}>
-                  <button type="button" style={styles.secondaryButton} onClick={exportSelectedTransferDetailCsv}>{ui("Export detail CSV")}</button>
-                  <button type="button" style={styles.secondaryButton} onClick={printSelectedTransferDetail}>{ui("Print detail")}</button>
+                  <button type="button" style={styles.secondaryButton} onClick={exportSelectedTransferDetailCsv} disabled={!selectedTransferAuditExportReady}>{ui("Export detail CSV")}</button>
+                  <button type="button" style={styles.secondaryButton} onClick={printSelectedTransferDetail} disabled={!selectedTransferAuditExportReady}>{ui("Print detail")}</button>
                   <span style={getStatusBadgeStyle(selectedTransfer.status)}>{ui(formatReadableText(selectedTransfer.status))}</span>
                 </div>
               </div>
 
               {selectedTransfer.cancellation_reason ? (
-                <div style={styles.cancellationBox}><strong>{ui("Cancellation reason:")}</strong> {displayCancellationReason(selectedTransfer.cancellation_reason, ui)}</div>
+                <div style={styles.cancellationBox}><strong>{ui("Cancellation reason:")}</strong> {displayCancellationReason(selectedTransfer.cancellation_reason, selectedTransfer.cancellation_reason_is_system, ui)}</div>
               ) : null}
               {displayTransferNotes(selectedTransfer, ui) ? <div style={styles.detailNotes}><strong>{ui("Transfer notes")}</strong><br />{displayTransferNotes(selectedTransfer, ui)}</div> : null}
 
@@ -1439,7 +1522,7 @@ export default function StockTransfersPage() {
                     {selectedTransfer.items.map((item) => (
                       <tr key={item.id}>
                         <td style={styles.td}><strong>{historicalName(item.product_name, ui, 'product')}</strong></td>
-                        <td style={styles.td}>{item.product_category || (selectedTransfer.status === 'draft' ? ui("Not categorized") : ui('Historical category unavailable'))}</td>
+                        <td style={styles.td}>{displayProductCategory(item, selectedTransfer.status, ui)}</td>
                         <td style={styles.td}>
                           {formatNumber(item.quantity, locale)}
                           {hasDistinctEnteredQuantity(item) ? <div style={styles.fieldHint}>{ui('Entered as:')} {formatNumber(item.entered_quantity, locale)} {item.uom_code}</div> : null}
@@ -1456,6 +1539,7 @@ export default function StockTransfersPage() {
                 <div style={styles.availabilityBlock}>
                   <h4 style={styles.itemTitle}>{ui("Execution Check")}</h4>
                   <p style={styles.panelSubtitle}>{ui("Execution requires reconciled, usable, non-expired, unreserved source stock and complete serial evidence where serial tracking is enabled.")}</p>
+                  {!canReadCurrentStock ? <div className="app-warning-state">{ui('Your current role cannot access the current stock information required to check or execute this transfer.')}</div> : null}
                   {transferAvailabilityQuery.isLoading ? <div className="app-empty-state">{ui("Checking source stock…")}</div> : null}
                   {transferAvailabilityQuery.isError ? <div className="app-error-state">{ui("Source-stock preview is unavailable. Refresh before executing this transfer.")}</div> : null}
                   {selectedTransferAvailability ? (
@@ -1479,8 +1563,8 @@ export default function StockTransfersPage() {
                               <td style={styles.td}>{formatNumber(item.requested_quantity, locale)} {item.product_unit}</td>
                               <td style={styles.td}>{formatNumber(item.on_hand_quantity, locale)} {item.product_unit}</td>
                               <td style={styles.td}>{formatNumber(item.reserved_quantity, locale)} {item.product_unit}</td>
-                              <td style={styles.td}>{formatNumber(item.available_quantity, locale)} {item.product_unit}</td>
-                              <td style={styles.td}>{formatNumber(item.remaining_after_transfer, locale)} {item.product_unit}</td>
+                              <td style={styles.td}>{formatAvailabilityEvidence(item.available_quantity, locale, ui)} {item.product_unit}</td>
+                              <td style={styles.td}>{formatAvailabilityEvidence(item.remaining_after_transfer, locale, ui)} {item.product_unit}</td>
                               <td style={styles.td}>
                                 <span style={item.sufficient ? styles.readyBadge : styles.notReadyBadge}>
                                   {getAvailabilityItemStatusLabel(item, ui)}
@@ -1533,12 +1617,12 @@ export default function StockTransfersPage() {
               {selectedTransfer.status === 'draft' ? (
                 <div style={styles.draftActionsBlock}>
                   <div style={styles.actionsRow}>
-                    <button type="button" style={styles.secondaryButton} onClick={startEditingSelectedTransfer} disabled={!canUpdateStockTransfers || executeMutation.isPending || cancelMutation.isPending || updateMutation.isPending}>{ui("Edit draft")}</button>
+                    <button type="button" style={styles.secondaryButton} onClick={startEditingSelectedTransfer} disabled={!canUpdateStockTransfersOperationally || executeMutation.isPending || cancelMutation.isPending || updateMutation.isPending}>{ui("Edit draft")}</button>
                     <button
                       type="button"
                       style={styles.primaryButton}
                       onClick={handleExecuteSelectedTransfer}
-                      disabled={!canExecuteStockTransfers || executeMutation.isPending || cancelMutation.isPending || !executePreviewReady || selectedTransferAvailability?.executable === false}
+                      disabled={!canExecuteStockTransfersOperationally || executeMutation.isPending || cancelMutation.isPending || !executePreviewReady || selectedTransferAvailability?.executable === false}
                     >
                       {executeMutation.isPending ? ui("Executing…") : ui("Execute transfer")}
                     </button>
@@ -1564,8 +1648,8 @@ export default function StockTransfersPage() {
                     </div>
                   </div>
 
-                  {!canUpdateStockTransfers ? <span style={styles.permissionHint}>{ui("Your role cannot edit transfer drafts.")}</span> : null}
-                  {!canExecuteStockTransfers ? <span style={styles.permissionHint}>{ui("Your role cannot execute transfers.")}</span> : null}
+                  {!canUpdateStockTransfers ? <span style={styles.permissionHint}>{ui("Your role cannot edit transfer drafts.")}</span> : canUpdateStockTransfers && !hasTransferOperationalReads ? <span style={styles.permissionHint}>{ui('Your current role cannot access the product, location, and stock information required to create or edit stock transfers.')}</span> : null}
+                  {!canExecuteStockTransfers ? <span style={styles.permissionHint}>{ui("Your role cannot execute transfers.")}</span> : canExecuteStockTransfers && !canReadCurrentStock ? <span style={styles.permissionHint}>{ui('Your current role cannot access the current stock information required to execute transfers.')}</span> : null}
                   {!canCancelStockTransfers ? <span style={styles.permissionHint}>{ui("Your role cannot cancel transfer drafts.")}</span> : null}
                 </div>
               ) : null}
