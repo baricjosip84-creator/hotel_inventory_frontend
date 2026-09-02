@@ -11508,6 +11508,7 @@ const rows: readonly TranslationRow[] = [
   ["Historical Product name unavailable", "Historischer Produktname nicht verfügbar", "Nombre histórico del producto no disponible", "Nom historique du produit indisponible", "Povijesni naziv proizvoda nije dostupan"],
   ["Historical unit evidence is unavailable for this legacy movement.", "Historischer Einheitennachweis ist für diese ältere Bewegung nicht verfügbar.", "La evidencia histórica de unidad no está disponible para este movimiento heredado.", "La preuve historique de l’unité est indisponible pour ce mouvement hérité.", "Povijesni dokaz jedinice nije dostupan za ovo starije kretanje."],
   ["Historical unit unavailable", "Historische Einheit nicht verfügbar", "Unidad histórica no disponible", "Unité historique indisponible", "Povijesna jedinica nije dostupna"],
+  ["Mixed historical units", "Gemischte historische Einheiten", "Unidades históricas mixtas", "Unités historiques mixtes", "Mješovite povijesne jedinice"],
   ["Movement classification:", "Bewegungsklassifizierung:", "Clasificación del movimiento:", "Classification du mouvement :", "Klasifikacija kretanja:"],
   ["Product, location, operator, note, package/barcode, shipment, or cost source", "Produkt, Lagerort, Bediener, Notiz, Paket/Barcode, Lieferung oder Kostenquelle", "Producto, ubicación, operador, nota, paquete/código de barras, envío o fuente de coste", "Produit, emplacement, opérateur, note, colis/code-barres, expédition ou source de coût", "Proizvod, lokacija, operater, napomena, paket/crtični kod, pošiljka ili izvor troška"],
   ["Recorded reason:", "Erfasster Grund:", "Motivo registrado:", "Motif enregistré :", "Zabilježeni razlog:"],
@@ -11517,6 +11518,11 @@ const rows: readonly TranslationRow[] = [
   ["Historical actor unavailable", "Historischer Akteur nicht verfügbar", "Actor histórico no disponible", "Acteur historique indisponible", "Povijesni izvršitelj nije dostupan"],
   ["Historical package evidence unavailable", "Historischer Paketnachweis nicht verfügbar", "Evidencia histórica del paquete no disponible", "Preuve historique du colis indisponible", "Povijesni dokaz paketa nije dostupan"],
   ["Legacy technical reason unavailable", "Technischer Grund des Altdatensatzes nicht verfügbar", "Motivo técnico heredado no disponible", "Motif technique hérité indisponible", "Tehnički razlog starijeg zapisa nije dostupan"],
+  ["An exact reason filter from a shared link is active.","Ein exakter Grundfilter aus einem freigegebenen Link ist aktiv.","Hay un filtro exacto de motivo activo desde un enlace compartido.","Un filtre de motif exact provenant d’un lien partagé est actif.","Aktivan je točan filtar razloga iz dijeljene poveznice."],
+  ["Inbound Cost","Eingangskosten","Coste de entrada","Coût entrant","Ulazni trošak"],
+  ["Cost recorded on stock-increasing movements, grouped by currency; currencies are never added together.","Kosten aus bestandserhöhenden Bewegungen, nach Währung gruppiert; Währungen werden niemals zusammengezählt.","Coste registrado en movimientos que aumentan el stock, agrupado por moneda; las monedas nunca se suman entre sí.","Coût enregistré sur les mouvements augmentant le stock, regroupé par devise ; les devises ne sont jamais additionnées.","Trošak zabilježen na kretanjima koja povećavaju zalihu, grupiran prema valuti; valute se nikada ne zbrajaju."],
+  ["Fulfilled reservation","Erfüllte Reservierung","Reserva cumplida","Réservation exécutée","Ispunjena rezervacija"],
+  ["Units per Package","Einheiten pro Paket","Unidades por paquete","Unités par colis","Jedinica po paketu"],
 ];
 
 const indexes: Record<AppLocale, number> = { 'en-GB': 0, 'de-DE': 1, 'es-ES': 2, 'fr-FR': 3, 'hr-HR': 4 };

@@ -95,7 +95,7 @@ const MOVEMENT_TYPE_OPTIONS = [
   ['outbound_dispatch', 'Outbound dispatch'],
   ['customer_return', 'Customer return'],
   ['supplier_return_dispatch', 'Supplier return dispatch'],
-  ['other', 'Other']
+  ['unproven_legacy', 'Unproven legacy movement']
 ] as const;
 
 const REPORT_TABS: Array<{ key: ReportTab; label: string }> = [
@@ -332,12 +332,26 @@ function humanizeMovementType(value: string | null | undefined, ui: Ui): string 
   return value;
 }
 
-function formatReference(type: string | null | undefined, id: string | null | undefined, ui: Ui): string {
-  if (!id) return '—';
-  const shortId = `${id.slice(0, 8)}…`;
-  if (type === 'shipment') return ui('Shipment: {id}').replace('{id}', shortId);
-  if (type === 'stock_transfer') return ui('Transfer: {id}').replace('{id}', shortId);
-  return ui('Reference: {id}').replace('{id}', shortId);
+function localizeMovementLedgerText(value: string | null | undefined, ui: Ui): string {
+  if (!value) return '—';
+  for (const prefix of ['Fulfilled reservation', 'Supplier return', 'Requisition', 'Reservation', 'Fulfilled', 'Order']) {
+    if (value === prefix) return ui(prefix);
+    if (value.startsWith(`${prefix} `)) return `${ui(prefix)} ${value.slice(prefix.length + 1)}`;
+  }
+  if (value === 'Reversed') return ui('Reversed');
+  if (value.startsWith('Reversed ')) {
+    const detail = value.slice('Reversed '.length);
+    return `${ui('Reversed')} ${ui(detail)}`;
+  }
+  if (value === 'Return') return ui('Return');
+  if (value.startsWith('Return ')) {
+    const [reference, condition] = value.slice('Return '.length).split(' · ', 2);
+    return `${ui('Return')} ${reference}${condition ? ` · ${ui(condition)}` : ''}`;
+  }
+  if (['Stock transfer', 'Opening stock import', 'Expiry processing', 'Lot hold', 'Lot hold release', 'Quarantine release', 'No linked workflow', 'Historical shipment reference unavailable', 'Legacy technical reason unavailable', 'Cycle count'].includes(value)) {
+    return ui(value);
+  }
+  return ui(value);
 }
 
 type InventoryValuationRow = {
@@ -375,33 +389,33 @@ type ProductMovementRow = {
   product_category?: string | null;
   product_unit?: string | null;
   movement_count: number | string;
-  total_increase: number | string;
-  total_decrease: number | string;
+  total_increase: number | string | null;
+  total_decrease: number | string | null;
+  quantity_evidence_status?: 'proven' | 'mixed' | 'unproven' | 'no_movements';
   last_movement_at?: string | null;
 };
 
 type MovementLedgerRow = {
   movement_id: string;
   created_at: string;
-  product_id: string;
-  product_name: string;
-  product_category?: string | null;
+  product_name?: string | null;
   product_unit?: string | null;
   storage_location_name?: string | null;
   quantity_change: number | string;
   movement_type?: string | null;
   reason?: string | null;
+  reason_is_operator_evidence?: boolean;
   receiving_note?: string | null;
   actor_name?: string | null;
-  reference_type?: string | null;
-  reference_id?: string | null;
+  actor_label?: string | null;
+  reference_label?: string | null;
 };
 
 type InventoryVarianceRow = {
   record_type: string;
   record_id: string;
   product_id: string;
-  product_name: string;
+  product_name?: string | null;
   product_category?: string | null;
   product_unit?: string | null;
   storage_location_name?: string | null;
@@ -411,6 +425,7 @@ type InventoryVarianceRow = {
   status?: string | null;
   reason?: string | null;
   actor_name?: string | null;
+  actor_label?: string | null;
   created_at: string;
 };
 
@@ -1319,7 +1334,23 @@ export default function ReportsPage() {
           {productMovementsQuery.isError ? <ErrorState message={ui('Failed to load product movements: {error}').replace('{error}', getReadableError(productMovementsQuery.error, ui))} /> : null}
           {!productMovementsQuery.isLoading && !productMovementsQuery.isError && movementRows.length === 0 ? <EmptyState message={ui("No products matched the movement report filters.")} /> : null}
           {movementRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Product")}</th><th>{ui("Category")}</th><th>{ui("Movements")}</th><th>{ui("Total increase")}</th><th>{ui("Total decrease")}</th><th>{ui("Last movement")}</th></tr></thead><tbody>
-            {movementRows.map((row) => <tr key={row.product_id}><td className="reports-strong">{row.product_name}</td><td>{row.product_category || '-'}</td><td>{formatNumber(row.movement_count, locale, 0)}</td><td>{formatNumber(row.total_increase, locale)} {row.product_unit || ui("units")}</td><td>{formatNumber(row.total_decrease, locale)} {row.product_unit || ui("units")}</td><td>{formatDateTime(row.last_movement_at, locale)}</td></tr>)}
+            {movementRows.map((row) => {
+              const quantityEvidence =
+                row.quantity_evidence_status === 'mixed'
+                  ? ui("Mixed historical units")
+                  : row.quantity_evidence_status === 'unproven'
+                    ? ui("Historical unit unavailable")
+                    : null;
+              const quantityUnit = row.quantity_evidence_status === 'proven' ? row.product_unit : null;
+              return <tr key={row.product_id}>
+                <td className="reports-strong">{row.product_name}</td>
+                <td>{row.product_category || '-'}</td>
+                <td>{formatNumber(row.movement_count, locale, 0)}</td>
+                <td>{quantityEvidence || <>{formatNumber(row.total_increase ?? 0, locale)}{quantityUnit ? ` ${quantityUnit}` : ''}</>}</td>
+                <td>{quantityEvidence || <>{formatNumber(row.total_decrease ?? 0, locale)}{quantityUnit ? ` ${quantityUnit}` : ''}</>}</td>
+                <td>{formatDateTime(row.last_movement_at, locale)}</td>
+              </tr>;
+            })}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
@@ -1343,7 +1374,12 @@ export default function ReportsPage() {
           {movementLedgerQuery.isError ? <ErrorState message={ui('Failed to load movement ledger: {error}').replace('{error}', getReadableError(movementLedgerQuery.error, ui))} /> : null}
           {!movementLedgerQuery.isLoading && !movementLedgerQuery.isError && ledgerRows.length === 0 ? <EmptyState message={ui("No stock movements matched these filters.")} /> : null}
           {ledgerRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Date / time")}</th><th>{ui("Product")}</th><th>{ui("Location")}</th><th>{ui("Change")}</th><th>{ui("Movement")}</th><th>{ui("Actor")}</th><th>{ui("Reason / reference")}</th></tr></thead><tbody>
-            {ledgerRows.map((row) => <tr key={row.movement_id}><td>{formatDateTime(row.created_at, locale)}</td><td className="reports-strong">{row.product_name}<span className="reports-subtext">{row.product_category || ui("Uncategorized")}</span></td><td>{row.storage_location_name || '-'}</td><td className={toNumber(row.quantity_change) < 0 ? 'reports-warning-text' : 'reports-positive-text'}>{formatSignedQuantity(row.quantity_change, locale, ui, row.product_unit)}</td><td>{humanizeMovementType(row.movement_type, ui)}</td><td>{row.actor_name || ui("System / unknown")}</td><td>{row.reason || row.receiving_note || '-'}<span className="reports-subtext">{formatReference(row.reference_type, row.reference_id, ui)}</span></td></tr>)}
+            {ledgerRows.map((row) => {
+              const reason = row.reason
+                ? (row.reason_is_operator_evidence ? row.reason : localizeMovementLedgerText(row.reason, ui))
+                : (row.receiving_note || '—');
+              return <tr key={row.movement_id}><td>{formatDateTime(row.created_at, locale)}</td><td className="reports-strong">{row.product_name || ui("Historical Product name unavailable")}<span className="reports-subtext">{row.product_unit || ui("Historical unit unavailable")}</span></td><td>{row.storage_location_name || ui("Historical location unavailable")}</td><td className={toNumber(row.quantity_change) < 0 ? 'reports-warning-text' : 'reports-positive-text'}>{formatSignedQuantity(row.quantity_change, locale, ui, row.product_unit || ui("Historical unit unavailable"))}</td><td>{humanizeMovementType(row.movement_type, ui)}</td><td>{row.actor_name || (row.actor_label ? ui(row.actor_label) : ui("System / support actor"))}</td><td>{reason}<span className="reports-subtext">{localizeMovementLedgerText(row.reference_label, ui)}</span></td></tr>;
+            })}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
@@ -1367,7 +1403,14 @@ export default function ReportsPage() {
           {inventoryVarianceQuery.isError ? <ErrorState message={ui('Failed to load count variance: {error}').replace('{error}', getReadableError(inventoryVarianceQuery.error, ui))} /> : null}
           {!inventoryVarianceQuery.isLoading && !inventoryVarianceQuery.isError && varianceRows.length === 0 ? <EmptyState message={ui("No cycle-count or manual-adjustment records matched these filters.")} /> : null}
           {varianceRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Date / time")}</th><th>{ui("Record")}</th><th>{ui("Product")}</th><th>{ui("Location")}</th><th>{ui("Expected")}</th><th>{ui("Counted")}</th><th>{ui("Variance")}</th><th>{ui("Status / actor")}</th></tr></thead><tbody>
-            {varianceRows.map((row) => <tr key={`${row.record_type}-${row.record_id}`}><td>{formatDateTime(row.created_at, locale)}</td><td>{row.record_type === 'cycle_count' ? ui("Cycle count") : ui("Manual adjustment")}<span className="reports-subtext">{row.reason || '-'}</span></td><td className="reports-strong">{row.product_name}</td><td>{row.storage_location_name || '-'}</td><td>{row.expected_quantity === null || row.expected_quantity === undefined ? '-' : ui('{quantity} {unit}').replace('{quantity}', formatNumber(row.expected_quantity, locale)).replace('{unit}', row.product_unit || ui('units'))}</td><td>{row.counted_quantity === null || row.counted_quantity === undefined ? '-' : ui('{quantity} {unit}').replace('{quantity}', formatNumber(row.counted_quantity, locale)).replace('{unit}', row.product_unit || ui('units'))}</td><td className={toNumber(row.variance_quantity) !== 0 ? 'reports-warning-text' : ''}>{row.variance_quantity === null || row.variance_quantity === undefined ? '-' : formatSignedQuantity(row.variance_quantity, locale, ui, row.product_unit)}</td><td>{formatStatus(row.status, ui)}<span className="reports-subtext">{row.actor_name || ui('System / unknown')}</span></td></tr>)}
+            {varianceRows.map((row) => {
+              const historicalMovement = row.record_type === 'manual_adjustment';
+              const productName = row.product_name || (historicalMovement ? ui("Historical Product name unavailable") : ui("Unavailable"));
+              const locationName = row.storage_location_name || (historicalMovement ? ui("Historical location unavailable") : '-');
+              const unit = row.product_unit || (historicalMovement ? ui("Historical unit unavailable") : ui("units"));
+              const actor = row.actor_name || (row.actor_label ? ui(row.actor_label) : ui('System / unknown'));
+              return <tr key={`${row.record_type}-${row.record_id}`}><td>{formatDateTime(row.created_at, locale)}</td><td>{row.record_type === 'cycle_count' ? ui("Cycle count") : ui("Manual adjustment")}<span className="reports-subtext">{row.reason || '-'}</span></td><td className="reports-strong">{productName}</td><td>{locationName}</td><td>{row.expected_quantity === null || row.expected_quantity === undefined ? '-' : ui('{quantity} {unit}').replace('{quantity}', formatNumber(row.expected_quantity, locale)).replace('{unit}', unit)}</td><td>{row.counted_quantity === null || row.counted_quantity === undefined ? '-' : ui('{quantity} {unit}').replace('{quantity}', formatNumber(row.counted_quantity, locale)).replace('{unit}', unit)}</td><td className={toNumber(row.variance_quantity) !== 0 ? 'reports-warning-text' : ''}>{row.variance_quantity === null || row.variance_quantity === undefined ? '-' : formatSignedQuantity(row.variance_quantity, locale, ui, unit)}</td><td>{formatStatus(row.status, ui)}<span className="reports-subtext">{actor}</span></td></tr>;
+            })}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}

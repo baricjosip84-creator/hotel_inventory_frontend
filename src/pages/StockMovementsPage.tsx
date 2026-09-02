@@ -40,6 +40,7 @@ type StockMovement = {
   user_id?: string | null;
   user_name?: string | null;
   created_at: string;
+  created_at_cursor?: string | null;
   package_id?: string | null;
   package_count_received?: number | string | null;
   package_name?: string | null;
@@ -186,8 +187,18 @@ function buildMovementParams(filters: FiltersState, paging?: { limit: number; of
   return params;
 }
 
-async function fetchStockMovements(filters: FiltersState, limit: number, offset: number): Promise<StockMovement[]> {
-  return apiRequest<StockMovement[]>(`/stock/movements?${buildMovementParams(filters, { limit, offset }).toString()}`);
+async function fetchStockMovements(
+  filters: FiltersState,
+  limit: number,
+  offset: number,
+  cursor?: { createdAt: string; id: string }
+): Promise<StockMovement[]> {
+  const params = buildMovementParams(filters, { limit, offset });
+  if (cursor) {
+    params.set('cursor_created_at', cursor.createdAt);
+    params.set('cursor_id', cursor.id);
+  }
+  return apiRequest<StockMovement[]>(`/stock/movements?${params.toString()}`);
 }
 
 async function fetchStockMovementSummary(filters: FiltersState): Promise<StockMovementSummary> {
@@ -278,6 +289,7 @@ function costSourceLabel(value?: string | null): string {
   if (!value) return 'No source recorded';
   if (value === 'shipment_item_unit_cost') return 'Shipment item unit cost';
   if (value === 'product_standard') return 'Product standard cost';
+  if (value === 'supplier_return') return 'Supplier return';
   return humanizeCode(value);
 }
 
@@ -286,7 +298,7 @@ function reasonDetail(movement: StockMovement): string | null {
   const reason = movement.reason || '';
   if (!reason) return null;
   if (type === 'usage' && reason.startsWith('usage:')) return humanizeCode(reason.slice('usage:'.length));
-  if (type === 'usage_reversal' && reason.startsWith('usage_reversal:')) return `Reversed ${humanizeCode(reason.slice('usage_reversal:'.length)).toLowerCase()}`;
+  if (type === 'usage_reversal' && reason.startsWith('usage_reversal:')) return `Reversed ${humanizeCode(reason.slice('usage_reversal:'.length))}`;
   if (type === 'stock_transfer_in' || type === 'stock_transfer_out') return null;
   if (type === 'outbound_dispatch' && reason.startsWith('outbound_dispatch:')) return `Order ${reason.slice('outbound_dispatch:'.length)}`;
   if (type === 'customer_return' && reason.startsWith('customer_return:')) {
@@ -343,9 +355,10 @@ function safeReasonDisplay(movement: StockMovement, ui: (englishText: string) =>
   const detail = reasonDetail(movement);
   if (type === 'stock_count' || type === 'manual_adjustment') return evidence;
   if ((type === 'stock_hold' || type === 'stock_hold_release') && detail) return detail;
-  if (type === 'supplier_return_dispatch' || type === 'requisition_fulfillment' || type === 'reservation_fulfillment') return evidence;
+  if (type === 'supplier_return_dispatch' || type === 'requisition_fulfillment' || type === 'reservation_fulfillment') return localizeComposedLabel(evidence, ui);
   if (type === 'outbound_dispatch' || type === 'customer_return') return localizeComposedLabel(evidence, ui);
-  if (type === 'usage' || type === 'usage_reversal') return ui(evidence);
+  if (type === 'usage') return ui(evidence);
+  if (type === 'usage_reversal') return localizeComposedLabel(evidence, ui);
   if (type === 'unproven_legacy' && evidence === 'Legacy technical reason unavailable') return ui(evidence);
   if (type === 'unproven_legacy') return evidence;
   return ui(evidence);
@@ -353,14 +366,34 @@ function safeReasonDisplay(movement: StockMovement, ui: (englishText: string) =>
 
 function localizeComposedLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
   if (!value) return '';
-  for (const prefix of ['Reversed', 'Order', 'Return', 'Requisition', 'Reservation']) {
+  for (const prefix of ['Fulfilled reservation', 'Supplier return', 'Requisition', 'Reservation', 'Fulfilled', 'Order']) {
     if (value === prefix) return ui(prefix);
     if (value.startsWith(`${prefix} `)) return `${ui(prefix)} ${value.slice(prefix.length + 1)}`;
+  }
+  if (value === 'Reversed') return ui('Reversed');
+  if (value.startsWith('Reversed ')) {
+    const detail = value.slice('Reversed '.length);
+    return `${ui('Reversed')} ${ui(detail)}`;
+  }
+  if (value === 'Return') return ui('Return');
+  if (value.startsWith('Return ')) {
+    const [reference, condition] = value.slice('Return '.length).split(' · ', 2);
+    return `${ui('Return')} ${reference}${condition ? ` · ${ui(condition)}` : ''}`;
   }
   if (['Stock transfer', 'Opening stock import', 'Expiry processing', 'Lot hold', 'Lot hold release', 'Quarantine release', 'No linked workflow', 'Historical shipment reference unavailable'].includes(value)) {
     return ui(value);
   }
   return value;
+}
+
+function displayedReceivingNote(movement: StockMovement, ui: (englishText: string) => string): string | null {
+  const note = safeReceivingNote(movement);
+  if (!note) return null;
+  const type = movementTypeFromRow(movement);
+  if (type === 'supplier_return_dispatch' || type === 'requisition_fulfillment' || type === 'reservation_fulfillment') {
+    return localizeComposedLabel(note, ui);
+  }
+  return note;
 }
 
 function businessReference(movement: StockMovement): { label: string; to?: string } {
@@ -391,6 +424,7 @@ function businessReference(movement: StockMovement): { label: string; to?: strin
     };
   }
 
+  if (type === 'cycle_count_reconciliation') return { label: 'Cycle count' };
   if (type === 'opening_stock') return { label: 'Opening stock import' };
   if (type === 'expiry_writeoff') return { label: 'Expiry processing' };
   if (type === 'stock_hold') return { label: 'Lot hold' };
@@ -426,8 +460,8 @@ function csvValue(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'number') return String(value);
   let text = value;
-  if (/^[=+\-@]/.test(text)) text = `'${text}`;
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  if (/^[\t\r ]*[=+\-@]/.test(text)) text = `'${text}`;
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
 function csvNumericValue(value: number | string | null | undefined): number | '' {
@@ -451,14 +485,18 @@ function downloadCsv(rows: Array<Array<string | number | null | undefined>>) {
 
 function exportRows(rows: StockMovement[], locale: AppLocale, ui: (englishText: string) => string) {
   downloadCsv([
-    [ui('Created'), ui('Product'), ui('Storage Location'), ui('Movement Type'), ui('Change'), ui('Unit'), ui('Reason'), ui('Receiving Note'), ui('Unit Cost'), ui('Total Cost'), ui('Cost Currency'), ui('Cost Source'), ui('Shipment'), ui('User'), ui('Package'), ui('Package Barcode'), ui('Package Count')],
-    ...rows.map((movement) => [
-      formatDateTime(movement.created_at, locale), movement.product_name || ui('Historical Product name unavailable'), movement.storage_location_name || ui('Historical location unavailable'),
-      ui(movementTypeLabel(movementTypeFromRow(movement))), toNumber(movement.change), movement.product_unit || ui('Historical unit unavailable'),
-      safeReasonDisplay(movement, ui), safeReceivingNote(movement) || '', csvNumericValue(movement.unit_cost), csvNumericValue(movement.total_cost), movement.cost_currency || '',
-      movement.cost_source || '', movement.shipment_id ? (movement.shipment_po_number || ui('Historical shipment reference unavailable')) : '', actorDisplay(movement, ui),
-      movement.package_id ? (movement.package_name || ui('Historical package evidence unavailable')) : (movement.package_name || ''), movement.package_barcode || '', movement.package_count_received ?? ''
-    ])
+    [ui('Created'), ui('Product'), ui('Storage Location'), ui('Movement Type'), ui('Change'), ui('Unit'), ui('Reason'), ui('Receiving Note'), ui('Unit Cost'), ui('Total Cost'), ui('Cost Currency'), ui('Cost Source'), ui('Reference'), ui('User'), ui('Package'), ui('Package Barcode'), ui('Package Count'), ui('Units per Package')],
+    ...rows.map((movement) => {
+      const reference = businessReference(movement);
+      return [
+        formatDateTime(movement.created_at, locale), movement.product_name || ui('Historical Product name unavailable'), movement.storage_location_name || ui('Historical location unavailable'),
+        ui(movementTypeLabel(movementTypeFromRow(movement))), toNumber(movement.change), movement.product_unit || ui('Historical unit unavailable'),
+        safeReasonDisplay(movement, ui), displayedReceivingNote(movement, ui) || '', csvNumericValue(movement.unit_cost), csvNumericValue(movement.total_cost), movement.cost_currency || '',
+        movement.cost_source ? ui(costSourceLabel(movement.cost_source)) : '', localizeComposedLabel(reference.label, ui), actorDisplay(movement, ui),
+        movement.package_id ? (movement.package_name || ui('Historical package evidence unavailable')) : (movement.package_name || ''), movement.package_barcode || '',
+        csvNumericValue(movement.package_count_received), csvNumericValue(movement.units_per_package)
+      ];
+    })
   ]);
 }
 
@@ -546,15 +584,19 @@ export default function StockMovementsPage() {
   };
 
   const exportAll = async () => {
-    if (rows.length === 0 || isExporting) return;
+    if (isExporting) return;
     setIsExporting(true);
     setExportError('');
     try {
       const allRows: StockMovement[] = [];
-      for (let offset = 0; ; offset += 500) {
-        const batch = await fetchStockMovements(queryFilters, 500, offset);
+      let cursor: { createdAt: string; id: string } | undefined;
+      for (;;) {
+        const batch = await fetchStockMovements(filters, 500, 0, cursor);
         allRows.push(...batch);
         if (batch.length < 500) break;
+        const last = batch[batch.length - 1];
+        if (!last?.created_at_cursor || !last.id) throw new Error(ui('Could not export the filtered movement ledger.'));
+        cursor = { createdAt: last.created_at_cursor, id: last.id };
       }
       exportRows(allRows, locale, ui);
     } catch (error) {
@@ -592,7 +634,7 @@ export default function StockMovementsPage() {
           [ui("Stock Removed"), summaryAvailable ? toNumber(summary.outbound_rows) : '—', ui("Movement events that reduced stock")],
           [ui("Package Audited"), summaryAvailable ? toNumber(summary.package_audited_rows) : '—', ui("Rows with package receiving evidence")],
           [ui("Cost Captured"), summaryAvailable ? toNumber(summary.costed_rows) : '—', ui("Rows with cost evidence")],
-          [ui("Received Cost"), summaryAvailable ? formatCurrencyBreakdown(summary.received_cost_by_currency) : '—', ui("Inbound receipt cost grouped by currency; currencies are never added together")]
+          [ui("Inbound Cost"), summaryAvailable ? formatCurrencyBreakdown(summary.received_cost_by_currency) : '—', ui("Cost recorded on stock-increasing movements, grouped by currency; currencies are never added together.")]
         ].map(([label, value, helper]) => (
           <OperationalWorkspaceStatCard key={String(label)} label={label} value={value} helper={helper} />
         ))}
@@ -612,7 +654,7 @@ export default function StockMovementsPage() {
         </div>
 
         {filterOptionsQuery.isError ? <div className="app-error-state">{ui("Filter options could not be loaded. The ledger itself can still be searched.")}</div> : null}
-        {filters.reason ? <div className="stock-movements-legacy-filter">{ui("Exact reason filter from a shared link:")} <strong>{filters.reason}</strong><button type="button" onClick={() => updateFilter('reason', '')}>{ui("Remove")}</button></div> : null}
+        {filters.reason ? <div className="stock-movements-legacy-filter">{ui("An exact reason filter from a shared link is active.")}<button type="button" onClick={() => updateFilter('reason', '')}>{ui("Remove")}</button></div> : null}
 
         <div className="stock-movements-filter-grid stock-movements-filter-grid--primary">
           <label className="stock-movements-field">{ui("Product")}
@@ -696,7 +738,7 @@ export default function StockMovementsPage() {
             <label>{ui("Rows per page")}
               <select value={paging.pageSize} onChange={(event) => pushState(filters, { page: 1, pageSize: Number(event.target.value) })}><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select>
             </label>
-            <button type="button" className="app-button app-button--secondary" onClick={exportAll} disabled={rows.length === 0 || isExporting}>{isExporting ? ui("Preparing CSV…") : ui("Export Filtered CSV")}</button>
+            <button type="button" className="app-button app-button--secondary" onClick={exportAll} disabled={isExporting || (summaryAvailable && totalRows === 0)}>{isExporting ? ui("Preparing CSV…") : ui("Export Filtered CSV")}</button>
           </div>
         </div>
 
@@ -726,7 +768,7 @@ export default function StockMovementsPage() {
                     <td style={styles.td}>{formatDateTime(movement.created_at, locale)}</td>
                     <td style={styles.td}><div style={styles.rowTitle}>{movement.product_name || ui("Historical Product name unavailable")}</div><div style={styles.rowSubtle}>{movement.storage_location_name || ui("Historical location unavailable")}</div><div style={styles.rowSubtle}>{movement.product_unit || ui("Historical unit unavailable")}</div></td>
                     <td style={styles.td}><span style={changeBadgeStyle(amount)}>{amount > 0 ? `+${formatLocalizedNumber(amount, locale)}` : formatLocalizedNumber(amount, locale)}</span><div style={styles.rowSubtle}>{formatLocalizedNumber(Math.abs(amount), locale)} {movement.product_unit || ui("Historical unit unavailable")}</div></td>
-                    <td style={styles.td}><span style={badgeStyle(type)}>{ui(movementTypeLabel(type))}</span>{detail ? <div style={styles.rowSubtle}>{localizeComposedLabel(detail, ui)}</div> : null}{safeReceivingNote(movement) && detail !== safeReceivingNote(movement) ? <div style={styles.note}>{ui("Note:")} {safeReceivingNote(movement)}</div> : null}</td>
+                    <td style={styles.td}><span style={badgeStyle(type)}>{ui(movementTypeLabel(type))}</span>{detail ? <div style={styles.rowSubtle}>{localizeComposedLabel(detail, ui)}</div> : null}{displayedReceivingNote(movement, ui) && detail !== safeReceivingNote(movement) ? <div style={styles.note}>{ui("Note:")} {displayedReceivingNote(movement, ui)}</div> : null}</td>
                     <td style={styles.td}>{canOpenReference && reference.to ? <Link className="stock-movements-reference-link" to={reference.to}>{localizeComposedLabel(reference.label, ui)}</Link> : <div style={styles.rowTitle}>{localizeComposedLabel(reference.label, ui)}</div>}</td>
                     <td style={styles.td}><div style={styles.rowTitle}>{actorDisplay(movement, ui)}</div></td>
                     <td style={styles.td}><button type="button" className="app-button app-button--secondary stock-movements-details-button" onClick={() => toggleMovementDetails(movement.id)} aria-expanded={isExpanded}>{isExpanded ? ui("Hide") : ui("View")}</button></td>
