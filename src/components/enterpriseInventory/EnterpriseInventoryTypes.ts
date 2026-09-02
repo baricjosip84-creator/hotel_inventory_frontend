@@ -1172,9 +1172,8 @@ export type StockTransfer = {
   created_at: string;
   executed_at?: string | null;
   cancelled_at?: string | null;
-  version?: number | string | null;
+  version: number | string;
   item_count?: number | string | null;
-  total_quantity?: number | string | null;
   items?: StockTransferItem[];
 };
 

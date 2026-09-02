@@ -56,9 +56,9 @@ export function buildStockTransferSummary(stockTransfers: StockTransfer[]) {
   const draft = stockTransfers.filter((item) => item.status === 'draft').length;
   const executed = stockTransfers.filter((item) => item.status === 'executed').length;
   const cancelled = stockTransfers.filter((item) => item.status === 'cancelled').length;
-  const totalUnits = stockTransfers.reduce((total, item) => total + toNumber(item.total_quantity), 0);
+  const lineItems = stockTransfers.reduce((total, item) => total + toNumber(item.item_count), 0);
 
-  return { draft, executed, cancelled, totalUnits };
+  return { draft, executed, cancelled, lineItems };
 }
 
 export function buildProcurementMatchRows(

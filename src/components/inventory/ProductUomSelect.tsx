@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../../lib/api';
+import { useAppTranslation } from '../../i18n/I18nContext';
 
 type UomConversion = {
   uom_code: string;
@@ -32,6 +33,7 @@ export default function ProductUomSelect({
   style,
   ariaLabel = 'Unit of measure'
 }: ProductUomSelectProps) {
+  const { ui } = useAppTranslation();
   const query = useQuery({
     queryKey: ['product-uom-options', productId],
     enabled: Boolean(productId),
@@ -41,12 +43,14 @@ export default function ProductUomSelect({
 
   const options = query.data
     ? [
-        { code: query.data.base_uom, label: `${query.data.base_uom} (base)` },
+        { code: query.data.base_uom, label: `${query.data.base_uom} (${ui('base')})` },
         ...query.data.conversions
           .filter((row) => purpose === 'any' || (purpose === 'purchase' ? row.purchase_uom !== false : row.issue_uom !== false))
           .map((row) => ({ code: row.uom_code, label: `${row.uom_code}${row.uom_name ? ` — ${row.uom_name}` : ''}` }))
       ]
     : [];
+  const knownCodes = new Set(options.map((row) => row.code.toUpperCase()));
+  const preservedValue = value && !knownCodes.has(value.toUpperCase()) ? value : '';
 
   return (
     <select
@@ -56,7 +60,8 @@ export default function ProductUomSelect({
       value={value}
       onChange={(event) => onChange(event.target.value)}
     >
-      <option value="">{query.data?.base_uom ? `${query.data.base_uom} (base)` : 'Base unit'}</option>
+      <option value="">{query.data?.base_uom ? `${query.data.base_uom} (${ui('base')})` : ui('Base unit')}</option>
+      {preservedValue ? <option value={preservedValue}>{preservedValue}</option> : null}
       {options.map((row) => <option key={row.code} value={row.code}>{row.label}</option>)}
     </select>
   );

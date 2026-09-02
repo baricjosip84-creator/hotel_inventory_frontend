@@ -281,6 +281,18 @@ const KNOWN_STATUS_LABELS: Record<string, string> = {
   active: 'Active', expired: 'Expired', due_soon: 'Due soon', upcoming: 'Upcoming'
 };
 
+function displayRepositoryActor(value: string | null | undefined, ui: (text: string) => string, fallback = 'Historical actor unavailable'): string {
+  const normalized = value?.trim();
+  if (normalized === 'System' || normalized === 'Support/System') return ui(normalized);
+  return normalized || ui(fallback);
+}
+
+function displayStockTransferCancellation(value: string | null | undefined, isSystem: boolean | undefined, ui: (text: string) => string): string {
+  const normalized = value?.trim();
+  if (!normalized) return '-';
+  return isSystem ? ui(normalized) : normalized;
+}
+
 function formatStatus(value: string | null | undefined, ui: Ui): string {
   if (!value) return '—';
   const known = KNOWN_STATUS_LABELS[value];
@@ -570,6 +582,7 @@ type StockTransferActivityRow = {
   created_at: string;
   executed_at?: string | null;
   cancellation_reason?: string | null;
+  cancellation_reason_is_system?: boolean;
   from_location: string;
   to_location: string;
   item_count: number | string;
@@ -1422,7 +1435,7 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={transferFilters.from} to={transferFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setTransferFilters, 'from', value)} onToChange={(value) => updateAndClear(setTransferFilters, 'to', value)} />
-              <ChoiceFilterField label={ui("Location")} value={transferFilters.location} placeholder={ui("Any source or destination")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setTransferFilters, 'location', value)} />
+              <AutocompleteFilterField label={ui("Location")} value={transferFilters.location} placeholder={ui("Any current or historical source/destination")} options={filterOptions.locations} listId="report-locations-transfers" disabled={isExporting} onChange={(value) => updateAndClear(setTransferFilters, 'location', value)} />
               <label className="reports-field reports-field--compact"><span>{ui("Status")}</span><select value={transferFilters.status} onChange={(event) => updateAndClear(setTransferFilters, 'status', event.target.value)} disabled={isExporting}>{TRANSFER_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{ui(label)}</option>)}</select></label>
               <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={transferFilters.limit} onChange={(event) => updateAndClear(setTransferFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
             </>
@@ -1433,7 +1446,7 @@ export default function ReportsPage() {
           {stockTransferActivityQuery.isError ? <ErrorState message={ui('Failed to load stock transfers: {error}').replace('{error}', getReadableError(stockTransferActivityQuery.error, ui))} /> : null}
           {!stockTransferActivityQuery.isLoading && !stockTransferActivityQuery.isError && transferRows.length === 0 ? <EmptyState message={ui("No stock transfers matched these filters.")} /> : null}
           {transferRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Created")}</th><th>{ui("From")}</th><th>{ui("To")}</th><th>{ui("Status")}</th><th>{ui("Items")}</th><th>{ui("Quantity by unit")}</th><th>{ui("Created by")}</th><th>{ui("Executed / cancellation")}</th></tr></thead><tbody>
-            {transferRows.map((row) => <tr key={row.transfer_id}><td>{formatDateTime(row.created_at, locale)}</td><td className="reports-strong">{row.from_location}</td><td className="reports-strong">{row.to_location}</td><td>{formatStatus(row.status, ui)}</td><td>{formatNumber(row.item_count, locale, 0)}</td><td>{formatQuantityByUnit(row.quantity_by_unit, undefined, locale, ui)}</td><td>{row.created_by || ui("System")}</td><td>{row.executed_at ? formatDateTime(row.executed_at, locale) : row.cancellation_reason || '-'}</td></tr>)}
+            {transferRows.map((row) => <tr key={row.transfer_id}><td>{formatDateTime(row.created_at, locale)}</td><td className="reports-strong">{row.from_location || ui("Historical location unavailable")}</td><td className="reports-strong">{row.to_location || ui("Historical location unavailable")}</td><td>{formatStatus(row.status, ui)}</td><td>{formatNumber(row.item_count, locale, 0)}</td><td>{row.quantity_evidence === 'Historical unit unavailable' ? ui('Historical unit unavailable') : formatQuantityByUnit(row.quantity_by_unit, undefined, locale, ui)}</td><td>{displayRepositoryActor(row.created_by, ui)}</td><td>{row.executed_at ? formatDateTime(row.executed_at, locale) : displayStockTransferCancellation(row.cancellation_reason, row.cancellation_reason_is_system, ui)}</td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}

@@ -6,6 +6,7 @@ import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError
 import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import ProductUomSelect from '../components/inventory/ProductUomSelect';
 import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceStatus } from '../components/ui/OperationalWorkspace';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
@@ -16,9 +17,9 @@ type StockTransferStatus = 'draft' | 'executed' | 'cancelled' | string;
 type StockTransferListItem = {
   id: string;
   from_storage_location_id: string;
-  from_storage_location_name: string;
+  from_storage_location_name?: string | null;
   to_storage_location_id: string;
-  to_storage_location_name: string;
+  to_storage_location_name?: string | null;
   status: StockTransferStatus;
   notes?: string | null;
   cancellation_reason?: string | null;
@@ -30,16 +31,20 @@ type StockTransferListItem = {
   cancelled_at?: string | null;
   version: number | string;
   item_count?: number | string;
-  total_quantity?: number | string;
 };
 
 type StockTransferDetailItem = {
   id: string;
   product_id: string;
-  product_name: string;
-  product_unit: string;
+  product_name?: string | null;
+  product_unit?: string | null;
   product_category?: string | null;
   quantity: number | string;
+  entered_quantity?: number | string;
+  uom_code?: string | null;
+  product_unit_snapshot?: string | null;
+  serial_numbers?: string[];
+  serial_tracking_enabled?: boolean | null;
 };
 
 type StockTransferDetail = StockTransferListItem & {
@@ -49,15 +54,13 @@ type StockTransferDetail = StockTransferListItem & {
 type StockTransferMovement = {
   id: string;
   product_id: string;
-  product_name: string;
-  product_unit: string;
+  product_name?: string | null;
+  product_unit?: string | null;
   stock_transfer_id: string;
   storage_location_id?: string | null;
   storage_location_name?: string | null;
   movement_type?: string | null;
   change: number | string;
-  reason?: string | null;
-  user_id?: string | null;
   user_name?: string | null;
   created_at: string;
 };
@@ -66,9 +69,22 @@ type StockTransferAvailabilityItem = {
   product_id: string;
   product_name: string;
   product_unit: string;
+  current_product_unit?: string | null;
+  product_active?: boolean;
+  unit_evidence_complete?: boolean;
+  unit_changed_since_draft?: boolean;
+  locations_active?: boolean;
   requested_quantity: number | string;
   on_hand_quantity: number | string;
   reserved_quantity: number | string;
+  available_lot_quantity?: number | string;
+  usable_lot_quantity?: number | string;
+  stock_lot_reconciled?: boolean;
+  serial_tracking_enabled?: boolean;
+  selected_serial_count?: number | string;
+  required_serial_count?: number | string;
+  serial_evidence_complete?: boolean;
+  serials_available?: boolean;
   available_quantity: number | string;
   remaining_after_transfer: number | string;
   sufficient: boolean;
@@ -86,6 +102,8 @@ type TransferOptionLocation = {
   id: string;
   name: string;
   temperature_zone?: string | null;
+  is_pickable?: boolean | null;
+  source_eligible?: boolean | null;
 };
 
 type TransferOptionProduct = {
@@ -97,6 +115,7 @@ type TransferOptionProduct = {
   reserved_quantity?: number | string | null;
   available_quantity?: number | string | null;
   transferable?: boolean | null;
+  serial_tracking_enabled?: boolean;
 };
 
 type TransferOptions = {
@@ -116,6 +135,8 @@ type TransferSummary = {
 type TransferFormItem = {
   product_id: string;
   quantity: string;
+  uom_code: string;
+  serial_numbers_text: string;
 };
 
 type TransferFormState = {
@@ -141,7 +162,7 @@ function emptyTransferForm(): TransferFormState {
     from_storage_location_id: '',
     to_storage_location_id: '',
     notes: '',
-    items: [{ product_id: '', quantity: '' }]
+    items: [{ product_id: '', quantity: '', uom_code: '', serial_numbers_text: '' }]
   };
 }
 
@@ -173,25 +194,102 @@ function getMovementTypeLabel(movement: StockTransferMovement): string {
   if (movement.movement_type === 'stock_transfer_in' || Number(movement.change) > 0) {
     return 'Transfer received';
   }
-  return formatReadableText(movement.movement_type || movement.reason || 'Transfer movement');
+  return formatReadableText(movement.movement_type || 'Transfer movement');
 }
 
 function formatCancellationReason(value: string | null | undefined): string {
   if (!value) return 'Not recorded';
   const trimmed = value.trim();
-  return trimmed.includes('_') && !/\s/.test(trimmed) ? formatReadableText(trimmed) : trimmed;
+  if (/^cancelled_from_enterprise_inventory_ui$/i.test(trimmed)) return 'Cancelled from Enterprise Inventory';
+  return trimmed;
+}
+
+function displayCancellationReason(value: string | null | undefined, ui: (text: string) => string): string {
+  const reason = formatCancellationReason(value);
+  return reason === 'Cancelled from Enterprise Inventory' ? ui(reason) : reason;
+}
+
+function splitSerialNumbers(value: string): string[] {
+  return Array.from(new Set(value.split(/[\r\n,]+/).map((entry) => entry.trim()).filter(Boolean)));
+}
+
+function historicalName(value: string | null | undefined, ui: (text: string) => string, kind: 'location' | 'product' | 'unit' | 'actor'): string {
+  if (value && value.trim()) return value;
+  if (kind === 'location') return ui('Historical location unavailable');
+  if (kind === 'product') return ui('Historical product unavailable');
+  if (kind === 'unit') return ui('Historical unit unavailable');
+  return ui('Historical actor unavailable');
+}
+
+function displayTransferActor(value: string | null | undefined, status: StockTransferStatus, ui: (text: string) => string): string {
+  const normalized = value?.trim();
+  if (normalized === 'System' || normalized === 'Support/System') return ui(normalized);
+  if (normalized) return normalized;
+  return status === 'draft' ? ui('Not recorded') : ui('Historical actor unavailable');
+}
+
+function displayMovementActor(value: string | null | undefined, transferActor: string | null | undefined, ui: (text: string) => string): string {
+  const normalized = value?.trim();
+  if (normalized === 'System' || normalized === 'Support/System') return ui(normalized);
+  if (normalized) return normalized;
+  const transferActorNormalized = transferActor?.trim();
+  if (transferActorNormalized === 'System' || transferActorNormalized === 'Support/System') return ui(transferActorNormalized);
+  return ui('Historical actor unavailable');
+}
+
+function getAvailabilityItemStatusLabel(item: StockTransferAvailabilityItem, ui: (text: string) => string): string {
+  if (item.sufficient) return ui('Ready');
+  if (item.locations_active === false) return ui('Location unavailable');
+  if (item.product_active === false) return ui('Product unavailable');
+  if (item.unit_evidence_complete === false || item.unit_changed_since_draft) return ui('Review unit');
+  if (item.serial_tracking_evidence_complete === false || item.serial_tracking_changed_since_draft) return ui('Review serial tracking');
+  if (item.stock_lot_reconciled === false) return ui('Stock/lot mismatch');
+  if (item.serial_tracking_enabled && (item.serial_evidence_complete === false || item.serials_available === false)) return ui('Serial evidence incomplete');
+  return ui('Insufficient unreserved stock');
+}
+
+function hasDistinctEnteredQuantity(item: StockTransferDetailItem): boolean {
+  if (item.entered_quantity === null || item.entered_quantity === undefined || !item.uom_code) return false;
+  const entered = Number(item.entered_quantity);
+  const base = Number(item.quantity);
+  const enteredUnit = item.uom_code.trim().toUpperCase();
+  const baseUnit = String(item.product_unit || item.product_unit_snapshot || '').trim().toUpperCase();
+  return enteredUnit !== baseUnit || (Number.isFinite(entered) && Number.isFinite(base) && Math.abs(entered - base) > 0.0000001);
+}
+
+const REPLENISHMENT_TRANSFER_NOTE = 'Draft generated from validated location replenishment planning. Human approval and normal transfer execution are still required.';
+
+function sanitizeKnownSystemTransferNote(value: string): string {
+  const replenishmentRunNote = /^Draft generated from validated location replenishment planning run [0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\. Human approval and normal transfer execution are still required\.$/i;
+  return replenishmentRunNote.test(value) ? REPLENISHMENT_TRANSFER_NOTE : value;
+}
+
+function displayHistoricalSerialEvidence(item: StockTransferDetailItem, ui: (text: string) => string): string {
+  const serials = item.serial_numbers || [];
+  if (item.serial_tracking_enabled === true) return serials.join(', ') || ui('Serial evidence missing');
+  if (item.serial_tracking_enabled === false) return ui('Not serial-tracked');
+  return serials.length ? serials.join(', ') : ui('Historical serial-tracking evidence unavailable');
 }
 
 function getDisplayNotes(transfer: Pick<StockTransferListItem, 'notes' | 'cancellation_reason'>): string | null {
   const notes = transfer.notes?.trim();
   if (!notes) return null;
 
-  if (!transfer.cancellation_reason) return notes;
-  const escapedReason = transfer.cancellation_reason.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const suffixPattern = new RegExp(`(?:\\r?\\n)?Cancelled:\\s*${escapedReason}\\s*$`, 'i');
-  const cleaned = notes.replace(suffixPattern, '').trim();
+  const escapedReason = transfer.cancellation_reason
+    ? transfer.cancellation_reason.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    : null;
+  const withoutCancellation = escapedReason
+    ? notes.replace(new RegExp(String.raw`(?:\r?\n)?Cancelled:\s*${escapedReason}\s*$`, 'i'), '').trim()
+    : notes;
+  const cleaned = sanitizeKnownSystemTransferNote(withoutCancellation);
   return cleaned || null;
 }
+
+function displayTransferNotes(transfer: Pick<StockTransferListItem, 'notes' | 'cancellation_reason'>, ui: (text: string) => string): string | null {
+  const notes = getDisplayNotes(transfer);
+  return notes === REPLENISHMENT_TRANSFER_NOTE ? ui(notes) : notes;
+}
+
 
 function getStatusBadgeStyle(status: StockTransferStatus): CSSProperties {
   if (status === 'executed') return styles.executedBadge;
@@ -207,7 +305,11 @@ function normalizeError(error: unknown, fallback: string, ui: (englishText: stri
 }
 
 function escapeCsvCell(value: unknown): string {
-  const raw = value === null || value === undefined ? '' : String(value);
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  let raw = String(value);
+  const canonicalNumber = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(raw.trim());
+  if (!canonicalNumber && /^[\t\r ]*[=+\-@]/.test(raw)) raw = `'${raw}`;
   const escaped = raw.replace(/"/g, '""');
   return /[",\r\n]/.test(escaped) ? `"${escaped}"` : escaped;
 }
@@ -242,11 +344,15 @@ function appendTransferFilters(params: URLSearchParams, filters: TransferFilters
   if (filters.productId) params.set('product_id', filters.productId);
 }
 
-async function fetchTransfers(filters: TransferFilters, limit: number, offset: number): Promise<StockTransferListItem[]> {
+async function fetchTransfers(filters: TransferFilters, limit: number, offset: number, cursor?: { before_created_at: string; before_id: string } | null): Promise<StockTransferListItem[]> {
   const params = new URLSearchParams();
   appendTransferFilters(params, filters);
   params.set('limit', String(limit));
   params.set('offset', String(offset));
+  if (cursor) {
+    params.set('before_created_at', cursor.before_created_at);
+    params.set('before_id', cursor.before_id);
+  }
   return apiRequest<StockTransferListItem[]>(`/stock-transfers?${params.toString()}`);
 }
 
@@ -285,7 +391,9 @@ async function createTransfer(input: TransferFormState): Promise<StockTransferDe
       notes: input.notes.trim() || null,
       items: input.items.map((item) => ({
         product_id: item.product_id,
-        quantity: Number(item.quantity)
+        quantity: Number(item.quantity),
+        uom_code: item.uom_code.trim() || null,
+        serial_numbers: splitSerialNumbers(item.serial_numbers_text)
       }))
     })
   });
@@ -301,23 +409,25 @@ async function updateTransfer(id: string, input: TransferFormState, version: num
       version: Number(version),
       items: input.items.map((item) => ({
         product_id: item.product_id,
-        quantity: Number(item.quantity)
+        quantity: Number(item.quantity),
+        uom_code: item.uom_code.trim() || null,
+        serial_numbers: splitSerialNumbers(item.serial_numbers_text)
       }))
     })
   });
 }
 
-async function executeTransfer(id: string): Promise<{ message: string; transfer: StockTransferDetail }> {
-  return apiRequest<{ message: string; transfer: StockTransferDetail }>(`/stock-transfers/${id}/execute`, {
+async function executeTransfer(input: { id: string; version: number | string }): Promise<{ message: string; transfer: StockTransferDetail }> {
+  return apiRequest<{ message: string; transfer: StockTransferDetail }>(`/stock-transfers/${input.id}/execute`, {
     method: 'POST',
-    body: JSON.stringify({})
+    body: JSON.stringify({ version: Number(input.version) })
   });
 }
 
-async function cancelTransfer(input: { id: string; reason?: string }): Promise<{ message: string; transfer: StockTransferDetail }> {
+async function cancelTransfer(input: { id: string; version: number | string; reason?: string }): Promise<{ message: string; transfer: StockTransferDetail }> {
   return apiRequest<{ message: string; transfer: StockTransferDetail }>(`/stock-transfers/${input.id}/cancel`, {
     method: 'POST',
-    body: JSON.stringify({ reason: input.reason?.trim() || null })
+    body: JSON.stringify({ version: Number(input.version), reason: input.reason?.trim() || null })
   });
 }
 
@@ -332,6 +442,7 @@ export default function StockTransfersPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const detailSectionRef = useRef<HTMLElement | null>(null);
+  const syncingFromUrlRef = useRef(false);
   const {
     canCreateStockTransfers,
     canUpdateStockTransfers,
@@ -364,6 +475,40 @@ export default function StockTransfersPage() {
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
+  useEffect(() => {
+    const nextStatus = searchParams.get('status') || '';
+    const nextSearch = searchParams.get('search') || '';
+    const nextFrom = searchParams.get('from_storage_location_id') || '';
+    const nextTo = searchParams.get('to_storage_location_id') || '';
+    const nextProduct = searchParams.get('product_id') || '';
+    const nextTransferId = searchParams.get('transfer_id');
+    const nextPage = Math.max(Number(searchParams.get('page') || 1), 1);
+    const requestedPageSize = Number(searchParams.get('limit') || 25);
+    const nextPageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize as (typeof PAGE_SIZE_OPTIONS)[number]) ? requestedPageSize : 25;
+
+    const differs = nextStatus !== statusFilter
+      || nextSearch !== searchInput
+      || nextSearch !== debouncedSearch
+      || nextFrom !== fromLocationFilter
+      || nextTo !== toLocationFilter
+      || nextProduct !== productFilter
+      || nextTransferId !== selectedTransferId
+      || nextPage !== page
+      || nextPageSize !== pageSize;
+
+    if (!differs) return;
+    syncingFromUrlRef.current = true;
+    setStatusFilter(nextStatus);
+    setSearchInput(nextSearch);
+    setDebouncedSearch(nextSearch.trim());
+    setFromLocationFilter(nextFrom);
+    setToLocationFilter(nextTo);
+    setProductFilter(nextProduct);
+    setSelectedTransferId(nextTransferId);
+    setPage(nextPage);
+    setPageSize(nextPageSize);
+  }, [searchParams]);
+
   const transferFilters = useMemo<TransferFilters>(() => ({
     status: statusFilter,
     search: debouncedSearch,
@@ -373,10 +518,15 @@ export default function StockTransfersPage() {
   }), [statusFilter, debouncedSearch, fromLocationFilter, toLocationFilter, productFilter]);
 
   useEffect(() => {
+    if (syncingFromUrlRef.current) return;
     setPage(1);
   }, [statusFilter, debouncedSearch, fromLocationFilter, toLocationFilter, productFilter]);
 
   useEffect(() => {
+    if (syncingFromUrlRef.current) {
+      syncingFromUrlRef.current = false;
+      return;
+    }
     const next = new URLSearchParams();
     appendTransferFilters(next, transferFilters);
     if (selectedTransferId) next.set('transfer_id', selectedTransferId);
@@ -439,17 +589,12 @@ export default function StockTransfersPage() {
     [sourceProducts]
   );
 
-  const summary = transferSummaryQuery.data ?? {
-    transfer_count: 0,
-    draft_count: 0,
-    executed_count: 0,
-    cancelled_count: 0,
-    item_count: 0
-  };
-  const totalTransfers = Number(summary.transfer_count || 0);
-  const totalPages = Math.max(Math.ceil(totalTransfers / pageSize), 1);
-  const firstVisible = totalTransfers === 0 ? 0 : offset + 1;
-  const lastVisible = Math.min(offset + transfers.length, totalTransfers);
+  const summary = transferSummaryQuery.data;
+  const summaryAvailable = Boolean(summary && !transferSummaryQuery.isError);
+  const totalTransfers = summaryAvailable ? Number(summary?.transfer_count || 0) : null;
+  const totalPages = totalTransfers === null ? null : Math.max(Math.ceil(totalTransfers / pageSize), 1);
+  const firstVisible = transfers.length === 0 ? 0 : offset + 1;
+  const lastVisible = totalTransfers === null ? offset + transfers.length : Math.min(offset + transfers.length, totalTransfers);
   const selectedTransfer = transferDetailQuery.data;
   const selectedTransferMovements = transferMovementsQuery.data ?? [];
   const selectedTransferAvailability = transferAvailabilityQuery.data;
@@ -460,7 +605,7 @@ export default function StockTransfersPage() {
   );
 
   useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
+    if (totalPages !== null && page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
   const createMutation = useMutation({
@@ -548,7 +693,7 @@ export default function StockTransfersPage() {
   });
 
   const addItemRow = () => {
-    setForm((current) => ({ ...current, items: [...current.items, { product_id: '', quantity: '' }] }));
+    setForm((current) => ({ ...current, items: [...current.items, { product_id: '', quantity: '', uom_code: '', serial_numbers_text: '' }] }));
   };
 
   const removeItemRow = (index: number) => {
@@ -582,7 +727,9 @@ export default function StockTransfersPage() {
       notes: getDisplayNotes(selectedTransfer) || '',
       items: selectedTransfer.items.map((item) => ({
         product_id: item.product_id,
-        quantity: String(item.quantity)
+        quantity: String(item.entered_quantity ?? item.quantity),
+        uom_code: item.uom_code || '',
+        serial_numbers_text: (item.serial_numbers || []).join('\n')
       }))
     });
     setMessage(null);
@@ -614,7 +761,15 @@ export default function StockTransfersPage() {
       if (!Number.isFinite(quantity) || quantity <= 0) return ui('Every transfer item quantity must be greater than zero.');
 
       const sourceProduct = sourceProductById.get(item.product_id);
-      if (sourceProduct?.available_quantity !== null && sourceProduct?.available_quantity !== undefined) {
+      const selectedUom = item.uom_code.trim().toUpperCase();
+      const baseUom = String(sourceProduct?.unit || '').trim().toUpperCase();
+      const quantityIsInBaseUnit = !selectedUom || !baseUom || selectedUom === baseUom;
+      if (sourceProduct?.serial_tracking_enabled && quantityIsInBaseUnit) {
+        const serialNumbers = splitSerialNumbers(item.serial_numbers_text);
+        if (!Number.isInteger(quantity)) return ui('Serial-tracked transfer quantities must be whole numbers.');
+        if (serialNumbers.length !== quantity) return `${sourceProduct.name} ${ui('requires one serial number for each transferred unit.')}`;
+      }
+      if (quantityIsInBaseUnit && sourceProduct?.available_quantity !== null && sourceProduct?.available_quantity !== undefined) {
         const available = Number(sourceProduct.available_quantity || 0);
         if (quantity > available) {
           return `${sourceProduct.name} ${ui('has')} ${formatNumber(available, locale)} ${sourceProduct.unit || ui('units')} ${ui('of unreserved stock available at the source location.')}`;
@@ -679,45 +834,32 @@ export default function StockTransfersPage() {
   };
 
   const exportFilteredTransfersCsv = async () => {
-    if (!totalTransfers || isExporting) return;
+    if (isExporting) return;
     setIsExporting(true);
     setError(null);
     setMessage(null);
-
     try {
       const allTransfers: StockTransferListItem[] = [];
-      for (let exportOffset = 0; exportOffset < totalTransfers; exportOffset += EXPORT_BATCH_SIZE) {
-        const batch = await fetchTransfers(transferFilters, EXPORT_BATCH_SIZE, exportOffset);
+      let cursor: { before_created_at: string; before_id: string } | null = null;
+      for (;;) {
+        const batch = await fetchTransfers(transferFilters, EXPORT_BATCH_SIZE, 0, cursor);
         allTransfers.push(...batch);
         if (batch.length < EXPORT_BATCH_SIZE) break;
+        const last = batch[batch.length - 1];
+        if (!last?.created_at || !last?.id) break;
+        cursor = { before_created_at: last.created_at, before_id: last.id };
       }
-
-      const rows: unknown[][] = [
-        [
-          ui('Transfer ID'), ui('Status'), ui('From Location'), ui('To Location'), ui('Item Count'),
-          ui('Combined Item Quantity (mixed units)'), ui('Created At'), ui('Created By'),
-          ui('Executed At'), ui('Executed By'), ui('Cancelled At'), ui('Cancelled By'),
-          ui('Cancellation Reason'), ui('Notes'), ui('Version')
-        ],
-        ...allTransfers.map((transfer) => [
-          transfer.id,
-          ui(formatReadableText(transfer.status)),
-          transfer.from_storage_location_name,
-          transfer.to_storage_location_name,
-          transfer.item_count ?? '',
-          transfer.total_quantity ?? '',
-          transfer.created_at,
-          transfer.created_by_user_name ?? '',
-          transfer.executed_at ?? '',
-          transfer.executed_by_user_name ?? '',
-          transfer.cancelled_at ?? '',
-          transfer.cancelled_by_user_name ?? '',
-          transfer.cancellation_reason ?? '',
-          getDisplayNotes(transfer) ?? '',
-          transfer.version
-        ])
-      ];
-
+      const rows: unknown[][] = [[
+        ui('Status'), ui('From Location'), ui('To Location'), ui('Item Count'), ui('Created At'), ui('Created By'),
+        ui('Executed At'), ui('Executed By'), ui('Cancelled At'), ui('Cancelled By'), ui('Cancellation Reason'), ui('Notes')
+      ], ...allTransfers.map((transfer) => [
+        ui(formatReadableText(transfer.status)),
+        historicalName(transfer.from_storage_location_name, ui, 'location'),
+        historicalName(transfer.to_storage_location_name, ui, 'location'),
+        Number(transfer.item_count ?? 0), transfer.created_at, displayTransferActor(transfer.created_by_user_name, transfer.status, ui),
+        transfer.executed_at ?? '', transfer.executed_at ? displayTransferActor(transfer.executed_by_user_name, transfer.status, ui) : '', transfer.cancelled_at ?? '', transfer.cancelled_at ? displayTransferActor(transfer.cancelled_by_user_name, transfer.status, ui) : '',
+        transfer.cancellation_reason ? displayCancellationReason(transfer.cancellation_reason, ui) : '', displayTransferNotes(transfer, ui) ?? ''
+      ])];
       const stamp = new Date().toISOString().slice(0, 10);
       downloadCsv(`stock-transfers-filtered-${stamp}.csv`, rows);
       setMessage(`${ui('Exported')} ${formatLocalizedNumber(allTransfers.length, locale)} ${ui(allTransfers.length === 1 ? 'filtered stock transfer.' : 'filtered stock transfers.')}`);
@@ -747,7 +889,7 @@ export default function StockTransfersPage() {
     const confirmed = window.confirm(
       `${ui('Execute this stock transfer?')}\n\n${selectedTransfer.from_storage_location_name} → ${selectedTransfer.to_storage_location_name}\n\n${itemSummary}\n\n${ui('This moves stock immediately, protects reserved stock, and cannot be edited afterwards.')}`
     );
-    if (confirmed) executeMutation.mutate(selectedTransfer.id);
+    if (confirmed) executeMutation.mutate({ id: selectedTransfer.id, version: selectedTransfer.version });
   };
 
   const handleCancelSelectedTransfer = () => {
@@ -756,74 +898,47 @@ export default function StockTransfersPage() {
     const confirmed = window.confirm(
       `${ui('Cancel this stock transfer draft?')}${reasonLine}\n\n${ui('Cancellation does not move stock and cannot be undone.')}`
     );
-    if (confirmed) cancelMutation.mutate({ id: selectedTransfer.id, reason: cancelReason });
+    if (confirmed) cancelMutation.mutate({ id: selectedTransfer.id, version: selectedTransfer.version, reason: cancelReason });
   };
 
   const exportSelectedTransferDetailCsv = () => {
     if (!selectedTransfer) return;
     const transferRows: unknown[][] = [
-      [ui('Transfer ID'), selectedTransfer.id],
-      [ui('Version'), selectedTransfer.version],
       [ui('Status'), ui(formatReadableText(selectedTransfer.status))],
-      [ui('From Location'), selectedTransfer.from_storage_location_name],
-      [ui('To Location'), selectedTransfer.to_storage_location_name],
-      [ui('Created At'), selectedTransfer.created_at],
-      [ui('Created By'), selectedTransfer.created_by_user_name ?? ''],
-      [ui('Executed At'), selectedTransfer.executed_at ?? ''],
-      [ui('Executed By'), selectedTransfer.executed_by_user_name ?? ''],
-      [ui('Cancelled At'), selectedTransfer.cancelled_at ?? ''],
-      [ui('Cancelled By'), selectedTransfer.cancelled_by_user_name ?? ''],
-      [ui('Cancellation Reason'), selectedTransfer.cancellation_reason ?? ''],
-      [ui('Notes'), getDisplayNotes(selectedTransfer) ?? ''],
-      [],
-      [ui('Items')],
-      [ui('Product'), ui('Category'), ui('Quantity'), ui('Unit')],
-      ...selectedTransfer.items.map((item) => [
-        item.product_name,
-        item.product_category ?? '',
-        item.quantity,
-        item.product_unit
-      ])
+      [ui('From Location'), historicalName(selectedTransfer.from_storage_location_name, ui, 'location')],
+      [ui('To Location'), historicalName(selectedTransfer.to_storage_location_name, ui, 'location')],
+      [ui('Created At'), selectedTransfer.created_at], [ui('Created By'), displayTransferActor(selectedTransfer.created_by_user_name, selectedTransfer.status, ui)],
+      [ui('Executed At'), selectedTransfer.executed_at ?? ''], [ui('Executed By'), selectedTransfer.executed_at ? displayTransferActor(selectedTransfer.executed_by_user_name, selectedTransfer.status, ui) : ''],
+      [ui('Cancelled At'), selectedTransfer.cancelled_at ?? ''], [ui('Cancelled By'), selectedTransfer.cancelled_at ? displayTransferActor(selectedTransfer.cancelled_by_user_name, selectedTransfer.status, ui) : ''],
+      [ui('Cancellation Reason'), selectedTransfer.cancellation_reason ? displayCancellationReason(selectedTransfer.cancellation_reason, ui) : ''],
+      [ui('Notes'), displayTransferNotes(selectedTransfer, ui) ?? ''], [], [ui('Items')],
+      [ui('Product'), ui('Category'), ui('Base quantity'), ui('Base unit'), ui('Entered quantity'), ui('Entered unit'), ui('Serial numbers')],
+      ...selectedTransfer.items.map((item) => [historicalName(item.product_name, ui, 'product'), item.product_category ?? '', Number(item.quantity), historicalName(item.product_unit, ui, 'unit'), item.entered_quantity ?? item.quantity, item.uom_code || item.product_unit || '', (item.serial_numbers || []).join(', ')])
     ];
-
-    const movementRows: unknown[][] = selectedTransferMovements.length
-      ? [
-          [],
-          [ui('Movement Audit')],
-          [ui('Time'), ui('Product'), ui('Movement Type'), ui('Storage Location'), ui('Change'), ui('Unit'), ui('Original Reason'), ui('User'), ui('Movement ID')],
-          ...selectedTransferMovements.map((movement) => [
-            movement.created_at,
-            movement.product_name,
-            ui(getMovementTypeLabel(movement)),
-            movement.storage_location_name ?? '',
-            movement.change,
-            movement.product_unit,
-            movement.reason ?? '',
-            movement.user_name ?? ui('Support/System'),
-            movement.id
-          ])
-        ]
-      : [];
-
-    downloadCsv(`stock-transfer-${selectedTransfer.id}.csv`, [...transferRows, ...movementRows]);
+    const movementRows: unknown[][] = selectedTransferMovements.length ? [[], [ui('Movement Audit')],
+      [ui('Time'), ui('Product'), ui('Movement Type'), ui('Storage Location'), ui('Change'), ui('Unit'), ui('User')],
+      ...selectedTransferMovements.map((movement) => [movement.created_at, historicalName(movement.product_name, ui, 'product'), ui(getMovementTypeLabel(movement)), historicalName(movement.storage_location_name, ui, 'location'), Number(movement.change), historicalName(movement.product_unit, ui, 'unit'), displayMovementActor(movement.user_name, selectedTransfer.executed_by_user_name, ui)])
+    ] : [];
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCsv(`stock-transfer-detail-${stamp}.csv`, [...transferRows, ...movementRows]);
   };
 
   const printSelectedTransferDetail = () => {
     if (!selectedTransfer) return;
 
     const itemRows = selectedTransfer.items.map((item) => `
-      <tr><td>${escapeHtml(item.product_name)}</td><td>${escapeHtml(item.product_category || '-')}</td><td>${escapeHtml(formatNumber(item.quantity, locale))}</td><td>${escapeHtml(item.product_unit)}</td></tr>
+      <tr><td>${escapeHtml(historicalName(item.product_name, ui, 'product'))}</td><td>${escapeHtml(item.product_category || '-')}</td><td>${escapeHtml(formatNumber(item.quantity, locale))} ${escapeHtml(historicalName(item.product_unit, ui, 'unit'))}</td><td>${escapeHtml(formatNumber(item.entered_quantity ?? item.quantity, locale))} ${escapeHtml(item.uom_code || item.product_unit || '')}</td><td>${escapeHtml(displayHistoricalSerialEvidence(item, ui))}</td></tr>
     `).join('');
 
     const movementRows = selectedTransferMovements.length
       ? selectedTransferMovements.map((movement) => `
           <tr>
             <td>${escapeHtml(formatDateTime(movement.created_at, locale, ui))}</td>
-            <td>${escapeHtml(movement.product_name)}</td>
+            <td>${escapeHtml(historicalName(movement.product_name, ui, 'product'))}</td>
             <td>${escapeHtml(ui(getMovementTypeLabel(movement)))}</td>
-            <td>${escapeHtml(movement.storage_location_name || ui('Location not recorded'))}</td>
-            <td>${escapeHtml(formatNumber(movement.change, locale))} ${escapeHtml(movement.product_unit)}</td>
-            <td>${escapeHtml(movement.user_name || ui('Support/System'))}</td>
+            <td>${escapeHtml(historicalName(movement.storage_location_name, ui, 'location'))}</td>
+            <td>${escapeHtml(formatNumber(movement.change, locale))} ${escapeHtml(historicalName(movement.product_unit, ui, 'unit'))}</td>
+            <td>${escapeHtml(displayMovementActor(movement.user_name, selectedTransfer.executed_by_user_name, ui))}</td>
           </tr>
         `).join('')
       : `<tr><td colspan="6">${escapeHtml(ui('No movement audit rows loaded.'))}</td></tr>`;
@@ -831,13 +946,13 @@ export default function StockTransfersPage() {
     const availabilityRows = selectedTransferAvailability?.items?.length
       ? selectedTransferAvailability.items.map((item) => `
           <tr>
-            <td>${escapeHtml(item.product_name)}</td>
-            <td>${escapeHtml(formatNumber(item.requested_quantity, locale))} ${escapeHtml(item.product_unit)}</td>
-            <td>${escapeHtml(formatNumber(item.on_hand_quantity, locale))} ${escapeHtml(item.product_unit)}</td>
-            <td>${escapeHtml(formatNumber(item.reserved_quantity, locale))} ${escapeHtml(item.product_unit)}</td>
-            <td>${escapeHtml(formatNumber(item.available_quantity, locale))} ${escapeHtml(item.product_unit)}</td>
-            <td>${escapeHtml(formatNumber(item.remaining_after_transfer, locale))} ${escapeHtml(item.product_unit)}</td>
-            <td>${item.sufficient ? ui('Ready') : ui('Insufficient unreserved stock')}</td>
+            <td>${escapeHtml(historicalName(item.product_name, ui, 'product'))}</td>
+            <td>${escapeHtml(formatNumber(item.requested_quantity, locale))} ${escapeHtml(historicalName(item.product_unit, ui, 'unit'))}</td>
+            <td>${escapeHtml(formatNumber(item.on_hand_quantity, locale))} ${escapeHtml(historicalName(item.product_unit, ui, 'unit'))}</td>
+            <td>${escapeHtml(formatNumber(item.reserved_quantity, locale))} ${escapeHtml(historicalName(item.product_unit, ui, 'unit'))}</td>
+            <td>${escapeHtml(formatNumber(item.available_quantity, locale))} ${escapeHtml(historicalName(item.product_unit, ui, 'unit'))}</td>
+            <td>${escapeHtml(formatNumber(item.remaining_after_transfer, locale))} ${escapeHtml(historicalName(item.product_unit, ui, 'unit'))}</td>
+            <td>${escapeHtml(getAvailabilityItemStatusLabel(item, ui))}</td>
           </tr>
         `).join('')
       : '';
@@ -850,7 +965,7 @@ export default function StockTransfersPage() {
     }
 
     printWindow.document.write(`
-      <!doctype html><html><head><title>${escapeHtml(ui('Stock Transfer'))} ${escapeHtml(selectedTransfer.id)}</title>
+      <!doctype html><html><head><title>${escapeHtml(ui('Stock Transfer'))}</title>
       <style>
         body { font-family: Arial, sans-serif; color: #0f172a; margin: 32px; }
         h1 { margin-bottom: 4px; } .meta { color: #475569; margin: 4px 0; }
@@ -864,14 +979,13 @@ export default function StockTransfersPage() {
         <button onclick="window.print()">${escapeHtml(ui('Print'))}</button>
         <h1>${escapeHtml(ui('Stock Transfer'))}</h1>
         <div class="badge">${escapeHtml(ui(formatReadableText(selectedTransfer.status)))}</div>
-        <p class="meta"><strong>${escapeHtml(ui('Transfer ID:'))}</strong> ${escapeHtml(selectedTransfer.id)} · <strong>${escapeHtml(ui('Version:'))}</strong> ${escapeHtml(selectedTransfer.version)}</p>
-        <p class="meta"><strong>${escapeHtml(ui('Route:'))}</strong> ${escapeHtml(selectedTransfer.from_storage_location_name)} → ${escapeHtml(selectedTransfer.to_storage_location_name)}</p>
-        <p class="meta"><strong>${escapeHtml(ui('Created:'))}</strong> ${escapeHtml(formatDateTime(selectedTransfer.created_at, locale, ui))} ${escapeHtml(ui('by'))} ${escapeHtml(selectedTransfer.created_by_user_name || ui('Not recorded'))}</p>
-        ${selectedTransfer.executed_at ? `<p class="meta"><strong>${escapeHtml(ui('Executed:'))}</strong> ${escapeHtml(formatDateTime(selectedTransfer.executed_at, locale, ui))} ${escapeHtml(ui('by'))} ${escapeHtml(selectedTransfer.executed_by_user_name || ui('Not recorded'))}</p>` : ''}
-        ${selectedTransfer.cancelled_at ? `<p class="meta"><strong>${escapeHtml(ui('Cancelled:'))}</strong> ${escapeHtml(formatDateTime(selectedTransfer.cancelled_at, locale, ui))} ${escapeHtml(ui('by'))} ${escapeHtml(selectedTransfer.cancelled_by_user_name || ui('Not recorded'))}</p>` : ''}
-        ${selectedTransfer.cancellation_reason ? `<p class="meta"><strong>${escapeHtml(ui('Cancellation reason:'))}</strong> ${escapeHtml(ui(formatCancellationReason(selectedTransfer.cancellation_reason)))}</p>` : ''}
-        ${getDisplayNotes(selectedTransfer) ? `<div class="notes"><strong>${escapeHtml(ui('Notes:'))}</strong><br />${escapeHtml(getDisplayNotes(selectedTransfer))}</div>` : ''}
-        <section><h2>${escapeHtml(ui('Items'))}</h2><table><thead><tr><th>${escapeHtml(ui('Product'))}</th><th>${escapeHtml(ui('Category'))}</th><th>${escapeHtml(ui('Quantity'))}</th><th>${escapeHtml(ui('Unit'))}</th></tr></thead><tbody>${itemRows}</tbody></table></section>
+        <p class="meta"><strong>${escapeHtml(ui('Route:'))}</strong> ${escapeHtml(historicalName(selectedTransfer.from_storage_location_name, ui, 'location'))} → ${escapeHtml(historicalName(selectedTransfer.to_storage_location_name, ui, 'location'))}</p>
+        <p class="meta"><strong>${escapeHtml(ui('Created:'))}</strong> ${escapeHtml(formatDateTime(selectedTransfer.created_at, locale, ui))} ${escapeHtml(ui('by'))} ${escapeHtml(displayTransferActor(selectedTransfer.created_by_user_name, selectedTransfer.status, ui))}</p>
+        ${selectedTransfer.executed_at ? `<p class="meta"><strong>${escapeHtml(ui('Executed:'))}</strong> ${escapeHtml(formatDateTime(selectedTransfer.executed_at, locale, ui))} ${escapeHtml(ui('by'))} ${escapeHtml(displayTransferActor(selectedTransfer.executed_by_user_name, selectedTransfer.status, ui))}</p>` : ''}
+        ${selectedTransfer.cancelled_at ? `<p class="meta"><strong>${escapeHtml(ui('Cancelled:'))}</strong> ${escapeHtml(formatDateTime(selectedTransfer.cancelled_at, locale, ui))} ${escapeHtml(ui('by'))} ${escapeHtml(displayTransferActor(selectedTransfer.cancelled_by_user_name, selectedTransfer.status, ui))}</p>` : ''}
+        ${selectedTransfer.cancellation_reason ? `<p class="meta"><strong>${escapeHtml(ui('Cancellation reason:'))}</strong> ${escapeHtml(displayCancellationReason(selectedTransfer.cancellation_reason, ui))}</p>` : ''}
+        ${displayTransferNotes(selectedTransfer, ui) ? `<div class="notes"><strong>${escapeHtml(ui('Notes:'))}</strong><br />${escapeHtml(displayTransferNotes(selectedTransfer, ui))}</div>` : ''}
+        <section><h2>${escapeHtml(ui('Items'))}</h2><table><thead><tr><th>${escapeHtml(ui('Product'))}</th><th>${escapeHtml(ui('Category'))}</th><th>${escapeHtml(ui('Base quantity'))}</th><th>${escapeHtml(ui('Entered as'))}</th><th>${escapeHtml(ui('Serial numbers'))}</th></tr></thead><tbody>${itemRows}</tbody></table></section>
         ${availabilityRows ? `<section><h2>${escapeHtml(ui('Execution Check'))}</h2><p class="meta">${escapeHtml(ui(selectedTransferAvailability?.message || ''))}</p><table><thead><tr><th>${escapeHtml(ui('Product'))}</th><th>${escapeHtml(ui('Requested'))}</th><th>${escapeHtml(ui('On Hand'))}</th><th>${escapeHtml(ui('Reserved'))}</th><th>${escapeHtml(ui('Available'))}</th><th>${escapeHtml(ui('After Transfer'))}</th><th>${escapeHtml(ui('Status'))}</th></tr></thead><tbody>${availabilityRows}</tbody></table></section>` : ''}
         ${selectedTransfer.status === 'executed' ? `<section><h2>${escapeHtml(ui('Movement Audit'))}</h2><table><thead><tr><th>${escapeHtml(ui('Time'))}</th><th>${escapeHtml(ui('Product'))}</th><th>${escapeHtml(ui('Direction'))}</th><th>${escapeHtml(ui('Location'))}</th><th>${escapeHtml(ui('Change'))}</th><th>${escapeHtml(ui('User'))}</th></tr></thead><tbody>${movementRows}</tbody></table></section>` : ''}
       </body></html>
@@ -902,15 +1016,15 @@ export default function StockTransfersPage() {
           <OperationalWorkspaceMetaPill>{ui("Draft before execution")}</OperationalWorkspaceMetaPill>
           <OperationalWorkspaceMetaPill>{canExecuteStockTransfers ? ui("Execution access") : `${ui(accessRoleLabel)} ${ui('review access')}`}</OperationalWorkspaceMetaPill>
         </>}
-        aside={<OperationalWorkspaceStatus value={transferSummaryQuery.isLoading ? '—' : summary.transfer_count} label={ui("transfers matching the current filters")} />}
+        aside={<OperationalWorkspaceStatus value={transferSummaryQuery.isLoading || !summaryAvailable ? '—' : summary?.transfer_count ?? '—'} label={ui("transfers matching the current filters")} />}
       />
 
       <div className="app-grid-stats io-workspace-stats" style={styles.statsGrid}>
-        <StatCard locale={locale} title={ui("Transfers")} value={summary.transfer_count} subtitle={ui("Matching the current filters")} loading={transferSummaryQuery.isLoading} />
-        <StatCard locale={locale} title={ui("Drafts")} value={summary.draft_count} subtitle={ui("Waiting for execution or cancellation")} loading={transferSummaryQuery.isLoading} />
-        <StatCard locale={locale} title={ui("Executed")} value={summary.executed_count} subtitle={ui("Stock already moved")} loading={transferSummaryQuery.isLoading} />
-        <StatCard locale={locale} title={ui("Cancelled")} value={summary.cancelled_count} subtitle={ui("Drafts closed without moving stock")} loading={transferSummaryQuery.isLoading} />
-        <StatCard locale={locale} title={ui("Line Items")} value={summary.item_count} subtitle={ui("Product lines across matching transfers")} loading={transferSummaryQuery.isLoading} />
+        <StatCard locale={locale} title={ui("Transfers")} value={summaryAvailable ? summary?.transfer_count ?? '—' : '—'} subtitle={ui("Matching the current filters")} loading={transferSummaryQuery.isLoading} />
+        <StatCard locale={locale} title={ui("Drafts")} value={summaryAvailable ? summary?.draft_count ?? '—' : '—'} subtitle={ui("Waiting for execution or cancellation")} loading={transferSummaryQuery.isLoading} />
+        <StatCard locale={locale} title={ui("Executed")} value={summaryAvailable ? summary?.executed_count ?? '—' : '—'} subtitle={ui("Stock already moved")} loading={transferSummaryQuery.isLoading} />
+        <StatCard locale={locale} title={ui("Cancelled")} value={summaryAvailable ? summary?.cancelled_count ?? '—' : '—'} subtitle={ui("Drafts closed without moving stock")} loading={transferSummaryQuery.isLoading} />
+        <StatCard locale={locale} title={ui("Line Items")} value={summaryAvailable ? summary?.item_count ?? '—' : '—'} subtitle={ui("Product lines across matching transfers")} loading={transferSummaryQuery.isLoading} />
       </div>
 
       {message ? <div className="app-success-state" style={styles.feedbackBox}>{message}</div> : null}
@@ -956,8 +1070,8 @@ export default function StockTransfersPage() {
               >
                 <option value="">{ui("Select source")}</option>
                 {locations.map((location) => (
-                  <option key={location.id} value={location.id} disabled={location.id === form.to_storage_location_id}>
-                    {location.name}{location.temperature_zone ? ` · ${ui(formatReadableText(location.temperature_zone))}` : ''}
+                  <option key={location.id} value={location.id} disabled={location.id === form.to_storage_location_id || location.source_eligible === false}>
+                    {location.name}{location.temperature_zone ? ` · ${ui(formatReadableText(location.temperature_zone))}` : ''}{location.source_eligible === false ? ` · ${ui('Not valid as a transfer source')}` : ''}
                   </option>
                 ))}
               </select>
@@ -1018,10 +1132,13 @@ export default function StockTransfersPage() {
             {form.items.map((item, index) => {
               const selectedProduct = sourceProductById.get(item.product_id);
               const requested = Number(item.quantity || 0);
+              const selectedUomCode = item.uom_code.trim().toUpperCase();
+              const baseUomCode = String(selectedProduct?.unit || '').trim().toUpperCase();
+              const quantityIsInBaseUnit = !selectedUomCode || !baseUomCode || selectedUomCode === baseUomCode;
               const available = selectedProduct?.available_quantity === null || selectedProduct?.available_quantity === undefined
                 ? null
                 : Number(selectedProduct.available_quantity || 0);
-              const remaining = available === null ? null : available - requested;
+              const remaining = available === null || !quantityIsInBaseUnit ? null : available - requested;
 
               return (
                 <div key={`${index}-${item.product_id}`} style={styles.itemRow}>
@@ -1067,6 +1184,18 @@ export default function StockTransfersPage() {
                           required
                         />
                       </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={styles.label}>{ui("Unit of measure")}</label>
+                        <ProductUomSelect
+                          productId={item.product_id}
+                          value={item.uom_code}
+                          purpose="issue"
+                          onChange={(value) => updateItemRow(index, { uom_code: value, serial_numbers_text: '' })}
+                          disabled={!canWriteTransferForm}
+                          style={styles.input}
+                          ariaLabel={`${ui("Transfer unit of measure")} ${formatNumber(index + 1, locale)}`}
+                        />
+                      </div>
                       <button
                         type="button"
                         style={styles.dangerButton}
@@ -1078,12 +1207,27 @@ export default function StockTransfersPage() {
                     </div>
                   </div>
 
+                  {selectedProduct?.serial_tracking_enabled ? (
+                    <div style={{ marginTop: 10 }}>
+                      <label htmlFor={`transfer-serials-${index}`} style={styles.label}>{ui("Serial numbers")}</label>
+                      <textarea
+                        id={`transfer-serials-${index}`}
+                        style={{ ...styles.input, minHeight: 82, resize: 'vertical' }}
+                        value={item.serial_numbers_text}
+                        onChange={(event) => updateItemRow(index, { serial_numbers_text: event.target.value })}
+                        placeholder={ui("Enter one serial number per line or separate them with commas")}
+                        disabled={!canWriteTransferForm}
+                      />
+                      <div style={styles.fieldHint}>{ui("Serial-tracked products require one available serial number for each transferred unit.")}</div>
+                    </div>
+                  ) : null}
+
                   {selectedProduct && available !== null ? (
                     <div style={remaining !== null && remaining < 0 ? styles.availabilityWarning : styles.availabilitySummary}>
                       <span>{ui("On hand:")} <strong>{formatNumber(selectedProduct.on_hand_quantity, locale)} {selectedProduct.unit}</strong></span>
                       <span>{ui("Reserved:")} <strong>{formatNumber(selectedProduct.reserved_quantity, locale)} {selectedProduct.unit}</strong></span>
                       <span>{ui("Available:")} <strong>{formatNumber(available, locale)} {selectedProduct.unit}</strong></span>
-                      <span>{ui("After draft quantity:")} <strong>{formatNumber(remaining, locale)} {selectedProduct.unit}</strong></span>
+                      {remaining !== null ? <span>{ui("After draft quantity:")} <strong>{formatNumber(remaining, locale)} {selectedProduct.unit}</strong></span> : null}
                     </div>
                   ) : null}
                 </div>
@@ -1119,7 +1263,7 @@ export default function StockTransfersPage() {
             <button type="button" style={styles.secondaryButton} onClick={refreshTransferBoard} disabled={isRefreshingTransfers}>
               {isRefreshingTransfers ? ui("Refreshing…") : ui("Refresh transfers")}
             </button>
-            <button type="button" style={styles.secondaryButton} onClick={exportFilteredTransfersCsv} disabled={totalTransfers === 0 || isExporting || transferSummaryQuery.isError}>
+            <button type="button" style={styles.secondaryButton} onClick={exportFilteredTransfersCsv} disabled={isExporting || transfersQuery.isLoading || transfersQuery.isError}>
               {isExporting ? ui("Preparing CSV…") : ui("Export filtered CSV")}
             </button>
             <button type="button" style={styles.secondaryButton} onClick={clearTransferFilters} disabled={!hasActiveFilters}>
@@ -1136,7 +1280,7 @@ export default function StockTransfersPage() {
               style={styles.input}
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder={ui("Product, location, notes, creator, executor, cancellation, or transfer ID")}
+              placeholder={ui("Product, location, notes, creator, executor, or cancellation reason")}
               maxLength={255}
               type="search"
             />
@@ -1181,7 +1325,9 @@ export default function StockTransfersPage() {
           <span style={styles.resultCount}>
             {transferSummaryQuery.isLoading
               ? ui("Calculating transfer totals…")
-              : `${ui('Showing')} ${formatLocalizedNumber(firstVisible, locale)}–${formatLocalizedNumber(lastVisible, locale)} ${ui('of')} ${formatLocalizedNumber(totalTransfers, locale)} ${ui('matching transfers')}`}
+              : totalTransfers === null
+                ? `${ui('Showing')} ${formatLocalizedNumber(firstVisible, locale)}–${formatLocalizedNumber(lastVisible, locale)} ${ui('matching transfers on this page')}`
+                : `${ui('Showing')} ${formatLocalizedNumber(firstVisible, locale)}–${formatLocalizedNumber(lastVisible, locale)} ${ui('of')} ${formatLocalizedNumber(totalTransfers, locale)} ${ui('matching transfers')}`}
           </span>
           <label style={styles.rowsLabel} htmlFor="transfer-page-size">
             {ui("Rows per page")}
@@ -1207,7 +1353,7 @@ export default function StockTransfersPage() {
 
         <div style={styles.transferList}>
           {transfers.map((transfer) => {
-            const displayNotes = getDisplayNotes(transfer);
+            const displayNotes = displayTransferNotes(transfer, ui);
             return (
               <button
                 key={transfer.id}
@@ -1217,31 +1363,31 @@ export default function StockTransfersPage() {
                 aria-pressed={selectedTransferId === transfer.id}
               >
                 <div style={styles.transferCardTop}>
-                  <strong>{transfer.from_storage_location_name} → {transfer.to_storage_location_name}</strong>
+                  <strong>{historicalName(transfer.from_storage_location_name, ui, 'location')} → {historicalName(transfer.to_storage_location_name, ui, 'location')}</strong>
                   <span style={getStatusBadgeStyle(transfer.status)}>{ui(formatReadableText(transfer.status))}</span>
                 </div>
                 <div style={styles.transferMeta}>
                   {formatNumber(transfer.item_count, locale)} {ui(Number(transfer.item_count || 0) === 1 ? "line item" : "line items")} {ui("· Created")} {formatDateTime(transfer.created_at, locale, ui)}
-                  {transfer.created_by_user_name ? ` ${ui('by')} ${transfer.created_by_user_name}` : ''}
+                  {` ${ui('by')} ${displayTransferActor(transfer.created_by_user_name, transfer.status, ui)}`}
                 </div>
                 {transfer.status === 'executed' && transfer.executed_at ? (
-                  <div style={styles.transferMeta}>{ui("Executed")} {formatDateTime(transfer.executed_at, locale, ui)}{transfer.executed_by_user_name ? ` ${ui('by')} ${transfer.executed_by_user_name}` : ''}</div>
+                  <div style={styles.transferMeta}>{ui("Executed")} {formatDateTime(transfer.executed_at, locale, ui)}{` ${ui('by')} ${displayTransferActor(transfer.executed_by_user_name, transfer.status, ui)}`}</div>
                 ) : null}
                 {transfer.status === 'cancelled' && transfer.cancelled_at ? (
-                  <div style={styles.transferMeta}>{ui("Cancelled")} {formatDateTime(transfer.cancelled_at, locale, ui)}{transfer.cancelled_by_user_name ? ` ${ui('by')} ${transfer.cancelled_by_user_name}` : ''}</div>
+                  <div style={styles.transferMeta}>{ui("Cancelled")} {formatDateTime(transfer.cancelled_at, locale, ui)}{` ${ui('by')} ${displayTransferActor(transfer.cancelled_by_user_name, transfer.status, ui)}`}</div>
                 ) : null}
-                {transfer.cancellation_reason ? <div style={styles.cancelReason}>{ui("Cancellation:")} {ui(formatCancellationReason(transfer.cancellation_reason))}</div> : null}
+                {transfer.cancellation_reason ? <div style={styles.cancelReason}>{ui("Cancellation:")} {displayCancellationReason(transfer.cancellation_reason, ui)}</div> : null}
                 {displayNotes ? <div style={styles.transferNotes}>{displayNotes}</div> : null}
               </button>
             );
           })}
         </div>
 
-        {totalPages > 1 ? (
+        {(page > 1 || (totalPages !== null ? totalPages > 1 : transfers.length === pageSize)) ? (
           <div style={styles.paginationRow}>
             <button type="button" style={styles.secondaryButton} onClick={() => setPage((current) => Math.max(current - 1, 1))} disabled={page <= 1 || transfersQuery.isFetching}>{ui("Previous")}</button>
-            <span style={styles.pageLabel}>{ui("Page")} {formatLocalizedNumber(page, locale)} {ui("of")} {formatLocalizedNumber(totalPages, locale)}</span>
-            <button type="button" style={styles.secondaryButton} onClick={() => setPage((current) => Math.min(current + 1, totalPages))} disabled={page >= totalPages || transfersQuery.isFetching}>{ui("Next")}</button>
+            <span style={styles.pageLabel}>{totalPages === null ? `${ui('Page')} ${formatLocalizedNumber(page, locale)}` : `${ui('Page')} ${formatLocalizedNumber(page, locale)} ${ui('of')} ${formatLocalizedNumber(totalPages, locale)}`}</span>
+            <button type="button" style={styles.secondaryButton} onClick={() => setPage((current) => current + 1)} disabled={transfersQuery.isFetching || (totalPages !== null ? page >= totalPages : transfers.length < pageSize)}>{ui("Next")}</button>
           </div>
         ) : null}
       </section>
@@ -1269,11 +1415,10 @@ export default function StockTransfersPage() {
             <div style={styles.detailBlock}>
               <div style={styles.detailHeader}>
                 <div>
-                  <div style={styles.detailRoute}>{selectedTransfer.from_storage_location_name} → {selectedTransfer.to_storage_location_name}</div>
-                  <div style={styles.transferMeta}>{ui("Transfer ID:")} {selectedTransfer.id} {ui("· Version")} {selectedTransfer.version}</div>
-                  <div style={styles.transferMeta}>{ui("Created")} {formatDateTime(selectedTransfer.created_at, locale, ui)} {ui("by")} {selectedTransfer.created_by_user_name || ui("Not recorded")}</div>
-                  {selectedTransfer.executed_at ? <div style={styles.transferMeta}>{ui("Executed")} {formatDateTime(selectedTransfer.executed_at, locale, ui)} {ui("by")} {selectedTransfer.executed_by_user_name || ui("Not recorded")}</div> : null}
-                  {selectedTransfer.cancelled_at ? <div style={styles.transferMeta}>{ui("Cancelled")} {formatDateTime(selectedTransfer.cancelled_at, locale, ui)} {ui("by")} {selectedTransfer.cancelled_by_user_name || ui("Not recorded")}</div> : null}
+                  <div style={styles.detailRoute}>{historicalName(selectedTransfer.from_storage_location_name, ui, 'location')} → {historicalName(selectedTransfer.to_storage_location_name, ui, 'location')}</div>
+                  <div style={styles.transferMeta}>{ui("Created")} {formatDateTime(selectedTransfer.created_at, locale, ui)} {ui("by")} {displayTransferActor(selectedTransfer.created_by_user_name, selectedTransfer.status, ui)}</div>
+                  {selectedTransfer.executed_at ? <div style={styles.transferMeta}>{ui("Executed")} {formatDateTime(selectedTransfer.executed_at, locale, ui)} {ui("by")} {displayTransferActor(selectedTransfer.executed_by_user_name, selectedTransfer.status, ui)}</div> : null}
+                  {selectedTransfer.cancelled_at ? <div style={styles.transferMeta}>{ui("Cancelled")} {formatDateTime(selectedTransfer.cancelled_at, locale, ui)} {ui("by")} {displayTransferActor(selectedTransfer.cancelled_by_user_name, selectedTransfer.status, ui)}</div> : null}
                 </div>
                 <div style={styles.detailHeaderActions}>
                   <button type="button" style={styles.secondaryButton} onClick={exportSelectedTransferDetailCsv}>{ui("Export detail CSV")}</button>
@@ -1283,20 +1428,24 @@ export default function StockTransfersPage() {
               </div>
 
               {selectedTransfer.cancellation_reason ? (
-                <div style={styles.cancellationBox}><strong>{ui("Cancellation reason:")}</strong> {ui(ui(formatCancellationReason(selectedTransfer.cancellation_reason)))}</div>
+                <div style={styles.cancellationBox}><strong>{ui("Cancellation reason:")}</strong> {displayCancellationReason(selectedTransfer.cancellation_reason, ui)}</div>
               ) : null}
-              {getDisplayNotes(selectedTransfer) ? <div style={styles.detailNotes}><strong>{ui("Transfer notes")}</strong><br />{getDisplayNotes(selectedTransfer)}</div> : null}
+              {displayTransferNotes(selectedTransfer, ui) ? <div style={styles.detailNotes}><strong>{ui("Transfer notes")}</strong><br />{displayTransferNotes(selectedTransfer, ui)}</div> : null}
 
               <div style={styles.tableWrapper}>
                 <table style={styles.table}>
-                  <thead><tr><th style={styles.th}>{ui("Product")}</th><th style={styles.th}>{ui("Category")}</th><th style={styles.th}>{ui("Quantity")}</th><th style={styles.th}>{ui("Unit")}</th></tr></thead>
+                  <thead><tr><th style={styles.th}>{ui("Product")}</th><th style={styles.th}>{ui("Category")}</th><th style={styles.th}>{ui("Quantity")}</th><th style={styles.th}>{ui("Unit")}</th><th style={styles.th}>{ui("Serial numbers")}</th></tr></thead>
                   <tbody>
                     {selectedTransfer.items.map((item) => (
                       <tr key={item.id}>
-                        <td style={styles.td}><strong>{item.product_name}</strong></td>
-                        <td style={styles.td}>{item.product_category || ui("Not categorized")}</td>
-                        <td style={styles.td}>{formatNumber(item.quantity, locale)}</td>
-                        <td style={styles.td}>{item.product_unit}</td>
+                        <td style={styles.td}><strong>{historicalName(item.product_name, ui, 'product')}</strong></td>
+                        <td style={styles.td}>{item.product_category || (selectedTransfer.status === 'draft' ? ui("Not categorized") : ui('Historical category unavailable'))}</td>
+                        <td style={styles.td}>
+                          {formatNumber(item.quantity, locale)}
+                          {hasDistinctEnteredQuantity(item) ? <div style={styles.fieldHint}>{ui('Entered as:')} {formatNumber(item.entered_quantity, locale)} {item.uom_code}</div> : null}
+                        </td>
+                        <td style={styles.td}>{historicalName(item.product_unit, ui, 'unit')}</td>
+                        <td style={styles.td}>{displayHistoricalSerialEvidence(item, ui)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1306,7 +1455,7 @@ export default function StockTransfersPage() {
               {selectedTransfer.status === 'draft' ? (
                 <div style={styles.availabilityBlock}>
                   <h4 style={styles.itemTitle}>{ui("Execution Check")}</h4>
-                  <p style={styles.panelSubtitle}>{ui("The transfer can use only unreserved stock at the source location.")}</p>
+                  <p style={styles.panelSubtitle}>{ui("Execution requires reconciled, usable, non-expired, unreserved source stock and complete serial evidence where serial tracking is enabled.")}</p>
                   {transferAvailabilityQuery.isLoading ? <div className="app-empty-state">{ui("Checking source stock…")}</div> : null}
                   {transferAvailabilityQuery.isError ? <div className="app-error-state">{ui("Source-stock preview is unavailable. Refresh before executing this transfer.")}</div> : null}
                   {selectedTransferAvailability ? (
@@ -1332,7 +1481,15 @@ export default function StockTransfersPage() {
                               <td style={styles.td}>{formatNumber(item.reserved_quantity, locale)} {item.product_unit}</td>
                               <td style={styles.td}>{formatNumber(item.available_quantity, locale)} {item.product_unit}</td>
                               <td style={styles.td}>{formatNumber(item.remaining_after_transfer, locale)} {item.product_unit}</td>
-                              <td style={styles.td}><span style={item.sufficient ? styles.readyBadge : styles.notReadyBadge}>{item.sufficient ? ui("Ready") : ui("Insufficient")}</span></td>
+                              <td style={styles.td}>
+                                <span style={item.sufficient ? styles.readyBadge : styles.notReadyBadge}>
+                                  {getAvailabilityItemStatusLabel(item, ui)}
+                                </span>
+                                {item.unit_evidence_complete === false ? <div style={styles.fieldHint}>{ui("Historical unit unavailable")}. {ui("Review and save the draft again before execution.")}</div> : null}
+                                {item.unit_changed_since_draft ? <div style={styles.fieldHint}>{ui("Current base unit:")} {item.current_product_unit || ui("Unavailable")}</div> : null}
+                                {item.serial_tracking_evidence_complete === false ? <div style={styles.fieldHint}>{ui('Historical serial-tracking evidence unavailable')}. {ui('Review and save the draft again before execution.')}</div> : null}
+                                {item.serial_tracking_changed_since_draft ? <div style={styles.fieldHint}>{ui('Product serial tracking changed after this draft was saved. Review and save the draft again before execution.')}</div> : null}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -1359,11 +1516,11 @@ export default function StockTransfersPage() {
                           {selectedTransferMovements.map((movement) => (
                             <tr key={movement.id}>
                               <td style={styles.td}>{formatDateTime(movement.created_at, locale, ui)}</td>
-                              <td style={styles.td}><strong>{movement.product_name}</strong></td>
+                              <td style={styles.td}><strong>{historicalName(movement.product_name, ui, 'product')}</strong></td>
                               <td style={styles.td}><span style={Number(movement.change) < 0 ? styles.outBadge : styles.inBadge}>{ui(getMovementTypeLabel(movement))}</span></td>
-                              <td style={styles.td}>{movement.storage_location_name || ui("Location not recorded")}</td>
-                              <td style={styles.td}><strong>{Number(movement.change) > 0 ? '+' : ''}{formatNumber(movement.change, locale)} {movement.product_unit}</strong></td>
-                              <td style={styles.td}>{movement.user_name || ui("Support/System")}<div style={styles.auditHint} title={movement.reason || ''}>{ui("Audit ID:")} {movement.id.slice(0, 8)}</div></td>
+                              <td style={styles.td}>{historicalName(movement.storage_location_name, ui, 'location')}</td>
+                              <td style={styles.td}><strong>{Number(movement.change) > 0 ? '+' : ''}{formatNumber(movement.change, locale)} {historicalName(movement.product_unit, ui, 'unit')}</strong></td>
+                              <td style={styles.td}>{displayMovementActor(movement.user_name, selectedTransfer.executed_by_user_name, ui)}</td>
                             </tr>
                           ))}
                         </tbody>

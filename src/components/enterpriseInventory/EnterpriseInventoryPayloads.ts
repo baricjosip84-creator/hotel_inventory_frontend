@@ -288,8 +288,8 @@ export function buildAutomationDisablePayload(reason: string): Record<string, un
   return { disabled_reason: reason.trim() || 'Disabled from enterprise inventory UI' };
 }
 
-export function buildStockTransferCancelPayload(): Record<string, unknown> {
-  return { reason: 'cancelled_from_enterprise_inventory_ui' };
+export function buildStockTransferCancelPayload(version: number | string): Record<string, unknown> {
+  return { version: Number(version), reason: 'cancelled_from_enterprise_inventory_ui' };
 }
 
 export function buildPurchaseOrderShipmentPayload(input: PurchaseOrderShipmentForm): Record<string, unknown> {

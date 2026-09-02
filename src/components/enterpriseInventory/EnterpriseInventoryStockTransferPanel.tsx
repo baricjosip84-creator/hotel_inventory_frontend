@@ -9,11 +9,9 @@ export function EnterpriseInventoryStockTransferPanel({
   pageData,
 }: EnterpriseInventoryPanelBaseProps) {
   const { setStockTransferForm, stockTransferForm } = formState;
-  const { queries, stableData, viewData } = pageData;
+  const { queries, stableData } = pageData;
   const { stockTransfersQuery } = queries;
   const { products, storageLocations, stockItems, stockTransfers } = stableData;
-  const { stockTransferSummary } = viewData;
-
   const {
     cancelStockTransferMutation,
     createStockTransferMutation,
@@ -28,7 +26,6 @@ export function EnterpriseInventoryStockTransferPanel({
         stockItems={stockItems}
         stockTransferForm={stockTransferForm}
         setStockTransferForm={setStockTransferForm}
-        stockTransferSummary={stockTransferSummary}
         stockTransfers={stockTransfers}
         stockTransfersQuery={stockTransfersQuery}
         createStockTransferMutation={createStockTransferMutation}

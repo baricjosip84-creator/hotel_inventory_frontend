@@ -169,38 +169,43 @@ export function useEnterpriseInventoryStockMutations(
         buildStockTransferPayload(input),
       ),
     onSuccess: mutationFeedback.resetting(
-      "Transfer draft created successfully.",
-      ["enterprise-stock-transfers", "enterprise-stock-movements"],
+      ui("Transfer draft created successfully."),
+      ["enterprise-stock-transfers", "enterprise-stock-transfer-drafts-all", "enterprise-stock-transfer-summary", "enterprise-stock-movements"],
       () => setStockTransferForm(emptyStockTransferForm),
     ),
-    onError: mutationFeedback.error("Failed to create stock transfer."),
+    onError: mutationFeedback.error(ui("Failed to create stock transfer.")),
   });
 
   const executeStockTransferMutation = useMutation({
-    mutationFn: (id: string) =>
+    mutationFn: (input: { id: string; version: number | string }) =>
       postEnterpriseInventoryRequest<StockTransfer>(
-        `/stock-transfers/${id}/execute`,
+        `/stock-transfers/${input.id}/execute`,
+        { version: Number(input.version) },
       ),
-    onSuccess: mutationFeedback.invalidating("Transfer executed successfully.", [
+    onSuccess: mutationFeedback.invalidating(ui("Transfer executed successfully."), [
       "enterprise-stock-transfers",
+      "enterprise-stock-transfer-drafts-all",
+      "enterprise-stock-transfer-summary",
       "enterprise-stock-overview",
       "enterprise-low-stock",
       "enterprise-stock-movements",
       "enterprise-products",
     ]),
-    onError: mutationFeedback.error("Failed to execute stock transfer."),
+    onError: mutationFeedback.error(ui("Failed to execute stock transfer.")),
   });
 
   const cancelStockTransferMutation = useMutation({
-    mutationFn: (id: string) =>
+    mutationFn: (input: { id: string; version: number | string }) =>
       postEnterpriseInventoryRequest<StockTransfer>(
-        `/stock-transfers/${id}/cancel`,
-        buildStockTransferCancelPayload(),
+        `/stock-transfers/${input.id}/cancel`,
+        buildStockTransferCancelPayload(input.version),
       ),
-    onSuccess: mutationFeedback.invalidating("Transfer cancelled successfully.", [
+    onSuccess: mutationFeedback.invalidating(ui("Transfer cancelled successfully."), [
       "enterprise-stock-transfers",
+      "enterprise-stock-transfer-drafts-all",
+      "enterprise-stock-transfer-summary",
     ]),
-    onError: mutationFeedback.error("Failed to cancel stock transfer."),
+    onError: mutationFeedback.error(ui("Failed to cancel stock transfer.")),
   });
 
   return {
