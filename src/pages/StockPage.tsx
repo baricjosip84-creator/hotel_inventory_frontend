@@ -1483,7 +1483,7 @@ export default function StockPage() {
             </div>
             <div className="app-grid-stats" style={styles.statsGrid}>
               <StatCard title={ui("Lot Balances")} value={formatLocalizedNumber(inventoryLots.length, locale)} subtitle={ui("Available, held, quarantined, or expired lot-level balances")} />
-              <StatCard title={`${ui('Expiring within')} ${formatLocalizedNumber(expiryWindowDays, locale)} ${ui('days')}`} value={formatLocalizedNumber(expiryWindowLots.length, locale)} subtitle={`${formatLocalizedNumber(expiryWindowQuantity, locale)} ${ui('units in the selected window')}`} tone={expiryWindowLots.length ? 'warn' : 'good'} />
+              <StatCard title={`${ui('Expiring within')} ${formatLocalizedNumber(expiryWindowDays, locale)} ${ui('days')}`} value={formatLocalizedNumber(expiryWindowLots.length, locale)} subtitle={`${formatLocalizedNumber(expiryWindowQuantity, locale)} ${ui('units in the selected window')}`} tone={inventoryLots.length === 0 ? 'default' : expiryWindowLots.length ? 'warn' : 'good'} />
               <StatCard
                 title={ui("Expiry Value at Risk")}
                 value={expiryWindowCostEvidence.unknownCurrencyValueRows > 0
@@ -1500,11 +1500,11 @@ export default function StockPage() {
                     : ui("Estimated from lot unit cost where available")}
                 tone={(expiryWindowCostRows.some(([, value]) => value > 0) || expiryWindowCostEvidence.unknownCurrencyValueRows > 0) ? 'warn' : 'default'}
               />
-              <StatCard title={ui("Expired")} value={formatLocalizedNumber(inventoryLots.filter((lot) => lot.operational_status === 'expired').length, locale)} subtitle={ui("Expired lot balances requiring or reflecting write-off status")} tone={inventoryLots.some((lot) => lot.operational_status === 'expired') ? 'warn' : 'good'} />
-              <StatCard title={ui("Blocked / Held")} value={formatLocalizedNumber(inventoryLots.filter((lot) => lot.condition === 'hold').length, locale)} subtitle={ui("Stock manually blocked from use")} tone={inventoryLots.some((lot) => lot.condition === 'hold') ? 'warn' : 'good'} />
-              <StatCard title={ui("Quarantine")} value={formatLocalizedNumber(inventoryLots.filter((lot) => lot.condition === 'quarantine').length, locale)} subtitle={ui("Stock received into quarantine")} tone={inventoryLots.some((lot) => lot.condition === 'quarantine') ? 'warn' : 'good'} />
-              <StatCard title={ui("Ledger Mismatches")} value={reconciliationQuery.data?.summary.ledger_mismatch_count == null ? '-' : formatLocalizedNumber(reconciliationQuery.data.summary.ledger_mismatch_count, locale)} subtitle={ui("Aggregate stock vs canonical movement ledger")} tone={(reconciliationQuery.data?.summary.ledger_mismatch_count || 0) > 0 ? 'warn' : 'good'} />
-              <StatCard title={ui("Lot Mismatches")} value={reconciliationQuery.data?.summary.lot_mismatch_count == null ? '-' : formatLocalizedNumber(reconciliationQuery.data.summary.lot_mismatch_count, locale)} subtitle={ui("Aggregate stock vs available lot balances")} tone={(reconciliationQuery.data?.summary.lot_mismatch_count || 0) > 0 ? 'warn' : 'good'} />
+              <StatCard title={ui("Expired")} value={formatLocalizedNumber(inventoryLots.filter((lot) => lot.operational_status === 'expired').length, locale)} subtitle={ui("Expired lot balances requiring or reflecting write-off status")} tone={inventoryLots.length === 0 ? 'default' : inventoryLots.some((lot) => lot.operational_status === 'expired') ? 'warn' : 'good'} />
+              <StatCard title={ui("Blocked / Held")} value={formatLocalizedNumber(inventoryLots.filter((lot) => lot.condition === 'hold').length, locale)} subtitle={ui("Stock manually blocked from use")} tone={inventoryLots.length === 0 ? 'default' : inventoryLots.some((lot) => lot.condition === 'hold') ? 'warn' : 'good'} />
+              <StatCard title={ui("Quarantine")} value={formatLocalizedNumber(inventoryLots.filter((lot) => lot.condition === 'quarantine').length, locale)} subtitle={ui("Stock received into quarantine")} tone={inventoryLots.length === 0 ? 'default' : inventoryLots.some((lot) => lot.condition === 'quarantine') ? 'warn' : 'good'} />
+              <StatCard title={ui("Ledger Mismatches")} value={reconciliationQuery.data?.summary.ledger_mismatch_count == null ? '-' : formatLocalizedNumber(reconciliationQuery.data.summary.ledger_mismatch_count, locale)} subtitle={ui("Aggregate stock vs canonical movement ledger")} tone={(reconciliationQuery.data?.summary.row_count || 0) === 0 ? 'default' : (reconciliationQuery.data?.summary.ledger_mismatch_count || 0) > 0 ? 'warn' : 'good'} />
+              <StatCard title={ui("Lot Mismatches")} value={reconciliationQuery.data?.summary.lot_mismatch_count == null ? '-' : formatLocalizedNumber(reconciliationQuery.data.summary.lot_mismatch_count, locale)} subtitle={ui("Aggregate stock vs available lot balances")} tone={(reconciliationQuery.data?.summary.row_count || 0) === 0 ? 'default' : (reconciliationQuery.data?.summary.lot_mismatch_count || 0) > 0 ? 'warn' : 'good'} />
             </div>
 
             {inventoryLots.length === 0 ? (
