@@ -1274,6 +1274,7 @@ export interface SupplierItem {
   address: string | null;
   phone: string | null;
   tax_id: string | null;
+  version: number;
   deleted_at: string | null;
 }
 

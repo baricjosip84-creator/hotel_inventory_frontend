@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
 import { apiRequest, ApiError } from '../lib/api';
 import { scrollToFormSection } from '../lib/scrollToForm';
-import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
+import { getCurrentAccessRoleLabel, getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import type { SupplierItem } from '../types/inventory';
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
@@ -97,10 +97,12 @@ async function createSupplier(input: SupplierFormState): Promise<SupplierItem> {
 
 async function updateSupplier(input: {
   id: string;
+  version: number;
   values: SupplierFormState;
 }): Promise<SupplierItem> {
   return apiRequest<SupplierItem>(`/suppliers/${input.id}`, {
     method: 'PATCH',
+    headers: { 'If-Match-Version': String(input.version) },
     body: JSON.stringify({
       name: input.values.name.trim(),
       email: input.values.email.trim() || null,
@@ -112,9 +114,10 @@ async function updateSupplier(input: {
   });
 }
 
-async function deleteSupplier(id: string): Promise<void> {
-  await apiRequest(`/suppliers/${id}`, {
-    method: 'DELETE'
+async function deleteSupplier(input: Pick<SupplierItem, 'id' | 'version'>): Promise<void> {
+  await apiRequest(`/suppliers/${input.id}`, {
+    method: 'DELETE',
+    headers: { 'If-Match-Version': String(input.version) }
   });
 }
 
@@ -250,6 +253,7 @@ export default function SuppliersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const { canManageSuppliers } = getRoleCapabilities();
+  const canViewShipmentPerformance = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ);
   const accessRoleLabel = getCurrentAccessRoleLabel();
 
   const [search, setSearch] = useState(() => searchParams.get('search')?.trim() || '');
@@ -267,13 +271,14 @@ export default function SuppliersPage() {
 
   const slaBreachesQuery = useQuery({
     queryKey: ['supplier-sla-breaches'],
-    queryFn: fetchSupplierSlaBreaches
+    queryFn: fetchSupplierSlaBreaches,
+    enabled: canViewShipmentPerformance
   });
 
   const supplierPerformanceQuery = useQuery({
     queryKey: ['supplier-performance', selectedPerformanceSupplier?.id],
     queryFn: () => fetchSupplierPerformance(selectedPerformanceSupplier?.id || ''),
-    enabled: Boolean(selectedPerformanceSupplier?.id)
+    enabled: canViewShipmentPerformance && Boolean(selectedPerformanceSupplier?.id)
   });
 
   const createMutation = useMutation({
@@ -311,7 +316,16 @@ export default function SuppliersPage() {
       await queryClient.invalidateQueries({ queryKey: ['supplier-performance'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
-    onError: (error) => {
+    onError: async (error) => {
+      if (error instanceof ApiError && (
+        error.status === 404
+        || error.code === 'VERSION_CONFLICT'
+        || error.code === 'STALE_VERSION'
+        || error.code === 'CONCURRENT_MODIFICATION'
+      )) {
+        await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+        await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
+      }
       const message = error instanceof ApiError ? error.message : ui('Failed to update supplier.');
       setFormError(message);
       setFormMessage(null);
@@ -320,21 +334,36 @@ export default function SuppliersPage() {
 
   const deleteMutation = useMutation({
     mutationFn: deleteSupplier,
-    onSuccess: async () => {
-      setFormError(null);
-      setFormMessage(ui("Supplier archived successfully."));
-      if (editingSupplier) {
+    onSuccess: async (_data, archivedSupplier) => {
+      const archivedSupplierWasBeingEdited = editingSupplier?.id === archivedSupplier.id;
+      if (archivedSupplierWasBeingEdited) {
         setEditingSupplier(null);
         setForm(emptyForm());
+        setFormError(null);
+        setFormMessage(ui("Supplier archived successfully."));
+      } else if (!editingSupplier) {
+        setFormError(null);
+        setFormMessage(ui("Supplier archived successfully."));
       }
-      setSelectedPerformanceSupplier(null);
+      setSelectedPerformanceSupplier((current) =>
+        current?.id === archivedSupplier.id ? null : current
+      );
       await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
       await queryClient.invalidateQueries({ queryKey: ['supplier-sla-breaches'] });
       await queryClient.invalidateQueries({ queryKey: ['supplier-performance'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
     },
-    onError: (error) => {
+    onError: async (error) => {
+      if (error instanceof ApiError && (
+        error.status === 404
+        || error.code === 'VERSION_CONFLICT'
+        || error.code === 'STALE_VERSION'
+        || error.code === 'CONCURRENT_MODIFICATION'
+      )) {
+        await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+        await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
+      }
       const message = error instanceof ApiError ? error.message : ui('Failed to archive supplier.');
       setFormError(message);
       setFormMessage(null);
@@ -456,6 +485,26 @@ export default function SuppliersPage() {
     }
   }, [selectedPerformanceSupplier, supplierById, suppliersQuery.isError, suppliersQuery.isLoading]);
 
+  useEffect(() => {
+    if (!editingSupplier || suppliersQuery.isLoading || suppliersQuery.isError) return;
+
+    const currentSupplier = supplierById.get(editingSupplier.id);
+    if (!currentSupplier) {
+      setEditingSupplier(null);
+      setForm(emptyForm());
+      setFormMessage(null);
+      setFormError(ui('This supplier is no longer available. The edit form was closed to prevent saving stale data.'));
+      return;
+    }
+
+    if (currentSupplier.version !== editingSupplier.version) {
+      setEditingSupplier(null);
+      setForm(emptyForm());
+      setFormMessage(null);
+      setFormError(ui('This supplier changed while you were editing it. Reopen the supplier and review the latest values before saving.'));
+    }
+  }, [editingSupplier, supplierById, suppliersQuery.isError, suppliersQuery.isLoading, ui]);
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError(null);
@@ -481,6 +530,7 @@ export default function SuppliersPage() {
     if (editingSupplier) {
       updateMutation.mutate({
         id: editingSupplier.id,
+        version: editingSupplier.version,
         values: form
       });
       return;
@@ -547,7 +597,7 @@ export default function SuppliersPage() {
 
     setFormError(null);
     setFormMessage(null);
-    deleteMutation.mutate(supplier.id);
+    deleteMutation.mutate({ id: supplier.id, version: supplier.version });
   };
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
@@ -560,7 +610,9 @@ export default function SuppliersPage() {
         iconPath="/suppliers"
         eyebrow={ui("Supplier operations")}
         title={ui("Supplier workspace")}
-        description={ui("Keep supplier contact details accurate, review delivery performance, and follow up late shipments from one tenant-scoped workspace.")}
+        description={canViewShipmentPerformance
+          ? ui("Keep supplier contact details accurate, review delivery performance, and follow up late shipments from one tenant-scoped workspace.")
+          : ui("Keep supplier contact details accurate from one tenant-scoped workspace. Shipment delivery performance requires shipments.read permission.")}
         meta={<>
           <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
           <OperationalWorkspaceMetaPill>{canManageSuppliers ? ui("Supplier write access") : ui("Supplier read-only")}</OperationalWorkspaceMetaPill>
@@ -590,15 +642,17 @@ export default function SuppliersPage() {
         />
         <StatCard
           title={ui("Late Shipments")}
-          value={slaBreachesQuery.isLoading || slaBreachesQuery.isError ? '—' : summary.slaBreaches}
-          subtitle={slaBreachesQuery.isError ? ui("Delivery status could not be loaded") : slaBreachesQuery.isLoading ? ui("Checking pending and partially received shipments") : `${summary.slaBreachSuppliers} ${supplierWord} ${ui('need delivery follow-up')}`}
-          tone={slaBreachesQuery.isLoading || slaBreachesQuery.isError || suppliersQuery.isLoading || suppliersQuery.isError || summary.total === 0 ? 'default' : summary.slaBreaches > 0 ? 'bad' : 'good'}
+          value={!canViewShipmentPerformance || slaBreachesQuery.isLoading || slaBreachesQuery.isError ? '—' : summary.slaBreaches}
+          subtitle={!canViewShipmentPerformance ? ui('Shipment performance unavailable for your current permissions') : slaBreachesQuery.isError ? ui("Delivery status could not be loaded") : slaBreachesQuery.isLoading ? ui("Checking pending and partially received shipments") : `${summary.slaBreachSuppliers} ${supplierWord} ${ui('need delivery follow-up')}`}
+          tone={!canViewShipmentPerformance || slaBreachesQuery.isLoading || slaBreachesQuery.isError || suppliersQuery.isLoading || suppliersQuery.isError || summary.total === 0 ? 'default' : summary.slaBreaches > 0 ? 'bad' : 'good'}
         />
       </div>
 
       {!canManageSuppliers ? (
         <div className="app-warning-state" style={styles.warningBox}>
-          {ui("Current access role:")} {ui(accessRoleLabel)}{ui(". You can review supplier details, delivery status, and performance. Creating, editing, archiving, and bulk importing suppliers requires suppliers.write permission.")}
+          {ui("Current access role:")} {ui(accessRoleLabel)}{canViewShipmentPerformance
+            ? ui(". You can review supplier details, delivery status, and performance. Creating, editing, archiving, and bulk importing suppliers requires suppliers.write permission.")
+            : ui(". You can review supplier master details. Shipment delivery status and performance require shipments.read permission. Creating, editing, archiving, and bulk importing suppliers requires suppliers.write permission.")}
         </div>
       ) : null}
 
@@ -711,7 +765,9 @@ export default function SuppliersPage() {
                         <div style={styles.rowSubtle}>{supplier.tax_id ? `${ui('Tax/VAT:')} ${supplier.tax_id}` : ui("No Tax/VAT ID")}</div>
                       </td>
                       <td style={styles.td}>
-                        {slaBreachesQuery.isLoading ? (
+                        {!canViewShipmentPerformance ? (
+                          <span style={styles.badgeNeutral}>{ui('Unavailable')}</span>
+                        ) : slaBreachesQuery.isLoading ? (
                           <span style={styles.badgeNeutral}>{ui("Checking…")}</span>
                         ) : slaBreachesQuery.isError ? (
                           <span style={styles.badgeNeutral}>{ui("Unavailable")}</span>
@@ -725,13 +781,15 @@ export default function SuppliersPage() {
                       </td>
                       <td style={styles.td}>
                         <div className="app-actions" style={styles.actionGroup}>
-                          <button
-                            type="button"
-                            style={styles.secondaryButton}
-                            onClick={() => setSelectedPerformanceSupplier(supplier)}
-                          >
-                            {ui("View performance")}
-                          </button>
+                          {canViewShipmentPerformance ? (
+                            <button
+                              type="button"
+                              style={styles.secondaryButton}
+                              onClick={() => setSelectedPerformanceSupplier(supplier)}
+                            >
+                              {ui("View performance")}
+                            </button>
+                          ) : null}
 
                           {canManageSuppliers ? (
                             <>
@@ -887,7 +945,7 @@ export default function SuppliersPage() {
         </section>
       ) : null}
 
-      {selectedPerformanceSupplier ? (
+      {canViewShipmentPerformance && selectedPerformanceSupplier ? (
         <section id="supplier-performance-panel" className="app-panel app-panel--padded" style={styles.panel}>
           <div style={styles.performanceHeader}>
             <div className="io-section-heading-with-icon">
@@ -999,6 +1057,7 @@ export default function SuppliersPage() {
         </section>
       ) : null}
 
+      {canViewShipmentPerformance ? (
       <section className="app-panel app-panel--padded" style={styles.panel}>
         <div style={styles.sectionHeader}>
           <div className="io-section-heading-with-icon">
@@ -1086,6 +1145,18 @@ export default function SuppliersPage() {
           <div key={note} style={styles.note}>{note}</div>
         )) : null}
       </section>
+      ) : (
+        <section className="app-panel app-panel--padded" style={styles.panel}>
+          <div className="io-section-heading-with-icon">
+            <span className="io-section-heading-icon"><TenantNavIcon path="/alerts" size={17} /></span>
+            <div className="io-section-heading-copy">
+              <h3 style={styles.panelTitle}>{ui("Delivery Follow-up")}</h3>
+              <p style={styles.panelSubtitle}>{ui("Shipment delivery status and performance are unavailable because your role does not have shipments.read permission.")}</p>
+            </div>
+          </div>
+          <div className="app-empty-state">{ui("Shipment performance unavailable for your current permissions")}</div>
+        </section>
+      )}
     </div>
   );
 }
