@@ -3,14 +3,15 @@ import { DataTable, InputField, SelectField } from '../EnterpriseInventoryShared
 import { styles } from '../EnterpriseInventoryStyles';
 import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import { useAppTranslation } from '../../../i18n/I18nContext';
-import { formatLocalizedCurrency, formatLocalizedDateTime } from '../../../i18n/formatters';
-import type { ApprovalRule, ApprovalRuleForm, StorageLocationOption } from '../EnterpriseInventoryTypes';
+import { formatLocalizedCurrency, formatLocalizedDateTime, formatLocalizedNumber } from '../../../i18n/formatters';
+import type { ApprovalRule, ApprovalRuleForm, CycleCountItem, StorageLocationOption } from '../EnterpriseInventoryTypes';
 
 type ApprovalQueueItem = {
   entity_type: string;
   entity_id: string;
   label: string;
   detail?: string;
+  cycle_count_items?: CycleCountItem[];
   status: string;
   created_at: string;
 };
@@ -52,6 +53,11 @@ export function ApprovalsTab({ approvalQueue, approvalRuleForm, approvalRulesQue
   const money = (value: number | string | null | undefined, currency: string) => {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? formatLocalizedCurrency(parsed, currency, locale, { maximumFractionDigits: 4 }) : '—';
+  };
+  const evidenceNumber = (value: number | string | null | undefined) => {
+    if (value === null || value === undefined || value === '') return '—';
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? formatLocalizedNumber(parsed, locale, { maximumFractionDigits: 4 }) : '—';
   };
 
   const handleApprovalRuleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -118,7 +124,15 @@ export function ApprovalsTab({ approvalQueue, approvalRuleForm, approvalRulesQue
               <thead><tr>{['Entity', 'Status', 'Created', 'Actions'].map((header) => <th key={header} style={styles.th}>{ui(header)}</th>)}</tr></thead>
               <tbody>{approvalQueue.map((item) => (
                 <tr key={`${item.entity_type}-${item.entity_id}`}>
-                  <td style={styles.td}><strong>{item.label}</strong>{item.detail ? <div style={styles.helper}>{item.detail}</div> : null}</td>
+                  <td style={styles.td}>
+                    <strong>{item.label}</strong>
+                    {item.detail ? <div style={styles.helper}>{item.detail}</div> : null}
+                    {item.entity_type === 'cycle_count' && item.cycle_count_items?.length ? item.cycle_count_items.map((line, index) => {
+                      return <div key={`${line.product_id}-${line.storage_location_id || index}`} style={{ ...styles.helper, marginTop: 4 }}>
+                        {line.product_name || ui('Unknown product')} · {line.storage_location_name || ui('Unknown location')} · {ui('Expected quantity')}: {evidenceNumber(line.expected_quantity)} · {ui('Counted quantity')}: {evidenceNumber(line.counted_quantity)} · {ui('Variance')}: {evidenceNumber(line.variance_quantity)}
+                      </div>;
+                    }) : null}
+                  </td>
                   <td style={styles.td}>{displayLabel(item.status, statusLabels)}</td>
                   <td style={styles.td}>{formatLocalizedDateTime(item.created_at, locale)}</td>
                   <td style={styles.td}><div style={styles.actions}>

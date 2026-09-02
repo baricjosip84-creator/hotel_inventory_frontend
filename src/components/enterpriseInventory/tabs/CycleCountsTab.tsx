@@ -3,7 +3,7 @@ import { InputField, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import { useAppTranslation } from '../../../i18n/I18nContext';
-import { formatLocalizedDateTime } from '../../../i18n/formatters';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../../../i18n/formatters';
 import type { CycleCount, CycleCountForm, ProductOption, StorageLocationOption } from '../EnterpriseInventoryTypes';
 
 type CycleCountsTabProps = {
@@ -38,6 +38,11 @@ export function CycleCountsTab({
   const { locale, ui } = useAppTranslation();
   const canCreateCycleCounts = hasPermission(TENANT_PERMISSIONS.CYCLE_COUNTS_WRITE);
   const canApproveCycleCounts = hasPermission(TENANT_PERMISSIONS.CYCLE_COUNTS_APPROVE);
+  const evidenceNumber = (value: number | string | null | undefined) => {
+    if (value === null || value === undefined || value === '') return '—';
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? formatLocalizedNumber(parsed, locale, { maximumFractionDigits: 4 }) : '—';
+  };
   const statusLabel = (status: string) => {
     const labels: Record<string, string> = {
       draft: 'Draft',
@@ -54,12 +59,11 @@ export function CycleCountsTab({
       <form onSubmit={onCycleCountSubmit} style={styles.card}>
         <h2 style={styles.cardTitle}>{ui('Create cycle count')}</h2>
         <div style={styles.formGrid}>
-          <SelectField label={ui('Storage location')} value={cycleCountForm.storage_location_id} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} disabled={!canCreateCycleCounts} />
+          <SelectField label={ui('Storage location')} value={cycleCountForm.storage_location_id} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} required disabled={!canCreateCycleCounts} />
           <InputField label={ui('Department')} value={cycleCountForm.department} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, department: value }))} disabled={!canCreateCycleCounts} />
           <InputField label={ui('Notes')} value={cycleCountForm.notes} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, notes: value }))} disabled={!canCreateCycleCounts} />
           <SelectField label={ui('Product')} value={cycleCountForm.product_id} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, product_id: value }))} options={products.map((product) => ({ value: product.id, label: product.name }))} required disabled={!canCreateCycleCounts} />
-          <InputField label={ui('Expected quantity')} type="number" value={cycleCountForm.expected_quantity} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, expected_quantity: value }))} required disabled={!canCreateCycleCounts} />
-          <InputField label={ui('Counted quantity')} type="number" value={cycleCountForm.counted_quantity} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, counted_quantity: value }))} disabled={!canCreateCycleCounts} />
+          <InputField label={ui('Counted quantity')} type="number" value={cycleCountForm.counted_quantity} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, counted_quantity: value }))} required disabled={!canCreateCycleCounts} />
           <InputField label={ui('Lot number')} value={cycleCountForm.lot_number} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, lot_number: value }))} disabled={!canCreateCycleCounts} />
           <InputField label={ui('Batch number')} value={cycleCountForm.batch_number} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, batch_number: value }))} disabled={!canCreateCycleCounts} />
           <InputField label={ui('Expiry date')} type="date" value={cycleCountForm.expiry_date} onChange={(value) => onCycleCountFormChange((current) => ({ ...current, expiry_date: value }))} disabled={!canCreateCycleCounts} />
@@ -96,19 +100,37 @@ export function CycleCountsTab({
                   <th style={styles.th}>{ui('Status')}</th>
                   <th style={styles.th}>{ui('Department')}</th>
                   <th style={styles.th}>{ui('Notes')}</th>
+                  <th style={styles.th}>{ui('Details')}</th>
                   <th style={styles.th}>{ui('Created')}</th>
                   <th style={styles.th}>{ui('Actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {cycleCounts.map((item) => {
-                  const canSubmitCount = canCreateCycleCounts && item.status === 'draft';
-                  const canReconcile = canApproveCycleCounts && item.status === 'approved';
+                  const evidence = item.items ?? [];
+                  const hasTrustedEvidence = evidence.length > 0 && evidence.every((line) => line.counted_quantity !== null && line.counted_quantity !== undefined && line.snapshot_available !== false);
+                  const canSubmitCount = canCreateCycleCounts && item.status === 'draft' && hasTrustedEvidence;
+                  const canReconcile = canApproveCycleCounts && item.status === 'approved' && hasTrustedEvidence;
                   return (
                     <tr key={item.id}>
                       <td style={styles.td}>{statusLabel(item.status)}</td>
                       <td style={styles.td}>{item.department || '—'}</td>
                       <td style={styles.td}>{item.notes || '—'}</td>
+                      <td style={styles.td}>
+                        {evidence.length ? evidence.map((line, index) => {
+                          return (
+                            <div key={`${line.product_id}-${line.storage_location_id || index}`} style={index ? { marginTop: 8 } : undefined}>
+                              <strong>{line.product_name || ui('Unknown product')}</strong>
+                              <div style={styles.helper}>{line.storage_location_name || ui('Unknown location')}</div>
+                              <div style={styles.helper}>{ui('Expected quantity')}: {evidenceNumber(line.expected_quantity)} · {ui('Counted quantity')}: {evidenceNumber(line.counted_quantity)} · {ui('Variance')}: {evidenceNumber(line.variance_quantity)}</div>
+                              {line.lot_number ? <div style={styles.helper}>{ui('Lot number')}: {line.lot_number}</div> : null}
+                              {line.batch_number ? <div style={styles.helper}>{ui('Batch number')}: {line.batch_number}</div> : null}
+                              {line.serial_numbers?.length ? <div style={styles.helper}>{ui('Serial numbers counted')}: {formatLocalizedNumber(line.serial_numbers.length, locale)}</div> : null}
+                              {line.snapshot_available === false ? <div style={styles.helper}>{ui('Not available')}</div> : null}
+                            </div>
+                          );
+                        }) : '—'}
+                      </td>
                       <td style={styles.td}>{formatLocalizedDateTime(item.created_at, locale)}</td>
                       <td style={styles.td}>
                         <div style={styles.actions}>

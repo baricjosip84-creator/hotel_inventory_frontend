@@ -167,6 +167,7 @@ export function buildApprovalQueue(
       entity_type: 'cycle_count',
       entity_id: item.id,
       label: `${item.department || 'Unassigned'} cycle count`,
+      cycle_count_items: item.items ?? [],
       status: item.status,
       created_at: item.created_at
     }));

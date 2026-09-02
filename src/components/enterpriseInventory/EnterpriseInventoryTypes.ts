@@ -17,6 +17,24 @@ export type ParLevel = {
   active: boolean;
 };
 
+export type CycleCountItem = {
+  product_id: string;
+  product_name?: string | null;
+  product_sku?: string | null;
+  product_unit?: string | null;
+  storage_location_id?: string | null;
+  storage_location_name?: string | null;
+  expected_quantity: number | string;
+  counted_quantity?: number | string | null;
+  variance_quantity?: number | string | null;
+  lot_number?: string | null;
+  batch_number?: string | null;
+  expiry_date?: string | null;
+  serial_numbers?: string[] | null;
+  notes?: string | null;
+  snapshot_available?: boolean;
+};
+
 export type CycleCount = {
   id: string;
   status: string;
@@ -25,6 +43,7 @@ export type CycleCount = {
   notes?: string | null;
   created_at: string;
   updated_at?: string | null;
+  items?: CycleCountItem[];
 };
 
 export type DepartmentRequisitionItem = {
@@ -1326,7 +1345,6 @@ export type CycleCountForm = {
   department: string;
   notes: string;
   product_id: string;
-  expected_quantity: string;
   counted_quantity: string;
   lot_number: string;
   batch_number: string;

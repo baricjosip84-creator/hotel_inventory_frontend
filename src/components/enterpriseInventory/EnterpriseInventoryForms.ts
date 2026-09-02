@@ -54,7 +54,6 @@ export const emptyCycleCountForm: CycleCountForm = {
   department: '',
   notes: '',
   product_id: '',
-  expected_quantity: '',
   counted_quantity: '',
   lot_number: '',
   batch_number: '',

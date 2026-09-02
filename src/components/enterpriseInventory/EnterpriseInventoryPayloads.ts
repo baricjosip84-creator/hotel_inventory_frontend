@@ -81,7 +81,6 @@ export function buildCycleCountPayload(input: CycleCountForm): Record<string, un
       {
         product_id: input.product_id,
         storage_location_id: input.storage_location_id || null,
-        expected_quantity: Number(input.expected_quantity),
         counted_quantity: input.counted_quantity === '' ? null : Number(input.counted_quantity),
         lot_number: input.lot_number.trim() || null,
         batch_number: input.batch_number.trim() || null,
