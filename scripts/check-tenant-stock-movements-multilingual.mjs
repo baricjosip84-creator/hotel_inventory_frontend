@@ -8,6 +8,7 @@ const pass = (message) => console.log(`PASS: ${message}`);
 
 const page = read('src/pages/StockMovementsPage.tsx');
 const reportsPage = read('src/pages/ReportsPage.tsx');
+const reportService = read('../backend/src/services/analytics/reportService.js');
 const reportsLedgerStart = reportsPage.indexOf("activeTab === 'movement-ledger'");
 const reportsLedgerEnd = reportsPage.indexOf("activeTab === 'inventory-variance'", reportsLedgerStart);
 const reportsLedgerSection = reportsPage.slice(reportsLedgerStart, reportsLedgerEnd);
@@ -45,6 +46,9 @@ for (const match of page.matchAll(literalPattern)) {
 const movementLabels = page.match(/const MOVEMENT_LABELS: Record<string, string> = \{([\s\S]*?)\n\};/);
 if (!movementLabels) fail('Stock Movements known movement-label mapping is missing.');
 else for (const match of movementLabels[1].matchAll(/:\s*'([^']+)'/g)) displayKeys.add(match[1]);
+const usageReasonLabels = page.match(/const USAGE_REASON_LABELS: Record<string, string> = \{([\s\S]*?)\n\};/);
+if (!usageReasonLabels) fail('Stock Movements known usage-reason mapping is missing.');
+else for (const match of usageReasonLabels[1].matchAll(/:\s*'([^']+)'/g)) displayKeys.add(match[1]);
 for (const key of [
   'Historical shipment reference unavailable', 'Mixed historical units',
   'No source recorded', 'Shipment item unit cost', 'Product standard cost', 'Supplier return', 'Opening Stock Import',
@@ -73,7 +77,17 @@ for (const anchor of [
   "displayedReceivingNote(movement, ui)",
   "if (type === 'usage_reversal') return localizeComposedLabel(evidence, ui);",
   "const [reference, condition] = value.slice('Return '.length).split(' · ', 2);",
-  "return `${ui('Reversed')} ${ui(detail)}`;"
+  "return `${ui('Reversed')} ${ui(detail)}`;",
+  "guest_use: 'Guest use'",
+  "internal_use: 'Internal use'",
+  "return USAGE_REASON_LABELS[value] || humanizeCode(value);",
+  "return usageReasonLabel(reason.slice('usage:'.length));",
+  "return `Reversed ${usageReasonLabel(reason.slice('usage_reversal:'.length))}`;",
+  "function safeReasonDetailDisplay(movement: StockMovement",
+  "if (type === 'usage') return ui(detail);",
+  "if (['stock_count', 'manual_adjustment', 'stock_hold', 'stock_hold_release'].includes(type)) return detail;",
+  "if (type === 'unproven_legacy') return UUID_TEXT_PATTERN.test(detail) ? ui('Legacy technical reason unavailable') : detail;",
+  "const displayedDetail = safeReasonDetailDisplay(movement, ui);"
 ]) if (!page.includes(anchor)) fail(`Stock Movements audit-safe presentation contract missing: ${anchor}`);
 if (!process.exitCode) pass('Stock Movements preserves unknown/operator evidence and uses keyset-based export independent from summary health.');
 
@@ -86,7 +100,8 @@ for (const forbidden of [
   "ui('Shipment ID')",
   "ui('Transfer ID')",
   '<strong>{filters.reason}</strong>',
-  "movement.cost_source || ''"
+  "movement.cost_source || ''",
+  "{detail ? <div style={styles.rowSubtle}>{localizeComposedLabel(detail, ui)}</div> : null}"
 ]) if (page.includes(forbidden)) fail(`Stock Movements exposes/transforms forbidden audit data: ${forbidden}`);
 if (!process.exitCode) pass('Stock Movements normal UI and CSV do not expose raw technical identifiers or translate exact user reason filters.');
 
@@ -100,7 +115,8 @@ for (const anchor of [
   'row.product_name || ui("Historical Product name unavailable")',
   'row.storage_location_name || ui("Historical location unavailable")',
   'row.actor_name || (row.actor_label ? ui(row.actor_label) : ui("System / support actor"))',
-  'localizeMovementLedgerText(row.reference_label, ui)'
+  'localizeMovementLedgerText(row.reference_label, ui)',
+  'listId="report-locations-ledger"'
 ]) if (!reportsPage.includes(anchor)) fail(`Reports movement-ledger historical presentation contract missing: ${anchor}`);
 for (const forbidden of [
   'formatReference(row.reference_type, row.reference_id, ui)',
@@ -125,8 +141,17 @@ for (const anchor of [
   'ui("Historical Product name unavailable")',
   'ui("Historical location unavailable")',
   'ui("Historical unit unavailable")',
-  "row.actor_label ? ui(row.actor_label)"
+  "row.actor_label ? ui(row.actor_label)",
+  'listId="report-locations-variance"'
 ]) if (!varianceSection.includes(anchor)) fail(`Reports manual-adjustment variance historical presentation contract missing: ${anchor}`);
 if (!process.exitCode) pass('Reports manual-adjustment variance uses historical movement evidence and truthful fallbacks.');
+
+for (const anchor of [
+  "guest_use: 'Guest use'",
+  "internal_use: 'Internal use'",
+  "stockUsageReasonLabel(reason.slice('usage:'.length))",
+  "Reversed ${stockUsageReasonLabel(reason.slice('usage_reversal:'.length))}"
+]) if (!reportService.includes(anchor)) fail(`Reports movement-ledger usage-reason localization contract missing: ${anchor}`);
+if (!process.exitCode) pass('Stock Movements and Reports use canonical translated labels for known usage reason codes.');
 
 if (process.exitCode) process.exit(process.exitCode);

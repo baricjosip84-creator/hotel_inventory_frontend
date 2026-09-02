@@ -1364,7 +1364,7 @@ export default function ReportsPage() {
               <DateRangeFields from={ledgerFilters.from} to={ledgerFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setLedgerFilters, 'from', value)} onToChange={(value) => updateAndClear(setLedgerFilters, 'to', value)} />
               <label className="reports-field reports-field--compact"><span>{ui("Movement type")}</span><select value={ledgerFilters.movement_type} onChange={(event) => updateAndClear(setLedgerFilters, 'movement_type', event.target.value)} disabled={isExporting}>{MOVEMENT_TYPE_OPTIONS.map(([value, label]) => <option key={value || 'all'} value={value}>{ui(label)}</option>)}</select></label>
               <AutocompleteFilterField label={ui("Product")} value={ledgerFilters.product} placeholder={ui("Any product name")} options={filterOptions.products} listId="report-products-ledger" disabled={isExporting} onChange={(value) => updateAndClear(setLedgerFilters, 'product', value)} />
-              <ChoiceFilterField label={ui("Location")} value={ledgerFilters.location} placeholder={ui("Any location")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setLedgerFilters, 'location', value)} />
+              <AutocompleteFilterField label={ui("Location")} value={ledgerFilters.location} placeholder={ui("Any location")} options={filterOptions.locations} listId="report-locations-ledger" disabled={isExporting} onChange={(value) => updateAndClear(setLedgerFilters, 'location', value)} />
               <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={ledgerFilters.limit} onChange={(event) => updateAndClear(setLedgerFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
             </>
           }
@@ -1392,7 +1392,7 @@ export default function ReportsPage() {
             <>
               <DateRangeFields from={varianceFilters.from} to={varianceFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setVarianceFilters, 'from', value)} onToChange={(value) => updateAndClear(setVarianceFilters, 'to', value)} />
               <AutocompleteFilterField label={ui("Product")} value={varianceFilters.product} placeholder={ui("Any product name")} options={filterOptions.products} listId="report-products-variance" disabled={isExporting} onChange={(value) => updateAndClear(setVarianceFilters, 'product', value)} />
-              <ChoiceFilterField label={ui("Location")} value={varianceFilters.location} placeholder={ui("Any location")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setVarianceFilters, 'location', value)} />
+              <AutocompleteFilterField label={ui("Location")} value={varianceFilters.location} placeholder={ui("Any location")} options={filterOptions.locations} listId="report-locations-variance" disabled={isExporting} onChange={(value) => updateAndClear(setVarianceFilters, 'location', value)} />
               <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={varianceFilters.limit} onChange={(event) => updateAndClear(setVarianceFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
             </>
           }

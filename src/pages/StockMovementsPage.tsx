@@ -233,6 +233,21 @@ function humanizeCode(value?: string | null): string {
     .trim();
 }
 
+const USAGE_REASON_LABELS: Record<string, string> = {
+  guest_use: 'Guest use',
+  internal_use: 'Internal use',
+  damage: 'Damage',
+  waste: 'Waste',
+  event: 'Event',
+  maintenance: 'Maintenance',
+  other: 'Other'
+};
+
+function usageReasonLabel(value?: string | null): string {
+  if (!value) return 'Other';
+  return USAGE_REASON_LABELS[value] || humanizeCode(value);
+}
+
 function movementTypeFromRow(movement: StockMovement): string {
   const explicitType = movement.movement_type?.trim();
   const movementKind = movement.movement_kind?.trim();
@@ -297,8 +312,8 @@ function reasonDetail(movement: StockMovement): string | null {
   const type = movementTypeFromRow(movement);
   const reason = movement.reason || '';
   if (!reason) return null;
-  if (type === 'usage' && reason.startsWith('usage:')) return humanizeCode(reason.slice('usage:'.length));
-  if (type === 'usage_reversal' && reason.startsWith('usage_reversal:')) return `Reversed ${humanizeCode(reason.slice('usage_reversal:'.length))}`;
+  if (type === 'usage' && reason.startsWith('usage:')) return usageReasonLabel(reason.slice('usage:'.length));
+  if (type === 'usage_reversal' && reason.startsWith('usage_reversal:')) return `Reversed ${usageReasonLabel(reason.slice('usage_reversal:'.length))}`;
   if (type === 'stock_transfer_in' || type === 'stock_transfer_out') return null;
   if (type === 'outbound_dispatch' && reason.startsWith('outbound_dispatch:')) return `Order ${reason.slice('outbound_dispatch:'.length)}`;
   if (type === 'customer_return' && reason.startsWith('customer_return:')) {
@@ -362,6 +377,16 @@ function safeReasonDisplay(movement: StockMovement, ui: (englishText: string) =>
   if (type === 'unproven_legacy' && evidence === 'Legacy technical reason unavailable') return ui(evidence);
   if (type === 'unproven_legacy') return evidence;
   return ui(evidence);
+}
+
+function safeReasonDetailDisplay(movement: StockMovement, ui: (englishText: string) => string): string | null {
+  const detail = reasonDetail(movement);
+  if (!detail) return null;
+  const type = movementTypeFromRow(movement);
+  if (['stock_count', 'manual_adjustment', 'stock_hold', 'stock_hold_release'].includes(type)) return detail;
+  if (type === 'usage') return ui(detail);
+  if (type === 'unproven_legacy') return UUID_TEXT_PATTERN.test(detail) ? ui('Legacy technical reason unavailable') : detail;
+  return localizeComposedLabel(detail, ui);
 }
 
 function localizeComposedLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
@@ -757,6 +782,7 @@ export default function StockMovementsPage() {
                 const amount = toNumber(movement.change);
                 const type = movementTypeFromRow(movement);
                 const detail = reasonDetail(movement);
+                const displayedDetail = safeReasonDetailDisplay(movement, ui);
                 const reference = businessReference(movement);
                 const canOpenReference = Boolean(
                   reference.to
@@ -768,7 +794,7 @@ export default function StockMovementsPage() {
                     <td style={styles.td}>{formatDateTime(movement.created_at, locale)}</td>
                     <td style={styles.td}><div style={styles.rowTitle}>{movement.product_name || ui("Historical Product name unavailable")}</div><div style={styles.rowSubtle}>{movement.storage_location_name || ui("Historical location unavailable")}</div><div style={styles.rowSubtle}>{movement.product_unit || ui("Historical unit unavailable")}</div></td>
                     <td style={styles.td}><span style={changeBadgeStyle(amount)}>{amount > 0 ? `+${formatLocalizedNumber(amount, locale)}` : formatLocalizedNumber(amount, locale)}</span><div style={styles.rowSubtle}>{formatLocalizedNumber(Math.abs(amount), locale)} {movement.product_unit || ui("Historical unit unavailable")}</div></td>
-                    <td style={styles.td}><span style={badgeStyle(type)}>{ui(movementTypeLabel(type))}</span>{detail ? <div style={styles.rowSubtle}>{localizeComposedLabel(detail, ui)}</div> : null}{displayedReceivingNote(movement, ui) && detail !== safeReceivingNote(movement) ? <div style={styles.note}>{ui("Note:")} {displayedReceivingNote(movement, ui)}</div> : null}</td>
+                    <td style={styles.td}><span style={badgeStyle(type)}>{ui(movementTypeLabel(type))}</span>{displayedDetail ? <div style={styles.rowSubtle}>{displayedDetail}</div> : null}{displayedReceivingNote(movement, ui) && detail !== safeReceivingNote(movement) ? <div style={styles.note}>{ui("Note:")} {displayedReceivingNote(movement, ui)}</div> : null}</td>
                     <td style={styles.td}>{canOpenReference && reference.to ? <Link className="stock-movements-reference-link" to={reference.to}>{localizeComposedLabel(reference.label, ui)}</Link> : <div style={styles.rowTitle}>{localizeComposedLabel(reference.label, ui)}</div>}</td>
                     <td style={styles.td}><div style={styles.rowTitle}>{actorDisplay(movement, ui)}</div></td>
                     <td style={styles.td}><button type="button" className="app-button app-button--secondary stock-movements-details-button" onClick={() => toggleMovementDetails(movement.id)} aria-expanded={isExpanded}>{isExpanded ? ui("Hide") : ui("View")}</button></td>
