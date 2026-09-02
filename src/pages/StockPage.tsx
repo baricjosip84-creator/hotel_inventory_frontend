@@ -2,8 +2,7 @@ import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '../lib/api';
-import { getActiveTenantCurrency } from '../lib/tenantCurrency';
+import { ApiError, apiRequest } from '../lib/api';
 import {
   getCurrentAccessRoleLabel,
   getRoleCapabilities,
@@ -65,6 +64,7 @@ type InventoryLot = {
   quantity: number | string;
   days_to_expiry?: number | string | null;
   unit_cost?: number | string | null;
+  unit_cost_currency?: string | null;
 };
 
 type StockReconciliation = {
@@ -93,6 +93,7 @@ type StockMovement = {
   product_unit?: string | null;
   shipment_id?: string | null;
   shipment_po_number?: string | null;
+  movement_type?: string | null;
   change: number | string;
   reason: string;
   user_id?: string | null;
@@ -157,6 +158,7 @@ type StockMutationResponse = {
     new_quantity: number;
     difference?: number;
     change?: number;
+    version?: number;
   };
 };
 
@@ -291,23 +293,51 @@ function formatLotReference(lot: InventoryLot, ui: (text: string) => string): st
   ].filter(Boolean).join(' · ') || ui('No lot / batch reference');
 }
 
-function formatMovementReason(reason: string | null | undefined): string {
-  if (!reason) return 'Unspecified movement';
+function getMovementReasonPresentation(movement: StockMovement): { text: string; systemOwned: boolean } {
+  const reason = (movement.reason || '').trim();
+  const normalizedReason = reason.toLowerCase();
+  const movementType = (movement.movement_type || '').trim().toLowerCase();
 
-  const normalized = reason.toLowerCase();
-
-  if (normalized === 'shipment_receive') return 'Shipment received';
-  if (normalized === 'inventory_count') return 'Physical count';
-  if (normalized === 'manual_adjustment') return 'Manual adjustment';
-  if (normalized.startsWith('usage:')) {
-    return formatUsageReason(normalized.slice('usage:'.length));
+  if (movementType === 'usage') {
+    if (normalizedReason.startsWith('usage:')) return { text: formatUsageReason(normalizedReason.slice('usage:'.length)), systemOwned: true };
+    return { text: reason || 'Stock consumed', systemOwned: !reason };
+  }
+  if (movementType === 'stock_count') {
+    if (normalizedReason === 'inventory_count' || !reason) return { text: 'Physical count', systemOwned: true };
+    return { text: reason, systemOwned: false };
+  }
+  if (movementType === 'manual_adjustment') {
+    if (normalizedReason === 'manual_adjustment' || !reason) return { text: 'Manual adjustment', systemOwned: true };
+    return { text: reason, systemOwned: false };
   }
 
-  return reason
-    .split(/[_:]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+  const systemLabels: Record<string, string> = {
+    shipment_receive: 'Shipment received',
+    opening_stock: 'Opening stock',
+    usage_reversal: 'Usage reversed',
+    stock_transfer_in: 'Transfer received',
+    stock_transfer_out: 'Transfer sent',
+    reservation_fulfillment: 'Reservation fulfilled',
+    requisition_fulfillment: 'Requisition fulfilled',
+    cycle_count_reconciliation: 'Cycle count reconciled',
+    expiry_writeoff: 'Expired stock write-off',
+    quarantine_release: 'Quarantine released',
+    stock_hold: 'Stock placed on hold',
+    stock_hold_release: 'Stock hold released',
+    supplier_return_dispatch: 'Supplier return sent',
+    outbound_dispatch: 'Outbound dispatched',
+    customer_return: 'Customer return'
+  };
+
+  if (movementType && systemLabels[movementType]) return { text: systemLabels[movementType], systemOwned: true };
+  if (normalizedReason === 'shipment_receive') return { text: 'Shipment received', systemOwned: true };
+  if (normalizedReason === 'inventory_count') return { text: 'Physical count', systemOwned: true };
+  if (normalizedReason === 'manual_adjustment') return { text: 'Manual adjustment', systemOwned: true };
+  if (normalizedReason.startsWith('usage:')) return { text: formatUsageReason(normalizedReason.slice('usage:'.length)), systemOwned: true };
+
+  // Unknown/user-entered reason text is business evidence. Preserve it exactly
+  // and keep it outside the repository-owned localization catalog.
+  return { text: reason || 'Unspecified movement', systemOwned: !reason };
 }
 
 function getEffectiveMinimum(item: StockItem): number {
@@ -527,10 +557,45 @@ export default function StockPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'healthy' | 'reserved-risk'>('all');
   const [expiryWindowDays, setExpiryWindowDays] = useState(30);
+  const [lotPage, setLotPage] = useState(0);
+  const [countBaseVersion, setCountBaseVersion] = useState<number | null>(null);
+  const lotPageSize = 100;
+  const lotPageCount = Math.max(1, Math.ceil(inventoryLots.length / lotPageSize));
+  const visibleInventoryLots = useMemo(
+    () => inventoryLots.slice(lotPage * lotPageSize, (lotPage + 1) * lotPageSize),
+    [inventoryLots, lotPage]
+  );
+
+  useEffect(() => {
+    setLotPage((current) => Math.min(current, Math.max(lotPageCount - 1, 0)));
+  }, [lotPageCount]);
 
   const expiryWindowLots = useMemo(() => inventoryLots.filter((lot) => { const days = lot.days_to_expiry === null || lot.days_to_expiry === undefined ? null : Number(lot.days_to_expiry); return lot.quantity && days !== null && Number.isFinite(days) && days >= 0 && days <= expiryWindowDays && !['expired'].includes(lot.operational_status || lot.condition); }), [inventoryLots, expiryWindowDays]);
   const expiryWindowQuantity = useMemo(() => expiryWindowLots.reduce((sum, lot) => sum + Number(lot.quantity || 0), 0), [expiryWindowLots]);
-  const expiryWindowValue = useMemo(() => expiryWindowLots.reduce((sum, lot) => sum + Number(lot.quantity || 0) * Number(lot.unit_cost || 0), 0), [expiryWindowLots]);
+  const expiryWindowCostEvidence = useMemo(() => {
+    const totals = new Map<string, number>();
+    let unknownCurrencyValueRows = 0;
+    let unpricedRows = 0;
+    for (const lot of expiryWindowLots) {
+      if (lot.unit_cost === null || lot.unit_cost === undefined || String(lot.unit_cost).trim() === '') {
+        unpricedRows += 1;
+        continue;
+      }
+      const currency = (lot.unit_cost_currency || '').trim().toUpperCase();
+      if (!currency) {
+        unknownCurrencyValueRows += 1;
+        continue;
+      }
+      const value = Number(lot.quantity || 0) * Number(lot.unit_cost);
+      if (!Number.isFinite(value)) continue;
+      totals.set(currency, (totals.get(currency) || 0) + value);
+    }
+    return { totals, unknownCurrencyValueRows, unpricedRows };
+  }, [expiryWindowLots]);
+  const expiryWindowCostRows = useMemo(
+    () => [...expiryWindowCostEvidence.totals.entries()].sort(([left], [right]) => left.localeCompare(right)),
+    [expiryWindowCostEvidence]
+  );
   const expiredAvailableLots = useMemo(
     () => inventoryLots.filter((lot) => {
       const days = lot.days_to_expiry === null || lot.days_to_expiry === undefined
@@ -638,6 +703,7 @@ export default function StockPage() {
     if (filteredRows.some((row) => row.id === selectedStockId)) return;
 
     setSelectedStockId('');
+    setCountBaseVersion(null);
     setDraft(getDefaultDraft(preferredAction));
     setOperationFeedback('');
     setOperationError('');
@@ -827,6 +893,7 @@ export default function StockPage() {
         body: JSON.stringify({
           product_id: selectedRow.product_id,
           storage_location_id: selectedRow.storage_location_id,
+          expected_version: countBaseVersion,
           quantity: Number(draft.quantity),
           reason: draft.reason.trim() || 'inventory_count',
           lot_number: Number(draft.quantity) > currentQuantity ? (draft.lot_number.trim() || null) : null,
@@ -842,6 +909,7 @@ export default function StockPage() {
       setOperationFeedback(ui('Stock count applied successfully.'));
       setLastResult(response);
       setDraft(getDefaultDraft('count'));
+      setCountBaseVersion(response.stock.version ?? null);
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock'] }),
@@ -854,6 +922,11 @@ export default function StockPage() {
       const message = error instanceof Error ? error.message : ui("Failed to apply stock count");
       setOperationFeedback('');
       setOperationError(message);
+      if (error instanceof ApiError && error.code === 'VERSION_CONFLICT') {
+        setDraft(getDefaultDraft('count'));
+        setCountBaseVersion(null);
+        void queryClient.invalidateQueries({ queryKey: ['stock'] });
+      }
     }
   });
 
@@ -994,6 +1067,10 @@ export default function StockPage() {
         return { valid: false, message: ui("Counted quantity must be zero or greater.") };
       }
 
+      if (!Number.isInteger(countBaseVersion) || Number(countBaseVersion) < 1) {
+        return { valid: false, message: ui("Re-enter the physical count after refreshing this stock position.") };
+      }
+
       if (quantity > currentQuantity) {
         if (selectedRow.requires_lot_tracking && !draft.lot_number.trim() && !draft.batch_number.trim()) {
           return { valid: false, message: ui("This product requires a lot or batch number for added stock.") };
@@ -1045,6 +1122,7 @@ export default function StockPage() {
 
     return { valid: true, message: '' };
   }, [
+    countBaseVersion,
     createsReservationShortfall,
     currentProjectedFreeQuantity,
     currentQuantity,
@@ -1182,6 +1260,7 @@ export default function StockPage() {
 
   const selectStockRow = (stockId: string) => {
     setSelectedStockId(stockId);
+    setCountBaseVersion(null);
     const selectedActionAllowed =
       draft.action === 'consume' ? canConsume : draft.action === 'count' ? canCount : canAdjust;
     setDraft(getDefaultDraft(selectedActionAllowed ? draft.action : preferredAction));
@@ -1278,13 +1357,13 @@ export default function StockPage() {
           title={ui("Low Stock")}
           value={formatLocalizedNumber(summary.lowRows, locale)}
           subtitle={ui("Below configured minimum threshold")}
-          tone={summary.lowRows > 0 ? 'warn' : 'good'}
+          tone={summary.totalRows === 0 ? 'default' : summary.lowRows > 0 ? 'warn' : 'good'}
         />
         <StatCard
           title={ui("Availability Risk")}
           value={formatLocalizedNumber(summary.availabilityRiskRows, locale)}
           subtitle={ui("Available quantity below the minimum after reservations")}
-          tone={summary.availabilityRiskRows > 0 ? 'warn' : 'good'}
+          tone={summary.totalRows === 0 ? 'default' : summary.availabilityRiskRows > 0 ? 'warn' : 'good'}
         />
         <StatCard
           title={ui("Total On Hand")}
@@ -1301,7 +1380,7 @@ export default function StockPage() {
           title={ui("Available")}
           value={formatLocalizedNumber(summary.projectedFreeTotal, locale)}
           subtitle={ui("On-hand quantity after active reservations")}
-          tone={summary.projectedFreeTotal < 0 ? 'warn' : 'good'}
+          tone={summary.totalRows === 0 ? 'default' : summary.projectedFreeTotal < 0 ? 'warn' : 'good'}
         />
       </div>
 
@@ -1405,7 +1484,22 @@ export default function StockPage() {
             <div className="app-grid-stats" style={styles.statsGrid}>
               <StatCard title={ui("Lot Balances")} value={formatLocalizedNumber(inventoryLots.length, locale)} subtitle={ui("Available, held, quarantined, or expired lot-level balances")} />
               <StatCard title={`${ui('Expiring within')} ${formatLocalizedNumber(expiryWindowDays, locale)} ${ui('days')}`} value={formatLocalizedNumber(expiryWindowLots.length, locale)} subtitle={`${formatLocalizedNumber(expiryWindowQuantity, locale)} ${ui('units in the selected window')}`} tone={expiryWindowLots.length ? 'warn' : 'good'} />
-              <StatCard title={ui("Expiry Value at Risk")} value={formatLocalizedCurrency(expiryWindowValue, getActiveTenantCurrency(), locale, { maximumFractionDigits: 2 })} subtitle={ui("Estimated from lot unit cost where available")} tone={expiryWindowValue > 0 ? 'warn' : 'good'} />
+              <StatCard
+                title={ui("Expiry Value at Risk")}
+                value={expiryWindowCostEvidence.unknownCurrencyValueRows > 0
+                  ? ui("Partial cost evidence")
+                  : expiryWindowCostRows.length === 0
+                    ? '-'
+                    : expiryWindowCostRows.length === 1
+                      ? formatLocalizedCurrency(expiryWindowCostRows[0][1], expiryWindowCostRows[0][0], locale, { maximumFractionDigits: 2 })
+                      : ui("Multiple currencies")}
+                subtitle={expiryWindowCostRows.length
+                  ? `${expiryWindowCostRows.map(([currency, value]) => formatLocalizedCurrency(value, currency, locale, { maximumFractionDigits: 2 })).join(' · ')}${expiryWindowCostEvidence.unknownCurrencyValueRows ? ` · ${ui('Some priced lots have unknown currency')}` : ''}`
+                  : expiryWindowCostEvidence.unpricedRows > 0
+                    ? ui("No comparable priced-lot evidence in the selected window")
+                    : ui("Estimated from lot unit cost where available")}
+                tone={(expiryWindowCostRows.some(([, value]) => value > 0) || expiryWindowCostEvidence.unknownCurrencyValueRows > 0) ? 'warn' : 'default'}
+              />
               <StatCard title={ui("Expired")} value={formatLocalizedNumber(inventoryLots.filter((lot) => lot.operational_status === 'expired').length, locale)} subtitle={ui("Expired lot balances requiring or reflecting write-off status")} tone={inventoryLots.some((lot) => lot.operational_status === 'expired') ? 'warn' : 'good'} />
               <StatCard title={ui("Blocked / Held")} value={formatLocalizedNumber(inventoryLots.filter((lot) => lot.condition === 'hold').length, locale)} subtitle={ui("Stock manually blocked from use")} tone={inventoryLots.some((lot) => lot.condition === 'hold') ? 'warn' : 'good'} />
               <StatCard title={ui("Quarantine")} value={formatLocalizedNumber(inventoryLots.filter((lot) => lot.condition === 'quarantine').length, locale)} subtitle={ui("Stock received into quarantine")} tone={inventoryLots.some((lot) => lot.condition === 'quarantine') ? 'warn' : 'good'} />
@@ -1420,7 +1514,7 @@ export default function StockPage() {
                 <table style={styles.table}>
                   <thead><tr><th style={styles.th}>{ui("Product")}</th><th style={styles.th}>{ui("Location")}</th><th style={styles.th}>{ui("Lot / Batch")}</th><th style={styles.th}>{ui("Expiry")}</th><th style={styles.th}>{ui("Condition")}</th><th style={styles.th}>{ui("Quantity")}</th><th style={styles.th}>{ui("Action")}</th></tr></thead>
                   <tbody>
-                    {inventoryLots.slice(0, 100).map((lot) => (
+                    {visibleInventoryLots.map((lot) => (
                       <tr key={lot.id}>
                         <td style={styles.td}>{lot.product_name || ui("Unnamed product")}</td>
                         <td style={styles.td}>{lot.storage_location_name || ui("Unknown location")}</td>
@@ -1433,6 +1527,15 @@ export default function StockPage() {
                     ))}
                   </tbody>
                 </table>
+                {inventoryLots.length > lotPageSize ? (
+                  <div className="app-actions" style={styles.loadingActions}>
+                    <span style={styles.rowSubtle}>
+                      {ui('Showing lot balances')} {formatLocalizedNumber(lotPage * lotPageSize + 1, locale)}–{formatLocalizedNumber(Math.min((lotPage + 1) * lotPageSize, inventoryLots.length), locale)} {ui('of')} {formatLocalizedNumber(inventoryLots.length, locale)}
+                    </span>
+                    <button type="button" style={styles.secondaryButton} disabled={lotPage === 0} onClick={() => setLotPage((current) => Math.max(current - 1, 0))}>{ui('Previous')}</button>
+                    <button type="button" style={styles.secondaryButton} disabled={lotPage >= lotPageCount - 1} onClick={() => setLotPage((current) => Math.min(current + 1, lotPageCount - 1))}>{ui('Next')}</button>
+                  </div>
+                ) : null}
               </div>
             )}
           </>
@@ -1893,6 +1996,7 @@ export default function StockPage() {
                       title={!canConsume ? currentActionBlockedMessage : undefined}
                       onClick={() => {
                         setDraft(getDefaultDraft('consume'));
+                        setCountBaseVersion(null);
                         setOperationFeedback('');
                         setOperationError('');
                         setLastResult(null);
@@ -1913,6 +2017,7 @@ export default function StockPage() {
                       title={!canCount ? ui("Your current access role cannot post physical stock counts.") : undefined}
                       onClick={() => {
                         setDraft(getDefaultDraft('count'));
+                        setCountBaseVersion(null);
                         setOperationFeedback('');
                         setOperationError('');
                         setLastResult(null);
@@ -1933,6 +2038,7 @@ export default function StockPage() {
                       title={!canAdjust ? ui("Your current access role cannot apply manual stock adjustments.") : undefined}
                       onClick={() => {
                         setDraft(getDefaultDraft('adjust'));
+                        setCountBaseVersion(null);
                         setOperationFeedback('');
                         setOperationError('');
                         setLastResult(null);
@@ -1982,12 +2088,17 @@ export default function StockPage() {
                           min={draft.action === 'consume' ? '0.0001' : '0'}
                           step="0.01"
                           value={draft.quantity}
-                          onChange={(event) =>
+                          onChange={(event) => {
+                            const nextValue = event.target.value;
+                            if (draft.action === 'count') {
+                              if (!nextValue) setCountBaseVersion(null);
+                              else if (!draft.quantity && selectedRow) setCountBaseVersion(Number(selectedRow.version));
+                            }
                             setDraft((current) => ({
                               ...current,
-                              quantity: event.target.value
-                            }))
-                          }
+                              quantity: nextValue
+                            }));
+                          }}
                         />
                       </div>
                     )}
@@ -2086,7 +2197,7 @@ export default function StockPage() {
                           >
                             {USAGE_REASON_OPTIONS.map((option) => (
                               <option key={option.value} value={option.value}>
-                                {option.label}
+                                {ui(option.label)}
                               </option>
                             ))}
                           </select>
@@ -2359,8 +2470,11 @@ export default function StockPage() {
                               <span style={changeBadgeStyle(change)}>{changeDisplay(change, locale)}</span>
                             </div>
                             <div style={styles.movementMetaRow}>
-                              <span style={reasonBadgeStyle(movement.reason)} title={movement.reason}>
-                                {ui(formatMovementReason(movement.reason))}
+                              <span style={reasonBadgeStyle(movement.movement_type || movement.reason)}>
+                                {(() => {
+                                  const presentation = getMovementReasonPresentation(movement);
+                                  return presentation.systemOwned ? ui(presentation.text) : presentation.text;
+                                })()}
                               </span>
                               <span style={styles.rowSubtle}>
                                 {ui("By")} {movement.user_name || ui("System / unknown user")}

@@ -55,7 +55,11 @@ const dynamicCatalogKeys = [
   'Other', 'Operational usage that does not fit another reason.', 'Unassigned', 'Unspecified movement',
   'Shipment received', 'Physical count', 'Manual adjustment', 'Consume Stock', 'Apply Physical Count', 'Manual Adjustment',
   'Reduce stock by a positive quantity for operational usage.', 'Set stock to the physically verified quantity from a real count.',
-  'Apply a positive or negative correction delta to the selected stock position.', 'Consume removes stock for day-to-day operational usage.'
+  'Apply a positive or negative correction delta to the selected stock position.', 'Consume removes stock for day-to-day operational usage.',
+  'Stock consumed', 'Opening stock', 'Usage reversed', 'Transfer received', 'Transfer sent',
+  'Reservation fulfilled', 'Requisition fulfilled', 'Cycle count reconciled', 'Expired stock write-off',
+  'Quarantine released', 'Stock placed on hold', 'Stock hold released', 'Supplier return sent',
+  'Outbound dispatched', 'Customer return'
 ];
 const missingDynamic = dynamicCatalogKeys.filter((key) => !uniqueKeys.has(key));
 if (missingDynamic.length) fail(`Stock dynamic helper labels are missing translations: ${missingDynamic.join(' | ')}`);
@@ -77,8 +81,9 @@ if (!stockSource.includes('useAppTranslation')) fail('Stock must use the shared 
 if (!stockSource.includes('formatLocalizedDate(') || !stockSource.includes('formatLocalizedDateTime(') || !stockSource.includes('formatLocalizedNumber(')) {
   fail('Stock must use locale-aware date, date/time and number formatting.');
 }
-if (!stockSource.includes('formatLocalizedCurrency(expiryWindowValue, getActiveTenantCurrency(), locale')) {
-  fail('Stock expiry value-at-risk must use locale-aware currency formatting.');
+if (!stockSource.includes('formatLocalizedCurrency(expiryWindowCostRows[0][1], expiryWindowCostRows[0][0], locale') ||
+    !stockSource.includes("expiryWindowCostRows.map(([currency, value]) => formatLocalizedCurrency(value, currency, locale")) {
+  fail('Stock expiry value-at-risk must preserve and format lot-level currency provenance.');
 }
 
 const forbiddenMixedLanguage = [
@@ -104,10 +109,15 @@ if (!stockSource.includes("setOperationFeedback(ui('Stock consumed successfully.
 if (!stockSource.includes("`${selectedRow.product_name || ui(\"Selected product\")} ${ui('is selected for review.')}`")) {
   fail('Stock workflow selection summary must localize its composed suffix.');
 }
-if (!stockSource.includes("ui(formatUsageReason(") || !stockSource.includes('ui(formatMovementReason(') ||
+if (!stockSource.includes("ui(formatUsageReason(") || !stockSource.includes('getMovementReasonPresentation(movement)') ||
+    !stockSource.includes('presentation.systemOwned ? ui(presentation.text) : presentation.text') ||
     !stockSource.includes('ui(getActionLabel(') || !stockSource.includes('ui(getActionHelpText(')) {
-  fail('Canonical Stock reason/action helpers must be translated only at display time.');
+  fail('Canonical Stock reason/action helpers must respect the repository-owned localization boundary at display time.');
 }
+if (!stockSource.includes('{ui(option.label)}')) fail('Stock usage reason labels must be localized.');
+if (stockSource.includes('title={movement.reason}')) fail('Stock movement cards must not expose raw technical movement reasons through title text.');
+if (stockSource.includes('inventoryLots.slice(0, 100)')) fail('Stock lot balances must not silently truncate after 100 rows.');
+if (stockSource.includes('function formatMovementReason(')) fail('Stock must not humanize arbitrary movement reason evidence.');
 
 const canonicalContracts = [
   "type StockActionType = 'consume' | 'count' | 'adjust'",
