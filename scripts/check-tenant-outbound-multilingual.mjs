@@ -25,7 +25,7 @@ else {
   const missingErrorTranslations=[...new Set(entries.map((m)=>m[2]).filter((key)=>!unique.has(key)))];
   if(entries.length<65)fail(`Outbound deterministic mutation-error coverage unexpectedly shrank to ${entries.length} code mappings.`);
   if(missingErrorTranslations.length)fail(`Outbound deterministic mutation-error messages missing translations: ${missingErrorTranslations.join(' | ')}`);
-  for(const code of ['CUSTOMER_NAME_CONFLICT','CUSTOMER_ARCHIVE_ACTIVE_OUTBOUND_ORDER','OUTBOUND_REFERENCE_ARCHIVED','OUTBOUND_DISPATCH_REFERENCE_ARCHIVED','CUSTOMER_RETURN_DISPATCH_CHANGED','CUSTOMER_RETURN_ALLOCATION_CLAIM_CHANGED']) {
+  for(const code of ['CUSTOMER_NAME_CONFLICT','CUSTOMER_ARCHIVE_ACTIVE_OUTBOUND_ORDER','OUTBOUND_REFERENCE_ARCHIVED','OUTBOUND_DISPATCH_REFERENCE_ARCHIVED','CUSTOMER_RETURN_DISPATCH_CHANGED','CUSTOMER_RETURN_ALLOCATION_CLAIM_CHANGED','CUSTOMER_RETURN_LOCATION_HIERARCHY_PARENT','CUSTOMER_RETURN_AVAILABLE_LOCATION_NOT_PICKABLE','OUTBOUND_DOCUMENT_STATE_INVALID','OUTBOUND_DOCUMENT_INTERNAL_ONLY','OUTBOUND_CUSTOMER_EMAIL_REQUIRED']) {
     if(!entries.some((m)=>m[1]===code)) fail(`Outbound deterministic mutation-error mapping missing code: ${code}`);
   }
   if(!process.exitCode)pass(`${entries.length} deterministic Outbound mutation-error codes are catalog-backed.`);
@@ -107,11 +107,13 @@ for(const required of [
   'TENANT_PERMISSIONS.CUSTOMER_RETURNS_CANCEL'
 ])if(!pageSource.includes(required))fail(`Outbound permission contract missing: ${required}`);
 for(const required of [
-  "apiRequest<Customer[]>(`/outbound/customers?include_archived=${includeArchivedCustomers ? 'true' : 'false'}`)",
-  "apiRequest<Order[]>('/outbound/orders')",
+  "apiRequest<Customer[]>('/outbound/customers?include_archived=false')",
+  "apiRequest<PageResponse<Customer>>(`/outbound/customers?include_archived=${includeArchivedCustomers ? 'true' : 'false'}&page=${customerPage}&page_size=${CUSTOMER_PAGE_SIZE}&search=${encodeURIComponent(customerSearch.trim())}`)",
+  "apiRequest<PageResponse<Order>>(`/outbound/orders?page=${orderPage}&page_size=${ORDER_PAGE_SIZE}&status=${encodeURIComponent(orderStatus)}&search=${encodeURIComponent(orderSearch.trim())}`)",
   "apiRequest<OutboundSummary>('/outbound/summary')",
-  "apiRequest<TraceRow[]>('/outbound/trace')",
-  "apiRequest<CustomerReturn[]>('/outbound/returns')",
+  "apiRequest<PageResponse<TraceRow>>(`/outbound/trace?page=${tracePage}&page_size=${TRACE_PAGE_SIZE}&search=${encodeURIComponent(traceSearch.trim())}`)",
+  "apiRequest<PageResponse<TraceRow>>(`/outbound/returnable-dispatches?page=${returnOptionPage}&page_size=${RETURNABLE_PAGE_SIZE}&search=${encodeURIComponent(returnOptionSearch.trim())}&order_id=${encodeURIComponent(returnSelectedOrderId)}`)",
+  "apiRequest<PageResponse<CustomerReturn>>(`/outbound/returns?page=${returnPage}&page_size=${RETURN_PAGE_SIZE}&status=${encodeURIComponent(returnStatus)}&search=${encodeURIComponent(returnSearch.trim())}`)",
   "apiRequest<OrderOptionsResponse>('/outbound/order-options')",
   '`/outbound/orders/${pickOrderId}/pick-options`',
   "path: '/outbound/customers'",
@@ -141,8 +143,27 @@ for(const required of [
   "<option value=\"damaged\">",
   "<option value=\"rejected\">",
   'condition: line.condition',
-  'body: { reason: reason.trim() }'
+  'body: { reason: cancelOrderReason.trim() }',
+  'body: { reason: cancelReturnReason.trim() }'
 ])if(!pageSource.includes(required))fail(`Outbound canonical payload/status value changed or missing: ${required}`);
+for(const required of [
+  "`/outbound/orders/${selectedOrderId}/activity?audit_page=${orderAuditPage}&audit_page_size=${AUDIT_PAGE_SIZE}`",
+  "`/outbound/returns/${selectedReturnId}/activity?audit_page=${returnAuditPage}&audit_page_size=${AUDIT_PAGE_SIZE}`",
+  "`/outbound/orders/${selectedOrderId}/documents`",
+  "`/outbound/orders/${selectedOrderId}/communications`",
+  "entity_type=outbound_order",
+  "entity_type=customer_return",
+  "ui('Full audit history')",
+  "orderActivity.data.audit.items",
+  "returnActivity.data.audit.items",
+  "const AUDIT_PAGE_SIZE = 25",
+  "ui('Preview & Send Email')",
+  "ui('Customer reference / PO number')",
+  "ui('Delivery address')",
+  "apiRequest<Array<Location & { is_pickable?: boolean; location_type?: string | null }>>('/outbound/return-locations')",
+  '<details className="outbound-panel outbound-workflow-panel">'
+])if(!pageSource.includes(required))fail(`Outbound operational-workflow closure missing: ${required}`);
+if(!process.exitCode)pass('Outbound exposes readable activity/audit history, customer documents/email history, attachments, delivery details, governed return destinations, and a compact workflow guide.');
 for(const required of [
   "apiRequest<OrderOptionsResponse>('/outbound/order-options')",
   "Choose product with available stock",
@@ -162,10 +183,14 @@ for(const required of [
   "window.confirm(ui('Clear the current picked quantities and pick again?'))",
   "window.confirm(ui('Dispatch all currently packed stock? Inventory will be reduced for the packed quantities now.'))",
   "window.confirm(ui('Receive this customer return into inventory now?'))",
-  "window.prompt(ui('Return cancellation reason'))",
+  "ui('Return cancellation reason')",
+  "cancelOrderReason.trim().length < 3",
+  "cancelReturnReason.trim().length < 3",
   "ui('Choose a customer and complete at least one order line.')",
   "ui('Enter a picked quantity greater than zero.')",
   "ui('Customer return created and is waiting to be received.')"
 ])if(!pageSource.includes(required))fail(`Outbound localized mutation feedback/confirmation missing: ${required}`);
-if(!process.exitCode)pass('Outbound frontend validations, confirmations, stock-aware draft rules, prompts, and success feedback are multilingual.');
+if(pageSource.includes('window.prompt('))fail('Outbound must not use browser prompt dialogs for cancellation reasons.');
+if(!process.exitCode)pass('Outbound frontend validations, confirmations, stock-aware draft rules, inline cancellation forms, and success feedback are multilingual.');
+if(pageSource.includes('/outbound/returnable-dispatches?page=') && pageSource.includes('RETURNABLE_PAGE_SIZE') && pageSource.includes('returnSelectedOrderId')) pass('Return creation uses a paged server-side eligible-dispatch search and narrows multi-line returns to one order.'); else fail('Return creation must use the paged server-side eligible-dispatch contract.');
 if(!process.exitCode)pass('OutboundPage multilingual conversion is complete.');

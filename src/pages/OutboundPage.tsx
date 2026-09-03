@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
+import { apiRequest, apiDownloadFile, apiMutationRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalSectionHeader, OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, OperationalWorkspaceStatCard, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './OutboundPage.css';
 
 type Customer = {
@@ -62,6 +62,12 @@ type Order = {
   requested_date?: string | null;
   notes?: string | null;
   cancellation_reason?: string | null;
+  customer_reference?: string | null;
+  delivery_contact_name?: string | null;
+  delivery_email?: string | null;
+  delivery_phone?: string | null;
+  delivery_address?: string | null;
+  delivery_instructions?: string | null;
   created_at?: string | null;
   confirmed_at?: string | null;
   picking_started_at?: string | null;
@@ -145,12 +151,27 @@ type CustomerReturn = {
   reason: string;
   notes?: string | null;
   cancellation_reason?: string | null;
+  customer_reference?: string | null;
+  delivery_contact_name?: string | null;
+  delivery_email?: string | null;
+  delivery_phone?: string | null;
+  delivery_address?: string | null;
+  delivery_instructions?: string | null;
   created_at?: string | null;
   received_at?: string | null;
   cancelled_at?: string | null;
   items: ReturnItem[];
   version: number;
 };
+
+type ActivityRow = { key: string; at: string; user_name?: string | null; details?: string | null; quantity?: number | string | null; dispatch_event_id?: string | null };
+type AuditRow = { id: string; action: string; created_at: string; metadata?: Record<string, unknown>; user_name?: string | null; user_email?: string | null };
+type OrderActivity = { events: ActivityRow[]; audit: PageResponse<AuditRow> | null };
+type OutboundDocument = { id: string; document_type: string; document_number: string; filename: string; created_at: string; created_by_name?: string | null; created_by_email?: string | null; sent_count?: number };
+type Communication = { id: string; recipient_email: string; subject: string; message?: string | null; delivery_method?: string | null; delivery_status: 'pending' | 'sent' | 'failed'; sandbox_capture: boolean; attempted_at: string; sent_at?: string | null; sent_by_name?: string | null; document_type: string; document_number: string; filename: string };
+type Attachment = { id: string; original_filename: string; mime_type?: string | null; file_size_bytes?: number; created_at: string; can_download?: boolean };
+type EmailCompose = { document_id: string; document_type: string; document_title: string; document_number: string; filename: string; recipient_email: string; subject: string; message: string };
+type DocumentPreview = { title: string; document_type: string; document_number: string; order_number?: string | null; return_number?: string | null; customer_reference?: string | null; company?: { name?: string | null; address?: string | null }; customer?: { name?: string | null; address?: string | null; email?: string | null; phone?: string | null; contact_name?: string | null }; delivery_instructions?: string | null; notes?: string | null; internal?: boolean; items: Array<{ sku?: string | null; product_name?: string | null; quantity: number; unit?: string | null; location?: string | null; condition?: string | null; notes?: string | null }> };
 
 type OutboundSummary = {
   open_orders: number;
@@ -165,7 +186,7 @@ type OutboundSummary = {
 };
 
 type CustomerForm = { name: string; email: string; phone: string; address: string; notes: string };
-type OrderForm = { customer_id: string; requested_date: string; notes: string; items: Line[] };
+type OrderForm = { customer_id: string; requested_date: string; customer_reference: string; delivery_contact_name: string; delivery_email: string; delivery_phone: string; delivery_address: string; delivery_instructions: string; notes: string; items: Line[] };
 type OutboundTab = 'orders' | 'customers' | 'returns' | 'trace';
 type ReturnLineForm = {
   allocation_id: string;
@@ -175,6 +196,8 @@ type ReturnLineForm = {
   serial_numbers: string[];
 };
 type ReturnForm = { reason: string; notes: string; items: ReturnLineForm[] };
+type PageResponse<T> = { items: T[]; total: number; page: number; page_size: number };
+
 type MutationInput = {
   path: string;
   method?: 'POST' | 'PUT';
@@ -187,6 +210,12 @@ const emptyCustomer: CustomerForm = { name: '', email: '', phone: '', address: '
 const emptyOrder: OrderForm = {
   customer_id: '',
   requested_date: '',
+  customer_reference: '',
+  delivery_contact_name: '',
+  delivery_email: '',
+  delivery_phone: '',
+  delivery_address: '',
+  delivery_instructions: '',
   notes: '',
   items: [{ product_id: '', storage_location_id: '', quantity: '1', uom_code: '' }]
 };
@@ -203,6 +232,8 @@ const ORDER_PAGE_SIZE = 10;
 const CUSTOMER_PAGE_SIZE = 12;
 const TRACE_PAGE_SIZE = 15;
 const RETURN_PAGE_SIZE = 10;
+const RETURNABLE_PAGE_SIZE = 20;
+const AUDIT_PAGE_SIZE = 25;
 
 const toNumber = (value: number | string | undefined | null) => {
   const parsed = Number(value ?? 0);
@@ -235,6 +266,32 @@ const CANONICAL_DISPLAY_LABELS: Record<string, string> = {
 const queryErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof ApiError || error instanceof Error) return error.message;
   return fallback;
+};
+
+const OUTBOUND_ACTIVITY_LABELS: Record<string, string> = {
+  created: 'Created', confirmed: 'Confirmed', picking_started: 'Picking started', picked_stock: 'Stock picked', packed: 'Order packed', packed_stock: 'Stock packed', dispatched: 'Order dispatched', dispatched_stock: 'Stock dispatched', cancelled: 'Cancelled',
+  dispatch_wave: 'Dispatch completed',
+  return_created: 'Return created', return_received: 'Return received', return_cancelled: 'Return cancelled'
+};
+
+const OUTBOUND_AUDIT_LABELS: Record<string, string> = {
+  'outbound_order.created': 'Order created',
+  'outbound_order.updated': 'Order updated',
+  'outbound_order.confirmed': 'Order confirmed',
+  'outbound_order.picking_started': 'Picking started',
+  'outbound_order.picked': 'Stock picked',
+  'outbound_order.stock_picked': 'Stock picked',
+  'outbound_order.packed': 'Order packed',
+  'outbound_order.picks_reset': 'Picks cleared',
+  'outbound_order.partially_dispatched': 'Partial dispatch',
+  'outbound_order.dispatched': 'Order dispatched',
+  'outbound_order.cancelled': 'Order cancelled',
+  'customer_return.created': 'Return created',
+  'customer_return.received': 'Return received',
+  'customer_return.cancelled': 'Return cancelled',
+  'outbound_document.created': 'Document created',
+  'outbound_document.email_sent': 'Customer email sent',
+  'outbound_document.email_failed': 'Customer email failed'
 };
 
 const OUTBOUND_MUTATION_ERROR_MESSAGES: Record<string, string> = {
@@ -303,7 +360,21 @@ const OUTBOUND_MUTATION_ERROR_MESSAGES: Record<string, string> = {
   CUSTOMER_RETURN_LOCATION_ARCHIVED: 'The selected return location is no longer active. Cancel this return and create it again with an active location.',
   CUSTOMER_RETURN_SERIAL_STATE_CHANGED: 'The serialized item state changed before the return was received. Refresh and review the return.',
   CUSTOMER_RETURN_NOT_CANCELLABLE: 'This return is no longer in the required state to be cancelled.',
-  CUSTOMER_RETURN_CANCEL_REASON_REQUIRED: 'Enter a cancellation reason.'
+  CUSTOMER_RETURN_CANCEL_REASON_REQUIRED: 'Enter a cancellation reason.',
+  CUSTOMER_RETURN_LOCATION_HIERARCHY_PARENT: 'Return stock must go to a final storage location, not a parent location.',
+  CUSTOMER_RETURN_AVAILABLE_LOCATION_NOT_PICKABLE: 'Stock returned as usable must go to a pickable storage location.',
+  OUTBOUND_DOCUMENT_TYPE_INVALID: 'Choose a valid Outbound document type.',
+  OUTBOUND_DOCUMENT_STATE_INVALID: 'This document cannot be created at the current stage of the order or return.',
+  OUTBOUND_DOCUMENT_ALREADY_EXISTS: 'This document has already been created. Download or send the existing PDF instead.',
+  OUTBOUND_DELIVERY_NOTE_NONE_PENDING: 'There is no dispatched stock waiting for a new delivery note.',
+  OUTBOUND_DOCUMENT_NOT_FOUND: 'The requested Outbound document is no longer available.',
+  OUTBOUND_DOCUMENT_INTERNAL_ONLY: 'This warehouse document is internal and cannot be emailed to the customer.',
+  OUTBOUND_DOCUMENT_TENANT_USER_REQUIRED: 'A tenant user must create Outbound business documents.',
+  OUTBOUND_EMAIL_TENANT_USER_REQUIRED: 'A tenant user must send customer documents.',
+  OUTBOUND_EMAIL_PENDING_ATTEMPT: 'A previous email attempt is still pending. Check the email history before sending another copy.',
+  OUTBOUND_EMAIL_DELIVERY_RECORD_PENDING: 'The email was accepted for delivery, but its history could not be finalized. Do not resend it; check the pending email record.',
+  OUTBOUND_EMAIL_CONFIRMATION_REQUIRED: 'Preview the customer email and confirm it before sending.',
+  OUTBOUND_CUSTOMER_EMAIL_REQUIRED: 'Enter a customer email address before sending.'
 };
 
 const mutationErrorMessage = (error: unknown, ui: (englishText: string) => string) => {
@@ -390,8 +461,23 @@ export default function OutboundPage() {
   const [returnSearch, setReturnSearch] = useState('');
   const [returnStatus, setReturnStatus] = useState('all');
   const [returnPage, setReturnPage] = useState(1);
+  const [returnOptionSearch, setReturnOptionSearch] = useState('');
+  const [returnOptionPage, setReturnOptionPage] = useState(1);
+  const [returnAllocationSelections, setReturnAllocationSelections] = useState<Record<string, TraceRow>>({});
   const [traceSearch, setTraceSearch] = useState('');
   const [tracePage, setTracePage] = useState(1);
+  const [orderAuditPage, setOrderAuditPage] = useState(1);
+  const [returnAuditPage, setReturnAuditPage] = useState(1);
+  const [selectedOrderId, setSelectedOrderId] = useState('');
+  const [selectedReturnId, setSelectedReturnId] = useState('');
+  const [documentPreview, setDocumentPreview] = useState<DocumentPreview | null>(null);
+  const [returnDocumentPreview, setReturnDocumentPreview] = useState<DocumentPreview | null>(null);
+  const [emailCompose, setEmailCompose] = useState<EmailCompose | null>(null);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [cancelOrderId, setCancelOrderId] = useState('');
+  const [cancelOrderReason, setCancelOrderReason] = useState('');
+  const [cancelReturnId, setCancelReturnId] = useState('');
+  const [cancelReturnReason, setCancelReturnReason] = useState('');
 
   const canCustomerRead = hasPermission(TENANT_PERMISSIONS.CUSTOMERS_READ);
   const canCustomerWrite = hasPermission(TENANT_PERMISSIONS.CUSTOMERS_WRITE);
@@ -406,23 +492,34 @@ export default function OutboundPage() {
   const canReturnCreate = hasPermission(TENANT_PERMISSIONS.CUSTOMER_RETURNS_CREATE);
   const canReturnReceive = hasPermission(TENANT_PERMISSIONS.CUSTOMER_RETURNS_RECEIVE);
   const canReturnCancel = hasPermission(TENANT_PERMISSIONS.CUSTOMER_RETURNS_CANCEL);
+  const canAuditRead = hasPermission(TENANT_PERMISSIONS.AUDIT_READ);
+  const canAttachmentRead = hasPermission(TENANT_PERMISSIONS.ATTACHMENTS_READ);
+  const canAttachmentWrite = hasPermission(TENANT_PERMISSIONS.ATTACHMENTS_WRITE);
 
-  const customerDataNeeded = canCustomerRead && (activeTab === 'customers' || showOrderForm || Boolean(editingOrder));
+  const customerDataNeeded = canCustomerRead && (showOrderForm || Boolean(editingOrder));
   const productDataNeeded = canProductRead && (showOrderForm || Boolean(editingOrder));
-  const locationDataNeeded = canLocationRead && (showOrderForm || Boolean(editingOrder) || (activeTab === 'returns' && canReturnCreate));
-  const traceDataNeeded = activeTab === 'trace' || (activeTab === 'returns' && canReturnCreate);
+  const locationDataNeeded = canLocationRead && (showOrderForm || Boolean(editingOrder));
+  const returnTraceDataNeeded = activeTab === 'returns' && canReturnCreate;
+  const returnSelectedOrderId = returnForm.items.map((line) => returnAllocationSelections[line.allocation_id]?.outbound_order_id).find(Boolean) ?? '';
 
   const customers = useQuery({
-    queryKey: ['outbound-customers', includeArchivedCustomers],
-    queryFn: () => apiRequest<Customer[]>(`/outbound/customers?include_archived=${includeArchivedCustomers ? 'true' : 'false'}`),
+    queryKey: ['outbound-customer-options'],
+    queryFn: () => apiRequest<Customer[]>('/outbound/customers?include_archived=false'),
     enabled: customerDataNeeded
   });
-  const orders = useQuery({ queryKey: ['outbound-orders'], queryFn: () => apiRequest<Order[]>('/outbound/orders') });
+  const customerRegistry = useQuery({
+    queryKey: ['outbound-customers', includeArchivedCustomers, customerSearch, customerPage],
+    queryFn: () => apiRequest<PageResponse<Customer>>(`/outbound/customers?include_archived=${includeArchivedCustomers ? 'true' : 'false'}&page=${customerPage}&page_size=${CUSTOMER_PAGE_SIZE}&search=${encodeURIComponent(customerSearch.trim())}`),
+    enabled: activeTab === 'customers' && canCustomerRead
+  });
+  const orders = useQuery({ queryKey: ['outbound-orders', orderSearch, orderStatus, orderPage], queryFn: () => apiRequest<PageResponse<Order>>(`/outbound/orders?page=${orderPage}&page_size=${ORDER_PAGE_SIZE}&status=${encodeURIComponent(orderStatus)}&search=${encodeURIComponent(orderSearch.trim())}`) });
   const summary = useQuery({ queryKey: ['outbound-summary'], queryFn: () => apiRequest<OutboundSummary>('/outbound/summary') });
-  const trace = useQuery({ queryKey: ['outbound-trace'], queryFn: () => apiRequest<TraceRow[]>('/outbound/trace'), enabled: traceDataNeeded });
-  const returns = useQuery({ queryKey: ['outbound-returns'], queryFn: () => apiRequest<CustomerReturn[]>('/outbound/returns'), enabled: activeTab === 'returns' && canReturnRead });
+  const trace = useQuery({ queryKey: ['outbound-trace', traceSearch, tracePage], queryFn: () => apiRequest<PageResponse<TraceRow>>(`/outbound/trace?page=${tracePage}&page_size=${TRACE_PAGE_SIZE}&search=${encodeURIComponent(traceSearch.trim())}`), enabled: activeTab === 'trace' });
+  const returnTrace = useQuery({ queryKey: ['outbound-returnable-dispatches', returnOptionSearch, returnOptionPage, returnSelectedOrderId], queryFn: () => apiRequest<PageResponse<TraceRow>>(`/outbound/returnable-dispatches?page=${returnOptionPage}&page_size=${RETURNABLE_PAGE_SIZE}&search=${encodeURIComponent(returnOptionSearch.trim())}&order_id=${encodeURIComponent(returnSelectedOrderId)}`), enabled: returnTraceDataNeeded });
+  const returns = useQuery({ queryKey: ['outbound-returns', returnSearch, returnStatus, returnPage], queryFn: () => apiRequest<PageResponse<CustomerReturn>>(`/outbound/returns?page=${returnPage}&page_size=${RETURN_PAGE_SIZE}&status=${encodeURIComponent(returnStatus)}&search=${encodeURIComponent(returnSearch.trim())}`), enabled: activeTab === 'returns' && canReturnRead });
   const products = useQuery({ queryKey: ['products'], queryFn: () => apiRequest<Product[]>('/products'), enabled: productDataNeeded });
   const locations = useQuery({ queryKey: ['storage-locations'], queryFn: () => apiRequest<Location[]>('/storage-locations'), enabled: locationDataNeeded });
+  const returnLocations = useQuery({ queryKey: ['outbound-return-locations'], queryFn: () => apiRequest<Array<Location & { is_pickable?: boolean; location_type?: string | null }>>('/outbound/return-locations'), enabled: activeTab === 'returns' && canReturnCreate && canLocationRead });
   const orderOptions = useQuery({
     queryKey: ['outbound-order-options'],
     queryFn: () => apiRequest<OrderOptionsResponse>('/outbound/order-options'),
@@ -434,6 +531,14 @@ export default function OutboundPage() {
     queryFn: () => apiRequest<PickOptions>(`/outbound/orders/${pickOrderId}/pick-options`),
     enabled: Boolean(pickOrderId) && canStockRead
   });
+  const orderActivity = useQuery({ queryKey: ['outbound-order-activity', selectedOrderId, orderAuditPage], queryFn: () => apiRequest<OrderActivity>(`/outbound/orders/${selectedOrderId}/activity?audit_page=${orderAuditPage}&audit_page_size=${AUDIT_PAGE_SIZE}`), enabled: Boolean(selectedOrderId) });
+  const orderDocuments = useQuery({ queryKey: ['outbound-order-documents', selectedOrderId], queryFn: () => apiRequest<OutboundDocument[]>(`/outbound/orders/${selectedOrderId}/documents`), enabled: Boolean(selectedOrderId) });
+  const orderCommunications = useQuery({ queryKey: ['outbound-order-communications', selectedOrderId], queryFn: () => apiRequest<Communication[]>(`/outbound/orders/${selectedOrderId}/communications`), enabled: Boolean(selectedOrderId) });
+  const orderAttachments = useQuery({ queryKey: ['outbound-order-attachments', selectedOrderId], queryFn: () => apiRequest<Attachment[]>(`/enterprise-inventory/attachments?entity_type=outbound_order&entity_id=${selectedOrderId}`), enabled: Boolean(selectedOrderId) && canAttachmentRead });
+  const returnDocuments = useQuery({ queryKey: ['outbound-return-documents', selectedReturnId], queryFn: () => apiRequest<OutboundDocument[]>(`/outbound/returns/${selectedReturnId}/documents`), enabled: Boolean(selectedReturnId) && canReturnRead });
+  const returnCommunications = useQuery({ queryKey: ['outbound-return-communications', selectedReturnId], queryFn: () => apiRequest<Communication[]>(`/outbound/returns/${selectedReturnId}/communications`), enabled: Boolean(selectedReturnId) && canReturnRead });
+  const returnActivity = useQuery({ queryKey: ['outbound-return-activity', selectedReturnId, returnAuditPage], queryFn: () => apiRequest<OrderActivity>(`/outbound/returns/${selectedReturnId}/activity?audit_page=${returnAuditPage}&audit_page_size=${AUDIT_PAGE_SIZE}`), enabled: Boolean(selectedReturnId) && canReturnRead });
+  const returnAttachments = useQuery({ queryKey: ['outbound-return-attachments', selectedReturnId], queryFn: () => apiRequest<Attachment[]>(`/enterprise-inventory/attachments?entity_type=customer_return&entity_id=${selectedReturnId}`), enabled: Boolean(selectedReturnId) && canAttachmentRead });
 
   useEffect(() => {
     if (!pickOptions.data) return;
@@ -456,6 +561,7 @@ export default function OutboundPage() {
   useEffect(() => { setOrderPage(1); }, [orderSearch, orderStatus]);
   useEffect(() => { setCustomerPage(1); }, [customerSearch, includeArchivedCustomers]);
   useEffect(() => { setReturnPage(1); }, [returnSearch, returnStatus]);
+  useEffect(() => { setReturnOptionPage(1); }, [returnOptionSearch]);
   useEffect(() => { setTracePage(1); }, [traceSearch]);
 
   const invalidate = async () => {
@@ -464,6 +570,7 @@ export default function OutboundPage() {
       qc.invalidateQueries({ queryKey: ['outbound-orders'] }),
       qc.invalidateQueries({ queryKey: ['outbound-summary'] }),
       qc.invalidateQueries({ queryKey: ['outbound-trace'] }),
+      qc.invalidateQueries({ queryKey: ['outbound-returnable-dispatches'] }),
       qc.invalidateQueries({ queryKey: ['outbound-returns'] }),
       qc.invalidateQueries({ queryKey: ['outbound-pick-options'] }),
       qc.invalidateQueries({ queryKey: ['outbound-order-options'] }),
@@ -475,7 +582,15 @@ export default function OutboundPage() {
       qc.invalidateQueries({ queryKey: ['inventory-reservations-summary'] }),
       qc.invalidateQueries({ queryKey: ['alerts'] }),
       qc.invalidateQueries({ queryKey: ['dashboard-unresolved-alerts'] }),
-      qc.invalidateQueries({ queryKey: ['dashboard-outbound-summary'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-outbound-summary'] }),
+      qc.invalidateQueries({ queryKey: ['outbound-order-activity'] }),
+      qc.invalidateQueries({ queryKey: ['outbound-order-documents'] }),
+      qc.invalidateQueries({ queryKey: ['outbound-order-communications'] }),
+      qc.invalidateQueries({ queryKey: ['outbound-order-attachments'] }),
+      qc.invalidateQueries({ queryKey: ['outbound-return-documents'] }),
+      qc.invalidateQueries({ queryKey: ['outbound-return-communications'] }),
+      qc.invalidateQueries({ queryKey: ['outbound-return-activity'] }),
+      qc.invalidateQueries({ queryKey: ['outbound-return-attachments'] })
     ]);
   };
 
@@ -499,7 +614,7 @@ export default function OutboundPage() {
 
   const customerOptions = useMemo(() => customers.data ?? [], [customers.data]);
   const activeCustomers = useMemo(() => customerOptions.filter((customer) => customer.active), [customerOptions]);
-  const orderRows = useMemo(() => orders.data ?? [], [orders.data]);
+  const orderRows = useMemo(() => orders.data?.items ?? [], [orders.data]);
   const productOptions = useMemo(() => products.data ?? [], [products.data]);
   const locationOptions = useMemo(() => locations.data ?? [], [locations.data]);
   const availableOrderProducts = useMemo(() => orderOptions.data?.products ?? [], [orderOptions.data]);
@@ -523,60 +638,26 @@ export default function OutboundPage() {
     return { product, location, factorToBase, availableInSelectedUom, requestedBase, valid };
   };
   const orderLinesStockValid = orderForm.items.length > 0 && orderForm.items.every((line) => orderAvailabilityForLine(line).valid);
-  const returnRows = useMemo(() => returns.data ?? [], [returns.data]);
-  const traceRows = useMemo(() => trace.data ?? [], [trace.data]);
-  const returnableTrace = traceRows.filter((row) => toNumber(row.returnable_quantity) > 0);
-  const returnCreateEligibleTrace = returnableTrace.filter((row) => !row.historical_serialized || row.serial_tracking_enabled);
-  const blockedHistoricalSerializedReturns = returnableTrace.filter((row) => row.historical_serialized && !row.serial_tracking_enabled);
+  const returnRows = useMemo(() => returns.data?.items ?? [], [returns.data]);
+  const traceRows = useMemo(() => trace.data?.items ?? [], [trace.data]);
+  const returnableTraceRows = useMemo(() => returnTrace.data?.items ?? [], [returnTrace.data]);
+  const returnCreateEligibleTrace = returnableTraceRows;
+  const returnableTotal = returnTrace.data?.total ?? 0;
+  const returnablePageCount = Math.max(1, Math.ceil(returnableTotal / RETURNABLE_PAGE_SIZE));
 
-  const filteredOrders = useMemo(() => {
-    const search = orderSearch.trim().toLocaleLowerCase();
-    return orderRows.filter((order) => {
-      if (orderStatus === 'open' && !OPEN_STATUSES.has(order.status)) return false;
-      if (orderStatus === 'completed' && !['dispatched', 'cancelled'].includes(order.status)) return false;
-      if (!['all', 'open', 'completed'].includes(orderStatus) && order.status !== orderStatus) return false;
-      if (!search) return true;
-      return [
-        order.order_number,
-        order.customer_name,
-        order.notes,
-        ...order.items.flatMap((item) => [item.product_name, item.product_sku, item.storage_location_name])
-      ].some((value) => String(value || '').toLocaleLowerCase().includes(search));
-    });
-  }, [orderRows, orderSearch, orderStatus]);
-
-  const pagedOrders = filteredOrders.slice((orderPage - 1) * ORDER_PAGE_SIZE, orderPage * ORDER_PAGE_SIZE);
-  const orderPageCount = Math.max(1, Math.ceil(filteredOrders.length / ORDER_PAGE_SIZE));
-
-  const filteredCustomers = useMemo(() => {
-    const search = customerSearch.trim().toLocaleLowerCase();
-    if (!search) return customerOptions;
-    return customerOptions.filter((customer) => [customer.name, customer.email, customer.phone, customer.address, customer.notes]
-      .some((value) => String(value || '').toLocaleLowerCase().includes(search)));
-  }, [customerOptions, customerSearch]);
-  const pagedCustomers = filteredCustomers.slice((customerPage - 1) * CUSTOMER_PAGE_SIZE, customerPage * CUSTOMER_PAGE_SIZE);
-  const customerPageCount = Math.max(1, Math.ceil(filteredCustomers.length / CUSTOMER_PAGE_SIZE));
-
-  const filteredReturns = useMemo(() => {
-    const search = returnSearch.trim().toLocaleLowerCase();
-    return returnRows.filter((row) => {
-      if (returnStatus !== 'all' && row.status !== returnStatus) return false;
-      if (!search) return true;
-      return [row.return_number, row.order_number, row.customer_name, row.reason, row.notes, ...row.items.flatMap((item) => [item.product_name, item.product_sku])]
-        .some((value) => String(value || '').toLocaleLowerCase().includes(search));
-    });
-  }, [returnRows, returnSearch, returnStatus]);
-  const pagedReturns = filteredReturns.slice((returnPage - 1) * RETURN_PAGE_SIZE, returnPage * RETURN_PAGE_SIZE);
-  const returnPageCount = Math.max(1, Math.ceil(filteredReturns.length / RETURN_PAGE_SIZE));
-
-  const filteredTrace = useMemo(() => {
-    const search = traceSearch.trim().toLocaleLowerCase();
-    if (!search) return traceRows;
-    return traceRows.filter((row) => [row.order_number, row.customer_name, row.product_name, row.product_sku, row.storage_location_name, row.lot_number, row.batch_number, ...(row.serial_numbers || [])]
-      .some((value) => String(value || '').toLocaleLowerCase().includes(search)));
-  }, [traceRows, traceSearch]);
-  const pagedTrace = filteredTrace.slice((tracePage - 1) * TRACE_PAGE_SIZE, tracePage * TRACE_PAGE_SIZE);
-  const tracePageCount = Math.max(1, Math.ceil(filteredTrace.length / TRACE_PAGE_SIZE));
+  const pagedOrders = orderRows;
+  const orderTotal = orders.data?.total ?? 0;
+  const orderPageCount = Math.max(1, Math.ceil(orderTotal / ORDER_PAGE_SIZE));
+  const customerRows = customerRegistry.data?.items ?? [];
+  const pagedCustomers = customerRows;
+  const customerTotal = customerRegistry.data?.total ?? 0;
+  const customerPageCount = Math.max(1, Math.ceil(customerTotal / CUSTOMER_PAGE_SIZE));
+  const pagedReturns = returnRows;
+  const returnTotal = returns.data?.total ?? 0;
+  const returnPageCount = Math.max(1, Math.ceil(returnTotal / RETURN_PAGE_SIZE));
+  const pagedTrace = traceRows;
+  const traceTotal = trace.data?.total ?? 0;
+  const tracePageCount = Math.max(1, Math.ceil(traceTotal / TRACE_PAGE_SIZE));
 
   const cleanOrderItems = (form: OrderForm) => form.items
     .filter((line) => line.product_id && line.storage_location_id && Number(line.quantity) > 0)
@@ -616,6 +697,20 @@ export default function OutboundPage() {
     setShowCustomerForm(false);
   };
 
+  const selectOrderCustomer = (customerId: string) => {
+    const customer = activeCustomers.find((row) => row.id === customerId);
+    setOrderForm((current) => ({
+      ...current,
+      customer_id: customerId,
+      // Copy current Customer contact details into the editable draft. They are
+      // saved on the order itself, so later Customer edits cannot rewrite history.
+      delivery_contact_name: customer?.name ?? '',
+      delivery_email: customer?.email ?? '',
+      delivery_phone: customer?.phone ?? '',
+      delivery_address: customer?.address ?? ''
+    }));
+  };
+
   const saveOrder = () => {
     const items = cleanOrderItems(orderForm);
     if (!orderForm.customer_id || !items.length) {
@@ -625,6 +720,12 @@ export default function OutboundPage() {
     const body = {
       customer_id: orderForm.customer_id,
       requested_date: orderForm.requested_date || null,
+      customer_reference: orderForm.customer_reference.trim() || null,
+      delivery_contact_name: orderForm.delivery_contact_name.trim() || null,
+      delivery_email: orderForm.delivery_email.trim() || null,
+      delivery_phone: orderForm.delivery_phone.trim() || null,
+      delivery_address: orderForm.delivery_address.trim() || null,
+      delivery_instructions: orderForm.delivery_instructions.trim() || null,
       notes: orderForm.notes.trim() || null,
       items
     };
@@ -640,11 +741,121 @@ export default function OutboundPage() {
     });
   };
 
+  const previewOrderDocument = async (order: Order, type: 'order_confirmation' | 'pick_list' | 'packing_slip' | 'delivery_note') => {
+    try {
+      setError('');
+      const preview = await apiRequest<DocumentPreview>(`/outbound/orders/${order.id}/documents/preview`, { method: 'POST', body: JSON.stringify({ type }) });
+      setSelectedOrderId(order.id);
+      setDocumentPreview(preview);
+    } catch (previewError) {
+      setError(mutationErrorMessage(previewError, ui));
+    }
+  };
+
+  const createOrderDocument = async (order: Order, type: 'order_confirmation' | 'pick_list' | 'packing_slip' | 'delivery_note') => {
+    try {
+      setError('');
+      await apiRequest(`/outbound/orders/${order.id}/documents`, { method: 'POST', body: JSON.stringify({ type }) });
+      setMessage(ui('Document created and stored with this order.'));
+      setSelectedOrderId(order.id);
+      await Promise.all([orderDocuments.refetch(), orderActivity.refetch()]);
+    } catch (documentError) {
+      setError(mutationErrorMessage(documentError, ui));
+    }
+  };
+
+  const sendStoredDocument = async (document: OutboundDocument) => {
+    try {
+      setError('');
+      const preview = await apiRequest<{ recipient_email: string; subject: string; message?: string; document: { document_type: string; title: string; document_number: string; filename: string } }>(`/outbound/documents/${document.id}/email-preview`, { method: 'POST', body: JSON.stringify({}) });
+      setEmailCompose({ document_id: document.id, document_type: preview.document.document_type, document_title: preview.document.title, document_number: preview.document.document_number, filename: preview.document.filename, recipient_email: preview.recipient_email || '', subject: preview.subject || '', message: preview.message || '' });
+    } catch (sendError) {
+      setError(mutationErrorMessage(sendError, ui));
+    }
+  };
+
+  const sendPreviewedEmail = async () => {
+    if (!emailCompose?.recipient_email.trim() || !emailCompose.subject.trim()) return;
+    try {
+      setError('');
+      const result = await apiRequest<{ message?: string }>(`/outbound/documents/${emailCompose.document_id}/send-email`, { method: 'POST', body: JSON.stringify({ recipient_email: emailCompose.recipient_email.trim(), subject: emailCompose.subject.trim(), message: emailCompose.message.trim(), confirmed: true }) });
+      setMessage(result.message || ui('Customer email sent.'));
+      setEmailCompose(null);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['outbound-order-documents'] }),
+        qc.invalidateQueries({ queryKey: ['outbound-order-communications'] }),
+        qc.invalidateQueries({ queryKey: ['outbound-order-activity'] }),
+        qc.invalidateQueries({ queryKey: ['outbound-return-documents'] }),
+        qc.invalidateQueries({ queryKey: ['outbound-return-communications'] }),
+        qc.invalidateQueries({ queryKey: ['outbound-return-activity'] })
+      ]);
+    } catch (sendError) {
+      setError(mutationErrorMessage(sendError, ui));
+    }
+  };
+
+  const emailComposer = emailCompose ? <div className="outbound-email-preview">
+    <div className="outbound-card-topline"><div><strong>{ui('Email preview')}</strong><div className="outbound-muted">{ui(emailCompose.document_title)} · {emailCompose.document_number}</div></div><button type="button" className="outbound-button" onClick={() => setEmailCompose(null)}>{ui('Close Preview')}</button></div>
+    <div className="outbound-form-grid">
+      <label className="outbound-field">{ui('Recipient')}<input type="email" value={emailCompose.recipient_email} onChange={(event) => setEmailCompose({ ...emailCompose, recipient_email: event.target.value })} /></label>
+      <label className="outbound-field">{ui('Email subject')}<input value={emailCompose.subject} onChange={(event) => setEmailCompose({ ...emailCompose, subject: event.target.value })} /></label>
+      <label className="outbound-field outbound-field--wide">{ui('Message')}<textarea placeholder={ui('Optional message to the customer')} value={emailCompose.message} onChange={(event) => setEmailCompose({ ...emailCompose, message: event.target.value })} /></label>
+    </div>
+    <div className="outbound-muted">{ui('The stored PDF will be attached to this email:')} {emailCompose.filename}</div>
+    <div className="outbound-actions-row"><button type="button" className="outbound-button-primary" disabled={!emailCompose.recipient_email.trim() || !emailCompose.subject.trim()} onClick={() => void sendPreviewedEmail()}>{ui('Send Email')}</button><button type="button" className="outbound-button" onClick={() => setEmailCompose(null)}>{ui('Cancel')}</button></div>
+  </div> : null;
+
+  const uploadBusinessAttachment = async (entityType: 'outbound_order' | 'customer_return', entityId: string) => {
+    if (!entityId || !attachmentFile) return;
+    try {
+      setError('');
+      const params = new URLSearchParams({ entity_type: entityType, entity_id: entityId, original_filename: attachmentFile.name, mime_type: attachmentFile.type || 'application/octet-stream' });
+      await apiMutationRequest(`/enterprise-inventory/attachments/upload?${params.toString()}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: attachmentFile, skipMutationFeedback: true });
+      setAttachmentFile(null);
+      setMessage(ui('Attachment uploaded.'));
+      if (entityType === 'outbound_order') await orderAttachments.refetch();
+      else await returnAttachments.refetch();
+    } catch (attachmentError) {
+      setError(mutationErrorMessage(attachmentError, ui));
+    }
+  };
+
+  const previewReturnReceipt = async (row: CustomerReturn) => {
+    try {
+      setError('');
+      const preview = await apiRequest<DocumentPreview>(`/outbound/returns/${row.id}/documents/preview`, { method: 'POST', body: JSON.stringify({}) });
+      setSelectedReturnId(row.id);
+      setReturnDocumentPreview(preview);
+    } catch (documentError) {
+      setError(mutationErrorMessage(documentError, ui));
+    }
+  };
+
+  const createReturnReceipt = async (row: CustomerReturn) => {
+    try {
+      setError('');
+      const created = await apiRequest<OutboundDocument>(`/outbound/returns/${row.id}/documents`, { method: 'POST', body: JSON.stringify({}) });
+      setMessage(ui('Document created and stored.'));
+      setSelectedReturnId(row.id);
+      await returnDocuments.refetch();
+      await apiDownloadFile(`/outbound/documents/${created.id}/download`, created.filename);
+    } catch (documentError) {
+      setError(mutationErrorMessage(documentError, ui));
+    }
+  };
+
+
   const beginOrderEdit = (order: Order) => {
     setEditingOrder(order);
     setOrderForm({
       customer_id: order.customer_id,
       requested_date: order.requested_date ? String(order.requested_date).slice(0, 10) : '',
+      customer_reference: order.customer_reference ?? '',
+      delivery_contact_name: order.delivery_contact_name ?? '',
+      delivery_email: order.delivery_email ?? '',
+      delivery_phone: order.delivery_phone ?? '',
+      delivery_address: order.delivery_address ?? '',
+      delivery_instructions: order.delivery_instructions ?? '',
       notes: order.notes ?? '',
       items: order.items.map((item) => ({
         product_id: item.product_id,
@@ -708,17 +919,24 @@ export default function OutboundPage() {
     });
   };
 
-  const selectedTraceForReturnLine = (line: ReturnLineForm) => returnCreateEligibleTrace.find((row) => row.allocation_id === line.allocation_id) ?? null;
+  const selectedTraceForReturnLine = (line: ReturnLineForm) => returnAllocationSelections[line.allocation_id] ?? returnCreateEligibleTrace.find((row) => row.allocation_id === line.allocation_id) ?? null;
   const firstSelectedReturnTrace = returnForm.items.map(selectedTraceForReturnLine).find(Boolean) ?? null;
   const returnOrderId = firstSelectedReturnTrace?.outbound_order_id ?? null;
 
+  useEffect(() => { setReturnOptionPage(1); }, [returnOrderId]);
+
   const eligibleReturnRowsForLine = (index: number) => {
     const selectedElsewhere = new Set(returnForm.items.filter((_, lineIndex) => lineIndex !== index).map((line) => line.allocation_id).filter(Boolean));
-    return returnCreateEligibleTrace.filter((row) => (!returnOrderId || row.outbound_order_id === returnOrderId) && !selectedElsewhere.has(row.allocation_id));
+    const currentSelected = selectedTraceForReturnLine(returnForm.items[index] ?? emptyReturnLine());
+    const rows = currentSelected && !returnCreateEligibleTrace.some((row) => row.allocation_id === currentSelected.allocation_id)
+      ? [currentSelected, ...returnCreateEligibleTrace]
+      : returnCreateEligibleTrace;
+    return rows.filter((row, rowIndex, allRows) => (!returnOrderId || row.outbound_order_id === returnOrderId) && !selectedElsewhere.has(row.allocation_id) && allRows.findIndex((candidate) => candidate.allocation_id === row.allocation_id) === rowIndex);
   };
 
   const chooseReturnAllocation = (index: number, allocationId: string) => {
-    const selected = returnableTrace.find((row) => row.allocation_id === allocationId);
+    const selected = returnCreateEligibleTrace.find((row) => row.allocation_id === allocationId) ?? returnAllocationSelections[allocationId];
+    if (selected) setReturnAllocationSelections((current) => ({ ...current, [selected.allocation_id]: selected }));
     setReturnForm((current) => ({
       ...current,
       items: current.items.map((line, lineIndex) => lineIndex === index
@@ -741,7 +959,7 @@ export default function OutboundPage() {
     if (returnForm.reason.trim().length < 3) return ui('Enter a return reason of at least 3 characters.');
     if (!returnForm.items.length) return ui('Add at least one returned item.');
     for (const line of returnForm.items) {
-      const selected = returnCreateEligibleTrace.find((row) => row.allocation_id === line.allocation_id);
+      const selected = selectedTraceForReturnLine(line);
       const quantity = Number(line.quantity);
       if (!selected || !line.storage_location_id || !Number.isFinite(quantity) || quantity <= 0) return ui('Complete every return line with dispatched stock, a return location, and a quantity.');
       if (quantity > toNumber(selected.returnable_quantity)) return ui('Return quantity for {product} exceeds the quantity still returnable.').replace('{product}', selected.product_name);
@@ -769,14 +987,14 @@ export default function OutboundPage() {
         }))
       },
       successMessage: ui('Customer return created and is waiting to be received.')
-    }, { onSuccess: () => setReturnForm(emptyReturnForm()) });
+    }, { onSuccess: () => { setReturnForm(emptyReturnForm()); setReturnAllocationSelections({}); setReturnOptionSearch(''); setReturnOptionPage(1); } });
   };
 
   const canUseOrderForm = canCreate && canCustomerRead && canProductRead && canLocationRead && canStockRead;
   const canEditOrderForm = canUpdate && canCustomerRead && canProductRead && canLocationRead && canStockRead;
   const showCustomerTab = canCustomerRead || canCustomerWrite;
   const showReturnTab = canReturnRead || canReturnCreate;
-  const activeOrderCount = orderRows.filter((row) => OPEN_STATUSES.has(row.status)).length;
+  const activeOrderCount = summary.data?.open_orders || undefined;
 
   const setTab = (tab: OutboundTab) => {
     setMessage('');
@@ -790,11 +1008,6 @@ export default function OutboundPage() {
       eyebrow={ui('Customer fulfillment')}
       title={ui('Outbound workspace')}
       description={ui('Confirming an order reserves stock. Warehouse staff then record what was physically picked, pack only those quantities, and dispatch only packed stock. Partial dispatches keep the remaining order reservation intact.')}
-      meta={<>
-        <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
-        <OperationalWorkspaceMetaPill>{ui('Reserve on confirmation')}</OperationalWorkspaceMetaPill>
-        <OperationalWorkspaceMetaPill>{ui('Dispatch reduces stock')}</OperationalWorkspaceMetaPill>
-      </>}
     />
 
     {message ? <div className="outbound-alert outbound-alert--success" role="status">{message}</div> : null}
@@ -819,12 +1032,8 @@ export default function OutboundPage() {
       </div> : null}
     </section>
 
-    <section className="outbound-panel outbound-workflow-panel">
-      <OperationalSectionHeader
-        iconPath="/outbound"
-        title={ui('Outbound workflow')}
-        description={ui('The same controlled sequence is used for every customer order.')}
-      />
+    <details className="outbound-panel outbound-workflow-panel">
+      <summary className="outbound-workflow-summary"><span><strong>{ui('Outbound workflow')}</strong><small>{ui('View the five order steps')}</small></span></summary>
       <div className="outbound-workflow-grid" aria-label={ui('Outbound workflow')}>
         <div className="outbound-workflow-step"><strong>{ui('1. Draft')}</strong><span>{ui('Choose the customer, products, source locations, quantities, and requested date.')}</span></div>
         <div className="outbound-workflow-step"><strong>{ui('2. Confirm')}</strong><span>{ui('Reserve usable stock so another workflow cannot consume the same free quantity.')}</span></div>
@@ -832,7 +1041,7 @@ export default function OutboundPage() {
         <div className="outbound-workflow-step"><strong>{ui('4. Pack')}</strong><span>{ui('Mark only the currently picked quantities as packed and ready for dispatch.')}</span></div>
         <div className="outbound-workflow-step"><strong>{ui('5. Dispatch')}</strong><span>{ui('Reduce inventory only when packed stock leaves the business. Returns are handled separately.')}</span></div>
       </div>
-    </section>
+    </details>
 
     <OperationalWorkspaceTabs ariaLabel={ui('Outbound work areas')} hint={ui('Choose the part of the fulfillment workflow you want to work in.')}>
       <OperationalWorkspaceTab active={activeTab === 'orders'} iconPath="/outbound" label={ui('Orders')} count={activeOrderCount} onClick={() => setTab('orders')} />
@@ -853,15 +1062,19 @@ export default function OutboundPage() {
           {(customers.isLoading || products.isLoading || locations.isLoading || orderOptions.isLoading) ? <div className="outbound-alert outbound-alert--info">{ui('Loading customer and currently available stock options…')}</div> : null}
           {(customers.isError || products.isError || locations.isError || orderOptions.isError) ? <div className="outbound-alert outbound-alert--error">{ui('Unable to load all order options.')} {customers.isError ? queryErrorMessage(customers.error, '') : products.isError ? queryErrorMessage(products.error, '') : locations.isError ? queryErrorMessage(locations.error, '') : queryErrorMessage(orderOptions.error, '')}</div> : null}
           <div className="outbound-form-grid">
-            <label className="outbound-field">{ui('Customer')} <select value={orderForm.customer_id} onChange={(event) => setOrderForm({ ...orderForm, customer_id: event.target.value })} disabled={mutation.isPending || customers.isLoading}>
+            <label className="outbound-field">{ui('Customer')} <select value={orderForm.customer_id} onChange={(event) => selectOrderCustomer(event.target.value)} disabled={mutation.isPending || customers.isLoading}>
                 <option value="">{ui('Choose customer')}</option>
                 {activeCustomers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
               </select>
             </label>
-            <label className="outbound-field">{ui('Requested date')} <input type="date" value={orderForm.requested_date} onChange={(event) => setOrderForm({ ...orderForm, requested_date: event.target.value })} disabled={mutation.isPending} />
-            </label>
-            <label className="outbound-field">{ui('Order notes')} <input placeholder={ui('Delivery instruction or internal reference')} value={orderForm.notes} onChange={(event) => setOrderForm({ ...orderForm, notes: event.target.value })} disabled={mutation.isPending} />
-            </label>
+            <label className="outbound-field">{ui('Requested date')} <input type="date" value={orderForm.requested_date} onChange={(event) => setOrderForm({ ...orderForm, requested_date: event.target.value })} disabled={mutation.isPending} /></label>
+            <label className="outbound-field">{ui('Customer reference / PO number')} <input placeholder={ui('Optional customer order or PO reference')} value={orderForm.customer_reference} onChange={(event) => setOrderForm({ ...orderForm, customer_reference: event.target.value })} disabled={mutation.isPending} /></label>
+            <label className="outbound-field">{ui('Delivery contact')} <input placeholder={ui('Person receiving this order')} value={orderForm.delivery_contact_name} onChange={(event) => setOrderForm({ ...orderForm, delivery_contact_name: event.target.value })} disabled={mutation.isPending} /></label>
+            <label className="outbound-field">{ui('Delivery email')} <input type="email" placeholder={ui('Customer email for order documents')} value={orderForm.delivery_email} onChange={(event) => setOrderForm({ ...orderForm, delivery_email: event.target.value })} disabled={mutation.isPending} /></label>
+            <label className="outbound-field">{ui('Delivery phone')} <input placeholder={ui('Delivery contact phone')} value={orderForm.delivery_phone} onChange={(event) => setOrderForm({ ...orderForm, delivery_phone: event.target.value })} disabled={mutation.isPending} /></label>
+            <label className="outbound-field outbound-field--wide">{ui('Delivery address')} <input placeholder={ui('Where this order should be delivered')} value={orderForm.delivery_address} onChange={(event) => setOrderForm({ ...orderForm, delivery_address: event.target.value })} disabled={mutation.isPending} /></label>
+            <label className="outbound-field outbound-field--wide">{ui('Delivery instructions')} <input placeholder={ui('Customer-facing delivery instructions')} value={orderForm.delivery_instructions} onChange={(event) => setOrderForm({ ...orderForm, delivery_instructions: event.target.value })} disabled={mutation.isPending} /></label>
+            <label className="outbound-field outbound-field--wide">{ui('Internal notes')} <input placeholder={ui('Internal notes not intended for the customer')} value={orderForm.notes} onChange={(event) => setOrderForm({ ...orderForm, notes: event.target.value })} disabled={mutation.isPending} /></label>
           </div>
           {!customers.isLoading && !customers.isError && activeCustomers.length === 0 ? <div className="outbound-alert outbound-alert--warning" style={{ marginTop: 12 }}>{ui('No active customers are available.')} <button type="button" className="outbound-button-quiet" onClick={() => { setTab('customers'); setShowCustomerForm(true); }}>{ui('Open Customers')}</button></div> : null}
           {orderForm.items.map((line, index) => {
@@ -927,8 +1140,8 @@ export default function OutboundPage() {
             </select>
           </label>
         </div>
-        {orders.isLoading ? <div className="outbound-empty">{ui('Loading customer orders…')}</div> : orders.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(orders.error, ui('Customer orders could not be loaded.'))}</div> : filteredOrders.length === 0 ? <EmptyState title={orderRows.length ? ui('No orders match these filters') : ui('No customer orders yet')} text={orderRows.length ? ui('Change the search or status filter to see other orders.') : ui('Create a draft customer order when outbound fulfillment is needed.')} action={!orderRows.length && canCreate ? <button type="button" className="outbound-button-primary" onClick={() => setShowOrderForm(true)}>{ui('Create first order')}</button> : undefined} /> : <>
-          <div className="outbound-list-meta"><span>{ui('Showing')} {((orderPage - 1) * ORDER_PAGE_SIZE) + 1}–{Math.min(orderPage * ORDER_PAGE_SIZE, filteredOrders.length)} {ui('of')} {filteredOrders.length} {ui('matching order(s).')}</span><span>{ui('Drafts do not reserve stock.')}</span></div>
+        {orders.isLoading ? <div className="outbound-empty">{ui('Loading customer orders…')}</div> : orders.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(orders.error, ui('Customer orders could not be loaded.'))}</div> : orderTotal === 0 ? <EmptyState title={(orderSearch.trim() || orderStatus !== 'all') ? ui('No orders match these filters') : ui('No customer orders yet')} text={(orderSearch.trim() || orderStatus !== 'all') ? ui('Change the search or status filter to see other orders.') : ui('Create a draft customer order when outbound fulfillment is needed.')} action={!orderSearch.trim() && orderStatus === 'all' && canCreate ? <button type="button" className="outbound-button-primary" onClick={() => setShowOrderForm(true)}>{ui('Create first order')}</button> : undefined} /> : <>
+          <div className="outbound-list-meta"><span>{ui('Showing')} {((orderPage - 1) * ORDER_PAGE_SIZE) + 1}–{Math.min(orderPage * ORDER_PAGE_SIZE, orderTotal)} {ui('of')} {orderTotal} {ui('matching order(s).')}</span><span>{ui('Drafts do not reserve stock.')}</span></div>
           <div className="outbound-order-list">{pagedOrders.map((order) => {
             const openPicked = order.items.reduce((sum, item) => sum + toNumber(item.open_picked_quantity), 0);
             const openPacked = order.items.reduce((sum, item) => sum + toNumber(item.open_packed_quantity), 0);
@@ -949,6 +1162,7 @@ export default function OutboundPage() {
                 <div>{ui('Picked waiting')} <strong>{formatNumber(item.open_picked_quantity)}</strong> {ui('· Packed waiting')} <strong>{formatNumber(item.open_packed_quantity)}</strong> {ui('· Remaining')} <strong>{formatNumber(item.remaining_quantity)}</strong> {referenceLabel(item.product_unit)}</div>
               </div>)}</div>
               <div className="outbound-actions-row">
+                <button type="button" className="outbound-button" onClick={() => { setSelectedOrderId(selectedOrderId === order.id ? '' : order.id); setOrderAuditPage(1); setDocumentPreview(null); }}>{selectedOrderId === order.id ? ui('Close Details') : ui('Open Details')}</button>
                 {order.status === 'draft' && canUpdate && canEditOrderForm ? <button type="button" className="outbound-button" onClick={() => beginOrderEdit(order)} disabled={mutation.isPending}>{ui('Edit Draft')}</button> : null}
                 {order.status === 'draft' && canUpdate ? <button type="button" className="outbound-button-primary" onClick={() => mutation.mutate({ path: `/outbound/orders/${order.id}/confirm`, version: Number(order.version), successMessage: ui('{order} confirmed and stock reserved.').replace('{order}', order.order_number) })} disabled={mutation.isPending}>{ui('Confirm & Reserve Stock')}</button> : null}
                 {['confirmed', 'partially_dispatched'].includes(order.status) && canUpdate ? <button type="button" className="outbound-button-primary" onClick={() => startPicking(order)} disabled={mutation.isPending}>{order.status === 'partially_dispatched' ? ui('Pick Remaining') : ui('Start Picking')}</button> : null}
@@ -956,13 +1170,58 @@ export default function OutboundPage() {
                 {order.status === 'picking' && canUpdate && openPicked > 0 ? <button type="button" className="outbound-button-primary" onClick={() => mutation.mutate({ path: `/outbound/orders/${order.id}/mark-packed`, version: Number(order.version), successMessage: ui('{order} picked stock marked packed.').replace('{order}', order.order_number) }, { onSuccess: () => setPickOrderId('') })} disabled={mutation.isPending}>{ui('Mark Picked Stock Packed')}</button> : null}
                 {['picking', 'packed'].includes(order.status) && canUpdate && openPicked > 0 ? <button type="button" className="outbound-button-danger" onClick={() => { if (window.confirm(ui('Clear the current picked quantities and pick again?'))) mutation.mutate({ path: `/outbound/orders/${order.id}/reset-picks`, version: Number(order.version), successMessage: ui('{order} open picks cleared.').replace('{order}', order.order_number) }, { onSuccess: () => { setPickOrderId(''); setPickDrafts({}); } }); }} disabled={mutation.isPending}>{ui('Clear Picks')}</button> : null}
                 {order.status === 'packed' && canDispatch && openPacked > 0 ? <button type="button" className="outbound-button-primary" onClick={() => { if (window.confirm(ui('Dispatch all currently packed stock? Inventory will be reduced for the packed quantities now.'))) mutation.mutate({ path: `/outbound/orders/${order.id}/dispatch`, version: Number(order.version), successMessage: ui('{order} packed stock dispatched.').replace('{order}', order.order_number) }); }} disabled={mutation.isPending}>{ui('Dispatch Packed Stock')}</button> : null}
-                {!['dispatched', 'cancelled'].includes(order.status) && canCancel ? <button type="button" className="outbound-button-danger" onClick={() => { const alreadyDispatched = order.items.some((item) => toNumber(item.dispatched_quantity) > 0); const reason = window.prompt(alreadyDispatched ? ui('Reason for cancelling the undelivered remainder') : ui('Cancellation reason')); if (reason && reason.trim().length >= 3) mutation.mutate({ path: `/outbound/orders/${order.id}/cancel`, body: { reason: reason.trim() }, version: Number(order.version), successMessage: alreadyDispatched ? ui('{order} cancelled for the remaining undelivered quantity.').replace('{order}', order.order_number) : ui('{order} cancelled.').replace('{order}', order.order_number) }, { onSuccess: () => { if (pickOrderId === order.id) setPickOrderId(''); } }); }} disabled={mutation.isPending}>{ui('Cancel')}{order.items.some((item) => toNumber(item.dispatched_quantity) > 0) ? ` ${ui('Remainder')}` : ''}</button> : null}
+                {!['dispatched', 'cancelled'].includes(order.status) && canCancel ? <button type="button" className="outbound-button-danger" onClick={() => { setCancelOrderId(cancelOrderId === order.id ? '' : order.id); setCancelOrderReason(''); }} disabled={mutation.isPending}>{ui('Cancel')}{order.items.some((item) => toNumber(item.dispatched_quantity) > 0) ? ` ${ui('Remainder')}` : ''}</button> : null}
               </div>
+              {cancelOrderId === order.id ? <div className="outbound-inline-action-form"><label className="outbound-field">{order.items.some((item) => toNumber(item.dispatched_quantity) > 0) ? ui('Reason for cancelling the undelivered remainder') : ui('Cancellation reason')}<textarea value={cancelOrderReason} onChange={(event) => setCancelOrderReason(event.target.value)} autoFocus /></label><div className="outbound-actions-row"><button type="button" className="outbound-button-danger" disabled={mutation.isPending || cancelOrderReason.trim().length < 3} onClick={() => { const alreadyDispatched = order.items.some((item) => toNumber(item.dispatched_quantity) > 0); mutation.mutate({ path: `/outbound/orders/${order.id}/cancel`, body: { reason: cancelOrderReason.trim() }, version: Number(order.version), successMessage: alreadyDispatched ? ui('{order} cancelled for the remaining undelivered quantity.').replace('{order}', order.order_number) : ui('{order} cancelled.').replace('{order}', order.order_number) }, { onSuccess: () => { if (pickOrderId === order.id) setPickOrderId(''); setCancelOrderId(''); setCancelOrderReason(''); } }); }}>{ui('Confirm')}</button><button type="button" className="outbound-button" onClick={() => { setCancelOrderId(''); setCancelOrderReason(''); }}>{ui('Close')}</button></div></div> : null}
             </article>;
           })}</div>
           {orderPageCount > 1 ? <div className="outbound-pagination"><button type="button" className="outbound-button" disabled={orderPage <= 1} onClick={() => setOrderPage((page) => Math.max(1, page - 1))}>{ui('Previous')}</button><span>{ui('Page')} {orderPage} {ui('of')} {orderPageCount}</span><button type="button" className="outbound-button" disabled={orderPage >= orderPageCount} onClick={() => setOrderPage((page) => Math.min(orderPageCount, page + 1))}>{ui('Next')}</button></div> : null}
         </>}
       </section>
+
+      {selectedOrderId ? (() => {
+        const selectedOrder = orderRows.find((row) => row.id === selectedOrderId);
+        if (!selectedOrder) return null;
+        const availableDocumentTypes: Array<'order_confirmation' | 'pick_list' | 'packing_slip' | 'delivery_note'> = [];
+        const storedOrderDocuments = orderDocuments.data ?? [];
+        const hasOrderConfirmation = storedOrderDocuments.some((doc) => doc.document_type === 'order_confirmation');
+        const dispatchWaveCount = (orderActivity.data?.events ?? []).filter((event) => event.key === 'dispatch_wave').length;
+        const deliveryNoteCount = storedOrderDocuments.filter((doc) => doc.document_type === 'delivery_note').length;
+        if (['confirmed','picking','packed','partially_dispatched','dispatched'].includes(selectedOrder.status) && !hasOrderConfirmation) availableDocumentTypes.push('order_confirmation');
+        if (['confirmed','picking','packed','partially_dispatched'].includes(selectedOrder.status)) availableDocumentTypes.push('pick_list');
+        if (selectedOrder.status === 'packed') availableDocumentTypes.push('packing_slip');
+        if (['partially_dispatched','dispatched'].includes(selectedOrder.status) && deliveryNoteCount < dispatchWaveCount) availableDocumentTypes.push('delivery_note');
+        const documentLabel: Record<string,string> = { order_confirmation: ui('Order Confirmation'), pick_list: ui('Pick List'), packing_slip: ui('Packing Slip'), delivery_note: ui('Delivery Note') };
+        return <section className="outbound-panel outbound-detail-workspace">
+          <div className="outbound-section-heading"><div><h3>{ui('Order details')} · {selectedOrder.order_number}</h3><p>{ui('See delivery information, who did what, documents, emails, and attachments for this order.')}</p></div><button type="button" className="outbound-button" onClick={() => { setSelectedOrderId(''); setDocumentPreview(null); }}>{ui('Close Details')}</button></div>
+          <div className="outbound-detail-grid">
+            <div className="outbound-detail-card"><h4>{ui('Customer and delivery')}</h4><dl>
+              <dt>{ui('Customer')}</dt><dd>{referenceLabel(selectedOrder.customer_name)}</dd>
+              <dt>{ui('Customer reference / PO number')}</dt><dd>{selectedOrder.customer_reference || ui('Not recorded')}</dd>
+              <dt>{ui('Delivery contact')}</dt><dd>{selectedOrder.delivery_contact_name || ui('Not recorded')}</dd>
+              <dt>{ui('Delivery email')}</dt><dd>{selectedOrder.delivery_email || ui('Not recorded')}</dd>
+              <dt>{ui('Delivery phone')}</dt><dd>{selectedOrder.delivery_phone || ui('Not recorded')}</dd>
+              <dt>{ui('Delivery address')}</dt><dd>{selectedOrder.delivery_address || ui('Not recorded')}</dd>
+              <dt>{ui('Delivery instructions')}</dt><dd>{selectedOrder.delivery_instructions || ui('Not recorded')}</dd>
+              <dt>{ui('Internal notes')}</dt><dd>{selectedOrder.notes || ui('Not recorded')}</dd>
+            </dl></div>
+            <div className="outbound-detail-card"><h4>{ui('Activity')}</h4>
+              {orderActivity.isLoading ? <div className="outbound-muted">{ui('Loading activity…')}</div> : (orderActivity.data?.events ?? []).length ? <div className="outbound-activity-list">{(orderActivity.data?.events ?? []).map((event,index) => <div key={`${event.key}-${event.at}-${index}`} className="outbound-activity-row"><strong>{ui(OUTBOUND_ACTIVITY_LABELS[event.key] || humanizeStatus(event.key))}</strong><span>{event.user_name || ui('User unavailable')} · {formatDate(event.at)}</span>{event.quantity !== undefined && event.quantity !== null ? <small>{ui('Dispatched quantity:')} {formatNumber(event.quantity)}</small> : event.details ? <small>{event.details}</small> : null}</div>)}</div> : <div className="outbound-muted">{ui('No activity recorded.')}</div>}
+              {canAuditRead && orderActivity.data?.audit ? <details className="outbound-audit-details"><summary>{ui('Full audit history')} ({orderActivity.data.audit.total})</summary>{orderActivity.data.audit.items.map((row) => <div key={row.id} className="outbound-audit-row"><strong>{ui(OUTBOUND_AUDIT_LABELS[row.action] || humanizeStatus(row.action))}</strong><span>{row.user_name || row.user_email || ui('User unavailable')} · {formatDate(row.created_at)}</span></div>)}{orderActivity.data.audit.total > AUDIT_PAGE_SIZE ? <div className="outbound-pagination"><button type="button" className="outbound-button" disabled={orderAuditPage <= 1} onClick={() => setOrderAuditPage((page) => Math.max(1,page-1))}>{ui('Previous')}</button><span>{ui('Page')} {orderAuditPage} {ui('of')} {Math.max(1,Math.ceil(orderActivity.data.audit.total/AUDIT_PAGE_SIZE))}</span><button type="button" className="outbound-button" disabled={orderAuditPage >= Math.ceil(orderActivity.data.audit.total/AUDIT_PAGE_SIZE)} onClick={() => setOrderAuditPage((page) => page+1)}>{ui('Next')}</button></div> : null}</details> : null}
+            </div>
+          </div>
+          <div className="outbound-detail-card"><h4>{ui('Documents')}</h4><p className="outbound-muted">{ui('Preview a document first, then create and store the PDF. Customer-facing documents can be emailed after creation.')}</p>
+            <div className="outbound-actions-row">{availableDocumentTypes.map((type) => <div key={type} className="outbound-document-action"><strong>{documentLabel[type]}</strong><button type="button" className="outbound-button" onClick={() => void previewOrderDocument(selectedOrder,type)}>{ui('Preview')}</button>{canUpdate ? <button type="button" className="outbound-button-primary" onClick={() => void createOrderDocument(selectedOrder,type)}>{ui('Create PDF')}</button> : null}</div>)}</div>
+            {documentPreview ? <div className="outbound-document-preview"><div className="outbound-card-topline"><div><strong>{ui(documentPreview.title)}</strong><div className="outbound-muted">{documentPreview.document_number}</div></div><button type="button" className="outbound-button" onClick={() => setDocumentPreview(null)}>{ui('Close Preview')}</button></div><p><strong>{ui('Customer')}:</strong> {documentPreview.customer?.name || ui('Not recorded')} · <strong>{ui('Delivery address')}:</strong> {documentPreview.customer?.address || ui('Not recorded')}</p><div className="outbound-order-lines">{documentPreview.items.map((item,index)=><div key={index} className="outbound-order-line"><div><strong>{item.product_name || ui('Reference unavailable')}</strong><div className="outbound-muted">{item.sku || ui('Reference unavailable')}{documentPreview.internal && item.location ? ` · ${item.location}` : ''}</div></div><div><strong>{formatNumber(item.quantity)} {item.unit || ''}</strong></div></div>)}</div></div> : null}
+            {emailCompose && emailCompose.document_type !== 'return_receipt' ? emailComposer : null}
+            {orderDocuments.isLoading ? <div className="outbound-muted">{ui('Loading documents…')}</div> : (orderDocuments.data ?? []).length ? <div className="outbound-document-list">{(orderDocuments.data ?? []).map((doc)=><div key={doc.id} className="outbound-document-row"><div><strong>{documentLabel[doc.document_type] || doc.document_type}</strong><div className="outbound-muted">{doc.document_number} · {formatDate(doc.created_at)}{doc.created_by_name ? ` · ${doc.created_by_name}` : ''}{Number(doc.sent_count||0)>0 ? ` · ${ui('Sent')} ${doc.sent_count}` : ''}</div></div><div className="outbound-actions-row"><button type="button" className="outbound-button" onClick={() => void apiDownloadFile(`/outbound/documents/${doc.id}/download`,doc.filename)}>{ui('Download PDF')}</button>{doc.document_type !== 'pick_list' && canUpdate ? <button type="button" className="outbound-button-primary" onClick={() => void sendStoredDocument(doc)}>{ui('Preview & Send Email')}</button> : null}</div></div>)}</div> : <div className="outbound-muted">{ui('No documents created yet.')}</div>}
+          </div>
+          <div className="outbound-detail-grid">
+            <div className="outbound-detail-card"><h4>{ui('Email history')}</h4>{(orderCommunications.data ?? []).length ? (orderCommunications.data ?? []).map((row)=><div key={row.id} className="outbound-communication-row"><strong>{row.subject}</strong><span>{row.recipient_email} · {formatDate(row.sent_at || row.attempted_at)}{row.sent_by_name ? ` · ${row.sent_by_name}` : ''}</span><small>{row.delivery_status === 'failed' ? ui('Delivery failed') : row.delivery_status === 'pending' ? ui('Sending') : row.sandbox_capture ? ui('Captured in email sandbox') : `${ui('Sent')} · ${row.delivery_method || ui('Email')}`}</small></div>) : <div className="outbound-muted">{ui('No customer emails sent yet.')}</div>}</div>
+            <div className="outbound-detail-card"><h4>{ui('Attachments')}</h4>{canAttachmentRead ? <>{(orderAttachments.data ?? []).length ? (orderAttachments.data ?? []).map((file)=><div key={file.id} className="outbound-attachment-row"><span>{file.original_filename}</span>{file.can_download ? <button type="button" className="outbound-button" onClick={() => void apiDownloadFile(`/enterprise-inventory/attachments/${file.id}/download`,file.original_filename)}>{ui('Download')}</button> : null}</div>) : <div className="outbound-muted">{ui('No attachments yet.')}</div>}{canAttachmentWrite ? <div className="outbound-attachment-upload"><input type="file" onChange={(event)=>setAttachmentFile(event.target.files?.[0]??null)} /><button type="button" className="outbound-button-primary" disabled={!attachmentFile} onClick={() => void uploadBusinessAttachment('outbound_order', selectedOrderId)}>{ui('Upload attachment')}</button></div> : null}</> : <div className="outbound-muted">{ui('Your role does not allow viewing attachments.')}</div>}</div>
+          </div>
+        </section>;
+      })() : null}
 
       {pickOrderId && canStockRead ? <section className="outbound-panel">
         <div className="outbound-section-heading">
@@ -998,7 +1257,7 @@ export default function OutboundPage() {
         <div className="io-section-heading-with-icon"><span className="io-section-heading-icon"><TenantNavIcon path="/suppliers" size={18} /></span><div className="io-section-heading-copy"><h3>{ui('Customers')}</h3><p>{ui('Maintain customer contact data used by outbound orders. Archived customers remain visible in historical orders but cannot be used for new orders.')}</p></div></div>
         <div className="outbound-section-heading-actions">
           {canCustomerRead ? <label className="outbound-checkbox-label"><input type="checkbox" checked={includeArchivedCustomers} onChange={(event) => setIncludeArchivedCustomers(event.target.checked)} /> {ui('Include archived')}</label> : null}
-          {canCustomerRead ? <button type="button" className="outbound-button" onClick={() => void customers.refetch()} disabled={customers.isFetching}>{customers.isFetching ? ui('Refreshing…') : ui('Refresh customers')}</button> : null}
+          {canCustomerRead ? <button type="button" className="outbound-button" onClick={() => void customerRegistry.refetch()} disabled={customerRegistry.isFetching}>{customerRegistry.isFetching ? ui('Refreshing…') : ui('Refresh customers')}</button> : null}
           {canCustomerWrite ? <button type="button" className="outbound-button-primary" onClick={() => { setEditingCustomer(null); setCustomerForm(emptyCustomer); setShowCustomerForm(true); }}>{ui('Add customer')}</button> : null}
         </div>
       </div>
@@ -1017,8 +1276,8 @@ export default function OutboundPage() {
         <div className="outbound-filter-grid">
           <label className="outbound-field outbound-field--wide">{ui('Search customers')}<input placeholder={ui('Name, email, phone, address, or notes')} value={customerSearch} onChange={(event) => setCustomerSearch(event.target.value)} /></label>
         </div>
-        {customers.isLoading ? <div className="outbound-empty">{ui('Loading customers…')}</div> : customers.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(customers.error, ui('Customers could not be loaded.'))}</div> : filteredCustomers.length === 0 ? <EmptyState title={customerOptions.length ? ui('No customers match this search') : ui('No customers yet')} text={customerOptions.length ? ui('Clear or change the search text.') : ui('Add a customer before creating a new outbound order.')} action={!customerOptions.length && canCustomerWrite ? <button type="button" className="outbound-button-primary" onClick={() => setShowCustomerForm(true)}>{ui('Add first customer')}</button> : undefined} /> : <>
-          <div className="outbound-list-meta"><span>{ui('Showing')} {((customerPage - 1) * CUSTOMER_PAGE_SIZE) + 1}–{Math.min(customerPage * CUSTOMER_PAGE_SIZE, filteredCustomers.length)} {ui('of')} {filteredCustomers.length} {ui('customer(s).')}</span></div>
+        {customerRegistry.isLoading ? <div className="outbound-empty">{ui('Loading customers…')}</div> : customerRegistry.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(customerRegistry.error, ui('Customers could not be loaded.'))}</div> : customerTotal === 0 ? <EmptyState title={customerSearch.trim() ? ui('No customers match this search') : ui('No customers yet')} text={customerSearch.trim() ? ui('Clear or change the search text.') : ui('Add a customer before creating a new outbound order.')} action={!customerSearch.trim() && canCustomerWrite ? <button type="button" className="outbound-button-primary" onClick={() => setShowCustomerForm(true)}>{ui('Add first customer')}</button> : undefined} /> : <>
+          <div className="outbound-list-meta"><span>{ui('Showing')} {((customerPage - 1) * CUSTOMER_PAGE_SIZE) + 1}–{Math.min(customerPage * CUSTOMER_PAGE_SIZE, customerTotal)} {ui('of')} {customerTotal} {ui('customer(s).')}</span></div>
           <div className="outbound-customer-list">{pagedCustomers.map((customer) => <article key={customer.id} className="outbound-customer-card" style={{ opacity: customer.active ? 1 : 0.72 }}>
             <div className="outbound-card-topline"><div><div className="outbound-card-title">{customer.name}</div><div className="outbound-card-subtitle">{[customer.email, customer.phone, customer.address].filter(Boolean).join(' · ') || ui('No contact details')}</div></div><StatusBadge status={customer.active ? 'active' : 'archived'} /></div>
             {customer.notes ? <div className="outbound-notes">{customer.notes}</div> : null}
@@ -1032,13 +1291,14 @@ export default function OutboundPage() {
     {activeTab === 'returns' ? <section className="outbound-panel">
       <div className="outbound-section-heading">
         <div className="io-section-heading-with-icon"><span className="io-section-heading-icon"><TenantNavIcon path="/stock-transfers" size={18} /></span><div className="io-section-heading-copy"><h3>{ui('Customer returns')}</h3><p>{ui('Create returns only from stock that was actually dispatched. Receiving a return restores usable stock only when the selected condition is “Return to usable stock”.')}</p></div></div>
-        <div className="outbound-section-heading-actions">{canReturnRead ? <button type="button" className="outbound-button" onClick={() => { void returns.refetch(); if (canReturnCreate) void trace.refetch(); }} disabled={returns.isFetching || (canReturnCreate && trace.isFetching)}>{returns.isFetching || (canReturnCreate && trace.isFetching) ? ui('Refreshing…') : ui('Refresh returns')}</button> : null}</div>
+        <div className="outbound-section-heading-actions">{canReturnRead ? <button type="button" className="outbound-button" onClick={() => { void returns.refetch(); if (canReturnCreate) void returnTrace.refetch(); }} disabled={returns.isFetching || (canReturnCreate && returnTrace.isFetching)}>{returns.isFetching || (canReturnCreate && returnTrace.isFetching) ? ui('Refreshing…') : ui('Refresh returns')}</button> : null}</div>
       </div>
       {canReturnCreate ? canLocationRead ? <div className="outbound-panel" style={{ boxShadow: 'none', background: '#f8fafc', marginBottom: 14 }}>
         <div className="outbound-section-heading"><div><h3>{ui('Create customer return')}</h3><p>{ui('Multiple lines can be grouped into one return when they came from the same customer order.')}</p></div></div>
-        {(trace.isLoading || locations.isLoading) ? <div className="outbound-alert outbound-alert--info">{ui('Loading dispatched stock and return locations…')}</div> : (trace.isError || locations.isError) ? <div className="outbound-alert outbound-alert--error">{trace.isError ? queryErrorMessage(trace.error, ui('Dispatch history could not be loaded for returns.')) : queryErrorMessage(locations.error, ui('Return locations could not be loaded.'))}</div> : <>
-        {blockedHistoricalSerializedReturns.length > 0 ? <div className="outbound-alert outbound-alert--warning">{ui('Some serialized dispatches cannot be returned because serial tracking is currently disabled. Re-enable serial tracking for those products before creating the return.')}</div> : null}
-        {returnCreateEligibleTrace.length === 0 ? <div className="outbound-alert outbound-alert--info">{ui('There is no dispatched stock currently eligible for a new return.')}</div> : <>
+        {(returnTrace.isLoading || returnLocations.isLoading) ? <div className="outbound-alert outbound-alert--info">{ui('Loading dispatched stock and return locations…')}</div> : (returnTrace.isError || returnLocations.isError) ? <div className="outbound-alert outbound-alert--error">{returnTrace.isError ? queryErrorMessage(returnTrace.error, ui('Dispatch history could not be loaded for returns.')) : queryErrorMessage(returnLocations.error, ui('Return locations could not be loaded.'))}</div> : <>
+        {returnableTotal === 0 && !returnOptionSearch.trim() ? <div className="outbound-alert outbound-alert--info">{ui('There is no dispatched stock currently eligible for a new return.')}</div> : <>
+          <div className="outbound-filter-grid"><label className="outbound-field outbound-field--wide">{ui('Search returnable dispatched stock')}<input placeholder={ui('Order, customer, product, location, lot, batch, or serial')} value={returnOptionSearch} onChange={(event) => setReturnOptionSearch(event.target.value)} /></label></div>
+          {returnableTotal === 0 ? <div className="outbound-alert outbound-alert--info">{ui('No returnable dispatched stock matches this search.')}</div> : <div className="outbound-list-meta"><span>{ui('Showing')} {((returnOptionPage - 1) * RETURNABLE_PAGE_SIZE) + 1}–{Math.min(returnOptionPage * RETURNABLE_PAGE_SIZE, returnableTotal)} {ui('of')} {returnableTotal} {ui('returnable dispatch(es).')}</span></div>}
           <div className="outbound-form-grid outbound-form-grid--customer">
             <label className="outbound-field">{ui('Return reason')}<input placeholder={ui('Why is the customer returning it?')} value={returnForm.reason} onChange={(event) => setReturnForm({ ...returnForm, reason: event.target.value })} /></label>
             <label className="outbound-field">{ui('Return notes')}<input placeholder={ui('Optional return reference or notes')} value={returnForm.notes} onChange={(event) => setReturnForm({ ...returnForm, notes: event.target.value })} /></label>
@@ -1055,7 +1315,7 @@ export default function OutboundPage() {
                 </label>
                 <label className="outbound-field">{ui('Return to location')} <select value={line.storage_location_id} onChange={(event) => updateReturnLine(index, { storage_location_id: event.target.value })}>
                     <option value="">{ui('Return to location')}</option>
-                    {locationOptions.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+                    {(returnLocations.data ?? []).filter((location) => line.condition !== 'available' || location.is_pickable !== false).map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
                   </select>
                 </label>
                 <label className="outbound-field">{ui('Quantity')} <input type="number" min="0.0001" max={selected ? toNumber(selected.returnable_quantity) : undefined} step="0.0001" value={line.quantity} onChange={(event) => updateReturnLine(index, { quantity: event.target.value, serial_numbers: [] })} />
@@ -1074,9 +1334,10 @@ export default function OutboundPage() {
               {selected?.returnable_serial_numbers?.length ? <div className="outbound-serial-box"><div className="outbound-muted" style={{ marginBottom: 7 }}>{ui('Select the exact serials physically returned (')}{line.serial_numbers.length}/{Number.isInteger(Number(line.quantity)) ? Number(line.quantity) : '?'})</div>{selected.returnable_serial_numbers.map((serial) => { const checked = line.serial_numbers.includes(serial); return <label key={serial}><input type="checkbox" checked={checked} onChange={(event) => updateReturnLine(index, { serial_numbers: event.target.checked ? [...line.serial_numbers, serial] : line.serial_numbers.filter((value) => value !== serial) })} /> {serial}</label>; })}</div> : null}
             </div>;
           })}
+          {returnablePageCount > 1 ? <div className="outbound-pagination"><button type="button" className="outbound-button" disabled={returnOptionPage <= 1} onClick={() => setReturnOptionPage((page) => Math.max(1,page-1))}>{ui('Previous')}</button><span>{ui('Page')} {returnOptionPage} {ui('of')} {returnablePageCount}</span><button type="button" className="outbound-button" disabled={returnOptionPage >= returnablePageCount} onClick={() => setReturnOptionPage((page) => Math.min(returnablePageCount,page+1))}>{ui('Next')}</button></div> : null}
           <div className="outbound-actions-row">
-            <button type="button" className="outbound-button" onClick={addReturnLine} disabled={!returnOrderId || eligibleReturnRowsForLine(returnForm.items.length).length === 0}>{ui('Add return line')}</button>
-            <button type="button" className="outbound-button-primary" disabled={Boolean(returnFormValidation) || mutation.isPending || locations.isLoading || trace.isLoading || locations.isError || trace.isError} onClick={createReturn}>{mutation.isPending ? ui('Creating…') : ui('Create Customer Return')}</button>
+            <button type="button" className="outbound-button" onClick={addReturnLine} disabled={!returnOrderId || returnableTotal === 0}>{ui('Add return line')}</button>
+            <button type="button" className="outbound-button-primary" disabled={Boolean(returnFormValidation) || mutation.isPending || returnLocations.isLoading || returnTrace.isLoading || returnLocations.isError || returnTrace.isError} onClick={createReturn}>{mutation.isPending ? ui('Creating…') : ui('Create Customer Return')}</button>
           </div>
           {returnFormValidation && (returnForm.reason || returnForm.items.some((line) => line.allocation_id)) ? <div className="outbound-form-help" style={{ marginTop: 7 }}>{returnFormValidation}</div> : null}
         </>}
@@ -1088,14 +1349,33 @@ export default function OutboundPage() {
           <label className="outbound-field">{ui('Search returns')}<input placeholder={ui('Return number, order, customer, product, or reason')} value={returnSearch} onChange={(event) => setReturnSearch(event.target.value)} /></label>
           <label className="outbound-field">{ui('Status')}<select value={returnStatus} onChange={(event) => setReturnStatus(event.target.value)}><option value="all">{ui('All statuses')}</option><option value="draft">{ui('Waiting to receive')}</option><option value="received">{ui('Received')}</option><option value="cancelled">{ui('Cancelled')}</option></select></label>
         </div>
-        {returns.isLoading ? <div className="outbound-empty">{ui('Loading customer returns…')}</div> : returns.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(returns.error, ui('Customer returns could not be loaded.'))}</div> : filteredReturns.length === 0 ? <EmptyState title={returnRows.length ? ui('No returns match these filters') : ui('No customer returns yet')} text={returnRows.length ? ui('Change the search or status filter.') : ui('Returns will appear here after they are created from dispatched stock.')} /> : <>
-          <div className="outbound-list-meta"><span>{ui('Showing')} {((returnPage - 1) * RETURN_PAGE_SIZE) + 1}–{Math.min(returnPage * RETURN_PAGE_SIZE, filteredReturns.length)} {ui('of')} {filteredReturns.length} {ui('return(s).')}</span></div>
+        {returns.isLoading ? <div className="outbound-empty">{ui('Loading customer returns…')}</div> : returns.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(returns.error, ui('Customer returns could not be loaded.'))}</div> : returnTotal === 0 ? <EmptyState title={returnTotal === 0 && (returnSearch.trim() || returnStatus !== 'all') ? ui('No returns match these filters') : ui('No customer returns yet')} text={returnTotal === 0 && (returnSearch.trim() || returnStatus !== 'all') ? ui('Change the search or status filter.') : ui('Returns will appear here after they are created from dispatched stock.')} /> : <>
+          <div className="outbound-list-meta"><span>{ui('Showing')} {((returnPage - 1) * RETURN_PAGE_SIZE) + 1}–{Math.min(returnPage * RETURN_PAGE_SIZE, returnTotal)} {ui('of')} {returnTotal} {ui('return(s).')}</span></div>
           <div className="outbound-return-list">{pagedReturns.map((row) => <article key={row.id} className="outbound-return-card">
             <div className="outbound-card-topline"><div><div className="outbound-card-title">{row.return_number} · {referenceLabel(row.customer_name)}</div><div className="outbound-card-subtitle">{ui('Order')} {referenceLabel(row.order_number)} {ui('· Created')} {formatDate(row.created_at)}</div></div><StatusBadge status={row.status} /></div>
             <div className="outbound-notes"><strong>{ui('Reason:')}</strong> {row.reason}{row.notes ? <> · {row.notes}</> : null}</div>
             {row.status === 'cancelled' && row.cancellation_reason ? <div className="outbound-alert outbound-alert--error" style={{ marginTop: 8 }}><strong>{ui('Cancellation:')}</strong> {row.cancellation_reason}</div> : null}
             <div className="outbound-return-items">{row.items.map((item) => <div key={item.id}><strong>{referenceLabel(item.product_name)}</strong> · {ui('SKU:')} {referenceLabel(item.product_sku)} · {formatNumber(item.quantity)} {referenceLabel(item.product_unit)} → {formatStatus(item.condition)} @ {referenceLabel(item.storage_location_name)}{item.lot_number || item.batch_number ? ` · ${[item.lot_number ? `${ui('Lot')} ${item.lot_number}` : '', item.batch_number ? `${ui('Batch')} ${item.batch_number}` : ''].filter(Boolean).join(' · ')}` : ''}{item.serial_numbers?.length ? <> · <strong>{ui('Serials:')}</strong> {item.serial_numbers.join(', ')}</> : null}{item.notes ? <> · <strong>{ui('Item note:')}</strong> {item.notes}</> : null}</div>)}</div>
-            {row.status === 'draft' ? <div className="outbound-actions-row">{canReturnReceive ? <button type="button" className="outbound-button-primary" disabled={mutation.isPending} onClick={() => { if (window.confirm(ui('Receive this customer return into inventory now?'))) mutation.mutate({ path: `/outbound/returns/${row.id}/receive`, version: Number(row.version), successMessage: ui('{return} received into inventory.').replace('{return}', row.return_number) }); }}>{ui('Receive Return')}</button> : null}{canReturnCancel ? <button type="button" className="outbound-button-danger" disabled={mutation.isPending} onClick={() => { const reason = window.prompt(ui('Return cancellation reason')); if (reason && reason.trim().length >= 3) mutation.mutate({ path: `/outbound/returns/${row.id}/cancel`, version: Number(row.version), body: { reason: reason.trim() }, successMessage: ui('{return} cancelled.').replace('{return}', row.return_number) }); }}>{ui('Cancel Return')}</button> : null}</div> : null}
+            <div className="outbound-actions-row">
+              <button type="button" className="outbound-button" onClick={() => { setSelectedReturnId(selectedReturnId === row.id ? '' : row.id); setReturnAuditPage(1); setReturnDocumentPreview(null); setAttachmentFile(null); }}>{selectedReturnId === row.id ? ui('Close Details') : ui('Open Details')}</button>
+              {row.status === 'draft' && canReturnReceive ? <button type="button" className="outbound-button-primary" disabled={mutation.isPending} onClick={() => { if (window.confirm(ui('Receive this customer return into inventory now?'))) mutation.mutate({ path: `/outbound/returns/${row.id}/receive`, version: Number(row.version), successMessage: ui('{return} received into inventory.').replace('{return}', row.return_number) }); }}>{ui('Receive Return')}</button> : null}
+              {row.status === 'draft' && canReturnCancel ? <button type="button" className="outbound-button-danger" disabled={mutation.isPending} onClick={() => { setCancelReturnId(cancelReturnId === row.id ? '' : row.id); setCancelReturnReason(''); }}>{ui('Cancel Return')}</button> : null}
+              
+            </div>
+            {cancelReturnId === row.id ? <div className="outbound-inline-action-form"><label className="outbound-field">{ui('Return cancellation reason')}<textarea value={cancelReturnReason} onChange={(event) => setCancelReturnReason(event.target.value)} autoFocus /></label><div className="outbound-actions-row"><button type="button" className="outbound-button-danger" disabled={mutation.isPending || cancelReturnReason.trim().length < 3} onClick={() => mutation.mutate({ path: `/outbound/returns/${row.id}/cancel`, version: Number(row.version), body: { reason: cancelReturnReason.trim() }, successMessage: ui('{return} cancelled.').replace('{return}', row.return_number) }, { onSuccess: () => { setCancelReturnId(''); setCancelReturnReason(''); } })}>{ui('Confirm')}</button><button type="button" className="outbound-button" onClick={() => { setCancelReturnId(''); setCancelReturnReason(''); }}>{ui('Close')}</button></div></div> : null}
+            {selectedReturnId === row.id ? <div className="outbound-detail-grid" style={{ marginTop: 12 }}>
+              <div className="outbound-detail-card"><h4>{ui('Activity')}</h4>
+                {returnActivity.isLoading ? <div className="outbound-muted">{ui('Loading activity…')}</div> : (returnActivity.data?.events ?? []).length ? <div className="outbound-activity-list">{(returnActivity.data?.events ?? []).map((event,index) => <div key={`${event.key}-${event.at}-${index}`} className="outbound-activity-row"><strong>{ui(OUTBOUND_ACTIVITY_LABELS[event.key] || humanizeStatus(event.key))}</strong><span>{event.user_name || ui('User unavailable')} · {formatDate(event.at)}</span>{event.quantity !== undefined && event.quantity !== null ? <small>{ui('Dispatched quantity:')} {formatNumber(event.quantity)}</small> : event.details ? <small>{event.details}</small> : null}</div>)}</div> : <div className="outbound-muted">{ui('No activity recorded.')}</div>}
+                {canAuditRead && returnActivity.data?.audit ? <details className="outbound-audit-details"><summary>{ui('Full audit history')} ({returnActivity.data.audit.total})</summary>{returnActivity.data.audit.items.map((auditRow) => <div key={auditRow.id} className="outbound-audit-row"><strong>{ui(OUTBOUND_AUDIT_LABELS[auditRow.action] || humanizeStatus(auditRow.action))}</strong><span>{auditRow.user_name || auditRow.user_email || ui('User unavailable')} · {formatDate(auditRow.created_at)}</span></div>)}{returnActivity.data.audit.total > AUDIT_PAGE_SIZE ? <div className="outbound-pagination"><button type="button" className="outbound-button" disabled={returnAuditPage <= 1} onClick={() => setReturnAuditPage((page) => Math.max(1,page-1))}>{ui('Previous')}</button><span>{ui('Page')} {returnAuditPage} {ui('of')} {Math.max(1,Math.ceil(returnActivity.data.audit.total/AUDIT_PAGE_SIZE))}</span><button type="button" className="outbound-button" disabled={returnAuditPage >= Math.ceil(returnActivity.data.audit.total/AUDIT_PAGE_SIZE)} onClick={() => setReturnAuditPage((page) => page+1)}>{ui('Next')}</button></div> : null}</details> : null}
+              </div>
+              <div className="outbound-detail-card"><h4>{ui('Documents')}</h4>
+                {row.status === 'received' && !(returnDocuments.data ?? []).some((doc) => doc.document_type === 'return_receipt') ? <div className="outbound-actions-row"><button type="button" className="outbound-button" onClick={() => void previewReturnReceipt(row)}>{ui('Preview Return Receipt')}</button>{canReturnReceive ? <button type="button" className="outbound-button-primary" onClick={() => void createReturnReceipt(row)}>{ui('Create Return Receipt')}</button> : null}</div> : null}
+                {returnDocumentPreview ? <div className="outbound-document-preview"><div className="outbound-card-topline"><div><strong>{ui(returnDocumentPreview.title)}</strong><div className="outbound-muted">{returnDocumentPreview.document_number}</div></div><button type="button" className="outbound-button" onClick={() => setReturnDocumentPreview(null)}>{ui('Close Preview')}</button></div><p><strong>{ui('Customer')}:</strong> {returnDocumentPreview.customer?.name || ui('Not recorded')} · <strong>{ui('Order')}:</strong> {returnDocumentPreview.order_number || ui('Not recorded')}</p><div className="outbound-order-lines">{returnDocumentPreview.items.map((item,index)=><div key={index} className="outbound-order-line"><div><strong>{item.product_name || ui('Reference unavailable')}</strong><div className="outbound-muted">{item.sku || ui('Reference unavailable')}{item.condition ? ` · ${formatStatus(item.condition)}` : ''}</div></div><div><strong>{formatNumber(item.quantity)} {item.unit || ''}</strong></div></div>)}</div></div> : null}
+                {emailCompose && emailCompose.document_type === 'return_receipt' ? emailComposer : null}
+                {(returnDocuments.data ?? []).length ? (returnDocuments.data ?? []).map((doc)=><div key={doc.id} className="outbound-document-row"><div><strong>{ui('Return Receipt')}</strong><div className="outbound-muted">{doc.document_number} · {formatDate(doc.created_at)}{doc.created_by_name ? ` · ${doc.created_by_name}` : ''}</div></div><div className="outbound-actions-row"><button type="button" className="outbound-button" onClick={() => void apiDownloadFile(`/outbound/documents/${doc.id}/download`,doc.filename)}>{ui('Download PDF')}</button>{canReturnReceive ? <button type="button" className="outbound-button-primary" onClick={() => void sendStoredDocument(doc)}>{ui('Preview & Send Email')}</button> : null}</div></div>) : <div className="outbound-muted">{ui('No documents created yet.')}</div>}</div>
+              <div className="outbound-detail-card"><h4>{ui('Email history')}</h4>{(returnCommunications.data ?? []).length ? (returnCommunications.data ?? []).map((comm)=><div key={comm.id} className="outbound-communication-row"><strong>{comm.subject}</strong><span>{comm.recipient_email} · {formatDate(comm.sent_at || comm.attempted_at)}{comm.sent_by_name ? ` · ${comm.sent_by_name}` : ''}</span><small>{comm.delivery_status === 'failed' ? ui('Delivery failed') : comm.delivery_status === 'pending' ? ui('Sending') : comm.sandbox_capture ? ui('Captured in email sandbox') : `${ui('Sent')} · ${comm.delivery_method || ui('Email')}`}</small></div>) : <div className="outbound-muted">{ui('No customer emails sent yet.')}</div>}</div>
+              <div className="outbound-detail-card"><h4>{ui('Attachments')}</h4>{canAttachmentRead ? <>{(returnAttachments.data ?? []).map((file)=><div key={file.id} className="outbound-attachment-row"><span>{file.original_filename}</span>{file.can_download ? <button type="button" className="outbound-button" onClick={() => void apiDownloadFile(`/enterprise-inventory/attachments/${file.id}/download`,file.original_filename)}>{ui('Download')}</button> : null}</div>)}{!(returnAttachments.data ?? []).length ? <div className="outbound-muted">{ui('No attachments yet.')}</div> : null}{canAttachmentWrite ? <div className="outbound-attachment-upload"><input type="file" onChange={(event)=>setAttachmentFile(event.target.files?.[0]??null)} /><button type="button" className="outbound-button-primary" disabled={!attachmentFile} onClick={() => void uploadBusinessAttachment('customer_return', row.id)}>{ui('Upload attachment')}</button></div> : null}</> : <div className="outbound-muted">{ui('Your role does not allow viewing attachments.')}</div>}</div>
+            </div> : null}
           </article>)}</div>
           {returnPageCount > 1 ? <div className="outbound-pagination"><button type="button" className="outbound-button" disabled={returnPage <= 1} onClick={() => setReturnPage((page) => Math.max(1, page - 1))}>{ui('Previous')}</button><span>{ui('Page')} {returnPage} {ui('of')} {returnPageCount}</span><button type="button" className="outbound-button" disabled={returnPage >= returnPageCount} onClick={() => setReturnPage((page) => Math.min(returnPageCount, page + 1))}>{ui('Next')}</button></div> : null}
         </>}
@@ -1108,8 +1388,8 @@ export default function OutboundPage() {
         <button type="button" className="outbound-button" onClick={() => void trace.refetch()} disabled={trace.isFetching}>{trace.isFetching ? ui('Refreshing…') : ui('Refresh trace')}</button>
       </div>
       <div className="outbound-filter-grid"><label className="outbound-field outbound-field--wide">{ui('Search dispatch trace')}<input placeholder={ui('Order, customer, product, location, lot, batch, or serial')} value={traceSearch} onChange={(event) => setTraceSearch(event.target.value)} /></label></div>
-      {trace.isLoading ? <div className="outbound-empty">{ui('Loading dispatch trace…')}</div> : trace.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(trace.error, ui('Dispatch trace could not be loaded.'))}</div> : filteredTrace.length === 0 ? <EmptyState title={traceRows.length ? ui('No dispatch records match this search') : ui('No dispatched stock yet')} text={traceRows.length ? ui('Change or clear the search.') : ui('Trace records appear after packed stock is dispatched.')} /> : <>
-        <div className="outbound-list-meta"><span>{ui('Showing')} {((tracePage - 1) * TRACE_PAGE_SIZE) + 1}–{Math.min(tracePage * TRACE_PAGE_SIZE, filteredTrace.length)} {ui('of')} {filteredTrace.length} {ui('dispatched allocation(s).')}</span></div>
+      {trace.isLoading ? <div className="outbound-empty">{ui('Loading dispatch trace…')}</div> : trace.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(trace.error, ui('Dispatch trace could not be loaded.'))}</div> : traceTotal === 0 ? <EmptyState title={traceSearch.trim() ? ui('No dispatch records match this search') : ui('No dispatched stock yet')} text={traceSearch.trim() ? ui('Change or clear the search.') : ui('Trace records appear after packed stock is dispatched.')} /> : <>
+        <div className="outbound-list-meta"><span>{ui('Showing')} {((tracePage - 1) * TRACE_PAGE_SIZE) + 1}–{Math.min(tracePage * TRACE_PAGE_SIZE, traceTotal)} {ui('of')} {traceTotal} {ui('dispatched allocation(s).')}</span></div>
         <div className="outbound-trace-list">{pagedTrace.map((row) => <article key={row.allocation_id} className="outbound-trace-card">
           <div className="outbound-card-topline"><div><div className="outbound-card-title">{row.order_number} · {referenceLabel(row.customer_name)}</div><div className="outbound-card-subtitle">{referenceLabel(row.product_name)} · {ui('SKU:')} {referenceLabel(row.product_sku)} · {referenceLabel(row.storage_location_name)} · {formatLot(row)}</div></div><StatusBadge status={row.order_status} /></div>
           <div className="outbound-trace-metrics"><span>{ui('Dispatched')} <strong>{formatNumber(row.dispatched_quantity)} {referenceLabel(row.product_unit)}</strong></span>{canReturnRead ? <><span>{ui('Returned')} <strong>{formatNumber(row.returned_quantity)}</strong></span><span>{ui('Pending return')} <strong>{formatNumber(Math.max(toNumber(row.claimed_return_quantity) - toNumber(row.returned_quantity), 0))}</strong></span><span>{ui('Still returnable')} <strong>{formatNumber(row.returnable_quantity)}</strong></span></> : null}</div>
