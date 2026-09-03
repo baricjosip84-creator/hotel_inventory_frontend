@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { getStorageLocationMutationErrorMessage } from '../lib/storageLocationMutationError';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, /* OperationalWorkspaceMetaPill, */ OperationalWorkspaceStatCard, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedCurrency, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import './InventoryCapabilitiesPage.css';
@@ -304,11 +304,17 @@ export default function InventoryCapabilitiesPage() {
         eyebrow={ui("Advanced inventory")}
         title={ui("Advanced inventory workspace")}
         description={ui("Optional controls for advanced inventory workflows. Use only the capabilities your operation needs; sections you cannot access are hidden automatically.")}
-        meta={<>
-          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui("Permission-aware")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui("Configure only what you use")}</OperationalWorkspaceMetaPill>
-        </>}
+        meta={
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+            <>
+                      <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{ui("Permission-aware")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{ui("Configure only what you use")}</OperationalWorkspaceMetaPill>
+                    </>
+          */
+        }
         aside={<OperationalWorkspaceStatus value={visibleTabs.length} label={ui("capability areas available to this role")} />}
       />
 

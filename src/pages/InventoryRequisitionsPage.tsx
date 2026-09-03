@@ -13,7 +13,7 @@ import ProductUomSelect from '../components/inventory/ProductUomSelect';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
 } from '../components/ui/OperationalWorkspace';
@@ -2414,11 +2414,17 @@ export default function InventoryRequisitionsPage() {
         eyebrow={ui("Requisition operations")}
         title={ui("Internal stock requests")}
         description={ui("Create, approve, and fulfill internal stock requests while protecting reservation commitments and preserving an auditable stock trail.")}
-        meta={<>
-          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui("Reservation-aware fulfillment")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{capabilities.canFulfillInventoryRequisitions ? ui('Fulfillment access') : capabilities.canApproveInventoryRequisitions ? ui('Approval access') : capabilities.canCreateInventoryRequisitions ? ui('Request creation access') : ui('Review-only access')}</OperationalWorkspaceMetaPill>
-        </>}
+        meta={
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+            <>
+                      <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{ui("Reservation-aware fulfillment")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{capabilities.canFulfillInventoryRequisitions ? ui('Fulfillment access') : capabilities.canApproveInventoryRequisitions ? ui('Approval access') : capabilities.canCreateInventoryRequisitions ? ui('Request creation access') : ui('Review-only access')}</OperationalWorkspaceMetaPill>
+                    </>
+          */
+        }
         aside={
           <div style={styles.inlineActions}>
             <button

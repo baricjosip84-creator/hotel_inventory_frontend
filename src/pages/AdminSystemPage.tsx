@@ -8,7 +8,7 @@ import { getRoleCapabilities } from '../lib/permissions';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceStatus
@@ -365,12 +365,17 @@ export default function AdminSystemPage() {
         title={ui('Admin system')}
         description={ui('Review tenant operational posture, write-lock and maintenance signals, blocking alerts, and tenant-scoped integrity diagnostics. Platform controls remain read-only from this tenant page.')}
         meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui('Platform signals read-only')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui('Diagnostics permission-gated')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui('Alert actions permission-gated')}</OperationalWorkspaceMetaPill>
-          </>
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+                      <>
+                        <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui('Platform signals read-only')}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui('Diagnostics permission-gated')}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui('Alert actions permission-gated')}</OperationalWorkspaceMetaPill>
+                      </>
+                    
+          */
         }
         aside={
           <div className="admin-system-hero-actions">

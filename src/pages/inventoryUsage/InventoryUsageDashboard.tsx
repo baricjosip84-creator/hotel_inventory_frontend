@@ -4,7 +4,7 @@ import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, 
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceTab,
@@ -487,11 +487,17 @@ export function InventoryUsageDashboard({
         eyebrow={ui("Usage operations")}
         title={ui("Inventory usage ledger")}
         description={ui("Record and review why stock leaves the business, with operational attribution, stock impact, audit evidence, templates, and controlled period close.")}
-        meta={<>
-          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui("Stock-linked audit trail")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{permissions.canRecord || permissions.canBulkRecord ? ui("Usage recording available") : ui("Review-only for current role")}</OperationalWorkspaceMetaPill>
-        </>}
+        meta={
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+            <>
+                      <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{ui("Stock-linked audit trail")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{permissions.canRecord || permissions.canBulkRecord ? ui("Usage recording available") : ui("Review-only for current role")}</OperationalWorkspaceMetaPill>
+                    </>
+          */
+        }
         aside={
           <div style={styles.heroActions}>
             <button

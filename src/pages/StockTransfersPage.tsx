@@ -7,7 +7,7 @@ import { getCurrentAccessRoleLabel, getRoleCapabilities, hasAllPermissions, hasP
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceStatus } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, /* OperationalWorkspaceMetaPill, */ OperationalWorkspaceStatCard, OperationalWorkspaceStatus } from '../components/ui/OperationalWorkspace';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
@@ -1079,11 +1079,17 @@ export default function StockTransfersPage() {
         eyebrow={ui("Internal logistics")}
         title={ui("Stock transfer workspace")}
         description={ui("Plan controlled moves between storage locations, keep drafts separate from execution, and preserve a complete movement audit trail.")}
-        meta={<>
-          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui("Draft before execution")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{canExecuteStockTransfersOperationally ? ui("Execution access") : `${ui(accessRoleLabel)} ${ui('review access')}`}</OperationalWorkspaceMetaPill>
-        </>}
+        meta={
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+            <>
+                      <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{ui("Draft before execution")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{canExecuteStockTransfersOperationally ? ui("Execution access") : `${ui(accessRoleLabel)} ${ui('review access')}`}</OperationalWorkspaceMetaPill>
+                    </>
+          */
+        }
         aside={<OperationalWorkspaceStatus value={transferSummaryQuery.isLoading || !summaryAvailable ? '—' : summary?.transfer_count ?? '—'} label={ui("transfers matching the current filters")} />}
       />
 

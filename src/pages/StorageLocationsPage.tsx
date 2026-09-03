@@ -8,7 +8,7 @@ import { getCurrentAccessRoleLabel, getRoleCapabilities, hasPermission, TENANT_P
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceStatus } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, /* OperationalWorkspaceMetaPill, */ OperationalWorkspaceStatCard, OperationalWorkspaceStatus } from '../components/ui/OperationalWorkspace';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 
@@ -374,11 +374,17 @@ export default function StorageLocationsPage() {
         eyebrow={ui("Storage operations")}
         title={ui("Storage location workspace")}
         description={ui("Maintain operational storage areas and keep location condition labels ready for receiving, transfers, reservations, counts, and scanning.")}
-        meta={<>
-          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{canManageStorageLocations ? ui("Location write access") : ui("Location read-only")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui("Retirement is dependency-checked")}</OperationalWorkspaceMetaPill>
-        </>}
+        meta={
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+            <>
+                      <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{canManageStorageLocations ? ui("Location write access") : ui("Location read-only")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{ui("Retirement is dependency-checked")}</OperationalWorkspaceMetaPill>
+                    </>
+          */
+        }
         aside={<OperationalWorkspaceStatus value={locationListUnavailable ? '—' : summary.active} label={ui("active storage locations")} />}
       />
 

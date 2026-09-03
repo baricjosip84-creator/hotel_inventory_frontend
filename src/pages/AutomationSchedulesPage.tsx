@@ -8,7 +8,7 @@ import { scrollToFormSection } from '../lib/scrollToForm';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceTab,
@@ -813,7 +813,13 @@ export default function AutomationSchedulesPage() {
           eyebrow={ui('Execution workflow')}
           title={ui('Automation schedules')}
           description={ui('Plan recurring review checks that can prepare execution requests without automatic approval, execution, or inventory changes.')}
-          meta={<OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>}
+          meta={
+            undefined /*
+              v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+              Previous rendering preserved for easy restoration:
+              <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+            */
+          }
           aside={<StatusChip status="disabled" />}
         />
         <section className="app-panel automation-schedules-card">
@@ -831,11 +837,16 @@ export default function AutomationSchedulesPage() {
         title={ui('Automation schedules')}
         description={ui('Plan recurring review checks that can prepare execution requests. Schedules never approve or execute changes automatically.')}
         meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui('Review scheduling')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui('No automatic execution')}</OperationalWorkspaceMetaPill>
-          </>
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+                      <>
+                        <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui('Review scheduling')}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui('No automatic execution')}</OperationalWorkspaceMetaPill>
+                      </>
+                    
+          */
         }
         aside={
           <button type="button" className="btn btn-secondary" disabled={loading || saving} onClick={() => void refreshPage()}>

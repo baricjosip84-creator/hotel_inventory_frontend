@@ -6,7 +6,7 @@ import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, /* OperationalWorkspaceMetaPill, */ OperationalWorkspaceStatCard, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './EnterpriseCollaborationPage.css';
 
 type CollaborationView = 'recommendations' | 'limits';
@@ -17,15 +17,12 @@ type CollaborationDomain =
   | 'control_tower'
   | 'decision_intelligence'
   | 'ai_governance'
-  | 'workflow'
-  | 'event_coordination'
-  | 'multi_domain';
+  | 'event_coordination';
 
 type CollaborationThreadType =
   | 'triage_thread'
   | 'approval_thread'
   | 'incident_thread'
-  | 'supplier_coordination_thread'
   | 'task_coordination_thread'
   | 'governance_review_thread';
 
@@ -46,6 +43,7 @@ type CollaborationThread = {
   coordination_context?: {
     source_surface?: string | null;
     recommended_next_step?: string | null;
+    recommended_next_step_key?: string | null;
     escalation_recommended?: boolean;
   };
   comment_guidance?: {
@@ -77,9 +75,13 @@ type CollaborationResponse = {
   };
   guidance?: {
     collaboration_guidance?: string;
+    collaboration_guidance_key?: string | null;
     escalation_thread_guidance?: string;
+    escalation_thread_guidance_key?: string | null;
     incident_war_room_guidance?: string;
+    incident_war_room_guidance_key?: string | null;
     supplier_coordination_guidance?: string;
+    supplier_coordination_guidance_key?: string | null;
   };
   threads?: CollaborationThread[];
   non_mutation_guarantee?: boolean;
@@ -93,8 +95,7 @@ const DOMAIN_FILTERS: Array<{ value: 'all' | CollaborationDomain; label: string 
   { value: 'control_tower', label: 'Control tower' },
   { value: 'decision_intelligence', label: 'Decision intelligence' },
   { value: 'ai_governance', label: 'AI governance' },
-  { value: 'event_coordination', label: 'Operational events' },
-  { value: 'multi_domain', label: 'All areas together' }
+  { value: 'event_coordination', label: 'Operational events' }
 ];
 
 const THREAD_FILTERS: Array<{ value: 'all' | CollaborationThreadType; label: string }> = [
@@ -147,7 +148,6 @@ const THREAD_TYPE_LABELS: Record<string, string> = {
   triage_thread: 'Triage guidance',
   approval_thread: 'Approval review',
   incident_thread: 'Incident coordination',
-  supplier_coordination_thread: 'Supplier coordination',
   task_coordination_thread: 'Task coordination',
   governance_review_thread: 'Governance review'
 };
@@ -158,7 +158,6 @@ const DOMAIN_LABELS: Record<string, string> = {
   control_tower: 'Control tower',
   decision_intelligence: 'Decision intelligence',
   ai_governance: 'AI governance',
-  workflow: 'Workflow',
   event_coordination: 'Operational events',
   multi_domain: 'Multiple areas'
 };
@@ -240,6 +239,16 @@ function topicLabel(value: string, ui: (englishText: string) => string): string 
 function cadenceLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
   if (!value) return ui('Review when needed');
   return CADENCE_LABELS[value] ? ui(CADENCE_LABELS[value]) : formatIdentifier(value);
+}
+
+function localizedSystemGuidance(
+  key: string | null | undefined,
+  value: string | null | undefined,
+  fallback: string,
+  ui: (englishText: string) => string
+): string {
+  const text = String(value || '').trim();
+  return text ? (key ? ui(text) : text) : ui(fallback);
 }
 
 async function fetchEnterpriseCollaborationSummary(filters: typeof DEFAULT_FILTERS): Promise<CollaborationResponse> {
@@ -334,10 +343,16 @@ export default function EnterpriseCollaborationPage() {
         eyebrow={ui('Read-only coordination guidance')}
         title={ui('Coordinate work in the source workflow')}
         description={ui('This page turns permitted alerts, tasks, governance reviews, and operational events into suggestions about who should coordinate, what to discuss, and where the real work belongs. It does not create a chat thread, send a message, notify anyone, or record a comment.')}
-        meta={<>
-          <OperationalWorkspaceMetaPill>{ui('Source permissions apply')}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui('Source workflow stays authoritative')}</OperationalWorkspaceMetaPill>
-        </>}
+        meta={
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+            <>
+                      <OperationalWorkspaceMetaPill>{ui('Source permissions apply')}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{ui('Source workflow stays authoritative')}</OperationalWorkspaceMetaPill>
+                    </>
+          */
+        }
         aside={<div style={{ display: 'grid', gap: 8 }}>
           <OperationalWorkspaceStatus value={formatLocalizedNumber(threads.length, locale)} label={(threads.length === 1 ? ui('{count} coordination recommendation · refreshed {time}') : ui('{count} coordination recommendations · refreshed {time}')).replace('{count}', formatLocalizedNumber(threads.length, locale)).replace('{time}', formatDateTime(response?.generated_at, locale, ui))} />
           <button className="app-button app-button--secondary" type="button" onClick={() => collaborationQuery.refetch()} disabled={collaborationQuery.isFetching}>
@@ -428,7 +443,7 @@ export default function EnterpriseCollaborationPage() {
               <div>
                 <h2 id="coordination-recommendations-title">{ui('Coordination recommendations')}</h2>
                 <p className="card__subtext">
-                  {guidance.collaboration_guidance || ui('Use these suggestions to coordinate people in the appropriate source workflow.')} {ui('Showing up to {limit} items.').replace('{limit}', formatLocalizedNumber(appliedLimit, locale))}
+                  {localizedSystemGuidance(guidance.collaboration_guidance_key, guidance.collaboration_guidance, 'Use these suggestions to coordinate people in the appropriate source workflow.', ui)} {ui('Showing up to {limit} items.').replace('{limit}', formatLocalizedNumber(appliedLimit, locale))}
                 </p>
               </div>
             </div>
@@ -488,7 +503,7 @@ export default function EnterpriseCollaborationPage() {
 
                     <div className="collaboration-guidance-block">
                       <div className="card__label">{ui('Recommended next step')}</div>
-                      <p>{thread.coordination_context?.recommended_next_step || ui('Confirm the owner, current status, blockers, and next safe action in the source workflow.')}</p>
+                      <p>{localizedSystemGuidance(thread.coordination_context?.recommended_next_step_key, thread.coordination_context?.recommended_next_step, 'Confirm the owner, current status, blockers, and next safe action in the source workflow.', ui)}</p>
                     </div>
 
                     {commentTopics.length ? (
@@ -523,15 +538,15 @@ export default function EnterpriseCollaborationPage() {
           </div>
           <article className="card collaboration-limit-card">
             <span className="collaboration-limit-icon"><TenantNavIcon path="/alerts" size={18} /></span>
-            <div><h3>{ui('Escalation remains in the source workflow')}</h3><p className="card__subtext">{guidance.escalation_thread_guidance || ui('Use the existing alert, task, Action Center, or governance process for escalation.')}</p></div>
+            <div><h3>{ui('Escalation remains in the source workflow')}</h3><p className="card__subtext">{localizedSystemGuidance(guidance.escalation_thread_guidance_key, guidance.escalation_thread_guidance, 'Use the existing alert, task, Action Center, or governance process for escalation.', ui)}</p></div>
           </article>
           <article className="card collaboration-limit-card">
             <span className="collaboration-limit-icon"><TenantNavIcon path="/collaboration" size={18} /></span>
-            <div><h3>{ui('No coordination room is created')}</h3><p className="card__subtext">{guidance.incident_war_room_guidance || ui('Active coordination is a suggestion only. This page does not create a room, channel, meeting, or participant list.')}</p></div>
+            <div><h3>{ui('No coordination room is created')}</h3><p className="card__subtext">{localizedSystemGuidance(guidance.incident_war_room_guidance_key, guidance.incident_war_room_guidance, 'Active coordination is a suggestion only. This page does not create a room, channel, meeting, or participant list.', ui)}</p></div>
           </article>
           <article className="card collaboration-limit-card">
             <span className="collaboration-limit-icon"><TenantNavIcon path="/suppliers" size={18} /></span>
-            <div><h3>{ui('No external partner is contacted')}</h3><p className="card__subtext">{guidance.supplier_coordination_guidance || ui('Supplier, carrier, and partner communication remains in the authorized source process.')}</p></div>
+            <div><h3>{ui('No external partner is contacted')}</h3><p className="card__subtext">{localizedSystemGuidance(guidance.supplier_coordination_guidance_key, guidance.supplier_coordination_guidance, 'Supplier, carrier, and partner communication remains in the authorized source process.', ui)}</p></div>
           </article>
           <article className="card collaboration-limit-card">
             <span className="collaboration-limit-icon"><TenantNavIcon path="/real-time-operations-feed" size={18} /></span>

@@ -1,7 +1,7 @@
 import type { useProductPageViewModel } from './useProductPageViewModel';
 import {
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatus,
   OperationalWorkspaceTab,
   OperationalWorkspaceTabs
@@ -40,11 +40,17 @@ export function ProductPageContent(props: ProductPageContentProps) {
         eyebrow={ui("Product operations")}
         title={ui("Product workspace")}
         description={ui("Keep the tenant product catalog accurate, then move into costing only when you need valuation or review evidence. Technical record identifiers and version counters stay out of the normal catalog view.")}
-        meta={<>
-          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{props.canManageProducts ? ui('Catalog write access') : ui('Catalog read-only')}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui("Cost intelligence is read-only")}</OperationalWorkspaceMetaPill>
-        </>}
+        meta={
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+            <>
+                      <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{props.canManageProducts ? ui('Catalog write access') : ui('Catalog read-only')}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{ui("Cost intelligence is read-only")}</OperationalWorkspaceMetaPill>
+                    </>
+          */
+        }
         aside={<OperationalWorkspaceStatus value={catalogStatusValue} label={ui("products in the current catalog scope")} />}
       />
 

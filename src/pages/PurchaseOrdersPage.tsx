@@ -17,7 +17,7 @@ import ProductUomSelect from '../components/inventory/ProductUomSelect';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceTab,
@@ -1710,7 +1710,13 @@ export default function PurchaseOrdersPage() {
           eyebrow={ui("Procurement")}
           title={ui("Purchase orders")}
           description={ui("Create, approve, and track supplier orders through receiving.")}
-          meta={<OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>}
+          meta={
+            undefined /*
+              v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+              Previous rendering preserved for easy restoration:
+              <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+            */
+          }
         />
         <section className="app-panel purchase-orders-card">
           <OperationalSectionHeader
@@ -1731,7 +1737,13 @@ export default function PurchaseOrdersPage() {
           eyebrow={ui("Procurement")}
           title={ui("Purchase orders")}
           description={ui("Create, approve, and track supplier orders through receiving.")}
-          meta={<OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>}
+          meta={
+            undefined /*
+              v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+              Previous rendering preserved for easy restoration:
+              <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+            */
+          }
         />
         <section className="app-panel purchase-orders-card">
           <OperationalSectionHeader
@@ -1752,11 +1764,16 @@ export default function PurchaseOrdersPage() {
         title={ui("Purchase orders")}
         description={ui("Create, approve, and track supplier orders from draft through receiving and completion. Stock changes only when linked shipments are received.")}
         meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Approval workflow")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Receiving through shipments")}</OperationalWorkspaceMetaPill>
-          </>
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+                      <>
+                        <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui("Approval workflow")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui("Receiving through shipments")}</OperationalWorkspaceMetaPill>
+                      </>
+                    
+          */
         }
         aside={
           <button

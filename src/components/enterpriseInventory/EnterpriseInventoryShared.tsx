@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import { styles } from './EnterpriseInventoryStyles';
 import { useAppTranslation } from '../../i18n/I18nContext';
-import { formatLocalizedDateTime } from '../../i18n/formatters';
+// import { formatLocalizedDateTime } from '../../i18n/formatters'; // v3.49.107: only used by hidden hero meta.
 import {
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
 } from '../ui/OperationalWorkspace';
 
 export function MetricCard({ label, value, helper }: { label: string; value: string | number; helper?: string }) {
@@ -133,14 +133,14 @@ export function EnterpriseInventoryHero({
   onEvaluateParLevels,
   evaluating,
   canEvaluate,
-  lastRefreshedAt
+  // lastRefreshedAt // v3.49.107: only used by hidden hero meta.
 }: {
   onEvaluateParLevels: () => void;
   evaluating: boolean;
   canEvaluate: boolean;
   lastRefreshedAt: number | null;
 }) {
-  const { locale, ui } = useAppTranslation();
+  const { ui } = useAppTranslation(); // locale was only used by the hidden hero meta.
   return (
     <OperationalWorkspaceHero
       iconPath="/enterprise-inventory"
@@ -148,15 +148,20 @@ export function EnterpriseInventoryHero({
       title={ui('Specialized inventory workflows')}
       description={ui('Manage the inventory controls that do not already have a dedicated tenant page: par levels, cycle counts, supplier returns, approvals, supplier catalogs, invoices, labels, attachments, and notifications.')}
       meta={
-        <>
-          <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui('Permission-aware')}</OperationalWorkspaceMetaPill>
-          {lastRefreshedAt ? (
-            <OperationalWorkspaceMetaPill>
-              {ui('Refreshed')} {formatLocalizedDateTime(lastRefreshedAt, locale)}
-            </OperationalWorkspaceMetaPill>
-          ) : null}
-        </>
+        undefined /*
+          v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+          Previous rendering preserved for easy restoration:
+                  <>
+                    <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+                    <OperationalWorkspaceMetaPill>{ui('Permission-aware')}</OperationalWorkspaceMetaPill>
+                    {lastRefreshedAt ? (
+                      <OperationalWorkspaceMetaPill>
+                        {ui('Refreshed')} {formatLocalizedDateTime(lastRefreshedAt, locale)}
+                      </OperationalWorkspaceMetaPill>
+                    ) : null}
+                  </>
+                
+        */
       }
       aside={canEvaluate ? (
         <button

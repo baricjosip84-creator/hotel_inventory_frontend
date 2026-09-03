@@ -11,7 +11,7 @@ import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissio
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceTab,
@@ -2181,11 +2181,16 @@ export default function ShipmentsPage() {
           title={ui('Inbound shipments')}
           description={ui('Receive supplier deliveries into inventory, keep partial receipts visible, document shortages, and finalize only when the shipment record is complete.')}
           meta={
-            <>
-              <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
-              <OperationalWorkspaceMetaPill>{ui('Receiving updates stock')}</OperationalWorkspaceMetaPill>
-              <OperationalWorkspaceMetaPill>{ui('Purchase-order aware')}</OperationalWorkspaceMetaPill>
-            </>
+            undefined /*
+              v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+              Previous rendering preserved for easy restoration:
+                          <>
+                            <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+                            <OperationalWorkspaceMetaPill>{ui('Receiving updates stock')}</OperationalWorkspaceMetaPill>
+                            <OperationalWorkspaceMetaPill>{ui('Purchase-order aware')}</OperationalWorkspaceMetaPill>
+                          </>
+                        
+            */
           }
           aside={
             <button

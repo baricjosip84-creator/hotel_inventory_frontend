@@ -7,7 +7,7 @@ import { ApiError, apiDownloadFile, apiRequest } from '../lib/api';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceStatus
@@ -411,12 +411,17 @@ export default function TenantAuditPage() {
         title={ui('Tenant audit trail')}
         description={ui('Review tenant-scoped business changes and attributed support-session activity. Audit evidence is read-only and remains isolated to the current tenant.')}
         meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui('Read-only evidence')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui('Support activity attributed')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui('CSV export')}</OperationalWorkspaceMetaPill>
-          </>
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+                      <>
+                        <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui('Read-only evidence')}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui('Support activity attributed')}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui('CSV export')}</OperationalWorkspaceMetaPill>
+                      </>
+                    
+          */
         }
         aside={<OperationalWorkspaceStatus value={summary ? formatLocalizedNumber(summary.total_events, locale) : '—'} label={ui('events matching applied filters')} />}
       />

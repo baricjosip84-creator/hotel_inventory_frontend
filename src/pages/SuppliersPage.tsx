@@ -8,7 +8,7 @@ import { getCurrentAccessRoleLabel, getRoleCapabilities, hasPermission, TENANT_P
 import type { SupplierItem } from '../types/inventory';
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, /* OperationalWorkspaceMetaPill, */ OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDate, formatLocalizedNumber } from '../i18n/formatters';
 
@@ -207,7 +207,8 @@ function getPerformanceTitle(
   fallback: SupplierItem | null | undefined,
   fallbackTitle: string
 ): string {
-  if (!performance) return fallback?.name || fallbackTitle;
+  if (fallback?.name) return fallback.name;
+  if (!performance) return fallbackTitle;
 
   if (typeof performance.supplier_name === 'string') return performance.supplier_name;
   if (performance.supplier?.name) return performance.supplier.name;
@@ -263,6 +264,8 @@ export default function SuppliersPage() {
   const [form, setForm] = useState<SupplierFormState>(emptyForm());
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [archiveMessage, setArchiveMessage] = useState<string | null>(null);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
 
   const suppliersQuery = useQuery({
     queryKey: ['suppliers'],
@@ -340,11 +343,10 @@ export default function SuppliersPage() {
         setEditingSupplier(null);
         setForm(emptyForm());
         setFormError(null);
-        setFormMessage(ui("Supplier archived successfully."));
-      } else if (!editingSupplier) {
-        setFormError(null);
-        setFormMessage(ui("Supplier archived successfully."));
+        setFormMessage(null);
       }
+      setArchiveError(null);
+      setArchiveMessage(ui("Supplier archived successfully."));
       setSelectedPerformanceSupplier((current) =>
         current?.id === archivedSupplier.id ? null : current
       );
@@ -365,8 +367,8 @@ export default function SuppliersPage() {
         await queryClient.invalidateQueries({ queryKey: ['suppliers-available'] });
       }
       const message = error instanceof ApiError ? error.message : ui('Failed to archive supplier.');
-      setFormError(message);
-      setFormMessage(null);
+      setArchiveError(message);
+      setArchiveMessage(null);
     }
   });
 
@@ -595,8 +597,8 @@ export default function SuppliersPage() {
       return;
     }
 
-    setFormError(null);
-    setFormMessage(null);
+    setArchiveError(null);
+    setArchiveMessage(null);
     deleteMutation.mutate({ id: supplier.id, version: supplier.version });
   };
 
@@ -613,10 +615,16 @@ export default function SuppliersPage() {
         description={canViewShipmentPerformance
           ? ui("Keep supplier contact details accurate, review delivery performance, and follow up late shipments from one tenant-scoped workspace.")
           : ui("Keep supplier contact details accurate from one tenant-scoped workspace. Shipment delivery performance requires shipments.read permission.")}
-        meta={<>
-          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{canManageSuppliers ? ui("Supplier write access") : ui("Supplier read-only")}</OperationalWorkspaceMetaPill>
-        </>}
+        meta={
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+            <>
+                      <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{canManageSuppliers ? ui("Supplier write access") : ui("Supplier read-only")}</OperationalWorkspaceMetaPill>
+                    </>
+          */
+        }
         aside={canManageSuppliers ? (
           <button type="button" className="app-button app-button--primary" onClick={handleStartCreate}>{ui("Add supplier")}</button>
         ) : undefined}
@@ -709,6 +717,9 @@ export default function SuppliersPage() {
               : `${formatLocalizedNumber(suppliers.length, locale)} ${ui('suppliers shown.')}`}
           </div>
         ) : null}
+
+        {archiveError ? <div className="app-error-state" style={styles.errorBox}>{archiveError}</div> : null}
+        {archiveMessage ? <div className="app-success-state" style={styles.successBox}>{archiveMessage}</div> : null}
 
         {suppliersQuery.isLoading ? <div className="app-empty-state">{ui("Loading suppliers...")}</div> : null}
 

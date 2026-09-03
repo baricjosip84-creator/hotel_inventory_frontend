@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalSectionHeader, OperationalWorkspaceHero, OperationalWorkspaceMetaPill } from '../components/ui/OperationalWorkspace';
+import { OperationalSectionHeader, OperationalWorkspaceHero /* OperationalWorkspaceMetaPill */ } from '../components/ui/OperationalWorkspace';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDate, formatLocalizedNumber } from '../i18n/formatters';
 
@@ -727,11 +727,17 @@ export default function ScannerPage() {
         eyebrow={ui("Scanning")}
         title={ui(modeLabel(mode))}
         description={ui(modeDescription(mode))}
-        meta={<>
-          <OperationalWorkspaceMetaPill>{mode === 'product' ? ui("Receiving mode") : ui("Shipment mode")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{liveCameraUnavailableReason ? ui("Camera unavailable") : ui("Camera ready")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui("Manual and image fallback")}</OperationalWorkspaceMetaPill>
-        </>}
+        meta={
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+            <>
+                      <OperationalWorkspaceMetaPill>{mode === 'product' ? ui("Receiving mode") : ui("Shipment mode")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{liveCameraUnavailableReason ? ui("Camera unavailable") : ui("Camera ready")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{ui("Manual and image fallback")}</OperationalWorkspaceMetaPill>
+                    </>
+          */
+        }
       />
 
       <section className="app-panel app-panel--padded" style={styles.heroPanel}>

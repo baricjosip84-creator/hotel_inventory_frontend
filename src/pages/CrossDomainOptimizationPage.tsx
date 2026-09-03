@@ -6,7 +6,7 @@ import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatte
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceStatus,
@@ -642,7 +642,13 @@ export default function CrossDomainOptimizationPage() {
         eyebrow={ui('Decision intelligence & planning')}
         title={ui('Cross-Domain Optimization')}
         description={ui('Compare stored planning runs, business objectives, proposed options, tradeoffs, and recorded outcomes across business areas. This workspace supports human planning review only and cannot approve, apply, or scale a plan automatically.')}
-        meta={<><OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{ui('Human-governed planning')}</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{ui('No automatic plan execution')}</OperationalWorkspaceMetaPill></>}
+        meta={
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+            <><OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{ui('Human-governed planning')}</OperationalWorkspaceMetaPill><OperationalWorkspaceMetaPill>{ui('No automatic plan execution')}</OperationalWorkspaceMetaPill></>
+          */
+        }
         aside={<><OperationalWorkspaceStatus value={formatCanonicalLabel(data?.governance?.cross_domain_optimization_posture, ui)} label={ui('Planning review posture · refreshed {time}').replace('{time}', lastRefreshed)} /><button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/cross-domain-optimization" size={14} />{isFetching ? ui('Refreshing…') : ui('Refresh evidence')}</button></>}
       />
 

@@ -7,7 +7,7 @@ import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatte
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import type { TenantPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, /* OperationalWorkspaceMetaPill, */ OperationalWorkspaceStatCard, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './DigitalTwinVisualizationPage.css';
 
 type DigitalTwinView = 'context' | 'limits';
@@ -476,10 +476,16 @@ export default function DigitalTwinVisualizationPage() {
         eyebrow={ui('Read-only operational context')}
         title={ui('Review relationships, dependencies, risks, and operational pressure')}
         description={ui('This page connects permitted products, suppliers, locations, stock, purchase orders, shipments, reservations, requisitions, transfers, execution tasks, alerts, stored graph evidence, and current operational context. It is not a live simulation and does not change source records.')}
-        meta={<>
-          <OperationalWorkspaceMetaPill>{ui('Source permissions apply')}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui('Source workflows remain authoritative')}</OperationalWorkspaceMetaPill>
-        </>}
+        meta={
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+            <>
+                      <OperationalWorkspaceMetaPill>{ui('Source permissions apply')}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{ui('Source workflows remain authoritative')}</OperationalWorkspaceMetaPill>
+                    </>
+          */
+        }
         aside={<div style={{ display: 'grid', gap: 8 }}>
           <OperationalWorkspaceStatus value={formatLocalizedNumber(nodes.length, locale)} label={(nodes.length === 1 ? ui('{count} context node · refreshed {time}') : ui('{count} context nodes · refreshed {time}')).replace('{count}', formatLocalizedNumber(nodes.length, locale)).replace('{time}', formatDateTime(response?.generated_at, locale, ui))} />
           <button className="app-button app-button--secondary" type="button" onClick={() => digitalTwinQuery.refetch()} disabled={digitalTwinQuery.isFetching}>

@@ -10,7 +10,7 @@ import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurr
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStatus,
   OperationalWorkspaceTab,
@@ -445,11 +445,16 @@ export default function SystemContextPage() {
           <p>{ui('See what the system currently knows about your operation, what needs attention, and whether the available data is safe to use for planning. This page does not change stock or execute actions.')}</p>
         }
         meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui('Read-only')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{contextQuery.isLoading ? ui('Loading') : contextQuery.isError ? ui('Unavailable') : data ? formatKnownValue(data.status, ui) : ui('Unavailable')}</OperationalWorkspaceMetaPill>
-          </>
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+                      <>
+                        <OperationalWorkspaceMetaPill>{ui('Read-only')}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{contextQuery.isLoading ? ui('Loading') : contextQuery.isError ? ui('Unavailable') : data ? formatKnownValue(data.status, ui) : ui('Unavailable')}</OperationalWorkspaceMetaPill>
+                      </>
+                    
+          */
         }
         aside={
           <>

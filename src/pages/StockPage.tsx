@@ -11,7 +11,7 @@ import {
 } from '../lib/permissions';
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, /* OperationalWorkspaceMetaPill, */ OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import './StockPage.css';
@@ -1450,11 +1450,17 @@ export default function StockPage() {
         eyebrow={ui("Stock operations")}
         title={ui("Stock workspace")}
         description={ui("Review stock by product and location, see quantities assigned to reservations, and post controlled consumption, count, or adjustment actions.")}
-        meta={<>
-          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{canCount && canAdjust ? ui("Count and adjust access") : canCount ? ui('Count access') : canAdjust ? ui('Adjust access') : ui("Stock review access")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{canConsume ? ui("Consumption enabled") : ui("Consumption restricted by role")}</OperationalWorkspaceMetaPill>
-        </>}
+        meta={
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+            <>
+                      <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{canCount && canAdjust ? ui("Count and adjust access") : canCount ? ui('Count access') : canAdjust ? ui('Adjust access') : ui("Stock review access")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{canConsume ? ui("Consumption enabled") : ui("Consumption restricted by role")}</OperationalWorkspaceMetaPill>
+                    </>
+          */
+        }
         aside={canAdjust ? (
           <button
             type="button"

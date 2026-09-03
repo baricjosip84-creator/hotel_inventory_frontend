@@ -6,10 +6,10 @@ import { useNavigate } from "react-router";
 import type { CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiRequest } from "../lib/api";
-import { getRoleCapabilities } from "../lib/permissions";
+import { getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from "../lib/permissions";
 import {
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceTab,
@@ -1479,6 +1479,7 @@ export default function ProcurementRecommendationsPage() {
   const canCreatePurchaseOrderDrafts = capabilities.canCreatePurchaseOrders;
   const canViewGeneratedPurchaseOrderDrafts = capabilities.canViewPurchaseOrders;
   const canManageProducts = capabilities.canManageProducts;
+  const canViewSuppliers = hasPermission(TENANT_PERMISSIONS.SUPPLIERS_READ);
   const [filters, setFilters] =
     useState<RecommendationFilters>(DEFAULT_FILTERS);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(
@@ -1506,6 +1507,7 @@ export default function ProcurementRecommendationsPage() {
   const optionsQuery = useQuery({
     queryKey: ["procurement-recommendation-options"],
     queryFn: fetchProcurementRecommendationOptions,
+    enabled: canViewSuppliers,
   });
 
   const recommendationsQuery = useQuery({
@@ -1860,14 +1862,19 @@ export default function ProcurementRecommendationsPage() {
         title={ui("Procurement recommendations")}
         description={ui("Review replenishment needs, choose what should be ordered, and turn approved recommendations into purchase order drafts without changing stock directly.")}
         meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Human approval")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Transfer-before-buy aware")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>
-              {ui("Generated {date}").replace("{date}", data?.generated_at ? formatUiDateTime(data.generated_at) : "—")}
-            </OperationalWorkspaceMetaPill>
-          </>
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+                      <>
+                        <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui("Human approval")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui("Transfer-before-buy aware")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>
+                          {ui("Generated {date}").replace("{date}", data?.generated_at ? formatUiDateTime(data.generated_at) : "—")}
+                        </OperationalWorkspaceMetaPill>
+                      </>
+                    
+          */
         }
         aside={
           <div className="procurement-recommendations-hero-actions">
@@ -2035,21 +2042,23 @@ export default function ProcurementRecommendationsPage() {
               <option value="low">{ui("Low")}</option>
             </select>
           </label>
-          <label style={styles.label}>
-            {ui("Supplier")}
-            <select
-              style={styles.input}
-              value={filters.supplierId}
-              onChange={(event) => setFilter("supplierId", event.target.value)}
-            >
-              <option value="">{ui("All suppliers")}</option>
-              {(optionsQuery.data?.suppliers || []).map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          {canViewSuppliers ? (
+            <label style={styles.label}>
+              {ui("Supplier")}
+              <select
+                style={styles.input}
+                value={filters.supplierId}
+                onChange={(event) => setFilter("supplierId", event.target.value)}
+              >
+                <option value="">{ui("All suppliers")}</option>
+                {(optionsQuery.data?.suppliers || []).map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <label style={styles.label}>
             {ui("Readiness")}
             <select
@@ -4041,7 +4050,7 @@ export default function ProcurementRecommendationsPage() {
                       </td>
                       <td style={styles.td}>
                         <div style={styles.mutedText}>{exception.resolution_hint || ui("Review recommendation detail.")}</div>
-                        {exception.code === "MISSING_SUPPLIER" ? (
+                        {exception.code === "MISSING_SUPPLIER" && canViewSuppliers ? (
                           <select
                             style={{ ...styles.input, marginTop: 8, width: "100%" }}
                             value={exceptionSupplierIds[exception.exception_key] || ""}
@@ -4061,11 +4070,11 @@ export default function ProcurementRecommendationsPage() {
                           placeholder={ui("Resolution note")}
                         />
                         <div style={styles.exceptionActionRow}>
-                          {exception.code === "MISSING_SUPPLIER" ? (
+                          {exception.code === "MISSING_SUPPLIER" && canViewSuppliers ? (
                             <button
                               style={styles.secondaryButton}
                               type="button"
-                              disabled={!canApproveRecommendations || !canManageProducts || !exceptionSupplierIds[exception.exception_key] || exceptionResolutionMutation.isPending}
+                              disabled={!canApproveRecommendations || !canManageProducts || !canViewSuppliers || !exceptionSupplierIds[exception.exception_key] || exceptionResolutionMutation.isPending}
                               onClick={() =>
                                 requestConfirmation({
                                   title: ui("Assign supplier to product?"),

@@ -12,7 +12,7 @@ import ProductUomSelect from '../components/inventory/ProductUomSelect';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceTab,
@@ -853,11 +853,17 @@ export default function InventoryReservationsPage() {
         eyebrow={ui("Reservation operations")}
         title={ui("Stock reservations")}
         description={ui("Reserve future stock, allocate available inventory, protect commitments, and preserve a traceable lifecycle through fulfillment, release, expiration, or cancellation.")}
-        meta={<>
-          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui("Stock-protected allocation")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{permissions.canCreateInventoryReservations ? ui('Reservation write access') : ui('Review-only for current role')}</OperationalWorkspaceMetaPill>
-        </>}
+        meta={
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+            <>
+                      <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{ui("Stock-protected allocation")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{permissions.canCreateInventoryReservations ? ui('Reservation write access') : ui('Review-only for current role')}</OperationalWorkspaceMetaPill>
+                    </>
+          */
+        }
         aside={
           <div style={pageStyles.buttonRow}>
             <button type="button" style={pageStyles.secondaryButton} disabled={summaryQuery.isFetching || reservationsQuery.isFetching} onClick={refreshReservationQueries}>

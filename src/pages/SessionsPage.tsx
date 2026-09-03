@@ -10,7 +10,7 @@ import {
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceStatus
@@ -350,12 +350,17 @@ export default function SessionsPage() {
         title={ui("Sessions")}
         description={ui("Review browser sessions for your account, identify the current browser, and revoke stale access without affecting other tenant users.")}
         meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui("Account-scoped")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Current browser protected")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{supportSession ? ui("Platform-managed support access") : ui("Revoke actions audited")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Historical records retained")}</OperationalWorkspaceMetaPill>
-          </>
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+                      <>
+                        <OperationalWorkspaceMetaPill>{ui("Account-scoped")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui("Current browser protected")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{supportSession ? ui("Platform-managed support access") : ui("Revoke actions audited")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui("Historical records retained")}</OperationalWorkspaceMetaPill>
+                      </>
+                    
+          */
         }
         aside={
           <div className="sessions-hero-actions">

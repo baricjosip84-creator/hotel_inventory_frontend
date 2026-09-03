@@ -9,7 +9,7 @@ import { formatCurrencyAmount, getActiveTenantCurrency, normalizeCurrencyCode } 
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceTab,
@@ -536,11 +536,16 @@ export default function ReplenishmentPlanningPage() {
         title={ui("Replenishment planning")}
         description={ui("Move available stock between locations before buying from suppliers. Planning runs are reviewed first, and nothing moves or orders automatically.")}
         meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Transfer before buy")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Human review required")}</OperationalWorkspaceMetaPill>
-          </>
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+                      <>
+                        <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui("Transfer before buy")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui("Human review required")}</OperationalWorkspaceMetaPill>
+                      </>
+                    
+          */
         }
         aside={
           <button

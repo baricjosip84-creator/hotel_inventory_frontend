@@ -7,7 +7,7 @@ import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatte
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { useRouteQueryState } from '../lib/useRouteQueryState';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, /* OperationalWorkspaceMetaPill, */ OperationalWorkspaceStatCard, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './ReliabilityCommandPage.css';
 
 type ReliabilityView = 'posture' | 'review-path' | 'limits';
@@ -399,11 +399,17 @@ export default function ReliabilityCommandPage() {
         eyebrow={ui('Read-only operational reliability review')}
         title={ui('Review current pressure, safety checks, and the manual follow-up path')}
         description={ui('Reliability Command combines permitted operational context into advisory guidance only. It never closes a risk, records approval, starts monitoring, opens an incident, sends a notification, or changes a source workflow.')}
-        meta={<>
-          <OperationalWorkspaceMetaPill>{ui('Read-only guidance')}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui('Manual follow-up')}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui('Source workflows authoritative')}</OperationalWorkspaceMetaPill>
-        </>}
+        meta={
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+            <>
+                      <OperationalWorkspaceMetaPill>{ui('Read-only guidance')}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{ui('Manual follow-up')}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{ui('Source workflows authoritative')}</OperationalWorkspaceMetaPill>
+                    </>
+          */
+        }
         aside={<div style={{ display: 'grid', gap: 8 }}>
           <OperationalWorkspaceStatus value={formatLocalizedNumber(risks.length, locale)} label={ui(risks.length === 1 ? '{count} review risk · refreshed {time}' : '{count} review risks · refreshed {time}').replace('{count}', formatLocalizedNumber(risks.length, locale)).replace('{time}', formatDateTime(response?.generated_at, locale, ui))} />
           <button className="app-button app-button--secondary" type="button" onClick={() => commandQuery.refetch()} disabled={commandQuery.isFetching}>

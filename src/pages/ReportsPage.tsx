@@ -7,7 +7,7 @@ import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, 
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceStatus,
@@ -1203,11 +1203,16 @@ export default function ReportsPage() {
         title={ui("Management reporting workspace")}
         description={ui("Run tenant-scoped inventory, movement, transfer, requisition, procurement, commitment, spend, usage, supplier, expiry, variance, and forecasting reports from live database records. Every report can be printed or exported for offline business use.")}
         meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Read-only reporting")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Print + PDF + CSV")}</OperationalWorkspaceMetaPill>
-          </>
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+                      <>
+                        <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui("Read-only reporting")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui("Print + PDF + CSV")}</OperationalWorkspaceMetaPill>
+                      </>
+                    
+          */
         }
         aside={<OperationalWorkspaceStatus value={availableReportCount} label={ui("report types available with current access")} />}
       />

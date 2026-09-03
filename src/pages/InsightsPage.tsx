@@ -12,7 +12,7 @@ import { formatCurrencyAmount } from '../lib/tenantCurrency';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStatus
 } from '../components/ui/OperationalWorkspace';
@@ -1540,11 +1540,16 @@ export default function InsightsPage() {
           </p>
         }
         meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui("Read-only intelligence")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped evidence")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Source workflows stay authoritative")}</OperationalWorkspaceMetaPill>
-          </>
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+                      <>
+                        <OperationalWorkspaceMetaPill>{ui("Read-only intelligence")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui("Tenant-scoped evidence")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui("Source workflows stay authoritative")}</OperationalWorkspaceMetaPill>
+                      </>
+                    
+          */
         }
         aside={
           <>

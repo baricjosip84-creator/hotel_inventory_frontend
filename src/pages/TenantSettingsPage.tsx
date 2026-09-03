@@ -6,7 +6,7 @@ import { ApiError, apiRequest } from '../lib/api';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceStatus
@@ -494,7 +494,13 @@ export default function TenantSettingsPage() {
           eyebrow={ui('Administration & policy')}
           title={ui('Tenant settings')}
           description={ui('Manage tenant-owned company profile, purchasing identity, operating-season, and inventory accounting context.')}
-          meta={<OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>}
+          meta={
+            undefined /*
+              v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+              Previous rendering preserved for easy restoration:
+              <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+            */
+          }
           aside={<OperationalWorkspaceStatus value={ui('Read blocked')} label={ui('tenant settings access')} />}
         />
         <div className="app-error-state tenant-settings-message">{ui('Your current role cannot read tenant settings.')}</div>
@@ -510,12 +516,17 @@ export default function TenantSettingsPage() {
         title={ui('Tenant settings')}
         description={ui("Maintain the current tenant's company profile, supplier-facing document details, operating-season, and inventory accounting context. Platform-owned creation, deletion, locking, billing, and plan controls stay outside this page.")}
         meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui('Supplier document identity')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui('Currency safety protected')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui('Tenant settings only')}</OperationalWorkspaceMetaPill>
-          </>
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+                      <>
+                        <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui('Supplier document identity')}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui('Currency safety protected')}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui('Tenant settings only')}</OperationalWorkspaceMetaPill>
+                      </>
+                    
+          */
         }
         aside={
           <div className="tenant-settings-hero-actions">

@@ -6,7 +6,7 @@ import { apiRequest } from '../lib/api';
 import { formatCurrencyAmount, getActiveTenantCurrency } from '../lib/tenantCurrency';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { OperationalWorkspaceHero, OperationalWorkspaceMetaPill, OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
+import { OperationalWorkspaceHero, /* OperationalWorkspaceMetaPill, */ OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
@@ -642,11 +642,17 @@ export default function StockMovementsPage() {
         eyebrow={ui("Stock audit")}
         title={ui("Stock movement ledger")}
         description={ui("Trace every recorded stock change by product, location, movement type, reference, operator, package, and cost evidence. This ledger is read-only.")}
-        meta={<>
-          <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui("Read-only ledger")}</OperationalWorkspaceMetaPill>
-          <OperationalWorkspaceMetaPill>{ui("Audit evidence")}</OperationalWorkspaceMetaPill>
-        </>}
+        meta={
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+            <>
+                      <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{ui("Read-only ledger")}</OperationalWorkspaceMetaPill>
+                      <OperationalWorkspaceMetaPill>{ui("Audit evidence")}</OperationalWorkspaceMetaPill>
+                    </>
+          */
+        }
         aside={(
           <button type="button" className="app-button app-button--secondary" onClick={refreshAll} disabled={movementsQuery.isFetching || summaryQuery.isFetching || filterOptionsQuery.isFetching}>
             {movementsQuery.isFetching || summaryQuery.isFetching || filterOptionsQuery.isFetching ? ui("Refreshing…") : ui("Refresh ledger")}

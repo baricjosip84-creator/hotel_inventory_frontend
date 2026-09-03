@@ -11,7 +11,7 @@ import './AlertsPage.css';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStatus
 } from '../components/ui/OperationalWorkspace';
@@ -522,11 +522,16 @@ export default function AlertsPage() {
           </p>
         }
         meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui('Open → acknowledge → resolve')}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui('Source workflow stays authoritative')}</OperationalWorkspaceMetaPill>
-          </>
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+                      <>
+                        <OperationalWorkspaceMetaPill>{ui('Tenant-scoped')}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui('Open → acknowledge → resolve')}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui('Source workflow stays authoritative')}</OperationalWorkspaceMetaPill>
+                      </>
+                    
+          */
         }
         aside={
           <>

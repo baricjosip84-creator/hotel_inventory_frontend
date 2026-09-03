@@ -8,7 +8,7 @@ import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceTab,
@@ -898,13 +898,18 @@ export default function ExecutionTasksPage() {
         title={ui("Operational task queue")}
         description={ui("Coordinate tenant work from assignment through completion. Execution tasks organize and evidence the work; stock-changing actions remain governed by their source workflows.")}
         meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Operational work queue")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>
-              {ui(canCreate || canAssign || canUpdate || canComplete || canCancel ? 'Workflow access' : 'Read-only access')}
-            </OperationalWorkspaceMetaPill>
-          </>
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+                      <>
+                        <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui("Operational work queue")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>
+                          {ui(canCreate || canAssign || canUpdate || canComplete || canCancel ? 'Workflow access' : 'Read-only access')}
+                        </OperationalWorkspaceMetaPill>
+                      </>
+                    
+          */
         }
         aside={
           <div className="execution-tasks-actions">

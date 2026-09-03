@@ -8,7 +8,7 @@ import { getRoleCapabilities } from '../lib/permissions';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
-  OperationalWorkspaceMetaPill,
+  // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
   OperationalWorkspaceStatCard,
   OperationalWorkspaceStats,
   OperationalWorkspaceStatus,
@@ -521,11 +521,16 @@ export default function UsersPage() {
         title={ui("Tenant user management")}
         description={ui("Create, review, and maintain tenant user accounts and access roles. Deactivation is the normal way to remove access while preserving business history.")}
         meta={
-          <>
-            <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Role-based access")}</OperationalWorkspaceMetaPill>
-            <OperationalWorkspaceMetaPill>{ui("Session revocation on deactivation")}</OperationalWorkspaceMetaPill>
-          </>
+          undefined /*
+            v3.49.107 — Tenant simplification. Title-area info pills intentionally hidden.
+            Previous rendering preserved for easy restoration:
+                      <>
+                        <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui("Role-based access")}</OperationalWorkspaceMetaPill>
+                        <OperationalWorkspaceMetaPill>{ui("Session revocation on deactivation")}</OperationalWorkspaceMetaPill>
+                      </>
+                    
+          */
         }
         aside={
           canWrite ? (
