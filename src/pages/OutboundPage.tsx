@@ -26,10 +26,11 @@ type Location = { id: string; name: string };
 type OrderItem = {
   id: string;
   product_id: string;
-  product_name: string;
-  product_unit: string;
+  product_name: string | null;
+  product_sku?: string | null;
+  product_unit: string | null;
   storage_location_id: string;
-  storage_location_name: string;
+  storage_location_name: string | null;
   quantity: number | string;
   entered_quantity?: number | string;
   uom_code?: string | null;
@@ -44,8 +45,7 @@ type Order = {
   id: string;
   order_number: string;
   customer_id: string;
-  customer_name: string;
-  customer_active: boolean;
+  customer_name: string | null;
   status: string;
   requested_date?: string | null;
   notes?: string | null;
@@ -90,31 +90,36 @@ type TraceRow = {
   outbound_order_item_id: string;
   order_number: string;
   order_status: string;
-  customer_name: string;
+  customer_name: string | null;
   storage_location_id: string;
-  storage_location_name: string;
-  product_name: string;
-  product_unit: string;
+  storage_location_name: string | null;
+  product_name: string | null;
+  product_sku?: string | null;
+  product_unit: string | null;
   lot_number?: string | null;
   batch_number?: string | null;
   expiry_date?: string | null;
   dispatched_quantity: number | string;
-  claimed_return_quantity: number | string;
-  returned_quantity: number | string;
-  returnable_quantity: number | string;
+  claimed_return_quantity: number | string | null;
+  returned_quantity: number | string | null;
+  returnable_quantity: number | string | null;
   historical_serialized?: boolean;
   serial_tracking_enabled?: boolean;
-  serial_numbers?: string[];
+  serial_numbers?: string[] | null;
+  returnable_serial_numbers?: string[] | null;
 };
 
 type ReturnItem = {
   id: string;
   quantity: number | string;
   condition: string;
+  notes?: string | null;
+  serial_numbers?: string[];
   storage_location_id: string;
-  storage_location_name: string;
-  product_name: string;
-  product_unit: string;
+  storage_location_name: string | null;
+  product_name: string | null;
+  product_sku?: string | null;
+  product_unit: string | null;
   lot_number?: string | null;
   batch_number?: string | null;
 };
@@ -122,8 +127,8 @@ type ReturnItem = {
 type CustomerReturn = {
   id: string;
   return_number: string;
-  order_number: string;
-  customer_name: string;
+  order_number: string | null;
+  customer_name: string | null;
   status: string;
   reason: string;
   notes?: string | null;
@@ -144,7 +149,7 @@ type OutboundSummary = {
   dispatched_orders_30d: number;
   units_waiting: number;
   units_dispatched_30d: number;
-  pending_customer_returns: number;
+  pending_customer_returns: number | null;
 };
 
 type CustomerForm = { name: string; email: string; phone: string; address: string; notes: string };
@@ -220,17 +225,78 @@ const queryErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
+const OUTBOUND_MUTATION_ERROR_MESSAGES: Record<string, string> = {
+  TENANT_CONTEXT_MISSING: 'The tenant context is unavailable. Sign in again and retry.',
+  OUTBOUND_ORDER_NOT_FOUND: 'The requested record is no longer available. Refresh and try again.',
+  CUSTOMER_NOT_FOUND: 'The requested record is no longer available. Refresh and try again.',
+  CUSTOMER_RETURN_NOT_FOUND: 'The requested record is no longer available. Refresh and try again.',
+  CUSTOMER_NAME_REQUIRED: 'Enter a customer name.',
+  CUSTOMER_NAME_CONFLICT: 'An active customer with this name already exists.',
+  CUSTOMER_ARCHIVED: 'Archived customers cannot be edited.',
+  CUSTOMER_ARCHIVE_ACTIVE_OUTBOUND_ORDER: 'This customer cannot be archived while an active outbound order still exists.',
+  OUTBOUND_ITEMS_REQUIRED: 'Add at least one order line before continuing.',
+  OUTBOUND_QUANTITY_INVALID: 'Every order line needs a product, source location, and quantity greater than zero.',
+  DUPLICATE_OUTBOUND_LINE: 'The same product and source location cannot appear twice on the order.',
+  OUTBOUND_PRODUCT_LOCATION_NOT_FOUND: 'A selected product or source location is no longer available. Refresh and review the order.',
+  OUTBOUND_LOCATION_NOT_PICKABLE: 'Outbound stock must come from an active pickable leaf location.',
+  OUTBOUND_HIERARCHY_PARENT_NOT_PICKABLE: 'Outbound stock must come from an active pickable leaf location.',
+  OUTBOUND_DRAFT_EDIT_ONLY: 'Only draft customer orders can be edited.',
+  BLOCKING_ALERTS_EXIST: 'This action is blocked by an unresolved critical stock alert.',
+  OUTBOUND_STOCK_INSUFFICIENT: 'There is not enough usable stock available for this action. Refresh and review stock.',
+  OUTBOUND_CONFIRM_STOCK_UNAVAILABLE: 'There is not enough usable stock available for this action. Refresh and review stock.',
+  OUTBOUND_ORDER_STATE_INVALID: 'This order is no longer in the required state for this action. Refresh and review it.',
+  OUTBOUND_ORDER_ALREADY_RESERVED: 'This order already has a stock reservation.',
+  OUTBOUND_CUSTOMER_ARCHIVED: 'The customer was archived before this order could be confirmed.',
+  OUTBOUND_REFERENCE_ARCHIVED: 'A product or source location was archived before this order could be confirmed.',
+  OUTBOUND_ORDER_NOT_PICKING: 'Start picking before recording or packing picked stock.',
+  OUTBOUND_PICK_ITEMS_REQUIRED: 'Add at least one picked line.',
+  OUTBOUND_ORDER_ITEM_NOT_FOUND: 'The selected order line is no longer available. Refresh and review the order.',
+  OUTBOUND_PICK_QUANTITY_INVALID: 'Picked quantity must be greater than zero.',
+  OUTBOUND_PICK_OVER_REMAINING: 'Picked quantity is greater than the order quantity still waiting to be picked.',
+  OUTBOUND_PICK_LOT_UNAVAILABLE: 'The selected lot or serialized stock is no longer available for picking.',
+  OUTBOUND_PICK_LOT_EXPIRED: 'Expired stock cannot be picked.',
+  OUTBOUND_PICK_LOT_QUANTITY_UNAVAILABLE: 'There is not enough usable stock available for this action. Refresh and review stock.',
+  SERIAL_STATE_CHANGED: 'One or more serial numbers changed state. Refresh and review the order.',
+  OUTBOUND_LOT_SELECTION_REQUIRED: 'This product requires a lot or batch to be selected before it can be picked.',
+  INVENTORY_LOT_NOT_FOUND: 'The selected lot or batch is no longer available for this product and location.',
+  OUTBOUND_PICK_STOCK_UNAVAILABLE: 'There is not enough usable stock available for this action. Refresh and review stock.',
+  OUTBOUND_NOTHING_PICKED: 'Record at least one picked quantity before continuing.',
+  OUTBOUND_PICKS_NOT_RESETTABLE: 'Picked stock can only be cleared while the order is being picked or is packed.',
+  OUTBOUND_NO_OPEN_PICKS: 'There are no open picked quantities to clear.',
+  OUTBOUND_ORDER_NOT_PACKED: 'Only packed stock can be dispatched.',
+  OUTBOUND_NOTHING_PACKED: 'There is no packed quantity waiting to dispatch.',
+  OUTBOUND_DISPATCH_REFERENCE_ARCHIVED: 'A product or source location changed before dispatch evidence could be captured. Refresh and review the order.',
+  OUTBOUND_SERIAL_ALLOCATION_MISMATCH: 'Packed serialized stock no longer matches the serial numbers reserved during picking.',
+  OUTBOUND_STOCK_CHANGED_AFTER_PICK: 'Stock changed after this order was picked. Clear the pick and pick available stock again.',
+  OUTBOUND_ORDER_NOT_CANCELLABLE: 'Fully dispatched or already cancelled orders cannot be cancelled.',
+  OUTBOUND_CANCEL_REASON_REQUIRED: 'Enter a cancellation reason.',
+  CUSTOMER_RETURN_REASON_REQUIRED: 'Enter a return reason.',
+  CUSTOMER_RETURN_ITEMS_REQUIRED: 'Add at least one returned item.',
+  CUSTOMER_RETURN_LINE_INVALID: 'Every return line needs dispatched stock, a return location, and quantity greater than zero.',
+  CUSTOMER_RETURN_CONDITION_INVALID: 'Choose a valid returned-stock condition.',
+  CUSTOMER_RETURN_DUPLICATE_LINE: 'The same dispatched stock selection cannot appear twice on one return.',
+  CUSTOMER_RETURN_MIXED_ORDERS: 'A customer return can only contain items from one customer order.',
+  CUSTOMER_RETURN_LOCATION_NOT_FOUND: 'The selected return location is no longer available.',
+  CUSTOMER_RETURN_DISPATCH_NOT_FOUND: 'The selected dispatched stock is no longer available for this return.',
+  CUSTOMER_RETURN_PRODUCT_ARCHIVED: 'This product was archived and can no longer be returned into inventory.',
+  CUSTOMER_RETURN_DISPATCH_CHANGED: 'The dispatched stock evidence changed. Refresh and review the return.',
+  CUSTOMER_RETURN_QUANTITY_UNAVAILABLE: 'Return quantity is greater than the quantity still eligible to be returned.',
+  CUSTOMER_RETURN_SERIAL_TRACKING_DISABLED_AFTER_DISPATCH: 'Serial tracking was disabled after these serialized items were dispatched. Re-enable serial tracking before creating or receiving the return.',
+  CUSTOMER_RETURN_SERIAL_COUNT_MISMATCH: 'Select the exact required number of serial numbers for this return line.',
+  CUSTOMER_RETURN_SERIAL_NOT_ELIGIBLE: 'One or more selected serial numbers are no longer eligible for this return.',
+  CUSTOMER_RETURN_SERIAL_ALREADY_CLAIMED: 'One or more selected serial numbers are already included in another active return.',
+  CUSTOMER_RETURN_NOT_RECEIVABLE: 'This return is no longer in the required state to be received.',
+  CUSTOMER_RETURN_ALLOCATION_CLAIM_CHANGED: 'Return claims for this dispatched stock changed. Refresh and review the return.',
+  CUSTOMER_RETURN_LOCATION_ARCHIVED: 'The selected return location is no longer active. Cancel this return and create it again with an active location.',
+  CUSTOMER_RETURN_SERIAL_STATE_CHANGED: 'The serialized item state changed before the return was received. Refresh and review the return.',
+  CUSTOMER_RETURN_NOT_CANCELLABLE: 'This return is no longer in the required state to be cancelled.',
+  CUSTOMER_RETURN_CANCEL_REASON_REQUIRED: 'Enter a cancellation reason.'
+};
+
 const mutationErrorMessage = (error: unknown, ui: (englishText: string) => string) => {
   if (isVersionConflictError(error)) return getVersionConflictMessage(error, ui);
-  if (error instanceof ApiError) {
-    const mapped: Record<string, string> = {
-      CUSTOMER_RETURN_SERIAL_TRACKING_DISABLED_AFTER_DISPATCH: 'Serial tracking was disabled after these serialized items were dispatched. Re-enable serial tracking before creating or receiving the return.',
-      CUSTOMER_RETURN_PRODUCT_ARCHIVED: 'This product was archived and can no longer be returned into inventory.',
-      CUSTOMER_RETURN_SERIAL_NOT_ELIGIBLE: 'One or more selected serial numbers are no longer eligible for this return.',
-      CUSTOMER_RETURN_SERIAL_ALREADY_CLAIMED: 'One or more selected serial numbers are already included in another active return.',
-      CUSTOMER_RETURN_SERIAL_STATE_CHANGED: 'The serialized item state changed before the return was received. Refresh and review the return.'
-    };
-    if (error.code && mapped[error.code]) return ui(mapped[error.code]);
+  if (error instanceof ApiError && error.code && OUTBOUND_MUTATION_ERROR_MESSAGES[error.code]) {
+    return ui(OUTBOUND_MUTATION_ERROR_MESSAGES[error.code]);
   }
   return getVersionConflictMessage(error, ui);
 };
@@ -273,6 +339,7 @@ export default function OutboundPage() {
     return dateOnly ? formatLocalizedDate(parsed, locale) : formatLocalizedDateTime(parsed, locale);
   };
   const formatStatus = (value: string) => CANONICAL_DISPLAY_LABELS[value.toLocaleLowerCase()] ? ui(CANONICAL_DISPLAY_LABELS[value.toLocaleLowerCase()]) : humanizeStatus(value);
+  const referenceLabel = (value: string | null | undefined) => String(value || '').trim() || ui('Reference unavailable');
   const formatLot = (lot?: PickLot | TraceRow | null) => {
     if (!lot) return ui('No lot label');
     const labels = [
@@ -283,7 +350,7 @@ export default function OutboundPage() {
     return labels.length ? labels.join(' · ') : ui('Untracked stock');
   };
   const formatOrderQuantity = (item: OrderItem) => {
-    const base = `${formatNumber(item.quantity)} ${item.product_unit}`;
+    const base = `${formatNumber(item.quantity)} ${referenceLabel(item.product_unit)}`;
     const enteredUom = String(item.uom_code || '').trim();
     const entered = item.entered_quantity;
     if (!enteredUom || entered === undefined || entered === null || enteredUom.toLocaleLowerCase() === String(item.product_unit || '').toLocaleLowerCase()) return base;
@@ -317,6 +384,7 @@ export default function OutboundPage() {
   const canCustomerWrite = hasPermission(TENANT_PERMISSIONS.CUSTOMERS_WRITE);
   const canProductRead = hasPermission(TENANT_PERMISSIONS.PRODUCTS_READ);
   const canLocationRead = hasPermission(TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ);
+  const canStockRead = hasPermission(TENANT_PERMISSIONS.STOCK_READ);
   const canCreate = hasPermission(TENANT_PERMISSIONS.OUTBOUND_ORDERS_CREATE);
   const canUpdate = hasPermission(TENANT_PERMISSIONS.OUTBOUND_ORDERS_UPDATE);
   const canDispatch = hasPermission(TENANT_PERMISSIONS.OUTBOUND_ORDERS_DISPATCH);
@@ -329,7 +397,7 @@ export default function OutboundPage() {
   const customerDataNeeded = canCustomerRead && (activeTab === 'customers' || showOrderForm || Boolean(editingOrder));
   const productDataNeeded = canProductRead && (showOrderForm || Boolean(editingOrder));
   const locationDataNeeded = canLocationRead && (showOrderForm || Boolean(editingOrder) || (activeTab === 'returns' && canReturnCreate));
-  const traceDataNeeded = activeTab === 'trace' || activeTab === 'returns';
+  const traceDataNeeded = activeTab === 'trace' || (activeTab === 'returns' && canReturnCreate);
 
   const customers = useQuery({
     queryKey: ['outbound-customers', includeArchivedCustomers],
@@ -345,7 +413,7 @@ export default function OutboundPage() {
   const pickOptions = useQuery({
     queryKey: ['outbound-pick-options', pickOrderId],
     queryFn: () => apiRequest<PickOptions>(`/outbound/orders/${pickOrderId}/pick-options`),
-    enabled: Boolean(pickOrderId)
+    enabled: Boolean(pickOrderId) && canStockRead
   });
 
   useEffect(() => {
@@ -431,7 +499,7 @@ export default function OutboundPage() {
         order.order_number,
         order.customer_name,
         order.notes,
-        ...order.items.flatMap((item) => [item.product_name, item.storage_location_name])
+        ...order.items.flatMap((item) => [item.product_name, item.product_sku, item.storage_location_name])
       ].some((value) => String(value || '').toLocaleLowerCase().includes(search));
     });
   }, [orderRows, orderSearch, orderStatus]);
@@ -453,7 +521,7 @@ export default function OutboundPage() {
     return returnRows.filter((row) => {
       if (returnStatus !== 'all' && row.status !== returnStatus) return false;
       if (!search) return true;
-      return [row.return_number, row.order_number, row.customer_name, row.reason, row.notes, ...row.items.map((item) => item.product_name)]
+      return [row.return_number, row.order_number, row.customer_name, row.reason, row.notes, ...row.items.flatMap((item) => [item.product_name, item.product_sku])]
         .some((value) => String(value || '').toLocaleLowerCase().includes(search));
     });
   }, [returnRows, returnSearch, returnStatus]);
@@ -463,7 +531,7 @@ export default function OutboundPage() {
   const filteredTrace = useMemo(() => {
     const search = traceSearch.trim().toLocaleLowerCase();
     if (!search) return traceRows;
-    return traceRows.filter((row) => [row.order_number, row.customer_name, row.product_name, row.storage_location_name, row.lot_number, row.batch_number, ...(row.serial_numbers || [])]
+    return traceRows.filter((row) => [row.order_number, row.customer_name, row.product_name, row.product_sku, row.storage_location_name, row.lot_number, row.batch_number, ...(row.serial_numbers || [])]
       .some((value) => String(value || '').toLocaleLowerCase().includes(search)));
   }, [traceRows, traceSearch]);
   const pagedTrace = filteredTrace.slice((tracePage - 1) * TRACE_PAGE_SIZE, tracePage * TRACE_PAGE_SIZE);
@@ -558,7 +626,7 @@ export default function OutboundPage() {
       path: `/outbound/orders/${order.id}/start-picking`,
       version: Number(order.version),
       successMessage: ui('{order} is ready for physical picking.').replace('{order}', order.order_number)
-    }, { onSuccess: () => { setPickDrafts({}); setPickOrderId(order.id); } });
+    }, { onSuccess: () => { setPickDrafts({}); if (canStockRead) setPickOrderId(order.id); } });
   };
 
   const recordPick = (item: PickItem) => {
@@ -589,7 +657,7 @@ export default function OutboundPage() {
           serial_numbers: draft.serial_numbers
         }]
       },
-      successMessage: ui('{product} pick recorded.').replace('{product}', item.product_name)
+      successMessage: ui('{product} pick recorded.').replace('{product}', referenceLabel(item.product_name))
     }, {
       onSuccess: () => setPickDrafts((current) => {
         const next = { ...current };
@@ -636,7 +704,7 @@ export default function OutboundPage() {
       const quantity = Number(line.quantity);
       if (!selected || !line.storage_location_id || !Number.isFinite(quantity) || quantity <= 0) return ui('Complete every return line with dispatched stock, a return location, and a quantity.');
       if (quantity > toNumber(selected.returnable_quantity)) return ui('Return quantity for {product} exceeds the quantity still returnable.').replace('{product}', selected.product_name);
-      if (selected.serial_numbers?.length && (!Number.isInteger(quantity) || line.serial_numbers.length !== quantity)) return ui('Select exactly {count} serial number(s) for {product}.').replace('{count}', Number.isInteger(quantity) ? formatNumber(quantity) : ui('one serial per whole')).replace('{product}', selected.product_name);
+      if (selected.returnable_serial_numbers?.length && (!Number.isInteger(quantity) || line.serial_numbers.length !== quantity)) return ui('Select exactly {count} serial number(s) for {product}.').replace('{count}', Number.isInteger(quantity) ? formatNumber(quantity) : ui('one serial per whole')).replace('{product}', selected.product_name);
     }
     return '';
   })();
@@ -706,7 +774,7 @@ export default function OutboundPage() {
         <StatCard label={ui('Packed')} value={summary.data.packed_orders} help={ui('Waiting for dispatch')} tone={summary.data.packed_orders > 0 ? 'warn' : 'default'} />
         <StatCard label={ui('Partial shipments')} value={summary.data.partially_dispatched_orders} help={ui('Remainder still reserved')} tone={summary.data.partially_dispatched_orders > 0 ? 'warn' : 'default'} />
         <StatCard label={ui('Completed 30 days')} value={summary.data.dispatched_orders_30d} help={ui('Fully dispatched orders')} tone="good" />
-        <StatCard label={ui('Returns waiting')} value={summary.data.pending_customer_returns} help={ui('Created but not yet received')} tone={summary.data.pending_customer_returns > 0 ? 'warn' : 'good'} />
+        {canReturnRead && summary.data.pending_customer_returns !== null ? <StatCard label={ui('Returns waiting')} value={summary.data.pending_customer_returns} help={ui('Created but not yet received')} tone={summary.data.pending_customer_returns > 0 ? 'warn' : 'good'} /> : null}
       </div> : null}
     </section>
 
@@ -728,7 +796,7 @@ export default function OutboundPage() {
     <OperationalWorkspaceTabs ariaLabel={ui('Outbound work areas')} hint={ui('Choose the part of the fulfillment workflow you want to work in.')}>
       <OperationalWorkspaceTab active={activeTab === 'orders'} iconPath="/outbound" label={ui('Orders')} count={activeOrderCount} onClick={() => setTab('orders')} />
       {showCustomerTab ? <OperationalWorkspaceTab active={activeTab === 'customers'} iconPath="/suppliers" label={ui('Customers')} onClick={() => setTab('customers')} /> : null}
-      {showReturnTab ? <OperationalWorkspaceTab active={activeTab === 'returns'} iconPath="/stock-transfers" label={ui('Customer returns')} count={summary.data?.pending_customer_returns || undefined} onClick={() => setTab('returns')} /> : null}
+      {showReturnTab ? <OperationalWorkspaceTab active={activeTab === 'returns'} iconPath="/stock-transfers" label={ui('Customer returns')} count={canReturnRead ? (summary.data?.pending_customer_returns || undefined) : undefined} onClick={() => setTab('returns')} /> : null}
       <OperationalWorkspaceTab active={activeTab === 'trace'} iconPath="/stock-movements" label={ui('Dispatch trace')} onClick={() => setTab('trace')} />
     </OperationalWorkspaceTabs>
 
@@ -754,7 +822,7 @@ export default function OutboundPage() {
             <label className="outbound-field">{ui('Order notes')} <input placeholder={ui('Delivery instruction or internal reference')} value={orderForm.notes} onChange={(event) => setOrderForm({ ...orderForm, notes: event.target.value })} disabled={mutation.isPending} />
             </label>
           </div>
-          {!customers.isLoading && activeCustomers.length === 0 ? <div className="outbound-alert outbound-alert--warning" style={{ marginTop: 12 }}>{ui('No active customers are available.')} <button type="button" className="outbound-button-quiet" onClick={() => { setTab('customers'); setShowCustomerForm(true); }}>{ui('Open Customers')}</button></div> : null}
+          {!customers.isLoading && !customers.isError && activeCustomers.length === 0 ? <div className="outbound-alert outbound-alert--warning" style={{ marginTop: 12 }}>{ui('No active customers are available.')} <button type="button" className="outbound-button-quiet" onClick={() => { setTab('customers'); setShowCustomerForm(true); }}>{ui('Open Customers')}</button></div> : null}
           {orderForm.items.map((line, index) => <div key={index} className="outbound-order-line-editor">
             <label className="outbound-field">{ui('Product')} <select value={line.product_id} onChange={(event) => setOrderForm({ ...orderForm, items: orderForm.items.map((current, lineIndex) => lineIndex === index ? { ...current, product_id: event.target.value, uom_code: '' } : current) })} disabled={mutation.isPending || products.isLoading}>
                 <option value="">{ui('Choose product')}</option>
@@ -774,7 +842,7 @@ export default function OutboundPage() {
           </div>)}
           <div className="outbound-actions-row">
             <button type="button" className="outbound-button" disabled={mutation.isPending} onClick={() => setOrderForm({ ...orderForm, items: [...orderForm.items, { product_id: '', storage_location_id: '', quantity: '1', uom_code: '' }] })}>{ui('Add line')}</button>
-            <button type="button" className="outbound-button-primary" disabled={!orderForm.customer_id || cleanOrderItems(orderForm).length === 0 || mutation.isPending || customers.isError || products.isError || locations.isError} onClick={saveOrder}>{mutation.isPending ? ui('Saving…') : editingOrder ? ui('Save Draft') : ui('Create Order')}</button>
+            <button type="button" className="outbound-button-primary" disabled={!orderForm.customer_id || cleanOrderItems(orderForm).length === 0 || mutation.isPending || customers.isLoading || products.isLoading || locations.isLoading || customers.isError || products.isError || locations.isError} onClick={saveOrder}>{mutation.isPending ? ui('Saving…') : editingOrder ? ui('Save Draft') : ui('Create Order')}</button>
             {editingOrder ? <button type="button" className="outbound-button" onClick={cancelOrderEdit} disabled={mutation.isPending}>{ui('Cancel Edit')}</button> : null}
           </div>
         </> : null}
@@ -814,7 +882,7 @@ export default function OutboundPage() {
             return <article key={order.id} className={`outbound-order-card${isPickingOpen ? ' outbound-order-card--active' : ''}`}>
               <div className="outbound-card-topline">
                 <div>
-                  <div className="outbound-card-title">{order.order_number} · {order.customer_name}</div>
+                  <div className="outbound-card-title">{order.order_number} · {referenceLabel(order.customer_name)}</div>
                   <div className="outbound-card-subtitle">{ui('Created')} {formatDate(order.created_at)} {ui('· Requested')} {order.requested_date ? formatDate(order.requested_date, true) : ui('date not set')} · {order.items.length} {ui('line')}{order.items.length === 1 ? '' : ui('s')}</div>
                 </div>
                 <StatusBadge status={order.status} />
@@ -822,15 +890,15 @@ export default function OutboundPage() {
               {order.notes ? <div className="outbound-notes"><strong>{ui('Order note:')}</strong> {order.notes}</div> : null}
               {order.status === 'cancelled' && order.cancellation_reason ? <div className="outbound-alert outbound-alert--error" style={{ marginTop: 9 }}><strong>{ui('Cancellation:')}</strong> {order.cancellation_reason}</div> : null}
               <div className="outbound-order-lines">{order.items.map((item) => <div key={item.id} className="outbound-order-line">
-                <div><strong>{item.product_name}</strong><div className="outbound-muted">{item.storage_location_name}</div></div>
-                <div>{ui('Ordered')} <strong>{formatOrderQuantity(item)}</strong><div className="outbound-muted">{ui('Dispatched')} {formatNumber(item.dispatched_quantity)} {item.product_unit}</div></div>
-                <div>{ui('Picked waiting')} <strong>{formatNumber(item.open_picked_quantity)}</strong> {ui('· Packed waiting')} <strong>{formatNumber(item.open_packed_quantity)}</strong> {ui('· Remaining')} <strong>{formatNumber(item.remaining_quantity)}</strong> {item.product_unit}</div>
+                <div><strong>{referenceLabel(item.product_name)}</strong><div className="outbound-muted">{ui('SKU:')} {referenceLabel(item.product_sku)} · {referenceLabel(item.storage_location_name)}</div></div>
+                <div>{ui('Ordered')} <strong>{formatOrderQuantity(item)}</strong><div className="outbound-muted">{ui('Dispatched')} {formatNumber(item.dispatched_quantity)} {referenceLabel(item.product_unit)}</div></div>
+                <div>{ui('Picked waiting')} <strong>{formatNumber(item.open_picked_quantity)}</strong> {ui('· Packed waiting')} <strong>{formatNumber(item.open_packed_quantity)}</strong> {ui('· Remaining')} <strong>{formatNumber(item.remaining_quantity)}</strong> {referenceLabel(item.product_unit)}</div>
               </div>)}</div>
               <div className="outbound-actions-row">
                 {order.status === 'draft' && canUpdate && canEditOrderForm ? <button type="button" className="outbound-button" onClick={() => beginOrderEdit(order)} disabled={mutation.isPending}>{ui('Edit Draft')}</button> : null}
                 {order.status === 'draft' && canUpdate ? <button type="button" className="outbound-button-primary" onClick={() => mutation.mutate({ path: `/outbound/orders/${order.id}/confirm`, version: Number(order.version), successMessage: ui('{order} confirmed and stock reserved.').replace('{order}', order.order_number) })} disabled={mutation.isPending}>{ui('Confirm & Reserve Stock')}</button> : null}
                 {['confirmed', 'partially_dispatched'].includes(order.status) && canUpdate ? <button type="button" className="outbound-button-primary" onClick={() => startPicking(order)} disabled={mutation.isPending}>{order.status === 'partially_dispatched' ? ui('Pick Remaining') : ui('Start Picking')}</button> : null}
-                {order.status === 'picking' && canUpdate ? <button type="button" className="outbound-button-primary" onClick={() => setPickOrderId(order.id)}>{isPickingOpen ? ui('Picking Open') : ui('Open Picking')}</button> : null}
+                {order.status === 'picking' && canUpdate && canStockRead ? <button type="button" className="outbound-button-primary" onClick={() => setPickOrderId(order.id)}>{isPickingOpen ? ui('Picking Open') : ui('Open Picking')}</button> : null}
                 {order.status === 'picking' && canUpdate && openPicked > 0 ? <button type="button" className="outbound-button-primary" onClick={() => mutation.mutate({ path: `/outbound/orders/${order.id}/mark-packed`, version: Number(order.version), successMessage: ui('{order} picked stock marked packed.').replace('{order}', order.order_number) }, { onSuccess: () => setPickOrderId('') })} disabled={mutation.isPending}>{ui('Mark Picked Stock Packed')}</button> : null}
                 {['picking', 'packed'].includes(order.status) && canUpdate && openPicked > 0 ? <button type="button" className="outbound-button-danger" onClick={() => { if (window.confirm(ui('Clear the current picked quantities and pick again?'))) mutation.mutate({ path: `/outbound/orders/${order.id}/reset-picks`, version: Number(order.version), successMessage: ui('{order} open picks cleared.').replace('{order}', order.order_number) }, { onSuccess: () => { setPickOrderId(''); setPickDrafts({}); } }); }} disabled={mutation.isPending}>{ui('Clear Picks')}</button> : null}
                 {order.status === 'packed' && canDispatch && openPacked > 0 ? <button type="button" className="outbound-button-primary" onClick={() => { if (window.confirm(ui('Dispatch all currently packed stock? Inventory will be reduced for the packed quantities now.'))) mutation.mutate({ path: `/outbound/orders/${order.id}/dispatch`, version: Number(order.version), successMessage: ui('{order} packed stock dispatched.').replace('{order}', order.order_number) }); }} disabled={mutation.isPending}>{ui('Dispatch Packed Stock')}</button> : null}
@@ -842,7 +910,7 @@ export default function OutboundPage() {
         </>}
       </section>
 
-      {pickOrderId ? <section className="outbound-panel">
+      {pickOrderId && canStockRead ? <section className="outbound-panel">
         <div className="outbound-section-heading">
           <div><h3>{ui('Picking workbench')}</h3><p>{ui('Record what was physically picked. This does not reduce stock yet; dispatch is the stock-changing step.')}</p></div>
           <button type="button" className="outbound-button" onClick={() => setPickOrderId('')}>{ui('Close')}</button>
@@ -851,8 +919,8 @@ export default function OutboundPage() {
           const draft = pickDrafts[item.id] ?? { quantity: '', inventory_lot_id: '', serial_numbers: [] };
           const unpickedRemaining = Math.max(toNumber(item.remaining_quantity) - toNumber(item.open_picked_quantity), 0);
           return <div key={item.id} className="outbound-picking-line">
-            <div className="outbound-card-title">{item.product_name} · {item.storage_location_name}</div>
-            <div className="outbound-card-subtitle">{ui('Ordered')} {formatOrderQuantity(item)} {ui('· Dispatched')} {formatNumber(item.dispatched_quantity)} {item.product_unit} {ui('· Picked waiting')} {formatNumber(item.open_picked_quantity)} {ui('· Still unpicked')} {formatNumber(unpickedRemaining)} {item.product_unit}</div>
+            <div className="outbound-card-title">{referenceLabel(item.product_name)} · {referenceLabel(item.storage_location_name)}</div>
+            <div className="outbound-card-subtitle">{ui('Ordered')} {formatOrderQuantity(item)} {ui('· Dispatched')} {formatNumber(item.dispatched_quantity)} {referenceLabel(item.product_unit)} {ui('· Picked waiting')} {formatNumber(item.open_picked_quantity)} {ui('· Still unpicked')} {formatNumber(unpickedRemaining)} {referenceLabel(item.product_unit)}</div>
             {unpickedRemaining > 0 ? <>
               <div className="outbound-picking-controls">
                 <label className="outbound-field">{ui('Picked quantity')} <input type="number" min="0.0001" max={unpickedRemaining} step="0.0001" value={draft.quantity} onChange={(event) => setPickDrafts({ ...pickDrafts, [item.id]: { ...draft, quantity: event.target.value, serial_numbers: [] } })} />
@@ -910,11 +978,11 @@ export default function OutboundPage() {
     {activeTab === 'returns' ? <section className="outbound-panel">
       <div className="outbound-section-heading">
         <div className="io-section-heading-with-icon"><span className="io-section-heading-icon"><TenantNavIcon path="/stock-transfers" size={18} /></span><div className="io-section-heading-copy"><h3>{ui('Customer returns')}</h3><p>{ui('Create returns only from stock that was actually dispatched. Receiving a return restores usable stock only when the selected condition is “Return to usable stock”.')}</p></div></div>
-        <div className="outbound-section-heading-actions">{canReturnRead ? <button type="button" className="outbound-button" onClick={() => { void returns.refetch(); void trace.refetch(); }} disabled={returns.isFetching || trace.isFetching}>{returns.isFetching || trace.isFetching ? ui('Refreshing…') : ui('Refresh returns')}</button> : null}</div>
+        <div className="outbound-section-heading-actions">{canReturnRead ? <button type="button" className="outbound-button" onClick={() => { void returns.refetch(); if (canReturnCreate) void trace.refetch(); }} disabled={returns.isFetching || (canReturnCreate && trace.isFetching)}>{returns.isFetching || (canReturnCreate && trace.isFetching) ? ui('Refreshing…') : ui('Refresh returns')}</button> : null}</div>
       </div>
-      {trace.isLoading ? <div className="outbound-alert outbound-alert--info">{ui('Loading dispatched stock eligible for returns…')}</div> : trace.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(trace.error, ui('Dispatch history could not be loaded for returns.'))}</div> : null}
       {canReturnCreate ? canLocationRead ? <div className="outbound-panel" style={{ boxShadow: 'none', background: '#f8fafc', marginBottom: 14 }}>
         <div className="outbound-section-heading"><div><h3>{ui('Create customer return')}</h3><p>{ui('Multiple lines can be grouped into one return when they came from the same customer order.')}</p></div></div>
+        {(trace.isLoading || locations.isLoading) ? <div className="outbound-alert outbound-alert--info">{ui('Loading dispatched stock and return locations…')}</div> : (trace.isError || locations.isError) ? <div className="outbound-alert outbound-alert--error">{trace.isError ? queryErrorMessage(trace.error, ui('Dispatch history could not be loaded for returns.')) : queryErrorMessage(locations.error, ui('Return locations could not be loaded.'))}</div> : <>
         {blockedHistoricalSerializedReturns.length > 0 ? <div className="outbound-alert outbound-alert--warning">{ui('Some serialized dispatches cannot be returned because serial tracking is currently disabled. Re-enable serial tracking for those products before creating the return.')}</div> : null}
         {returnCreateEligibleTrace.length === 0 ? <div className="outbound-alert outbound-alert--info">{ui('There is no dispatched stock currently eligible for a new return.')}</div> : <>
           <div className="outbound-form-grid outbound-form-grid--customer">
@@ -928,7 +996,7 @@ export default function OutboundPage() {
               <div className="outbound-return-line-grid">
                 <label className="outbound-field">{ui('Dispatched stock')} <select value={line.allocation_id} onChange={(event) => chooseReturnAllocation(index, event.target.value)}>
                     <option value="">{ui('Choose dispatched stock')}</option>
-                    {eligibleRows.map((row) => <option key={row.allocation_id} value={row.allocation_id}>{row.order_number} · {row.customer_name} · {row.product_name} · {formatLot(row)} · {formatNumber(row.returnable_quantity)} {row.product_unit} {ui('returnable')}</option>)}
+                    {eligibleRows.map((row) => <option key={row.allocation_id} value={row.allocation_id}>{row.order_number} · {referenceLabel(row.customer_name)} · {referenceLabel(row.product_name)} · {formatLot(row)} · {formatNumber(row.returnable_quantity)} {referenceLabel(row.product_unit)} {ui('returnable')}</option>)}
                   </select>
                 </label>
                 <label className="outbound-field">{ui('Return to location')} <select value={line.storage_location_id} onChange={(event) => updateReturnLine(index, { storage_location_id: event.target.value })}>
@@ -948,15 +1016,16 @@ export default function OutboundPage() {
                 </label>
                 <button type="button" className="outbound-button-danger" disabled={returnForm.items.length === 1} onClick={() => removeReturnLine(index)}>{ui('Remove')}</button>
               </div>
-              {selected ? <div className="outbound-card-subtitle">{selected.order_number} · {selected.customer_name} · {selected.product_name} · {formatLot(selected)} {ui('· up to')} {formatNumber(selected.returnable_quantity)} {selected.product_unit} {ui('still returnable.')}</div> : null}
-              {selected?.serial_numbers?.length ? <div className="outbound-serial-box"><div className="outbound-muted" style={{ marginBottom: 7 }}>{ui('Select the exact serials physically returned (')}{line.serial_numbers.length}/{Number.isInteger(Number(line.quantity)) ? Number(line.quantity) : '?'})</div>{selected.serial_numbers.map((serial) => { const checked = line.serial_numbers.includes(serial); return <label key={serial}><input type="checkbox" checked={checked} onChange={(event) => updateReturnLine(index, { serial_numbers: event.target.checked ? [...line.serial_numbers, serial] : line.serial_numbers.filter((value) => value !== serial) })} /> {serial}</label>; })}</div> : null}
+              {selected ? <div className="outbound-card-subtitle">{selected.order_number} · {referenceLabel(selected.customer_name)} · {referenceLabel(selected.product_name)} · {formatLot(selected)} {ui('· up to')} {formatNumber(selected.returnable_quantity)} {referenceLabel(selected.product_unit)} {ui('still returnable.')}</div> : null}
+              {selected?.returnable_serial_numbers?.length ? <div className="outbound-serial-box"><div className="outbound-muted" style={{ marginBottom: 7 }}>{ui('Select the exact serials physically returned (')}{line.serial_numbers.length}/{Number.isInteger(Number(line.quantity)) ? Number(line.quantity) : '?'})</div>{selected.returnable_serial_numbers.map((serial) => { const checked = line.serial_numbers.includes(serial); return <label key={serial}><input type="checkbox" checked={checked} onChange={(event) => updateReturnLine(index, { serial_numbers: event.target.checked ? [...line.serial_numbers, serial] : line.serial_numbers.filter((value) => value !== serial) })} /> {serial}</label>; })}</div> : null}
             </div>;
           })}
           <div className="outbound-actions-row">
             <button type="button" className="outbound-button" onClick={addReturnLine} disabled={!returnOrderId || eligibleReturnRowsForLine(returnForm.items.length).length === 0}>{ui('Add return line')}</button>
-            <button type="button" className="outbound-button-primary" disabled={Boolean(returnFormValidation) || mutation.isPending || locations.isLoading || trace.isLoading} onClick={createReturn}>{mutation.isPending ? ui('Creating…') : ui('Create Customer Return')}</button>
+            <button type="button" className="outbound-button-primary" disabled={Boolean(returnFormValidation) || mutation.isPending || locations.isLoading || trace.isLoading || locations.isError || trace.isError} onClick={createReturn}>{mutation.isPending ? ui('Creating…') : ui('Create Customer Return')}</button>
           </div>
           {returnFormValidation && (returnForm.reason || returnForm.items.some((line) => line.allocation_id)) ? <div className="outbound-form-help" style={{ marginTop: 7 }}>{returnFormValidation}</div> : null}
+        </>}
         </>}
       </div> : <div className="outbound-alert outbound-alert--warning">{ui('Creating a return requires storage-location read permission so the destination can be selected safely.')}</div> : null}
 
@@ -968,10 +1037,10 @@ export default function OutboundPage() {
         {returns.isLoading ? <div className="outbound-empty">{ui('Loading customer returns…')}</div> : returns.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(returns.error, ui('Customer returns could not be loaded.'))}</div> : filteredReturns.length === 0 ? <EmptyState title={returnRows.length ? ui('No returns match these filters') : ui('No customer returns yet')} text={returnRows.length ? ui('Change the search or status filter.') : ui('Returns will appear here after they are created from dispatched stock.')} /> : <>
           <div className="outbound-list-meta"><span>{ui('Showing')} {((returnPage - 1) * RETURN_PAGE_SIZE) + 1}–{Math.min(returnPage * RETURN_PAGE_SIZE, filteredReturns.length)} {ui('of')} {filteredReturns.length} {ui('return(s).')}</span></div>
           <div className="outbound-return-list">{pagedReturns.map((row) => <article key={row.id} className="outbound-return-card">
-            <div className="outbound-card-topline"><div><div className="outbound-card-title">{row.return_number} · {row.customer_name}</div><div className="outbound-card-subtitle">{ui('Order')} {row.order_number} {ui('· Created')} {formatDate(row.created_at)}</div></div><StatusBadge status={row.status} /></div>
+            <div className="outbound-card-topline"><div><div className="outbound-card-title">{row.return_number} · {referenceLabel(row.customer_name)}</div><div className="outbound-card-subtitle">{ui('Order')} {referenceLabel(row.order_number)} {ui('· Created')} {formatDate(row.created_at)}</div></div><StatusBadge status={row.status} /></div>
             <div className="outbound-notes"><strong>{ui('Reason:')}</strong> {row.reason}{row.notes ? <> · {row.notes}</> : null}</div>
             {row.status === 'cancelled' && row.cancellation_reason ? <div className="outbound-alert outbound-alert--error" style={{ marginTop: 8 }}><strong>{ui('Cancellation:')}</strong> {row.cancellation_reason}</div> : null}
-            <div className="outbound-return-items">{row.items.map((item) => <div key={item.id}><strong>{item.product_name}</strong> · {formatNumber(item.quantity)} {item.product_unit} → {formatStatus(item.condition)} @ {item.storage_location_name}{item.lot_number || item.batch_number ? ` · ${[item.lot_number ? `${ui('Lot')} ${item.lot_number}` : '', item.batch_number ? `${ui('Batch')} ${item.batch_number}` : ''].filter(Boolean).join(' · ')}` : ''}</div>)}</div>
+            <div className="outbound-return-items">{row.items.map((item) => <div key={item.id}><strong>{referenceLabel(item.product_name)}</strong> · {ui('SKU:')} {referenceLabel(item.product_sku)} · {formatNumber(item.quantity)} {referenceLabel(item.product_unit)} → {formatStatus(item.condition)} @ {referenceLabel(item.storage_location_name)}{item.lot_number || item.batch_number ? ` · ${[item.lot_number ? `${ui('Lot')} ${item.lot_number}` : '', item.batch_number ? `${ui('Batch')} ${item.batch_number}` : ''].filter(Boolean).join(' · ')}` : ''}{item.serial_numbers?.length ? <> · <strong>{ui('Serials:')}</strong> {item.serial_numbers.join(', ')}</> : null}{item.notes ? <> · <strong>{ui('Item note:')}</strong> {item.notes}</> : null}</div>)}</div>
             {row.status === 'draft' ? <div className="outbound-actions-row">{canReturnReceive ? <button type="button" className="outbound-button-primary" disabled={mutation.isPending} onClick={() => { if (window.confirm(ui('Receive this customer return into inventory now?'))) mutation.mutate({ path: `/outbound/returns/${row.id}/receive`, version: Number(row.version), successMessage: ui('{return} received into inventory.').replace('{return}', row.return_number) }); }}>{ui('Receive Return')}</button> : null}{canReturnCancel ? <button type="button" className="outbound-button-danger" disabled={mutation.isPending} onClick={() => { const reason = window.prompt(ui('Return cancellation reason')); if (reason && reason.trim().length >= 3) mutation.mutate({ path: `/outbound/returns/${row.id}/cancel`, version: Number(row.version), body: { reason: reason.trim() }, successMessage: ui('{return} cancelled.').replace('{return}', row.return_number) }); }}>{ui('Cancel Return')}</button> : null}</div> : null}
           </article>)}</div>
           {returnPageCount > 1 ? <div className="outbound-pagination"><button type="button" className="outbound-button" disabled={returnPage <= 1} onClick={() => setReturnPage((page) => Math.max(1, page - 1))}>{ui('Previous')}</button><span>{ui('Page')} {returnPage} {ui('of')} {returnPageCount}</span><button type="button" className="outbound-button" disabled={returnPage >= returnPageCount} onClick={() => setReturnPage((page) => Math.min(returnPageCount, page + 1))}>{ui('Next')}</button></div> : null}
@@ -988,9 +1057,9 @@ export default function OutboundPage() {
       {trace.isLoading ? <div className="outbound-empty">{ui('Loading dispatch trace…')}</div> : trace.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(trace.error, ui('Dispatch trace could not be loaded.'))}</div> : filteredTrace.length === 0 ? <EmptyState title={traceRows.length ? ui('No dispatch records match this search') : ui('No dispatched stock yet')} text={traceRows.length ? ui('Change or clear the search.') : ui('Trace records appear after packed stock is dispatched.')} /> : <>
         <div className="outbound-list-meta"><span>{ui('Showing')} {((tracePage - 1) * TRACE_PAGE_SIZE) + 1}–{Math.min(tracePage * TRACE_PAGE_SIZE, filteredTrace.length)} {ui('of')} {filteredTrace.length} {ui('dispatched allocation(s).')}</span></div>
         <div className="outbound-trace-list">{pagedTrace.map((row) => <article key={row.allocation_id} className="outbound-trace-card">
-          <div className="outbound-card-topline"><div><div className="outbound-card-title">{row.order_number} · {row.customer_name}</div><div className="outbound-card-subtitle">{row.product_name} · {row.storage_location_name} · {formatLot(row)}</div></div><StatusBadge status={row.order_status} /></div>
-          <div className="outbound-trace-metrics"><span>{ui('Dispatched')} <strong>{formatNumber(row.dispatched_quantity)} {row.product_unit}</strong></span><span>{ui('Returned')} <strong>{formatNumber(row.returned_quantity)}</strong></span><span>{ui('Pending return')} <strong>{formatNumber(Math.max(toNumber(row.claimed_return_quantity) - toNumber(row.returned_quantity), 0))}</strong></span><span>{ui('Still returnable')} <strong>{formatNumber(row.returnable_quantity)}</strong></span></div>
-          {row.serial_numbers?.length ? <div className="outbound-notes"><strong>{ui('Serials:')}</strong> {row.serial_numbers.join(', ')}</div> : null}
+          <div className="outbound-card-topline"><div><div className="outbound-card-title">{row.order_number} · {referenceLabel(row.customer_name)}</div><div className="outbound-card-subtitle">{referenceLabel(row.product_name)} · {ui('SKU:')} {referenceLabel(row.product_sku)} · {referenceLabel(row.storage_location_name)} · {formatLot(row)}</div></div><StatusBadge status={row.order_status} /></div>
+          <div className="outbound-trace-metrics"><span>{ui('Dispatched')} <strong>{formatNumber(row.dispatched_quantity)} {referenceLabel(row.product_unit)}</strong></span>{canReturnRead ? <><span>{ui('Returned')} <strong>{formatNumber(row.returned_quantity)}</strong></span><span>{ui('Pending return')} <strong>{formatNumber(Math.max(toNumber(row.claimed_return_quantity) - toNumber(row.returned_quantity), 0))}</strong></span><span>{ui('Still returnable')} <strong>{formatNumber(row.returnable_quantity)}</strong></span></> : null}</div>
+          {row.serial_numbers === null ? <div className="outbound-notes"><strong>{ui('Serials:')}</strong> {ui('Reference unavailable')}</div> : row.serial_numbers?.length ? <div className="outbound-notes"><strong>{ui('Serials:')}</strong> {row.serial_numbers.join(', ')}</div> : null}
         </article>)}</div>
         {tracePageCount > 1 ? <div className="outbound-pagination"><button type="button" className="outbound-button" disabled={tracePage <= 1} onClick={() => setTracePage((page) => Math.max(1, page - 1))}>{ui('Previous')}</button><span>{ui('Page')} {tracePage} {ui('of')} {tracePageCount}</span><button type="button" className="outbound-button" disabled={tracePage >= tracePageCount} onClick={() => setTracePage((page) => Math.min(tracePageCount, page + 1))}>{ui('Next')}</button></div> : null}
       </>}

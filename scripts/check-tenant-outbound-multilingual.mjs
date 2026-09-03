@@ -16,6 +16,20 @@ function decode(lit){if(lit.startsWith('"'))return JSON.parse(lit);const body=li
 const literals=[];for(const m of pageSource.matchAll(literalPattern)){try{literals.push(decode(m[1]));}catch{}}
 const missing=[...new Set(literals.filter((k)=>!unique.has(k)))];
 if(missing.length)fail(`Outbound ui() literals missing translations: ${missing.join(' | ')}`);else pass(`Outbound has ${new Set(literals).size} catalog-backed literal UI keys.`);
+const errorMapStart=pageSource.indexOf('const OUTBOUND_MUTATION_ERROR_MESSAGES');
+const errorMapEnd=pageSource.indexOf('const mutationErrorMessage',errorMapStart+1);
+if(errorMapStart<0||errorMapEnd<=errorMapStart)fail('Outbound deterministic mutation-error map is missing.');
+else {
+  const errorMapSource=pageSource.slice(errorMapStart,errorMapEnd);
+  const entries=[...errorMapSource.matchAll(/^\s{2}([A-Z0-9_]+): '([^']+)'/gm)];
+  const missingErrorTranslations=[...new Set(entries.map((m)=>m[2]).filter((key)=>!unique.has(key)))];
+  if(entries.length<65)fail(`Outbound deterministic mutation-error coverage unexpectedly shrank to ${entries.length} code mappings.`);
+  if(missingErrorTranslations.length)fail(`Outbound deterministic mutation-error messages missing translations: ${missingErrorTranslations.join(' | ')}`);
+  for(const code of ['CUSTOMER_NAME_CONFLICT','CUSTOMER_ARCHIVE_ACTIVE_OUTBOUND_ORDER','OUTBOUND_REFERENCE_ARCHIVED','OUTBOUND_DISPATCH_REFERENCE_ARCHIVED','CUSTOMER_RETURN_DISPATCH_CHANGED','CUSTOMER_RETURN_ALLOCATION_CLAIM_CHANGED']) {
+    if(!entries.some((m)=>m[1]===code)) fail(`Outbound deterministic mutation-error mapping missing code: ${code}`);
+  }
+  if(!process.exitCode)pass(`${entries.length} deterministic Outbound mutation-error codes are catalog-backed.`);
+}
 for(const required of [
   "import { useAppTranslation } from '../i18n/I18nContext';",
   "import { formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';",
@@ -49,16 +63,18 @@ if(!process.exitCode)pass('Outbound quantities, dates, lots/batches/expiry, pagi
 for(const required of [
   'if (error instanceof ApiError || error instanceof Error) return error.message;',
   '{customer.name}',
-  '{order.customer_name}',
-  '{item.product_name}',
-  '{item.storage_location_name}',
+  'referenceLabel(order.customer_name)',
+  'referenceLabel(item.product_name)',
+  'referenceLabel(item.storage_location_name)',
   '{order.notes}',
   '{row.reason}',
   '{row.notes}',
-  '{row.customer_name}',
-  '{row.product_name}',
-  '{row.storage_location_name}',
+  'referenceLabel(row.customer_name)',
+  'referenceLabel(row.product_name)',
+  'referenceLabel(row.storage_location_name)',
   'row.serial_numbers.join',
+  'selected.returnable_serial_numbers',
+  'item.serial_numbers.join',
 ])if(!pageSource.includes(required))fail(`Outbound business/server-data boundary changed unexpectedly: ${required}`);
 for(const forbidden of [
   'ui(error.message)',
@@ -80,6 +96,7 @@ for(const required of [
   'TENANT_PERMISSIONS.CUSTOMERS_WRITE',
   'TENANT_PERMISSIONS.PRODUCTS_READ',
   'TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ',
+  'TENANT_PERMISSIONS.STOCK_READ',
   'TENANT_PERMISSIONS.OUTBOUND_ORDERS_CREATE',
   'TENANT_PERMISSIONS.OUTBOUND_ORDERS_UPDATE',
   'TENANT_PERMISSIONS.OUTBOUND_ORDERS_DISPATCH',
