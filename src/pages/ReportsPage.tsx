@@ -87,6 +87,8 @@ const MOVEMENT_TYPE_OPTIONS = [
   ['cycle_count_reconciliation', 'Cycle count reconciliation'],
   ['stock_count', 'Stock count'],
   ['manual_adjustment', 'Manual adjustment'],
+  ['bom_assembly', 'BOM assembly'],
+  ['bom_disassembly', 'BOM disassembly'],
   ['opening_stock', 'Opening stock'],
   ['expiry_writeoff', 'Expiry write-off'],
   ['quarantine_release', 'Quarantine release'],

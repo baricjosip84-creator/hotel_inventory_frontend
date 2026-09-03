@@ -3,12 +3,14 @@ import { normalizeError } from './EnterpriseInventoryFormat';
 import { invalidateEnterpriseInventoryQueries } from './EnterpriseInventoryRefresh';
 
 type SetErrorMessage = (message: string | null) => void;
+type ErrorNormalizer = (error: unknown, fallback: string) => string;
 
 export function createEnterpriseInventoryMutationErrorHandler(
   setErrorMessage: SetErrorMessage,
-  fallbackMessage: string
+  fallbackMessage: string,
+  errorNormalizer: ErrorNormalizer = normalizeError
 ) {
-  return (error: unknown) => setErrorMessage(normalizeError(error, fallbackMessage));
+  return (error: unknown) => setErrorMessage(errorNormalizer(error, fallbackMessage));
 }
 
 
@@ -97,7 +99,8 @@ export function createEnterpriseInventoryBoundMutationFeedback(
   queryClient: QueryClient
 ) {
   return {
-    error: (fallbackMessage: string) => createEnterpriseInventoryMutationErrorHandler(setErrorMessage, fallbackMessage),
+    error: (fallbackMessage: string, errorNormalizer?: ErrorNormalizer) =>
+      createEnterpriseInventoryMutationErrorHandler(setErrorMessage, fallbackMessage, errorNormalizer),
     invalidating: (successMessage: string, queryKeys: string[]) =>
       createEnterpriseInventoryInvalidatingSuccessHandler(setStatusMessage, queryClient, successMessage, queryKeys),
     refresh: (successMessage: string, refreshQueries: (queryClient: QueryClient) => Promise<unknown>) =>

@@ -1655,7 +1655,7 @@ const router = createBrowserRouter([
       {
         path: 'inventory-capabilities',
         element: (
-          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.PRODUCTS_READ]}>
+          <ProtectedRoute>
             <InventoryCapabilitiesPage />
           </ProtectedRoute>
         )

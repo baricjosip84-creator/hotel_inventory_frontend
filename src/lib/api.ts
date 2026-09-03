@@ -316,7 +316,6 @@ export function isVersionConflictError(error: unknown): boolean {
   }
 
   return (
-    error.status === 409 ||
     error.code === 'VERSION_CONFLICT' ||
     error.code === 'STALE_VERSION' ||
     error.code === 'CONCURRENT_MODIFICATION'

@@ -10,6 +10,12 @@ const translationSource = read('src/i18n/tenantUiTranslations.ts');
 const scannerSource = read('src/pages/ScannerPage.tsx');
 const movementsSource = read('src/pages/StockMovementsPage.tsx');
 const transfersSource = read('src/pages/StockTransfersPage.tsx');
+const shipmentsSource = read('src/pages/ShipmentsPage.tsx');
+const productBarcodeLookupSource = read('../backend/src/routes/productBarcodeLookup.js');
+const barcodeWriteGuardsSource = read('../backend/src/services/catalog/productWriteGuards.js');
+const productMutationSource = read('../backend/src/services/catalog/productMutationService.js');
+const packageMutationSource = read('../backend/src/services/catalog/productPackageMutationService.js');
+const enterpriseInventorySource = read('../backend/src/services/inventory/enterpriseInventoryService.js');
 
 const rows = [];
 for (const line of translationSource.split(/\r?\n/)) {
@@ -125,3 +131,33 @@ if (transfersSource.includes('>Create Transfer Draft<') || transfersSource.inclu
 } else pass('Stock Transfers dynamic summaries, role/status display, confirmations, print/export text and availability copy are localization-aware.');
 
 if (!process.exitCode) console.log('Tenant Scanner/Movements/Transfers multilingual hardening: PASS');
+
+
+// Scanner integrity regression contract: business context must be server verified,
+// internal UUIDs must not be normal display text, and ambiguous barcode data must
+// be rejected instead of resolved by arbitrary SQL ordering.
+if (!scannerSource.includes("queryFn: () => apiRequest<ScannerShipmentContext>(`/shipments/${encodeURIComponent(shipmentId)}`)")) {
+  fail('Scanner must load the selected shipment from the server instead of trusting URL display labels.');
+}
+if (!scannerSource.includes("shipment.id !== shipmentId")) {
+  fail('Shipment verification mode must reject a QR code for a different shipment.');
+}
+for (const forbidden of ['Shipment ID:', 'Location ID:', 'Resolved shipment ID', 'Resolved shipment item ID']) {
+  if (scannerSource.includes(forbidden)) fail(`Scanner must not expose internal identifiers in normal UI: ${forbidden}`);
+}
+if (shipmentsSource.includes("scannerParams.set('shipmentLabel'") || shipmentsSource.includes("scannerParams.set('locationName'")) {
+  fail('Shipments must not pass display labels to Scanner as trusted URL context.');
+}
+if (!productBarcodeLookupSource.includes("'SCANNER_BARCODE_AMBIGUOUS'")
+    || !productBarcodeLookupSource.includes("'SCANNER_SHIPMENT_ITEM_AMBIGUOUS'")
+    || !productBarcodeLookupSource.includes('AND si.product_id = $4')) {
+  fail('Scanner backend must reject barcode ambiguity and bind final resolution to the product verified by the registry precheck.');
+}
+if (!barcodeWriteGuardsSource.includes('lockBarcodeGovernance')
+    || !barcodeWriteGuardsSource.includes('ensureNoOtherProductBarcodeConflict')
+    || !productMutationSource.includes('lockBarcodeGovernance(db, tenantId, barcode)')
+    || !packageMutationSource.includes('ensureNoOtherProductBarcodeConflict(db, tenantId, barcode, id)')
+    || !enterpriseInventorySource.includes('lockBarcodeGovernance(client, tenantId, barcodeValue)')) {
+  fail('Product, Package and Barcode Label writes must share barcode governance and cross-registry collision protection.');
+}
+if (!process.exitCode) pass('Scanner server-verification, identifier-hiding and barcode-ambiguity integrity contract is protected.');

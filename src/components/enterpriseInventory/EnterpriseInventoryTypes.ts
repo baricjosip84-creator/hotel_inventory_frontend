@@ -360,6 +360,7 @@ export type StorageLocationOption = {
   name: string;
   temperature_zone?: string | null;
   created_at?: string | null;
+  version: number | string;
 };
 
 export type SupplierOption = {

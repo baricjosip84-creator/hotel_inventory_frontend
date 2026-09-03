@@ -152,7 +152,7 @@ const customRolePermissionSurfaces = [
   ['Shipments', read('src/pages/ShipmentsPage.tsx'), 'This role cannot change ordered shipment lines.'],
   ['Alerts', read('src/pages/AlertsPage.tsx'), 'Alerts write permission'],
   ['Stock transfers', read('src/pages/StockTransfersPage.tsx'), 'cannot create stock transfer drafts'],
-  ['Storage locations', read('src/pages/StorageLocationsPage.tsx'), 'storage_locations.write'],
+  ['Storage locations', read('src/pages/StorageLocationsPage.tsx'), 'cannot create, edit, or retire them.'],
   ['Suppliers', read('src/pages/SuppliersPage.tsx'), 'suppliers.write'],
   ['Products', read('src/pages/products/ProductManagementSectionsPanel.tsx'), 'products.write']
 ];

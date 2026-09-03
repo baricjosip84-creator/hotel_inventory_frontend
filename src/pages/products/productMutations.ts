@@ -53,6 +53,32 @@ const invalidatePackages = async (queryClient: QueryClient, selectedPackageProdu
   }
 };
 
+const productBarcodeErrorMessage = (error: ApiError, ui: (englishText: string) => string): string => {
+  if (error.code === 'PRODUCT_BARCODE_ALREADY_EXISTS') {
+    return ui('This barcode value is already used by another active product.');
+  }
+  if (error.code === 'PRODUCT_PACKAGE_BARCODE_ALREADY_EXISTS') {
+    return ui('A product package with this barcode already exists.');
+  }
+  if (error.code === 'PRODUCT_PACKAGE_BARCODE_CONFLICTS_PRODUCT') {
+    return ui('Only the default package may share the Product barcode.');
+  }
+  if (error.code === 'BARCODE_VALUE_EXISTS') {
+    return ui('This barcode value is already used by an active inventory label.');
+  }
+  return error.message;
+};
+
+const productArchiveErrorMessage = (error: ApiError, ui: (englishText: string) => string): string => {
+  if (error.code === 'PRODUCT_ARCHIVE_DEPENDENCY_HIDDEN') {
+    return ui('This product cannot be archived because it is still referenced by active work that is not visible to this role.');
+  }
+  if (error.code === 'PRODUCT_HAS_DRAFT_CUSTOMER_RETURN') {
+    return ui('This product has a customer return waiting to be received. Receive or cancel that return before archiving the product.');
+  }
+  return error.message;
+};
+
 export function useProductMutations({
   queryClient,
   selectedPackageProduct,
@@ -79,7 +105,7 @@ export function useProductMutations({
     },
     onError: (error) => {
       if (error instanceof ApiError) {
-        setFormError(error.message);
+        setFormError(productBarcodeErrorMessage(error, ui));
       } else {
         setFormError(ui('Failed to create product.'));
       }
@@ -103,7 +129,7 @@ export function useProductMutations({
     },
     onError: (error) => {
       if (error instanceof ApiError) {
-        setFormError(error.message);
+        setFormError(productBarcodeErrorMessage(error, ui));
       } else {
         setFormError(ui('Failed to update product.'));
       }
@@ -127,7 +153,7 @@ export function useProductMutations({
     },
     onError: (error) => {
       if (error instanceof ApiError) {
-        setFormError(error.message);
+        setFormError(productArchiveErrorMessage(error, ui));
       } else {
         setFormError(ui('Failed to archive product.'));
       }
@@ -146,7 +172,7 @@ export function useProductMutations({
     },
     onError: (error) => {
       if (error instanceof ApiError) {
-        setPackageError(error.message);
+        setPackageError(productBarcodeErrorMessage(error, ui));
       } else {
         setPackageError(ui('Failed to create package.'));
       }
@@ -165,7 +191,7 @@ export function useProductMutations({
     },
     onError: (error) => {
       if (error instanceof ApiError) {
-        setPackageError(error.message);
+        setPackageError(productBarcodeErrorMessage(error, ui));
       } else {
         setPackageError(ui('Failed to update package.'));
       }

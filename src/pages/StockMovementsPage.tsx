@@ -274,6 +274,8 @@ const MOVEMENT_LABELS: Record<string, string> = {
   usage_reversal: 'Usage reversed',
   stock_count: 'Physical count',
   manual_adjustment: 'Manual adjustment',
+  bom_assembly: 'BOM assembly',
+  bom_disassembly: 'BOM disassembly',
   stock_transfer_in: 'Transfer received',
   stock_transfer_out: 'Transfer sent',
   reservation_fulfillment: 'Reservation fulfilled',
@@ -344,7 +346,7 @@ function safeReasonEvidence(movement: StockMovement): string {
   const reason = movement.reason || '';
   const detail = reasonDetail(movement);
 
-  if (type === 'stock_count' || type === 'manual_adjustment') return reason;
+  if (type === 'stock_count' || type === 'manual_adjustment' || type === 'bom_assembly' || type === 'bom_disassembly') return reason;
   if (type === 'stock_hold' || type === 'stock_hold_release') return detail || movementTypeLabel(type);
   if (type === 'outbound_dispatch' || type === 'customer_return') return detail || movementTypeLabel(type);
   if (type === 'supplier_return_dispatch') return movement.receiving_note || movementTypeLabel(type);

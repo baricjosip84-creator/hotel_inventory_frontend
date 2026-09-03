@@ -9,6 +9,7 @@ type EnterpriseInventoryQueryLike = {
 type EnterpriseInventoryQueryRecord = Record<string, EnterpriseInventoryQueryLike | undefined>;
 
 const TAB_QUERY_MAP: Record<string, string[]> = {
+  locations: ['storageLocationsQuery'],
   'par-levels': ['productsQuery', 'storageLocationsQuery', 'parLevelsQuery'],
   'cycle-counts': ['productsQuery', 'storageLocationsQuery', 'cycleCountsQuery'],
   'supplier-returns': [],

@@ -1,4 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
+import { useAppTranslation } from "../../i18n/I18nContext";
+import { getStorageLocationMutationErrorMessage } from "../../lib/storageLocationMutationError";
 import type { createEnterpriseInventoryBoundMutationFeedback } from "./EnterpriseInventoryMutationFeedback";
 import {
   buildProductPackagePayload,
@@ -43,6 +45,7 @@ type SetProductPackageForm = (
 export function useEnterpriseInventoryMasterDataMutations(
   mutationFeedback: EnterpriseInventoryMutationFeedback,
   products: ProductOption[],
+  storageLocations: StorageLocationOption[],
   editingStorageLocationId: string | null,
   setStorageLocationForm: SetValue<StorageLocationForm>,
   setEditingStorageLocationId: SetValue<string | null>,
@@ -55,37 +58,69 @@ export function useEnterpriseInventoryMasterDataMutations(
   setProductPackageForm: SetProductPackageForm,
   setEditingProductPackageId: SetValue<string | null>,
 ) {
+  const { ui } = useAppTranslation();
+
   const saveStorageLocationMutation = useMutation({
-    mutationFn: (input: StorageLocationForm) =>
-      editingStorageLocationId
+    mutationFn: (input: StorageLocationForm) => {
+      const editingLocation = editingStorageLocationId
+        ? storageLocations.find((item) => item.id === editingStorageLocationId)
+        : null;
+      return editingStorageLocationId
         ? patchEnterpriseInventoryRequest<StorageLocationOption>(
             `/storage-locations/${editingStorageLocationId}`,
             buildStorageLocationPayload(input),
+            editingLocation?.version,
           )
         : postEnterpriseInventoryRequest<StorageLocationOption>(
             "/storage-locations",
             buildStorageLocationPayload(input),
-          ),
+          );
+    },
     onSuccess: mutationFeedback.resetting(
-      "Storage location saved.",
-      ["enterprise-storage-locations"],
+      ui(editingStorageLocationId ? "Storage location updated successfully." : "Storage location created successfully."),
+      [
+        "enterprise-storage-locations",
+        "storage-locations",
+        "inventory-usage-storage-locations-page",
+        "stock-transfer-options",
+        "enterprise-stock-transfer-options",
+        "inventory-capabilities-locations",
+        "location-hierarchy",
+        "dashboard-summary",
+        "enterprise-dashboard-summary",
+      ],
       () => {
         setStorageLocationForm(emptyStorageLocationForm);
         setEditingStorageLocationId(null);
       },
     ),
-    onError: mutationFeedback.error("Failed to save storage location."),
+    onError: mutationFeedback.error(
+      ui("Failed to save storage location."),
+      (error, fallback) => getStorageLocationMutationErrorMessage(error, fallback, ui),
+    ),
   });
 
   const deleteStorageLocationMutation = useMutation({
-    mutationFn: (id: string) =>
-      deleteEnterpriseInventoryRequest<{ message?: string }>(
-        `/storage-locations/${id}`,
+    mutationFn: (location: StorageLocationOption) =>
+      deleteEnterpriseInventoryVersionedRequest<{ message?: string }>(
+        `/storage-locations/${location.id}`,
+        location.version,
       ),
-    onSuccess: mutationFeedback.invalidating("Storage location deleted.", [
-      "enterprise-storage-locations",
-    ]),
-    onError: mutationFeedback.error("Failed to delete storage location."),
+    onSuccess: mutationFeedback.invalidating(ui("Storage location retired successfully."), [
+        "enterprise-storage-locations",
+        "storage-locations",
+        "inventory-usage-storage-locations-page",
+        "stock-transfer-options",
+        "enterprise-stock-transfer-options",
+        "inventory-capabilities-locations",
+        "location-hierarchy",
+        "dashboard-summary",
+        "enterprise-dashboard-summary",
+      ]),
+    onError: mutationFeedback.error(
+      ui("Failed to retire storage location."),
+      (error, fallback) => getStorageLocationMutationErrorMessage(error, fallback, ui),
+    ),
   });
 
   const saveSupplierMutation = useMutation({

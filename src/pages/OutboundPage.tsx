@@ -102,6 +102,8 @@ type TraceRow = {
   claimed_return_quantity: number | string;
   returned_quantity: number | string;
   returnable_quantity: number | string;
+  historical_serialized?: boolean;
+  serial_tracking_enabled?: boolean;
   serial_numbers?: string[];
 };
 
@@ -216,6 +218,21 @@ const CANONICAL_DISPLAY_LABELS: Record<string, string> = {
 const queryErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof ApiError || error instanceof Error) return error.message;
   return fallback;
+};
+
+const mutationErrorMessage = (error: unknown, ui: (englishText: string) => string) => {
+  if (isVersionConflictError(error)) return getVersionConflictMessage(error, ui);
+  if (error instanceof ApiError) {
+    const mapped: Record<string, string> = {
+      CUSTOMER_RETURN_SERIAL_TRACKING_DISABLED_AFTER_DISPATCH: 'Serial tracking was disabled after these serialized items were dispatched. Re-enable serial tracking before creating or receiving the return.',
+      CUSTOMER_RETURN_PRODUCT_ARCHIVED: 'This product was archived and can no longer be returned into inventory.',
+      CUSTOMER_RETURN_SERIAL_NOT_ELIGIBLE: 'One or more selected serial numbers are no longer eligible for this return.',
+      CUSTOMER_RETURN_SERIAL_ALREADY_CLAIMED: 'One or more selected serial numbers are already included in another active return.',
+      CUSTOMER_RETURN_SERIAL_STATE_CHANGED: 'The serialized item state changed before the return was received. Refresh and review the return.'
+    };
+    if (error.code && mapped[error.code]) return ui(mapped[error.code]);
+  }
+  return getVersionConflictMessage(error, ui);
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -387,7 +404,7 @@ export default function OutboundPage() {
     },
     onError: async (mutationError) => {
       setMessage('');
-      setError(getVersionConflictMessage(mutationError, ui));
+      setError(mutationErrorMessage(mutationError, ui));
       if (isVersionConflictError(mutationError)) await invalidate();
     }
   });
@@ -400,6 +417,8 @@ export default function OutboundPage() {
   const returnRows = useMemo(() => returns.data ?? [], [returns.data]);
   const traceRows = useMemo(() => trace.data ?? [], [trace.data]);
   const returnableTrace = traceRows.filter((row) => toNumber(row.returnable_quantity) > 0);
+  const returnCreateEligibleTrace = returnableTrace.filter((row) => !row.historical_serialized || row.serial_tracking_enabled);
+  const blockedHistoricalSerializedReturns = returnableTrace.filter((row) => row.historical_serialized && !row.serial_tracking_enabled);
 
   const filteredOrders = useMemo(() => {
     const search = orderSearch.trim().toLocaleLowerCase();
@@ -580,13 +599,13 @@ export default function OutboundPage() {
     });
   };
 
-  const selectedTraceForReturnLine = (line: ReturnLineForm) => returnableTrace.find((row) => row.allocation_id === line.allocation_id) ?? null;
+  const selectedTraceForReturnLine = (line: ReturnLineForm) => returnCreateEligibleTrace.find((row) => row.allocation_id === line.allocation_id) ?? null;
   const firstSelectedReturnTrace = returnForm.items.map(selectedTraceForReturnLine).find(Boolean) ?? null;
   const returnOrderId = firstSelectedReturnTrace?.outbound_order_id ?? null;
 
   const eligibleReturnRowsForLine = (index: number) => {
     const selectedElsewhere = new Set(returnForm.items.filter((_, lineIndex) => lineIndex !== index).map((line) => line.allocation_id).filter(Boolean));
-    return returnableTrace.filter((row) => (!returnOrderId || row.outbound_order_id === returnOrderId) && !selectedElsewhere.has(row.allocation_id));
+    return returnCreateEligibleTrace.filter((row) => (!returnOrderId || row.outbound_order_id === returnOrderId) && !selectedElsewhere.has(row.allocation_id));
   };
 
   const chooseReturnAllocation = (index: number, allocationId: string) => {
@@ -613,7 +632,7 @@ export default function OutboundPage() {
     if (returnForm.reason.trim().length < 3) return ui('Enter a return reason of at least 3 characters.');
     if (!returnForm.items.length) return ui('Add at least one returned item.');
     for (const line of returnForm.items) {
-      const selected = returnableTrace.find((row) => row.allocation_id === line.allocation_id);
+      const selected = returnCreateEligibleTrace.find((row) => row.allocation_id === line.allocation_id);
       const quantity = Number(line.quantity);
       if (!selected || !line.storage_location_id || !Number.isFinite(quantity) || quantity <= 0) return ui('Complete every return line with dispatched stock, a return location, and a quantity.');
       if (quantity > toNumber(selected.returnable_quantity)) return ui('Return quantity for {product} exceeds the quantity still returnable.').replace('{product}', selected.product_name);
@@ -896,7 +915,8 @@ export default function OutboundPage() {
       {trace.isLoading ? <div className="outbound-alert outbound-alert--info">{ui('Loading dispatched stock eligible for returns…')}</div> : trace.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(trace.error, ui('Dispatch history could not be loaded for returns.'))}</div> : null}
       {canReturnCreate ? canLocationRead ? <div className="outbound-panel" style={{ boxShadow: 'none', background: '#f8fafc', marginBottom: 14 }}>
         <div className="outbound-section-heading"><div><h3>{ui('Create customer return')}</h3><p>{ui('Multiple lines can be grouped into one return when they came from the same customer order.')}</p></div></div>
-        {returnableTrace.length === 0 ? <div className="outbound-alert outbound-alert--info">{ui('There is no dispatched stock currently eligible for a new return.')}</div> : <>
+        {blockedHistoricalSerializedReturns.length > 0 ? <div className="outbound-alert outbound-alert--warning">{ui('Some serialized dispatches cannot be returned because serial tracking is currently disabled. Re-enable serial tracking for those products before creating the return.')}</div> : null}
+        {returnCreateEligibleTrace.length === 0 ? <div className="outbound-alert outbound-alert--info">{ui('There is no dispatched stock currently eligible for a new return.')}</div> : <>
           <div className="outbound-form-grid outbound-form-grid--customer">
             <label className="outbound-field">{ui('Return reason')}<input placeholder={ui('Why is the customer returning it?')} value={returnForm.reason} onChange={(event) => setReturnForm({ ...returnForm, reason: event.target.value })} /></label>
             <label className="outbound-field">{ui('Return notes')}<input placeholder={ui('Optional return reference or notes')} value={returnForm.notes} onChange={(event) => setReturnForm({ ...returnForm, notes: event.target.value })} /></label>

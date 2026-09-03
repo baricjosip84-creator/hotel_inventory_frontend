@@ -25,7 +25,8 @@ const tabs = [
 
 export function ProductPageContent(props: ProductPageContentProps) {
   const { ui, locale } = useAppTranslation();
-  const activeTab = tabs.find((tab) => tab.view === props.workspaceView) ?? tabs[0];
+  const visibleTabs = props.canViewStock ? tabs : tabs.filter((tab) => tab.view === 'catalog');
+  const activeTab = visibleTabs.find((tab) => tab.view === props.workspaceView) ?? visibleTabs[0];
   const catalogStatusValue = props.productsQuery.isLoading
     ? ui('Loading')
     : props.productsQuery.isError
@@ -47,10 +48,10 @@ export function ProductPageContent(props: ProductPageContentProps) {
         aside={<OperationalWorkspaceStatus value={catalogStatusValue} label={ui("products in the current catalog scope")} />}
       />
 
-      <ProductSummaryStatsPanel summary={props.summary} productsQuery={props.productsQuery} canViewSuppliers={props.canViewSuppliers} />
+      <ProductSummaryStatsPanel summary={props.summary} productsQuery={props.productsQuery} canViewSuppliers={props.canViewSuppliers} canViewStock={props.canViewStock} />
 
       <OperationalWorkspaceTabs ariaLabel={ui("Product workspace views")} hint={ui(activeTab.hint)}>
-        {tabs.map((tab) => (
+        {visibleTabs.map((tab) => (
           <OperationalWorkspaceTab
             key={tab.view}
             active={props.workspaceView === tab.view}

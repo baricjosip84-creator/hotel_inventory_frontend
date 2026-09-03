@@ -146,7 +146,7 @@ assert(closureFiles.audit.includes("return ui('Unknown error');") && closureFile
 assert(closureFiles.requisitions.includes("ui(activityLabel(entry.action))"), 'Requisition canonical activity display must pass through tenant UI translation');
 assert(closureFiles.transfers.includes("return getVersionConflictMessage(error, ui);"), 'Stock Transfers version-conflict frontend message must be translated');
 assert(closureFiles.purchaseOrders.includes("return getVersionConflictMessage(error, ui);"), 'Purchase Orders version-conflict frontend message must be translated');
-assert(closureFiles.outbound.includes('getVersionConflictMessage(mutationError, ui)'), 'Outbound version-conflict frontend message must be translated');
+assert(closureFiles.outbound.includes('if (isVersionConflictError(error)) return getVersionConflictMessage(error, ui);') && closureFiles.outbound.includes('setError(mutationErrorMessage(mutationError, ui))'), 'Outbound version-conflict frontend message must be translated through the mutation error mapper');
 assert(closureFiles.api.includes('return { message: error.message, translateMessage: false };'), 'raw API/server errors must be explicitly excluded from tenant feedback translation');
 assert(closureFiles.api.includes("translateMessage: true") && closureFiles.api.includes("tenantMutationSuccessMessage"), 'frontend-owned API mutation feedback must be marked translatable');
 assert(closureFiles.actionFeedback.includes('translateMessage?: boolean'), 'action feedback contract must preserve translatability metadata');

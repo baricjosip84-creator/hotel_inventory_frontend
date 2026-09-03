@@ -95,10 +95,11 @@ const forbiddenMixedLanguage = [
 for (const pattern of forbiddenMixedLanguage) if (pageSource.includes(pattern)) fail(`Advanced Inventory still contains mixed-language or translated technical presentation: ${pattern}`);
 
 const canonicalContracts = [
-  "{ value: 'products:read', label: 'Read products' }",
-  "{ value: 'products:write', label: 'Create products' }",
-  "{ value: 'stock:read', label: 'Read stock' }",
-  "const DEFAULT_API_SCOPES = ['products:read', 'stock:read']",
+  "{ value: 'products:read', label: 'Read products', requiredPermission: TENANT_PERMISSIONS.PRODUCTS_READ }",
+  "{ value: 'products:write', label: 'Create products', requiredPermission: TENANT_PERMISSIONS.PRODUCTS_WRITE }",
+  "{ value: 'stock:read', label: 'Read stock', requiredPermission: TENANT_PERMISSIONS.STOCK_READ }",
+  "const [apiScopes, setApiScopes] = useState<string[]>([])",
+  "const grantableApiScopes = API_SCOPE_OPTIONS.filter((scope) => hasPermission(scope.requiredPermission))",
   "reason: 'Revoked from tenant Integrations page'",
   'placeholder="purchase_order.approved,purchase_order.completed"',
   'placeholder="CASE"',
@@ -116,3 +117,12 @@ for (const contract of canonicalContracts) if (!pageSource.includes(contract)) f
 if (!process.exitCode) pass('Advanced Inventory canonical scopes, event names, statuses, directions and API routes remain language-independent.');
 
 if (!process.exitCode) console.log('Tenant Advanced Inventory multilingual hardening: PASS');
+
+
+const inventoryCapabilitiesBackend = read('../backend/src/services/inventory/inventoryCapabilitiesService.js');
+if (!inventoryCapabilitiesBackend.includes('has_more: hasMore')
+    || !inventoryCapabilitiesBackend.includes('OR p.sku ILIKE')) {
+  fail('Serial Registry paged backend contract must expose has_more and make the advertised SKU search real.');
+} else {
+  pass('Serial Registry paged backend contract exposes has_more and searches serial, Product name, and SKU.');
+}

@@ -54,6 +54,7 @@ export type ProductPageQueryInput = {
   selectedCostProduct: ProductItem | ProductCostRiskItem | null;
   canViewProductPackages: boolean;
   canViewSuppliers: boolean;
+  canViewStock: boolean;
   costHistoryFilters: CostHistoryFilterState;
   costValuationDetailFilters: CostValuationDetailFilterState;
   costRiskDetailFilters: CostRiskDetailFilterState;
@@ -71,14 +72,15 @@ export function useProductPageQueries({
   selectedCostProduct,
   canViewProductPackages,
   canViewSuppliers,
+  canViewStock,
   costHistoryFilters,
   costValuationDetailFilters,
   costRiskDetailFilters,
   costActionDetailFilters
 }: ProductPageQueryInput) {
-  const valuationEnabled = workspaceView === 'valuation';
-  const actionsEnabled = workspaceView === 'actions';
-  const governanceEnabled = workspaceView === 'governance';
+  const valuationEnabled = canViewStock && workspaceView === 'valuation';
+  const actionsEnabled = canViewStock && workspaceView === 'actions';
+  const governanceEnabled = canViewStock && workspaceView === 'governance';
 
   const productsQuery = useQuery({
     queryKey: ['products', categoryFilter, supplierFilter, costStatusFilter, costBasisFilter, costVarianceStatusFilter],

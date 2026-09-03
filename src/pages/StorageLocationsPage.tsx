@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
-import { apiRequest, ApiError } from '../lib/api';
-import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
+import { apiRequest } from '../lib/api';
+import { getStorageLocationMutationErrorMessage } from '../lib/storageLocationMutationError';
+import { getCurrentAccessRoleLabel, getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
@@ -13,11 +14,11 @@ import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatte
 
 type StorageLocationItem = {
   id: string;
-  tenant_id: string;
   name: string;
   temperature_zone: string | null;
   created_at?: string;
   deleted_at?: string | null;
+  version: number;
   stock_position_count?: number | string | null;
   nonzero_stock_position_count?: number | string | null;
   low_stock_position_count?: number | string | null;
@@ -26,11 +27,6 @@ type StorageLocationItem = {
 type StorageLocationFormState = {
   name: string;
   temperature_zone: string;
-};
-
-type StorageLocationBlocker = {
-  key?: string;
-  label?: string;
 };
 
 const TEMPERATURE_ZONE_SUGGESTIONS = [
@@ -66,10 +62,12 @@ async function createStorageLocation(input: StorageLocationFormState): Promise<S
 
 async function updateStorageLocation(input: {
   id: string;
+  version: number;
   values: StorageLocationFormState;
 }): Promise<StorageLocationItem> {
   return apiRequest<StorageLocationItem>(`/storage-locations/${input.id}`, {
     method: 'PATCH',
+    headers: { 'If-Match-Version': String(input.version) },
     body: JSON.stringify({
       name: input.values.name.trim(),
       temperature_zone: input.values.temperature_zone.trim() || null
@@ -77,9 +75,10 @@ async function updateStorageLocation(input: {
   });
 }
 
-async function retireStorageLocation(id: string): Promise<{ message: string }> {
-  return apiRequest<{ message: string }>(`/storage-locations/${id}`, {
-    method: 'DELETE'
+async function retireStorageLocation(input: Pick<StorageLocationItem, 'id' | 'version'>): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/storage-locations/${input.id}`, {
+    method: 'DELETE',
+    headers: { 'If-Match-Version': String(input.version) }
   });
 }
 
@@ -110,19 +109,9 @@ function normalizeText(value: string | null | undefined): string {
   return String(value || '').trim().toLocaleLowerCase();
 }
 
-function formatTemperatureZone(value: string | null | undefined): string {
-  const normalized = String(value || '').trim();
-  return normalized || 'Not classified';
-}
-
 function isStandardTemperatureZone(value: string | null | undefined): boolean {
   const normalized = normalizeText(value);
   return Boolean(normalized && STANDARD_TEMPERATURE_ZONE_KEYS.has(normalized));
-}
-
-function shortenId(value: string): string {
-  if (value.length <= 18) return value;
-  return `${value.slice(0, 8)}…${value.slice(-6)}`;
 }
 
 function getSearchRank(location: StorageLocationItem, normalizedSearch: string): number {
@@ -130,33 +119,11 @@ function getSearchRank(location: StorageLocationItem, normalizedSearch: string):
 
   const name = normalizeText(location.name);
   const zone = normalizeText(location.temperature_zone);
-  const id = normalizeText(location.id);
-
   if (name.startsWith(normalizedSearch)) return 0;
   if (name.includes(normalizedSearch)) return 1;
   if (zone.startsWith(normalizedSearch)) return 2;
   if (zone.includes(normalizedSearch)) return 3;
-  if (id.includes(normalizedSearch)) return 4;
   return Number.POSITIVE_INFINITY;
-}
-
-function getMutationErrorMessage(error: unknown, fallback: string, ui: (englishText: string) => string): string {
-  if (!(error instanceof ApiError)) return fallback;
-
-  if (error.code === 'STORAGE_LOCATION_IN_USE') {
-    const details = error.details as { blockers?: StorageLocationBlocker[] } | undefined;
-    const labels = Array.isArray(details?.blockers)
-      ? details.blockers
-          .map((blocker) => blocker.label?.trim())
-          .filter((label): label is string => Boolean(label))
-      : [];
-
-    if (labels.length) {
-      return `${ui('This location cannot be retired until these active dependencies are resolved:')} ${labels.join(', ')}.`;
-    }
-  }
-
-  return error.message || fallback;
 }
 
 function StatCard(props: {
@@ -175,6 +142,7 @@ export default function StorageLocationsPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const { canManageStorageLocations } = getRoleCapabilities();
+  const canReadStock = hasPermission(TENANT_PERMISSIONS.STOCK_READ);
   const accessRoleLabel = getCurrentAccessRoleLabel();
 
   const [search, setSearch] = useState(() => searchParams.get('search')?.trim() || '');
@@ -195,7 +163,11 @@ export default function StorageLocationsPage() {
       queryClient.invalidateQueries({ queryKey: ['enterprise-storage-locations'] }),
       queryClient.invalidateQueries({ queryKey: ['inventory-usage-storage-locations-page'] }),
       queryClient.invalidateQueries({ queryKey: ['stock-transfer-options'] }),
-      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }),
+      queryClient.invalidateQueries({ queryKey: ['enterprise-dashboard-summary'] }),
+      queryClient.invalidateQueries({ queryKey: ['enterprise-stock-transfer-options'] }),
+      queryClient.invalidateQueries({ queryKey: ['inventory-capabilities-locations'] }),
+      queryClient.invalidateQueries({ queryKey: ['location-hierarchy'] })
     ]);
   };
 
@@ -209,7 +181,7 @@ export default function StorageLocationsPage() {
       await invalidateLocationConsumers();
     },
     onError: (error) => {
-      setFormError(getMutationErrorMessage(error, ui('Failed to create storage location.'), ui));
+      setFormError(getStorageLocationMutationErrorMessage(error, ui('Failed to create storage location.'), ui));
       setFormMessage(null);
     }
   });
@@ -224,7 +196,7 @@ export default function StorageLocationsPage() {
       await invalidateLocationConsumers();
     },
     onError: (error) => {
-      setFormError(getMutationErrorMessage(error, ui('Failed to update storage location.'), ui));
+      setFormError(getStorageLocationMutationErrorMessage(error, ui('Failed to update storage location.'), ui));
       setFormMessage(null);
     }
   });
@@ -239,7 +211,7 @@ export default function StorageLocationsPage() {
       await invalidateLocationConsumers();
     },
     onError: (error) => {
-      setFormError(getMutationErrorMessage(error, ui('Failed to retire storage location.'), ui));
+      setFormError(getStorageLocationMutationErrorMessage(error, ui('Failed to retire storage location.'), ui));
       setFormMessage(null);
       scrollToFormSection('storage-location-form-panel');
     }
@@ -279,9 +251,9 @@ export default function StorageLocationsPage() {
   }, [locations, search, zoneFilter]);
 
   const summary = useMemo(() => {
-    const withStock = locations.filter(
-      (location) => toNumber(location.nonzero_stock_position_count) > 0
-    ).length;
+    const withStock = canReadStock
+      ? locations.filter((location) => toNumber(location.nonzero_stock_position_count) > 0).length
+      : 0;
     const zonesNeedingReview = locations.filter(
       (location) => !isStandardTemperatureZone(location.temperature_zone)
     ).length;
@@ -292,7 +264,7 @@ export default function StorageLocationsPage() {
       empty: Math.max(0, locations.length - withStock),
       zonesNeedingReview
     };
-  }, [locations]);
+  }, [canReadStock, locations]);
 
   useEffect(() => {
     const nextParams = new URLSearchParams(searchParams);
@@ -308,6 +280,7 @@ export default function StorageLocationsPage() {
     }
   }, [search, searchParams, setSearchParams, zoneFilter]);
 
+  const locationListUnavailable = locationsQuery.isLoading || locationsQuery.isError;
   const writeBusy = createMutation.isPending || updateMutation.isPending || retireMutation.isPending;
   const inputDisabled = writeBusy || !canManageStorageLocations;
   const filtersActive = Boolean(search.trim() || zoneFilter.trim());
@@ -319,7 +292,7 @@ export default function StorageLocationsPage() {
 
     if (!canManageStorageLocations) {
       setFormError(
-        ui("Your current role is read-only for storage locations because it does not have storage_locations.write permission.")
+        ui("Your current role can view storage locations but cannot create, edit, or retire them.")
       );
       return;
     }
@@ -342,7 +315,7 @@ export default function StorageLocationsPage() {
     }
 
     if (editingLocation) {
-      updateMutation.mutate({ id: editingLocation.id, values: form });
+      updateMutation.mutate({ id: editingLocation.id, version: editingLocation.version, values: form });
       return;
     }
 
@@ -379,14 +352,14 @@ export default function StorageLocationsPage() {
     }
 
     const confirmed = window.confirm(
-      `Retire storage location "${location.name}"? It will be removed from new inventory operations, while historical records remain. Retirement is blocked when the location still has stock or active operational work.`
+      `${ui('Retire storage location')} "${location.name}"? ${ui('It will be removed from new inventory operations while historical records remain. Retirement is blocked while stock or active operational work still depends on it.')}`
     );
 
     if (!confirmed) return;
 
     setFormError(null);
     setFormMessage(null);
-    retireMutation.mutate(location.id);
+    retireMutation.mutate({ id: location.id, version: location.version });
   };
 
   const clearFilters = () => {
@@ -400,37 +373,37 @@ export default function StorageLocationsPage() {
         iconPath="/storage-locations"
         eyebrow={ui("Storage operations")}
         title={ui("Storage location workspace")}
-        description={ui("Maintain operational storage areas, review where stock is held, and keep location condition labels ready for receiving, transfers, reservations, counts, and scanning.")}
+        description={ui("Maintain operational storage areas and keep location condition labels ready for receiving, transfers, reservations, counts, and scanning.")}
         meta={<>
           <OperationalWorkspaceMetaPill>{ui("Tenant-scoped")}</OperationalWorkspaceMetaPill>
           <OperationalWorkspaceMetaPill>{canManageStorageLocations ? ui("Location write access") : ui("Location read-only")}</OperationalWorkspaceMetaPill>
           <OperationalWorkspaceMetaPill>{ui("Retirement is dependency-checked")}</OperationalWorkspaceMetaPill>
         </>}
-        aside={<OperationalWorkspaceStatus value={locationsQuery.isLoading ? '—' : summary.active} label={ui("active storage locations")} />}
+        aside={<OperationalWorkspaceStatus value={locationListUnavailable ? '—' : summary.active} label={ui("active storage locations")} />}
       />
 
       <div className="app-grid-stats io-workspace-stats" style={styles.statsGrid}>
         <StatCard
           title={ui("Active Locations")}
-          value={locationsQuery.isLoading ? '—' : summary.active}
+          value={locationListUnavailable ? '—' : summary.active}
           subtitle={ui("Available to current inventory workflows")}
         />
         <StatCard
           title={ui("Locations With Stock")}
-          value={locationsQuery.isLoading ? '—' : summary.withStock}
-          subtitle={ui("At least one stock position has a non-zero balance")}
-          tone={!locationsQuery.isLoading && summary.withStock > 0 ? 'good' : 'default'}
+          value={locationListUnavailable || !canReadStock ? '—' : summary.withStock}
+          subtitle={canReadStock ? ui("At least one stock position has a non-zero balance") : ui("Current stock information is not available to this role.")}
+          tone={!locationListUnavailable && canReadStock && summary.withStock > 0 ? 'good' : 'default'}
         />
         <StatCard
           title={ui("Empty Locations")}
-          value={locationsQuery.isLoading ? '—' : summary.empty}
-          subtitle={ui("No non-zero stock; active work may still block retirement")}
+          value={locationListUnavailable || !canReadStock ? '—' : summary.empty}
+          subtitle={canReadStock ? ui("No non-zero stock; active work may still block retirement") : ui("Current stock information is not available to this role.")}
         />
         <StatCard
           title={ui("Condition Labels to Review")}
-          value={locationsQuery.isLoading ? '—' : summary.zonesNeedingReview}
+          value={locationListUnavailable ? '—' : summary.zonesNeedingReview}
           subtitle={ui("Missing or outside the recommended storage-condition labels")}
-          tone={!locationsQuery.isLoading && summary.zonesNeedingReview > 0 ? 'warn' : 'good'}
+          tone={!locationListUnavailable && summary.zonesNeedingReview > 0 ? 'warn' : 'good'}
         />
       </div>
 
@@ -443,7 +416,7 @@ export default function StorageLocationsPage() {
 
       {!canManageStorageLocations ? (
         <div className="app-warning-state" style={styles.warningBox}>
-          {ui("Current access role:")} {ui(accessRoleLabel)}{ui(". Storage locations are read-only because this role does not have storage_locations.write permission.")}
+          {ui("Current access role:")} {ui(accessRoleLabel)}. {ui("This role can view storage locations but cannot create, edit, or retire them.")}
         </div>
       ) : null}
 
@@ -454,7 +427,7 @@ export default function StorageLocationsPage() {
         templateColumns={['name', 'temperature_zone']}
         templateExample={{ name: 'Main Warehouse', temperature_zone: 'Ambient' }}
         canImport={canManageStorageLocations}
-        disabledReason={ui("Storage-locations write permission is required for bulk location import.")}
+        disabledReason={ui("Your current role cannot import storage locations.")}
         onCommitted={invalidateLocationConsumers}
       />
 
@@ -540,7 +513,7 @@ export default function StorageLocationsPage() {
             <div className="io-section-heading-copy">
               <h3 style={styles.panelTitle}>{ui("Storage Location List")}</h3>
               <p style={styles.panelSubtitle}>
-                {ui("Search and review active storage areas, stock usage, storage-condition classification, and retirement actions.")}
+                {ui("Search and review active storage areas, storage-condition classification, and retirement actions. Current stock use is shown only when your role can read stock.")}
               </p>
             </div>
           </div>
@@ -560,7 +533,7 @@ export default function StorageLocationsPage() {
             <input
               id="storage-location-search"
               type="search"
-              placeholder={ui("Name, zone, or location ID")}
+              placeholder={ui("Name or storage condition")}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               style={styles.searchInput}
@@ -582,21 +555,23 @@ export default function StorageLocationsPage() {
           </div>
         </div>
 
-        <div style={styles.listMetaRow}>
-          <span style={styles.resultCount}>
-            {filtersActive
-              ? `${formatLocalizedNumber(filteredLocations.length, locale)} ${ui('of')} ${formatLocalizedNumber(locations.length, locale)} ${ui('active locations match.')}`
-              : `${formatLocalizedNumber(locations.length, locale)} ${ui('active')} ${ui(locations.length === 1 ? 'location' : 'locations')}.`}
-          </span>
-          <button
-            type="button"
-            style={filtersActive ? styles.secondaryButton : styles.disabledButton}
-            onClick={clearFilters}
-            disabled={!filtersActive}
-          >
-            {ui("Clear Filters")}
-          </button>
-        </div>
+        {!locationListUnavailable ? (
+          <div style={styles.listMetaRow}>
+            <span style={styles.resultCount}>
+              {filtersActive
+                ? `${formatLocalizedNumber(filteredLocations.length, locale)} ${ui('of')} ${formatLocalizedNumber(locations.length, locale)} ${ui('active locations match.')}`
+                : `${formatLocalizedNumber(locations.length, locale)} ${ui('active')} ${ui(locations.length === 1 ? 'location' : 'locations')}.`}
+            </span>
+            <button
+              type="button"
+              style={filtersActive ? styles.secondaryButton : styles.disabledButton}
+              onClick={clearFilters}
+              disabled={!filtersActive}
+            >
+              {ui("Clear Filters")}
+            </button>
+          </div>
+        ) : null}
 
         {locationsQuery.isLoading ? (
           <div className="app-empty-state" style={styles.stateBox}>{ui("Loading storage locations...")}</div>
@@ -604,7 +579,7 @@ export default function StorageLocationsPage() {
 
         {locationsQuery.isError ? (
           <div className="app-error-state" style={styles.stateBox}>
-            {ui("Failed to load storage locations:")} {(locationsQuery.error as Error).message || ui("Unknown error")}
+            {ui("Storage locations are unavailable because the location list could not be loaded.")}
           </div>
         ) : null}
 
@@ -638,19 +613,20 @@ export default function StorageLocationsPage() {
                       <tr key={location.id} style={isEditing ? styles.editingRow : undefined}>
                         <td style={styles.td}>
                           <div style={styles.rowTitle}>{location.name}</div>
-                          <div style={styles.rowSubtle} title={location.id}>{ui("ID:")} {shortenId(location.id)}</div>
                           {isEditing ? <div style={styles.editHint}>{ui("Editing in the form above")}</div> : null}
                         </td>
                         <td style={styles.td}>
                           <span style={isStandardTemperatureZone(location.temperature_zone) ? styles.zoneBadge : styles.zoneMissingBadge}>
-                            {ui(formatTemperatureZone(location.temperature_zone))}
+                            {location.temperature_zone ? location.temperature_zone : ui('Not classified')}
                           </span>
                           {!isStandardTemperatureZone(location.temperature_zone) ? (
                             <div style={styles.rowSubtle}>{ui("Review condition classification")}</div>
                           ) : null}
                         </td>
                         <td style={styles.td}>
-                          {stockPositionCount > 0 ? (
+                          {!canReadStock ? (
+                            <span style={styles.rowSubtle}>{ui('Current stock information is not available to this role.')}</span>
+                          ) : stockPositionCount > 0 ? (
                             <>
                               <div style={styles.stockSummary}>
                                 {formatLocalizedNumber(stockPositionCount, locale)} {ui(stockPositionCount === 1 ? 'position' : 'positions')} · {formatLocalizedNumber(nonzeroStockPositionCount, locale)} {ui("with stock")}
@@ -684,7 +660,7 @@ export default function StorageLocationsPage() {
                                 disabled={writeBusy}
                                 title={ui("Retire this location from new operations while preserving history")}
                               >
-                                {retireMutation.isPending && retireMutation.variables === location.id ? ui('Retiring...') : ui('Retire')}
+                                {retireMutation.isPending && retireMutation.variables?.id === location.id ? ui('Retiring...') : ui('Retire')}
                               </button>
                             </div>
                           ) : (

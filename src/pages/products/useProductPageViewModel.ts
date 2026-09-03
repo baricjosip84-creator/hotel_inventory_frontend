@@ -8,7 +8,7 @@ import { useProductPageQueries } from './productQueries';
 
 export function useProductPageViewModel() {
   const queryClient = useQueryClient();
-  const { role, canManageProducts, canViewProductPackages, canManageProductPackages, canViewSuppliers } = getRoleCapabilities();
+  const { role, canManageProducts, canViewProductPackages, canManageProductPackages, canViewSuppliers, canViewStock } = getRoleCapabilities();
 
   const productPageState = useProductPageState();
 
@@ -17,6 +17,12 @@ export function useProductPageViewModel() {
       productPageState.setSupplierFilter('');
     }
   }, [canViewSuppliers, productPageState.supplierFilter, productPageState.setSupplierFilter]);
+
+  useEffect(() => {
+    if (!canViewStock && productPageState.workspaceView !== 'catalog') {
+      productPageState.setWorkspaceView('catalog');
+    }
+  }, [canViewStock, productPageState.workspaceView, productPageState.setWorkspaceView]);
 
   const queries = useProductPageQueries({
     workspaceView: productPageState.workspaceView,
@@ -29,6 +35,7 @@ export function useProductPageViewModel() {
     selectedCostProduct: productPageState.selectedCostProduct,
     canViewProductPackages,
     canViewSuppliers,
+    canViewStock,
     costHistoryFilters: productPageState.costHistoryFilters,
     costValuationDetailFilters: productPageState.costValuationDetailFilters,
     costRiskDetailFilters: productPageState.costRiskDetailFilters,
@@ -43,7 +50,8 @@ export function useProductPageViewModel() {
     productPageData,
     canManageProducts,
     canManageProductPackages,
-    canViewSuppliers
+    canViewSuppliers,
+    canViewStock
   });
 
   return {
@@ -96,6 +104,7 @@ export function useProductPageViewModel() {
     canManageProducts,
     canViewProductPackages,
     canViewSuppliers,
+    canViewStock,
     role,
     isSubmitting: productPageActions.createMutation.isPending || productPageActions.updateMutation.isPending,
     handleSubmit: productPageActions.handleSubmit,

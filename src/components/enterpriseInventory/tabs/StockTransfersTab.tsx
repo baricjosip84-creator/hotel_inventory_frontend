@@ -16,6 +16,7 @@ type UomResponse = {
 };
 
 type SerialRow = { id: string; serial_number: string; storage_location_id?: string | null; status: string };
+type SerialPage = { items: SerialRow[]; has_more: boolean; next_cursor: string | null };
 type TransferOptionProduct = { id: string; name: string; unit?: string | null; available_quantity?: number | string | null; stock_lot_reconciled?: boolean | null; transferable?: boolean | null; serial_tracking_enabled?: boolean };
 type TransferOptionsResponse = { products: TransferOptionProduct[]; locations?: Array<{ id: string; name: string; source_eligible?: boolean | null }> };
 
@@ -62,6 +63,30 @@ function toFiniteNumber(value: number | string | null | undefined): number {
 function formatQuantity(value: number | string | null | undefined, unit?: string | null): string {
   const quantity = formatNumber(toFiniteNumber(value));
   return unit ? `${quantity} ${unit}` : quantity;
+}
+
+
+async function fetchAllAvailableTransferSerials(productId: string, storageLocationId: string): Promise<SerialRow[]> {
+  const serials = new Map<string, SerialRow>();
+  let cursor = '';
+  const seenCursors = new Set<string>();
+  for (;;) {
+    const params = new URLSearchParams({
+      product_id: productId,
+      status: 'available',
+      storage_location_id: storageLocationId,
+      paged: 'true',
+      limit: '300'
+    });
+    if (cursor) params.set('cursor', cursor);
+    const page = await apiRequest<SerialPage>(`/inventory-capabilities/serials?${params.toString()}`);
+    for (const serial of page.items || []) serials.set(serial.id, serial);
+    if (!page.has_more || !page.next_cursor) break;
+    if (seenCursors.has(page.next_cursor)) throw new Error('Serial registry pagination cursor did not advance');
+    seenCursors.add(page.next_cursor);
+    cursor = page.next_cursor;
+  }
+  return [...serials.values()];
 }
 
 async function fetchAllOpenStockTransferDrafts(): Promise<StockTransfer[]> {
@@ -169,7 +194,7 @@ export function StockTransfersTab({
   const serialQuery = useQuery({
     queryKey: ['stock-transfer-serials', stockTransferForm.product_id, stockTransferForm.from_storage_location_id],
     enabled: Boolean(canCreateTransfers && stockTransferForm.product_id && stockTransferForm.from_storage_location_id && serialTrackingEnabled),
-    queryFn: () => apiRequest<SerialRow[]>(`/inventory-capabilities/serials?product_id=${encodeURIComponent(stockTransferForm.product_id)}&status=available&storage_location_id=${encodeURIComponent(stockTransferForm.from_storage_location_id)}`)
+    queryFn: () => fetchAllAvailableTransferSerials(stockTransferForm.product_id, stockTransferForm.from_storage_location_id)
   });
   const expectedSerialCount = Number.isInteger(selectedBaseQuantity) ? selectedBaseQuantity : -1;
   const serialEvidenceReady = !serialTrackingEnabled || serialQuery.isSuccess;

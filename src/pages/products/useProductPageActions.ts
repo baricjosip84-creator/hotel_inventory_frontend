@@ -13,6 +13,7 @@ type UseProductPageActionsParams = {
   canManageProducts: boolean;
   canManageProductPackages: boolean;
   canViewSuppliers: boolean;
+  canViewStock: boolean;
 };
 
 export function useProductPageActions({
@@ -21,7 +22,8 @@ export function useProductPageActions({
   productPageData,
   canManageProducts,
   canManageProductPackages,
-  canViewSuppliers
+  canViewSuppliers,
+  canViewStock
 }: UseProductPageActionsParams) {
   const { ui } = useAppTranslation();
   const {
@@ -76,7 +78,8 @@ export function useProductPageActions({
     costRiskDetails: productPageData.costRiskDetails,
     setSelectedCostProduct: productPageState.setSelectedCostProduct,
     setCostHistoryFilters: productPageState.setCostHistoryFilters,
-    ui
+    ui,
+    canViewStock
   });
 
   return {

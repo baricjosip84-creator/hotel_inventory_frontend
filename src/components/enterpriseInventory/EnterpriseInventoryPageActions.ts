@@ -18,7 +18,7 @@ import type { useEnterpriseInventoryPageFeedback } from "./EnterpriseInventoryPa
 import { useEnterpriseInventoryProcurementMutations } from "./EnterpriseInventoryProcurementMutations";
 import { useEnterpriseInventoryStockMutations } from "./EnterpriseInventoryStockMutations";
 import { createEnterpriseInventorySubmitHandlers } from "./EnterpriseInventorySubmitHandlers";
-import type { ProductOption, PurchaseOrder, Shipment } from "./EnterpriseInventoryTypes";
+import type { ProductOption, PurchaseOrder, Shipment, StorageLocationOption } from "./EnterpriseInventoryTypes";
 import { useEnterpriseInventoryWorkflowMutations } from "./EnterpriseInventoryWorkflowMutations";
 
 type EnterpriseInventoryFormState = ReturnType<
@@ -33,6 +33,7 @@ type EnterpriseInventoryPageActionsParams = {
   formState: EnterpriseInventoryFormState;
   mutationFeedback: EnterpriseInventoryMutationFeedback;
   products: ProductOption[];
+  storageLocations: StorageLocationOption[];
   purchaseOrders: PurchaseOrder[];
   shipments: Shipment[];
   setErrorMessage: Dispatch<SetStateAction<string | null>>;
@@ -43,6 +44,7 @@ export function useEnterpriseInventoryPageActions({
   formState,
   mutationFeedback,
   products,
+  storageLocations,
   purchaseOrders,
   shipments,
   setErrorMessage,
@@ -107,6 +109,7 @@ export function useEnterpriseInventoryPageActions({
   const masterDataMutations = useEnterpriseInventoryMasterDataMutations(
     mutationFeedback,
     products,
+    storageLocations,
     editingStorageLocationId,
     setStorageLocationForm,
     setEditingStorageLocationId,

@@ -74,7 +74,7 @@ export function useEnterpriseInventoryPageController() {
     attachmentEntityId: attachmentForm.entity_id,
   });
 
-  const { products, purchaseOrders, shipments } = pageData.stableData;
+  const { products, storageLocations, purchaseOrders, shipments } = pageData.stableData;
   const subscriptionAccess = pageData.queries.tenantSubscriptionAccessQuery.data;
 
   useEffect(() => {
@@ -95,6 +95,7 @@ export function useEnterpriseInventoryPageController() {
     formState,
     mutationFeedback,
     products,
+    storageLocations,
     purchaseOrders,
     shipments,
     setErrorMessage,

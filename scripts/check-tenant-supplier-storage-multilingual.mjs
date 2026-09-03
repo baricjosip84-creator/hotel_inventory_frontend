@@ -84,8 +84,11 @@ if (supplierSource.includes('>Add supplier<') || supplierSource.includes("setFor
 if (!storageSource.includes('formatLocalizedDateTime') || !storageSource.includes('formatLocalizedNumber')) {
   fail('Storage Locations must use locale-aware date/time and number formatting.');
 }
-if (!storageSource.includes('{ui(formatTemperatureZone(location.temperature_zone))}')) {
-  fail('Storage condition labels must translate only at display time.');
+if (!storageSource.includes("location.temperature_zone ? location.temperature_zone : ui('Not classified')")) {
+  fail('Saved storage-condition evidence must remain verbatim while only the empty-state label is translated.');
+}
+if (storageSource.includes('{ui(formatTemperatureZone(location.temperature_zone))}')) {
+  fail('Tenant-entered storage-condition evidence must not be reinterpreted through the translation catalog.');
 }
 if (!storageSource.includes('value={zone} label={ui(zone)}')) {
   fail('Recommended storage-condition suggestions must keep canonical values while displaying localized labels.');

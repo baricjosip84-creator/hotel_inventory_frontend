@@ -13,6 +13,7 @@ export function ProductManagementSectionsPanel({
   canManageProducts,
   canViewProductPackages,
   canViewSuppliers,
+  canViewStock,
   role,
   editingProduct,
   form,
@@ -54,7 +55,7 @@ export function ProductManagementSectionsPanel({
     <>
       {!canManageProducts ? (
         <div style={styles.warningBox}>
-          {ui("Current access role:")} {ui(getCurrentAccessRoleLabel() || role)}{ui(". Products are read-only because this role does not have products.write permission.")}
+          {ui("Current access role:")} {ui(getCurrentAccessRoleLabel() || role)}{ui(". Products are read-only because this role cannot change product records.")}
         </div>
       ) : null}
 
@@ -115,6 +116,7 @@ export function ProductManagementSectionsPanel({
         canManageProducts={canManageProducts}
         canViewProductPackages={canViewProductPackages}
         canViewSuppliers={canViewSuppliers}
+        canViewStock={canViewStock}
         deleteProductPending={deleteMutation.isPending}
         onExportProductsCsv={handleExportProductsCsv}
         onOpenCostHistory={handleOpenCostHistory}

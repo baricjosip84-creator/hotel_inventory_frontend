@@ -12,9 +12,10 @@ type ProductSummaryStatsPanelProps = {
     isError: boolean;
   };
   canViewSuppliers: boolean;
+  canViewStock: boolean;
 };
 
-export function ProductSummaryStatsPanel({ summary, productsQuery, canViewSuppliers }: ProductSummaryStatsPanelProps) {
+export function ProductSummaryStatsPanel({ summary, productsQuery, canViewSuppliers, canViewStock }: ProductSummaryStatsPanelProps) {
   const { ui, locale } = useAppTranslation();
 
   if (productsQuery.isLoading) {
@@ -57,8 +58,8 @@ export function ProductSummaryStatsPanel({ summary, productsQuery, canViewSuppli
       />
       <OperationalWorkspaceStatCard
         label={ui("Inventory Value")}
-        value={formatMoney(summary.estimatedInventoryValue, locale)}
-        helper={ui("Estimated from received cost, then standard fallback")}
+        value={canViewStock ? formatMoney(summary.estimatedInventoryValue, locale) : ui('Unavailable')}
+        helper={canViewStock ? ui("Estimated from received cost, then standard fallback") : ui('Stock read permission is required to view current inventory value.')}
       />
     </div>
   );

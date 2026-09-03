@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, CSSProperties, FormEvent } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { useNavigate, useSearchParams } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
@@ -93,6 +94,17 @@ type ShipmentLookupResponse = {
   status: string;
 };
 
+type ScannerShipmentContext = {
+  id: string;
+  status: string;
+  po_number?: string | null;
+  qr_code?: string | null;
+};
+
+type ScannerShipmentOptions = {
+  storage_locations?: Array<{ id: string; name: string }>;
+};
+
 type ProductBarcodeLookupResponse = {
   shipment_item_id: string;
   shipment_id: string;
@@ -155,6 +167,14 @@ function scannerResolutionError(error: unknown, mode: ScannerMode): string {
 
     if (error.code === 'SHIPMENT_RECEIVING_CLOSED') {
       return 'This shipment is already finalized. Barcode receiving is closed.';
+    }
+
+    if (error.code === 'SCANNER_BARCODE_AMBIGUOUS') {
+      return 'This barcode is assigned to more than one active product. Correct the duplicate barcode assignments before scanning.';
+    }
+
+    if (error.code === 'SCANNER_SHIPMENT_ITEM_AMBIGUOUS') {
+      return 'This barcode matches more than one active line for the same product in this shipment. Select the shipment item manually.';
     }
 
     return error.message;
@@ -260,20 +280,57 @@ export default function ScannerPage() {
   const mode = (searchParams.get('mode') === 'product' ? 'product' : 'shipment') as ScannerMode;
   const shipmentId = searchParams.get('shipmentId') || '';
   const locationId = searchParams.get('locationId') || '';
-  const shipmentLabel = searchParams.get('shipmentLabel') || '';
-  const locationName = searchParams.get('locationName') || '';
   const canReceiveShipments = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_RECEIVE);
-  const isProductContextMissing = mode === 'product' && (!shipmentId || !locationId);
-  const isProductPermissionMissing = mode === 'product' && !canReceiveShipments;
+  const isShipmentVerificationMode = mode === 'shipment' && Boolean(shipmentId);
+  const shipmentContextQuery = useQuery({
+    queryKey: ['scanner-shipment-context', shipmentId],
+    enabled: Boolean(shipmentId),
+    queryFn: () => apiRequest<ScannerShipmentContext>(`/shipments/${encodeURIComponent(shipmentId)}`)
+  });
+  const shipmentOptionsQuery = useQuery({
+    queryKey: ['scanner-shipment-options'],
+    enabled: mode === 'product' && Boolean(shipmentId) && Boolean(locationId) && canReceiveShipments,
+    queryFn: () => apiRequest<ScannerShipmentOptions>('/shipments/options')
+  });
+  const verifiedLocation = shipmentOptionsQuery.data?.storage_locations?.find((location) => location.id === locationId) || null;
+  const productContextLoading = mode === 'product'
+    && canReceiveShipments
+    && Boolean(shipmentId)
+    && Boolean(locationId)
+    && (shipmentContextQuery.isLoading || shipmentOptionsQuery.isLoading);
+  const shipmentVerificationLoading = isShipmentVerificationMode && shipmentContextQuery.isLoading;
   const productModeUnavailableReason = mode !== 'product'
     ? null
-    : isProductPermissionMissing
+    : !canReceiveShipments
       ? ui('Shipment receive permission is required for the receiving barcode scanner.')
       : !shipmentId
         ? ui('Select a shipment before opening the receiving barcode scanner.')
         : !locationId
           ? ui('Select a default storage location before opening the receiving barcode scanner.')
-          : null;
+          : shipmentContextQuery.isError
+            ? ui('The selected shipment could not be verified. Return to Shipments and choose it again.')
+            : shipmentOptionsQuery.isError
+              ? ui('The selected storage location could not be verified. Return to Shipments and choose it again.')
+              : shipmentContextQuery.data?.status === 'received'
+                ? ui('This shipment is already finalized. Barcode receiving is closed.')
+                : shipmentOptionsQuery.isSuccess && !verifiedLocation
+                  ? ui('The selected storage location is no longer available. Return to Shipments and choose another location.')
+                  : null;
+  const shipmentVerificationUnavailableReason = !isShipmentVerificationMode
+    ? null
+    : shipmentContextQuery.isError
+      ? ui('The shipment selected for verification could not be loaded. Return to the source task and try again.')
+      : null;
+  const productContextReady = mode !== 'product' || (
+    canReceiveShipments
+    && Boolean(shipmentId)
+    && Boolean(locationId)
+    && shipmentContextQuery.isSuccess
+    && shipmentOptionsQuery.isSuccess
+    && shipmentContextQuery.data?.status !== 'received'
+    && Boolean(verifiedLocation)
+  );
+  const shipmentVerificationReady = !isShipmentVerificationMode || shipmentContextQuery.isSuccess;
   const secureCameraContext = typeof window === 'undefined' ? true : window.isSecureContext;
   const cameraApiAvailable = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
   const liveCameraUnavailableReason = !secureCameraContext
@@ -295,7 +352,7 @@ export default function ScannerPage() {
   const [isDecodingImage, setIsDecodingImage] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const scannerInputDisabled = isResolving || isDecodingImage || isProductContextMissing || isProductPermissionMissing;
+  const scannerInputDisabled = isResolving || isDecodingImage || !productContextReady || !shipmentVerificationReady;
   const liveScannerDisabled = isRunning || isStartingCamera || scannerInputDisabled || Boolean(liveCameraUnavailableReason);
   const manualSubmitDisabled = scannerInputDisabled || !manualCode.trim();
 
@@ -323,6 +380,10 @@ export default function ScannerPage() {
     const shipment = await apiRequest<ShipmentLookupResponse>(
       `/shipments/qr/${encodeURIComponent(decodedText)}`
     );
+
+    if (isShipmentVerificationMode && shipment.id !== shipmentId) {
+      throw new Error('This QR code belongs to a different shipment than the one selected for verification.');
+    }
 
     setResolvedShipmentId(shipment.id);
     playSuccessFeedback();
@@ -683,20 +744,28 @@ export default function ScannerPage() {
         {mode === 'product' ? (
           <div style={styles.contextPanel}>
             <div style={styles.contextGrid}>
-              <div style={shipmentId ? styles.contextCard : styles.contextCardWarn}>
+              <div style={shipmentId && !shipmentContextQuery.isError ? styles.contextCard : styles.contextCardWarn}>
                 <div style={styles.contextLabel}>{ui("Selected shipment")}</div>
-                <div style={styles.contextValue}>{shipmentLabel || shipmentId || ui("Missing shipment ID")}</div>
-                {shipmentLabel && shipmentId ? (
-                  <div style={styles.contextMeta}>{ui("Shipment ID:")} {shipmentId}</div>
-                ) : null}
+                <div style={styles.contextValue}>
+                  {!shipmentId
+                    ? ui("No shipment selected")
+                    : shipmentContextQuery.isLoading
+                      ? ui("Loading selected shipment…")
+                      : shipmentContextQuery.isError
+                        ? ui("Shipment unavailable")
+                        : shipmentContextQuery.data?.po_number || shipmentContextQuery.data?.qr_code || ui("Reference unavailable")}
+                </div>
               </div>
 
-              <div style={locationId ? styles.contextCard : styles.contextCardWarn}>
+              <div style={locationId && verifiedLocation ? styles.contextCard : styles.contextCardWarn}>
                 <div style={styles.contextLabel}>{ui("Default scan location")}</div>
-                <div style={styles.contextValue}>{locationName || locationId || ui("Missing default location")}</div>
-                {locationName && locationId ? (
-                  <div style={styles.contextMeta}>{ui("Location ID:")} {locationId}</div>
-                ) : null}
+                <div style={styles.contextValue}>
+                  {!locationId
+                    ? ui("No default location selected")
+                    : shipmentOptionsQuery.isLoading
+                      ? ui("Loading selected storage location…")
+                      : verifiedLocation?.name || ui("Location unavailable")}
+                </div>
               </div>
 
               <div style={styles.contextCard}>
@@ -713,9 +782,23 @@ export default function ScannerPage() {
           </div>
         ) : null}
 
+        {mode === 'product' && productContextLoading ? (
+          <div className="app-warning-state" style={styles.infoBanner}>{ui("Loading and verifying the selected receiving context…")}</div>
+        ) : null}
+
         {mode === 'product' && productModeUnavailableReason ? (
           <div className="app-warning-state" style={styles.infoBanner}>
             {productModeUnavailableReason} {ui("Open the scanner from the Shipments page to preserve the selected shipment and destination.")}
+          </div>
+        ) : null}
+
+        {isShipmentVerificationMode ? (
+          <div className={shipmentVerificationUnavailableReason ? "app-error-state" : "app-warning-state"} style={styles.infoBanner}>
+            {shipmentVerificationLoading
+              ? ui("Loading the shipment selected for verification…")
+              : shipmentVerificationUnavailableReason
+                ? shipmentVerificationUnavailableReason
+                : `${ui("Verification target:")} ${shipmentContextQuery.data?.po_number || shipmentContextQuery.data?.qr_code || ui("Reference unavailable")}. ${ui("A different shipment QR code will be rejected.")}`}
           </div>
         ) : null}
 
@@ -739,7 +822,9 @@ export default function ScannerPage() {
         <div style={mode === 'product' ? styles.operationNoticeWarn : styles.operationNoticeInfo}>
           {mode === 'product'
             ? ui("A successful barcode scan returns to the selected shipment. Standard items are received immediately; tracked items pause for any required serial, lot/batch, or expiry details.")
-            : ui("Shipment QR lookup only opens the matching shipment. It does not change stock.")}
+            : isShipmentVerificationMode
+              ? ui("Verification mode only opens the selected shipment when its QR code matches. It does not change stock.")
+              : ui("Shipment QR lookup only opens the matching shipment. It does not change stock.")}
         </div>
 
         {mode === 'shipment' ? (
@@ -949,15 +1034,15 @@ export default function ScannerPage() {
 
             {resolvedShipmentId ? (
               <div style={styles.resultCardSuccess}>
-                <div style={styles.resultLabel}>{ui("Resolved shipment ID")}</div>
-                <div style={styles.resultValue}>{resolvedShipmentId}</div>
+                <div style={styles.resultLabel}>{ui("Shipment match")}</div>
+                <div style={styles.resultValue}>{ui("Shipment matched successfully")}</div>
               </div>
             ) : null}
 
             {resolvedShipmentItemId ? (
               <div style={styles.resultCardSuccess}>
-                <div style={styles.resultLabel}>{ui("Resolved shipment item ID")}</div>
-                <div style={styles.resultValue}>{resolvedShipmentItemId}</div>
+                <div style={styles.resultLabel}>{ui("Shipment item match")}</div>
+                <div style={styles.resultValue}>{ui("Matching shipment item found")}</div>
               </div>
             ) : null}
 

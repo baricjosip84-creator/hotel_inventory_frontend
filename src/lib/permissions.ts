@@ -825,6 +825,7 @@ export function getRoleCapabilities(role: UserRole = getCurrentUserRole()) {
     canViewSuppliers: can(TENANT_PERMISSIONS.SUPPLIERS_READ),
     canManageSuppliers: can(TENANT_PERMISSIONS.SUPPLIERS_WRITE),
     canManageStorageLocations: can(TENANT_PERMISSIONS.STORAGE_LOCATIONS_WRITE),
+    canViewStock: can(TENANT_PERMISSIONS.STOCK_READ),
     canManageAlerts: can(TENANT_PERMISSIONS.ALERTS_WRITE),
     canOverrideAlerts: can(TENANT_PERMISSIONS.ALERTS_OVERRIDE),
     canManageShipments: can(TENANT_PERMISSIONS.SHIPMENTS_WRITE),

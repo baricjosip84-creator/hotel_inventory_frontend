@@ -48,6 +48,7 @@ type BuildProductCostHistoryHandlersParams = {
   setSelectedCostProduct: Dispatch<SetStateAction<ProductItem | ProductCostRiskItem | null>>;
   setCostHistoryFilters: Dispatch<SetStateAction<CostHistoryFilterState>>;
   ui: (englishText: string) => string;
+  canViewStock: boolean;
 };
 
 export function buildProductCostHistoryHandlers({
@@ -65,7 +66,8 @@ export function buildProductCostHistoryHandlers({
   costRiskDetails,
   setSelectedCostProduct,
   setCostHistoryFilters,
-  ui
+  ui,
+  canViewStock
 }: BuildProductCostHistoryHandlersParams) {
   const handleOpenCostHistory = (product: ProductItem | ProductCostRiskItem) => {
     setSelectedCostProduct(product);
@@ -91,7 +93,7 @@ export function buildProductCostHistoryHandlers({
   };
 
   const handleExportProductsCsv = () => {
-    exportProductsCsv(products, ui);
+    exportProductsCsv(products, ui, canViewStock);
   };
 
   const handleExportCostReportCsv = () => {

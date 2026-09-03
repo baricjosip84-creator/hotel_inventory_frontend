@@ -104,7 +104,7 @@ export function exportStandardCostHistoryCsv(
   downloadCsv(`product-standard-cost-history-${productExportToken(selectedCostProduct)}.csv`, rows.map((row) => withLocalizedHeaders(row, ui)));
 }
 
-export function exportProductsCsv(products: ProductItem[], ui: UiTranslator = identityUi) {
+export function exportProductsCsv(products: ProductItem[], ui: UiTranslator = identityUi, canViewStock = true) {
   const rows = products.map((product) => withTenantCurrency({
     sku: product.sku,
     name: product.name,
@@ -115,7 +115,7 @@ export function exportProductsCsv(products: ProductItem[], ui: UiTranslator = id
       ? product.supplier_name || ''
       : ui('Unavailable'),
     default_barcode: product.barcode || '',
-    current_stock_quantity: product.current_stock_quantity ?? 0,
+    current_stock_quantity: canViewStock ? (product.current_stock_quantity ?? '') : ui('Unavailable'),
     latest_unit_cost: product.latest_unit_cost ?? '',
     standard_unit_cost: product.standard_unit_cost ?? '',
     effective_unit_cost: product.effective_unit_cost ?? '',
@@ -123,7 +123,7 @@ export function exportProductsCsv(products: ProductItem[], ui: UiTranslator = id
     effective_cost_at: product.effective_cost_at || '',
     latest_cost_source: product.latest_cost_source || '',
     latest_cost_at: product.latest_cost_at || '',
-    estimated_inventory_value: product.estimated_inventory_value ?? '',
+    estimated_inventory_value: canViewStock ? (product.estimated_inventory_value ?? '') : ui('Unavailable'),
     cost_variance_status: product.cost_variance_status || '',
     cost_variance_amount: product.cost_variance_amount ?? '',
     cost_variance_percent: product.cost_variance_percent ?? '',

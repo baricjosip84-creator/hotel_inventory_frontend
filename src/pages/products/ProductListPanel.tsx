@@ -34,6 +34,7 @@ type ProductListPanelProps = {
   canManageProducts: boolean;
   canViewProductPackages: boolean;
   canViewSuppliers: boolean;
+  canViewStock: boolean;
   deleteProductPending: boolean;
   onExportProductsCsv: () => void;
   onOpenCostHistory: (product: ProductItem) => void;
@@ -64,6 +65,7 @@ export function ProductListPanel({
   canManageProducts,
   canViewProductPackages,
   canViewSuppliers,
+  canViewStock,
   deleteProductPending,
   onExportProductsCsv,
   onOpenCostHistory,
@@ -109,6 +111,7 @@ export function ProductListPanel({
         canManageProducts={canManageProducts}
         canViewProductPackages={canViewProductPackages}
         canViewSuppliers={canViewSuppliers}
+        canViewStock={canViewStock}
         deleteProductPending={deleteProductPending}
         onOpenCostHistory={onOpenCostHistory}
         onOpenPackages={onOpenPackages}

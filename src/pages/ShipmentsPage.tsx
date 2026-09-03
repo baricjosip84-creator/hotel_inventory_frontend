@@ -2145,8 +2145,6 @@ export default function ShipmentsPage() {
     scannerParams.set('mode', 'product');
     scannerParams.set('shipmentId', selectedShipmentId);
     scannerParams.set('locationId', selectedScannerLocationId);
-    scannerParams.set('shipmentLabel', selectedShipment?.po_number || selectedShipmentId);
-    scannerParams.set('locationName', selectedScannerLocationName || selectedScannerLocationId);
 
     navigate(`/scanner?${scannerParams.toString()}`);
   };

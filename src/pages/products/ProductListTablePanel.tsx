@@ -16,6 +16,7 @@ type ProductListTablePanelProps = {
   canManageProducts: boolean;
   canViewProductPackages: boolean;
   canViewSuppliers: boolean;
+  canViewStock: boolean;
   deleteProductPending: boolean;
   onOpenCostHistory: (product: ProductItem) => void;
   onOpenPackages: (product: ProductItem) => void;
@@ -42,6 +43,7 @@ export function ProductListTablePanel({
   canManageProducts,
   canViewProductPackages,
   canViewSuppliers,
+  canViewStock,
   deleteProductPending,
   onOpenCostHistory,
   onOpenPackages,
@@ -83,7 +85,7 @@ export function ProductListTablePanel({
             products.map((product) => {
               const currentStock = toNumber(product.current_stock_quantity);
               const minimumStock = toNumber(product.min_stock);
-              const belowMinimum = minimumStock > 0 && currentStock < minimumStock;
+              const belowMinimum = canViewStock && minimumStock > 0 && currentStock < minimumStock;
 
               return (
                 <tr key={product.id}>
@@ -104,7 +106,7 @@ export function ProductListTablePanel({
                   <td style={styles.td}>{canViewSuppliers ? (product.supplier_name || ui('Not linked')) : ui('Unavailable')}</td>
                   <td style={styles.td}>
                     <div style={belowMinimum ? styles.rowTitleWarn : styles.rowTitle}>
-                      {String(product.current_stock_quantity ?? 0)} {product.unit}
+                      {canViewStock ? `${String(product.current_stock_quantity ?? '')} ${product.unit}` : ui('Unavailable')}
                     </div>
                     <div style={styles.rowSubtle}>{ui("Minimum:")} {String(product.min_stock ?? 0)}</div>
                     {belowMinimum ? <span style={styles.miniBadgeWarn}>{ui("Below minimum")}</span> : null}
@@ -129,7 +131,7 @@ export function ProductListTablePanel({
                     )}
                   </td>
                   <td style={styles.td}>
-                    <div style={styles.rowTitle}>{formatMoney(product.estimated_inventory_value, locale)}</div>
+                    <div style={styles.rowTitle}>{canViewStock ? formatMoney(product.estimated_inventory_value, locale) : ui('Unavailable')}</div>
                   </td>
                   <td style={styles.td}>
                     <div style={styles.actionGroup}>

@@ -396,6 +396,8 @@ function changeDisplay(value: number, locale: Parameters<typeof formatLocalizedN
 type UiTranslator = (englishText: string) => string;
 
 function enumDisplayLabel(value: string, ui: UiTranslator): string {
+  if (value === 'bom_assembly') return ui('BOM assembly');
+  if (value === 'bom_disassembly') return ui('BOM disassembly');
   const englishLabel = value
     .split('_')
     .filter(Boolean)
