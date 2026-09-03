@@ -703,8 +703,8 @@ function LifecycleCard({ config, section, diagnostics }: { config: LifecycleConf
             ))}
           </div>
           <div className="forecast-check-grid">
-            <CheckColumn title="Checks" items={checks} diagnostics={diagnostics} />
-            <CheckColumn title="Items needing attention" items={blockers} diagnostics={diagnostics} attention />
+            <CheckColumn title={ui('Checks')} items={checks} diagnostics={diagnostics} />
+            <CheckColumn title={ui('Items needing attention')} items={blockers} diagnostics={diagnostics} attention />
           </div>
         </>
       ) : (

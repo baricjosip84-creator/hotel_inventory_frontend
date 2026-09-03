@@ -4991,7 +4991,7 @@ export default function DecisionLearningFeedbackPage() {
           </div>
         </div>
 
-        <div className="learning-feedback-source-picker" style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) minmax(280px, 2fr)', gap: 12, marginBottom: 12 }}>
+        <div className="learning-feedback-source-picker">
           <label>
             <span className="form-label">{ui('Find source')}</span>
             <input className="input" value={sourceSearch} onChange={(event) => setSourceSearch(event.target.value)} placeholder={ui('Search by name or key')} />
@@ -5006,7 +5006,7 @@ export default function DecisionLearningFeedbackPage() {
         </div>
 
         {mode === 'optimization-results' ? (
-          <div className="learning-feedback-source-picker" style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr)', gap: 12, marginBottom: 12 }}>
+          <div className="learning-feedback-source-picker learning-feedback-source-picker--single">
             <label>
               <span className="form-label">{ui('Planning option used in the manual trial')}</span>
               <select
@@ -5517,10 +5517,10 @@ export default function DecisionLearningFeedbackPage() {
             </p>
           </section>
 
-          <EvidenceTable title="Learning outcomes" mode="learning-outcomes" rows={summaryQuery.data?.outcomes || []} pageInfo={summaryQuery.data?.pagination?.outcomes} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('outcomes', direction)} />
-          {canReadInsights ? <EvidenceTable title="Forecast accuracy" mode="forecast-accuracy" rows={summaryQuery.data?.forecast_accuracy || []} pageInfo={summaryQuery.data?.pagination?.forecast_accuracy} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('forecast_accuracy', direction)} /> : null}
-          <EvidenceTable title="Policy effectiveness" mode="policy-effectiveness" rows={summaryQuery.data?.policy_effectiveness || []} pageInfo={summaryQuery.data?.pagination?.policy_effectiveness} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('policy_effectiveness', direction)} />
-          <EvidenceTable title="Optimization results" mode="optimization-results" rows={summaryQuery.data?.optimization_results || []} pageInfo={summaryQuery.data?.pagination?.optimization_results} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('optimization_results', direction)} />
+          <EvidenceTable title={ui('Learning outcomes')} mode="learning-outcomes" rows={summaryQuery.data?.outcomes || []} pageInfo={summaryQuery.data?.pagination?.outcomes} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('outcomes', direction)} />
+          {canReadInsights ? <EvidenceTable title={ui('Forecast accuracy')} mode="forecast-accuracy" rows={summaryQuery.data?.forecast_accuracy || []} pageInfo={summaryQuery.data?.pagination?.forecast_accuracy} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('forecast_accuracy', direction)} /> : null}
+          <EvidenceTable title={ui('Policy effectiveness')} mode="policy-effectiveness" rows={summaryQuery.data?.policy_effectiveness || []} pageInfo={summaryQuery.data?.pagination?.policy_effectiveness} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('policy_effectiveness', direction)} />
+          <EvidenceTable title={ui('Optimization results')} mode="optimization-results" rows={summaryQuery.data?.optimization_results || []} pageInfo={summaryQuery.data?.pagination?.optimization_results} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('optimization_results', direction)} />
         </>
       ) : canViewDiagnostics ? (
         <>

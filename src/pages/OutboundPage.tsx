@@ -22,6 +22,18 @@ type Customer = {
 
 type Product = { id: string; name: string; unit: string };
 type Location = { id: string; name: string };
+type OrderOptionLocation = { id: string; name: string; available_quantity: number | string };
+type OrderOptionUom = { uom_code: string; uom_name?: string | null; factor_to_base: number | string; rounding_scale?: number | string };
+type OrderOptionProduct = {
+  id: string;
+  name: string;
+  sku?: string | null;
+  unit: string;
+  total_available_quantity: number | string;
+  uom_conversions: OrderOptionUom[];
+  locations: OrderOptionLocation[];
+};
+type OrderOptionsResponse = { products: OrderOptionProduct[] };
 
 type OrderItem = {
   id: string;
@@ -243,6 +255,7 @@ const OUTBOUND_MUTATION_ERROR_MESSAGES: Record<string, string> = {
   OUTBOUND_DRAFT_EDIT_ONLY: 'Only draft customer orders can be edited.',
   BLOCKING_ALERTS_EXIST: 'This action is blocked by an unresolved critical stock alert.',
   OUTBOUND_STOCK_INSUFFICIENT: 'There is not enough usable stock available for this action. Refresh and review stock.',
+  OUTBOUND_DRAFT_STOCK_UNAVAILABLE: 'There is not enough usable, unreserved stock at the selected source location to save this order. Refresh and choose available stock.',
   OUTBOUND_CONFIRM_STOCK_UNAVAILABLE: 'There is not enough usable stock available for this action. Refresh and review stock.',
   OUTBOUND_ORDER_STATE_INVALID: 'This order is no longer in the required state for this action. Refresh and review it.',
   OUTBOUND_ORDER_ALREADY_RESERVED: 'This order already has a stock reservation.',
@@ -410,6 +423,12 @@ export default function OutboundPage() {
   const returns = useQuery({ queryKey: ['outbound-returns'], queryFn: () => apiRequest<CustomerReturn[]>('/outbound/returns'), enabled: activeTab === 'returns' && canReturnRead });
   const products = useQuery({ queryKey: ['products'], queryFn: () => apiRequest<Product[]>('/products'), enabled: productDataNeeded });
   const locations = useQuery({ queryKey: ['storage-locations'], queryFn: () => apiRequest<Location[]>('/storage-locations'), enabled: locationDataNeeded });
+  const orderOptions = useQuery({
+    queryKey: ['outbound-order-options'],
+    queryFn: () => apiRequest<OrderOptionsResponse>('/outbound/order-options'),
+    enabled: Boolean(showOrderForm || editingOrder) && canStockRead && canProductRead && canLocationRead && (canCreate || canUpdate),
+    staleTime: 15_000
+  });
   const pickOptions = useQuery({
     queryKey: ['outbound-pick-options', pickOrderId],
     queryFn: () => apiRequest<PickOptions>(`/outbound/orders/${pickOrderId}/pick-options`),
@@ -447,6 +466,7 @@ export default function OutboundPage() {
       qc.invalidateQueries({ queryKey: ['outbound-trace'] }),
       qc.invalidateQueries({ queryKey: ['outbound-returns'] }),
       qc.invalidateQueries({ queryKey: ['outbound-pick-options'] }),
+      qc.invalidateQueries({ queryKey: ['outbound-order-options'] }),
       qc.invalidateQueries({ queryKey: ['stock'] }),
       qc.invalidateQueries({ queryKey: ['inventory-lots'] }),
       qc.invalidateQueries({ queryKey: ['inventory-serials'] }),
@@ -482,6 +502,27 @@ export default function OutboundPage() {
   const orderRows = useMemo(() => orders.data ?? [], [orders.data]);
   const productOptions = useMemo(() => products.data ?? [], [products.data]);
   const locationOptions = useMemo(() => locations.data ?? [], [locations.data]);
+  const availableOrderProducts = useMemo(() => orderOptions.data?.products ?? [], [orderOptions.data]);
+  const orderAvailabilityForLine = (line: Line) => {
+    const product = availableOrderProducts.find((option) => option.id === line.product_id) || null;
+    const location = product?.locations.find((option) => option.id === line.storage_location_id) || null;
+    if (!product || !location) return { product, location, factorToBase: null as number | null, availableInSelectedUom: 0, requestedBase: 0, valid: false };
+    const selectedUom = (line.uom_code || product.unit || '').trim().toUpperCase();
+    const baseUom = (product.unit || '').trim().toUpperCase();
+    let factorToBase: number | null = selectedUom === '' || selectedUom === baseUom ? 1 : null;
+    if (factorToBase === null) {
+      const conversion = product.uom_conversions.find((row) => row.uom_code.trim().toUpperCase() === selectedUom);
+      const factor = Number(conversion?.factor_to_base);
+      if (Number.isFinite(factor) && factor > 0) factorToBase = factor;
+    }
+    const availableBase = toNumber(location.available_quantity);
+    const requested = Number(line.quantity);
+    const requestedBase = factorToBase && Number.isFinite(requested) ? requested * factorToBase : Number.NaN;
+    const availableInSelectedUom = factorToBase ? availableBase / factorToBase : 0;
+    const valid = Boolean(factorToBase && Number.isFinite(requestedBase) && requestedBase > 0 && requestedBase <= availableBase + 0.0000001);
+    return { product, location, factorToBase, availableInSelectedUom, requestedBase, valid };
+  };
+  const orderLinesStockValid = orderForm.items.length > 0 && orderForm.items.every((line) => orderAvailabilityForLine(line).valid);
   const returnRows = useMemo(() => returns.data ?? [], [returns.data]);
   const traceRows = useMemo(() => trace.data ?? [], [trace.data]);
   const returnableTrace = traceRows.filter((row) => toNumber(row.returnable_quantity) > 0);
@@ -731,8 +772,8 @@ export default function OutboundPage() {
     }, { onSuccess: () => setReturnForm(emptyReturnForm()) });
   };
 
-  const canUseOrderForm = canCreate && canCustomerRead && canProductRead && canLocationRead;
-  const canEditOrderForm = canUpdate && canCustomerRead && canProductRead && canLocationRead;
+  const canUseOrderForm = canCreate && canCustomerRead && canProductRead && canLocationRead && canStockRead;
+  const canEditOrderForm = canUpdate && canCustomerRead && canProductRead && canLocationRead && canStockRead;
   const showCustomerTab = canCustomerRead || canCustomerWrite;
   const showReturnTab = canReturnRead || canReturnCreate;
   const activeOrderCount = orderRows.filter((row) => OPEN_STATUSES.has(row.status)).length;
@@ -806,11 +847,11 @@ export default function OutboundPage() {
           <div className="io-section-heading-with-icon"><span className="io-section-heading-icon"><TenantNavIcon path="/outbound" size={18} /></span><div className="io-section-heading-copy"><h3>{editingOrder ? ui('Edit draft {order}').replace('{order}', editingOrder.order_number) : ui('Create customer order')}</h3><p>{ui('Create a draft first. Stock is not reserved until the draft is confirmed.')}</p></div></div>
           <button type="button" className="outbound-button" onClick={cancelOrderEdit}>{ui('Close form')}</button>
         </div>
-        {!canUseOrderForm && !editingOrder ? <div className="outbound-alert outbound-alert--warning">{ui('Creating an order also requires read access to customers, products, and storage locations so the selections can be verified safely.')}</div> : null}
-        {editingOrder && !canEditOrderForm ? <div className="outbound-alert outbound-alert--warning">{ui('Editing this draft requires read access to customers, products, and storage locations.')}</div> : null}
+        {!canUseOrderForm && !editingOrder ? <div className="outbound-alert outbound-alert--warning">{ui('Creating an order also requires read access to customers, products, storage locations, and stock so only currently fulfillable selections are offered.')}</div> : null}
+        {editingOrder && !canEditOrderForm ? <div className="outbound-alert outbound-alert--warning">{ui('Editing this draft requires read access to customers, products, storage locations, and stock so availability can be verified.')}</div> : null}
         {(canUseOrderForm || (editingOrder && canEditOrderForm)) ? <>
-          {(customers.isLoading || products.isLoading || locations.isLoading) ? <div className="outbound-alert outbound-alert--info">{ui('Loading customer, product, and location options…')}</div> : null}
-          {(customers.isError || products.isError || locations.isError) ? <div className="outbound-alert outbound-alert--error">{ui('Unable to load all order options.')} {customers.isError ? queryErrorMessage(customers.error, '') : products.isError ? queryErrorMessage(products.error, '') : queryErrorMessage(locations.error, '')}</div> : null}
+          {(customers.isLoading || products.isLoading || locations.isLoading || orderOptions.isLoading) ? <div className="outbound-alert outbound-alert--info">{ui('Loading customer and currently available stock options…')}</div> : null}
+          {(customers.isError || products.isError || locations.isError || orderOptions.isError) ? <div className="outbound-alert outbound-alert--error">{ui('Unable to load all order options.')} {customers.isError ? queryErrorMessage(customers.error, '') : products.isError ? queryErrorMessage(products.error, '') : locations.isError ? queryErrorMessage(locations.error, '') : queryErrorMessage(orderOptions.error, '')}</div> : null}
           <div className="outbound-form-grid">
             <label className="outbound-field">{ui('Customer')} <select value={orderForm.customer_id} onChange={(event) => setOrderForm({ ...orderForm, customer_id: event.target.value })} disabled={mutation.isPending || customers.isLoading}>
                 <option value="">{ui('Choose customer')}</option>
@@ -823,26 +864,39 @@ export default function OutboundPage() {
             </label>
           </div>
           {!customers.isLoading && !customers.isError && activeCustomers.length === 0 ? <div className="outbound-alert outbound-alert--warning" style={{ marginTop: 12 }}>{ui('No active customers are available.')} <button type="button" className="outbound-button-quiet" onClick={() => { setTab('customers'); setShowCustomerForm(true); }}>{ui('Open Customers')}</button></div> : null}
-          {orderForm.items.map((line, index) => <div key={index} className="outbound-order-line-editor">
-            <label className="outbound-field">{ui('Product')} <select value={line.product_id} onChange={(event) => setOrderForm({ ...orderForm, items: orderForm.items.map((current, lineIndex) => lineIndex === index ? { ...current, product_id: event.target.value, uom_code: '' } : current) })} disabled={mutation.isPending || products.isLoading}>
-                <option value="">{ui('Choose product')}</option>
-                {productOptions.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-              </select>
-            </label>
-            <label className="outbound-field">{ui('Source location')} <select value={line.storage_location_id} onChange={(event) => setOrderForm({ ...orderForm, items: orderForm.items.map((current, lineIndex) => lineIndex === index ? { ...current, storage_location_id: event.target.value } : current) })} disabled={mutation.isPending || locations.isLoading}>
-                <option value="">{ui('Choose location')}</option>
-                {locationOptions.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
-              </select>
-            </label>
-            <label className="outbound-field">{ui('Quantity')} <input type="number" min="0.0001" step="0.0001" value={line.quantity} onChange={(event) => setOrderForm({ ...orderForm, items: orderForm.items.map((current, lineIndex) => lineIndex === index ? { ...current, quantity: event.target.value } : current) })} disabled={mutation.isPending} />
-            </label>
-            <label className="outbound-field">{ui('Unit of measure')} <ProductUomSelect productId={line.product_id} value={line.uom_code} purpose="issue" onChange={(value) => setOrderForm({ ...orderForm, items: orderForm.items.map((current, lineIndex) => lineIndex === index ? { ...current, uom_code: value } : current) })} ariaLabel={ui('Unit of measure for outbound line {line}').replace('{line}', formatNumber(index + 1))} disabled={mutation.isPending} />
-            </label>
-            <button type="button" className="outbound-button-danger" disabled={orderForm.items.length === 1 || mutation.isPending} onClick={() => setOrderForm({ ...orderForm, items: orderForm.items.filter((_, lineIndex) => lineIndex !== index) })}>{ui('Remove')}</button>
-          </div>)}
+          {orderForm.items.map((line, index) => {
+            const availability = orderAvailabilityForLine(line);
+            const selectedLegacyProduct = line.product_id && !availability.product ? productOptions.find((product) => product.id === line.product_id) : null;
+            const selectedLegacyLocation = line.storage_location_id && !availability.location ? locationOptions.find((location) => location.id === line.storage_location_id) : null;
+            const selectedProduct = availability.product;
+            const locationChoices = selectedProduct?.locations ?? [];
+            const selectedUomLabel = line.uom_code || selectedProduct?.unit || selectedLegacyProduct?.unit || '';
+            return <div key={index} className="outbound-order-line-editor">
+              <label className="outbound-field">{ui('Product')} <select value={line.product_id} onChange={(event) => setOrderForm({ ...orderForm, items: orderForm.items.map((current, lineIndex) => lineIndex === index ? { ...current, product_id: event.target.value, storage_location_id: '', uom_code: '' } : current) })} disabled={mutation.isPending || orderOptions.isLoading}>
+                  <option value="">{ui('Choose product with available stock')}</option>
+                  {selectedLegacyProduct ? <option value={selectedLegacyProduct.id} disabled>{selectedLegacyProduct.name} — {ui('No available stock')}</option> : null}
+                  {availableOrderProducts.map((product) => <option key={product.id} value={product.id}>{product.name}{product.sku ? ` · ${product.sku}` : ''} — {formatNumber(product.total_available_quantity)} {product.unit} {ui('available')}</option>)}
+                </select>
+              </label>
+              <label className="outbound-field">{ui('Source location')} <select value={line.storage_location_id} onChange={(event) => setOrderForm({ ...orderForm, items: orderForm.items.map((current, lineIndex) => lineIndex === index ? { ...current, storage_location_id: event.target.value } : current) })} disabled={mutation.isPending || orderOptions.isLoading || !line.product_id}>
+                  <option value="">{line.product_id ? ui('Choose location with available stock') : ui('Choose a product first')}</option>
+                  {selectedLegacyLocation ? <option value={selectedLegacyLocation.id} disabled>{selectedLegacyLocation.name} — {ui('No available stock')}</option> : null}
+                  {locationChoices.map((location) => <option key={location.id} value={location.id}>{location.name} — {formatNumber(location.available_quantity)} {selectedProduct?.unit || ''} {ui('available')}</option>)}
+                </select>
+              </label>
+              <label className="outbound-field">{ui('Quantity')} <input type="number" min="0.0001" step="0.0001" value={line.quantity} onChange={(event) => setOrderForm({ ...orderForm, items: orderForm.items.map((current, lineIndex) => lineIndex === index ? { ...current, quantity: event.target.value } : current) })} disabled={mutation.isPending || !line.storage_location_id} />
+                {availability.location && availability.factorToBase ? <span className="outbound-muted">{ui('Available at this location:')} {formatNumber(availability.availableInSelectedUom)} {selectedUomLabel || selectedProduct?.unit}</span> : null}
+                {line.product_id && line.storage_location_id && !availability.valid ? <span className="outbound-field-error">{availability.factorToBase ? ui('Requested quantity is greater than the stock currently available at this location.') : ui('The selected unit cannot be converted to the product base unit.')}</span> : null}
+              </label>
+              <label className="outbound-field">{ui('Unit of measure')} <ProductUomSelect productId={line.product_id} value={line.uom_code} purpose="issue" onChange={(value) => setOrderForm({ ...orderForm, items: orderForm.items.map((current, lineIndex) => lineIndex === index ? { ...current, uom_code: value } : current) })} ariaLabel={ui('Unit of measure for outbound line {line}').replace('{line}', formatNumber(index + 1))} disabled={mutation.isPending || !line.product_id} />
+              </label>
+              <button type="button" className="outbound-button-danger" disabled={orderForm.items.length === 1 || mutation.isPending} onClick={() => setOrderForm({ ...orderForm, items: orderForm.items.filter((_, lineIndex) => lineIndex !== index) })}>{ui('Remove')}</button>
+            </div>;
+          })}
+          {!orderOptions.isLoading && !orderOptions.isError && availableOrderProducts.length === 0 ? <div className="outbound-alert outbound-alert--warning">{ui('There is currently no usable, unreserved stock available for a new customer order.')}</div> : null}
           <div className="outbound-actions-row">
             <button type="button" className="outbound-button" disabled={mutation.isPending} onClick={() => setOrderForm({ ...orderForm, items: [...orderForm.items, { product_id: '', storage_location_id: '', quantity: '1', uom_code: '' }] })}>{ui('Add line')}</button>
-            <button type="button" className="outbound-button-primary" disabled={!orderForm.customer_id || cleanOrderItems(orderForm).length === 0 || mutation.isPending || customers.isLoading || products.isLoading || locations.isLoading || customers.isError || products.isError || locations.isError} onClick={saveOrder}>{mutation.isPending ? ui('Saving…') : editingOrder ? ui('Save Draft') : ui('Create Order')}</button>
+            <button type="button" className="outbound-button-primary" disabled={!orderForm.customer_id || cleanOrderItems(orderForm).length === 0 || !orderLinesStockValid || mutation.isPending || customers.isLoading || products.isLoading || locations.isLoading || orderOptions.isLoading || customers.isError || products.isError || locations.isError || orderOptions.isError} onClick={saveOrder}>{mutation.isPending ? ui('Saving…') : editingOrder ? ui('Save Draft') : ui('Create Order')}</button>
             {editingOrder ? <button type="button" className="outbound-button" onClick={cancelOrderEdit} disabled={mutation.isPending}>{ui('Cancel Edit')}</button> : null}
           </div>
         </> : null}

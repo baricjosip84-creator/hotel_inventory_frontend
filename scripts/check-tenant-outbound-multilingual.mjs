@@ -112,6 +112,7 @@ for(const required of [
   "apiRequest<OutboundSummary>('/outbound/summary')",
   "apiRequest<TraceRow[]>('/outbound/trace')",
   "apiRequest<CustomerReturn[]>('/outbound/returns')",
+  "apiRequest<OrderOptionsResponse>('/outbound/order-options')",
   '`/outbound/orders/${pickOrderId}/pick-options`',
   "path: '/outbound/customers'",
   '`/outbound/customers/${editingCustomer.id}`',
@@ -142,7 +143,21 @@ for(const required of [
   'condition: line.condition',
   'body: { reason: reason.trim() }'
 ])if(!pageSource.includes(required))fail(`Outbound canonical payload/status value changed or missing: ${required}`);
-if(!process.exitCode)pass('Outbound customer/order/pick/pack/dispatch/cancel/return endpoints, permissions, version headers, and canonical payload values are unchanged.');
+for(const required of [
+  "apiRequest<OrderOptionsResponse>('/outbound/order-options')",
+  "Choose product with available stock",
+  "Choose location with available stock",
+  "No available stock",
+  "Available at this location:",
+  "Requested quantity is greater than the stock currently available at this location.",
+  "const orderLinesStockValid = orderForm.items.length > 0 && orderForm.items.every((line) => orderAvailabilityForLine(line).valid);",
+  "product_id: event.target.value, storage_location_id: '', uom_code: ''",
+  "availableOrderProducts.map((product)",
+  "locationChoices.map((location)",
+  "!orderLinesStockValid"
+])if(!pageSource.includes(required))fail(`Outbound stock-aware order creation UX missing: ${required}`);
+if(!process.exitCode)pass('Outbound order creation is stock-aware: zero-stock products are excluded, locations are product-specific, and impossible quantities block draft save.');
+if(!process.exitCode)pass('Outbound customer/order/pick/pack/dispatch/cancel/return endpoints, permissions, version headers, and canonical payload values remain governed.');
 for(const required of [
   "window.confirm(ui('Clear the current picked quantities and pick again?'))",
   "window.confirm(ui('Dispatch all currently packed stock? Inventory will be reduced for the packed quantities now.'))",
@@ -152,5 +167,5 @@ for(const required of [
   "ui('Enter a picked quantity greater than zero.')",
   "ui('Customer return created and is waiting to be received.')"
 ])if(!pageSource.includes(required))fail(`Outbound localized mutation feedback/confirmation missing: ${required}`);
-if(!process.exitCode)pass('Outbound frontend validations, confirmations, prompts, and success feedback are multilingual without changing mutation behavior.');
+if(!process.exitCode)pass('Outbound frontend validations, confirmations, stock-aware draft rules, prompts, and success feedback are multilingual.');
 if(!process.exitCode)pass('OutboundPage multilingual conversion is complete.');

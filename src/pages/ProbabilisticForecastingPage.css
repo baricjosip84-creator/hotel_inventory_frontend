@@ -586,3 +586,14 @@
   font-size: 0.86rem;
   color: var(--muted-foreground, #667085);
 }
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-refresh-error {
+  display: grid;
+  gap: 6px;
+  border-left: 4px solid #dc2626;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-source-focus {
+  border-top: 3px solid #2563eb;
+  background: #f8fbff;
+}
