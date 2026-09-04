@@ -367,15 +367,24 @@ export default function InventoryCapabilitiesPage() {
 }
 
 const API_SCOPE_OPTIONS = [
-  { value: 'products:read', label: 'Read products', requiredPermission: TENANT_PERMISSIONS.PRODUCTS_READ },
-  { value: 'products:write', label: 'Create products', requiredPermission: TENANT_PERMISSIONS.PRODUCTS_WRITE },
-  { value: 'stock:read', label: 'Read stock', requiredPermission: TENANT_PERMISSIONS.STOCK_READ },
-  { value: 'suppliers:read', label: 'Read suppliers', requiredPermission: TENANT_PERMISSIONS.SUPPLIERS_READ },
-  { value: 'suppliers:write', label: 'Create suppliers', requiredPermission: TENANT_PERMISSIONS.SUPPLIERS_WRITE },
-  { value: 'purchase_orders:read', label: 'Read purchase orders', requiredPermission: TENANT_PERMISSIONS.PURCHASE_ORDERS_READ },
-  { value: 'purchase_orders:write', label: 'Create purchase orders', requiredPermission: TENANT_PERMISSIONS.PURCHASE_ORDERS_CREATE },
-  { value: 'shipments:write', label: 'Create shipments', requiredPermission: TENANT_PERMISSIONS.SHIPMENTS_WRITE },
-  { value: 'events:write', label: 'Submit integration events', requiredPermission: TENANT_PERMISSIONS.ENTERPRISE_INTEGRATIONS_GOVERN }
+  { value: 'products:read', label: 'Read products', requiredPermissions: [TENANT_PERMISSIONS.PRODUCTS_READ] },
+  { value: 'products:write', label: 'Create products', requiredPermissions: [TENANT_PERMISSIONS.PRODUCTS_WRITE] },
+  { value: 'stock:read', label: 'Read stock', requiredPermissions: [TENANT_PERMISSIONS.STOCK_READ] },
+  { value: 'suppliers:read', label: 'Read suppliers', requiredPermissions: [TENANT_PERMISSIONS.SUPPLIERS_READ] },
+  { value: 'suppliers:write', label: 'Create suppliers', requiredPermissions: [TENANT_PERMISSIONS.SUPPLIERS_WRITE] },
+  { value: 'purchase_orders:read', label: 'Read purchase orders', requiredPermissions: [TENANT_PERMISSIONS.PURCHASE_ORDERS_READ] },
+  { value: 'purchase_orders:write', label: 'Create purchase orders', requiredPermissions: [TENANT_PERMISSIONS.PURCHASE_ORDERS_CREATE] },
+  { value: 'shipments:read', label: 'Read shipments', requiredPermissions: [TENANT_PERMISSIONS.SHIPMENTS_READ] },
+  { value: 'shipments:write', label: 'Create shipments', requiredPermissions: [TENANT_PERMISSIONS.SHIPMENTS_WRITE] },
+  { value: 'customers:read', label: 'Read customers', requiredPermissions: [TENANT_PERMISSIONS.CUSTOMERS_READ] },
+  { value: 'customers:write', label: 'Manage customers', requiredPermissions: [TENANT_PERMISSIONS.CUSTOMERS_WRITE] },
+  { value: 'locations:read', label: 'Read storage locations', requiredPermissions: [TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ] },
+  { value: 'stock_movements:read', label: 'Read stock movements', requiredPermissions: [TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ] },
+  { value: 'outbound_orders:read', label: 'Read outbound orders', requiredPermissions: [TENANT_PERMISSIONS.OUTBOUND_ORDERS_READ] },
+  { value: 'outbound_orders:write', label: 'Manage outbound order drafts', requiredPermissions: [TENANT_PERMISSIONS.OUTBOUND_ORDERS_CREATE, TENANT_PERMISSIONS.OUTBOUND_ORDERS_UPDATE, TENANT_PERMISSIONS.OUTBOUND_ORDERS_CANCEL] },
+  { value: 'customer_returns:read', label: 'Read customer returns', requiredPermissions: [TENANT_PERMISSIONS.CUSTOMER_RETURNS_READ] },
+  { value: 'customer_returns:write', label: 'Manage customer return drafts', requiredPermissions: [TENANT_PERMISSIONS.CUSTOMER_RETURNS_CREATE, TENANT_PERMISSIONS.CUSTOMER_RETURNS_CANCEL] },
+  { value: 'events:write', label: 'Submit integration events', requiredPermissions: [TENANT_PERMISSIONS.ENTERPRISE_INTEGRATIONS_GOVERN] }
 ] as const;
 const API_SCOPE_LABELS = Object.fromEntries(API_SCOPE_OPTIONS.map((scope) => [scope.value, scope.label])) as Record<string, string>;
 
@@ -400,7 +409,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
   const [webhookRows, setWebhookRows] = useState<WebhookSubscription[]>([]);
   const [webhookNextCursor, setWebhookNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const grantableApiScopes = API_SCOPE_OPTIONS.filter((scope) => hasPermission(scope.requiredPermission));
+  const grantableApiScopes = API_SCOPE_OPTIONS.filter((scope) => scope.requiredPermissions.every((permission) => hasPermission(permission)));
 
   const clients = useQuery({ queryKey: ['inventory-api-clients'], queryFn: () => apiRequest<ApiClient[]>('/inventory-capabilities/api-clients') });
   const connections = useQuery({ queryKey: ['inventory-external-connections'], queryFn: () => apiRequest<Connection[]>('/inventory-capabilities/connections') });

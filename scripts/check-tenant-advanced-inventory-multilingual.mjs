@@ -95,11 +95,11 @@ const forbiddenMixedLanguage = [
 for (const pattern of forbiddenMixedLanguage) if (pageSource.includes(pattern)) fail(`Advanced Inventory still contains mixed-language or translated technical presentation: ${pattern}`);
 
 const canonicalContracts = [
-  "{ value: 'products:read', label: 'Read products', requiredPermission: TENANT_PERMISSIONS.PRODUCTS_READ }",
-  "{ value: 'products:write', label: 'Create products', requiredPermission: TENANT_PERMISSIONS.PRODUCTS_WRITE }",
-  "{ value: 'stock:read', label: 'Read stock', requiredPermission: TENANT_PERMISSIONS.STOCK_READ }",
+  "{ value: 'products:read', label: 'Read products', requiredPermissions: [TENANT_PERMISSIONS.PRODUCTS_READ] }",
+  "{ value: 'products:write', label: 'Create products', requiredPermissions: [TENANT_PERMISSIONS.PRODUCTS_WRITE] }",
+  "{ value: 'stock:read', label: 'Read stock', requiredPermissions: [TENANT_PERMISSIONS.STOCK_READ] }",
   "const [apiScopes, setApiScopes] = useState<string[]>([])",
-  "const grantableApiScopes = API_SCOPE_OPTIONS.filter((scope) => hasPermission(scope.requiredPermission))",
+  "const grantableApiScopes = API_SCOPE_OPTIONS.filter((scope) => scope.requiredPermissions.every((permission) => hasPermission(permission)))",
   "reason: 'Revoked from tenant Integrations page'",
   'placeholder="purchase_order.approved,purchase_order.completed"',
   'placeholder="CASE"',

@@ -11986,6 +11986,15 @@ const rows: readonly TranslationRow[] = [
   ["Search returnable dispatched stock", "Rückgabefähigen versendeten Bestand durchsuchen", "Buscar stock despachado retornable", "Rechercher le stock expédié retournable", "Pretraži otpremljenu zalihu koja se može vratiti"],
   ["No returnable dispatched stock matches this search.", "Kein rückgabefähiger versendeter Bestand entspricht dieser Suche.", "Ningún stock despachado retornable coincide con esta búsqueda.", "Aucun stock expédié retournable ne correspond à cette recherche.", "Nijedna otpremljena zaliha koja se može vratiti ne odgovara ovoj pretrazi."],
   ["returnable dispatch(es).", "rückgabefähige Versandposition(en).", "despacho(s) retornable(s).", "expédition(s) retournable(s).", "otprema koje se mogu vratiti."],
+  ["Read shipments", "Sendungen lesen", "Leer envíos", "Lire les expéditions", "Čitanje pošiljki"],
+  ["Read customers", "Kunden lesen", "Leer clientes", "Lire les clients", "Čitanje kupaca"],
+  ["Manage customers", "Kunden verwalten", "Gestionar clientes", "Gérer les clients", "Upravljanje kupcima"],
+  ["Read storage locations", "Lagerorte lesen", "Leer ubicaciones de almacenamiento", "Lire les emplacements de stockage", "Čitanje skladišnih lokacija"],
+  ["Read stock movements", "Lagerbewegungen lesen", "Leer movimientos de inventario", "Lire les mouvements de stock", "Čitanje kretanja zaliha"],
+  ["Read outbound orders", "Ausgangsaufträge lesen", "Leer pedidos de salida", "Lire les commandes sortantes", "Čitanje izlaznih narudžbi"],
+  ["Manage outbound order drafts", "Ausgangsauftragsentwürfe verwalten", "Gestionar borradores de pedidos de salida", "Gérer les brouillons de commandes sortantes", "Upravljanje nacrtima izlaznih narudžbi"],
+  ["Read customer returns", "Kundenrücksendungen lesen", "Leer devoluciones de clientes", "Lire les retours clients", "Čitanje povrata kupaca"],
+  ["Manage customer return drafts", "Entwürfe von Kundenrücksendungen verwalten", "Gestionar borradores de devoluciones de clientes", "Gérer les brouillons de retours clients", "Upravljanje nacrtima povrata kupaca"],
 ];
 
 const indexes: Record<AppLocale, number> = { 'en-GB': 0, 'de-DE': 1, 'es-ES': 2, 'fr-FR': 3, 'hr-HR': 4 };
