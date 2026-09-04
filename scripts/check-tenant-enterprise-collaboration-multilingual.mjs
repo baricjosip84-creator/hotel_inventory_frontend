@@ -27,9 +27,26 @@ for(const m of pageSource.matchAll(/\b(?:label|description)="([^"]+)"/g))dynamic
 const missingDynamic=[...dynamic].filter((k)=>!unique.has(k));if(missingDynamic.length)fail(`Enterprise Collaboration dynamic display keys missing translations: ${missingDynamic.join(' | ')}`);else pass(`${dynamic.size} filter, role, topic, source, summary, and cadence display keys are catalog-backed.`);
 for(const required of ['const { locale, ui } = useAppTranslation();','formatLocalizedDateTime(date, locale)','formatLocalizedNumber(value, locale)','formatLocalizedNumber(threads.length, locale)','formatLocalizedNumber(appliedLimit, locale)','formatDateTime(thread.updated_at || thread.created_at, locale, ui)'])if(!pageSource.includes(required))fail(`Enterprise Collaboration locale-aware presentation missing: ${required}`);
 if(!process.exitCode)pass('Recommendation counts, limits, summary metrics, and timestamps use the tenant locale.');
-for(const required of ['collaborationQuery.error.message','guidance.collaboration_guidance || ui(','thread.title || ui(','thread.summary || ui(','thread.coordination_context?.recommended_next_step || ui(','guidance.escalation_thread_guidance || ui(','guidance.incident_war_room_guidance || ui(','guidance.supplier_coordination_guidance || ui('])if(!pageSource.includes(required))fail(`Enterprise Collaboration server-data boundary changed unexpectedly: ${required}`);
-for(const forbidden of ['ui(thread.title)','ui(thread.summary)','ui(guidance.collaboration_guidance)','ui(thread.coordination_context?.recommended_next_step)'])if(pageSource.includes(forbidden))fail(`Enterprise Collaboration translates backend/user business text unexpectedly: ${forbidden}`);
-if(!process.exitCode)pass('Backend guidance, thread titles/summaries, next steps, and API error text remain server/business data.');
+for(const required of [
+  'collaborationQuery.error.message',
+  'thread.title || ui(',
+  'thread.summary || ui(',
+  'localizedSystemGuidance(guidance.collaboration_guidance_key, guidance.collaboration_guidance,',
+  'localizedSystemGuidance(thread.coordination_context?.recommended_next_step_key, thread.coordination_context?.recommended_next_step,',
+  'localizedSystemGuidance(guidance.escalation_thread_guidance_key, guidance.escalation_thread_guidance,',
+  'localizedSystemGuidance(guidance.incident_war_room_guidance_key, guidance.incident_war_room_guidance,',
+  'localizedSystemGuidance(guidance.supplier_coordination_guidance_key, guidance.supplier_coordination_guidance,'
+])if(!pageSource.includes(required))fail(`Enterprise Collaboration system/business text boundary changed unexpectedly: ${required}`);
+for(const forbidden of ['ui(thread.title)','ui(thread.summary)','ui(thread.coordination_context?.recommended_next_step)'])if(pageSource.includes(forbidden))fail(`Enterprise Collaboration translates unowned backend/business text unexpectedly: ${forbidden}`);
+const systemGuidanceKeys=[
+  'Use this read-only collaboration context to coordinate humans in the governed source workflow; this endpoint does not send messages, create rooms, or record comments.',
+  'No collaboration context candidates currently match the requested filters.',
+  'Escalation threads are guidance-only and must be handled through existing alert, execution, control-tower, or governance workflows.',
+  'War-room candidates are suggested for human coordination only; this endpoint does not provision channels or notify participants.',
+  'Supplier or partner coordination remains visibility-only here and never dispatches supplier, carrier, or external workflow actions.'
+];
+const missingSystemGuidance=systemGuidanceKeys.filter((key)=>!unique.has(key));
+if(missingSystemGuidance.length)fail(`Enterprise Collaboration system-owned guidance missing translations: ${missingSystemGuidance.join(' | ')}`);else pass('Collaboration-owned guidance is localized only when the backend marks it with a stable system key; business/source text and API errors remain verbatim.');
 for(const required of ["apiRequest<CollaborationResponse>(`/operational-action-center/enterprise-collaboration-summary?${params.toString()}`)","ui('This page turns permitted alerts, tasks, governance reviews, and operational events into suggestions about who should coordinate, what to discuss, and where the real work belongs. It does not create a chat thread, send a message, notify anyone, or record a comment.')","ui('No messages or comments are recorded')","ui('No operational data is changed')","ui('Source permissions still apply')"])if(!pageSource.includes(required))fail(`Enterprise Collaboration read-only/governance contract missing: ${required}`);
 if(/\buseMutation\b/.test(pageSource)||/method:\s*['"](?:POST|PUT|PATCH|DELETE)['"]/.test(pageSource))fail('Enterprise Collaboration page unexpectedly contains a mutation path.');else pass('Enterprise Collaboration remains a read-only coordination-guidance workspace with source workflows authoritative.');
 if(!process.exitCode)pass('EnterpriseCollaborationPage staged multilingual conversion is complete.');
