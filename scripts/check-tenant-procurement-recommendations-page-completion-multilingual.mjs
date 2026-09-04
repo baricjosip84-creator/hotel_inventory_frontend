@@ -144,7 +144,9 @@ for (const required of [
   'canManageProducts = capabilities.canManageProducts',
   'disabled={!canApproveRecommendations || scheduledRunMutation.isPending}',
   'disabled={!canCreatePurchaseOrderDrafts || scheduledRunMutation.isPending}',
-  'disabled={!canApproveRecommendations || !canManageProducts || !exceptionSupplierIds[exception.exception_key] || exceptionResolutionMutation.isPending}',
+  'const canViewSuppliers = hasPermission(TENANT_PERMISSIONS.SUPPLIERS_READ);',
+  'enabled: canViewSuppliers',
+  'disabled={!canApproveRecommendations || !canManageProducts || !canViewSuppliers || !exceptionSupplierIds[exception.exception_key] || exceptionResolutionMutation.isPending}',
 ]) if (!pageSource.includes(required)) fail(`Advanced Procurement Recommendations frontend permission-gating contract changed or missing: ${required}`);
 if (!process.exitCode) pass('Advanced scheduled-run and exception-resolution UI retains approval/create/product-write capability gating.');
 
