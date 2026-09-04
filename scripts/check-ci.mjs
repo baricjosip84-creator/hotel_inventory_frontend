@@ -227,11 +227,15 @@ const steps = [
   "check:deployment-readiness-gate",
   "typecheck:deployment-readiness"
 ];
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const npmExecPath = process.env.npm_execpath;
+if (!npmExecPath) {
+  console.error('Unable to locate the npm CLI that started this check.');
+  process.exit(1);
+}
 
 for (const step of steps) {
   console.log(`\n=== npm run ${step} ===`);
-  const result = spawnSync(npmCommand, ['run', step], {
+  const result = spawnSync(process.execPath, [npmExecPath, 'run', step], {
     cwd: process.cwd(),
     env: process.env,
     stdio: 'inherit',
