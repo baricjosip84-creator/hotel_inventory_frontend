@@ -177,6 +177,24 @@ type PurchaseOrderFormState = {
   items: PurchaseOrderFormItem[];
 };
 
+type PurchaseOrderProductOption = {
+  id: string;
+  name: string;
+  sku?: string | null;
+  unit: string;
+  category?: string | null;
+  supplier_catalog_item_id?: string | null;
+  current_supplier_unit_cost?: number | string | null;
+  current_supplier_price_currency?: string | null;
+  current_supplier_price_effective_from?: string | null;
+};
+
+type PurchaseOrderCreateOptions = {
+  supplier: { id: string; name: string };
+  purchase_order_currency: string;
+  products: PurchaseOrderProductOption[];
+};
+
 type Filters = {
   status: string;
   receivingStatus: string;
@@ -693,6 +711,11 @@ async function fetchProducts(): Promise<ProductItem[]> {
   return apiRequest<ProductItem[]>('/products');
 }
 
+async function fetchPurchaseOrderCreateOptions(supplierId: string): Promise<PurchaseOrderCreateOptions> {
+  const params = new URLSearchParams({ supplier_id: supplierId });
+  return apiRequest<PurchaseOrderCreateOptions>(`/purchase-orders/create-options?${params.toString()}`);
+}
+
 function buildPayload(input: PurchaseOrderFormState) {
   return {
     supplier_id: input.supplier_id,
@@ -864,10 +887,14 @@ export default function PurchaseOrdersPage() {
 
   const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: fetchSuppliers, enabled: purchaseOrdersFeatureReady });
   const productsQuery = useQuery({ queryKey: ['products'], queryFn: fetchProducts, enabled: purchaseOrdersFeatureReady });
-  const supplierProducts = useMemo(() => {
-    if (!form.supplier_id) return [];
-    return (productsQuery.data || []).filter((product) => String(product.supplier_id || '') === String(form.supplier_id));
-  }, [form.supplier_id, productsQuery.data]);
+  const purchaseOrderCreateOptionsQuery = useQuery({
+    queryKey: ['purchase-order-create-options', form.supplier_id],
+    queryFn: () => fetchPurchaseOrderCreateOptions(form.supplier_id),
+    enabled: Boolean(form.supplier_id && purchaseOrdersFeatureReady && (capabilities.canCreatePurchaseOrders || capabilities.canUpdatePurchaseOrders)),
+    staleTime: 30_000
+  });
+  const supplierProducts = purchaseOrderCreateOptionsQuery.data?.products || [];
+  const purchaseOrderFormCurrency = purchaseOrderCreateOptionsQuery.data?.purchase_order_currency || getActiveTenantCurrency();
 
   const selectedDetail = detailQuery.data ?? null;
   const selectedLifecycleEvents = useMemo(() => {
@@ -2288,7 +2315,7 @@ export default function PurchaseOrdersPage() {
           </div>
 
           <div className="purchase-orders-items-heading">
-            <div><strong>{ui("Order items")}</strong><span>{ui("Add the products, quantities, ordering units, and commercial cost for this supplier order.")}</span></div>
+            <div><strong>{ui("Order items")}</strong><span>{ui("Add the products, quantities, ordering units, and supplier purchase prices for this order.")}</span></div>
           </div>
 
           <div className="purchase-orders-item-list">
@@ -2299,10 +2326,35 @@ export default function PurchaseOrdersPage() {
                   <button type="button" className="purchase-orders-remove-button" onClick={() => removeItem(index)} disabled={form.items.length <= 1}>{ui("Remove")}</button>
                 </div>
                 <div className="purchase-orders-item-grid">
-                  <label className="purchase-orders-field purchase-orders-field--wide">
+                  <label className="purchase-orders-field">
                     <span>{ui("Product")}</span>
-                    <select value={item.product_id} onChange={(event) => updateItem(index, { product_id: event.target.value, uom_code: '' })} disabled={!form.supplier_id}>
-                      <option value="">{form.supplier_id ? ui('Select product') : ui('Select a supplier first')}</option>
+                    <select
+                      value={item.product_id}
+                      onChange={(event) => {
+                        const productId = event.target.value;
+                        const option = supplierProducts.find((product) => product.id === productId);
+                        const supplierCurrency = String(option?.current_supplier_price_currency || '').toUpperCase();
+                        const poCurrency = String(purchaseOrderFormCurrency || '').toUpperCase();
+                        const supplierPrice = option?.current_supplier_unit_cost;
+                        const canPrefill = supplierPrice !== null
+                          && supplierPrice !== undefined
+                          && Number.isFinite(Number(supplierPrice))
+                          && (!supplierCurrency || supplierCurrency === poCurrency);
+                        updateItem(index, {
+                          product_id: productId,
+                          uom_code: '',
+                          unit_cost: canPrefill ? String(Number(supplierPrice)) : ''
+                        });
+                      }}
+                      disabled={!form.supplier_id || purchaseOrderCreateOptionsQuery.isLoading}
+                    >
+                      <option value="">
+                        {!form.supplier_id
+                          ? ui('Select a supplier first')
+                          : purchaseOrderCreateOptionsQuery.isLoading
+                            ? ui('Loading supplier products…')
+                            : ui('Select product')}
+                      </option>
                       {supplierProducts.map((product) => <option key={product.id} value={product.id}>{product.name} ({product.unit})</option>)}
                     </select>
                     <small className="purchase-orders-field-help">{form.supplier_id ? (supplierProducts.length ? ui('Only products assigned to the selected supplier are shown.') : ui('No products are assigned to this supplier. Assign products to the supplier on the Products page first.')) : ui('Choose a supplier before selecting products.')}</small>
@@ -2318,13 +2370,49 @@ export default function PurchaseOrdersPage() {
                       value={item.uom_code}
                       purpose="purchase"
                       onChange={(value) => updateItem(index, { uom_code: value })}
+                      onSelectionChange={({ code, factorToBase }) => {
+                        const option = supplierProducts.find((product) => product.id === item.product_id);
+                        const supplierCurrency = String(option?.current_supplier_price_currency || '').toUpperCase();
+                        const poCurrency = String(purchaseOrderFormCurrency || '').toUpperCase();
+                        const supplierPrice = option?.current_supplier_unit_cost;
+                        const canPrefill = supplierPrice !== null
+                          && supplierPrice !== undefined
+                          && Number.isFinite(Number(supplierPrice))
+                          && (!supplierCurrency || supplierCurrency === poCurrency);
+                        updateItem(index, {
+                          uom_code: code,
+                          unit_cost: canPrefill ? String(Number(supplierPrice) * factorToBase) : ''
+                        });
+                      }}
                       ariaLabel={`Unit of measure for purchase order line ${index + 1}`}
                     />
                   </label>
                   <label className="purchase-orders-field">
-                    <span>{ui("Cost per ordering unit")}</span>
+                    <span>{ui("Purchase price per unit")}</span>
                     <input type="number" min="0" step="any" value={item.unit_cost} onChange={(event) => updateItem(index, { unit_cost: event.target.value })} placeholder={ui("Required before submit")} />
+                    {(() => {
+                      const option = supplierProducts.find((product) => product.id === item.product_id);
+                      const supplierCurrency = String(option?.current_supplier_price_currency || '').toUpperCase();
+                      const poCurrency = String(purchaseOrderFormCurrency || '').toUpperCase();
+                      if (!item.product_id) return <small className="purchase-orders-field-help">{ui('Choose a product to load its current supplier price.')}</small>;
+                      if (option?.current_supplier_unit_cost === null || option?.current_supplier_unit_cost === undefined) {
+                        return <small className="purchase-orders-field-help">{ui('No current supplier price is stored. Enter the price agreed for this purchase order.')}</small>;
+                      }
+                      if (supplierCurrency && supplierCurrency !== poCurrency) {
+                        return <small className="purchase-orders-field-help">{ui('The stored supplier price uses {currency}, while this purchase order uses {poCurrency}. Enter the agreed price in {poCurrency}.').replace('{currency}', supplierCurrency).replaceAll('{poCurrency}', poCurrency)}</small>;
+                      }
+                      return <small className="purchase-orders-field-help">{ui("The selected supplier's current price is prefilled. Change it only if this order has a different quoted price.")}</small>;
+                    })()}
+                    <small className="purchase-orders-field-help">{ui("This is the supplier's purchase price for this order, not the product standard cost.")}</small>
                   </label>
+                  <div className="purchase-orders-line-total">
+                    <span>{ui("Line total")}</span>
+                    <strong>
+                      {item.quantity.trim() !== '' && item.unit_cost.trim() !== '' && Number.isFinite(Number(item.quantity)) && Number.isFinite(Number(item.unit_cost))
+                        ? formatMoney(Number(item.quantity) * Number(item.unit_cost), purchaseOrderFormCurrency)
+                        : '—'}
+                    </strong>
+                  </div>
                   <label className="purchase-orders-field purchase-orders-field--full">
                     <span>{ui("Item note")}</span>
                     <input value={item.notes} onChange={(event) => updateItem(index, { notes: event.target.value })} placeholder={ui("Optional item note")} />

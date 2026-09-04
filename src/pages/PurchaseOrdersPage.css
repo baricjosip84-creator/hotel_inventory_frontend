@@ -603,8 +603,29 @@
 }
 
 .purchase-orders-item-grid {
-  grid-template-columns: minmax(220px, 1.6fr) repeat(3, minmax(140px, 0.8fr));
-  align-items: end;
+  grid-template-columns: minmax(260px, 1.55fr) minmax(110px, 0.55fr) minmax(150px, 0.75fr) minmax(210px, 0.95fr);
+  align-items: start;
+}
+
+.purchase-orders-line-total {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-height: 28px;
+  padding: 2px 2px 0;
+  color: #475569;
+  font-size: 12px;
+}
+
+.purchase-orders-line-total span {
+  font-weight: 700;
+}
+
+.purchase-orders-line-total strong {
+  color: #0f172a;
+  font-size: 13px;
 }
 
 .purchase-orders-remove-button,
@@ -959,8 +980,13 @@
   }
 
   .purchase-orders-field--wide,
-  .purchase-orders-field--full {
+  .purchase-orders-field--full,
+  .purchase-orders-line-total {
     grid-column: auto;
+  }
+
+  .purchase-orders-line-total {
+    justify-content: flex-start;
   }
 
   .purchase-orders-action-panel > button,
