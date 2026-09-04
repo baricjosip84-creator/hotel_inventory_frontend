@@ -39,7 +39,8 @@ if (!routeContracts.length) fail('backend route contract manifest is empty');
 
 const apiRequestPaths = [...pageSource.matchAll(/apiRequest<[^>]+>\(\s*(?:`([^`]+)`|'([^']+)'|"([^"]+)")/g)]
   .map((match) => match[1] || match[2] || match[3])
-  .map((apiPath) => apiPath.replace(/\$\{encodeURIComponent\(featureKey\)\}/g, ':featureKey'));
+  .map((apiPath) => apiPath.replace(/\$\{encodeURIComponent\(featureKey\)\}/g, ':featureKey'))
+  .map((apiPath) => apiPath.replace(/\$\{forceRefresh\s*\?\s*'\?refresh=true'\s*:\s*''\}/g, ''));
 const queryKeys = [...pageSource.matchAll(/queryKey\s*:\s*\[\s*['"]([^'"]+)['"]/g)].map((match) => match[1]);
 
 const failures = [];

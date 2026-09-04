@@ -253,7 +253,8 @@ else {
   });
   const apiRequestPaths = [...pageSource.matchAll(/apiRequest<[^>]+>\(\s*(?:`([^`]+)`|'([^']+)'|"([^"]+)")/g)]
     .map((match) => match[1] || match[2] || match[3])
-    .map((apiPath) => apiPath.replace(/\$\{encodeURIComponent\(featureKey\)\}/g, ':featureKey'));
+    .map((apiPath) => apiPath.replace(/\$\{encodeURIComponent\(featureKey\)\}/g, ':featureKey'))
+    .map((apiPath) => apiPath.replace(/\$\{forceRefresh\s*\?\s*'\?refresh=true'\s*:\s*''\}/g, ''));
   const queryKeys = [...pageSource.matchAll(/queryKey\s*:\s*\[\s*['"]([^'"]+)['"]/g)].map((match) => match[1]);
   const expectedApiPaths = routeContracts.map((contract) => contract.frontend_api_path).filter(Boolean);
   const expectedQueryKeys = routeContracts.map((contract) => contract.frontend_query_key).filter(Boolean);
