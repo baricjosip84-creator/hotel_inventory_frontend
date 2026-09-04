@@ -50,8 +50,8 @@ const dynamicCatalogKeys = [
   'Units of measure', 'Saved conversions', 'Custom fields', 'Active field definitions',
   'Landed cost', 'Finalized cost records', 'Variants', 'Variant products', 'Location hierarchy',
   'Nested locations', 'BOM & assemblies', 'Active BOMs', 'Offline task mode', 'Offline sync batches',
-  'Read products', 'Create products', 'Read stock', 'Read suppliers', 'Create suppliers',
-  'Read purchase orders', 'Create purchase orders', 'Create shipments', 'Submit integration events',
+  'Read products', 'Manage products', 'Read stock', 'Read suppliers', 'Manage suppliers',
+  'Read purchase orders', 'Create purchase orders', 'Update purchase order drafts', 'Create shipments', 'Submit integration events',
   'products', 'suppliers', 'storage locations', 'shipments', 'purchase orders',
   'Active', 'Available', 'Reserved', 'Issued', 'Damaged', 'Quarantine', 'Retired',
   'Configured', 'Disabled', 'Pending', 'Queued', 'Blocked', 'Delivered', 'Failed', 'Received',
@@ -90,18 +90,17 @@ const forbiddenMixedLanguage = [
   'placeholder={ui("CASE")}',
   'placeholder={ui("country_of_origin")}',
   'placeholder={ui("WH1-A03-R02-B04")}',
-  'placeholder={ui("purchase_order.approved,purchase_order.completed")}'
 ];
 for (const pattern of forbiddenMixedLanguage) if (pageSource.includes(pattern)) fail(`Advanced Inventory still contains mixed-language or translated technical presentation: ${pattern}`);
 
 const canonicalContracts = [
   "{ value: 'products:read', label: 'Read products', requiredPermissions: [TENANT_PERMISSIONS.PRODUCTS_READ] }",
-  "{ value: 'products:write', label: 'Create products', requiredPermissions: [TENANT_PERMISSIONS.PRODUCTS_WRITE] }",
+  "{ value: 'products:write', label: 'Manage products', requiredPermissions: [TENANT_PERMISSIONS.PRODUCTS_WRITE] }",
   "{ value: 'stock:read', label: 'Read stock', requiredPermissions: [TENANT_PERMISSIONS.STOCK_READ] }",
   "const [apiScopes, setApiScopes] = useState<string[]>([])",
   "const grantableApiScopes = API_SCOPE_OPTIONS.filter((scope) => scope.requiredPermissions.every((permission) => hasPermission(permission)))",
   "reason: 'Revoked from tenant Integrations page'",
-  'placeholder="purchase_order.approved,purchase_order.completed"',
+  "apiRequest<WebhookEventCatalog>('/inventory-capabilities/webhook-events')",
   'placeholder="CASE"',
   'placeholder="country_of_origin"',
   'placeholder="WH1-A03-R02-B04"',

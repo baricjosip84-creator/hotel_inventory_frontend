@@ -18,7 +18,8 @@ type Shipment = { id: string; po_number?: string | null; status?: string; qr_cod
 type SupplierRef = { id: string; name: string; email?: string | null };
 type PurchaseOrderRef = { id: string; po_number?: string | null; status?: string };
 type Overview = { counts?: Record<string, number>; priorities?: string[] };
-type ApiClient = { id: string; name: string; description?: string | null; key_prefix: string; scopes: string[]; status: string; last_used_at?: string | null; created_at?: string };
+type ApiClient = { id: string; name: string; description?: string | null; key_prefix: string; scopes: string[]; status: string; expires_at?: string | null; allowed_ips?: string[]; version: number; last_used_at?: string | null; created_at?: string; created_by_user_id?: string | null; created_by_user_name?: string | null };
+type WebhookEventCatalog = { items: Array<{ event_type: string; group: string; label: string }> };
 type Connection = { id: string; system_name: string; system_type: string; base_url?: string | null; direction: string; status: string; credential_reference?: string | null; version: number };
 type WebhookSubscription = { id: string; subscription_key: string; display_name: string; event_types: string[]; destination_reference: string; signing_secret_prefix?: string | null; status: string; version: number; created_at?: string; updated_at?: string };
 type PagedResponse<T> = { items: T[]; has_more: boolean; next_cursor: string | null };
@@ -368,12 +369,14 @@ export default function InventoryCapabilitiesPage() {
 
 const API_SCOPE_OPTIONS = [
   { value: 'products:read', label: 'Read products', requiredPermissions: [TENANT_PERMISSIONS.PRODUCTS_READ] },
-  { value: 'products:write', label: 'Create products', requiredPermissions: [TENANT_PERMISSIONS.PRODUCTS_WRITE] },
+  { value: 'products:write', label: 'Manage products', requiredPermissions: [TENANT_PERMISSIONS.PRODUCTS_WRITE] },
   { value: 'stock:read', label: 'Read stock', requiredPermissions: [TENANT_PERMISSIONS.STOCK_READ] },
   { value: 'suppliers:read', label: 'Read suppliers', requiredPermissions: [TENANT_PERMISSIONS.SUPPLIERS_READ] },
-  { value: 'suppliers:write', label: 'Create suppliers', requiredPermissions: [TENANT_PERMISSIONS.SUPPLIERS_WRITE] },
+  { value: 'suppliers:write', label: 'Manage suppliers', requiredPermissions: [TENANT_PERMISSIONS.SUPPLIERS_WRITE] },
   { value: 'purchase_orders:read', label: 'Read purchase orders', requiredPermissions: [TENANT_PERMISSIONS.PURCHASE_ORDERS_READ] },
   { value: 'purchase_orders:write', label: 'Create purchase orders', requiredPermissions: [TENANT_PERMISSIONS.PURCHASE_ORDERS_CREATE] },
+  { value: 'purchase_orders:update', label: 'Update purchase order drafts', requiredPermissions: [TENANT_PERMISSIONS.PURCHASE_ORDERS_UPDATE] },
+  { value: 'purchase_orders:cancel', label: 'Cancel purchase orders', requiredPermissions: [TENANT_PERMISSIONS.PURCHASE_ORDERS_CANCEL] },
   { value: 'shipments:read', label: 'Read shipments', requiredPermissions: [TENANT_PERMISSIONS.SHIPMENTS_READ] },
   { value: 'shipments:write', label: 'Create shipments', requiredPermissions: [TENANT_PERMISSIONS.SHIPMENTS_WRITE] },
   { value: 'customers:read', label: 'Read customers', requiredPermissions: [TENANT_PERMISSIONS.CUSTOMERS_READ] },
@@ -384,6 +387,24 @@ const API_SCOPE_OPTIONS = [
   { value: 'outbound_orders:write', label: 'Manage outbound order drafts', requiredPermissions: [TENANT_PERMISSIONS.OUTBOUND_ORDERS_CREATE, TENANT_PERMISSIONS.OUTBOUND_ORDERS_UPDATE, TENANT_PERMISSIONS.OUTBOUND_ORDERS_CANCEL] },
   { value: 'customer_returns:read', label: 'Read customer returns', requiredPermissions: [TENANT_PERMISSIONS.CUSTOMER_RETURNS_READ] },
   { value: 'customer_returns:write', label: 'Manage customer return drafts', requiredPermissions: [TENANT_PERMISSIONS.CUSTOMER_RETURNS_CREATE, TENANT_PERMISSIONS.CUSTOMER_RETURNS_CANCEL] },
+  { value: 'stock_transfers:read', label: 'Read stock transfers', requiredPermissions: [TENANT_PERMISSIONS.STOCK_TRANSFERS_READ] },
+  { value: 'stock_transfers:write', label: 'Create stock transfer drafts', requiredPermissions: [TENANT_PERMISSIONS.STOCK_TRANSFERS_CREATE, TENANT_PERMISSIONS.STOCK_READ, TENANT_PERMISSIONS.PRODUCTS_READ, TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ] },
+  { value: 'stock_transfers:update', label: 'Update stock transfer drafts', requiredPermissions: [TENANT_PERMISSIONS.STOCK_TRANSFERS_UPDATE, TENANT_PERMISSIONS.STOCK_READ, TENANT_PERMISSIONS.PRODUCTS_READ, TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ] },
+  { value: 'stock_transfers:cancel', label: 'Cancel stock transfers', requiredPermissions: [TENANT_PERMISSIONS.STOCK_TRANSFERS_CANCEL] },
+  { value: 'reservations:read', label: 'Read reservations', requiredPermissions: [TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_READ] },
+  { value: 'reservations:write', label: 'Create reservation drafts', requiredPermissions: [TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CREATE, TENANT_PERMISSIONS.STOCK_READ, TENANT_PERMISSIONS.PRODUCTS_READ, TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ] },
+  { value: 'reservations:update', label: 'Update reservation drafts', requiredPermissions: [TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CREATE, TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CANCEL_ANY, TENANT_PERMISSIONS.STOCK_READ, TENANT_PERMISSIONS.PRODUCTS_READ, TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ] },
+  { value: 'reservations:cancel', label: 'Cancel reservations', requiredPermissions: [TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CANCEL_ANY] },
+  { value: 'requisitions:read', label: 'Read requisitions', requiredPermissions: [TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_READ] },
+  { value: 'requisitions:write', label: 'Create requisition drafts', requiredPermissions: [TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_CREATE, TENANT_PERMISSIONS.PRODUCTS_READ, TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ] },
+  { value: 'requisitions:update', label: 'Update requisition drafts', requiredPermissions: [TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_CREATE, TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_CANCEL_ANY, TENANT_PERMISSIONS.PRODUCTS_READ, TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ] },
+  { value: 'requisitions:cancel', label: 'Cancel requisitions', requiredPermissions: [TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_CANCEL_ANY] },
+  { value: 'serials:read', label: 'Read serial numbers', requiredPermissions: [TENANT_PERMISSIONS.PRODUCTS_READ, TENANT_PERMISSIONS.STOCK_READ] },
+  { value: 'alerts:read', label: 'Read alerts', requiredPermissions: [TENANT_PERMISSIONS.ALERTS_READ] },
+  { value: 'reports:read', label: 'Read reports', requiredPermissions: [TENANT_PERMISSIONS.REPORTS_READ] },
+  { value: 'attachments:read', label: 'Read attachments', requiredPermissions: [TENANT_PERMISSIONS.ATTACHMENTS_READ] },
+  { value: 'attachments:write', label: 'Manage attachments', requiredPermissions: [TENANT_PERMISSIONS.ATTACHMENTS_READ, TENANT_PERMISSIONS.ATTACHMENTS_WRITE] },
+  { value: 'outbound_documents:read', label: 'Read outbound documents', requiredPermissions: [] },
   { value: 'events:write', label: 'Submit integration events', requiredPermissions: [TENANT_PERMISSIONS.ENTERPRISE_INTEGRATIONS_GOVERN] }
 ] as const;
 const API_SCOPE_LABELS = Object.fromEntries(API_SCOPE_OPTIONS.map((scope) => [scope.value, scope.label])) as Record<string, string>;
@@ -394,6 +415,9 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [apiScopes, setApiScopes] = useState<string[]>([]);
+  const [apiExpiresAt, setApiExpiresAt] = useState('');
+  const [apiAllowedIps, setApiAllowedIps] = useState('');
+  const [editingApiClient, setEditingApiClient] = useState<ApiClient | null>(null);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [systemName, setSystemName] = useState('');
   const [systemType, setSystemType] = useState('custom');
@@ -403,7 +427,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
   const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
   const [webhookName, setWebhookName] = useState('');
   const [webhookUrl, setWebhookUrl] = useState('');
-  const [webhookEvents, setWebhookEvents] = useState('purchase_order.approved,purchase_order.completed');
+  const [webhookEvents, setWebhookEvents] = useState<string[]>(['purchase_order.approved','purchase_order.completed']);
   const [revealedWebhookSecret, setRevealedWebhookSecret] = useState<string | null>(null);
   const [webhookMessage, setWebhookMessage] = useState<string | null>(null);
   const [webhookRows, setWebhookRows] = useState<WebhookSubscription[]>([]);
@@ -413,17 +437,30 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
 
   const clients = useQuery({ queryKey: ['inventory-api-clients'], queryFn: () => apiRequest<ApiClient[]>('/inventory-capabilities/api-clients') });
   const connections = useQuery({ queryKey: ['inventory-external-connections'], queryFn: () => apiRequest<Connection[]>('/inventory-capabilities/connections') });
+  const webhookEventCatalog = useQuery({ queryKey: ['inventory-webhook-events'], queryFn: () => apiRequest<WebhookEventCatalog>('/inventory-capabilities/webhook-events') });
   const webhooks = useQuery({ queryKey: ['inventory-webhooks'], queryFn: () => apiRequest<PagedResponse<WebhookSubscription>>('/inventory-capabilities/webhooks?paged=true&limit=100') });
   useEffect(() => { if (webhooks.data) { setWebhookRows(webhooks.data.items); setWebhookNextCursor(webhooks.data.next_cursor); } }, [webhooks.data]);
   const deliveries = useQuery({ queryKey: ['inventory-webhook-deliveries'], queryFn: () => apiRequest<WebhookDelivery[]>('/inventory-capabilities/webhook-deliveries?limit=25') });
   const createClient = useMutation({
-    mutationFn: () => apiRequest<ApiClient & { api_key: string }>('/inventory-capabilities/api-clients', { method: 'POST', body: JSON.stringify({ name, description, scopes: apiScopes }) }),
-    onSuccess: (data) => { setRevealedKey(data.api_key); setName(''); setDescription(''); setApiScopes([]); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
+    mutationFn: () => apiRequest<ApiClient & { api_key: string }>('/inventory-capabilities/api-clients', { method: 'POST', body: JSON.stringify({ name, description, scopes: apiScopes, expires_at: apiExpiresAt || null, allowed_ips: apiAllowedIps.split(',').map((value) => value.trim()).filter(Boolean) }) }),
+    onSuccess: (data) => { setRevealedKey(data.api_key); setName(''); setDescription(''); setApiScopes([]); setApiExpiresAt(''); setApiAllowedIps(''); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
     onError: (err) => setError(messageFrom(err, ui("Unable to create API client."), ui))
   });
+  const clearApiClientForm = () => { setEditingApiClient(null); setName(''); setDescription(''); setApiScopes([]); setApiExpiresAt(''); setApiAllowedIps(''); };
+  const editApiClient = (client: ApiClient) => { setEditingApiClient(client); setName(client.name); setDescription(client.description || ''); setApiScopes(client.scopes || []); setApiExpiresAt(client.expires_at ? client.expires_at.slice(0, 10) : ''); setApiAllowedIps((client.allowed_ips || []).join(', ')); setError(null); };
+  const updateClient = useMutation({
+    mutationFn: () => apiRequest<ApiClient>(`/inventory-capabilities/api-clients/${editingApiClient!.id}`, { method: 'PATCH', body: JSON.stringify({ description, scopes: apiScopes, expires_at: apiExpiresAt || null, allowed_ips: apiAllowedIps.split(',').map((value) => value.trim()).filter(Boolean) }), version: editingApiClient!.version }),
+    onSuccess: () => { clearApiClientForm(); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
+    onError: (err) => setError(messageFrom(err, ui("Unable to update API client."), ui))
+  });
+  const rotateClient = useMutation({
+    mutationFn: (client: ApiClient) => apiRequest<ApiClient & { api_key: string }>(`/inventory-capabilities/api-clients/${client.id}/rotate`, { method: 'POST', body: JSON.stringify({}), version: client.version }),
+    onSuccess: (data) => { setRevealedKey(data.api_key); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
+    onError: (err) => setError(messageFrom(err, ui("Unable to rotate API key."), ui))
+  });
   const revokeClient = useMutation({
-    mutationFn: (id: string) => apiRequest(`/inventory-capabilities/api-clients/${id}/revoke`, { method: 'POST', body: JSON.stringify({ reason: 'Revoked from tenant Integrations page' }) }),
-    onSuccess: () => { setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
+    mutationFn: (client: ApiClient) => apiRequest(`/inventory-capabilities/api-clients/${client.id}/revoke`, { method: 'POST', body: JSON.stringify({ reason: 'Revoked from tenant Integrations page' }), version: client.version }),
+    onSuccess: () => { clearApiClientForm(); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
     onError: (err) => setError(messageFrom(err, ui("Unable to revoke API key."), ui))
   });
   const clearConnectionForm = () => { setEditingConnection(null); setSystemName(''); setSystemType('custom'); setBaseUrl(''); setDirection('bidirectional'); setCredentialReference(''); };
@@ -439,7 +476,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
       body: JSON.stringify({
         display_name: webhookName,
         destination_url: webhookUrl,
-        event_types: webhookEvents.split(',').map((value) => value.trim()).filter(Boolean)
+        event_types: webhookEvents
       })
     }),
     onSuccess: (data) => {
@@ -492,19 +529,21 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
           <div className="form-success"><strong>{ui("Copy this key now. It is only shown once:")}</strong><br /><code style={{ wordBreak: 'break-all' }}>{revealedKey}</code></div>
         ) : null}
         {error ? <div className="form-error">{error}</div> : null}
-        <form onSubmit={(e) => { e.preventDefault(); createClient.mutate(); }} style={formGridStyle}>
-          <label>{ui("Connection name")}<input value={name} onChange={(e) => setName(e.target.value)} placeholder={ui("Company ERP")} disabled={!canWrite} /></label>
+        <form onSubmit={(e) => { e.preventDefault(); if (editingApiClient) updateClient.mutate(); else createClient.mutate(); }} style={formGridStyle}>
+          <label>{ui("Connection name")}<input value={name} onChange={(e) => setName(e.target.value)} placeholder={ui("Company ERP")} disabled={!canWrite || Boolean(editingApiClient)} /></label>
           <label>{ui("Description")}<input value={description} onChange={(e) => setDescription(e.target.value)} placeholder={ui("Used by head-office integration")} disabled={!canWrite} /></label>
+          <label>{ui("Expiry date")}<input type="date" value={apiExpiresAt} onChange={(e) => setApiExpiresAt(e.target.value)} disabled={!canWrite} /></label>
+          <label>{ui("Allowed IP addresses")}<input value={apiAllowedIps} onChange={(e) => setApiAllowedIps(e.target.value)} placeholder="203.0.113.10, 2001:db8::10" disabled={!canWrite} /></label>
           <fieldset style={{ gridColumn: '1 / -1', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: '#f8fafc' }} disabled={!canWrite}>
             <legend>{ui("API permissions")}</legend>
             <p className="card__subtext">{ui("Select only the API permissions this connection genuinely needs. You can grant only permissions available to your current role.")}</p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>{grantableApiScopes.map((scope) => <label key={scope.value} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={apiScopes.includes(scope.value)} onChange={(event) => setApiScopes((current) => event.target.checked ? Array.from(new Set([...current, scope.value])) : current.filter((value) => value !== scope.value))} />{ui(scope.label)}</label>)}</div>
           </fieldset>
-          <div style={{ alignSelf: 'end' }}><button className="button" disabled={!canWrite || !name.trim() || apiScopes.length === 0 || createClient.isPending}>{ui("Create API key")}</button></div>
+          <div style={{ alignSelf: 'end', display: 'flex', gap: 8 }}><button className="button" disabled={!canWrite || !name.trim() || apiScopes.length === 0 || createClient.isPending || updateClient.isPending}>{editingApiClient ? ui("Save changes") : ui("Create API key")}</button>{editingApiClient ? <button className="button button--secondary" type="button" onClick={clearApiClientForm} disabled={updateClient.isPending}>{ui("Cancel")}</button> : null}</div>
         </form>
         <div style={tableWrapStyle}>
-          <table><thead><tr><th>{ui("Name")}</th><th>{ui("Prefix")}</th><th>{ui("Scopes")}</th><th>{ui("Last used")}</th><th>{ui("Status")}</th><th /></tr></thead><tbody>
-            {!clients.isLoading && !clients.isError && !(clients.data || []).length ? <EmptyTableRow colSpan={6} message={ui("No API keys have been created yet.")} /> : null}{(clients.data || []).map((client) => <tr key={client.id}><td>{client.name}</td><td>{client.key_prefix}</td><td>{client.scopes?.map((scope) => API_SCOPE_LABELS[scope] ? ui(API_SCOPE_LABELS[scope]) : ui("Unknown API permission")).join(', ')}</td><td>{formatDate(client.last_used_at, locale)}</td><td>{displayCanonicalLabel(client.status, ui)}</td><td>{client.status === 'active' && canWrite ? <button className="button button--secondary" type="button" disabled={revokeClient.isPending} onClick={() => { if (window.confirm(`${ui('Revoke API key')} ${client.name}? ${ui('Systems using it will stop working immediately.')}`)) revokeClient.mutate(client.id); }}>{revokeClient.isPending ? ui("Revoking…") : ui("Revoke")}</button> : null}</td></tr>)}
+          <table><thead><tr><th>{ui("Name")}</th><th>{ui("Prefix")}</th><th>{ui("Scopes")}</th><th>{ui("Expires")}</th><th>{ui("Allowed IP addresses")}</th><th>{ui("Created by")}</th><th>{ui("Last used")}</th><th>{ui("Status")}</th><th>{ui("Actions")}</th></tr></thead><tbody>
+            {!clients.isLoading && !clients.isError && !(clients.data || []).length ? <EmptyTableRow colSpan={9} message={ui("No API keys have been created yet.")} /> : null}{(clients.data || []).map((client) => <tr key={client.id}><td>{client.name}</td><td>{client.key_prefix}</td><td>{client.scopes?.map((scope) => API_SCOPE_LABELS[scope] ? ui(API_SCOPE_LABELS[scope]) : ui("Unknown API permission")).join(', ')}</td><td>{client.expires_at ? formatDate(client.expires_at, locale) : ui("Never")}</td><td>{(client.allowed_ips || []).length ? (client.allowed_ips || []).join(', ') : '—'}</td><td>{client.created_by_user_name || '—'}</td><td>{formatDate(client.last_used_at, locale)}</td><td>{displayCanonicalLabel(client.status, ui)}</td><td>{client.status === 'active' && canWrite ? <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><button className="button button--secondary" type="button" disabled={updateClient.isPending || rotateClient.isPending || revokeClient.isPending} onClick={() => editApiClient(client)}>{ui("Edit")}</button><button className="button button--secondary" type="button" disabled={updateClient.isPending || rotateClient.isPending || revokeClient.isPending} onClick={() => { if (window.confirm(`${ui('Rotate secret')} ${client.name}?`)) rotateClient.mutate(client); }}>{ui("Rotate secret")}</button><button className="button button--secondary" type="button" disabled={updateClient.isPending || rotateClient.isPending || revokeClient.isPending} onClick={() => { if (window.confirm(`${ui('Revoke API key')} ${client.name}? ${ui('Systems using it will stop working immediately.')}`)) revokeClient.mutate(client); }}>{revokeClient.isPending ? ui("Revoking…") : ui("Revoke")}</button></div> : null}</td></tr>)}
           </tbody></table>
         </div>
         {clients.isLoading ? <div className="muted">{ui("Loading API clients…")}</div> : null}
@@ -514,14 +553,14 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
       <div className="card">
         <div className="card__label">{ui("Automatic outbound notifications")}</div>
         <h3>{ui("Webhooks")}</h3>
-        <p className="card__subtext">{ui("Another system can give this app an HTTPS address. When a subscribed inventory action happens, the app queues a signed notification and retries failed deliveries automatically. Use exact audit event names, or")} <strong>*</strong> {ui("for every tenant audit event.")}</p>
+        <p className="card__subtext">{ui("Another system can give this app an HTTPS address. Choose which inventory events it should receive, or select all events.")}</p>
         {revealedWebhookSecret ? <div className="form-success"><strong>{ui("Copy this signing secret now. It is only shown once:")}</strong><br /><code style={{ wordBreak: 'break-all' }}>{revealedWebhookSecret}</code></div> : null}
         {webhookMessage ? <div className="form-success">{webhookMessage}</div> : null}
         <form onSubmit={(e) => { e.preventDefault(); createWebhook.mutate(); }} style={formGridStyle}>
           <label>{ui("Name")}<input value={webhookName} onChange={(e) => setWebhookName(e.target.value)} placeholder={ui("Head office events")} disabled={!canWrite} /></label>
           <label>{ui("HTTPS destination")}<input value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} placeholder="https://example.com/inventory-webhook" disabled={!canWrite} /></label>
-          <label>{ui("Events")}<input value={webhookEvents} onChange={(e) => setWebhookEvents(e.target.value)} placeholder="purchase_order.approved,purchase_order.completed" disabled={!canWrite} /></label>
-          <div style={{ alignSelf: 'end' }}><button className="button" disabled={!canWrite || !webhooks.isSuccess || !webhookName.trim() || !webhookUrl.trim() || !webhookEvents.trim() || createWebhook.isPending || loadMoreWebhooks.isPending || changeWebhookStatus.isPending || rotateWebhook.isPending}>{ui("Create webhook")}</button></div>
+          <fieldset style={{ gridColumn: '1 / -1', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: '#f8fafc' }} disabled={!canWrite || webhookEventCatalog.isLoading || webhookEventCatalog.isError}><legend>{ui("Events")}</legend><div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', maxHeight: 220, overflowY: 'auto' }}>{(webhookEventCatalog.data?.items || []).map(({ event_type, group, label }) => <label key={event_type} title={event_type} style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={webhookEvents.includes(event_type)} onChange={(event) => setWebhookEvents((current) => event.target.checked ? (event_type === '*' ? ['*'] : Array.from(new Set(current.filter((value) => value !== '*').concat(event_type)))) : current.filter((value) => value !== event_type))} />{event_type === '*' ? ui("All events") : <span><strong>{ui(group)}</strong> — {ui(label)}</span>}</label>)}</div></fieldset>
+          <div style={{ alignSelf: 'end' }}><button className="button" disabled={!canWrite || !webhooks.isSuccess || !webhookName.trim() || !webhookUrl.trim() || webhookEvents.length === 0 || createWebhook.isPending || loadMoreWebhooks.isPending || changeWebhookStatus.isPending || rotateWebhook.isPending}>{ui("Create webhook")}</button></div>
         </form>
         <div style={tableWrapStyle}><table><thead><tr><th>{ui("Name")}</th><th>{ui("Destination")}</th><th>{ui("Events")}</th><th>{ui("Status")}</th><th>{ui("Actions")}</th></tr></thead><tbody>
           {!webhooks.isLoading && !webhooks.isError && !webhookRows.length ? <EmptyTableRow colSpan={5} message={ui("No webhooks are configured yet.")} /> : null}{webhookRows.map((row) => <tr key={row.id}><td>{row.display_name}</td><td style={{ maxWidth: 320, wordBreak: 'break-all' }}>{row.destination_reference}</td><td>{row.event_types.join(', ')}</td><td>{displayCanonicalLabel(row.status, ui)}</td><td><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{canWrite ? <><button className="button button--secondary" type="button" disabled={testWebhook.isPending || rotateWebhook.isPending || changeWebhookStatus.isPending || loadMoreWebhooks.isPending || createWebhook.isPending} onClick={() => testWebhook.mutate(row.id)}>{testWebhook.isPending ? ui("Testing…") : ui("Test")}</button><button className="button button--secondary" type="button" disabled={testWebhook.isPending || rotateWebhook.isPending || changeWebhookStatus.isPending || loadMoreWebhooks.isPending || createWebhook.isPending} onClick={() => rotateWebhook.mutate(row)}>{rotateWebhook.isPending ? ui("Rotating…") : ui("Rotate secret")}</button><button className="button button--secondary" type="button" disabled={testWebhook.isPending || rotateWebhook.isPending || changeWebhookStatus.isPending || loadMoreWebhooks.isPending || createWebhook.isPending} onClick={() => changeWebhookStatus.mutate({ row, status: row.status === 'configured' ? 'disabled' : 'configured' })}>{changeWebhookStatus.isPending ? ui("Saving…") : row.status === 'configured' ? ui("Disable") : ui("Enable")}</button></> : null}</div></td></tr>)}
