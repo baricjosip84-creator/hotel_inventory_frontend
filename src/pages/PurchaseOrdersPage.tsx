@@ -875,7 +875,8 @@ export default function PurchaseOrdersPage() {
   const detailQuery = useQuery({
     queryKey: ['purchase-order', selectedId],
     queryFn: () => fetchPurchaseOrder(selectedId as string),
-    enabled: Boolean(selectedId && purchaseOrdersFeatureReady)
+    enabled: Boolean(selectedId && purchaseOrdersFeatureReady),
+    staleTime: 5_000
   });
 
   const auditQuery = useQuery({
@@ -893,7 +894,7 @@ export default function PurchaseOrdersPage() {
     enabled: Boolean(form.supplier_id && purchaseOrdersFeatureReady && (capabilities.canCreatePurchaseOrders || capabilities.canUpdatePurchaseOrders)),
     staleTime: 30_000
   });
-  const supplierProducts = purchaseOrderCreateOptionsQuery.data?.products || [];
+  const supplierProducts = useMemo(() => purchaseOrderCreateOptionsQuery.data?.products || [], [purchaseOrderCreateOptionsQuery.data?.products]);
   const purchaseOrderFormCurrency = purchaseOrderCreateOptionsQuery.data?.purchase_order_currency || getActiveTenantCurrency();
 
   const selectedDetail = detailQuery.data ?? null;
@@ -1113,17 +1114,29 @@ export default function PurchaseOrdersPage() {
     setFormError(null);
   }, [searchParams, selectedId]);
 
-  useEffect(() => {
-    if (!selectedId) return;
-    void queryClient.invalidateQueries({ queryKey: ['purchase-order', selectedId] });
-  }, [selectedId, queryClient]);
-
   const createMutation = useMutation({
     mutationFn: createPurchaseOrder,
-    onSuccess: async (created) => {
-      await queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+    onSuccess: (created) => {
+      // The create response is already the authoritative detail. Seed it directly
+      // instead of mounting the detail query and immediately invalidating it again.
+      queryClient.setQueryData(['purchase-order', created.id], created);
       setSelectedId(created.id);
-      resetForm();
+      setEditingId(null);
+      setFormError(null);
+      setActiveWorkspaceSection('detail');
+
+      // Refresh the registry in the background. Do not block the UI or cause a
+      // second detail fetch before the newly-created order can be shown.
+      void queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+
+      // Clear the draft only after the new detail target exists. This avoids the
+      // create form collapsing before the destination is selected.
+      window.requestAnimationFrame(() => {
+        setForm(emptyForm());
+        window.requestAnimationFrame(() => {
+          detailRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' });
+        });
+      });
     }
   });
 
@@ -1633,6 +1646,7 @@ export default function PurchaseOrdersPage() {
 
   const submitForm = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (createMutation.isPending || updateMutation.isPending) return;
     setFormError(null);
     const validationError = validateForm();
     if (validationError) {
