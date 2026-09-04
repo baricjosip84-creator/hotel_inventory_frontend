@@ -4,7 +4,9 @@ import type { TenantPermission } from '../../lib/permissions';
 export const enterpriseInventoryTabs = [
   ['par-levels', 'Par levels', TENANT_PERMISSIONS.PAR_LEVELS_READ],
   ['cycle-counts', 'Cycle counts', TENANT_PERMISSIONS.CYCLE_COUNTS_READ],
-  ['stock-transfers', 'Stock transfers', TENANT_PERMISSIONS.STOCK_TRANSFERS_READ],
+  // v3.49.119 — Stock Transfers has its own dedicated /stock-transfers workspace.
+  // Keep the legacy Inventory Controls integration code dormant instead of exposing a duplicate tab.
+  // ['stock-transfers', 'Stock transfers', TENANT_PERMISSIONS.STOCK_TRANSFERS_READ],
   ['supplier-returns', 'Supplier returns', TENANT_PERMISSIONS.SUPPLIER_RETURNS_READ],
   ['approvals', 'Approvals', TENANT_PERMISSIONS.APPROVAL_RULES_READ],
   ['supplier-catalog', 'Supplier catalogs', TENANT_PERMISSIONS.SUPPLIER_CATALOG_READ],
@@ -21,7 +23,7 @@ export const enterpriseInventoryReadPermissions = enterpriseInventoryTabs.map(([
 export const enterpriseInventoryTabIconPaths: Record<EnterpriseInventoryTabKey, string> = {
   'par-levels': '/replenishment-planning',
   'cycle-counts': '/stock',
-  'stock-transfers': '/stock-transfers',
+  // 'stock-transfers': '/stock-transfers', // Dedicated page; duplicate Inventory Controls tab disabled in v3.49.119.
   'supplier-returns': '/shipments',
   'approvals': '/execution-requests',
   'supplier-catalog': '/suppliers',
@@ -34,11 +36,11 @@ export const enterpriseInventoryTabIconPaths: Record<EnterpriseInventoryTabKey, 
 export const enterpriseInventoryActionPermissionGroups: Record<EnterpriseInventoryTabKey, readonly (readonly TenantPermission[])[]> = {
   'par-levels': [[TENANT_PERMISSIONS.PAR_LEVELS_WRITE]],
   'cycle-counts': [[TENANT_PERMISSIONS.CYCLE_COUNTS_WRITE]],
-  'stock-transfers': [
-    [TENANT_PERMISSIONS.STOCK_TRANSFERS_CREATE, TENANT_PERMISSIONS.STOCK_READ, TENANT_PERMISSIONS.PRODUCTS_READ, TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ],
-    [TENANT_PERMISSIONS.STOCK_TRANSFERS_EXECUTE, TENANT_PERMISSIONS.STOCK_READ],
-    [TENANT_PERMISSIONS.STOCK_TRANSFERS_CANCEL],
-  ],
+  // 'stock-transfers': [
+  //   [TENANT_PERMISSIONS.STOCK_TRANSFERS_CREATE, TENANT_PERMISSIONS.STOCK_READ, TENANT_PERMISSIONS.PRODUCTS_READ, TENANT_PERMISSIONS.STORAGE_LOCATIONS_READ],
+  //   [TENANT_PERMISSIONS.STOCK_TRANSFERS_EXECUTE, TENANT_PERMISSIONS.STOCK_READ],
+  //   [TENANT_PERMISSIONS.STOCK_TRANSFERS_CANCEL],
+  // ], // Dedicated page; duplicate Inventory Controls tab disabled in v3.49.119.
   'supplier-returns': [[TENANT_PERMISSIONS.SUPPLIER_RETURNS_WRITE]],
   'approvals': [[TENANT_PERMISSIONS.APPROVAL_RULES_WRITE]],
   'supplier-catalog': [[TENANT_PERMISSIONS.SUPPLIER_CATALOG_WRITE]],

@@ -75,7 +75,6 @@ if (!process.exitCode) pass('Tenant UI placeholder parity is intact across all f
 const retainedTabs = [
   ['par-levels', 'Par levels'],
   ['cycle-counts', 'Cycle counts'],
-  ['stock-transfers', 'Stock transfers'],
   ['supplier-returns', 'Supplier returns'],
   ['approvals', 'Approvals'],
   ['supplier-catalog', 'Supplier catalogs'],
@@ -90,8 +89,8 @@ for (const [key, label] of retainedTabs) {
 }
 const configuredTabs = [...tabsConfigSource.matchAll(/^\s*\['([^']+)',\s*'([^']+)'/gm)].map((match) => match[1]);
 if (configuredTabs.length !== retainedTabs.length || configuredTabs.some((key, index) => key !== retainedTabs[index][0])) {
-  fail(`Enterprise Inventory live-tab set is not the expected ten-tab surface: ${configuredTabs.join(', ')}`);
-} else pass('Enterprise Inventory live route remains exactly the ten retained operational tabs.');
+  fail(`Enterprise Inventory live-tab set is not the expected nine-tab surface: ${configuredTabs.join(', ')}`);
+} else pass('Enterprise Inventory live route remains exactly the nine retained specialized-control tabs.');
 
 if (!routerSource.includes("path: 'enterprise-inventory'") || !routerSource.includes('<EnterpriseInventoryPage />')) fail('Enterprise Inventory route contract changed or missing.');
 else pass('Enterprise Inventory route remains mounted at /enterprise-inventory.');
@@ -131,7 +130,7 @@ for (const [file, source] of tabSources) {
   if (rawText.length) fail(`Raw direct JSX presentation remains in ${file}: ${rawText.join(' | ')}`);
   if (rawAttributes.length) fail(`Raw literal presentation attributes remain in ${file}: ${rawAttributes.join(' | ')}`);
 }
-if (!process.exitCode) pass('All ten live Enterprise Inventory tabs have zero raw direct JSX text and raw literal presentation attributes.');
+if (!process.exitCode) pass('All nine live Enterprise Inventory tabs have zero raw direct JSX text and raw literal presentation attributes.');
 
 for (const [name, source] of [['Labels', labelsSource], ['Attachments', attachmentsSource], ['Notifications', notificationsSource]]) {
   if (!source.includes('useAppTranslation')) fail(`${name} does not use the tenant translation runtime.`);
@@ -233,8 +232,8 @@ if (!pageActionsSource.includes('const { locale, ui } = useAppTranslation();') |
 if (!process.exitCode) pass('Shared Enterprise Inventory query/action presentation remains multilingual.');
 
 if (!tabsSource.includes('const visibleTabs = enterpriseInventoryTabs.filter') || !tabsSource.includes('label={ui(label)}')) fail('Enterprise Inventory tab navigation does not filter by permission and localize live labels.');
-if (!cleanupSource.includes("'par-levels', 'cycle-counts', 'supplier-returns', 'approvals', 'supplier-catalog',") || !cleanupSource.includes("'stock-transfers'") || !cleanupSource.includes("'invoices', 'labels', 'attachments', 'notifications'")) fail('Enterprise Inventory cleanup checker no longer protects the ten-tab live surface.');
-if (!process.exitCode) pass('Enterprise Inventory navigation and cleanup guards remain aligned to the ten-tab live route.');
+if (!cleanupSource.includes("'par-levels', 'cycle-counts', 'supplier-returns', 'approvals', 'supplier-catalog',") || !cleanupSource.includes("'invoices', 'labels', 'attachments', 'notifications'") || !cleanupSource.includes("'stock-transfers'")) fail('Enterprise Inventory cleanup checker no longer protects the nine-tab specialized-control surface and dedicated Stock Transfers boundary.');
+if (!process.exitCode) pass('Enterprise Inventory navigation and cleanup guards remain aligned to the nine-tab specialized-control route.');
 
 if (!catalogSupportSource.includes('LabelsTab') || !catalogSupportSource.includes('AttachmentsTab') || !compliancePanelsSource.includes('NotificationsTab')) fail('Final live Enterprise Inventory panels are no longer mounted.');
 else pass('Labels, Attachments, and Notifications remain reachable through the retained Enterprise Inventory panel families.');

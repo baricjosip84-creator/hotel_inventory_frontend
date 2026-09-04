@@ -28,11 +28,12 @@ const removedTabs = [
   'locations', 'alerts', 'audit', 'procurement-match', 'receiving', 'requisitions', 'packages'
 ];
 
+const activeTabKeys = [...tabs.matchAll(/^\s*\['([^']+)'/gm)].map((match) => match[1]);
 for (const key of retainedTabs) {
-  if (!tabs.includes(`['${key}'`)) throw new Error(`Missing retained Enterprise Inventory tab: ${key}`);
+  if (!activeTabKeys.includes(key)) throw new Error(`Missing retained Enterprise Inventory tab: ${key}`);
 }
 for (const key of removedTabs) {
-  if (tabs.includes(`['${key}'`)) throw new Error(`Duplicate/legacy Enterprise Inventory tab still exposed: ${key}`);
+  if (activeTabKeys.includes(key)) throw new Error(`Duplicate/legacy Enterprise Inventory tab still exposed: ${key}`);
 }
 
 for (const required of [
