@@ -3,6 +3,17 @@ import path from 'node:path';
 
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+const backendCandidates = [
+  process.env.BACKEND_ROOT,
+  path.resolve(root, '../hotel-inventory-backend'),
+  path.resolve(root, '../backend'),
+].filter(Boolean);
+const backendRoot = backendCandidates.find((candidate) => fs.existsSync(candidate));
+if (!backendRoot) {
+  console.error(`FAIL: Backend source folder not found. Checked: ${backendCandidates.join(', ')}`);
+  process.exit(1);
+}
+const readBackend = (file) => fs.readFileSync(path.join(backendRoot, file), 'utf8');
 const fail = (message) => { console.error(`FAIL: ${message}`); process.exitCode = 1; };
 const pass = (message) => console.log(`PASS: ${message}`);
 
@@ -11,11 +22,11 @@ const scannerSource = read('src/pages/ScannerPage.tsx');
 const movementsSource = read('src/pages/StockMovementsPage.tsx');
 const transfersSource = read('src/pages/StockTransfersPage.tsx');
 const shipmentsSource = read('src/pages/ShipmentsPage.tsx');
-const productBarcodeLookupSource = read('../backend/src/routes/productBarcodeLookup.js');
-const barcodeWriteGuardsSource = read('../backend/src/services/catalog/productWriteGuards.js');
-const productMutationSource = read('../backend/src/services/catalog/productMutationService.js');
-const packageMutationSource = read('../backend/src/services/catalog/productPackageMutationService.js');
-const enterpriseInventorySource = read('../backend/src/services/inventory/enterpriseInventoryService.js');
+const productBarcodeLookupSource = readBackend('src/routes/productBarcodeLookup.js');
+const barcodeWriteGuardsSource = readBackend('src/services/catalog/productWriteGuards.js');
+const productMutationSource = readBackend('src/services/catalog/productMutationService.js');
+const packageMutationSource = readBackend('src/services/catalog/productPackageMutationService.js');
+const enterpriseInventorySource = readBackend('src/services/inventory/enterpriseInventoryService.js');
 
 const rows = [];
 for (const line of translationSource.split(/\r?\n/)) {

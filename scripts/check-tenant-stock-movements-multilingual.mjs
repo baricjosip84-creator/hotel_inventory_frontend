@@ -3,12 +3,23 @@ import path from 'node:path';
 
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+const backendCandidates = [
+  process.env.BACKEND_ROOT,
+  path.resolve(root, '../hotel-inventory-backend'),
+  path.resolve(root, '../backend'),
+].filter(Boolean);
+const backendRoot = backendCandidates.find((candidate) => fs.existsSync(candidate));
+if (!backendRoot) {
+  console.error(`FAIL: Backend source folder not found. Checked: ${backendCandidates.join(', ')}`);
+  process.exit(1);
+}
+const readBackend = (file) => fs.readFileSync(path.join(backendRoot, file), 'utf8');
 const fail = (message) => { console.error(`FAIL: ${message}`); process.exitCode = 1; };
 const pass = (message) => console.log(`PASS: ${message}`);
 
 const page = read('src/pages/StockMovementsPage.tsx');
 const reportsPage = read('src/pages/ReportsPage.tsx');
-const reportService = read('../backend/src/services/analytics/reportService.js');
+const reportService = readBackend('src/services/analytics/reportService.js');
 const reportsLedgerStart = reportsPage.indexOf("activeTab === 'movement-ledger'");
 const reportsLedgerEnd = reportsPage.indexOf("activeTab === 'inventory-variance'", reportsLedgerStart);
 const reportsLedgerSection = reportsPage.slice(reportsLedgerStart, reportsLedgerEnd);
