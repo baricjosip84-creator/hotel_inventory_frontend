@@ -48,11 +48,12 @@ else pass(`Alerts has ${new Set(literalKeys).size} catalog-backed literal UI key
 
 const representativeRows = [
   'Alert workspace', 'Alert queue', 'Create a manual alert', 'Filter the alert queue',
-  'Critical alerts block protected stock and shipment operations until resolved.',
+  'Critical alerts can block protected stock or shipment operations according to alert scope until resolved.',
   'Acknowledge', 'Resolve', 'Reopen', 'Increase escalation level',
   'Emergency blocking-alert override', 'Mandatory override reason',
   'Open and resolved', 'Acknowledged and unacknowledged', 'All severities',
-  'Ownership', 'Escalation level', 'Resolution', 'Source workflow stays authoritative'
+  'Ownership', 'Escalation level', 'Resolution', 'Source workflow stays authoritative',
+  'This queues an in-app notification event but does not send an email or webhook notification.'
 ];
 const missingRepresentative = representativeRows.filter((key) => !uniqueKeys.has(key));
 if (missingRepresentative.length) fail(`Missing representative Alerts translations: ${missingRepresentative.join(' | ')}`);
@@ -60,7 +61,7 @@ else pass(`${representativeRows.length} representative Alerts rows are present i
 
 const dynamicActionLabels = [
   'Open Stock', 'Open Shipments', 'Open Stock Transfers', 'Open Reservations', 'Open Requisitions',
-  'Open Inventory Usage', 'Open Purchase Orders', 'Open Suppliers', 'Open Execution Tasks', 'Open Action Center'
+  'Open Inventory Usage', 'Open Purchase Orders', 'Open Suppliers', 'Open Execution Tasks', 'Open Admin System', 'Open Action Center'
 ];
 const missingDynamicActions = dynamicActionLabels.filter((key) => !uniqueKeys.has(key));
 if (missingDynamicActions.length) fail(`Alerts next-action labels are missing translations: ${missingDynamicActions.join(' | ')}`);
@@ -126,10 +127,24 @@ if (!process.exitCode) pass('Alerts API routes, canonical filter values, permiss
 
 const businessDataContracts = [
   '<div style={styles.cardText}>{alert.message}</div>',
-  'alert.product_name || ui(\'No product linked\')',
+  "alert.product_name || (alert.product_id ? ui('Linked product unavailable') : ui('No product linked'))",
   '<span>{alert.resolution_note}</span>'
 ];
 for (const contract of businessDataContracts) if (!alertsSource.includes(contract)) fail(`Alerts user/business data must remain unmodified at display time: ${contract}`);
-if (!process.exitCode) pass('Alert messages, product names, operator names, and resolution notes remain business data rather than translation keys.');
+if (!alertsSource.includes("alert.product_name || (alert.product_id ? ui('Linked product unavailable') : ui('No product linked'))")) {
+  fail('Alerts must preserve the raw Product name and distinguish a missing readable Product reference from an alert with no Product link.');
+}
+if (!alertsSource.includes('if (canonicalLabel) return ui(canonicalLabel);') || !alertsSource.includes('return normalized;')) {
+  fail('Unknown/manual alert types must remain tenant business text while canonical system alert codes localize at display time.');
+}
+if (alertsSource.includes('.map((word) => word.toLowerCase())')) {
+  fail('Alerts must not normalize or lowercase user-defined alert types at display time.');
+}
+if (!process.exitCode) pass('Alert messages, manual alert types, product names, operator names, and resolution notes remain business data rather than translation keys.');
+
+if (alertsSource.includes('This does not notify anyone automatically.')) {
+  fail('Alerts still claims manual escalation sends no notification even though the backend queues an in-app notification event.');
+}
+
 
 if (!process.exitCode) console.log('Tenant Alerts multilingual hardening: PASS');
