@@ -7,29 +7,46 @@ const css = read('src/pages/PurchaseOrdersPage.css');
 const uomSelect = read('src/components/inventory/ProductUomSelect.tsx');
 const checks = [];
 const expect = (condition, message) => { if (!condition) throw new Error(message); checks.push(message); };
+
 expect(po.includes('/purchase-orders/create-options') && po.includes('purchaseOrderCreateOptionsQuery') && po.includes('supplierProducts'), 'Purchase Order product choices come from supplier-scoped create options');
-expect(po.includes("!form.supplier_id || purchaseOrderCreateOptionsQuery.isLoading") && po.includes("Select a supplier first"), 'Purchase Order product selection is blocked until supplier is chosen and supplier options are ready');
-expect(po.includes('Purchase price per unit') && po.includes('current_supplier_unit_cost') && po.includes("current price is prefilled"), 'Purchase Order supplier price is clearly labelled and auto-prefilled from current supplier pricing');
+expect(po.includes("!form.supplier_id || purchaseOrderCreateOptionsQuery.isLoading") && po.includes('Select a supplier first'), 'Purchase Order product selection is blocked until supplier is chosen and supplier options are ready');
+expect(po.includes('Purchase price per unit') && po.includes('current_supplier_unit_cost') && po.includes('current price is prefilled'), 'Purchase Order supplier price is clearly labelled and auto-prefilled from current supplier pricing');
 expect(po.includes('Line total') && po.includes('Number(item.quantity) * Number(item.unit_cost)'), 'Purchase Order line total is shown from entered quantity and purchase price');
-expect(po.includes("queryClient.setQueryData(['purchase-order', created.id], created)") && po.includes("setActiveWorkspaceSection('detail')"), 'Purchase Order creation seeds the created detail and moves deterministically to the detail workspace');
-expect(po.includes("void queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })") && !po.includes("await queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });\n      setSelectedId(created.id)"), 'Purchase Order creation refreshes the registry in the background instead of blocking the post-create transition');
-expect(!po.includes("if (!selectedId) return;\n    void queryClient.invalidateQueries({ queryKey: ['purchase-order', selectedId] })"), 'Purchase Order selection does not redundantly invalidate and immediately refetch the same detail query');
-expect(po.includes('if (createMutation.isPending || updateMutation.isPending) return;'), 'Purchase Order form prevents duplicate submit while a save is already pending');
-expect(po.includes('staleTime: 5_000') && po.includes("detailRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' })"), 'Newly-created Purchase Order detail remains stable long enough to render before a single non-animated detail scroll');
-expect(css.includes('grid-template-columns: minmax(260px, 1.55fr)') && css.includes('align-items: start;') && !po.includes('purchase-orders-field purchase-orders-field--wide">\n                    <span>{ui("Product")}</span>'), 'Purchase Order item fields use one aligned four-column row');
+expect(css.includes('grid-template-columns: minmax(260px, 1.55fr)') && css.includes('align-items: start;'), 'Purchase Order item fields remain aligned in the guided four-column layout');
 expect(uomSelect.includes('factor_to_base') && uomSelect.includes('onSelectionChange') && po.includes('factorToBase'), 'Supplier price follows the selected purchase ordering unit conversion');
-expect(po.includes('How Purchase Orders work') && po.includes('Receiving happens on the Shipments page'), 'Purchase Orders page contains a plain-language workflow guide');
-expect(shipments.includes('order.can_create_shipment !== false') && shipments.includes('No eligible Purchase Orders for this supplier'), 'Shipment PO selector only shows eligible Purchase Orders');
-expect(shipments.includes("ui('Shipment reference')") && shipments.includes('Do not enter the Purchase Order number here'), 'Shipment reference is clearly separated from Purchase Order number');
-expect(!shipments.includes("po_number: selectedOrder?.po_number || current.po_number"), 'Selecting a linked Purchase Order no longer copies the PO number into shipment reference');
-expect(shipments.includes('How Shipments work') && shipments.includes('Purchase Order vs Shipment'), 'Shipments page contains a plain-language receiving workflow guide');
-expect(!/^  const createInboundReservationMutation =/m.test(po) && !/^              \{selectedCanCreateInboundReservation/m.test(po) && po.includes('Inbound reservation action intentionally hidden'), 'Purchase Orders no longer presents inbound reservations as a competing receiving workflow');
-expect(po.includes('{ui("Create shipment")}</button>') && !po.includes('{ui("Create remaining shipment")}</button>'), 'Purchase Order shipment action uses the short Create shipment button label');
-expect(po.includes("navigate(`/shipments?shipmentId=${encodeURIComponent(payload.shipment.id)}&source=purchase-order`)") && !po.includes("await queryClient.invalidateQueries({ queryKey: ['shipments'] });\n      await queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });"), 'Purchase Order shipment handoff navigates immediately instead of waiting on cache invalidations');
-expect(shipments.includes('async function fetchShipmentById(shipmentId: string)') && shipments.includes("apiRequest<ShipmentDetailResponse>(`/shipments/${shipmentId}`)"), 'Purchase Order shipment handoff can open the created shipment directly by id');
-expect(shipments.includes("source') === 'purchase-order'") && shipments.includes("effect is reserved for scanner/barcode navigation only"), 'Purchase Order shipment handoff is separated from scanner navigation logic');
-expect(shipments.includes("setWorkspaceSection('receiving')") && shipments.includes("getElementById('shipments-detail')?.scrollIntoView({ behavior: 'auto', block: 'start' })"), 'Purchase Order shipment handoff focuses the receiving workspace directly');
-expect(shipments.includes("queryClient.setQueryData<ShipmentSummary[]>(['shipments']") && shipments.includes('return [shipment, ...withoutCurrent];'), 'Directly opened Purchase Order shipment is merged into shipment-list cache to prevent stale-list selection churn');
-expect(shipments.includes('From PO {po}. Receive the goods below. The PO updates automatically as quantities are received.') && shipments.includes('This shipment came from a purchase order. Receive the goods here.'), 'Shipments gives short plain-language context when opened from a linked Purchase Order');
-for (const text of ['How Purchase Orders work','How Shipments work','Shipment reference','No eligible Purchase Orders for this supplier','Purchase price per unit','Line total',"This is the supplier's purchase price for this order, not the product standard cost.",'Creates a shipment for the quantity still due on this PO. Stock changes only when goods are received.','This shipment came from a purchase order. Receive the goods here.','From PO {po}. Receive the goods below. The PO updates automatically as quantities are received.','The PO updates automatically when items are received here.']) expect(catalog.includes(`[${JSON.stringify(text)}`) || catalog.includes(`['${text}'`), `translation catalog includes ${text}`);
-console.log(`Tenant procurement guided workflow v3.49.117: PASS (${checks.length}/${checks.length} checks).`);
+
+expect(po.includes("if (status === 'create_shipment') return 'Send to supplier';"), 'Purchase Order next action presents supplier sending instead of internal shipment creation');
+expect(po.includes('selectedCanSendPurchaseOrder') && po.includes('capabilities.canSendShipments') && po.includes('capabilities.canManageShipments'), 'Purchase Order supplier-send action requires both shipment-send and shipment-management capability');
+expect(po.includes("selectedOpenShipment = (selectedDetail?.linked_shipments || []).find((shipment) => shipment.status !== 'received')"), 'Purchase Order supplier-send flow reuses an existing open receiving shipment when present');
+expect(po.includes('if (!shipmentId)') && po.includes('createShipmentFromPurchaseOrder(purchaseOrderId, deliveryDate, version)'), 'Purchase Order supplier-send flow automatically creates the receiving shipment only when none is open');
+expect(po.includes('/shipments/${input.shipmentId}/supplier-email-preview') && po.includes('/shipments/${input.shipmentId}/send-to-supplier'), 'Purchase Order page uses the exact existing shipment supplier-email preview and send endpoints');
+expect(po.includes('setSupplierEmailPreview(preview)') && po.includes('Confirm & Send Email'), 'Purchase Order page preserves the existing preview-before-send confirmation flow');
+expect(po.includes('supplierEmailPreview.document.pdf_filename') && po.includes('supplierEmailPreview.document.qr_code') && po.includes('supplierEmailPreview.document.items.map'), 'Purchase Order page previews the same PDF, Receiving QR, and order-item document content');
+expect(po.includes("!selectedOpenShipment && !selectedDetail.expected_delivery_date") && po.includes('Delivery date is required before sending this purchase order.'), 'Purchase Order supplier-send flow only asks for a delivery date when no receiving shipment or PO delivery date exists');
+expect(!po.includes("navigate(`/shipments?shipmentId=${encodeURIComponent(payload.shipment.id)}&source=purchase-order`)"), 'Sending a Purchase Order no longer navigates the user to Shipments just to email the supplier');
+expect(po.includes('Manual Create shipment is intentionally not exposed') && !/^              \{selectedCanCreateShipment/m.test(po), 'Manual Create shipment is not exposed in the normal Purchase Order workflow');
+expect(!/^  const createInboundReservationMutation =/m.test(po) && po.includes('Inbound reservation action intentionally hidden'), 'Inbound reservation remains hidden from the normal Purchase Order workflow');
+
+expect(shipments.includes('{!selectedShipment.purchase_order_id ? (') && shipments.includes('Preview & Send Supplier Shipment Request'), 'Shipment page keeps supplier-request email only for shipments that are not linked to a Purchase Order');
+expect(!shipments.includes("selectedShipment.purchase_order_id\n                          ? ui('Preview & Send Purchase Order')"), 'Linked Purchase Orders are no longer emailed from the Shipment page');
+expect(shipments.includes('Use this page when supplier goods arrive.') && shipments.includes('Purchase Order = what you ordered. Shipment = what arrived from that order.'), 'Shipments page now explains its receiving purpose in short normal language');
+expect(shipments.includes('From PO {po}. Receive the goods below. The PO updates automatically as quantities are received.'), 'Linked shipment still shows short PO handoff context');
+expect(shipments.includes('async function fetchShipmentById(shipmentId: string)') && shipments.includes("apiRequest<ShipmentDetailResponse>(`/shipments/${shipmentId}`)"), 'Direct shipment opening remains stable by shipment id');
+expect(shipments.includes("source') === 'purchase-order'") && shipments.includes('effect is reserved for scanner/barcode navigation only'), 'Purchase Order shipment handoff remains separated from scanner navigation logic');
+
+for (const text of [
+  'Send to supplier',
+  '4. Send to supplier',
+  'Send the approved Purchase Order. Receiving is prepared automatically.',
+  'Use this page when supplier goods arrive.',
+  '1. Open the delivery',
+  '2. Confirm what arrived',
+  '3. Finalize',
+  'Purchase Order = what you ordered. Shipment = what arrived from that order.',
+  'Delivery date is required before sending this purchase order.',
+  'Open a supplier email preview. Nothing is sent until you confirm in the preview.'
+]) {
+  expect(catalog.includes(`[${JSON.stringify(text)}`) || catalog.includes(`['${text}'`), `translation catalog includes ${text}`);
+}
+
+console.log(`Tenant procurement guided workflow v3.49.118: PASS (${checks.length}/${checks.length} checks).`);

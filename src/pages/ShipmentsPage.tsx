@@ -2390,20 +2390,18 @@ export default function ShipmentsPage() {
       <section style={styles.workflowGuide} aria-label={ui('How Shipments work')}>
         <div style={styles.workflowGuideIntro}>
           <strong>{ui('How Shipments work')}</strong>
-          <span>{ui('A Shipment is one incoming delivery record. It is where expected goods become real stock through receiving.')}</span>
+          <span>{ui('Use this page when supplier goods arrive.')}</span>
         </div>
-        <div style={{ ...styles.workflowGuideSteps, gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0, 1fr))' }}>
+        <div style={{ ...styles.workflowGuideSteps, gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))' }}>
           {[
-            [ui('1. Create or open a shipment'), ui('For a Purchase Order, link only a PO that still has quantity to receive and has no other open shipment.')],
-            [ui('2. Add or review shipment lines'), ui('While the shipment is pending, confirm which products and quantities are expected.')],
-            [ui('3. Choose receiving location'), ui('Set the storage location used for manual receiving or barcode scanning.')],
-            [ui('4. Receive items'), ui('Enter what actually arrived. This is the step that increases stock.')],
-            [ui('5. Finalize shipment'), ui('Finalize after all lines are received, or save discrepancy reasons before closing a partial delivery.')]
+            [ui('1. Open the delivery'), ui('Open the shipment linked to the Purchase Order.')],
+            [ui('2. Confirm what arrived'), ui('Choose the receiving location and record the delivered quantity.')],
+            [ui('3. Finalize'), ui('Finalize when this delivery record is complete.')]
           ].map(([title, text]) => <div key={title} style={styles.workflowGuideStep}><strong>{title}</strong><span>{text}</span></div>)}
         </div>
         <div style={styles.workflowGuideNote}>
           <strong>{ui('Purchase Order vs Shipment')}</strong>
-          <span>{ui('Purchase Order = what you asked the supplier to deliver. Shipment = one actual delivery and receiving record. One Purchase Order can have more than one shipment over time, but only one linked shipment should be open at once.')}</span>
+          <span>{ui('Purchase Order = what you ordered. Shipment = what arrived from that order.')}</span>
         </div>
       </section>
 
@@ -3314,47 +3312,47 @@ export default function ShipmentsPage() {
                     {ui('Scan Barcode')}
                   </button>
 
-                  <div
-                    style={{
-                      ...styles.emailSupplierActionBlock,
-                      width: isMobile ? '100%' : undefined
-                    }}
-                  >
-                    <button
-                      type="button"
+                  {!selectedShipment.purchase_order_id ? (
+                    <div
                       style={{
-                        ...styles.emailSupplierButton,
-                        width: '100%',
-                        ...(!canSendShipments || shipmentItems.length === 0
-                          ? styles.emailSupplierButtonDisabled
-                          : {})
+                        ...styles.emailSupplierActionBlock,
+                        width: isMobile ? '100%' : undefined
                       }}
-                      onClick={handleSendShipmentToSupplier}
-                      disabled={
-                        previewShipmentSupplierEmailMutation.isPending ||
-                        sendShipmentToSupplierMutation.isPending ||
-                        !canSendShipments ||
-                        shipmentItems.length === 0
-                      }
-                      title={
-                        !canSendShipments
-                          ? ui('Shipments send permission required')
-                          : shipmentItems.length === 0
-                            ? ui('Add at least one shipment item before emailing the supplier')
-                            : ui('Open a supplier email and Purchase Order / Receiving Reference preview. Nothing is sent until you confirm in the preview.')
-                      }
                     >
-                      {previewShipmentSupplierEmailMutation.isPending
-                        ? ui('Preparing Preview...')
-                        : selectedShipment.purchase_order_id
-                          ? ui('Preview & Send Purchase Order')
+                      <button
+                        type="button"
+                        style={{
+                          ...styles.emailSupplierButton,
+                          width: '100%',
+                          ...(!canSendShipments || shipmentItems.length === 0
+                            ? styles.emailSupplierButtonDisabled
+                            : {})
+                        }}
+                        onClick={handleSendShipmentToSupplier}
+                        disabled={
+                          previewShipmentSupplierEmailMutation.isPending ||
+                          sendShipmentToSupplierMutation.isPending ||
+                          !canSendShipments ||
+                          shipmentItems.length === 0
+                        }
+                        title={
+                          !canSendShipments
+                            ? ui('Shipments send permission required')
+                            : shipmentItems.length === 0
+                              ? ui('Add at least one shipment item before emailing the supplier')
+                              : ui('Open a supplier email preview. Nothing is sent until you confirm in the preview.')
+                        }
+                      >
+                        {previewShipmentSupplierEmailMutation.isPending
+                          ? ui('Preparing Preview...')
                           : ui('Preview & Send Supplier Shipment Request')}
-                    </button>
+                      </button>
 
-                    <div style={styles.emailSupplierHint}>
-                      {ui('Opens a confirmation preview first. The PDF includes buyer/supplier details, item prices when recorded, and the Receiving QR used to identify this shipment on arrival.')}
+                      <div style={styles.emailSupplierHint}>
+                        {ui('Opens a confirmation preview first. The Receiving QR identifies this shipment on arrival.')}
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
 
                   <button
                     type="button"

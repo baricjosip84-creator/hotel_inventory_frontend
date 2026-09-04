@@ -155,6 +155,58 @@ type CreateShipmentFromPurchaseOrderResponse = {
   copied_total_quantity?: number;
 };
 
+
+type SendShipmentToSupplierResponse = {
+  message?: string;
+  shipment_id?: string;
+  po_number?: string | null;
+  supplier_email?: string | null;
+  recipient_email?: string | null;
+  pdf_filename?: string;
+  qr_filename?: string;
+  delivery_method?: string;
+  sandbox_capture?: boolean;
+  attachments?: Array<{ filename?: string | null; content_type?: string | null }>;
+};
+
+type SupplierEmailPreview = {
+  recipient_email: string;
+  subject: string;
+  message?: string | null;
+  qr_image_data_uri?: string | null;
+  document: {
+    document_title: string;
+    shipment_id: string;
+    linked_purchase_order_id?: string | null;
+    po_number?: string | null;
+    issue_date?: string | null;
+    expected_delivery_date?: string | null;
+    delivery_address?: string | null;
+    payment_terms?: string | null;
+    notes?: string | null;
+    approved_by?: string | null;
+    currency?: string | null;
+    show_pricing?: boolean;
+    pricing_complete?: boolean | null;
+    subtotal?: number | null;
+    qr_code: string;
+    qr_purpose: string;
+    pdf_filename: string;
+    buyer: { name: string; address?: string | null; email?: string | null; phone?: string | null; tax_id?: string | null };
+    supplier: { name: string; address?: string | null; email?: string | null; phone?: string | null; tax_id?: string | null };
+    items: Array<{
+      product_id: string;
+      product_name: string;
+      sku?: string | null;
+      supplier_sku?: string | null;
+      quantity: number | string;
+      unit: string;
+      unit_price?: number | null;
+      line_total?: number | null;
+    }>;
+  };
+};
+
 /*
  * v3.49.116: The inbound-reservation action is intentionally hidden from the
  * Purchase Orders workflow. The backend capability is preserved for compatibility,
@@ -494,7 +546,7 @@ function deliveryBadgeStyle(status: string | null | undefined): CSSProperties {
 function nextActionLabelKey(status: string | null | undefined): string {
   if (status === 'submit_for_approval') return 'Submit for approval';
   if (status === 'approve_or_cancel') return 'Approve or cancel';
-  if (status === 'create_shipment') return 'Create shipment';
+  if (status === 'create_shipment') return 'Send to supplier';
   if (status === 'receive_open_shipment') return 'Receive shipment';
   if (status === 'follow_up_overdue') return 'Follow up overdue';
   if (status === 'monitor_receiving') return 'Monitor receiving';
@@ -778,6 +830,35 @@ async function createShipmentFromPurchaseOrder(
   });
 }
 
+async function previewShipmentSupplierEmail(input: {
+  shipmentId: string;
+  recipientEmail?: string;
+  message?: string;
+}): Promise<SupplierEmailPreview> {
+  return apiRequest<SupplierEmailPreview>(`/shipments/${input.shipmentId}/supplier-email-preview`, {
+    method: 'POST',
+    body: JSON.stringify({
+      recipient_email: input.recipientEmail?.trim() || null,
+      message: input.message?.trim() || null
+    })
+  });
+}
+
+async function sendShipmentToSupplier(input: {
+  shipmentId: string;
+  recipientEmail: string;
+  message?: string;
+}): Promise<SendShipmentToSupplierResponse> {
+  return apiRequest<SendShipmentToSupplierResponse>(`/shipments/${input.shipmentId}/send-to-supplier`, {
+    method: 'POST',
+    body: JSON.stringify({
+      recipient_email: input.recipientEmail.trim(),
+      message: input.message?.trim() || null,
+      confirmed: true
+    })
+  });
+}
+
 /*
  * v3.49.116: Intentionally not exposed on the Purchase Orders page.
  * Kept here as commented compatibility history rather than deleting the previous
@@ -861,6 +942,10 @@ export default function PurchaseOrdersPage() {
   const [cancelReason, setCancelReason] = useState('');
   const [closeReason, setCloseReason] = useState('');
   const [shipmentDeliveryDate, setShipmentDeliveryDate] = useState('');
+  const [supplierEmailPreview, setSupplierEmailPreview] = useState<SupplierEmailPreview | null>(null);
+  const [supplierEmailRecipient, setSupplierEmailRecipient] = useState('');
+  const [supplierEmailMessage, setSupplierEmailMessage] = useState('');
+  const [supplierEmailShipmentId, setSupplierEmailShipmentId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>(() => sortKeyFromSearchParams(searchParams));
   const [currentPage, setCurrentPage] = useState<number>(() => pageFromSearchParams(searchParams));
   const [pageSize, setPageSize] = useState<number>(() => pageSizeFromSearchParams(searchParams));
@@ -1175,23 +1260,92 @@ export default function PurchaseOrdersPage() {
     }
   });
 
-  const createShipmentMutation = useMutation({
-    mutationFn: ({ id, deliveryDate, version }: { id: string; deliveryDate?: string | null; version?: number | string | null }) =>
-      createShipmentFromPurchaseOrder(id, deliveryDate, version),
-    onSuccess: (payload, variables) => {
-      setShipmentDeliveryDate('');
+  const preparePurchaseOrderSupplierEmailMutation = useMutation({
+    mutationFn: async ({
+      purchaseOrderId,
+      version,
+      deliveryDate,
+      existingShipmentId
+    }: {
+      purchaseOrderId: string;
+      version?: number | string | null;
+      deliveryDate?: string | null;
+      existingShipmentId?: string | null;
+    }) => {
+      let shipmentId = existingShipmentId || null;
+      let createdShipment = false;
 
-      // v3.49.117: Move to the receiving workspace immediately. Do not keep the
-      // Purchase Orders page mounted while several cache invalidations finish.
-      navigate(`/shipments?shipmentId=${encodeURIComponent(payload.shipment.id)}&source=purchase-order`);
+      if (!shipmentId) {
+        const payload = await createShipmentFromPurchaseOrder(purchaseOrderId, deliveryDate, version);
+        shipmentId = payload.shipment.id;
+        createdShipment = true;
+      }
 
-      // Refresh source/list data in the background after navigation. The Shipments
-      // page opens the returned shipment by id, so it does not depend on stale list
-      // cache being refreshed before the handoff can complete.
+      const preview = await previewShipmentSupplierEmail({ shipmentId });
+      return { preview, shipmentId, createdShipment, purchaseOrderId };
+    },
+    onSuccess: ({ preview, shipmentId, createdShipment, purchaseOrderId }) => {
+      setSupplierEmailPreview(preview);
+      setSupplierEmailRecipient(preview.recipient_email || '');
+      setSupplierEmailMessage(preview.message || '');
+      setSupplierEmailShipmentId(shipmentId);
+      setFormError(null);
+
+      if (createdShipment) {
+        setShipmentDeliveryDate('');
+        void queryClient.invalidateQueries({ queryKey: ['shipments'] });
+        void queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+        void queryClient.invalidateQueries({ queryKey: ['purchase-order', purchaseOrderId] });
+      }
+    },
+    onError: (error) => {
+      setSupplierEmailPreview(null);
+      setSupplierEmailShipmentId(null);
+      setFormError(error instanceof ApiError ? error.message : ui('Failed to prepare supplier email preview.'));
+    }
+  });
+
+  const sendPurchaseOrderToSupplierMutation = useMutation({
+    mutationFn: sendShipmentToSupplier,
+    onSuccess: (data) => {
+      const recipientEmail = data.recipient_email || data.supplier_email || ui('supplier');
+      const poLabel = data.po_number ? ui(' for PO {po}').replace('{po}', data.po_number) : '';
+      const attachmentNames = data.attachments
+        ?.map((attachment) => attachment.filename)
+        .filter((filename): filename is string => Boolean(filename)) ?? [];
+      const attachmentLabel = attachmentNames.length > 0
+        ? ui(' Attachments: {attachments}.').replace('{attachments}', attachmentNames.join(', '))
+        : ui(' QR information was included by the backend when available.');
+      const fallbackMessage = data.sandbox_capture
+        ? ui('✔ Purchase order test email{poLabel} captured in Mailtrap Sandbox for {recipient}.{attachmentLabel}')
+            .replace('{poLabel}', poLabel)
+            .replace('{recipient}', recipientEmail)
+            .replace('{attachmentLabel}', attachmentLabel)
+        : ui('✔ Purchase order{poLabel} emailed to {recipient}.{attachmentLabel}')
+            .replace('{poLabel}', poLabel)
+            .replace('{recipient}', recipientEmail)
+            .replace('{attachmentLabel}', attachmentLabel);
+
+      showTenantActionSuccess(data.message || fallbackMessage);
+      setSupplierEmailPreview(null);
+      setSupplierEmailRecipient('');
+      setSupplierEmailMessage('');
+      setSupplierEmailShipmentId(null);
+      setFormError(null);
+
       void queryClient.invalidateQueries({ queryKey: ['shipments'] });
       void queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
-      void queryClient.invalidateQueries({ queryKey: ['purchase-order', variables.id] });
-      void queryClient.invalidateQueries({ queryKey: ['purchase-order', 'audit', variables.id] });
+      if (selectedId) {
+        void queryClient.invalidateQueries({ queryKey: ['purchase-order', selectedId] });
+        void queryClient.invalidateQueries({ queryKey: ['purchase-order', 'audit', selectedId] });
+      }
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.code === 'EMAIL_NOT_CONFIGURED') {
+        setFormError(ui('Supplier email is not configured on this server. Configure backend email settings before sending the purchase order.'));
+      } else {
+        setFormError(error instanceof ApiError ? error.message : ui('Failed to email purchase order to supplier.'));
+      }
     }
   });
 
@@ -1719,7 +1873,6 @@ export default function PurchaseOrdersPage() {
   };
 
   const actionError = normalizeError(actionMutation.error, ui('Purchase order action failed.'), ui);
-  const createShipmentError = normalizeError(createShipmentMutation.error, ui('Creating shipment from purchase order failed.'), ui);
   // v3.49.116: inbound-reservation action is intentionally hidden from this page.
   // const createInboundReservationError = normalizeError(createInboundReservationMutation.error, ui('Creating inbound reservation from purchase order failed.'), ui);
   const formMutationError = normalizeError(createMutation.error || updateMutation.error, ui('Saving purchase order failed.'), ui);
@@ -1734,9 +1887,12 @@ export default function PurchaseOrdersPage() {
   const selectedRemainingQuantity = Number(selectedDetail?.receiving_summary?.remaining_quantity || 0);
   const selectedCanReopen = selectedDetail?.status === 'completed' && selectedDetail?.completion_type === 'manual_close' && selectedRemainingQuantity > 0;
   const selectedHasOpenShipment = Number(selectedDetail?.receiving_summary?.open_linked_shipment_count || 0) > 0;
-  const selectedCanCreateShipment = Boolean(
-    selectedDetail?.receiving_summary?.can_create_remaining_shipment ??
-    (selectedDetail?.status === 'approved' && selectedRemainingQuantity > 0 && !selectedHasOpenShipment)
+  const selectedOpenShipment = (selectedDetail?.linked_shipments || []).find((shipment) => shipment.status !== 'received') || null;
+  const selectedCanSendPurchaseOrder = Boolean(
+    selectedDetail?.status === 'approved' &&
+    selectedRemainingQuantity > 0 &&
+    capabilities.canManageShipments &&
+    capabilities.canSendShipments
   );
   /*
    * v3.49.116: Do not expose inbound reservations as a normal PO workflow action.
@@ -1773,6 +1929,58 @@ export default function PurchaseOrdersPage() {
     }
 
     actionMutation.mutate({ id: selectedDetail.id, action: 'approve', version: selectedDetail.version });
+  };
+
+
+  const prepareSelectedPurchaseOrderEmail = () => {
+    if (!selectedDetail || !selectedCanSendPurchaseOrder) return;
+
+    if (selectedHasOpenShipment && !selectedOpenShipment) {
+      const message = ui('The open receiving record could not be identified. Refresh the Purchase Order and try again.');
+      setFormError(message);
+      showTenantActionError(message);
+      return;
+    }
+
+    const deliveryDate = shipmentDeliveryDate || selectedDetail.expected_delivery_date || null;
+    if (!selectedOpenShipment && !deliveryDate) {
+      const message = ui('Delivery date is required before sending this purchase order.');
+      setFormError(message);
+      showTenantActionError(message);
+      return;
+    }
+
+    setFormError(null);
+    preparePurchaseOrderSupplierEmailMutation.mutate({
+      purchaseOrderId: selectedDetail.id,
+      version: selectedDetail.version,
+      deliveryDate,
+      existingShipmentId: selectedOpenShipment?.id || null
+    });
+  };
+
+  const closeSupplierEmailPreview = () => {
+    if (sendPurchaseOrderToSupplierMutation.isPending) return;
+    setSupplierEmailPreview(null);
+    setSupplierEmailRecipient('');
+    setSupplierEmailMessage('');
+    setSupplierEmailShipmentId(null);
+  };
+
+  const confirmPurchaseOrderEmailSend = () => {
+    if (!supplierEmailShipmentId || !supplierEmailPreview) return;
+    if (!supplierEmailRecipient.trim()) {
+      const message = ui('Enter a valid supplier email address before sending.');
+      setFormError(message);
+      showTenantActionError(message);
+      return;
+    }
+
+    sendPurchaseOrderToSupplierMutation.mutate({
+      shipmentId: supplierEmailShipmentId,
+      recipientEmail: supplierEmailRecipient,
+      message: supplierEmailMessage
+    });
   };
 
   if (subscriptionAccessQuery.isLoading) {
@@ -1951,13 +2159,13 @@ export default function PurchaseOrdersPage() {
             [ui('1. Create a draft'), ui('Choose the supplier first. Product choices are then limited to products assigned to that supplier.')],
             [ui('2. Submit for approval'), ui('Submitting sends the draft into the approval step. Stock still does not change.')],
             [ui('3. Approve the order'), ui('Approval authorizes the order. It still does not mean the goods have arrived.')],
-            [ui('4. Create a shipment'), ui('A shipment is the receiving record for an expected delivery. Only one open shipment should exist for a Purchase Order at a time.')],
-            [ui('5. Receive the goods'), ui('Receiving happens on the Shipments page. Stock increases only when quantities are actually received.')]
+            [ui('4. Send to supplier'), ui('Send the approved Purchase Order. The receiving record is prepared automatically.')],
+            [ui('5. Receive the delivery'), ui('When the goods arrive, open Shipments and confirm what was delivered. That is when stock increases.')]
           ].map(([title, text]) => <div key={title}><strong>{title}</strong><span>{text}</span></div>)}
         </div>
         <div className="purchase-orders-guide-note">
           <strong>{ui('What the main areas mean')}</strong>
-          <span>{ui('Orders = find existing Purchase Orders. Create order = make or edit a draft. Order detail = submit, approve, create shipments, review receiving, close or cancel, export, and review audit history.')}</span>
+          <span>{ui('Orders = find existing Purchase Orders. Create order = make or edit a draft. Order detail = submit, approve, send to the supplier, review receiving, close or cancel, export, and review audit history.')}</span>
         </div>
       </section>
 
@@ -2059,7 +2267,7 @@ export default function PurchaseOrdersPage() {
                 <option value="">{ui("All next actions")}</option>
                 <option value="submit_for_approval">{ui("Submit for approval")}</option>
                 <option value="approve_or_cancel">{ui("Approve or cancel")}</option>
-                <option value="create_shipment">{ui("Create shipment")}</option>
+                <option value="create_shipment">{ui("Send to supplier")}</option>
                 <option value="receive_open_shipment">{ui("Receive shipment")}</option>
                 <option value="follow_up_overdue">{ui("Follow up overdue")}</option>
                 <option value="monitor_receiving">{ui("Monitor receiving")}</option>
@@ -2319,7 +2527,7 @@ export default function PurchaseOrdersPage() {
           <OperationalSectionHeader
             iconPath="/purchase-orders"
             title={editingId ? ui('Edit purchase order draft') : ui('Create purchase order')}
-            description={editingId ? ui('Update the selected draft before it is submitted for approval.') : ui('Create a draft supplier order. Submission, approval, shipment creation, and receiving remain separate steps.')}
+            description={editingId ? ui('Update the selected draft before it is submitted for approval.') : ui('Create a draft supplier order. Submit it, approve it, send it to the supplier, then receive the delivery later.')}
             actions={<button type="button" className="app-button app-button--secondary" onClick={addItem}>{ui("Add item")}</button>}
           />
 
@@ -2536,14 +2744,37 @@ export default function PurchaseOrdersPage() {
                 ) : null}
               </div>
 
-              {selectedCanCreateShipment && capabilities.canManageShipments ? (
+              {selectedCanSendPurchaseOrder ? (
                 <div className="purchase-orders-action-panel">
-                  <div><strong>{ui("Create shipment")}</strong><span>{ui("Creates a shipment for the quantity still due on this PO. Stock changes only when goods are received.")}</span></div>
-                  <label className="purchase-orders-field"><span>{ui("Delivery date")}</span><input type="date" value={shipmentDeliveryDate} onChange={(event) => setShipmentDeliveryDate(event.target.value)} /></label>
-                  <button type="button" className="app-button app-button--primary" disabled={createShipmentMutation.isPending || selectedHasOpenShipment} onClick={() => createShipmentMutation.mutate({ id: selectedDetail.id, deliveryDate: shipmentDeliveryDate || selectedDetail.expected_delivery_date || null, version: selectedDetail.version })}>{ui("Create shipment")}</button>
-                  {createShipmentMutation.error ? <p style={styles.error}>{createShipmentError}</p> : null}
+                  <div><strong>{ui("Send to supplier")}</strong><span>{ui("Send the approved Purchase Order. Receiving is prepared automatically.")}</span></div>
+                  {!selectedOpenShipment && !selectedDetail.expected_delivery_date ? (
+                    <label className="purchase-orders-field"><span>{ui("Delivery date")}</span><input type="date" value={shipmentDeliveryDate} onChange={(event) => setShipmentDeliveryDate(event.target.value)} /></label>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="app-button app-button--primary"
+                    disabled={preparePurchaseOrderSupplierEmailMutation.isPending || sendPurchaseOrderToSupplierMutation.isPending}
+                    onClick={prepareSelectedPurchaseOrderEmail}
+                  >
+                    {preparePurchaseOrderSupplierEmailMutation.isPending ? ui('Preparing Preview...') : ui('Send to supplier')}
+                  </button>
+                  {preparePurchaseOrderSupplierEmailMutation.error ? <p style={styles.error}>{normalizeError(preparePurchaseOrderSupplierEmailMutation.error, ui('Failed to prepare supplier email preview.'), ui)}</p> : null}
                 </div>
               ) : null}
+
+              {/*
+                v3.49.118: Manual Create shipment is intentionally not exposed in the
+                normal Purchase Order workflow. Sending an approved PO prepares or
+                reuses the open receiving shipment automatically, then uses the same
+                shipment-backed supplier email/PDF/QR pipeline.
+
+                {selectedCanCreateShipment && capabilities.canManageShipments ? (
+                  <div className="purchase-orders-action-panel">
+                    <div><strong>{ui("Create shipment")}</strong></div>
+                    <button type="button">{ui("Create shipment")}</button>
+                  </div>
+                ) : null}
+              */}
 
               {/*
                 v3.49.116: Inbound reservation action intentionally hidden. It was a
@@ -2679,11 +2910,135 @@ export default function PurchaseOrdersPage() {
           ) : null}
         </section>
       </div>
+
+      {supplierEmailPreview ? (
+        <div style={styles.emailPreviewOverlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeSupplierEmailPreview(); }}>
+          <section style={styles.emailPreviewModal} role="dialog" aria-modal="true" aria-labelledby="purchase-order-supplier-email-preview-title">
+            <div style={styles.emailPreviewHeader}>
+              <div>
+                <h3 id="purchase-order-supplier-email-preview-title" style={styles.emailPreviewTitle}>{ui('Supplier Email Preview')}</h3>
+                <div className="purchase-orders-muted">{ui('Review the recipient, message, {documentTitle}, and Receiving QR. Nothing has been sent yet.').replace('{documentTitle}', supplierEmailPreview.document.document_title)}</div>
+              </div>
+              <button type="button" className="app-button app-button--secondary" onClick={closeSupplierEmailPreview} disabled={sendPurchaseOrderToSupplierMutation.isPending}>{ui('Close')}</button>
+            </div>
+
+            <div style={styles.emailPreviewFields}>
+              <label className="purchase-orders-field">
+                <span>{ui('To')}</span>
+                <input type="email" value={supplierEmailRecipient} onChange={(event) => setSupplierEmailRecipient(event.target.value)} disabled={sendPurchaseOrderToSupplierMutation.isPending} />
+              </label>
+              <label className="purchase-orders-field">
+                <span>{ui('Subject')}</span>
+                <input value={supplierEmailPreview.subject} readOnly />
+              </label>
+              <label className="purchase-orders-field purchase-orders-field--full">
+                <span>{ui('Optional email message')}</span>
+                <textarea style={styles.emailMessageInput} value={supplierEmailMessage} onChange={(event) => setSupplierEmailMessage(event.target.value)} maxLength={4000} disabled={sendPurchaseOrderToSupplierMutation.isPending} placeholder={ui('Optional message to supplier')} />
+              </label>
+            </div>
+
+            <div style={styles.documentPreview}>
+              <div style={styles.documentPreviewHeader}>
+                <div>
+                  <div style={styles.documentTitle}>{supplierEmailPreview.document.document_title}</div>
+                  <div className="purchase-orders-muted">{ui('PO / Reference')}: {supplierEmailPreview.document.po_number || supplierEmailPreview.document.shipment_id}</div>
+                </div>
+                {supplierEmailPreview.qr_image_data_uri ? <img src={supplierEmailPreview.qr_image_data_uri} alt={ui('Receiving QR code')} style={styles.previewQr} /> : null}
+              </div>
+
+              <div style={styles.documentPartyGrid}>
+                <div style={styles.documentPartyCard}>
+                  <strong>{ui('Buyer / Delivery To')}</strong>
+                  <span>{supplierEmailPreview.document.buyer.name}</span>
+                  <span>{supplierEmailPreview.document.buyer.address || ui('Business address not recorded')}</span>
+                  <span>{supplierEmailPreview.document.buyer.email || ui('Business email not recorded')}</span>
+                  <span>{supplierEmailPreview.document.buyer.phone || ui('Business phone not recorded')}</span>
+                  {supplierEmailPreview.document.buyer.tax_id ? <span>{ui('Tax / VAT ID:')} {supplierEmailPreview.document.buyer.tax_id}</span> : null}
+                </div>
+                <div style={styles.documentPartyCard}>
+                  <strong>{ui('Supplier')}</strong>
+                  <span>{supplierEmailPreview.document.supplier.name}</span>
+                  <span>{supplierEmailPreview.document.supplier.address || ui('Supplier address not recorded')}</span>
+                  <span>{supplierEmailPreview.document.supplier.email || supplierEmailRecipient}</span>
+                  <span>{supplierEmailPreview.document.supplier.phone || ui('Supplier phone not recorded')}</span>
+                  {supplierEmailPreview.document.supplier.tax_id ? <span>{ui('Tax / VAT ID:')} {supplierEmailPreview.document.supplier.tax_id}</span> : null}
+                </div>
+              </div>
+
+              <div style={styles.documentMetaGrid}>
+                <span><strong>{ui('Issue:')}</strong> {formatDate(supplierEmailPreview.document.issue_date)}</span>
+                <span><strong>{ui('Expected delivery:')}</strong> {formatDate(supplierEmailPreview.document.expected_delivery_date)}</span>
+                <span><strong>{ui('Delivery address:')}</strong> {supplierEmailPreview.document.delivery_address || ui('Not specified')}</span>
+                <span><strong>{ui('Payment terms:')}</strong> {supplierEmailPreview.document.payment_terms || ui('Not specified')}</span>
+                <span><strong>{ui('Approved by:')}</strong> {supplierEmailPreview.document.approved_by || ui('Not specified')}</span>
+                <span><strong>{ui('Currency:')}</strong> {supplierEmailPreview.document.currency || ui('Not specified')}</span>
+              </div>
+
+              {supplierEmailPreview.document.notes ? <div style={styles.documentNotes}><strong>{ui('PO notes')}:</strong> {supplierEmailPreview.document.notes}</div> : null}
+
+              <div className="purchase-orders-table-wrap">
+                <table className="purchase-orders-table purchase-orders-table--detail">
+                  <thead><tr><th>{ui('SKU')}</th><th>{ui('Product')}</th><th>{ui('Qty')}</th><th>{ui('UoM')}</th><th>{ui('Unit price')}</th><th>{ui('Line total')}</th></tr></thead>
+                  <tbody>
+                    {supplierEmailPreview.document.items.map((item) => (
+                      <tr key={item.product_id}>
+                        <td>{item.supplier_sku || item.sku || ui('Not specified')}</td>
+                        <td>{item.product_name}</td>
+                        <td>{formatNumber(item.quantity)}</td>
+                        <td>{item.unit || ui('Not specified')}</td>
+                        <td>{item.unit_price == null ? ui('Not specified') : formatMoney(item.unit_price, supplierEmailPreview.document.currency)}</td>
+                        <td>{item.line_total == null ? ui('Not specified') : formatMoney(item.line_total, supplierEmailPreview.document.currency)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={styles.documentTotal}><strong>{ui('Order subtotal:')}</strong> {supplierEmailPreview.document.subtotal == null ? ui('Not specified') : formatMoney(supplierEmailPreview.document.subtotal, supplierEmailPreview.document.currency)}</div>
+              {supplierEmailPreview.document.pricing_complete === false ? <div style={styles.emailPreviewWarning}>{ui('One or more lines do not have a recorded unit price. The document shows “Not specified” rather than inventing a value.')}</div> : null}
+              <div style={styles.qrPurposeBox}>
+                <strong>{ui('Receiving QR Code')}</strong>
+                <span>{supplierEmailPreview.document.qr_code}</span>
+                <span>{supplierEmailPreview.document.qr_purpose}</span>
+              </div>
+              <div style={styles.attachmentLine}>{ui('PDF attachment:')} <strong>{supplierEmailPreview.document.pdf_filename}</strong></div>
+            </div>
+
+            <div style={styles.emailConfirmationBox}>{ui('This email and attached {documentTitle} will be sent to {recipient}.').replace('{documentTitle}', supplierEmailPreview.document.document_title).replace('{recipient}', supplierEmailRecipient || ui('the entered recipient'))}</div>
+            <div style={styles.emailPreviewActions}>
+              <button type="button" className="app-button app-button--secondary" onClick={closeSupplierEmailPreview} disabled={sendPurchaseOrderToSupplierMutation.isPending}>{ui('Cancel')}</button>
+              <button type="button" className="app-button app-button--primary" onClick={confirmPurchaseOrderEmailSend} disabled={sendPurchaseOrderToSupplierMutation.isPending || !supplierEmailRecipient.trim()}>
+                {sendPurchaseOrderToSupplierMutation.isPending ? ui('Sending...') : ui('Confirm & Send Email')}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 const styles: Record<string, CSSProperties> = {
+  emailPreviewOverlay: { position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(15, 23, 42, 0.58)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  emailPreviewModal: { width: 'min(1080px, 96vw)', maxHeight: '92vh', overflowY: 'auto', background: '#ffffff', borderRadius: 14, border: '1px solid #e2e8f0', boxShadow: '0 24px 70px rgba(15,23,42,0.28)', padding: 22, display: 'grid', gap: 18 },
+  emailPreviewHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 },
+  emailPreviewTitle: { margin: 0, fontSize: 22 },
+  emailPreviewFields: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 },
+  emailMessageInput: { width: '100%', boxSizing: 'border-box', minHeight: 78, resize: 'vertical', border: '1px solid #cbd5e1', borderRadius: 10, padding: '10px 12px', fontSize: 14, background: '#ffffff' },
+  documentPreview: { border: '1px solid #d1d5db', borderRadius: 12, padding: 18, display: 'grid', gap: 15, background: '#ffffff' },
+  documentPreviewHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 18 },
+  documentTitle: { fontSize: 20, fontWeight: 800 },
+  previewQr: { width: 128, height: 128, objectFit: 'contain', border: '1px solid #e5e7eb', padding: 5, background: '#fff' },
+  documentPartyGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 },
+  documentPartyCard: { border: '1px solid #e5e7eb', borderRadius: 10, padding: 12, display: 'grid', gap: 4, whiteSpace: 'pre-line' },
+  documentMetaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 8, fontSize: 13 },
+  documentNotes: { padding: 10, background: '#f8fafc', borderRadius: 8, whiteSpace: 'pre-wrap' },
+  documentTotal: { textAlign: 'right', fontSize: 16 },
+  emailPreviewWarning: { padding: 10, borderRadius: 8, background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a' },
+  qrPurposeBox: { display: 'grid', gap: 5, padding: 12, borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0', wordBreak: 'break-word' },
+  attachmentLine: { fontSize: 13, color: '#475569' },
+  emailConfirmationBox: { padding: 12, borderRadius: 10, background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e3a8a' },
+  emailPreviewActions: { display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' },
   badge: { display: 'inline-flex', alignItems: 'center', borderRadius: 999, padding: '4px 10px', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' },
   draftBadge: { background: '#f1f5f9', color: '#334155' },
   submittedBadge: { background: '#fef3c7', color: '#92400e' },
