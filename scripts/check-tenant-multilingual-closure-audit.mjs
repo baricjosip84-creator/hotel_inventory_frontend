@@ -155,6 +155,10 @@ assert(closureFiles.appProviders.includes("item.surface === 'tenant'"), 'toast r
 assert(closureFiles.appProviders.includes('translateTenantFeedbackMessage(ui, item.message)'), 'tenant API feedback must translate only explicitly frontend-owned messages');
 assert(closureFiles.appProviders.includes("aria-label={tenant ? ui('Dismiss message') : 'Dismiss platform message'}"), 'tenant toast accessibility label must be translated without converting Platform presentation');
 assert(closureFiles.systemContextChecker.includes('process.env.BACKEND_ROOT') && closureFiles.systemContextChecker.includes('backend contract validation deferred to the cross-repository CI job'), 'System Context checker must honor BACKEND_ROOT and remain frontend-only-CI compatible');
+const advancedInventoryChecker = read('scripts/check-tenant-advanced-inventory-multilingual.mjs');
+const scannerMovementsTransfersChecker = read('scripts/check-tenant-scanner-movements-transfers-multilingual.mjs');
+assert(advancedInventoryChecker.includes('process.env.BACKEND_ROOT') && advancedInventoryChecker.includes('backend contract validation deferred to the cross-repository CI job'), 'Advanced Inventory checker must honor BACKEND_ROOT and remain frontend-only-CI compatible');
+assert(scannerMovementsTransfersChecker.includes('process.env.BACKEND_ROOT') && scannerMovementsTransfersChecker.includes('backend integrity validation deferred to the cross-repository CI job'), 'Scanner/Movements/Transfers checker must honor BACKEND_ROOT and remain frontend-only-CI compatible');
 assert(String(closureFiles.packageJson.scripts?.['check:cross-repo'] || '').includes('npm run check:tenant-system-context-multilingual'), 'check:cross-repo must enforce the System Context backend contract through the repository script');
 
 const requiredFeedbackKeys = new Set([
