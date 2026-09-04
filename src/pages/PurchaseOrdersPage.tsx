@@ -155,11 +155,17 @@ type CreateShipmentFromPurchaseOrderResponse = {
   copied_total_quantity?: number;
 };
 
-type InboundReservationResponse = {
-  id: string;
-  reservation_number?: string | null;
-  status?: string | null;
-};
+/*
+ * v3.49.116: The inbound-reservation action is intentionally hidden from the
+ * Purchase Orders workflow. The backend capability is preserved for compatibility,
+ * but this tenant page no longer presents it as a normal PO action.
+ *
+ * type InboundReservationResponse = {
+ *   id: string;
+ *   reservation_number?: string | null;
+ *   status?: string | null;
+ * };
+ */
 
 type PurchaseOrderFormItem = {
   product_id: string;
@@ -772,16 +778,22 @@ async function createShipmentFromPurchaseOrder(
   });
 }
 
-async function createInboundReservationFromPurchaseOrder(
-  id: string,
-  version?: number | string | null
-): Promise<InboundReservationResponse> {
-  return apiRequest<InboundReservationResponse>(`/inventory-reservations/from-purchase-order/${id}`, {
-    method: 'POST',
-    headers: buildIfMatchHeaders(version),
-    body: JSON.stringify({ activate: true, linkage_note: 'Protect open inbound purchase order quantity' })
-  });
-}
+/*
+ * v3.49.116: Intentionally not exposed on the Purchase Orders page.
+ * Kept here as commented compatibility history rather than deleting the previous
+ * integration path outright.
+ *
+ * async function createInboundReservationFromPurchaseOrder(
+ *   id: string,
+ *   version?: number | string | null
+ * ): Promise<InboundReservationResponse> {
+ *   return apiRequest<InboundReservationResponse>(`/inventory-reservations/from-purchase-order/${id}`, {
+ *     method: 'POST',
+ *     headers: buildIfMatchHeaders(version),
+ *     body: JSON.stringify({ activate: true, linkage_note: 'Protect open inbound purchase order quantity' })
+ *   });
+ * }
+ */
 
 function detailToForm(detail: PurchaseOrderDetail): PurchaseOrderFormState {
   return {
@@ -1176,17 +1188,22 @@ export default function PurchaseOrdersPage() {
     }
   });
 
-  const createInboundReservationMutation = useMutation({
-    mutationFn: ({ id, version }: { id: string; version?: number | string | null }) =>
-      createInboundReservationFromPurchaseOrder(id, version),
-    onSuccess: async (reservation, variables) => {
-      await queryClient.invalidateQueries({ queryKey: ['inventory-reservations'] });
-      await queryClient.invalidateQueries({ queryKey: ['inventory-reservations-summary'] });
-      await queryClient.invalidateQueries({ queryKey: ['purchase-order', variables.id] });
-      await queryClient.invalidateQueries({ queryKey: ['purchase-order', 'audit', variables.id] });
-      navigate(`/inventory-reservations?reservationId=${encodeURIComponent(reservation.id)}`);
-    }
-  });
+  /*
+   * v3.49.116: Inbound reservation creation is intentionally not offered from the
+   * Purchase Orders page. Supporting backend behavior remains untouched.
+   *
+   * const createInboundReservationMutation = useMutation({
+   *   mutationFn: ({ id, version }: { id: string; version?: number | string | null }) =>
+   *     createInboundReservationFromPurchaseOrder(id, version),
+   *   onSuccess: async (reservation, variables) => {
+   *     await queryClient.invalidateQueries({ queryKey: ['inventory-reservations'] });
+   *     await queryClient.invalidateQueries({ queryKey: ['inventory-reservations-summary'] });
+   *     await queryClient.invalidateQueries({ queryKey: ['purchase-order', variables.id] });
+   *     await queryClient.invalidateQueries({ queryKey: ['purchase-order', 'audit', variables.id] });
+   *     navigate(`/inventory-reservations?reservationId=${encodeURIComponent(reservation.id)}`);
+   *   }
+   * });
+   */
 
   const validateForm = (): string | null => {
     if (!form.supplier_id) return ui('Supplier is required.');
@@ -1696,7 +1713,8 @@ export default function PurchaseOrdersPage() {
 
   const actionError = normalizeError(actionMutation.error, ui('Purchase order action failed.'), ui);
   const createShipmentError = normalizeError(createShipmentMutation.error, ui('Creating shipment from purchase order failed.'), ui);
-  const createInboundReservationError = normalizeError(createInboundReservationMutation.error, ui('Creating inbound reservation from purchase order failed.'), ui);
+  // v3.49.116: inbound-reservation action is intentionally hidden from this page.
+  // const createInboundReservationError = normalizeError(createInboundReservationMutation.error, ui('Creating inbound reservation from purchase order failed.'), ui);
   const formMutationError = normalizeError(createMutation.error || updateMutation.error, ui('Saving purchase order failed.'), ui);
 
   const selectedCanEdit = isPurchaseOrderEditable(selectedDetail?.status);
@@ -1713,12 +1731,15 @@ export default function PurchaseOrdersPage() {
     selectedDetail?.receiving_summary?.can_create_remaining_shipment ??
     (selectedDetail?.status === 'approved' && selectedRemainingQuantity > 0 && !selectedHasOpenShipment)
   );
-  const selectedCanCreateInboundReservation = Boolean(
-    capabilities.canCreateInventoryReservations &&
-    selectedDetail &&
-    ['submitted', 'approved'].includes(String(selectedDetail.status)) &&
-    selectedRemainingQuantity > 0
-  );
+  /*
+   * v3.49.116: Do not expose inbound reservations as a normal PO workflow action.
+   * const selectedCanCreateInboundReservation = Boolean(
+   *   capabilities.canCreateInventoryReservations &&
+   *   selectedDetail &&
+   *   ['submitted', 'approved'].includes(String(selectedDetail.status)) &&
+   *   selectedRemainingQuantity > 0
+   * );
+   */
 
   const selectedCostIssue = selectedDetail ? purchaseOrderCostIssue(selectedDetail) : null;
 
@@ -2510,20 +2531,26 @@ export default function PurchaseOrdersPage() {
 
               {selectedCanCreateShipment && capabilities.canManageShipments ? (
                 <div className="purchase-orders-action-panel">
-                  <div><strong>{ui("Create shipment")}</strong><span>{ui("Copy the remaining order quantity into a pending shipment. Stock is not changed until receiving.")}</span></div>
+                  <div><strong>{ui("Create shipment")}</strong><span>{ui("Creates a shipment for the quantity still due on this PO. Stock changes only when goods are received.")}</span></div>
                   <label className="purchase-orders-field"><span>{ui("Delivery date")}</span><input type="date" value={shipmentDeliveryDate} onChange={(event) => setShipmentDeliveryDate(event.target.value)} /></label>
-                  <button type="button" className="app-button app-button--primary" disabled={createShipmentMutation.isPending || selectedHasOpenShipment} onClick={() => createShipmentMutation.mutate({ id: selectedDetail.id, deliveryDate: shipmentDeliveryDate || selectedDetail.expected_delivery_date || null, version: selectedDetail.version })}>{ui("Create remaining shipment")}</button>
+                  <button type="button" className="app-button app-button--primary" disabled={createShipmentMutation.isPending || selectedHasOpenShipment} onClick={() => createShipmentMutation.mutate({ id: selectedDetail.id, deliveryDate: shipmentDeliveryDate || selectedDetail.expected_delivery_date || null, version: selectedDetail.version })}>{ui("Create shipment")}</button>
                   {createShipmentMutation.error ? <p style={styles.error}>{createShipmentError}</p> : null}
                 </div>
               ) : null}
 
-              {selectedCanCreateInboundReservation ? (
-                <div className="purchase-orders-action-panel">
-                  <div><strong>{ui("Create inbound reservation")}</strong><span>{ui("Track the expected inbound quantity without reserving current on-hand stock.")}</span></div>
-                  <button type="button" className="app-button app-button--secondary" disabled={createInboundReservationMutation.isPending} onClick={() => createInboundReservationMutation.mutate({ id: selectedDetail.id, version: selectedDetail.version })}>{createInboundReservationMutation.isPending ? ui('Creating reservation…') : ui('Create inbound reservation')}</button>
-                  {createInboundReservationMutation.error ? <p style={styles.error}>{createInboundReservationError}</p> : null}
-                </div>
-              ) : null}
+              {/*
+                v3.49.116: Inbound reservation action intentionally hidden. It was a
+                planning-only record and made the normal PO -> Shipment receiving flow
+                look like there were two competing ways to receive supplier goods.
+
+                {selectedCanCreateInboundReservation ? (
+                  <div className="purchase-orders-action-panel">
+                    <div><strong>{ui("Create inbound reservation")}</strong><span>{ui("Track the expected inbound quantity without reserving current on-hand stock.")}</span></div>
+                    <button type="button" className="app-button app-button--secondary" disabled={createInboundReservationMutation.isPending} onClick={() => createInboundReservationMutation.mutate({ id: selectedDetail.id, version: selectedDetail.version })}>{createInboundReservationMutation.isPending ? ui('Creating reservation…') : ui('Create inbound reservation')}</button>
+                    {createInboundReservationMutation.error ? <p style={styles.error}>{createInboundReservationError}</p> : null}
+                  </div>
+                ) : null}
+              */}
 
               {selectedCanClose && capabilities.canCancelPurchaseOrders ? (
                 <div className="purchase-orders-action-panel purchase-orders-action-panel--danger">

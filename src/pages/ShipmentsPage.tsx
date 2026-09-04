@@ -2673,7 +2673,9 @@ export default function ShipmentsPage() {
             <OperationalSectionHeader
               iconPath="/scanner"
               title={ui('Selected Shipment')}
-              description={ui('Add shipment lines, receive stock into locations, document shortages, and finalize the shipment.')}
+              description={selectedShipment?.purchase_order_id
+                ? ui('This shipment came from a purchase order. Receive the goods here.')
+                : ui('Add shipment lines, receive stock into locations, document shortages, and finalize the shipment.')}
             />
           </div>
 
@@ -2697,6 +2699,13 @@ export default function ShipmentsPage() {
             </div>
           ) : (
             <>
+              {selectedShipment.purchase_order_id ? (
+                <div style={{ ...styles.readOnlyNotice, marginBottom: 14 }}>
+                  {ui('From PO {po}. Receive the goods below. The PO updates automatically as quantities are received.')
+                    .replace('{po}', selectedShipment.linked_purchase_order_number || selectedShipment.purchase_order_id)}
+                </div>
+              ) : null}
+
               <div style={styles.workflowGuideGrid}>
                 {shipmentWorkflowSteps.map((step) => (
                   <article
@@ -2752,7 +2761,7 @@ export default function ShipmentsPage() {
                           {ui('Open PO')}
                         </button>
                         <div style={{ marginTop: 8, color: '#64748b', fontSize: '0.85rem', lineHeight: 1.4 }}>
-                          {ui('Receiving this shipment updates stock through the existing shipment flow and refreshes linked PO progress.')}
+                          {ui('The PO updates automatically when items are received here.')}
                         </div>
                       </>
                     ) : null}
