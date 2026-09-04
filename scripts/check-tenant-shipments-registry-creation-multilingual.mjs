@@ -134,8 +134,8 @@ for (const required of [
 if (!process.exitCode) pass('Supplier names, PO numbers, access-role data, shipment IDs, and backend/API error detail remain raw while frontend-owned presentation is localized.');
 
 for (const required of [
-  "ui('Optional bridge only. Linking an approved Purchase Order does not change stock or receiving logic.')",
-  "ui('Optional bridge only: this links an approved Purchase Order to the shipment without changing stock or receiving logic.')",
+  "ui('Only approved Purchase Orders with remaining quantity and no other open shipment are available here. Linking does not change stock.')",
+  "ui('Only approved Purchase Orders with remaining quantity and no other open shipment are available. Linking does not change stock.')",
   "ui('This role can review shipments but cannot create or edit shipment headers.')",
   "ui('Shipments write permission required')",
   "ui('Select a supplier and delivery date before creating a shipment.')"

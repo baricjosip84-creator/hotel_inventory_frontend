@@ -106,6 +106,11 @@ type PurchaseOrderOption = {
   po_number: string;
   status: string;
   expected_delivery_date?: string | null;
+  ordered_quantity?: number | string;
+  received_quantity?: number | string;
+  remaining_quantity?: number | string;
+  open_linked_shipment_count?: number | string;
+  can_create_shipment?: boolean;
   items?: Array<{
     product_id: string;
     quantity: number | string;
@@ -1005,13 +1010,16 @@ export default function ShipmentsPage() {
     [purchaseOrdersFeatureReady, shipmentOptionsQuery.data]
   );
   const linkablePurchaseOrders = useMemo(() => {
-    if (!shipmentForm.supplier_id) return approvedPurchaseOrders;
-    return approvedPurchaseOrders.filter((order) => order.supplier_id === shipmentForm.supplier_id);
+    if (!shipmentForm.supplier_id) return [];
+    return approvedPurchaseOrders.filter((order) => order.supplier_id === shipmentForm.supplier_id && order.can_create_shipment !== false);
   }, [approvedPurchaseOrders, shipmentForm.supplier_id]);
   const editLinkablePurchaseOrders = useMemo(() => {
-    if (!editShipmentForm.supplier_id) return approvedPurchaseOrders;
-    return approvedPurchaseOrders.filter((order) => order.supplier_id === editShipmentForm.supplier_id);
-  }, [approvedPurchaseOrders, editShipmentForm.supplier_id]);
+    if (!editShipmentForm.supplier_id) return [];
+    return approvedPurchaseOrders.filter((order) =>
+      order.supplier_id === editShipmentForm.supplier_id &&
+      (order.can_create_shipment !== false || order.id === editShipmentForm.purchase_order_id)
+    );
+  }, [approvedPurchaseOrders, editShipmentForm.purchase_order_id, editShipmentForm.supplier_id]);
 
   const selectedShipment =
     shipments.find((shipment) => shipment.id === selectedShipmentId) ?? null;
@@ -2285,6 +2293,26 @@ export default function ShipmentsPage() {
         ) : null}
       </OperationalWorkspaceTabs>
 
+      <section style={styles.workflowGuide} aria-label={ui('How Shipments work')}>
+        <div style={styles.workflowGuideIntro}>
+          <strong>{ui('How Shipments work')}</strong>
+          <span>{ui('A Shipment is one incoming delivery record. It is where expected goods become real stock through receiving.')}</span>
+        </div>
+        <div style={{ ...styles.workflowGuideSteps, gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0, 1fr))' }}>
+          {[
+            [ui('1. Create or open a shipment'), ui('For a Purchase Order, link only a PO that still has quantity to receive and has no other open shipment.')],
+            [ui('2. Add or review shipment lines'), ui('While the shipment is pending, confirm which products and quantities are expected.')],
+            [ui('3. Choose receiving location'), ui('Set the storage location used for manual receiving or barcode scanning.')],
+            [ui('4. Receive items'), ui('Enter what actually arrived. This is the step that increases stock.')],
+            [ui('5. Finalize shipment'), ui('Finalize after all lines are received, or save discrepancy reasons before closing a partial delivery.')]
+          ].map(([title, text]) => <div key={title} style={styles.workflowGuideStep}><strong>{title}</strong><span>{text}</span></div>)}
+        </div>
+        <div style={styles.workflowGuideNote}>
+          <strong>{ui('Purchase Order vs Shipment')}</strong>
+          <span>{ui('Purchase Order = what you asked the supplier to deliver. Shipment = one actual delivery and receiving record. One Purchase Order can have more than one shipment over time, but only one linked shipment should be open at once.')}</span>
+        </div>
+      </section>
+
       {pageError ? <div style={styles.errorBox}>{pageError}</div> : null}
       {pageMessage ? <div style={styles.successBox}>{pageMessage}</div> : null}
 
@@ -2348,7 +2376,7 @@ export default function ShipmentsPage() {
             <input
               style={styles.input}
               type="text"
-              placeholder={ui('Search by PO, supplier, shipment ID, status...')}
+              placeholder={ui('Search by shipment reference, linked PO, supplier, shipment ID, status...')}
               value={shipmentSearch}
               onChange={(event) => setShipmentSearch(event.target.value)}
               maxLength={255}
@@ -2400,7 +2428,7 @@ export default function ShipmentsPage() {
                     >
                       <div style={styles.shipmentCardTitleBlock}>
                         <div style={styles.shipmentCardTitle}>
-                          {shipment.po_number || ui('No PO Number')}
+                          {shipment.po_number || ui('No shipment reference')}
                         </div>
                         <div style={styles.shipmentCardSubtle}>
                           {ui('Reference: {reference}').replace('{reference}', `${shipment.id.slice(0, 8)}…`)}
@@ -2553,7 +2581,7 @@ export default function ShipmentsPage() {
             </div>
 
             <div>
-              <label style={styles.label}>{ui('PO Number')}</label>
+              <label style={styles.label}>{ui('Shipment reference')}</label>
               <input
                 style={styles.input}
                 type="text"
@@ -2564,9 +2592,10 @@ export default function ShipmentsPage() {
                     po_number: event.target.value
                   }))
                 }
-                placeholder={ui('Optional purchase order number')}
+                placeholder={ui('Optional unique shipment reference')}
                 maxLength={100}
               />
+              <p style={styles.fieldHelp}>{ui('Leave empty to generate a unique shipment reference automatically. Do not enter the Purchase Order number here.')}</p>
             </div>
 
             {purchaseOrdersFeatureReady ? (
@@ -2577,8 +2606,8 @@ export default function ShipmentsPage() {
                   style={styles.infoBadge}
                   role="note"
                   tabIndex={0}
-                  aria-label={ui('Optional bridge only. Linking an approved Purchase Order does not change stock or receiving logic.')}
-                  title={ui('Optional bridge only: this links an approved Purchase Order to the shipment without changing stock or receiving logic.')}
+                  aria-label={ui('Only approved Purchase Orders with remaining quantity and no other open shipment are available here. Linking does not change stock.')}
+                  title={ui('Only approved Purchase Orders with remaining quantity and no other open shipment are available. Linking does not change stock.')}
                 >
                   i
                 </span>
@@ -2593,12 +2622,12 @@ export default function ShipmentsPage() {
                   setShipmentForm((current) => ({
                     ...current,
                     purchase_order_id: purchaseOrderId,
-                    supplier_id: selectedOrder?.supplier_id || current.supplier_id,
-                    po_number: selectedOrder?.po_number || current.po_number
+                    supplier_id: selectedOrder?.supplier_id || current.supplier_id
                   }));
                 }}
               >
                 <option value="">{ui('No linked PO yet')}</option>
+                {shipmentForm.supplier_id && linkablePurchaseOrders.length === 0 ? <option value="__none__" disabled>{ui('No eligible Purchase Orders for this supplier')}</option> : null}
                 {linkablePurchaseOrders.map((order) => (
                   <option key={order.id} value={order.id}>
                     {order.po_number} · {order.supplier_name || order.supplier_id}
@@ -2606,6 +2635,7 @@ export default function ShipmentsPage() {
                   </option>
                 ))}
               </select>
+              <p style={styles.fieldHelp}>{ui('Only approved Purchase Orders with remaining quantity and no other open shipment are shown. If one is missing, open its existing shipment or finish that shipment first.')}</p>
             </div>
             ) : null}
 
@@ -2704,7 +2734,7 @@ export default function ShipmentsPage() {
                     <div>{formatShipmentDate(selectedShipment.delivery_date)}</div>
                   </div>
                   <div>
-                    <strong>{ui('PO Number')}</strong>
+                    <strong>{ui('Shipment reference')}</strong>
                     <div style={{ wordBreak: 'break-all' }}>{selectedShipment.po_number || '-'}</div>
                   </div>
                   <div>
@@ -2823,7 +2853,7 @@ export default function ShipmentsPage() {
                   </div>
 
                   <div>
-                    <label style={styles.label}>{ui('PO Number')}</label>
+                    <label style={styles.label}>{ui('Shipment reference')}</label>
                     <input
                       style={styles.input}
                       type="text"
@@ -2834,7 +2864,7 @@ export default function ShipmentsPage() {
                           po_number: event.target.value
                         }))
                       }
-                      placeholder={ui('Optional purchase order number')}
+                      placeholder={ui('Optional unique shipment reference')}
                       maxLength={100}
                     />
                   </div>
@@ -2851,8 +2881,7 @@ export default function ShipmentsPage() {
                           setEditShipmentForm((current) => ({
                             ...current,
                             purchase_order_id: purchaseOrderId,
-                            supplier_id: selectedOrder?.supplier_id || current.supplier_id,
-                            po_number: selectedOrder?.po_number || current.po_number
+                            supplier_id: selectedOrder?.supplier_id || current.supplier_id
                           }));
                         }}
                       >
@@ -3825,6 +3854,15 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.6,
     maxWidth: 860
   },
+  workflowGuide: {
+    display: 'grid', gap: 12, padding: 16, border: '1px solid #bfdbfe', borderRadius: 12,
+    background: '#f8fbff', marginBottom: 0
+  },
+  workflowGuideIntro: { display: 'grid', gap: 4, color: '#0f172a' },
+  workflowGuideSteps: { display: 'grid', gap: 8 },
+  workflowGuideStep: { display: 'grid', gap: 4, padding: 10, border: '1px solid #dbeafe', borderRadius: 10, background: '#ffffff', fontSize: 12, lineHeight: 1.5, color: '#64748b' },
+  workflowGuideNote: { display: 'grid', gap: 4, padding: '10px 12px', borderRadius: 10, background: '#eff6ff', fontSize: 12, lineHeight: 1.5, color: '#475569' },
+  fieldHelp: { margin: '6px 2px 0', color: '#64748b', fontSize: 12, lineHeight: 1.45 },
   panel: {
     background: '#ffffff',
     border: '1px solid #e2e8f0',

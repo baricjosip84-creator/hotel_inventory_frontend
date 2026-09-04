@@ -838,6 +838,60 @@
   overflow-wrap: anywhere;
 }
 
+
+.purchase-orders-guide {
+  display: grid;
+  gap: 12px;
+  border-color: #bfdbfe;
+  background: #f8fbff;
+}
+
+.purchase-orders-guide-intro,
+.purchase-orders-guide-note,
+.purchase-orders-guide-steps > div {
+  display: grid;
+  gap: 4px;
+}
+
+.purchase-orders-guide-intro strong,
+.purchase-orders-guide-note strong,
+.purchase-orders-guide-steps strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.purchase-orders-guide-intro span,
+.purchase-orders-guide-note span,
+.purchase-orders-guide-steps span,
+.purchase-orders-field-help {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.purchase-orders-guide-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.purchase-orders-guide-steps > div {
+  padding: 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.purchase-orders-guide-note {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #eff6ff;
+}
+
+.purchase-orders-field-help {
+  font-weight: 500;
+}
+
 @media (max-width: 1180px) {
   .purchase-orders-primary-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -858,6 +912,10 @@
   }
 
   .purchase-orders-breakdown-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .purchase-orders-guide-steps {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -908,6 +966,10 @@
   .purchase-orders-action-panel > button,
   .purchase-orders-action-panel > p {
     grid-column: auto;
+  }
+
+  .purchase-orders-guide-steps {
+    grid-template-columns: 1fr;
   }
 
   .purchase-orders-table {

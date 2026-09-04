@@ -864,6 +864,10 @@ export default function PurchaseOrdersPage() {
 
   const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: fetchSuppliers, enabled: purchaseOrdersFeatureReady });
   const productsQuery = useQuery({ queryKey: ['products'], queryFn: fetchProducts, enabled: purchaseOrdersFeatureReady });
+  const supplierProducts = useMemo(() => {
+    if (!form.supplier_id) return [];
+    return (productsQuery.data || []).filter((product) => String(product.supplier_id || '') === String(form.supplier_id));
+  }, [form.supplier_id, productsQuery.data]);
 
   const selectedDetail = detailQuery.data ?? null;
   const selectedLifecycleEvents = useMemo(() => {
@@ -1868,6 +1872,26 @@ export default function PurchaseOrdersPage() {
         />
       </OperationalWorkspaceTabs>
 
+      <section className="app-panel purchase-orders-card purchase-orders-guide" aria-label={ui('How Purchase Orders work')}>
+        <div className="purchase-orders-guide-intro">
+          <strong>{ui('How Purchase Orders work')}</strong>
+          <span>{ui('A Purchase Order is the buying instruction to a supplier. It records what you intend to buy, but it does not add stock.')}</span>
+        </div>
+        <div className="purchase-orders-guide-steps">
+          {[
+            [ui('1. Create a draft'), ui('Choose the supplier first. Product choices are then limited to products assigned to that supplier.')],
+            [ui('2. Submit for approval'), ui('Submitting sends the draft into the approval step. Stock still does not change.')],
+            [ui('3. Approve the order'), ui('Approval authorizes the order. It still does not mean the goods have arrived.')],
+            [ui('4. Create a shipment'), ui('A shipment is the receiving record for an expected delivery. Only one open shipment should exist for a Purchase Order at a time.')],
+            [ui('5. Receive the goods'), ui('Receiving happens on the Shipments page. Stock increases only when quantities are actually received.')]
+          ].map(([title, text]) => <div key={title}><strong>{title}</strong><span>{text}</span></div>)}
+        </div>
+        <div className="purchase-orders-guide-note">
+          <strong>{ui('What the main areas mean')}</strong>
+          <span>{ui('Orders = find existing Purchase Orders. Create order = make or edit a draft. Order detail = submit, approve, create shipments, review receiving, close or cancel, export, and review audit history.')}</span>
+        </div>
+      </section>
+
       <div ref={registryRef} id="purchase-order-registry" className="purchase-orders-scroll-anchor">
         <section className="app-panel purchase-orders-card purchase-orders-section-card">
           <OperationalSectionHeader
@@ -2235,7 +2259,14 @@ export default function PurchaseOrdersPage() {
               <span>{ui("Supplier")}</span>
               <select
                 value={form.supplier_id}
-                onChange={(event) => setForm((current) => ({ ...current, supplier_id: event.target.value }))}
+                onChange={(event) => {
+                  const supplierId = event.target.value;
+                  setForm((current) => current.supplier_id === supplierId ? current : ({
+                    ...current,
+                    supplier_id: supplierId,
+                    items: current.items.map((line) => ({ ...line, product_id: '', uom_code: '', unit_cost: '' }))
+                  }));
+                }}
                 disabled={!capabilities.canCreatePurchaseOrders && !capabilities.canUpdatePurchaseOrders}
               >
                 <option value="">{ui("Select supplier")}</option>
@@ -2270,10 +2301,11 @@ export default function PurchaseOrdersPage() {
                 <div className="purchase-orders-item-grid">
                   <label className="purchase-orders-field purchase-orders-field--wide">
                     <span>{ui("Product")}</span>
-                    <select value={item.product_id} onChange={(event) => updateItem(index, { product_id: event.target.value, uom_code: '' })}>
-                      <option value="">{ui("Select product")}</option>
-                      {(productsQuery.data || []).map((product) => <option key={product.id} value={product.id}>{product.name} ({product.unit})</option>)}
+                    <select value={item.product_id} onChange={(event) => updateItem(index, { product_id: event.target.value, uom_code: '' })} disabled={!form.supplier_id}>
+                      <option value="">{form.supplier_id ? ui('Select product') : ui('Select a supplier first')}</option>
+                      {supplierProducts.map((product) => <option key={product.id} value={product.id}>{product.name} ({product.unit})</option>)}
                     </select>
+                    <small className="purchase-orders-field-help">{form.supplier_id ? (supplierProducts.length ? ui('Only products assigned to the selected supplier are shown.') : ui('No products are assigned to this supplier. Assign products to the supplier on the Products page first.')) : ui('Choose a supplier before selecting products.')}</small>
                   </label>
                   <label className="purchase-orders-field">
                     <span>{ui("Quantity")}</span>
