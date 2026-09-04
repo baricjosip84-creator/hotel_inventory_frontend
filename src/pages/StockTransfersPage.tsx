@@ -520,17 +520,9 @@ export default function StockTransfersPage() {
     const requestedPageSize = Number(searchParams.get('limit') || 25);
     const nextPageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize as (typeof PAGE_SIZE_OPTIONS)[number]) ? requestedPageSize : 25;
 
-    const differs = nextStatus !== statusFilter
-      || nextSearch !== searchInput
-      || nextSearch !== debouncedSearch
-      || nextFrom !== fromLocationFilter
-      || nextTo !== toLocationFilter
-      || nextProduct !== productFilter
-      || nextTransferId !== selectedTransferId
-      || nextPage !== page
-      || nextPageSize !== pageSize;
-
-    if (!differs) return;
+    // URL changes are authoritative here (for example browser Back/Forward or a shared link).
+    // The write-back effect below skips once via this ref so it cannot overwrite the
+    // incoming URL with stale state from the current render.
     syncingFromUrlRef.current = true;
     setStatusFilter(nextStatus);
     setSearchInput(nextSearch);

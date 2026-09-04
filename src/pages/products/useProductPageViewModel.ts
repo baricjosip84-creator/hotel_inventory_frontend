@@ -11,18 +11,19 @@ export function useProductPageViewModel() {
   const { role, canManageProducts, canViewProductPackages, canManageProductPackages, canViewSuppliers, canViewStock } = getRoleCapabilities();
 
   const productPageState = useProductPageState();
+  const { supplierFilter, setSupplierFilter, workspaceView, setWorkspaceView } = productPageState;
 
   useEffect(() => {
-    if (!canViewSuppliers && productPageState.supplierFilter) {
-      productPageState.setSupplierFilter('');
+    if (!canViewSuppliers && supplierFilter) {
+      setSupplierFilter('');
     }
-  }, [canViewSuppliers, productPageState.supplierFilter, productPageState.setSupplierFilter]);
+  }, [canViewSuppliers, setSupplierFilter, supplierFilter]);
 
   useEffect(() => {
-    if (!canViewStock && productPageState.workspaceView !== 'catalog') {
-      productPageState.setWorkspaceView('catalog');
+    if (!canViewStock && workspaceView !== 'catalog') {
+      setWorkspaceView('catalog');
     }
-  }, [canViewStock, productPageState.workspaceView, productPageState.setWorkspaceView]);
+  }, [canViewStock, setWorkspaceView, workspaceView]);
 
   const queries = useProductPageQueries({
     workspaceView: productPageState.workspaceView,

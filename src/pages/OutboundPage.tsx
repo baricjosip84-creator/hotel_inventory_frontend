@@ -227,7 +227,6 @@ const emptyReturnLine = (): ReturnLineForm => ({
   serial_numbers: []
 });
 const emptyReturnForm = (): ReturnForm => ({ reason: '', notes: '', items: [emptyReturnLine()] });
-const OPEN_STATUSES = new Set(['confirmed', 'picking', 'packed', 'partially_dispatched']);
 const ORDER_PAGE_SIZE = 10;
 const CUSTOMER_PAGE_SIZE = 12;
 const TRACE_PAGE_SIZE = 15;

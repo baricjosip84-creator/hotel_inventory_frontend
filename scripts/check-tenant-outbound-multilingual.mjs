@@ -134,7 +134,8 @@ for(const required of [
   "headers: version === undefined ? undefined : { 'If-Match-Version': String(version) }"
 ])if(!pageSource.includes(required))fail(`Outbound mutation/read contract missing: ${required}`);
 for(const required of [
-  "const OPEN_STATUSES = new Set(['confirmed', 'picking', 'packed', 'partially_dispatched'])",
+  '<option value="open">',
+  "ui('Confirmed through partially dispatched')",
   "condition: 'available'",
   "<option value=\"partially_dispatched\">",
   "<option value=\"available\">",
