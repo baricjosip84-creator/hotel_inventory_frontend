@@ -1178,13 +1178,20 @@ export default function PurchaseOrdersPage() {
   const createShipmentMutation = useMutation({
     mutationFn: ({ id, deliveryDate, version }: { id: string; deliveryDate?: string | null; version?: number | string | null }) =>
       createShipmentFromPurchaseOrder(id, deliveryDate, version),
-    onSuccess: async (payload, variables) => {
-      await queryClient.invalidateQueries({ queryKey: ['shipments'] });
-      await queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
-      await queryClient.invalidateQueries({ queryKey: ['purchase-order', variables.id] });
-      await queryClient.invalidateQueries({ queryKey: ['purchase-order', 'audit', variables.id] });
+    onSuccess: (payload, variables) => {
       setShipmentDeliveryDate('');
-      navigate(`/shipments?shipmentId=${encodeURIComponent(payload.shipment.id)}`);
+
+      // v3.49.117: Move to the receiving workspace immediately. Do not keep the
+      // Purchase Orders page mounted while several cache invalidations finish.
+      navigate(`/shipments?shipmentId=${encodeURIComponent(payload.shipment.id)}&source=purchase-order`);
+
+      // Refresh source/list data in the background after navigation. The Shipments
+      // page opens the returned shipment by id, so it does not depend on stale list
+      // cache being refreshed before the handoff can complete.
+      void queryClient.invalidateQueries({ queryKey: ['shipments'] });
+      void queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      void queryClient.invalidateQueries({ queryKey: ['purchase-order', variables.id] });
+      void queryClient.invalidateQueries({ queryKey: ['purchase-order', 'audit', variables.id] });
     }
   });
 

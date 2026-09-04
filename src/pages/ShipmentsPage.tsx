@@ -285,6 +285,25 @@ async function fetchShipments(): Promise<ShipmentSummary[]> {
   return apiRequest<ShipmentSummary[]>('/shipments');
 }
 
+type ShipmentDetailResponse = {
+  shipment: ShipmentSummary;
+  summary?: {
+    line_count?: number | string;
+    total_ordered_quantity?: number | string;
+    total_received_quantity?: number | string;
+  };
+};
+
+async function fetchShipmentById(shipmentId: string): Promise<ShipmentSummary> {
+  const payload = await apiRequest<ShipmentDetailResponse>(`/shipments/${shipmentId}`);
+  return {
+    ...payload.shipment,
+    line_count: payload.summary?.line_count === undefined ? payload.shipment.line_count : Number(payload.summary.line_count),
+    total_ordered_quantity: payload.summary?.total_ordered_quantity ?? payload.shipment.total_ordered_quantity,
+    total_received_quantity: payload.summary?.total_received_quantity ?? payload.shipment.total_received_quantity
+  };
+}
+
 async function fetchShipmentOptions(): Promise<ShipmentOptions> {
   return apiRequest<ShipmentOptions>('/shipments/options');
 }
@@ -600,6 +619,11 @@ export default function ShipmentsPage() {
   const accessRoleLabel = getCurrentAccessRoleLabel();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const purchaseOrderHandoffShipmentId = searchParams.get('source') === 'purchase-order'
+    ? (searchParams.get('shipmentId') || '')
+    : '';
+  const uiRef = useRef(ui);
+  uiRef.current = ui;
   const isMobile = useIsMobile();
 
   const formatShipmentDate = (value: string | null | undefined): string => {
@@ -654,6 +678,7 @@ export default function ShipmentsPage() {
   const [receiveDrafts, setReceiveDrafts] = useState<Record<string, ReceiveDraft>>({});
   const [pendingAutoReceive, setPendingAutoReceive] = useState<PendingAutoReceive | null>(null);
   const autoReceiveAttemptKeyRef = useRef<string>('');
+  const purchaseOrderHandoffRef = useRef<string>('');
 
   const [pageMessage, setPageMessage] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -1238,7 +1263,76 @@ export default function ShipmentsPage() {
   }, [shipmentPage, shipmentPageCount]);
 
   useEffect(() => {
+    if (!purchaseOrderHandoffShipmentId) {
+      return;
+    }
+
+    if (purchaseOrderHandoffRef.current === purchaseOrderHandoffShipmentId) {
+      return;
+    }
+
+    purchaseOrderHandoffRef.current = purchaseOrderHandoffShipmentId;
+    setWorkspaceSection('receiving');
+    setPageError(null);
+    setPageMessage(null);
+    window.requestAnimationFrame(() => {
+      document.getElementById('shipments-detail')?.scrollIntoView({ behavior: 'auto', block: 'start' });
+    });
+
+    // v3.49.117: A PO-created shipment must open by its own id. Do not depend on
+    // the possibly stale shipment-list cache, and do not route it through scanner
+    // handoff logic.
+    let cancelled = false;
+
+    const openPurchaseOrderShipment = async () => {
+      try {
+        const shipment = await fetchShipmentById(purchaseOrderHandoffShipmentId);
+        if (cancelled) return;
+
+        queryClient.setQueryData<ShipmentSummary[]>(['shipments'], (current) => {
+          const existing = current ?? [];
+          const withoutCurrent = existing.filter((item) => item.id !== shipment.id);
+          return [shipment, ...withoutCurrent];
+        });
+
+        setSelectedShipmentId(shipment.id);
+        setReceiveDrafts({});
+        setHighlightedItemId('');
+        setPendingAutoReceive(null);
+        setSelectedScannerLocationId('');
+        autoReceiveAttemptKeyRef.current = '';
+
+        const nextParams = new URLSearchParams(window.location.search);
+        nextParams.delete('shipmentId');
+        nextParams.delete('source');
+        setSearchParams(nextParams, { replace: true });
+
+        window.requestAnimationFrame(() => {
+          document.getElementById('shipments-detail')?.scrollIntoView({ behavior: 'auto', block: 'start' });
+        });
+      } catch (error) {
+        if (cancelled) return;
+        purchaseOrderHandoffRef.current = '';
+        setPageError(error instanceof ApiError ? error.message : uiRef.current('Failed to open shipment.'));
+      }
+    };
+
+    void openPurchaseOrderShipment();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [purchaseOrderHandoffShipmentId, queryClient, setSearchParams]);
+
+
+  useEffect(() => {
     const shipmentIdFromQuery = searchParams.get('shipmentId');
+
+    // Purchase-order handoff has its own stable direct-open path above. This
+    // effect is reserved for scanner/barcode navigation only.
+    if (searchParams.get('source') === 'purchase-order') {
+      return;
+    }
 
     if (!shipmentIdFromQuery) {
       return;

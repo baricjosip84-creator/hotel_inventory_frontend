@@ -2805,6 +2805,7 @@ const rows: readonly TranslationRow[] = [
   ["Failed to create package.", "Paket konnte nicht erstellt werden.", "No se pudo crear el paquete.", "Impossible de créer le conditionnement.", "Nije moguće izraditi pakiranje."],
   ["Failed to create product.", "Produkt konnte nicht erstellt werden.", "No se pudo crear el producto.", "Impossible de créer le produit.", "Nije moguće izraditi proizvod."],
   ["Failed to create shipment.", "Sendung konnte nicht erstellt werden.", "No se pudo crear el envío.", "Échec de la création de l’expédition.", "Stvaranje pošiljke nije uspjelo."],
+  ["Failed to open shipment.", "Sendung konnte nicht geöffnet werden.", "No se pudo abrir el envío.", "Impossible d’ouvrir l’expédition.", "Pošiljku nije bilo moguće otvoriti."],
   ["Failed to create stock transfer.", "Umlagerung konnte nicht erstellt werden.", "No se pudo crear la transferencia de stock.", "Échec de la création du transfert de stock.", "Nije moguće stvoriti prijenos zalihe."],
   ["Failed to create storage location.", "Lagerort konnte nicht erstellt werden.", "No se pudo crear la ubicación de almacenamiento.", "Impossible de créer l’emplacement de stockage.", "Lokaciju skladišta nije moguće stvoriti."],
   ["Failed to create supplier.", "Lieferant konnte nicht erstellt werden.", "No se pudo crear el proveedor.", "Impossible de créer le fournisseur.", "Dobavljača nije moguće stvoriti."],
