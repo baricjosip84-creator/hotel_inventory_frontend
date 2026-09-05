@@ -226,9 +226,12 @@ for (const signal of [
 }
 
 for (const signal of [
-  "queryKey: ['alerts', 'navigation-open-indicator'",
-  "'/alerts?resolved=false&limit=1'",
-  'hasOpenAlerts',
+  "queryKey: ['alerts', 'navigation-attention'",
+  "'/alerts/attention-summary'",
+  'TENANT_PERMISSIONS.ALERTS_WRITE',
+  'TENANT_PERMISSIONS.ALERTS_OVERRIDE',
+  'canActOnAlerts',
+  'hasAlertAttention',
   'alertIndicatorDot',
   "width: '280px', minWidth: '280px'",
   "whiteSpace: 'normal'",
@@ -236,7 +239,17 @@ for (const signal of [
   "t('common.openAlertsAttention')"
 ]) {
   if (!layout.includes(signal)) {
-    failures.push(`AppLayout.tsx is missing the open-alert navigation indicator signal: ${signal}`);
+    failures.push(`AppLayout.tsx is missing the role-aware alert navigation attention signal: ${signal}`);
+  }
+}
+
+for (const forbiddenSignal of [
+  "'/alerts?resolved=false&limit=1'",
+  "queryKey: ['alerts', 'navigation-open-indicator'",
+  'hasOpenAlerts'
+]) {
+  if (layout.includes(forbiddenSignal)) {
+    failures.push(`AppLayout.tsx must not use existence-only alert navigation attention: ${forbiddenSignal}`);
   }
 }
 

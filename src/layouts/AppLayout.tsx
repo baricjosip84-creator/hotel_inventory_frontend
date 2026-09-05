@@ -26,7 +26,13 @@ import { formatLocalizedDateTime } from '../i18n/formatters';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { fetchTenantCurrencyContext, setActiveTenantCurrency, DEFAULT_INVENTORY_CURRENCY } from '../lib/tenantCurrency';
 
-type NavAlertIndicatorRow = { id: string };
+type NavAlertAttentionSummary = {
+  requires_attention: boolean;
+  actionable_count: number | string;
+  unresolved_count: number | string;
+  unresolved_blocking_count: number | string;
+  attention_scope: 'none' | 'all_unresolved' | 'blocking_only';
+};
 
 type NavExecutionRequestAttentionSummary = {
   requires_attention: boolean;
@@ -65,16 +71,19 @@ export default function AppLayout() {
   const tenantAccess = getTenantAccessSnapshot();
   const supportSession = getSupportSessionInfo();
   const canReadAlerts = tenantAccess.hasTenantContext && hasPermission(TENANT_PERMISSIONS.ALERTS_READ);
-  const openAlertsIndicatorQuery = useQuery({
-    queryKey: ['alerts', 'navigation-open-indicator', tenantAccess.tenantId],
-    queryFn: () => apiRequest<NavAlertIndicatorRow[]>('/alerts?resolved=false&limit=1'),
-    enabled: canReadAlerts,
+  const canManageAlerts = canReadAlerts && hasPermission(TENANT_PERMISSIONS.ALERTS_WRITE);
+  const canOverrideBlockingAlerts = canReadAlerts && hasPermission(TENANT_PERMISSIONS.ALERTS_OVERRIDE);
+  const canActOnAlerts = canManageAlerts || canOverrideBlockingAlerts;
+  const alertAttentionQuery = useQuery({
+    queryKey: ['alerts', 'navigation-attention', tenantAccess.tenantId],
+    queryFn: () => apiRequest<NavAlertAttentionSummary>('/alerts/attention-summary'),
+    enabled: canActOnAlerts,
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
     retry: 1
   });
-  const hasOpenAlerts = canReadAlerts && (openAlertsIndicatorQuery.data?.length ?? 0) > 0;
+  const hasAlertAttention = canActOnAlerts && alertAttentionQuery.data?.requires_attention === true;
   const canViewExecutionRequests = tenantAccess.hasTenantContext && hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW);
   const canReviewExecutionRequests = canViewExecutionRequests && hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_REVIEW);
   const canExecuteExecutionRequests = canViewExecutionRequests && hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_EXECUTE);
@@ -495,7 +504,7 @@ export default function AppLayout() {
                     <span style={styles.navItemLabelGroup}>
                       <span style={styles.navItemLabel}>{nav(item.label)}</span>
                     </span>
-                    {item.to === '/alerts' && hasOpenAlerts ? (
+                    {item.to === '/alerts' && hasAlertAttention ? (
                       <span
                         style={styles.alertIndicatorDot}
                         aria-label={t('common.openAlertsAttention')}
