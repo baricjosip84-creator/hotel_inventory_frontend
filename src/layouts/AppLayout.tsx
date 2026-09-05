@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import type { CSSProperties, MouseEvent } from 'react';
 import {
@@ -7,6 +7,7 @@ import {
   getSupportSessionInfo
 } from '../lib/auth';
 import { apiRequest, logoutTenantSession } from '../lib/api';
+import { TENANT_MUTATION_FEEDBACK_EVENT } from '../lib/actionFeedback';
 import { refreshTenantPermissionSnapshot } from '../lib/permissionPolicies';
 import { fetchCurrentSupportContext, type CurrentSupportContext } from '../lib/supportContext';
 import { fetchMaintenanceContext, type MaintenanceContext } from '../lib/maintenanceContext';
@@ -22,7 +23,7 @@ import { InventoryBrand } from '../components/brand/InventoryBrand';
 import { LanguageSelector } from '../components/i18n/LanguageSelector';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { normalizeAppLocale } from '../i18n/config';
-import { formatLocalizedDateTime } from '../i18n/formatters';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { fetchTenantCurrencyContext, setActiveTenantCurrency, DEFAULT_INVENTORY_CURRENCY } from '../lib/tenantCurrency';
 
@@ -48,6 +49,53 @@ type NavIntelligenceReviewAttentionSummary = {
   overdue_count: number | string;
 };
 
+type NavOperationalAttentionSummary = {
+  usage_ledger: {
+    requires_attention: boolean;
+    pending_review_count: number | string;
+    follow_up_required_count: number | string;
+  };
+  requisitions: {
+    requires_attention: boolean;
+    approval_count: number | string;
+    fulfillment_count: number | string;
+  };
+  execution_tasks: {
+    requires_attention: boolean;
+    actionable_count: number | string;
+  };
+  reservations: {
+    requires_attention: boolean;
+    expiration_count: number | string;
+    conflict_requires_attention: boolean;
+  };
+  purchase_orders: {
+    requires_attention: boolean;
+    approval_count: number | string;
+  };
+  shipments: {
+    requires_attention: boolean;
+    due_receive_count: number | string;
+    ready_finalize_count: number | string;
+  };
+  outbound: {
+    requires_attention: boolean;
+    update_queue_count: number | string;
+    dispatch_queue_count: number | string;
+    return_receive_queue_count: number | string;
+  };
+  inventory_controls: {
+    requires_attention: boolean;
+    approval_count: number | string;
+    approval_queue_count: number | string;
+    supplier_return_approval_count: number | string;
+    cycle_count_reconcile_count: number | string;
+    supplier_return_dispatch_count: number | string;
+    invoice_match_count: number | string;
+    invoice_payment_due_count: number | string;
+  };
+};
+
 function useIsMobile(breakpoint = 960): boolean {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
 
@@ -64,6 +112,7 @@ export default function AppLayout() {
   const { locale, setLocale, t, nav } = useAppTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const [, setPermissionRevision] = useState(0);
   const role = getCurrentUserRole();
@@ -129,6 +178,242 @@ export default function AppLayout() {
   });
   const hasIntelligenceReviewAttention = canHandleIntelligenceReviewEscalations
     && intelligenceReviewAttentionQuery.data?.requires_attention === true;
+
+  const hasTenantActorForOperationalAttention = tenantAccess.hasTenantContext
+    && Boolean(tenantAccess.userId)
+    && !supportSession.isSupportSession;
+  const canReviewUsageForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_USAGE_READ)
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_USAGE_REVIEW);
+  const canApproveRequisitionsForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_READ)
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_APPROVE);
+  const canFulfillRequisitionsForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_READ)
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_FULFILL);
+  const canUpdateExecutionTasksForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ)
+    && hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_UPDATE);
+  const canCompleteExecutionTasksForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ)
+    && hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_COMPLETE);
+  const canAssignExecutionTasksForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ)
+    && hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_ASSIGN);
+  const canExpireReservationsForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_READ)
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_EXPIRE);
+  const canAllocateReservationsForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_READ)
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_ALLOCATE);
+  const canReleaseReservationsForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_READ)
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_RELEASE);
+  const canCancelOwnReservationsForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_READ)
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CANCEL_OWN);
+  const canCancelAnyReservationsForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_READ)
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_CANCEL_ANY);
+  const canApprovePurchaseOrdersForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_READ)
+    && hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_APPROVE);
+  const canReceiveShipmentsForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ)
+    && hasPermission(TENANT_PERMISSIONS.SHIPMENTS_RECEIVE);
+  const canFinalizeShipmentsForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ)
+    && hasPermission(TENANT_PERMISSIONS.SHIPMENTS_FINALIZE);
+  const canUpdateOutboundForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.OUTBOUND_ORDERS_READ)
+    && hasPermission(TENANT_PERMISSIONS.OUTBOUND_ORDERS_UPDATE);
+  const canDispatchOutboundForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.OUTBOUND_ORDERS_READ)
+    && hasPermission(TENANT_PERMISSIONS.OUTBOUND_ORDERS_DISPATCH);
+  const canReceiveCustomerReturnsForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.OUTBOUND_ORDERS_READ)
+    && hasPermission(TENANT_PERMISSIONS.CUSTOMER_RETURNS_READ)
+    && hasPermission(TENANT_PERMISSIONS.CUSTOMER_RETURNS_RECEIVE);
+  const canUseInventoryApprovalQueueForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.APPROVAL_RULES_READ)
+    && hasPermission(TENANT_PERMISSIONS.APPROVALS_EXECUTE);
+  const canApproveDepartmentRequisitionsInQueueForAttention = canUseInventoryApprovalQueueForAttention
+    && hasPermission(TENANT_PERMISSIONS.REQUISITIONS_READ);
+  const canApproveCycleCountsInQueueForAttention = canUseInventoryApprovalQueueForAttention
+    && hasPermission(TENANT_PERMISSIONS.CYCLE_COUNTS_READ);
+  const canApproveSupplierInvoicesInQueueForAttention = canUseInventoryApprovalQueueForAttention
+    && hasPermission(TENANT_PERMISSIONS.INVOICES_READ);
+  const canApproveSupplierReturnsInQueueForAttention = canUseInventoryApprovalQueueForAttention
+    && hasPermission(TENANT_PERMISSIONS.SUPPLIER_RETURNS_READ);
+  const canExecuteInventoryApprovalQueueForAttention = canApproveDepartmentRequisitionsInQueueForAttention
+    || canApproveCycleCountsInQueueForAttention
+    || canApproveSupplierInvoicesInQueueForAttention
+    || canApproveSupplierReturnsInQueueForAttention;
+  const canApproveSupplierReturnsForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.SUPPLIER_RETURNS_READ)
+    && hasPermission(TENANT_PERMISSIONS.APPROVALS_EXECUTE);
+  const canReconcileCycleCountsForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.CYCLE_COUNTS_READ)
+    && hasPermission(TENANT_PERMISSIONS.CYCLE_COUNTS_APPROVE);
+  const canDispatchSupplierReturnsForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.SUPPLIER_RETURNS_READ)
+    && hasPermission(TENANT_PERMISSIONS.SUPPLIER_RETURNS_DISPATCH);
+  const canManageSupplierInvoicesForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.INVOICES_READ)
+    && hasPermission(TENANT_PERMISSIONS.INVOICES_WRITE);
+
+  const canActOnOperationalNavigationQueues = canReviewUsageForAttention
+    || canApproveRequisitionsForAttention
+    || canFulfillRequisitionsForAttention
+    || canUpdateExecutionTasksForAttention
+    || canCompleteExecutionTasksForAttention
+    || canAssignExecutionTasksForAttention
+    || canExpireReservationsForAttention
+    || canAllocateReservationsForAttention
+    || canReleaseReservationsForAttention
+    || canCancelOwnReservationsForAttention
+    || canCancelAnyReservationsForAttention
+    || canApprovePurchaseOrdersForAttention
+    || canReceiveShipmentsForAttention
+    || canFinalizeShipmentsForAttention
+    || canUpdateOutboundForAttention
+    || canDispatchOutboundForAttention
+    || canReceiveCustomerReturnsForAttention
+    || canExecuteInventoryApprovalQueueForAttention
+    || canApproveSupplierReturnsForAttention
+    || canReconcileCycleCountsForAttention
+    || canDispatchSupplierReturnsForAttention
+    || canManageSupplierInvoicesForAttention;
+
+  const operationalNavigationAttentionScope = [
+    canReviewUsageForAttention ? 'usage-review' : 'no-usage-review',
+    canApproveRequisitionsForAttention ? 'req-approve' : 'no-req-approve',
+    canFulfillRequisitionsForAttention ? 'req-fulfill' : 'no-req-fulfill',
+    canUpdateExecutionTasksForAttention ? 'task-update' : 'no-task-update',
+    canCompleteExecutionTasksForAttention ? 'task-complete' : 'no-task-complete',
+    canAssignExecutionTasksForAttention ? 'task-assign' : 'no-task-assign',
+    canExpireReservationsForAttention ? 'reservation-expire' : 'no-reservation-expire',
+    canAllocateReservationsForAttention ? 'reservation-allocate' : 'no-reservation-allocate',
+    canReleaseReservationsForAttention ? 'reservation-release' : 'no-reservation-release',
+    canCancelOwnReservationsForAttention ? 'reservation-cancel-own' : 'no-reservation-cancel-own',
+    canCancelAnyReservationsForAttention ? 'reservation-cancel-any' : 'no-reservation-cancel-any',
+    canApprovePurchaseOrdersForAttention ? `po-approve-${role || 'unknown'}` : 'no-po-approve',
+    canReceiveShipmentsForAttention ? 'shipment-receive' : 'no-shipment-receive',
+    canFinalizeShipmentsForAttention ? 'shipment-finalize' : 'no-shipment-finalize',
+    canUpdateOutboundForAttention ? 'outbound-update' : 'no-outbound-update',
+    canDispatchOutboundForAttention ? 'outbound-dispatch' : 'no-outbound-dispatch',
+    canReceiveCustomerReturnsForAttention ? 'return-receive' : 'no-return-receive',
+    canExecuteInventoryApprovalQueueForAttention ? `inventory-approval-queue-${role || 'unknown'}` : 'no-inventory-approval-queue',
+    canApproveDepartmentRequisitionsInQueueForAttention ? 'inventory-approval-department-requisition' : 'no-inventory-approval-department-requisition',
+    canApproveCycleCountsInQueueForAttention ? 'inventory-approval-cycle-count' : 'no-inventory-approval-cycle-count',
+    canApproveSupplierInvoicesInQueueForAttention ? 'inventory-approval-invoice' : 'no-inventory-approval-invoice',
+    canApproveSupplierReturnsInQueueForAttention ? 'inventory-approval-supplier-return' : 'no-inventory-approval-supplier-return',
+    canApproveSupplierReturnsForAttention ? `supplier-return-approve-${role || 'unknown'}` : 'no-supplier-return-approve',
+    canReconcileCycleCountsForAttention ? 'cycle-reconcile' : 'no-cycle-reconcile',
+    canDispatchSupplierReturnsForAttention ? 'supplier-return-dispatch' : 'no-supplier-return-dispatch',
+    canManageSupplierInvoicesForAttention ? 'invoice-write' : 'no-invoice-write'
+  ].join(':');
+
+  const operationalNavigationAttentionQuery = useQuery({
+    queryKey: ['tenant-sidebar', 'operational-navigation-attention', tenantAccess.tenantId, tenantAccess.userId, operationalNavigationAttentionScope],
+    queryFn: () => apiRequest<NavOperationalAttentionSummary>('/navigation-attention/operational-summary'),
+    enabled: canActOnOperationalNavigationQueues,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    retry: 1
+  });
+
+  const operationalAttention = operationalNavigationAttentionQuery.data;
+  const hasUsageLedgerAttention = canReviewUsageForAttention && operationalAttention?.usage_ledger.requires_attention === true;
+  const hasRequisitionAttention = (canApproveRequisitionsForAttention || canFulfillRequisitionsForAttention)
+    && operationalAttention?.requisitions.requires_attention === true;
+  const hasExecutionTaskAttention = (canUpdateExecutionTasksForAttention || canCompleteExecutionTasksForAttention || canAssignExecutionTasksForAttention)
+    && operationalAttention?.execution_tasks.requires_attention === true;
+  const hasReservationAttention = (canExpireReservationsForAttention || canAllocateReservationsForAttention || canReleaseReservationsForAttention || canCancelOwnReservationsForAttention || canCancelAnyReservationsForAttention)
+    && operationalAttention?.reservations.requires_attention === true;
+  const hasPurchaseOrderAttention = canApprovePurchaseOrdersForAttention
+    && operationalAttention?.purchase_orders.requires_attention === true;
+  const hasShipmentAttention = (canReceiveShipmentsForAttention || canFinalizeShipmentsForAttention)
+    && operationalAttention?.shipments.requires_attention === true;
+  const hasOutboundAttention = (canUpdateOutboundForAttention || canDispatchOutboundForAttention || canReceiveCustomerReturnsForAttention)
+    && operationalAttention?.outbound.requires_attention === true;
+  const hasInventoryControlsAttention = (canExecuteInventoryApprovalQueueForAttention || canApproveSupplierReturnsForAttention || canReconcileCycleCountsForAttention || canDispatchSupplierReturnsForAttention || canManageSupplierInvoicesForAttention)
+    && operationalAttention?.inventory_controls.requires_attention === true;
+
+  const attentionCount = (value: number | string | undefined) => {
+    const parsed = Number(value || 0);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const attentionNumber = (value: number | string | undefined) => formatLocalizedNumber(attentionCount(value), locale, { maximumFractionDigits: 0 });
+  const attentionReasons: string[] = [];
+  const attentionPath = location.pathname;
+
+  if (attentionPath.startsWith('/alerts') && hasAlertAttention && alertAttentionQuery.data) {
+    const alertReason = alertAttentionQuery.data.attention_scope === 'blocking_only'
+      ? t('common.attentionAlertsBlocking')
+      : t('common.attentionAlertsManage');
+    attentionReasons.push(alertReason.replace('{count}', attentionNumber(alertAttentionQuery.data.actionable_count)));
+  }
+  if (attentionPath.startsWith('/execution-requests') && hasExecutionRequestAttention && executionRequestAttentionQuery.data) {
+    if (attentionCount(executionRequestAttentionQuery.data.pending_review_count) > 0) attentionReasons.push(t('common.attentionExecutionReview').replace('{count}', attentionNumber(executionRequestAttentionQuery.data.pending_review_count)));
+    if (attentionCount(executionRequestAttentionQuery.data.approved_waiting_execution_count) > 0) attentionReasons.push(t('common.attentionExecutionExecute').replace('{count}', attentionNumber(executionRequestAttentionQuery.data.approved_waiting_execution_count)));
+    if (attentionCount(executionRequestAttentionQuery.data.retry_ready_count) > 0) attentionReasons.push(t('common.attentionExecutionRetry').replace('{count}', attentionNumber(executionRequestAttentionQuery.data.retry_ready_count)));
+  }
+  if (attentionPath.startsWith('/intelligence-review') && hasIntelligenceReviewAttention && intelligenceReviewAttentionQuery.data) {
+    attentionReasons.push(t('common.attentionIntelligence').replace('{count}', attentionNumber(intelligenceReviewAttentionQuery.data.actionable_count)));
+    if (attentionCount(intelligenceReviewAttentionQuery.data.overdue_count) > 0) attentionReasons.push(t('common.attentionIntelligenceOverdue').replace('{count}', attentionNumber(intelligenceReviewAttentionQuery.data.overdue_count)));
+  }
+  if (attentionPath.startsWith('/inventory-usage') && hasUsageLedgerAttention && operationalAttention) {
+    if (attentionCount(operationalAttention.usage_ledger.pending_review_count) > 0) attentionReasons.push(t('common.attentionUsagePending').replace('{count}', attentionNumber(operationalAttention.usage_ledger.pending_review_count)));
+    if (attentionCount(operationalAttention.usage_ledger.follow_up_required_count) > 0) attentionReasons.push(t('common.attentionUsageFollowUp').replace('{count}', attentionNumber(operationalAttention.usage_ledger.follow_up_required_count)));
+  }
+  if (attentionPath.startsWith('/inventory-requisitions') && hasRequisitionAttention && operationalAttention) {
+    if (attentionCount(operationalAttention.requisitions.approval_count) > 0) attentionReasons.push(t('common.attentionRequisitionApproval').replace('{count}', attentionNumber(operationalAttention.requisitions.approval_count)));
+    if (attentionCount(operationalAttention.requisitions.fulfillment_count) > 0) attentionReasons.push(t('common.attentionRequisitionFulfillment').replace('{count}', attentionNumber(operationalAttention.requisitions.fulfillment_count)));
+  }
+  if (attentionPath.startsWith('/execution-tasks') && hasExecutionTaskAttention && operationalAttention) {
+    attentionReasons.push(t('common.attentionExecutionTasks').replace('{count}', attentionNumber(operationalAttention.execution_tasks.actionable_count)));
+  }
+  if (attentionPath.startsWith('/inventory-reservations') && hasReservationAttention && operationalAttention) {
+    if (attentionCount(operationalAttention.reservations.expiration_count) > 0) attentionReasons.push(t('common.attentionReservationExpiration').replace('{count}', attentionNumber(operationalAttention.reservations.expiration_count)));
+    if (operationalAttention.reservations.conflict_requires_attention) attentionReasons.push(t('common.attentionReservationConflict'));
+  }
+  if (attentionPath.startsWith('/purchase-orders') && hasPurchaseOrderAttention && operationalAttention) {
+    attentionReasons.push(t('common.attentionPurchaseOrderApproval').replace('{count}', attentionNumber(operationalAttention.purchase_orders.approval_count)));
+  }
+  if (attentionPath.startsWith('/shipments') && hasShipmentAttention && operationalAttention) {
+    if (attentionCount(operationalAttention.shipments.due_receive_count) > 0) attentionReasons.push(t('common.attentionShipmentDueReceive').replace('{count}', attentionNumber(operationalAttention.shipments.due_receive_count)));
+    if (attentionCount(operationalAttention.shipments.ready_finalize_count) > 0) attentionReasons.push(t('common.attentionShipmentReadyFinalize').replace('{count}', attentionNumber(operationalAttention.shipments.ready_finalize_count)));
+  }
+  if (attentionPath.startsWith('/outbound') && hasOutboundAttention && operationalAttention) {
+    if (attentionCount(operationalAttention.outbound.update_queue_count) > 0) attentionReasons.push(t('common.attentionOutboundUpdate').replace('{count}', attentionNumber(operationalAttention.outbound.update_queue_count)));
+    if (attentionCount(operationalAttention.outbound.dispatch_queue_count) > 0) attentionReasons.push(t('common.attentionOutboundDispatch').replace('{count}', attentionNumber(operationalAttention.outbound.dispatch_queue_count)));
+    if (attentionCount(operationalAttention.outbound.return_receive_queue_count) > 0) attentionReasons.push(t('common.attentionOutboundReturn').replace('{count}', attentionNumber(operationalAttention.outbound.return_receive_queue_count)));
+  }
+  if (attentionPath.startsWith('/enterprise-inventory') && hasInventoryControlsAttention && operationalAttention) {
+    if (attentionCount(operationalAttention.inventory_controls.approval_queue_count) > 0) attentionReasons.push(t('common.attentionInventoryApproval').replace('{count}', attentionNumber(operationalAttention.inventory_controls.approval_queue_count)));
+    if (attentionCount(operationalAttention.inventory_controls.supplier_return_approval_count) > 0) attentionReasons.push(t('common.attentionInventorySupplierReturnApproval').replace('{count}', attentionNumber(operationalAttention.inventory_controls.supplier_return_approval_count)));
+    if (attentionCount(operationalAttention.inventory_controls.cycle_count_reconcile_count) > 0) attentionReasons.push(t('common.attentionInventoryCycleReconcile').replace('{count}', attentionNumber(operationalAttention.inventory_controls.cycle_count_reconcile_count)));
+    if (attentionCount(operationalAttention.inventory_controls.supplier_return_dispatch_count) > 0) attentionReasons.push(t('common.attentionInventoryReturnDispatch').replace('{count}', attentionNumber(operationalAttention.inventory_controls.supplier_return_dispatch_count)));
+    if (attentionCount(operationalAttention.inventory_controls.invoice_match_count) > 0) attentionReasons.push(t('common.attentionInventoryInvoiceMatch').replace('{count}', attentionNumber(operationalAttention.inventory_controls.invoice_match_count)));
+    if (attentionCount(operationalAttention.inventory_controls.invoice_payment_due_count) > 0) attentionReasons.push(t('common.attentionInventoryInvoicePaymentDue').replace('{count}', attentionNumber(operationalAttention.inventory_controls.invoice_payment_due_count)));
+  }
+  const showAttentionExplanation = attentionReasons.length > 0;
+
+  useEffect(() => {
+    const onTenantMutationFeedback = (event: Event) => {
+      const detail = (event as CustomEvent<{ type?: string }>).detail;
+      if (detail?.type !== 'success') return;
+      void queryClient.invalidateQueries({ queryKey: ['alerts', 'navigation-attention'] });
+      void queryClient.invalidateQueries({ queryKey: ['execution-requests', 'navigation-attention'] });
+      void queryClient.invalidateQueries({ queryKey: ['intelligence-review', 'navigation-attention'] });
+      void queryClient.invalidateQueries({ queryKey: ['tenant-sidebar', 'operational-navigation-attention'] });
+    };
+
+    window.addEventListener(TENANT_MUTATION_FEEDBACK_EVENT, onTenantMutationFeedback);
+    return () => window.removeEventListener(TENANT_MUTATION_FEEDBACK_EVENT, onTenantMutationFeedback);
+  }, [queryClient]);
 
 
   const announcementContextQuery = useQuery({
@@ -539,6 +824,30 @@ export default function AppLayout() {
                         title={t('common.intelligenceReviewAttention')}
                       />
                     ) : null}
+                    {item.to === '/inventory-usage' && hasUsageLedgerAttention ? (
+                      <span style={styles.alertIndicatorDot} aria-label={t('common.usageLedgerAttention')} title={t('common.usageLedgerAttention')} />
+                    ) : null}
+                    {item.to === '/inventory-requisitions' && hasRequisitionAttention ? (
+                      <span style={styles.alertIndicatorDot} aria-label={t('common.requisitionsAttention')} title={t('common.requisitionsAttention')} />
+                    ) : null}
+                    {item.to === '/execution-tasks' && hasExecutionTaskAttention ? (
+                      <span style={styles.alertIndicatorDot} aria-label={t('common.executionTasksAttention')} title={t('common.executionTasksAttention')} />
+                    ) : null}
+                    {item.to === '/inventory-reservations' && hasReservationAttention ? (
+                      <span style={styles.alertIndicatorDot} aria-label={t('common.reservationsAttention')} title={t('common.reservationsAttention')} />
+                    ) : null}
+                    {item.to === '/purchase-orders' && hasPurchaseOrderAttention ? (
+                      <span style={styles.alertIndicatorDot} aria-label={t('common.purchaseOrdersAttention')} title={t('common.purchaseOrdersAttention')} />
+                    ) : null}
+                    {item.to === '/shipments' && hasShipmentAttention ? (
+                      <span style={styles.alertIndicatorDot} aria-label={t('common.shipmentsAttention')} title={t('common.shipmentsAttention')} />
+                    ) : null}
+                    {item.to === '/outbound' && hasOutboundAttention ? (
+                      <span style={styles.alertIndicatorDot} aria-label={t('common.outboundAttention')} title={t('common.outboundAttention')} />
+                    ) : null}
+                    {item.to === '/enterprise-inventory' && hasInventoryControlsAttention ? (
+                      <span style={styles.alertIndicatorDot} aria-label={t('common.inventoryControlsAttention')} title={t('common.inventoryControlsAttention')} />
+                    ) : null}
                   </NavLink>
                 ))}
               </div>
@@ -711,6 +1020,20 @@ export default function AppLayout() {
             ...(isMobile ? styles.contentMobile : styles.contentDesktop)
           }}
         >
+          {showAttentionExplanation ? (
+            <section style={styles.attentionExplanation} aria-live="polite" data-sidebar-attention-explanation="true">
+              <div style={styles.attentionExplanationHeader}>
+                <span style={styles.attentionExplanationDot} aria-hidden="true" />
+                <div>
+                  <strong style={styles.attentionExplanationTitle}>{t('common.attentionBannerTitle')}</strong>
+                  <div style={styles.attentionExplanationIntro}>{t('common.attentionBannerIntro')}</div>
+                </div>
+              </div>
+              <ul style={styles.attentionExplanationList}>
+                {attentionReasons.map((reason) => <li key={reason}>{reason}</li>)}
+              </ul>
+            </section>
+          ) : null}
           <Outlet />
         </main>
         <CopyrightNotice />
@@ -720,6 +1043,21 @@ export default function AppLayout() {
 }
 
 const styles: Record<string, CSSProperties> = {
+
+  attentionExplanation: {
+    marginBottom: '18px',
+    padding: '15px 17px',
+    borderRadius: '14px',
+    border: '1px solid #fecaca',
+    background: '#fff7f7',
+    color: '#7f1d1d',
+    boxShadow: '0 10px 24px rgba(127,29,29,0.06)'
+  },
+  attentionExplanationHeader: { display: 'flex', alignItems: 'flex-start', gap: '11px' },
+  attentionExplanationDot: { width: '10px', height: '10px', borderRadius: '999px', background: '#dc2626', marginTop: '5px', flex: '0 0 auto', boxShadow: '0 0 0 4px rgba(220,38,38,0.10)' },
+  attentionExplanationTitle: { display: 'block', fontSize: '15px', lineHeight: 1.3 },
+  attentionExplanationIntro: { marginTop: '3px', color: '#991b1b', fontSize: '13px', lineHeight: 1.45 },
+  attentionExplanationList: { margin: '10px 0 0 21px', padding: 0, display: 'grid', gap: '5px', color: '#7f1d1d', fontSize: '13px', lineHeight: 1.45 },
 
   tenantAccessBanner: {
     margin: '0 24px 8px 24px',

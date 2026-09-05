@@ -242,7 +242,53 @@ for (const signal of [
   "width: '280px', minWidth: '280px'",
   "whiteSpace: 'normal'",
   "marginLeft: 'auto'",
-  "t('common.openAlertsAttention')"
+  "t('common.openAlertsAttention')",
+  "'/navigation-attention/operational-summary'",
+  "queryKey: ['tenant-sidebar', 'operational-navigation-attention'",
+  'operationalNavigationAttentionScope',
+  "`po-approve-${role || 'unknown'}`",
+  "`supplier-return-approve-${role || 'unknown'}`",
+  'tenantAccess.userId, operationalNavigationAttentionScope',
+  'TENANT_MUTATION_FEEDBACK_EVENT',
+  "queryKey: ['tenant-sidebar', 'operational-navigation-attention']",
+  'hasUsageLedgerAttention',
+  'hasRequisitionAttention',
+  'hasExecutionTaskAttention',
+  'hasReservationAttention',
+  'hasPurchaseOrderAttention',
+  'hasShipmentAttention',
+  'hasOutboundAttention',
+  'hasInventoryControlsAttention',
+  'canExecuteInventoryApprovalQueueForAttention',
+  'canApproveSupplierReturnsForAttention',
+  'canApproveDepartmentRequisitionsInQueueForAttention',
+  'canApproveCycleCountsInQueueForAttention',
+  'canApproveSupplierInvoicesInQueueForAttention',
+  'canApproveSupplierReturnsInQueueForAttention',
+  'canReconcileCycleCountsForAttention',
+  'canDispatchSupplierReturnsForAttention',
+  'canManageSupplierInvoicesForAttention',
+  'canReceiveShipmentsForAttention',
+  'canFinalizeShipmentsForAttention',
+  'shipments',
+  'invoice_payment_due_count',
+  'inventory_controls',
+  'data-sidebar-attention-explanation=\"true\"',
+  "t('common.attentionBannerTitle')",
+  "t('common.attentionBannerIntro')",
+  "t('common.attentionAlertsManage')",
+  "t('common.attentionExecutionReview')",
+  "t('common.attentionUsagePending')",
+  "t('common.attentionRequisitionApproval')",
+  "t('common.attentionExecutionTasks')",
+  "t('common.attentionReservationExpiration')",
+  "t('common.attentionPurchaseOrderApproval')",
+  "t('common.attentionShipmentDueReceive')",
+  "t('common.attentionShipmentReadyFinalize')",
+  "t('common.attentionOutboundUpdate')",
+  "t('common.attentionInventoryApproval')",
+  "t('common.attentionInventorySupplierReturnApproval')",
+  "t('common.attentionInventoryInvoicePaymentDue')"
 ]) {
   if (!layout.includes(signal)) {
     failures.push(`AppLayout.tsx is missing the role-aware alert navigation attention signal: ${signal}`);
@@ -260,19 +306,59 @@ for (const forbiddenSignal of [
 }
 
 
+const approvedSidebarAttentionPaths = [
+  '/alerts',
+  '/execution-requests',
+  '/intelligence-review',
+  '/inventory-usage',
+  '/inventory-requisitions',
+  '/execution-tasks',
+  '/inventory-reservations',
+  '/purchase-orders',
+  '/shipments',
+  '/outbound',
+  '/enterprise-inventory'
+];
+
 const sidebarAttentionDotCount = (layout.match(/style=\{styles\.alertIndicatorDot\}/g) || []).length;
-if (sidebarAttentionDotCount !== 3) {
-  failures.push(`AppLayout.tsx must expose exactly the three approved sidebar attention dots (Alerts, Execution Requests, Intelligence Review); found ${sidebarAttentionDotCount}.`);
+if (sidebarAttentionDotCount !== approvedSidebarAttentionPaths.length) {
+  failures.push(`AppLayout.tsx must expose exactly ${approvedSidebarAttentionPaths.length} approved role-actionable sidebar attention dots; found ${sidebarAttentionDotCount}.`);
 }
 
-for (const approvedPath of ['/alerts', '/execution-requests', '/intelligence-review']) {
+for (const approvedPath of approvedSidebarAttentionPaths) {
   if (!layout.includes(`item.to === '${approvedPath}'`)) {
     failures.push(`AppLayout.tsx is missing approved sidebar attention binding for ${approvedPath}.`);
   }
 }
 
+for (const attentionPathPrefix of [
+  '/alerts',
+  '/execution-requests',
+  '/intelligence-review',
+  '/inventory-usage',
+  '/inventory-requisitions',
+  '/execution-tasks',
+  '/inventory-reservations',
+  '/purchase-orders',
+  '/shipments',
+  '/outbound',
+  '/enterprise-inventory'
+]) {
+  if (!layout.includes(`attentionPath.startsWith('${attentionPathPrefix}')`)) {
+    failures.push(`On-page attention explanation is missing route coverage for ${attentionPathPrefix}.`);
+  }
+}
+
 if (/item\.to === ['"]\/action-center['"][\s\S]{0,240}alertIndicatorDot/.test(layout)) {
   failures.push('Action Center must remain an aggregation/routing surface and must not receive a sidebar red dot from its current mixed read/action summary.');
+}
+
+for (const forbiddenAttentionPath of ['/mobile-execution', '/stock-transfers', '/automation-schedules']) {
+  const escaped = forbiddenAttentionPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`item\\.to === ['\"]${escaped}['\"][\\s\\S]{0,240}alertIndicatorDot`);
+  if (pattern.test(layout)) {
+    failures.push(`${forbiddenAttentionPath} must not receive a sidebar red dot without a distinct unresolved role-actionable condition.`);
+  }
 }
 
 if (!registry.includes("commercialSurface: 'command'")) {
