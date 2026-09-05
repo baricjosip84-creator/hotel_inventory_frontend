@@ -4750,7 +4750,10 @@ export default function DecisionLearningFeedbackPage() {
     }),
     onSuccess: async () => {
       setMessage(ui('Feedback review updated. No operational data was changed.'));
-      await queryClient.invalidateQueries({ queryKey: ['decision-learning-summary'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['decision-learning-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['decision-learning-feedback', 'navigation-attention'] }),
+      ]);
     },
     onError: (error) => setMessage(error instanceof Error ? error.message : ui('Unable to update the feedback review.'))
   });

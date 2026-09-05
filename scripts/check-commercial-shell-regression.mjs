@@ -13,6 +13,8 @@ const collaborationPage = read('src/pages/EnterpriseCollaborationPage.tsx');
 const digitalTwinPage = read('src/pages/DigitalTwinVisualizationPage.tsx');
 const reliabilityCommandPage = read('src/pages/ReliabilityCommandPage.tsx');
 const alertsPage = read('src/pages/AlertsPage.tsx');
+const learningFeedbackPage = read('src/pages/DecisionLearningFeedbackPage.tsx');
+const procurementRecommendationsPage = read('src/pages/ProcurementRecommendationsPage.tsx');
 
 const commercialRoutes = [
   {
@@ -238,6 +240,12 @@ for (const signal of [
   'intelligenceReviewAttentionScope',
   'tenantAccess.userId, intelligenceReviewAttentionScope',
   'hasAlertAttention',
+  'hasTenantUserAttentionActor',
+  '!supportSession.isSupportSession',
+  'const canReadAlerts = hasTenantUserAttentionActor',
+  'const canViewExecutionRequests = hasTenantUserAttentionActor',
+  'const canViewIntelligenceReview = hasTenantUserAttentionActor',
+  'const hasTenantActorForOperationalAttention = hasTenantUserAttentionActor',
   'alertIndicatorDot',
   "width: '280px', minWidth: '280px'",
   "whiteSpace: 'normal'",
@@ -288,7 +296,20 @@ for (const signal of [
   "t('common.attentionOutboundUpdate')",
   "t('common.attentionInventoryApproval')",
   "t('common.attentionInventorySupplierReturnApproval')",
-  "t('common.attentionInventoryInvoicePaymentDue')"
+  "t('common.attentionInventoryInvoicePaymentDue')",
+  "queryKey: ['decision-learning-feedback', 'navigation-attention'",
+  "'/decision-intelligence-feedback/attention-summary'",
+  'learningFeedbackAttentionScope',
+  'hasLearningFeedbackAttention',
+  "queryKey: ['procurement-recommendations', 'navigation-attention'",
+  "'/reorder-insights/recommendations/attention-summary'",
+  'procurementRecommendationAttentionScope',
+  'hasProcurementRecommendationAttention',
+  "t('common.attentionLearningFeedbackReview')",
+  "t('common.attentionLearningFeedbackForecast')",
+  "t('common.attentionProcurementDecision')",
+  "t('common.attentionProcurementPoDraft')",
+  "t('common.attentionProcurementRecheck')"
 ]) {
   if (!layout.includes(signal)) {
     failures.push(`AppLayout.tsx is missing the role-aware alert navigation attention signal: ${signal}`);
@@ -306,6 +327,17 @@ for (const forbiddenSignal of [
 }
 
 
+
+for (const supportUnsafeSignal of [
+  'const canReadAlerts = tenantAccess.hasTenantContext',
+  'const canViewExecutionRequests = tenantAccess.hasTenantContext',
+  'const canViewIntelligenceReview = tenantAccess.hasTenantContext'
+]) {
+  if (layout.includes(supportUnsafeSignal)) {
+    failures.push(`Sidebar attention must fail closed during support sessions: ${supportUnsafeSignal}`);
+  }
+}
+
 const approvedSidebarAttentionPaths = [
   '/alerts',
   '/execution-requests',
@@ -317,7 +349,9 @@ const approvedSidebarAttentionPaths = [
   '/purchase-orders',
   '/shipments',
   '/outbound',
-  '/enterprise-inventory'
+  '/enterprise-inventory',
+  '/decision-learning-feedback',
+  '/procurement-recommendations'
 ];
 
 const sidebarAttentionDotCount = (layout.match(/style=\{styles\.alertIndicatorDot\}/g) || []).length;
@@ -342,11 +376,20 @@ for (const attentionPathPrefix of [
   '/purchase-orders',
   '/shipments',
   '/outbound',
-  '/enterprise-inventory'
+  '/enterprise-inventory',
+  '/decision-learning-feedback',
+  '/procurement-recommendations'
 ]) {
   if (!layout.includes(`attentionPath.startsWith('${attentionPathPrefix}')`)) {
     failures.push(`On-page attention explanation is missing route coverage for ${attentionPathPrefix}.`);
   }
+}
+
+for (const [source, signal, message] of [
+  [learningFeedbackPage, "queryKey: ['decision-learning-feedback', 'navigation-attention']", 'Learning Feedback review actions must immediately refresh their sidebar/page attention state.'],
+  [procurementRecommendationsPage, 'queryKey: ["procurement-recommendations"]', 'Procurement Recommendation actions must invalidate the recommendation query prefix so navigation attention refreshes immediately.']
+]) {
+  if (!source.includes(signal)) failures.push(message);
 }
 
 if (/item\.to === ['"]\/action-center['"][\s\S]{0,240}alertIndicatorDot/.test(layout)) {

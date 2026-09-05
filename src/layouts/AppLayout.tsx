@@ -49,6 +49,20 @@ type NavIntelligenceReviewAttentionSummary = {
   overdue_count: number | string;
 };
 
+type NavLearningFeedbackAttentionSummary = {
+  requires_attention: boolean;
+  actionable_count: number | string;
+  forecast_review_count: number | string;
+};
+
+type NavProcurementRecommendationAttentionSummary = {
+  requires_attention: boolean;
+  actionable_count: number | string;
+  high_risk_pending_decision_count: number | string;
+  approved_ready_po_draft_count: number | string;
+  approved_recheck_count: number | string;
+};
+
 type NavOperationalAttentionSummary = {
   usage_ledger: {
     requires_attention: boolean;
@@ -119,7 +133,10 @@ export default function AppLayout() {
   const accessRoleLabel = getCurrentAccessRoleLabel();
   const tenantAccess = getTenantAccessSnapshot();
   const supportSession = getSupportSessionInfo();
-  const canReadAlerts = tenantAccess.hasTenantContext && hasPermission(TENANT_PERMISSIONS.ALERTS_READ);
+  const hasTenantUserAttentionActor = tenantAccess.hasTenantContext
+    && Boolean(tenantAccess.userId)
+    && !supportSession.isSupportSession;
+  const canReadAlerts = hasTenantUserAttentionActor && hasPermission(TENANT_PERMISSIONS.ALERTS_READ);
   const canManageAlerts = canReadAlerts && hasPermission(TENANT_PERMISSIONS.ALERTS_WRITE);
   const canOverrideBlockingAlerts = canReadAlerts && hasPermission(TENANT_PERMISSIONS.ALERTS_OVERRIDE);
   const canActOnAlerts = canManageAlerts || canOverrideBlockingAlerts;
@@ -134,7 +151,7 @@ export default function AppLayout() {
     retry: 1
   });
   const hasAlertAttention = canActOnAlerts && alertAttentionQuery.data?.requires_attention === true;
-  const canViewExecutionRequests = tenantAccess.hasTenantContext && hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW);
+  const canViewExecutionRequests = hasTenantUserAttentionActor && hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW);
   const canReviewExecutionRequests = canViewExecutionRequests && hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_REVIEW);
   const canExecuteExecutionRequests = canViewExecutionRequests && hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_EXECUTE);
   const canWriteProductsForExecution = canViewExecutionRequests && hasPermission(TENANT_PERMISSIONS.PRODUCTS_WRITE);
@@ -155,12 +172,12 @@ export default function AppLayout() {
   });
   const hasExecutionRequestAttention = canActOnExecutionRequests
     && executionRequestAttentionQuery.data?.requires_attention === true;
-  const canViewIntelligenceReview = tenantAccess.hasTenantContext
+  const canViewIntelligenceReview = hasTenantUserAttentionActor
     && hasPermission(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ)
     && hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ);
   const canHandleIntelligenceReviewEscalations = canViewIntelligenceReview
     && hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
-  const canReadProbabilisticForecastingForAttention = tenantAccess.hasTenantContext
+  const canReadProbabilisticForecastingForAttention = hasTenantUserAttentionActor
     && hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
   const intelligenceReviewAttentionScope = [
     role || 'unknown',
@@ -179,9 +196,50 @@ export default function AppLayout() {
   const hasIntelligenceReviewAttention = canHandleIntelligenceReviewEscalations
     && intelligenceReviewAttentionQuery.data?.requires_attention === true;
 
-  const hasTenantActorForOperationalAttention = tenantAccess.hasTenantContext
-    && Boolean(tenantAccess.userId)
-    && !supportSession.isSupportSession;
+  const canHandleLearningFeedbackReviews = hasTenantUserAttentionActor
+    && hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ)
+    && hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
+  const learningFeedbackAttentionScope = canReadProbabilisticForecastingForAttention ? 'with-forecast-review' : 'without-forecast-review';
+  const learningFeedbackAttentionQuery = useQuery({
+    queryKey: ['decision-learning-feedback', 'navigation-attention', tenantAccess.tenantId, tenantAccess.userId, learningFeedbackAttentionScope],
+    queryFn: () => apiRequest<NavLearningFeedbackAttentionSummary>('/decision-intelligence-feedback/attention-summary'),
+    enabled: canHandleLearningFeedbackReviews,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    retry: 1
+  });
+  const hasLearningFeedbackAttention = canHandleLearningFeedbackReviews
+    && learningFeedbackAttentionQuery.data?.requires_attention === true;
+
+  const canViewProcurementRecommendationsForAttention = hasTenantUserAttentionActor
+    && hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
+  const canDecideProcurementRecommendationsForAttention = canViewProcurementRecommendationsForAttention
+    && hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_APPROVE);
+  const canConvertProcurementRecommendationsForAttention = canViewProcurementRecommendationsForAttention
+    && hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_CREATE);
+  const canActOnProcurementRecommendationsForAttention = canDecideProcurementRecommendationsForAttention
+    || canConvertProcurementRecommendationsForAttention;
+  const procurementRecommendationAttentionScope = [
+    canDecideProcurementRecommendationsForAttention ? 'decide' : 'no-decide',
+    canConvertProcurementRecommendationsForAttention ? 'convert' : 'no-convert'
+  ].join(':');
+  const procurementRecommendationAttentionQuery = useQuery({
+    queryKey: ['procurement-recommendations', 'navigation-attention', tenantAccess.tenantId, tenantAccess.userId, procurementRecommendationAttentionScope],
+    queryFn: () => apiRequest<NavProcurementRecommendationAttentionSummary>('/reorder-insights/recommendations/attention-summary'),
+    enabled: canActOnProcurementRecommendationsForAttention,
+    // Current procurement recommendations are deterministically recalculated from
+    // stock, demand and supplier evidence. Keep the global shell poll bounded and
+    // rely on window-focus plus mutation invalidation for faster local refreshes.
+    staleTime: 60_000,
+    refetchInterval: 300_000,
+    refetchOnWindowFocus: true,
+    retry: 1
+  });
+  const hasProcurementRecommendationAttention = canActOnProcurementRecommendationsForAttention
+    && procurementRecommendationAttentionQuery.data?.requires_attention === true;
+
+  const hasTenantActorForOperationalAttention = hasTenantUserAttentionActor;
   const canReviewUsageForAttention = hasTenantActorForOperationalAttention
     && hasPermission(TENANT_PERMISSIONS.INVENTORY_USAGE_READ)
     && hasPermission(TENANT_PERMISSIONS.INVENTORY_USAGE_REVIEW);
@@ -364,6 +422,17 @@ export default function AppLayout() {
     attentionReasons.push(t('common.attentionIntelligence').replace('{count}', attentionNumber(intelligenceReviewAttentionQuery.data.actionable_count)));
     if (attentionCount(intelligenceReviewAttentionQuery.data.overdue_count) > 0) attentionReasons.push(t('common.attentionIntelligenceOverdue').replace('{count}', attentionNumber(intelligenceReviewAttentionQuery.data.overdue_count)));
   }
+  if (attentionPath.startsWith('/decision-learning-feedback') && hasLearningFeedbackAttention && learningFeedbackAttentionQuery.data) {
+    attentionReasons.push(t('common.attentionLearningFeedbackReview').replace('{count}', attentionNumber(learningFeedbackAttentionQuery.data.actionable_count)));
+    if (attentionCount(learningFeedbackAttentionQuery.data.forecast_review_count) > 0) {
+      attentionReasons.push(t('common.attentionLearningFeedbackForecast').replace('{count}', attentionNumber(learningFeedbackAttentionQuery.data.forecast_review_count)));
+    }
+  }
+  if (attentionPath.startsWith('/procurement-recommendations') && hasProcurementRecommendationAttention && procurementRecommendationAttentionQuery.data) {
+    if (attentionCount(procurementRecommendationAttentionQuery.data.high_risk_pending_decision_count) > 0) attentionReasons.push(t('common.attentionProcurementDecision').replace('{count}', attentionNumber(procurementRecommendationAttentionQuery.data.high_risk_pending_decision_count)));
+    if (attentionCount(procurementRecommendationAttentionQuery.data.approved_ready_po_draft_count) > 0) attentionReasons.push(t('common.attentionProcurementPoDraft').replace('{count}', attentionNumber(procurementRecommendationAttentionQuery.data.approved_ready_po_draft_count)));
+    if (attentionCount(procurementRecommendationAttentionQuery.data.approved_recheck_count) > 0) attentionReasons.push(t('common.attentionProcurementRecheck').replace('{count}', attentionNumber(procurementRecommendationAttentionQuery.data.approved_recheck_count)));
+  }
   if (attentionPath.startsWith('/inventory-usage') && hasUsageLedgerAttention && operationalAttention) {
     if (attentionCount(operationalAttention.usage_ledger.pending_review_count) > 0) attentionReasons.push(t('common.attentionUsagePending').replace('{count}', attentionNumber(operationalAttention.usage_ledger.pending_review_count)));
     if (attentionCount(operationalAttention.usage_ledger.follow_up_required_count) > 0) attentionReasons.push(t('common.attentionUsageFollowUp').replace('{count}', attentionNumber(operationalAttention.usage_ledger.follow_up_required_count)));
@@ -408,6 +477,8 @@ export default function AppLayout() {
       void queryClient.invalidateQueries({ queryKey: ['alerts', 'navigation-attention'] });
       void queryClient.invalidateQueries({ queryKey: ['execution-requests', 'navigation-attention'] });
       void queryClient.invalidateQueries({ queryKey: ['intelligence-review', 'navigation-attention'] });
+      void queryClient.invalidateQueries({ queryKey: ['decision-learning-feedback', 'navigation-attention'] });
+      void queryClient.invalidateQueries({ queryKey: ['procurement-recommendations', 'navigation-attention'] });
       void queryClient.invalidateQueries({ queryKey: ['tenant-sidebar', 'operational-navigation-attention'] });
     };
 
@@ -823,6 +894,12 @@ export default function AppLayout() {
                         aria-label={t('common.intelligenceReviewAttention')}
                         title={t('common.intelligenceReviewAttention')}
                       />
+                    ) : null}
+                    {item.to === '/decision-learning-feedback' && hasLearningFeedbackAttention ? (
+                      <span style={styles.alertIndicatorDot} aria-label={t('common.learningFeedbackAttention')} title={t('common.learningFeedbackAttention')} />
+                    ) : null}
+                    {item.to === '/procurement-recommendations' && hasProcurementRecommendationAttention ? (
+                      <span style={styles.alertIndicatorDot} aria-label={t('common.procurementRecommendationsAttention')} title={t('common.procurementRecommendationsAttention')} />
                     ) : null}
                     {item.to === '/inventory-usage' && hasUsageLedgerAttention ? (
                       <span style={styles.alertIndicatorDot} aria-label={t('common.usageLedgerAttention')} title={t('common.usageLedgerAttention')} />
