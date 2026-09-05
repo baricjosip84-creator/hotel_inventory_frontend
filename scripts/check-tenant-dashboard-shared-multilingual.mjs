@@ -46,7 +46,10 @@ if (!inventoryShared.includes("ui('Select…')")) fail('Shared inventory select 
 if (!inventoryShared.includes("ui('Specialized inventory workflows')")) fail('Shared specialized-inventory hero must be localized.');
 if (!inventoryShared.includes('formatLocalizedDateTime(lastRefreshedAt, locale)')) fail('Shared specialized-inventory refresh time must use selected locale.');
 if (!inventoryLayout.includes("label={ui('Available controls')}")) fail('Specialized-inventory workspace summary must be localized.');
-if (!inventoryTabs.includes('label={ui(label)}')) fail('Specialized-inventory tab labels must be localized at display time.');
+const inventoryTabLabelIsLocalized =
+  inventoryTabs.includes('label={ui(label)}') ||
+  /label=\{\s*<span\b[\s\S]*?\{ui\(label\)\}[\s\S]*?<\/span>\s*\}/m.test(inventoryTabs);
+if (!inventoryTabLabelIsLocalized) fail('Specialized-inventory tab labels must be localized at display time.');
 else pass('Reusable specialized-inventory workspace primitives are localization-aware.');
 
 if (!process.exitCode) console.log('Tenant dashboard/shared multilingual hardening: PASS');
