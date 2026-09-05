@@ -162,6 +162,13 @@ type RequisitionFormState = {
 
 type FulfillmentFormState = Record<string, string>;
 
+function parseFulfillmentSerialNumbers(value: string | undefined): string[] {
+  return String(value || '')
+    .split(/[\n,]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 type RequisitionFulfillment = {
   id: string;
   requisition_item_id: string;
@@ -169,6 +176,8 @@ type RequisitionFulfillment = {
   product_name?: string | null;
   product_unit?: string | null;
   source_storage_location_name?: string | null;
+  target_storage_location_id?: string | null;
+  target_storage_location_name?: string | null;
   quantity: number | string;
   stock_movement_id: string;
   stock_movement_change?: number | string;
@@ -195,6 +204,8 @@ type RequisitionReadiness = {
   status?: string | null;
   ready: boolean;
   source_storage_location_name?: string | null;
+  target_storage_location_id?: string | null;
+  target_storage_location_name?: string | null;
   blockers?: Array<{ code: string; product_name?: string | null; message: string }>;
   warnings?: Array<{ code: string; product_name?: string | null; message: string }>;
   lines?: Array<{
@@ -212,6 +223,11 @@ type RequisitionReadiness = {
     min_quantity?: number | string | null;
     projected_on_hand_quantity?: number | string | null;
     projected_quantity: number | string | null;
+    serial_tracking_enabled?: boolean;
+    selected_serial_numbers?: string[];
+    selected_serial_count?: number | string;
+    required_serial_count?: number | string;
+    serial_evidence_complete?: boolean;
     ready: boolean;
     blocker_code?: string | null;
     warning_code?: string | null;
@@ -1493,6 +1509,7 @@ export default function InventoryRequisitionsPage() {
   const [defaultFulfillmentNote, setDefaultFulfillmentNote] = useState('');
   const [fulfillmentLines, setFulfillmentLines] = useState<FulfillmentFormState>({});
   const [fulfillmentLineNotes, setFulfillmentLineNotes] = useState<FulfillmentFormState>({});
+  const [fulfillmentSerialNumbers, setFulfillmentSerialNumbers] = useState<FulfillmentFormState>({});
   const [bulkFulfillmentIds, setBulkFulfillmentIds] = useState<string[]>([]);
   const [bulkFulfillmentLocationId, setBulkFulfillmentLocationId] = useState('');
   const [bulkFulfillmentNote, setBulkFulfillmentNote] = useState('');
@@ -1697,8 +1714,9 @@ export default function InventoryRequisitionsPage() {
     .map(([requisition_item_id, quantity]) => ({
       requisition_item_id,
       quantity: Number(quantity),
-      notes: fulfillmentLineNotes[requisition_item_id]?.trim() || null
-    })), [fulfillmentLineNotes, fulfillmentLines]);
+      notes: fulfillmentLineNotes[requisition_item_id]?.trim() || null,
+      serial_numbers: parseFulfillmentSerialNumbers(fulfillmentSerialNumbers[requisition_item_id])
+    })), [fulfillmentLineNotes, fulfillmentLines, fulfillmentSerialNumbers]);
 
   const readinessQuery = useQuery({
     queryKey: ['inventory-requisition-readiness', selectedId, effectiveFulfillmentLocationId, readinessPreviewLines, fulfillAllRemaining, defaultFulfillmentNote],
@@ -1786,7 +1804,8 @@ export default function InventoryRequisitionsPage() {
         .map(([requisition_item_id, quantity]) => ({
           requisition_item_id,
           quantity: Number(quantity),
-          notes: fulfillmentLineNotes[requisition_item_id]?.trim() || null
+          notes: fulfillmentLineNotes[requisition_item_id]?.trim() || null,
+          serial_numbers: parseFulfillmentSerialNumbers(fulfillmentSerialNumbers[requisition_item_id])
         }));
 
       return apiMutationRequest<{ requisition: InventoryRequisition }>(`/inventory-requisitions/${selected.id}/fulfill`, {
@@ -1803,6 +1822,7 @@ export default function InventoryRequisitionsPage() {
       setSelectedId(response.requisition.id);
       setFulfillmentLines({});
       setFulfillmentLineNotes({});
+      setFulfillmentSerialNumbers({});
       setFulfillAllRemaining(false);
       setDefaultFulfillmentNote('');
       await invalidateRequisitions();
@@ -3229,9 +3249,11 @@ export default function InventoryRequisitionsPage() {
                 onChange={(event) => setForm((current) => ({ ...current, source_storage_location_id: event.target.value }))}
               >
                 <option value="">{ui('Use during fulfillment')}</option>
-                {activeLocationOptions.map((location) => (
-                  <option key={location.id} value={location.id}>{location.name}{location.retired ? ` (${ui('retired')})` : ''}</option>
-                ))}
+                {activeLocationOptions
+                  .filter((location) => String(location.id) !== String(form.target_storage_location_id || ''))
+                  .map((location) => (
+                    <option key={location.id} value={location.id}>{location.name}{location.retired ? ` (${ui('retired')})` : ''}</option>
+                  ))}
               </select>
             </label>
             <label style={styles.field}>
@@ -3242,9 +3264,11 @@ export default function InventoryRequisitionsPage() {
                 onChange={(event) => setForm((current) => ({ ...current, target_storage_location_id: event.target.value }))}
               >
                 <option value="">{ui('No target location')}</option>
-                {activeLocationOptions.map((location) => (
-                  <option key={location.id} value={location.id}>{location.name}{location.retired ? ` (${ui('retired')})` : ''}</option>
-                ))}
+                {activeLocationOptions
+                  .filter((location) => String(location.id) !== String(form.source_storage_location_id || ''))
+                  .map((location) => (
+                    <option key={location.id} value={location.id}>{location.name}{location.retired ? ` (${ui('retired')})` : ''}</option>
+                  ))}
               </select>
             </label>
             <label style={styles.field}>
@@ -3801,6 +3825,10 @@ export default function InventoryRequisitionsPage() {
                     const remaining = Math.max(0, Number(item.remaining_quantity ?? Number(item.requested_quantity) - Number(item.fulfilled_quantity)) || 0);
                     const fulfillmentQuantity = Number(fulfillmentLines[item.id] || 0);
                     const fulfillmentNoteLength = fulfillmentLineNotes[item.id]?.trim().length || 0;
+                    const readinessLine = readinessQuery.data?.lines?.find((line) => line.requisition_item_id === item.id);
+                    const serialTrackingEnabled = Boolean(readinessLine?.serial_tracking_enabled);
+                    const selectedSerialNumbers = parseFulfillmentSerialNumbers(fulfillmentSerialNumbers[item.id]);
+                    const requiredSerialCount = Number(readinessLine?.required_serial_count || 0);
                     const fulfillmentNoteDepthRequired = approvalThresholdNotesRequired && fulfillmentQuantity > 0;
                     const fulfillmentNoteMeetsThresholdDepth = !fulfillmentNoteDepthRequired || fulfillmentNoteLength >= selectedApprovalThresholdNoteMinLength;
                     return (
@@ -3825,8 +3853,23 @@ export default function InventoryRequisitionsPage() {
                             step="0.0001"
                             disabled={!canFulfill || fulfillAllRemaining || remaining <= 0}
                             value={fulfillmentLines[item.id] || ''}
-                            onChange={(event) => setFulfillmentLines((current) => ({ ...current, [item.id]: event.target.value }))}
+                            onChange={(event) => {
+                              setFulfillmentLines((current) => ({ ...current, [item.id]: event.target.value }));
+                              setFulfillmentSerialNumbers((current) => ({ ...current, [item.id]: '' }));
+                            }}
                           />
+                          {serialTrackingEnabled && !fulfillAllRemaining && fulfillmentQuantity > 0 && (
+                            <div style={{ marginTop: 8 }}>
+                              <label style={styles.muted}>{ui('Serial numbers')} ({formatNumber(selectedSerialNumbers.length)}/{formatNumber(requiredSerialCount)})</label>
+                              <textarea
+                                style={{ ...styles.input, minHeight: 72, resize: 'vertical', marginTop: 4 }}
+                                value={fulfillmentSerialNumbers[item.id] || ''}
+                                onChange={(event) => setFulfillmentSerialNumbers((current) => ({ ...current, [item.id]: event.target.value }))}
+                                placeholder={ui('One serial per unit; required only for products configured to require serials')}
+                                disabled={!canFulfill || remaining <= 0}
+                              />
+                            </div>
+                          )}
                         </td>
                         <td style={styles.td}>
                           <input
@@ -3893,10 +3936,13 @@ export default function InventoryRequisitionsPage() {
                   onChange={(event) => setFulfillmentLocationId(event.target.value)}
                 >
                   <option value="">{ui('Select source location')}</option>
-                  {activeLocationOptions.map((location) => (
-                    <option key={location.id} value={location.id}>{location.name}{location.retired ? ` (${ui('retired')})` : ''}</option>
-                  ))}
+                  {activeLocationOptions
+                    .filter((location) => String(location.id) !== String(selected.target_storage_location_id || ''))
+                    .map((location) => (
+                      <option key={location.id} value={location.id}>{location.name}{location.retired ? ` (${ui('retired')})` : ''}</option>
+                    ))}
                 </select>
+                {selected.target_storage_location_name ? <span style={styles.muted}>{ui('Target location')}: {selected.target_storage_location_name}</span> : null}
               </label>
               <label style={styles.checkboxLabel}>
                 <input
@@ -3908,6 +3954,7 @@ export default function InventoryRequisitionsPage() {
                     if (event.target.checked) {
                       setFulfillmentLines({});
                       setFulfillmentLineNotes({});
+                      setFulfillmentSerialNumbers({});
                     }
                   }}
                 />
@@ -4060,6 +4107,7 @@ export default function InventoryRequisitionsPage() {
                         <th style={styles.th}>{ui('Product')}</th>
                         <th style={styles.th}>{ui('Qty')}</th>
                         <th style={styles.th}>{ui('Source')}</th>
+                        <th style={styles.th}>{ui('Target')}</th>
                         <th style={styles.th}>{ui('Notes')}</th>
                         <th style={styles.th}>{ui('By')}</th>
                       </tr>
@@ -4071,6 +4119,7 @@ export default function InventoryRequisitionsPage() {
                           <td style={styles.td}>{line.product_name || line.product_id}<br /><span style={styles.muted}>{line.product_unit || ''}</span></td>
                           <td style={styles.td}>{formatNumber(line.quantity)}</td>
                           <td style={styles.td}>{line.source_storage_location_name || '-'}</td>
+                          <td style={styles.td}>{line.target_storage_location_name || selected.target_storage_location_name || '-'}</td>
                           <td style={styles.td}>{line.notes || '-'}</td>
                           <td style={styles.td}>{line.fulfilled_by_user_name || '-'}</td>
                         </tr>
