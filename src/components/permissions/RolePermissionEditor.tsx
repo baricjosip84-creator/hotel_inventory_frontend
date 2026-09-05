@@ -276,7 +276,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                 className={`role-permission-editor__role-card${role.role === activeRole?.role ? ' is-active' : ''}`}
               >
                 <strong>{role.display_name || roleLabel(role.role)}</strong>
-                <span>{role.effective_permissions.length} {ui("enabled")}</span>
+                <span>{role.effective_permissions.length} {ui("enabled ·")} {role.user_count ?? 0} {ui("assigned users")}</span>
                 <small>{role.editable ? (role.is_default ? ui("Default baseline") : `${role.override_count} ${ui("saved overrides")}`) : ui("Protected")}</small>
               </button>
             ))}
@@ -315,7 +315,7 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                 {activeRole.editable
                   ? activeRole.role_kind === 'custom'
                     ? `${ui("Changes apply to every user assigned to this tenant custom role")}${activeRole.description ? ` — ${activeRole.description}` : ""}.`
-                    : ui("Changes apply to every active user assigned to this role.")
+                    : `${roleLabel(activeRole.role)}: ${activeRole.user_count ?? 0} ${ui("assigned users")}. ${ui("Changes apply to every active user assigned to this role.")}`
                   : ui("This role is protected and cannot be edited.")}
               </p>
             </div>

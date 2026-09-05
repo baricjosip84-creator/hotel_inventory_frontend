@@ -121,8 +121,8 @@ for (const required of [
   'canReview: permissions.canReviewInventoryUsage,',
   'canManageTemplates: permissions.canManageInventoryUsageTemplates,',
   'canRunScheduled: permissions.canRunScheduledInventoryUsage,',
-  'const canRecordStockUsage = !permissions.isAdmin && permissions.canConsumeStock && permissions.canRecordInventoryUsage;',
-  'const canBulkRecordStockUsage = !permissions.isAdmin && permissions.canConsumeStock && permissions.canBulkRecordInventoryUsage;',
+  'const canRecordStockUsage = permissions.canConsumeStock && permissions.canRecordInventoryUsage;',
+  'const canBulkRecordStockUsage = permissions.canConsumeStock && permissions.canBulkRecordInventoryUsage;',
 ]) if (!pageSource.includes(required)) fail(`Inventory Usage controller permission gate changed or missing: ${required}`);
 for (const required of [
   'activeArea === "close" && permissions.canClosePeriods',

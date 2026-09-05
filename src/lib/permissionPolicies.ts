@@ -38,6 +38,8 @@ export type RolePermissionPolicy<Role extends string, Permission extends string>
   is_default: boolean;
   is_active?: boolean;
   user_count?: number | null;
+  active_user_count?: number | null;
+  inactive_user_count?: number | null;
   source_template_key?: string | null;
   source_template_name?: string | null;
   version?: number | null;

@@ -1,6 +1,6 @@
 import { apiMutationRequest, apiRequest } from '../../lib/api';
 import { buildUsageQuery } from './inventoryUsageFormatting';
-import type { InventoryUsageAlertScanResponse, InventoryUsageAttachmentDraft, InventoryUsageAttachmentResponse, InventoryUsageBarcodeRequest, InventoryUsageBarcodePreviewResponse, InventoryUsageBarcodeResponse, InventoryUsageBulkRequest, InventoryUsageBulkReadinessResponse, InventoryUsageBulkResponse, InventoryUsageAnomalies, InventoryUsageScheduledTemplates, InventoryUsageTemplate, InventoryUsageTemplateDraft, InventoryUsageTemplateResponse, InventoryUsageTemplateArchiveResponse, InventoryUsageTemplateConsumeResponse, InventoryUsageTemplateReadiness, InventoryUsageScheduledTemplateRunDueResponse, InventoryUsageExceptions, InventoryUsageImpact, InventoryUsageLog, InventoryUsageLogDetail, InventoryUsagePeriodClosure, InventoryUsagePeriodClosureDraft, InventoryUsagePeriodClosurePreviewResponse, InventoryUsagePeriodClosureResponse, InventoryUsageReviewResponse, InventoryUsageReversalResponse, InventoryUsageSummary, InventoryUsageStorageLocationOption, InventoryUsageOptions, UsageFilters } from './inventoryUsageTypes';
+import type { InventoryUsageAlertScanResponse, InventoryUsageAttachmentDraft, InventoryUsageAttachmentResponse, InventoryUsageBarcodeRequest, InventoryUsageBarcodePreviewResponse, InventoryUsageBarcodeResponse, InventoryUsageBulkRequest, InventoryUsageBulkReadinessResponse, InventoryUsageBulkResponse, InventoryUsageAnomalies, InventoryUsageScheduledTemplates, InventoryUsageTemplate, InventoryUsageTemplateDraft, InventoryUsageTemplateUpdateDraft, InventoryUsageTemplateResponse, InventoryUsageTemplateArchiveResponse, InventoryUsageTemplateConsumeResponse, InventoryUsageTemplateReadiness, InventoryUsageScheduledTemplateRunDueResponse, InventoryUsageExceptions, InventoryUsageImpact, InventoryUsageLog, InventoryUsageLogDetail, InventoryUsagePeriodClosure, InventoryUsagePeriodClosureDraft, InventoryUsagePeriodClosurePreviewResponse, InventoryUsagePeriodClosureResponse, InventoryUsageReviewResponse, InventoryUsageReversalResponse, InventoryUsageSummary, InventoryUsageStorageLocationOption, InventoryUsageOptions, UsageFilters } from './inventoryUsageTypes';
 
 export async function fetchInventoryUsageLogs(filters: UsageFilters, limit = 100, offset = 0): Promise<InventoryUsageLog[]> {
   return apiRequest<InventoryUsageLog[]>(`/stock/usage${buildUsageQuery(filters, limit, offset)}`);
@@ -131,6 +131,13 @@ export async function fetchInventoryUsageTemplateReadiness(templateId: string): 
 export async function createInventoryUsageTemplate(payload: InventoryUsageTemplateDraft): Promise<InventoryUsageTemplateResponse> {
   return apiMutationRequest<InventoryUsageTemplateResponse>('/stock/usage/templates', {
     method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function updateInventoryUsageTemplate(templateId: string, payload: InventoryUsageTemplateUpdateDraft): Promise<InventoryUsageTemplateResponse> {
+  return apiMutationRequest<InventoryUsageTemplateResponse>(`/stock/usage/templates/${templateId}`, {
+    method: 'PUT',
     body: JSON.stringify(payload)
   });
 }

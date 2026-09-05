@@ -36,11 +36,18 @@ for (const [name, source] of [['StockPage.tsx', stock], ['InventoryRequisitionsP
 }
 
 for (const signal of [
-  'const canConsume = !isAdmin && canConsumeStock && canRecordInventoryUsage;',
+  'const canConsume = canConsumeStock && canRecordInventoryUsage;',
+  'const canRecordStockUsage = permissions.canConsumeStock && permissions.canRecordInventoryUsage;',
+  'const canBulkRecordStockUsage = permissions.canConsumeStock && permissions.canBulkRecordInventoryUsage;'
+]) {
+  if (!(stock.includes(signal) || usage.includes(signal))) fail(`permission-composed operational consumption gate missing ${signal}`);
+}
+for (const forbidden of [
+  'const canConsume = !isAdmin',
   'const canRecordStockUsage = !permissions.isAdmin',
   'const canBulkRecordStockUsage = !permissions.isAdmin'
 ]) {
-  if (!(stock.includes(signal) || usage.includes(signal))) fail(`admin operational consumption boundary missing ${signal}`);
+  if (stock.includes(forbidden) || usage.includes(forbidden)) fail(`role-name hard block still overrides explicit owner/operator permissions: ${forbidden}`);
 }
 
 for (const signal of [
@@ -74,4 +81,4 @@ for (const forbidden of ['Priority #', 'added on top of the existing', 'Frontend
   if (advanced.includes(forbidden) || navigation.includes(forbidden)) fail(`customer-facing development wording remains: ${forbidden}`);
 }
 
-console.log('Tenant-owner permission UX contract passed: live permission changes re-render pages, admin consumption entry stays separated from management, and Advanced Inventory only loads/shows role-appropriate tenant data.');
+console.log('Tenant-owner permission UX contract passed: live permission changes re-render pages, stock usage follows effective permissions without a role-name bypass/block, and Advanced Inventory only loads/shows role-appropriate tenant data.');

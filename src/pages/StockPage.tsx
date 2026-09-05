@@ -564,7 +564,6 @@ export default function StockPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedProductId = searchParams.get('product_id')?.trim() || '';
   const {
-    isAdmin,
     canConsumeStock,
     canCountStock: canCount,
     canAdjustStock: canAdjust,
@@ -572,7 +571,7 @@ export default function StockPage() {
     canRecordInventoryUsage
   } = getRoleCapabilities();
   const canViewMovements = hasPermission(TENANT_PERMISSIONS.STOCK_MOVEMENTS_READ);
-  const canConsume = !isAdmin && canConsumeStock && canRecordInventoryUsage;
+  const canConsume = canConsumeStock && canRecordInventoryUsage;
   const accessRoleLabel = getCurrentAccessRoleLabel();
   const preferredAction: StockActionType = canConsume ? 'consume' : canCount ? 'count' : canAdjust ? 'adjust' : 'consume';
   const selectedDetailsRef = useRef<HTMLElement | null>(null);

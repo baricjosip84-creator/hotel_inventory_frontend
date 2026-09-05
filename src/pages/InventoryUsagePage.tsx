@@ -11,6 +11,7 @@ import {
   createInventoryUsageAttachment,
   consumeInventoryUsageTemplate,
   createInventoryUsageTemplate,
+  updateInventoryUsageTemplate,
   fetchInventoryUsageAnomalies,
   fetchInventoryUsageExceptions,
   fetchInventoryUsageImpact,
@@ -44,6 +45,7 @@ import type {
   InventoryUsagePeriodClosurePreviewResponse,
   InventoryUsageTemplate,
   InventoryUsageTemplateDraft,
+  InventoryUsageTemplateUpdateDraft,
   InventoryUsageTemplateReadiness,
 } from "./inventoryUsage/inventoryUsageTypes";
 
@@ -385,6 +387,27 @@ export default function InventoryUsagePage() {
     },
   });
 
+  const updateTemplateMutation = useMutation({
+    mutationFn: ({
+      templateId,
+      payload,
+    }: {
+      templateId: string;
+      payload: InventoryUsageTemplateUpdateDraft;
+    }) => updateInventoryUsageTemplate(templateId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["inventory-usage-templates-page"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["inventory-usage-template-readiness-page"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["inventory-usage-scheduled-templates-page"],
+      });
+    },
+  });
+
   const archiveTemplateMutation = useMutation({
     mutationFn: ({
       templateId,
@@ -636,8 +659,15 @@ export default function InventoryUsagePage() {
     });
   };
 
-  const handleCreateTemplate = (payload: InventoryUsageTemplateDraft) => {
-    createTemplateMutation.mutate(payload);
+  const handleCreateTemplate = async (payload: InventoryUsageTemplateDraft) => {
+    await createTemplateMutation.mutateAsync(payload);
+  };
+
+  const handleUpdateTemplate = async (
+    templateId: string,
+    payload: InventoryUsageTemplateUpdateDraft,
+  ) => {
+    await updateTemplateMutation.mutateAsync({ templateId, payload });
   };
 
   const handlePreviewPeriodClose = (payload: InventoryUsagePeriodClosureDraft) => {
@@ -919,8 +949,8 @@ export default function InventoryUsagePage() {
     usageOptionsQuery,
   ].some((query) => query.isFetching);
 
-  const canRecordStockUsage = !permissions.isAdmin && permissions.canConsumeStock && permissions.canRecordInventoryUsage;
-  const canBulkRecordStockUsage = !permissions.isAdmin && permissions.canConsumeStock && permissions.canBulkRecordInventoryUsage;
+  const canRecordStockUsage = permissions.canConsumeStock && permissions.canRecordInventoryUsage;
+  const canBulkRecordStockUsage = permissions.canConsumeStock && permissions.canBulkRecordInventoryUsage;
 
   return (
     <InventoryUsageDashboard
@@ -1007,6 +1037,14 @@ export default function InventoryUsagePage() {
           ? (createTemplateMutation.error as Error)
           : null
       }
+      templateUpdatingId={
+        updateTemplateMutation.variables?.templateId || null
+      }
+      templateUpdateError={
+        updateTemplateMutation.isError
+          ? (updateTemplateMutation.error as Error)
+          : null
+      }
       templateArchivingId={
         archiveTemplateMutation.variables?.templateId || null
       }
@@ -1027,6 +1065,7 @@ export default function InventoryUsagePage() {
       templateReadinessById={templateReadinessQuery.data || {}}
       selectedTemplate={selectedTemplate}
       onCreateTemplate={handleCreateTemplate}
+      onUpdateTemplate={handleUpdateTemplate}
       onUseTemplate={handleUseTemplate}
       onArchiveTemplate={handleArchiveTemplate}
       onRecordTemplate={handleRecordTemplate}

@@ -680,6 +680,11 @@ export type InventoryUsageTemplateDraft = {
 };
 
 
+export type InventoryUsageTemplateUpdateDraft = InventoryUsageTemplateDraft & {
+  expected_version: number;
+};
+
+
 export type InventoryUsageScheduledTemplateRow = {
   id: string;
   name: string;

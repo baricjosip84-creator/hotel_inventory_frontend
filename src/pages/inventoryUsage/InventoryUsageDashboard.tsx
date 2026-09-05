@@ -56,7 +56,7 @@ import type {
   InventoryUsageTemplate,
   InventoryUsageScheduledTemplateRunDueResponse,
   InventoryUsageTemplateConsumeResponse,
-  InventoryUsageTemplateDraft,
+  InventoryUsageTemplateDraft, InventoryUsageTemplateUpdateDraft,
   InventoryUsageTemplateReadiness,
   UsageFilters,
 } from "./inventoryUsageTypes";
@@ -113,6 +113,8 @@ type InventoryUsageDashboardProps = {
   templatesError?: Error | null;
   templateCreating: boolean;
   templateCreateError?: Error | null;
+  templateUpdatingId?: string | null;
+  templateUpdateError?: Error | null;
   templateArchivingId?: string | null;
   templateArchiveError?: Error | null;
   templateRecordingId?: string | null;
@@ -120,7 +122,8 @@ type InventoryUsageDashboardProps = {
   templateRecordResult?: InventoryUsageTemplateConsumeResponse | null;
   templateReadinessById?: Record<string, InventoryUsageTemplateReadiness>;
   selectedTemplate?: InventoryUsageTemplate | null;
-  onCreateTemplate: (draft: InventoryUsageTemplateDraft) => void;
+  onCreateTemplate: (draft: InventoryUsageTemplateDraft) => Promise<void>;
+  onUpdateTemplate: (templateId: string, draft: InventoryUsageTemplateUpdateDraft) => Promise<void>;
   onUseTemplate: (template: InventoryUsageTemplate) => void;
   onArchiveTemplate: (template: InventoryUsageTemplate) => void;
   onRecordTemplate: (template: InventoryUsageTemplate) => void;
@@ -241,6 +244,8 @@ export function InventoryUsageDashboard({
   templatesError,
   templateCreating,
   templateCreateError,
+  templateUpdatingId,
+  templateUpdateError,
   templateArchivingId,
   templateArchiveError,
   templateRecordingId,
@@ -249,6 +254,7 @@ export function InventoryUsageDashboard({
   templateReadinessById,
   selectedTemplate,
   onCreateTemplate,
+  onUpdateTemplate,
   onUseTemplate,
   onArchiveTemplate,
   onRecordTemplate,
@@ -830,6 +836,8 @@ export function InventoryUsageDashboard({
         error={templatesError}
         creating={templateCreating}
         createError={templateCreateError}
+        updatingTemplateId={templateUpdatingId}
+        updateError={templateUpdateError}
         archivingTemplateId={templateArchivingId}
         archiveError={templateArchiveError}
         recordingTemplateId={templateRecordingId}
@@ -837,6 +845,7 @@ export function InventoryUsageDashboard({
         recordResult={templateRecordResult}
         templateReadinessById={templateReadinessById}
         onCreateTemplate={onCreateTemplate}
+        onUpdateTemplate={onUpdateTemplate}
         onUseTemplate={onUseTemplate}
         onArchiveTemplate={onArchiveTemplate}
         onRecordTemplate={onRecordTemplate}

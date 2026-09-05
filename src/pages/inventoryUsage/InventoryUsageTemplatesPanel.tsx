@@ -6,7 +6,7 @@ import { formatLocalizedDateTime, formatLocalizedNumber } from '../../i18n/forma
 import { USAGE_REASON_OPTIONS } from './inventoryUsageConfig';
 import { toNumber } from './inventoryUsageFormatting';
 import { styles } from './inventoryUsageStyles';
-import type { InventoryUsageTemplate, InventoryUsageTemplateConsumeResponse, InventoryUsageTemplateDraft, InventoryUsageTemplateLine, InventoryUsageTemplateReadiness, InventoryUsageProductOption, InventoryUsageStorageLocationOption } from './inventoryUsageTypes';
+import type { InventoryUsageTemplate, InventoryUsageTemplateConsumeResponse, InventoryUsageTemplateDraft, InventoryUsageTemplateUpdateDraft, InventoryUsageTemplateLine, InventoryUsageTemplateReadiness, InventoryUsageProductOption, InventoryUsageStorageLocationOption } from './inventoryUsageTypes';
 import { showTenantActionError } from '../../lib/actionFeedback';
 
 const createBlankLine = (): InventoryUsageTemplateLine => ({
@@ -34,6 +34,8 @@ type InventoryUsageTemplatesPanelProps = {
   error?: Error | null;
   creating: boolean;
   createError?: Error | null;
+  updatingTemplateId?: string | null;
+  updateError?: Error | null;
   archivingTemplateId?: string | null;
   archiveError?: Error | null;
   recordingTemplateId?: string | null;
@@ -42,7 +44,8 @@ type InventoryUsageTemplatesPanelProps = {
   templateReadinessById?: Record<string, InventoryUsageTemplateReadiness>;
   canManageTemplates?: boolean;
   canRecordTemplates?: boolean;
-  onCreateTemplate: (draft: InventoryUsageTemplateDraft) => void;
+  onCreateTemplate: (draft: InventoryUsageTemplateDraft) => Promise<void>;
+  onUpdateTemplate: (templateId: string, draft: InventoryUsageTemplateUpdateDraft) => Promise<void>;
   onUseTemplate: (template: InventoryUsageTemplate) => void;
   onArchiveTemplate: (template: InventoryUsageTemplate) => void;
   onRecordTemplate: (template: InventoryUsageTemplate) => void;
@@ -57,6 +60,8 @@ export function InventoryUsageTemplatesPanel({
   error,
   creating,
   createError,
+  updatingTemplateId,
+  updateError,
   archivingTemplateId,
   archiveError,
   recordingTemplateId,
@@ -64,6 +69,7 @@ export function InventoryUsageTemplatesPanel({
   recordResult,
   templateReadinessById = {},
   onCreateTemplate,
+  onUpdateTemplate,
   onUseTemplate,
   onArchiveTemplate,
   onRecordTemplate,
@@ -82,6 +88,8 @@ export function InventoryUsageTemplatesPanel({
   const [nextRunAt, setNextRunAt] = useState('');
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [lines, setLines] = useState<InventoryUsageTemplateLine[]>([createBlankLine()]);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [editingTemplateVersion, setEditingTemplateVersion] = useState<number | null>(null);
 
   const validLineCount = useMemo(() => {
     return lines.filter((line) => line.product_id.trim() && line.storage_location_id.trim() && Number(line.quantity) > 0).length;
@@ -111,9 +119,37 @@ export function InventoryUsageTemplatesPanel({
     setNextRunAt('');
     setScheduleEnabled(false);
     setLines([createBlankLine()]);
+    setEditingTemplateId(null);
+    setEditingTemplateVersion(null);
   };
 
-  const handleCreate = () => {
+  const loadTemplateForEdit = (template: InventoryUsageTemplate) => {
+    setEditingTemplateId(template.id);
+    setEditingTemplateVersion(Number(template.version || 0) || null);
+    setName(template.name || '');
+    setDescription(template.description || '');
+    setDepartment(template.department || '');
+    setEventName(template.event_name || '');
+    setReason(template.consumption_reason || 'internal_use');
+    setNotes(template.notes || '');
+    setScheduleFrequency(template.schedule_frequency || '');
+    setScheduleInterval(String(template.schedule_interval || 1));
+    setNextRunAt(template.next_run_at ? String(template.next_run_at).slice(0, 16) : '');
+    setScheduleEnabled(Boolean(template.schedule_is_active));
+    setLines(
+      template.items?.length
+        ? template.items.map((item) => ({
+            product_id: item.product_id || '',
+            storage_location_id: item.storage_location_id || '',
+            quantity: String(item.quantity ?? ''),
+            consumption_reason: String(item.consumption_reason || ''),
+            notes: item.notes || ''
+          }))
+        : [createBlankLine()]
+    );
+  };
+
+  const handleCreate = async () => {
     const items = lines.filter((line) => line.product_id.trim() && line.storage_location_id.trim() && Number(line.quantity) > 0);
 
     if (!name.trim()) {
@@ -126,7 +162,7 @@ export function InventoryUsageTemplatesPanel({
       return;
     }
 
-    onCreateTemplate({
+    const draft: InventoryUsageTemplateDraft = {
       name: name.trim(),
       description: description.trim() || undefined,
       department: department.trim() || undefined,
@@ -144,10 +180,30 @@ export function InventoryUsageTemplatesPanel({
         consumption_reason: line.consumption_reason || undefined,
         notes: line.notes.trim() || undefined
       }))
-    });
+    };
 
-    resetForm();
+    try {
+      if (editingTemplateId) {
+        if (!editingTemplateVersion) {
+          showTenantActionError(ui('Refresh the template before editing it again.'));
+          return;
+        }
+
+        await onUpdateTemplate(editingTemplateId, {
+          ...draft,
+          expected_version: editingTemplateVersion
+        });
+      } else {
+        await onCreateTemplate(draft);
+      }
+
+      resetForm();
+    } catch {
+      // Keep every builder field intact so the user can correct and resubmit.
+    }
   };
+
+  const saving = creating || Boolean(editingTemplateId && updatingTemplateId === editingTemplateId);
 
   return (
     <section style={styles.card}>
@@ -160,7 +216,9 @@ export function InventoryUsageTemplatesPanel({
 
       <div style={styles.templateGrid}>
         <div style={styles.templateBuilderCard}>
-          <h3 style={styles.subsectionTitle}>{ui('Create reusable template')}</h3>
+          <h3 style={styles.subsectionTitle}>
+            {editingTemplateId ? ui('Edit reusable template') : ui('Create reusable template')}
+          </h3>
           <div style={styles.filterGrid}>
             <label style={styles.fieldLabel}>
               {ui('Template name')}
@@ -252,11 +310,21 @@ export function InventoryUsageTemplatesPanel({
 
           <div style={styles.bulkFooter}>
             <button type="button" style={styles.secondaryButton} onClick={addLine}>{ui('Add template line')}</button>
-            <button type="button" style={styles.primaryButton} onClick={handleCreate} disabled={creating || !name.trim() || validLineCount === 0}>
-              {creating ? ui('Saving template...') : ui('Save usage template')}
+            {editingTemplateId ? (
+              <button type="button" style={styles.secondaryButton} onClick={resetForm} disabled={saving}>
+                {ui('Cancel edit')}
+              </button>
+            ) : null}
+            <button type="button" style={styles.primaryButton} onClick={handleCreate} disabled={saving || !name.trim() || validLineCount === 0}>
+              {saving
+                ? ui('Saving template...')
+                : editingTemplateId
+                  ? ui('Update usage template')
+                  : ui('Save usage template')}
             </button>
           </div>
-          {createError ? <p style={styles.errorText}>{ui('Template save failed: ')}{createError.message}</p> : null}
+          {createError && !editingTemplateId ? <p style={styles.errorText}>{ui('Template save failed: ')}{createError.message}</p> : null}
+          {updateError && editingTemplateId ? <p style={styles.errorText}>{ui('Template update failed: ')}{updateError.message}</p> : null}
           {archiveError ? <p style={styles.errorText}>{ui('Template archive failed: ')}{archiveError.message}</p> : null}
           {recordError ? <p style={styles.errorText}>{ui('Template recording failed: ')}{recordError.message}</p> : null}
           {recordResult ? <p style={styles.successText}>{recordResult.message} · {formatLocalizedNumber(toNumber(recordResult.usage_count), locale)} {ui('lines recorded.')}</p> : null}
@@ -331,6 +399,14 @@ export function InventoryUsageTemplatesPanel({
                         disabled={!canRecordTemplates || recordingTemplateId === template.id || !(template.items?.length) || !canRecord}
                       >
                         {recordingTemplateId === template.id ? ui('Recording...') : evidenceAcknowledgementCount > 0 ? ui('Record with acknowledgement') : ui('Record now')}
+                      </button>
+                      <button
+                        type="button"
+                        style={styles.secondaryButton}
+                        onClick={() => loadTemplateForEdit(template)}
+                        disabled={!canManageTemplates || Boolean(updatingTemplateId) || archivingTemplateId === template.id}
+                      >
+                        {updatingTemplateId === template.id ? ui('Saving...') : ui('Edit')}
                       </button>
                       <button
                         type="button"

@@ -228,7 +228,7 @@ export default function TenantPermissionsPage() {
 
     if (!nextActive && activeRole.can_deactivate === false) {
       setSuccessMessage(null);
-      setErrorMessage(ui("Reassign all users before deactivating this custom role."));
+      setErrorMessage(ui("Reassign or deactivate active users before deactivating this custom role."));
       return;
     }
     if (nextActive && activeRole.can_activate === false) return;
@@ -404,7 +404,7 @@ export default function TenantPermissionsPage() {
           <OperationalSectionHeader
             iconPath="/permissions"
             title={`${ui("Manage")} ${roleName(activeRole)}`}
-            description={`${activeRole.user_count || 0} ${ui("assigned users ·")} ${activeRole.is_active === false ? ui("Inactive") : ui("Active")} · ${ui("starting point:")} ${activeRole.source_template_name || ui("Blank role")}`}
+            description={`${activeRole.user_count || 0} ${ui("assigned users ·")} ${activeRole.active_user_count || 0} ${ui("active ·")} ${activeRole.is_active === false ? ui("Inactive") : ui("Active")} · ${ui("starting point:")} ${activeRole.source_template_name || ui("Blank role")}`}
           />
           <div className="tenant-permissions-form-grid tenant-permissions-form-grid--manage">
             <label className="tenant-permissions-field">
@@ -417,11 +417,13 @@ export default function TenantPermissionsPage() {
             </label>
           </div>
           <div className="tenant-permissions-lifecycle-note">
-            {activeRole.user_count
-              ? `${activeRole.user_count} ${ui(activeRole.user_count === 1 ? "user must be reassigned before this role can be deactivated or deleted." : "users must be reassigned before this role can be deactivated or deleted.")}`
-              : activeRole.is_active === false
-                ? ui("Inactive roles retain their definition but cannot be assigned or edited until reactivated.")
-                : ui("No users are assigned. This role can be safely deactivated if it is no longer needed.")}
+            {(activeRole.active_user_count || 0) > 0
+              ? `${activeRole.active_user_count} ${ui(activeRole.active_user_count === 1 ? "active user must be reassigned or deactivated before this role can be deactivated." : "active users must be reassigned or deactivated before this role can be deactivated.")}`
+              : (activeRole.user_count || 0) > 0
+                ? `${activeRole.user_count} ${ui(activeRole.user_count === 1 ? "inactive historical assignment is preserved. This role can be deactivated, but not deleted until the assignment is removed." : "inactive historical assignments are preserved. This role can be deactivated, but not deleted until the assignments are removed.")}`
+                : activeRole.is_active === false
+                  ? ui("Inactive roles retain their definition but cannot be assigned or edited until reactivated.")
+                  : ui("No users are assigned. This role can be safely deactivated if it is no longer needed.")}
           </div>
           <div className="tenant-permissions-panel-actions tenant-permissions-panel-actions--manage">
             <button
@@ -440,7 +442,7 @@ export default function TenantPermissionsPage() {
               className="app-button app-button--secondary"
               disabled={managing || (activeRole.is_active === false ? activeRole.can_activate === false : activeRole.can_deactivate === false)}
               onClick={() => void toggleCustomRoleActive()}
-              title={activeRole.is_active !== false && activeRole.can_deactivate === false ? ui("Reassign all users before deactivating this role.") : undefined}
+              title={activeRole.is_active !== false && activeRole.can_deactivate === false ? ui("Reassign or deactivate active users before deactivating this role.") : undefined}
             >
               {activeRole.is_active === false ? ui("Activate") : ui("Deactivate")}
             </button>
