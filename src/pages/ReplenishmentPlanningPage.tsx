@@ -112,6 +112,11 @@ type PlanTransfer = {
   destination_shortage_after: number | string;
   linked_stock_transfer_id?: string | null;
   linked_stock_transfer_status?: string | null;
+  evidence?: {
+    source_policy_configured?: boolean;
+    source_review_required?: boolean;
+    [key: string]: unknown;
+  };
 };
 
 type PlanningRunDetail = {
@@ -768,7 +773,11 @@ export default function ReplenishmentPlanningPage() {
                       <td><strong>{row.product_name}</strong><small>{row.product_unit || ui('Unit not recorded')}</small></td>
                       <td><strong>{row.source_storage_location_name}</strong><small>{ui('to {location}').replace('{location}', row.destination_storage_location_name)}</small></td>
                       <td><strong>{formatUiNumber(row.recommended_quantity)}</strong></td>
-                      <td><strong>{ui('{count} available').replace('{count}', formatUiNumber(row.source_surplus_before))}</strong><small>{ui('{count} shortage').replace('{count}', formatUiNumber(row.destination_shortage_before))}</small></td>
+                      <td>
+                        <strong>{ui('{count} available').replace('{count}', formatUiNumber(row.source_surplus_before))}</strong>
+                        {row.evidence?.source_review_required ? <small>{ui('Review required')} · {ui('Source policy not configured')}</small> : null}
+                        <small>{ui('{count} shortage').replace('{count}', formatUiNumber(row.destination_shortage_before))}</small>
+                      </td>
                       <td><select value={draft.decision} disabled={disabled} onChange={(event) => setDrafts((current) => ({ ...current, [key]: { ...draft, decision: event.target.value as Decision } }))}>{DECISIONS.map((decision) => <option key={decision} value={decision} disabled={decision === 'pending' && row.decision_status !== 'pending'}>{decisionDisplayLabel(decision)}</option>)}</select></td>
                       <td><input className="replenishment-planning-quantity-input" type="number" min={0} step="0.0001" value={draft.quantity} disabled={disabled || draft.decision !== 'overridden'} onChange={(event) => setDrafts((current) => ({ ...current, [key]: { ...draft, quantity: event.target.value } }))}/></td>
                       <td><input value={draft.reason} maxLength={2000} placeholder={reasonRequired(draft.decision) ? ui('Reason required') : ui('Optional note')} disabled={disabled} onChange={(event) => setDrafts((current) => ({ ...current, [key]: { ...draft, reason: event.target.value } }))}/></td>

@@ -7361,6 +7361,7 @@ const rows: readonly TranslationRow[] = [
   ["Source link", "Quellverknüpfung", "Enlace de origen", "Lien source", "Poveznica izvora"],
   ["Source location", "Quellort", "Ubicación de origen", "Emplacement source", "Izvorna lokacija"],
   ["Source location demand", "Bedarf nach Quelllagerort", "Demanda por ubicación de origen", "Demande par emplacement source", "Potražnja po izvornoj lokaciji"],
+  ["Source policy not configured", "Quellenrichtlinie nicht konfiguriert", "Política de origen no configurada", "Politique source non configurée", "Pravila izvorne lokacije nisu konfigurirana"],
   ["Source permissions apply", "Quellberechtigungen gelten", "Se aplican los permisos de origen", "Les autorisations source s’appliquent", "Primjenjuju se izvorne dozvole"],
   ["Source permissions still apply", "Quellberechtigungen gelten weiterhin", "Los permisos de origen siguen aplicándose", "Les autorisations source continuent de s’appliquer", "Izvorne dozvole i dalje se primjenjuju"],
   ["Source priority products", "Produkte mit Quellenpriorität", "Productos con prioridad de fuente", "Produits prioritaires selon la source", "Proizvodi s prioritetom prema izvoru"],
