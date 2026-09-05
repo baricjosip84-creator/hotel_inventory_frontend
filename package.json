@@ -282,20 +282,20 @@
     "check:simulation-requisition-target-transfer-v349131": "node scripts/check-simulation-requisition-target-transfer-v349131.mjs"
   },
   "dependencies": {
-    "@sentry/react": "^10.67.0",
-    "@tanstack/react-query": "^5.96.2",
+    "@sentry/react": "^10.73.0",
+    "@tanstack/react-query": "^5.102.8",
     "html5-qrcode": "^2.3.8",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-router": "^8.3.0"
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router": "^8.3.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.44.0",
     "@sentry/vite-plugin": "^5.4.0",
     "@types/node": "^24.12.2",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9.39.4",
