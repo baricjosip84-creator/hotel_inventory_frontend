@@ -184,6 +184,11 @@ export type SupplierInvoice = {
   updated_at?: string | null;
   version: number | string;
   line_count?: number | string | null;
+  return_credit_count?: number | string | null;
+  open_return_credit_count?: number | string | null;
+  settled_return_credit_count?: number | string | null;
+  expected_return_credit_total?: number | string | null;
+  actual_return_credit_total?: number | string | null;
   items: SupplierInvoiceItem[];
 };
 

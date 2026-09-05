@@ -218,7 +218,19 @@ export function InvoicesTab({ createSupplierInvoiceMutation, updateSupplierInvoi
                   <td style={styles.td}>{ui('Invoice: {date}').replace('{date}', formatLocalizedDate(invoice.invoice_date, locale))}<br/>{ui('Due: {date}').replace('{date}', invoice.due_date ? formatLocalizedDate(invoice.due_date, locale) : '—')}<br/><span style={styles.muted}>{ui('Updated {date}').replace('{date}', formatLocalizedDateTime(invoice.updated_at || invoice.created_at, locale))}</span></td>
                   <td style={styles.td}>{businessLabel(invoice.status)}</td>
                   <td style={styles.td}>{businessLabel(invoice.variance_status)}</td>
-                  <td style={styles.td}>{amount(invoice.total_amount, invoice.currency)}</td>
+                  <td style={styles.td}>
+                    {amount(invoice.total_amount, invoice.currency)}
+                    {Number(invoice.return_credit_count || 0) > 0 ? (
+                      <div style={{ marginTop: 6 }}>
+                        <span style={styles.muted}>{ui('{count} supplier return credit(s)').replace('{count}', quantity(invoice.return_credit_count || 0))}</span><br/>
+                        <span style={styles.muted}>{ui('Expected credits: {value}').replace('{value}', amount(invoice.expected_return_credit_total || 0, invoice.currency))}</span><br/>
+                        <span style={styles.muted}>{ui('Recorded credits: {value} · Settled {settled} · Open {open}')
+                          .replace('{value}', amount(invoice.actual_return_credit_total || 0, invoice.currency))
+                          .replace('{settled}', quantity(invoice.settled_return_credit_count || 0))
+                          .replace('{open}', quantity(invoice.open_return_credit_count || 0))}</span>
+                      </div>
+                    ) : null}
+                  </td>
                   <td style={styles.td}>
                     <details><summary>{ui('{count} line(s)').replace('{count}', formatLocalizedNumber(invoice.items.length || Number(invoice.line_count || 0), locale))}</summary>
                       <div style={{ marginTop: 8 }}>{invoice.items.map((item) => <div key={item.id} style={{ marginBottom: 8 }}><strong>{item.product_name || item.product_id}</strong><br/><span style={styles.muted}>{quantity(item.quantity)} × {amount(item.unit_cost, invoice.currency)} = {amount(item.line_amount, invoice.currency)}{item.quantity_variance != null ? ui(' · qty variance {quantity}').replace('{quantity}', quantity(item.quantity_variance)) : ''}{item.unit_cost_variance != null ? ui(' · cost variance {value}').replace('{value}', quantity(item.unit_cost_variance)) : ''}</span></div>)}</div>

@@ -10,8 +10,9 @@ import { useOperationalAttentionItems } from '../../../lib/sidebarAttentionItems
 import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../../../i18n/formatters';
 import { normalizeError } from '../EnterpriseInventoryFormat';
 import { InputField, SelectField, TextareaField } from '../EnterpriseInventoryShared';
-import { postEnterpriseInventoryRequest, postEnterpriseInventoryVersionedRequest } from '../EnterpriseInventoryRequests';
+import { patchEnterpriseInventoryRequest, postEnterpriseInventoryRequest, postEnterpriseInventoryVersionedRequest } from '../EnterpriseInventoryRequests';
 import { styles } from '../EnterpriseInventoryStyles';
+import type { SupplierInvoice, SupplierInvoiceItem } from '../EnterpriseInventoryTypes';
 
 type EligibleReturnLot = {
   inventory_lot_id: string;
@@ -42,7 +43,9 @@ type SupplierReturnItem = {
   id: string;
   inventory_lot_id: string;
   shipment_id?: string | null;
+  shipment_item_id?: string | null;
   purchase_order_id?: string | null;
+  product_id: string;
   product_name?: string | null;
   storage_location_name?: string | null;
   source_condition: string;
@@ -54,6 +57,44 @@ type SupplierReturnItem = {
   batch_number?: string | null;
   expiry_date?: string | null;
   reason?: string | null;
+};
+
+type SupplierReturnCreditItem = {
+  id: string;
+  supplier_return_item_id: string;
+  supplier_invoice_item_id: string;
+  product_id: string;
+  product_name?: string | null;
+  returned_quantity: number | string;
+  invoice_unit_cost: number | string;
+  expected_line_subtotal: number | string;
+};
+
+type SupplierReturnCredit = {
+  id: string;
+  supplier_return_id: string;
+  supplier_invoice_id: string;
+  invoice_number?: string | null;
+  supplier_invoice_status?: string | null;
+  status: 'expected' | 'credit_note_received' | 'settled' | 'waived' | string;
+  currency: string;
+  expected_subtotal_amount: number | string;
+  expected_tax_amount: number | string;
+  expected_total_amount: number | string;
+  actual_subtotal_amount?: number | string | null;
+  actual_tax_amount?: number | string | null;
+  actual_total_amount?: number | string | null;
+  credit_note_number?: string | null;
+  credit_note_date?: string | null;
+  settlement_method?: string | null;
+  settlement_reference?: string | null;
+  settlement_notes?: string | null;
+  notes?: string | null;
+  waiver_reason?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+  version: number | string;
+  items: SupplierReturnCreditItem[];
 };
 
 type SupplierReturn = {
@@ -77,6 +118,7 @@ type SupplierReturn = {
   created_at: string;
   version: number;
   items: SupplierReturnItem[];
+  credit_reconciliations?: SupplierReturnCredit[];
 };
 
 type DraftReturnItem = {
@@ -101,6 +143,9 @@ export function SupplierReturnsTab() {
   const canWrite = hasPermission(TENANT_PERMISSIONS.SUPPLIER_RETURNS_WRITE);
   const canDispatch = hasPermission(TENANT_PERMISSIONS.SUPPLIER_RETURNS_DISPATCH);
   const canApprove = hasPermission(TENANT_PERMISSIONS.APPROVALS_EXECUTE);
+  const canReadInvoices = hasPermission(TENANT_PERMISSIONS.INVOICES_READ);
+  const canWriteInvoices = hasPermission(TENANT_PERMISSIONS.INVOICES_WRITE);
+  const canManageCredits = canWrite && canWriteInvoices;
   const inventoryControlAttentionItemsQuery = useOperationalAttentionItems('inventory_controls', canApprove || canDispatch);
   const approvalAttentionKeys = new Set(inventoryControlAttentionItemsQuery.data?.approval_item_keys || []);
   const directApprovalAttentionIds = new Set(inventoryControlAttentionItemsQuery.data?.supplier_return_approval_ids || []);
@@ -112,6 +157,11 @@ export function SupplierReturnsTab() {
   const [returnReason, setReturnReason] = useState('');
   const [notes, setNotes] = useState('');
   const [draftItems, setDraftItems] = useState<DraftReturnItem[]>([]);
+  const [creditReturnId, setCreditReturnId] = useState('');
+  const [creditInvoiceId, setCreditInvoiceId] = useState('');
+  const [creditReturnItemIds, setCreditReturnItemIds] = useState<string[]>([]);
+  const [expectedCreditTax, setExpectedCreditTax] = useState('0');
+  const [creditNotes, setCreditNotes] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -135,6 +185,7 @@ export function SupplierReturnsTab() {
     const labels: Record<string, string> = {
       draft: 'Draft', submitted: 'Submitted', pending_approval: 'Pending approval', approved: 'Approved',
       rejected: 'Rejected', dispatched: 'Dispatched', completed: 'Completed', cancelled: 'Cancelled',
+      expected: 'Expected', credit_note_received: 'Credit note received', settled: 'Settled', waived: 'Waived',
     };
     return value && labels[value] ? ui(labels[value]) : String(value || '—');
   };
@@ -145,6 +196,12 @@ export function SupplierReturnsTab() {
     queryKey: ['enterprise-supplier-returns'],
     queryFn: () => apiRequest<SupplierReturn[]>('/enterprise-inventory/supplier-returns'),
     enabled: canRead,
+  });
+
+  const invoicesQuery = useQuery({
+    queryKey: ['enterprise-supplier-invoices'],
+    queryFn: () => apiRequest<SupplierInvoice[]>('/enterprise-inventory/supplier-invoices'),
+    enabled: canReadInvoices,
   });
 
   const eligibleLotsQuery = useQuery({
@@ -182,9 +239,55 @@ export function SupplierReturnsTab() {
     return total + (Number.isFinite(unitCost) ? unitCost * item.quantity : 0);
   }, 0);
 
+
+  const findCreditInvoiceLine = (returnItem: SupplierReturnItem, invoice: SupplierInvoice | null): SupplierInvoiceItem | null => {
+    if (!invoice) return null;
+    const productLines = invoice.items.filter((line) => line.product_id === returnItem.product_id);
+    const direct = productLines.filter((line) => Boolean(line.shipment_item_id && returnItem.shipment_item_id && line.shipment_item_id === returnItem.shipment_item_id));
+    if (direct.length === 1) return direct[0];
+    const hasHeaderLineage = Boolean(
+      (invoice.shipment_id && returnItem.shipment_id && invoice.shipment_id === returnItem.shipment_id)
+      || (invoice.purchase_order_id && returnItem.purchase_order_id && invoice.purchase_order_id === returnItem.purchase_order_id)
+    );
+    return hasHeaderLineage && productLines.length === 1 ? productLines[0] : null;
+  };
+
+  const completedReturns = (returnsQuery.data ?? []).filter((item) => item.status === 'completed');
+  const selectedCreditReturn = completedReturns.find((item) => item.id === creditReturnId) ?? null;
+  const activeCreditReturnItemIds = new Set(
+    (selectedCreditReturn?.credit_reconciliations ?? [])
+      .filter((credit) => credit.status !== 'waived')
+      .flatMap((credit) => credit.items.map((item) => item.supplier_return_item_id)),
+  );
+  const candidateInvoices = (invoicesQuery.data ?? []).filter((invoice) => (
+    selectedCreditReturn
+    && invoice.supplier_id === selectedCreditReturn.supplier_id
+    && ['matched', 'paid'].includes(invoice.status)
+  ));
+  const selectedCreditInvoice = candidateInvoices.find((invoice) => invoice.id === creditInvoiceId) ?? null;
+  const creditEligibleItems = (selectedCreditReturn?.items ?? []).filter((item) => (
+    !activeCreditReturnItemIds.has(item.id) && Boolean(findCreditInvoiceLine(item, selectedCreditInvoice))
+  ));
+  const expectedCreditSubtotal = creditEligibleItems
+    .filter((item) => creditReturnItemIds.includes(item.id))
+    .reduce((sum, item) => {
+      const invoiceLine = findCreditInvoiceLine(item, selectedCreditInvoice);
+      return sum + Number(item.quantity || 0) * Number(invoiceLine?.unit_cost || 0);
+    }, 0);
+  const expectedCreditTaxNumber = Number(expectedCreditTax);
+  const creditDraftValid = Boolean(
+    canManageCredits
+    && selectedCreditReturn
+    && selectedCreditInvoice
+    && creditReturnItemIds.length
+    && Number.isFinite(expectedCreditTaxNumber)
+    && expectedCreditTaxNumber >= 0
+  );
+
   const refreshReturnData = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['enterprise-supplier-returns'] }),
+      queryClient.invalidateQueries({ queryKey: ['enterprise-supplier-invoices'] }),
       queryClient.invalidateQueries({ queryKey: ['enterprise-supplier-return-eligible-lots'] }),
       queryClient.invalidateQueries({ queryKey: ['enterprise-stock-overview'] }),
       queryClient.invalidateQueries({ queryKey: ['enterprise-stock-movements'] }),
@@ -263,6 +366,132 @@ export function SupplierReturnsTab() {
       setError(normalizeError(mutationError, ui('Failed to update supplier return.')));
     },
   });
+
+  const createCreditMutation = useMutation({
+    mutationFn: () => postEnterpriseInventoryRequest<SupplierReturnCredit>(
+      `/enterprise-inventory/supplier-returns/${selectedCreditReturn?.id}/credit-reconciliations`,
+      {
+        supplier_invoice_id: selectedCreditInvoice?.id,
+        supplier_return_item_ids: creditReturnItemIds,
+        expected_tax_amount: expectedCreditTaxNumber,
+        notes: creditNotes.trim() || null,
+      },
+    ),
+    onSuccess: async () => {
+      setCreditReturnId('');
+      setCreditInvoiceId('');
+      setCreditReturnItemIds([]);
+      setExpectedCreditTax('0');
+      setCreditNotes('');
+      setError(null);
+      setMessage(ui('Supplier return credit expectation created successfully.'));
+      await refreshReturnData();
+    },
+    onError: (mutationError) => {
+      setMessage(null);
+      setError(normalizeError(mutationError, ui('Failed to create supplier return credit expectation.')));
+    },
+  });
+
+  const creditLifecycleMutation = useMutation({
+    mutationFn: async ({ credit, action, payload }: { credit: SupplierReturnCredit; action: 'expected' | 'credit_note' | 'settle' | 'waive'; payload: Record<string, unknown> }) => {
+      const base = `/enterprise-inventory/supplier-return-credit-reconciliations/${credit.id}`;
+      if (action === 'expected') return patchEnterpriseInventoryRequest<SupplierReturnCredit>(`${base}/expected`, payload, credit.version);
+      return postEnterpriseInventoryVersionedRequest<SupplierReturnCredit>(`${base}/${action === 'credit_note' ? 'credit-note' : action}`, credit.version, payload);
+    },
+    onSuccess: async (_result, input) => {
+      const labels = {
+        expected: 'Supplier return credit expectation updated.',
+        credit_note: 'Supplier credit note recorded.',
+        settle: 'Supplier return credit settled.',
+        waive: 'Supplier return credit expectation waived.',
+      } as const;
+      setError(null);
+      setMessage(ui(labels[input.action]));
+      await refreshReturnData();
+    },
+    onError: (mutationError) => {
+      setMessage(null);
+      setError(normalizeError(mutationError, ui('Failed to update supplier return credit reconciliation.')));
+    },
+  });
+
+  const handleCreditReturnChange = (returnId: string) => {
+    setCreditReturnId(returnId);
+    setCreditInvoiceId('');
+    setCreditReturnItemIds([]);
+    setExpectedCreditTax('0');
+    setCreditNotes('');
+  };
+
+  const handleCreditInvoiceChange = (invoiceId: string) => {
+    setCreditInvoiceId(invoiceId);
+    const invoice = candidateInvoices.find((item) => item.id === invoiceId) ?? null;
+    const compatibleIds = (selectedCreditReturn?.items ?? [])
+      .filter((item) => !activeCreditReturnItemIds.has(item.id) && Boolean(findCreditInvoiceLine(item, invoice)))
+      .map((item) => item.id);
+    setCreditReturnItemIds(compatibleIds);
+  };
+
+  const toggleCreditReturnItem = (itemId: string) => {
+    setCreditReturnItemIds((current) => current.includes(itemId) ? current.filter((id) => id !== itemId) : [...current, itemId]);
+  };
+
+  const adjustExpectedCredit = (credit: SupplierReturnCredit) => {
+    if (creditLifecycleMutation.isPending) return;
+    const taxInput = window.prompt(ui('Expected supplier credit tax:'), String(credit.expected_tax_amount ?? 0));
+    if (taxInput === null) return;
+    const tax = Number(taxInput);
+    if (!Number.isFinite(tax) || tax < 0) {
+      setError(ui('Expected supplier credit tax must be zero or greater.'));
+      return;
+    }
+    const notesInput = window.prompt(ui('Supplier credit notes (optional):'), credit.notes || '');
+    if (notesInput === null) return;
+    creditLifecycleMutation.mutate({ credit, action: 'expected', payload: { expected_tax_amount: tax, notes: notesInput.trim() || null } });
+  };
+
+  const recordCreditNote = (credit: SupplierReturnCredit) => {
+    if (creditLifecycleMutation.isPending) return;
+    const number = window.prompt(ui('Supplier credit-note number:'));
+    if (!number?.trim()) return;
+    const date = window.prompt(ui('Supplier credit-note date (YYYY-MM-DD):'), new Date().toISOString().slice(0, 10));
+    if (!date?.trim()) return;
+    const subtotalInput = window.prompt(ui('Actual supplier credit subtotal:'), String(credit.expected_subtotal_amount ?? 0));
+    if (subtotalInput === null) return;
+    const taxInput = window.prompt(ui('Actual supplier credit tax:'), String(credit.expected_tax_amount ?? 0));
+    if (taxInput === null) return;
+    const subtotal = Number(subtotalInput);
+    const tax = Number(taxInput);
+    if (!Number.isFinite(subtotal) || subtotal < 0 || !Number.isFinite(tax) || tax < 0) {
+      setError(ui('Actual supplier credit subtotal and tax must be zero or greater.'));
+      return;
+    }
+    creditLifecycleMutation.mutate({ credit, action: 'credit_note', payload: { credit_note_number: number.trim(), credit_note_date: date.trim(), actual_subtotal_amount: subtotal, actual_tax_amount: tax } });
+  };
+
+  const settleCredit = (credit: SupplierReturnCredit) => {
+    if (creditLifecycleMutation.isPending) return;
+    const suggestedMethod = credit.supplier_invoice_status === 'paid' ? 'refund' : 'invoice_offset';
+    const method = window.prompt(ui('Settlement method (refund, invoice_offset, other):'), suggestedMethod);
+    if (method === null) return;
+    if (!['refund', 'invoice_offset', 'other'].includes(method.trim())) {
+      setError(ui('Settlement method must be refund, invoice_offset, or other.'));
+      return;
+    }
+    const reference = window.prompt(ui('Settlement reference:'));
+    if (!reference?.trim()) return;
+    const settlementNotes = window.prompt(ui('Settlement notes (optional):'), '');
+    if (settlementNotes === null) return;
+    creditLifecycleMutation.mutate({ credit, action: 'settle', payload: { settlement_method: method.trim(), settlement_reference: reference.trim(), settlement_notes: settlementNotes.trim() || null } });
+  };
+
+  const waiveCredit = (credit: SupplierReturnCredit) => {
+    if (creditLifecycleMutation.isPending) return;
+    const reason = window.prompt(ui('Reason for waiving this expected supplier credit:'));
+    if (!reason?.trim()) return;
+    creditLifecycleMutation.mutate({ credit, action: 'waive', payload: { reason: reason.trim() } });
+  };
 
   const addDraftItem = () => {
     setMessage(null);
@@ -394,6 +623,56 @@ export function SupplierReturnsTab() {
         </div>
       </section>
 
+      {canReadInvoices ? (
+        <section style={styles.card}>
+          <h2 style={styles.cardTitle}>{ui('Supplier return financial reconciliation')}</h2>
+          <p style={styles.helper}>{ui('Keep physical return valuation separate from the supplier credit. Link completed return lines to the original matched or paid invoice so the expected credit uses the invoiced price, then record the supplier credit note and settlement without rewriting the original invoice.')}</p>
+          <div style={{ ...styles.formGrid, marginTop: 14 }}>
+            <SelectField
+              label={ui('Completed supplier return')}
+              value={creditReturnId}
+              onChange={handleCreditReturnChange}
+              disabled={!canManageCredits || createCreditMutation.isPending || creditLifecycleMutation.isPending}
+              options={completedReturns.map((item) => ({ value: item.id, label: `${item.return_number} · ${item.supplier_name}` }))}
+            />
+            <SelectField
+              label={ui('Original matched / paid invoice')}
+              value={creditInvoiceId}
+              onChange={handleCreditInvoiceChange}
+              disabled={!canManageCredits || !selectedCreditReturn || createCreditMutation.isPending || creditLifecycleMutation.isPending}
+              options={candidateInvoices.map((invoice) => ({ value: invoice.id, label: `${invoice.invoice_number} · ${statusLabel(invoice.status)} · ${formatMoney(invoice.total_amount, invoice.currency)}` }))}
+            />
+            <InputField label={ui('Expected credit tax')} type="number" min="0" step="0.0001" value={expectedCreditTax} onChange={setExpectedCreditTax} disabled={!canManageCredits || !selectedCreditInvoice || createCreditMutation.isPending || creditLifecycleMutation.isPending} />
+          </div>
+          {selectedCreditReturn && selectedCreditInvoice ? (
+            <div style={{ marginTop: 12 }}>
+              <p style={styles.helper}>{ui('Select the returned invoice lines covered by this supplier credit. The expected subtotal is calculated from the original invoice unit price, not the inventory lot cost.')}</p>
+              <div style={{ marginTop: 10 }}>
+                {creditEligibleItems.length ? creditEligibleItems.map((item) => {
+                  const invoiceLine = findCreditInvoiceLine(item, selectedCreditInvoice);
+                  const lineExpected = Number(item.quantity || 0) * Number(invoiceLine?.unit_cost || 0);
+                  return (
+                    <label key={item.id} style={styles.checkboxRow}>
+                      <input type="checkbox" checked={creditReturnItemIds.includes(item.id)} onChange={() => toggleCreditReturnItem(item.id)} disabled={!canManageCredits || createCreditMutation.isPending || creditLifecycleMutation.isPending} />
+                      <span>{item.product_name || ui('Product')} · {formatQuantity(item.quantity)} × {formatMoney(invoiceLine?.unit_cost, selectedCreditInvoice.currency)} = {formatMoney(lineExpected, selectedCreditInvoice.currency)}</span>
+                    </label>
+                  );
+                }) : <p style={styles.helper}>{ui('No unreconciled return lines can be safely matched to this invoice.')}</p>}
+              </div>
+              <TextareaField label={ui('Supplier credit notes (optional)')} value={creditNotes} onChange={setCreditNotes} disabled={!canManageCredits || createCreditMutation.isPending || creditLifecycleMutation.isPending} />
+              <p style={styles.helper}>{ui('Expected supplier credit: subtotal {subtotal} · tax {tax} · total {total}')
+                .replace('{subtotal}', formatMoney(expectedCreditSubtotal, selectedCreditInvoice.currency))
+                .replace('{tax}', formatMoney(Number.isFinite(expectedCreditTaxNumber) ? expectedCreditTaxNumber : 0, selectedCreditInvoice.currency))
+                .replace('{total}', formatMoney(expectedCreditSubtotal + (Number.isFinite(expectedCreditTaxNumber) ? expectedCreditTaxNumber : 0), selectedCreditInvoice.currency))}</p>
+              <button type="button" style={creditDraftValid && !createCreditMutation.isPending ? styles.primaryButton : styles.disabledButton} disabled={!creditDraftValid || createCreditMutation.isPending || creditLifecycleMutation.isPending} onClick={() => createCreditMutation.mutate()}>
+                {createCreditMutation.isPending ? ui('Creating…') : ui('Create expected supplier credit')}
+              </button>
+            </div>
+          ) : null}
+          {!canManageCredits ? <p style={{ ...styles.helper, marginTop: 12 }}>{ui('Managing supplier credits requires both Supplier Returns Write and Supplier Invoices Write permissions.')}</p> : null}
+        </section>
+      ) : null}
+
       <section style={styles.card}>
         <h2 style={styles.cardTitle}>{ui('Supplier returns')}</h2>
         {returnsQuery.isLoading ? <p style={styles.helper}>{ui('Loading…')}</p> : returnsQuery.isError ? (
@@ -401,7 +680,7 @@ export function SupplierReturnsTab() {
         ) : (returnsQuery.data ?? []).length ? (
           <div style={styles.tableWrap}>
             <table style={styles.table}>
-              <thead><tr>{['Return', 'Supplier', 'Items', 'Reason', 'Value', 'Status', 'Created', 'Actions'].map((header) => <th key={header} style={styles.th}>{ui(header)}</th>)}</tr></thead>
+              <thead><tr>{['Return', 'Supplier', 'Items', 'Reason', 'Value', 'Status', 'Financial credit', 'Created', 'Actions'].map((header) => <th key={header} style={styles.th}>{ui(header)}</th>)}</tr></thead>
               <tbody>
                 {(returnsQuery.data ?? []).map((item) => {
                   const causesSidebarAttention = approvalAttentionKeys.has(`supplier_return:${item.id}`) || directApprovalAttentionIds.has(item.id) || dispatchAttentionIds.has(item.id);
@@ -422,6 +701,28 @@ export function SupplierReturnsTab() {
                     <td style={styles.td}>{item.reason}</td>
                     <td style={styles.td}>{item.valuation_status === 'unavailable' ? ui('Not available') : formatMoney(item.total_amount, item.currency)}</td>
                     <td style={styles.td}>{statusLabel(item.status)}</td>
+                    <td style={styles.td}>
+                      {(item.credit_reconciliations ?? []).length ? (item.credit_reconciliations ?? []).map((credit) => (
+                        <div key={credit.id} style={{ marginBottom: 10 }}>
+                          <strong>{credit.invoice_number || ui('Supplier invoice')}</strong> · {statusLabel(credit.status)}
+                          <div style={styles.helper}>{ui('Expected: {value}').replace('{value}', formatMoney(credit.expected_total_amount, credit.currency))}</div>
+                          {credit.actual_total_amount != null ? <div style={styles.helper}>{ui('Actual: {value}').replace('{value}', formatMoney(credit.actual_total_amount, credit.currency))}</div> : null}
+                          {credit.credit_note_number ? <div style={styles.helper}>{ui('Credit note: {number} · {date}').replace('{number}', credit.credit_note_number).replace('{date}', credit.credit_note_date ? formatLocalizedDate(credit.credit_note_date, locale) : '—')}</div> : null}
+                          {credit.settlement_reference ? <div style={styles.helper}>{ui('Settlement: {method} · {reference}').replace('{method}', credit.settlement_method || '—').replace('{reference}', credit.settlement_reference)}</div> : null}
+                          {credit.waiver_reason ? <div style={styles.helper}>{ui('Waived: {reason}').replace('{reason}', credit.waiver_reason)}</div> : null}
+                          {canManageCredits ? (
+                            <div style={{ ...styles.actions, marginTop: 6 }}>
+                              {credit.status === 'expected' ? <>
+                                <button type="button" style={styles.secondarySmallButton} disabled={creditLifecycleMutation.isPending} onClick={() => adjustExpectedCredit(credit)}>{ui('Adjust expected credit')}</button>
+                                <button type="button" style={styles.smallButton} disabled={creditLifecycleMutation.isPending} onClick={() => recordCreditNote(credit)}>{ui('Record credit note')}</button>
+                                <button type="button" style={styles.dangerButton} disabled={creditLifecycleMutation.isPending} onClick={() => waiveCredit(credit)}>{ui('Waive')}</button>
+                              </> : null}
+                              {credit.status === 'credit_note_received' ? <button type="button" style={styles.smallButton} disabled={creditLifecycleMutation.isPending} onClick={() => settleCredit(credit)}>{ui('Settle credit')}</button> : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      )) : <span style={styles.helper}>{item.status === 'completed' ? ui('No supplier credit reconciliation yet.') : '—'}</span>}
+                    </td>
                     <td style={styles.td}>{formatLocalizedDateTime(item.created_at, locale)}</td>
                     <td style={styles.td}>
                       <div style={styles.actions}>
