@@ -75,7 +75,7 @@ export function OperationsDashboardTab({
             `${formatNumber(item.quantity)} ${item.product_unit || ''}`.trim(),
             formatNumber(item.reserved_quantity ?? 0),
             `${formatNumber(item.usable_free_quantity ?? item.projected_free_quantity ?? item.quantity)} ${item.product_unit || ''}`.trim(),
-            formatNumber(item.effective_min_quantity ?? item.min_quantity ?? item.product_min_stock),
+            formatNumber(item.effective_min_quantity ?? item.min_quantity ?? 0),
             formatDateTime(item.updated_at)
           ])}
         />
@@ -91,7 +91,7 @@ export function OperationsDashboardTab({
               item.product_name || '-',
               item.storage_location_name || '-',
               formatNumber(item.quantity),
-              formatNumber(item.min_stock ?? item.product_min_stock ?? item.min_quantity),
+              formatNumber(item.min_stock ?? item.effective_min_quantity ?? item.min_quantity ?? 0),
               formatNumber(item.shortage),
               formatDateTime(item.updated_at)
             ])}

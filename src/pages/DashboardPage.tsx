@@ -1089,7 +1089,7 @@ export default function DashboardPage() {
                     <th style={styles.th}>{ui('Product')}</th>
                     <th style={styles.th}>{ui('Location')}</th>
                     <th style={styles.th}>{ui('Qty')}</th>
-                    <th style={styles.th}>{ui('Min')}</th>
+                    <th style={styles.th}>{ui('Minimum')}</th>
                     <th style={styles.th}>{ui('Shortage')}</th>
                   </tr>
                 </thead>

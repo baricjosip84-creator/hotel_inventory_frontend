@@ -20,8 +20,7 @@ function effectiveMinimum(item: StockItem): number {
   if (item.effective_min_quantity !== undefined && item.effective_min_quantity !== null) {
     return toNumber(item.effective_min_quantity);
   }
-  const locationMinimum = toNumber(item.min_quantity);
-  return locationMinimum > 0 ? locationMinimum : toNumber(item.product_min_stock);
+  return Math.max(toNumber(item.min_quantity), 0);
 }
 
 function usableQuantity(item: StockItem): number {

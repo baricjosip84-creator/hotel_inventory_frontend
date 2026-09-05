@@ -41,6 +41,8 @@ type StockItem = {
   earliest_expiry_date?: string | null;
   min_quantity?: number | string | null;
   product_min_stock?: number | string | null;
+  effective_min_quantity?: number | string | null;
+  threshold_source?: 'location_par_level' | 'stock_minimum' | 'none' | string | null;
   requires_lot_tracking?: boolean;
   requires_expiry_date?: boolean;
   serial_tracking_enabled?: boolean;
@@ -354,8 +356,10 @@ function getMovementReasonPresentation(movement: StockMovement): { text: string;
 }
 
 function getEffectiveMinimum(item: StockItem): number {
-  const locationMinimum = toNumber(item.min_quantity);
-  return locationMinimum > 0 ? locationMinimum : toNumber(item.product_min_stock);
+  if (item.effective_min_quantity !== undefined && item.effective_min_quantity !== null) {
+    return Math.max(toNumber(item.effective_min_quantity), 0);
+  }
+  return Math.max(toNumber(item.min_quantity), 0);
 }
 
 function getAvailableLotQuantity(item: StockItem): number {

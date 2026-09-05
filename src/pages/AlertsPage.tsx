@@ -33,6 +33,8 @@ type AlertRow = {
   product_name?: string | null;
   product_category?: string | null;
   product_unit?: string | null;
+  storage_location_id?: string | null;
+  storage_location_name?: string | null;
   type: string;
   message: string;
   resolved: boolean;
@@ -750,7 +752,9 @@ export default function AlertsPage() {
                     <div style={styles.cardHeaderText}>
                       <div style={styles.cardTitle}>{alertTitle}</div>
                       <div style={styles.cardMeta}>
-                        {alert.product_name || (alert.product_id ? ui('Linked product unavailable') : ui('No product linked'))} · {ui('Created')} {formatDateTime(alert.created_at, locale)}
+                        {alert.product_name || (alert.product_id ? ui('Linked product unavailable') : ui('No product linked'))}
+                        {alert.storage_location_name ? ` · ${ui('Location:')} ${alert.storage_location_name}` : ''}
+                        {' · '}{ui('Created')} {formatDateTime(alert.created_at, locale)}
                       </div>
                     </div>
                     <div style={styles.badgeRow} className="alerts-badge-row">
