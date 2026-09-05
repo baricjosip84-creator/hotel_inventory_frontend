@@ -5,7 +5,8 @@ import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatte
 import type { AppLocale } from '../i18n/config';
 import { ApiError, apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
-import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
+import { SidebarAttentionMarker, SidebarAttentionTabDot } from '../components/ui/SidebarAttentionMarker';
+import { sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionStyles';
 import { useOperationalAttentionItems } from '../lib/sidebarAttentionItems';
 import {
   OperationalSectionHeader,

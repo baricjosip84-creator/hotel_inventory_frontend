@@ -9,7 +9,8 @@ import type { AppLocale } from '../i18n/config';
 import './OperationalExperiencePages.css';
 import './AlertsPage.css';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { SidebarAttentionMarker, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
+import { SidebarAttentionMarker } from '../components/ui/SidebarAttentionMarker';
+import { sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionStyles';
 import {
   OperationalWorkspaceHero,
   // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.

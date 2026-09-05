@@ -6,7 +6,8 @@ import { formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } f
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
+import { SidebarAttentionMarker, SidebarAttentionTabDot } from '../components/ui/SidebarAttentionMarker';
+import { sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionStyles';
 import { useOperationalAttentionItems } from '../lib/sidebarAttentionItems';
 import { OperationalWorkspaceHero, OperationalWorkspaceStatCard, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './OutboundPage.css';

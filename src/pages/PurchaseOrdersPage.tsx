@@ -14,7 +14,8 @@ import type { ProductItem, SupplierItem } from '../types/inventory';
 import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
 import { formatCurrencyAmount, getActiveTenantCurrency, normalizeCurrencyCode } from '../lib/tenantCurrency';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
-import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
+import { SidebarAttentionMarker, SidebarAttentionTabDot } from '../components/ui/SidebarAttentionMarker';
+import { sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionStyles';
 import { useOperationalAttentionItems } from '../lib/sidebarAttentionItems';
 import {
   OperationalSectionHeader,

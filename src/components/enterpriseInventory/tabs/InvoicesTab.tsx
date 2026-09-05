@@ -2,7 +2,8 @@ import { useState, type Dispatch, type FormEvent, type SetStateAction } from 're
 import { getActiveTenantCurrency } from '../../../lib/tenantCurrency';
 import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import { useAppTranslation } from '../../../i18n/I18nContext';
-import { SidebarAttentionMarker, sidebarAttentionItemStyle } from '../../ui/SidebarAttentionMarker';
+import { SidebarAttentionMarker } from '../../ui/SidebarAttentionMarker';
+import { sidebarAttentionItemStyle } from '../../ui/SidebarAttentionStyles';
 import { useOperationalAttentionItems } from '../../../lib/sidebarAttentionItems';
 import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../../../i18n/formatters';
 import { InputField, SelectField, TextareaField } from '../EnterpriseInventoryShared';

@@ -9,7 +9,8 @@ import { ApiError, apiMutationRequest, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import { getCurrentTenantUserId } from '../lib/auth';
 import { scrollToFormSection } from '../lib/scrollToForm';
-import { SidebarAttentionMarker, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
+import { SidebarAttentionMarker } from '../components/ui/SidebarAttentionMarker';
+import { sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionStyles';
 import { useOperationalAttentionItems } from '../lib/sidebarAttentionItems';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
 import {

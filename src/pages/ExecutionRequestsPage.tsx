@@ -18,7 +18,8 @@ import {
   OperationalWorkspaceTab,
   OperationalWorkspaceTabs
 } from '../components/ui/OperationalWorkspace';
-import { SidebarAttentionMarker, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
+import { SidebarAttentionMarker } from '../components/ui/SidebarAttentionMarker';
+import { sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionStyles';
 import type {
   ExecutionAdapterRegistryResponse,
   ExecutionModuleHardeningSummaryResponse,

@@ -29,6 +29,7 @@ const cycleCountsTab = read('src/components/enterpriseInventory/tabs/CycleCounts
 const invoicesTab = read('src/components/enterpriseInventory/tabs/InvoicesTab.tsx');
 const supplierReturnsTab = read('src/components/enterpriseInventory/tabs/SupplierReturnsTab.tsx');
 const attentionMarker = read('src/components/ui/SidebarAttentionMarker.tsx');
+const attentionStyles = read('src/components/ui/SidebarAttentionStyles.ts');
 const attentionItemsHook = read('src/lib/sidebarAttentionItems.ts');
 
 const commercialRoutes = [
@@ -392,6 +393,8 @@ for (const [source, label] of exactAttentionItemSources) {
 }
 if (!attentionMarker.includes('data-sidebar-attention-item-marker="true"')) failures.push('Shared exact-record attention marker is missing.');
 if (!attentionMarker.includes('data-sidebar-attention-tab-marker="true"')) failures.push('Shared sub-tab attention dot is missing.');
+if (attentionMarker.includes('export const sidebarAttentionItemStyle')) failures.push('SidebarAttentionMarker.tsx must export React components only so Vite Fast Refresh lint stays valid.');
+if (!attentionStyles.includes('export const sidebarAttentionItemStyle')) failures.push('Shared sidebar attention row style must live in SidebarAttentionStyles.ts, outside the React component module.');
 if (!attentionItemsHook.includes('identityKey') || !attentionItemsHook.includes('permissionKey')) failures.push('Exact-record attention queries must include tenant/user/permission identity in their cache key.');
 if (!attentionItemsHook.includes('tenantAccess.hasTenantContext')) failures.push('Exact-record attention queries must fail closed without tenant context.');
 for (const [source, label] of [

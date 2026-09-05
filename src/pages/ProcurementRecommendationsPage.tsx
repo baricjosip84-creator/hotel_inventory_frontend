@@ -15,7 +15,8 @@ import {
   OperationalWorkspaceTab,
   OperationalWorkspaceTabs,
 } from "../components/ui/OperationalWorkspace";
-import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from "../components/ui/SidebarAttentionMarker";
+import { SidebarAttentionMarker, SidebarAttentionTabDot } from "../components/ui/SidebarAttentionMarker";
+import { sidebarAttentionItemStyle } from "../components/ui/SidebarAttentionStyles";
 import "./ProcurementRecommendationsPage.css";
 
 type CurrencyTotal = { currency_code: string; amount: number | string };

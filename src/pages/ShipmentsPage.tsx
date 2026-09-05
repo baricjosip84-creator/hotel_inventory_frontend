@@ -8,7 +8,8 @@ import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedNumber } f
 import { apiRequest, ApiError } from '../lib/api';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
 import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
-import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
+import { SidebarAttentionMarker, SidebarAttentionTabDot } from '../components/ui/SidebarAttentionMarker';
+import { sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionStyles';
 import { useOperationalAttentionItems } from '../lib/sidebarAttentionItems';
 import {
   OperationalSectionHeader,

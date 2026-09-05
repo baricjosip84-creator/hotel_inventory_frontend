@@ -9,7 +9,8 @@ import { getCurrentTenantUserId } from '../lib/auth';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { ProductItem } from '../types/inventory';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
-import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
+import { SidebarAttentionMarker, SidebarAttentionTabDot } from '../components/ui/SidebarAttentionMarker';
+import { sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionStyles';
 import { useOperationalAttentionItems } from '../lib/sidebarAttentionItems';
 import {
   OperationalSectionHeader,

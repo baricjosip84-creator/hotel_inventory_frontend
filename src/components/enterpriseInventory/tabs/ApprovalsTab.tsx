@@ -3,7 +3,8 @@ import { DataTable, InputField, SelectField } from '../EnterpriseInventoryShared
 import { styles } from '../EnterpriseInventoryStyles';
 import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import { useAppTranslation } from '../../../i18n/I18nContext';
-import { SidebarAttentionMarker, sidebarAttentionItemStyle } from '../../ui/SidebarAttentionMarker';
+import { SidebarAttentionMarker } from '../../ui/SidebarAttentionMarker';
+import { sidebarAttentionItemStyle } from '../../ui/SidebarAttentionStyles';
 import { useOperationalAttentionItems } from '../../../lib/sidebarAttentionItems';
 import { formatLocalizedCurrency, formatLocalizedDateTime, formatLocalizedNumber } from '../../../i18n/formatters';
 import type { ApprovalRule, ApprovalRuleForm, CycleCountItem, StorageLocationOption } from '../EnterpriseInventoryTypes';

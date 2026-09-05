@@ -11,7 +11,8 @@ import {
   OperationalWorkspaceTabs,
 } from "../../components/ui/OperationalWorkspace";
 import { InventoryUsageBulkRecorder } from "./InventoryUsageBulkRecorder";
-import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from "../../components/ui/SidebarAttentionMarker";
+import { SidebarAttentionMarker, SidebarAttentionTabDot } from "../../components/ui/SidebarAttentionMarker";
+import { sidebarAttentionItemStyle } from "../../components/ui/SidebarAttentionStyles";
 import { useOperationalAttentionItems } from "../../lib/sidebarAttentionItems";
 import { InventoryUsageQuickConsumePanel } from "./InventoryUsageQuickConsumePanel";
 import { InventoryUsageGovernancePanel } from "./InventoryUsageGovernancePanel";

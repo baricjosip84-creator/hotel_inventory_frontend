@@ -7,7 +7,8 @@ import { formatLocalizedCurrency, formatLocalizedDateTime } from '../i18n/format
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { getActiveTenantCurrency } from '../lib/tenantCurrency';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
+import { SidebarAttentionMarker, SidebarAttentionTabDot } from '../components/ui/SidebarAttentionMarker';
+import { sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionStyles';
 import {
   OperationalWorkspaceHero,
   // OperationalWorkspaceMetaPill, // hidden from tenant-facing Learning Feedback hero

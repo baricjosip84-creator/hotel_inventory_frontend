@@ -10,7 +10,8 @@ import { getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/p
 import { getTenantAccessSnapshot } from '../lib/tenantAccess';
 import { getSupportSessionInfo } from '../lib/auth';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
-import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
+import { SidebarAttentionMarker, SidebarAttentionTabDot } from '../components/ui/SidebarAttentionMarker';
+import { sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionStyles';
 import {
   OperationalWorkspaceHero,
   // OperationalWorkspaceMetaPill, // hidden tenant-facing redundancy; keep source for easy restoration
