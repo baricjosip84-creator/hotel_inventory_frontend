@@ -20,7 +20,7 @@ type ApprovalQueueItem = {
 };
 
 type CreateApprovalRuleMutation = { isPending: boolean; mutate: (input: ApprovalRuleForm) => void };
-type ExecuteApprovalMutation = { isPending: boolean; mutate: (input: { entity_type: string; entity_id: string; action: 'approved' | 'rejected' }) => void };
+type ExecuteApprovalMutation = { isPending: boolean; mutate: (input: { entity_type: string; entity_id: string; action: 'approved' | 'rejected'; comment?: string }) => void };
 type ApprovalRulesQuery = { isLoading: boolean; data?: ApprovalRule[] };
 
 type ApprovalsTabProps = {
@@ -44,6 +44,14 @@ export function ApprovalsTab({ approvalQueue, approvalRuleForm, approvalRulesQue
   const { locale, ui } = useAppTranslation();
   const canWriteApprovalRules = hasPermission(TENANT_PERMISSIONS.APPROVAL_RULES_WRITE);
   const canExecuteApprovals = hasPermission(TENANT_PERMISSIONS.APPROVALS_EXECUTE);
+  const approvalEntityOptions = [
+    { value: 'purchase_order', label: ui('Purchase order'), visible: hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_READ) },
+    { value: 'supplier_invoice', label: ui('Supplier invoice'), visible: hasPermission(TENANT_PERMISSIONS.INVOICES_READ) },
+    { value: 'department_requisition', label: ui('Department requisition'), visible: hasPermission(TENANT_PERMISSIONS.REQUISITIONS_READ) },
+    { value: 'cycle_count', label: ui('Cycle count'), visible: hasPermission(TENANT_PERMISSIONS.CYCLE_COUNTS_READ) },
+    { value: 'supplier_return', label: ui('Supplier return'), visible: hasPermission(TENANT_PERMISSIONS.SUPPLIER_RETURNS_READ) }
+  ].filter((option) => option.visible).map(({ value, label }) => ({ value, label }));
+  const selectedEntityVisible = approvalEntityOptions.some((option) => option.value === approvalRuleForm.entity_type);
   const inventoryControlAttentionItemsQuery = useOperationalAttentionItems('inventory_controls', canExecuteApprovals);
   const approvalAttentionKeys = new Set(inventoryControlAttentionItemsQuery.data?.approval_item_keys || []);
   const entitySupportsScope = ['department_requisition', 'cycle_count'].includes(approvalRuleForm.entity_type);
@@ -52,7 +60,7 @@ export function ApprovalsTab({ approvalQueue, approvalRuleForm, approvalRulesQue
   const maximumAmount = approvalRuleForm.max_amount === '' ? null : Number(approvalRuleForm.max_amount);
   const amountRangeValid = !entityUsesAmount || (Number.isFinite(minimumAmount) && minimumAmount >= 0 && (maximumAmount === null || (Number.isFinite(maximumAmount) && maximumAmount >= minimumAmount)));
   const currencyValid = !entityUsesAmount || /^[A-Z]{3}$/.test(approvalRuleForm.currency.trim().toUpperCase());
-  const canSaveRule = canWriteApprovalRules && Boolean(approvalRuleForm.entity_type && approvalRuleForm.required_role) && (entityUsesAmount ? approvalRuleForm.min_amount !== '' && amountRangeValid && currencyValid : true) && !createApprovalRuleMutation.isPending;
+  const canSaveRule = canWriteApprovalRules && selectedEntityVisible && Boolean(approvalRuleForm.entity_type && approvalRuleForm.required_role) && (entityUsesAmount ? approvalRuleForm.min_amount !== '' && amountRangeValid && currencyValid : true) && !createApprovalRuleMutation.isPending;
   const storageLocationNames = new Map(storageLocations.map((location) => [location.id, location.name]));
   const displayLabel = (value: string, labels: Record<string, string>) => labels[value] ? ui(labels[value]) : value;
   const money = (value: number | string | null | undefined, currency: string) => {
@@ -73,9 +81,13 @@ export function ApprovalsTab({ approvalQueue, approvalRuleForm, approvalRulesQue
 
   const handleApprovalAction = (item: ApprovalQueueItem, action: 'approved' | 'rejected') => {
     if (!canExecuteApprovals) return;
-    const prompt = action === 'approved'
-      ? ui('Approve {item}?').replace('{item}', item.label)
-      : ui('Reject {item}?').replace('{item}', item.label);
+    if (action === 'rejected') {
+      const comment = window.prompt(ui('Rejection reason'))?.trim() || '';
+      if (comment.length < 3) return;
+      executeApprovalMutation.mutate({ entity_type: item.entity_type, entity_id: item.entity_id, action, comment });
+      return;
+    }
+    const prompt = ui('Approve {item}?').replace('{item}', item.label);
     if (!window.confirm(prompt)) return;
     executeApprovalMutation.mutate({ entity_type: item.entity_type, entity_id: item.entity_id, action });
   };
@@ -94,13 +106,7 @@ export function ApprovalsTab({ approvalQueue, approvalRuleForm, approvalRulesQue
             ...(!['department_requisition', 'cycle_count'].includes(value) ? { department: '', storage_location_id: '' } : {}),
             ...(['department_requisition', 'cycle_count'].includes(value) ? { min_amount: '0', max_amount: '' } : {})
           }))}
-          options={[
-            { value: 'purchase_order', label: ui('Purchase order') },
-            { value: 'supplier_invoice', label: ui('Supplier invoice') },
-            { value: 'department_requisition', label: ui('Department requisition') },
-            { value: 'cycle_count', label: ui('Cycle count') },
-            { value: 'supplier_return', label: ui('Supplier return') }
-          ]}
+          options={approvalEntityOptions}
           required
         />
         {entitySupportsScope ? <>

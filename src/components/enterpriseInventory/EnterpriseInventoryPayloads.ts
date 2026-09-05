@@ -332,11 +332,12 @@ export function buildShipmentReceivingPayload(input: ShipmentReceivingForm): Rec
   };
 }
 
-export function buildApprovalExecutionPayload(input: { entity_type: string; entity_id: string; action: 'approved' | 'rejected' }): Record<string, unknown> {
+export function buildApprovalExecutionPayload(input: { entity_type: string; entity_id: string; action: 'approved' | 'rejected'; comment?: string }): Record<string, unknown> {
   return {
     entity_type: input.entity_type,
     entity_id: input.entity_id,
-    action: input.action
+    action: input.action,
+    comment: input.comment?.trim() || null
   };
 }
 

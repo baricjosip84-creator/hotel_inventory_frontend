@@ -47,6 +47,7 @@ type ApprovalExecutionInput = {
   entity_type: string;
   entity_id: string;
   action: "approved" | "rejected";
+  comment?: string;
 };
 
 type AlertResolveInput = {
