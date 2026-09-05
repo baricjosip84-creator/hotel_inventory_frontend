@@ -551,6 +551,7 @@ function nextActionLabelKey(status: string | null | undefined): string {
   if (status === 'approve_or_cancel') return 'Approve or cancel';
   if (status === 'create_shipment') return 'Send to supplier';
   if (status === 'receive_open_shipment') return 'Receive shipment';
+  if (status === 'finalize_open_shipment') return 'Finalize Shipment';
   if (status === 'follow_up_overdue') return 'Follow up overdue';
   if (status === 'monitor_receiving') return 'Monitor receiving';
   if (status === 'none_completed') return 'Completed';
@@ -561,7 +562,7 @@ function nextActionLabelKey(status: string | null | undefined): string {
 function nextActionBadgeStyle(status: string | null | undefined): CSSProperties {
   if (status === 'follow_up_overdue') return styles.overdueBadge;
   if (status === 'create_shipment') return styles.approvedBadge;
-  if (status === 'receive_open_shipment') return styles.partialReceivedBadge;
+  if (status === 'receive_open_shipment' || status === 'finalize_open_shipment') return styles.partialReceivedBadge;
   if (status === 'submit_for_approval' || status === 'approve_or_cancel') return styles.notStartedBadge;
   if (status === 'none_completed') return styles.completedBadge;
   if (status === 'none_cancelled') return styles.cancelledBadge;
@@ -1053,7 +1054,7 @@ export default function PurchaseOrdersPage() {
       estimatedTotal: rows.reduce((sum, row) => sum + Number(row.estimated_total_cost || 0), 0),
       overdue: rows.filter((row) => row.delivery_status === 'overdue').length,
       dueToday: rows.filter((row) => row.delivery_status === 'due_today').length,
-      openReceiving: rows.filter((row) => row.next_action_status === 'receive_open_shipment').length,
+      openReceiving: rows.filter((row) => ['receive_open_shipment', 'finalize_open_shipment'].includes(row.next_action_status || '')).length,
       awaitingApproval: rows.filter((row) => row.next_action_status === 'approve_or_cancel').length,
       needsAction: rows.filter((row) => !['none', 'none_completed', 'none_cancelled'].includes(row.next_action_status || 'none')).length
     };
@@ -1062,11 +1063,12 @@ export default function PurchaseOrdersPage() {
   const attentionPurchaseOrders = useMemo(() => {
     const priority: Record<string, number> = {
       follow_up_overdue: 1,
-      receive_open_shipment: 2,
-      approve_or_cancel: 3,
-      create_shipment: 4,
-      monitor_receiving: 5,
-      submit_for_approval: 6
+      finalize_open_shipment: 2,
+      receive_open_shipment: 3,
+      approve_or_cancel: 4,
+      create_shipment: 5,
+      monitor_receiving: 6,
+      submit_for_approval: 7
     };
 
     return (purchaseOrdersQuery.data || [])
