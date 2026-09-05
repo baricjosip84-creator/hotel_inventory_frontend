@@ -4,6 +4,7 @@ import { useAppTranslation } from '../i18n/I18nContext';
 import type { AppLocale } from '../i18n/config';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { ApiError, apiDownloadFile, apiRequest } from '../lib/api';
+import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
@@ -268,7 +269,9 @@ export default function TenantAuditPage() {
   const [appliedFilters, setAppliedFilters] = useState<AuditFilters>(DEFAULT_FILTERS);
   const [pageIndex, setPageIndex] = useState(0);
   const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
-  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
+  const [technicalDetailsRequested, setTechnicalDetailsRequested] = useState(false);
+  const canViewTechnicalDetails = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
+  const showTechnicalDetails = canViewTechnicalDetails && technicalDetailsRequested;
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [filterError, setFilterError] = useState<string | null>(null);
@@ -548,14 +551,16 @@ export default function TenantAuditPage() {
           description={`${lastRefreshedText} · ${ui('Page {page}').replace('{page}', formatLocalizedNumber(pageIndex + 1, locale))} · ${(rows.length === 1 ? ui('{count} event loaded') : ui('{count} events loaded')).replace('{count}', formatLocalizedNumber(rows.length, locale))}${auditQuery.isFetching && !auditQuery.isLoading ? ` · ${ui('Updating…')}` : ''}`}
           actions={
             <>
-              <button
-                type="button"
-                className="app-button app-button--secondary"
-                onClick={() => setShowTechnicalDetails((current) => !current)}
-                aria-pressed={showTechnicalDetails}
-              >
-                {showTechnicalDetails ? ui('Hide technical details') : ui('Show technical details')}
-              </button>
+              {canViewTechnicalDetails ? (
+                <button
+                  type="button"
+                  className="app-button app-button--secondary"
+                  onClick={() => setTechnicalDetailsRequested((current) => !current)}
+                  aria-pressed={showTechnicalDetails}
+                >
+                  {showTechnicalDetails ? ui('Hide technical details') : ui('Show technical details')}
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="app-button app-button--secondary"

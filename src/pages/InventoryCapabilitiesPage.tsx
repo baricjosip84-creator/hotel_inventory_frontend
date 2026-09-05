@@ -361,7 +361,7 @@ export default function InventoryCapabilitiesPage() {
       {tab === 'landed-cost' && canReadProducts && canReadShipments && supportingReferencesReady && <LandedCostPanel shipments={shipmentsQuery.data || []} canWrite={canWriteProducts} />}
       {tab === 'variants' && supportingReferencesReady && <VariantsPanel products={productsQuery.data || []} canWrite={canWriteProducts && canReadSuppliers} canReadStock={canReadStock} canWriteProducts={canWriteProducts} canReadSuppliers={canReadSuppliers} onChanged={() => queryClient.invalidateQueries({ queryKey: ['inventory-capabilities-products'] })} />}
       {tab === 'hierarchy' && canReadLocations && <HierarchyPanel canWrite={canWriteLocations} canReadStock={canReadStock} />}
-      {tab === 'bom' && supportingReferencesReady && <BomPanel products={productsQuery.data || []} locations={locationsQuery.data || []} canWrite={canWriteProducts} canExecute={canAdjustStock && canReadLocations} />}
+      {tab === 'bom' && supportingReferencesReady && <BomPanel products={productsQuery.data || []} locations={locationsQuery.data || []} canWrite={canWriteProducts} canExecute={canAdjustStock && canReadLocations && canReadStock} />}
       {tab === 'mobile' && canUseMobileExecution && <MobilePanel canOpenScanner={canOpenScanner} />}
     </div>
   );

@@ -150,7 +150,7 @@ export function SupplierReturnsTab() {
   const eligibleLotsQuery = useQuery({
     queryKey: ['enterprise-supplier-return-eligible-lots'],
     queryFn: () => apiRequest<EligibleReturnLot[]>('/enterprise-inventory/supplier-returns/eligible-lots'),
-    enabled: canRead,
+    enabled: canWrite,
   });
 
   const selectedSupplierId = draftItems[0]?.lot.supplier_id ?? null;
