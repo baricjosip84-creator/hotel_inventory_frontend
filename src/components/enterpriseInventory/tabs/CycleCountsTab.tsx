@@ -40,7 +40,7 @@ export function CycleCountsTab({
 }: CycleCountsTabProps) {
   const { locale, ui } = useAppTranslation();
   const canCreateCycleCounts = hasPermission(TENANT_PERMISSIONS.CYCLE_COUNTS_WRITE);
-  const canApproveCycleCounts = hasPermission(TENANT_PERMISSIONS.CYCLE_COUNTS_APPROVE);
+  const canApproveCycleCounts = hasPermission(TENANT_PERMISSIONS.CYCLE_COUNTS_APPROVE) && hasPermission(TENANT_PERMISSIONS.STOCK_ADJUST);
   const inventoryControlAttentionItemsQuery = useOperationalAttentionItems('inventory_controls', canApproveCycleCounts || hasPermission(TENANT_PERMISSIONS.APPROVALS_EXECUTE));
   const approvalAttentionKeys = new Set(inventoryControlAttentionItemsQuery.data?.approval_item_keys || []);
   const reconcileAttentionIds = new Set(inventoryControlAttentionItemsQuery.data?.cycle_count_reconcile_ids || []);
@@ -163,7 +163,7 @@ export function CycleCountsTab({
                               type="button"
                               disabled={!canReconcile || isReconciling}
                               style={canReconcile && !isReconciling ? styles.smallButton : styles.disabledButton}
-                              title={!canApproveCycleCounts ? ui('Requires {permission} permission.').replace('{permission}', TENANT_PERMISSIONS.CYCLE_COUNTS_APPROVE) : isReconciling ? ui('Reconciliation is already running.') : undefined}
+                              title={!hasPermission(TENANT_PERMISSIONS.CYCLE_COUNTS_APPROVE) ? ui('Requires {permission} permission.').replace('{permission}', TENANT_PERMISSIONS.CYCLE_COUNTS_APPROVE) : !hasPermission(TENANT_PERMISSIONS.STOCK_ADJUST) ? ui('Requires {permission} permission.').replace('{permission}', TENANT_PERMISSIONS.STOCK_ADJUST) : isReconciling ? ui('Reconciliation is already running.') : undefined}
                               onClick={() => {
                                 if (window.confirm(ui('Reconcile this approved cycle count and post its stock changes?'))) onReconcile(item.id);
                               }}
