@@ -231,6 +231,12 @@ for (const signal of [
   'TENANT_PERMISSIONS.ALERTS_WRITE',
   'TENANT_PERMISSIONS.ALERTS_OVERRIDE',
   'canActOnAlerts',
+  'alertAttentionScope',
+  'tenantAccess.userId, alertAttentionScope',
+  'executionRequestAttentionScope',
+  'tenantAccess.userId, executionRequestAttentionScope',
+  'intelligenceReviewAttentionScope',
+  'tenantAccess.userId, intelligenceReviewAttentionScope',
   'hasAlertAttention',
   'alertIndicatorDot',
   "width: '280px', minWidth: '280px'",
@@ -251,6 +257,22 @@ for (const forbiddenSignal of [
   if (layout.includes(forbiddenSignal)) {
     failures.push(`AppLayout.tsx must not use existence-only alert navigation attention: ${forbiddenSignal}`);
   }
+}
+
+
+const sidebarAttentionDotCount = (layout.match(/style=\{styles\.alertIndicatorDot\}/g) || []).length;
+if (sidebarAttentionDotCount !== 3) {
+  failures.push(`AppLayout.tsx must expose exactly the three approved sidebar attention dots (Alerts, Execution Requests, Intelligence Review); found ${sidebarAttentionDotCount}.`);
+}
+
+for (const approvedPath of ['/alerts', '/execution-requests', '/intelligence-review']) {
+  if (!layout.includes(`item.to === '${approvedPath}'`)) {
+    failures.push(`AppLayout.tsx is missing approved sidebar attention binding for ${approvedPath}.`);
+  }
+}
+
+if (/item\.to === ['"]\/action-center['"][\s\S]{0,240}alertIndicatorDot/.test(layout)) {
+  failures.push('Action Center must remain an aggregation/routing surface and must not receive a sidebar red dot from its current mixed read/action summary.');
 }
 
 if (!registry.includes("commercialSurface: 'command'")) {

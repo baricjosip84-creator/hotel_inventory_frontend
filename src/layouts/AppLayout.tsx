@@ -74,8 +74,9 @@ export default function AppLayout() {
   const canManageAlerts = canReadAlerts && hasPermission(TENANT_PERMISSIONS.ALERTS_WRITE);
   const canOverrideBlockingAlerts = canReadAlerts && hasPermission(TENANT_PERMISSIONS.ALERTS_OVERRIDE);
   const canActOnAlerts = canManageAlerts || canOverrideBlockingAlerts;
+  const alertAttentionScope = canManageAlerts ? 'all_unresolved' : canOverrideBlockingAlerts ? 'blocking_only' : 'none';
   const alertAttentionQuery = useQuery({
-    queryKey: ['alerts', 'navigation-attention', tenantAccess.tenantId],
+    queryKey: ['alerts', 'navigation-attention', tenantAccess.tenantId, tenantAccess.userId, alertAttentionScope],
     queryFn: () => apiRequest<NavAlertAttentionSummary>('/alerts/attention-summary'),
     enabled: canActOnAlerts,
     staleTime: 30_000,
@@ -87,9 +88,15 @@ export default function AppLayout() {
   const canViewExecutionRequests = tenantAccess.hasTenantContext && hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW);
   const canReviewExecutionRequests = canViewExecutionRequests && hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_REVIEW);
   const canExecuteExecutionRequests = canViewExecutionRequests && hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_EXECUTE);
+  const canWriteProductsForExecution = canViewExecutionRequests && hasPermission(TENANT_PERMISSIONS.PRODUCTS_WRITE);
   const canActOnExecutionRequests = canReviewExecutionRequests || canExecuteExecutionRequests;
+  const executionRequestAttentionScope = [
+    canReviewExecutionRequests ? 'review' : 'no-review',
+    canExecuteExecutionRequests ? 'execute' : 'no-execute',
+    canWriteProductsForExecution ? 'product-write' : 'no-product-write'
+  ].join(':');
   const executionRequestAttentionQuery = useQuery({
-    queryKey: ['execution-requests', 'navigation-attention', tenantAccess.tenantId],
+    queryKey: ['execution-requests', 'navigation-attention', tenantAccess.tenantId, tenantAccess.userId, executionRequestAttentionScope],
     queryFn: () => apiRequest<NavExecutionRequestAttentionSummary>('/execution-requests/attention-summary'),
     enabled: canActOnExecutionRequests,
     staleTime: 30_000,
@@ -104,8 +111,15 @@ export default function AppLayout() {
     && hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ);
   const canHandleIntelligenceReviewEscalations = canViewIntelligenceReview
     && hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
+  const canReadProbabilisticForecastingForAttention = tenantAccess.hasTenantContext
+    && hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
+  const intelligenceReviewAttentionScope = [
+    role || 'unknown',
+    canHandleIntelligenceReviewEscalations ? 'govern' : 'no-govern',
+    canReadProbabilisticForecastingForAttention ? 'forecast-read' : 'no-forecast-read'
+  ].join(':');
   const intelligenceReviewAttentionQuery = useQuery({
-    queryKey: ['intelligence-review', 'navigation-attention', tenantAccess.tenantId],
+    queryKey: ['intelligence-review', 'navigation-attention', tenantAccess.tenantId, tenantAccess.userId, intelligenceReviewAttentionScope],
     queryFn: () => apiRequest<NavIntelligenceReviewAttentionSummary>('/operational-action-center/human-in-loop-ai-reviews/escalation-attention-summary'),
     enabled: canHandleIntelligenceReviewEscalations,
     staleTime: 30_000,
