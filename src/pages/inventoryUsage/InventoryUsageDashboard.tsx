@@ -11,6 +11,8 @@ import {
   OperationalWorkspaceTabs,
 } from "../../components/ui/OperationalWorkspace";
 import { InventoryUsageBulkRecorder } from "./InventoryUsageBulkRecorder";
+import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from "../../components/ui/SidebarAttentionMarker";
+import { useOperationalAttentionItems } from "../../lib/sidebarAttentionItems";
 import { InventoryUsageQuickConsumePanel } from "./InventoryUsageQuickConsumePanel";
 import { InventoryUsageGovernancePanel } from "./InventoryUsageGovernancePanel";
 import { InventoryUsagePeriodClosuresPanel } from "./InventoryUsagePeriodClosuresPanel";
@@ -303,6 +305,8 @@ export function InventoryUsageDashboard({
   onScanAlerts,
 }: InventoryUsageDashboardProps) {
   const { locale, ui } = useAppTranslation();
+  const usageAttentionItemsQuery = useOperationalAttentionItems("usage_ledger", permissions.canReview);
+  const usageAttentionIds = usageAttentionItemsQuery.attentionIds;
   const formatNumber = (value: number | string | null | undefined, maximumFractionDigits = 2) => {
     if (value === null || value === undefined || value === "") return "—";
     const numeric = Number(value);
@@ -604,7 +608,7 @@ export function InventoryUsageDashboard({
         <OperationalWorkspaceTab
           active={activeArea === "ledger"}
           iconPath="/stock-movements"
-          label={ui("Ledger")}
+          label={<span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>{ui("Ledger")}{usageAttentionItemsQuery.data?.requires_attention ? <SidebarAttentionTabDot label={ui("Attention required")} /> : null}</span>}
           count={ledgerTotal || undefined}
           onClick={() => setActiveArea("ledger")}
         />
@@ -1520,8 +1524,14 @@ export function InventoryUsageDashboard({
                 </tr>
               </thead>
               <tbody>
-                {logs.map((usage) => (
-                  <tr key={usage.id}>
+                {logs.map((usage) => {
+                  const causesSidebarAttention = usageAttentionIds.has(usage.id);
+                  return (
+                  <tr
+                    key={usage.id}
+                    data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
+                    style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined}
+                  >
                     <td style={styles.td}>
                       {formatDateTimeLocal(usage.consumed_at)}
                     </td>
@@ -1573,6 +1583,7 @@ export function InventoryUsageDashboard({
                       </div>
                     </td>
                     <td style={styles.td}>
+                      {causesSidebarAttention ? <div style={{ marginBottom: 6 }}><SidebarAttentionMarker label={ui("Attention required")} /></div> : null}
                       {usage.reversed_at ? (
                         <div style={styles.contextCell}>
                           <strong>{ui("Reversed")}</strong>
@@ -1612,7 +1623,8 @@ export function InventoryUsageDashboard({
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

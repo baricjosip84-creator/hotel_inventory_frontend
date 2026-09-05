@@ -9,6 +9,8 @@ import { getCurrentTenantUserId } from '../lib/auth';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { ProductItem } from '../types/inventory';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
+import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
+import { useOperationalAttentionItems } from '../lib/sidebarAttentionItems';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
@@ -530,6 +532,9 @@ export default function InventoryReservationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const permissions = getRoleCapabilities();
   const currentUserId = getCurrentTenantUserId();
+  const reservationAttentionItemsQuery = useOperationalAttentionItems('reservations', permissions.canExpireInventoryReservations || permissions.canAllocateInventoryReservations || permissions.canReleaseInventoryReservations || permissions.canCancelAnyInventoryReservations || permissions.canCancelOwnInventoryReservations);
+  const reservationAttentionIds = reservationAttentionItemsQuery.attentionIds;
+  const reservationConflictAttentionIds = useMemo(() => new Set(reservationAttentionItemsQuery.data?.conflict_reservation_ids || []), [reservationAttentionItemsQuery.data?.conflict_reservation_ids]);
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [selectedReservationId, setSelectedReservationId] = useState('');
   const [draft, setDraft] = useState<ReservationDraft>(defaultDraft);
@@ -930,14 +935,14 @@ export default function InventoryReservationsPage() {
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'queue'}
           iconPath="/execution-tasks"
-          label={ui("Reservation queue")}
+          label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>{ui("Reservation queue")}{(reservationAttentionItemsQuery.data?.expiration_ids?.length || 0) > 0 ? <SidebarAttentionTabDot label={ui("Attention required")} /> : null}</span>}
           count={toNumber(summaryQuery.data?.active_reservations) || undefined}
           onClick={() => navigateWorkspaceSection('queue', 'reservation-queue')}
         />
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'capacity'}
           iconPath="/insights"
-          label={ui("Capacity & conflicts")}
+          label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>{ui("Capacity & conflicts")}{(reservationAttentionItemsQuery.data?.conflict_reservation_ids?.length || 0) > 0 ? <SidebarAttentionTabDot label={ui("Attention required")} /> : null}</span>}
           count={(conflictsQuery.data || []).length || undefined}
           onClick={() => navigateWorkspaceSection('capacity', 'reservation-capacity')}
         />
@@ -1130,9 +1135,15 @@ export default function InventoryReservationsPage() {
               <tr><th style={pageStyles.th}>{ui("Reservation")}</th><th style={pageStyles.th}>{ui("Status")}</th><th style={pageStyles.th}>{ui("Source")}</th><th style={pageStyles.th}>{ui("Priority")}</th><th style={pageStyles.th}>{ui("Needed")}</th><th style={pageStyles.th}>{ui("Open reserved")}</th><th style={pageStyles.th}></th></tr>
             </thead>
             <tbody>
-              {reservations.map((reservation) => (
-                <tr key={reservation.id}>
-                  <td style={pageStyles.td}><strong>{reservation.reservation_number}</strong><br /><span style={pageStyles.muted}>{reservation.requesting_department || ui('No department')}</span></td>
+              {reservations.map((reservation) => {
+                const causesSidebarAttention = reservationAttentionIds.has(reservation.id);
+                return (
+                <tr
+                  key={reservation.id}
+                  style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined}
+                  data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
+                >
+                  <td style={pageStyles.td}><strong>{reservation.reservation_number}</strong>{causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}<br /><span style={pageStyles.muted}>{reservation.requesting_department || ui('No department')}</span></td>
                   <td style={pageStyles.td}><span style={pageStyles.pill}>{formatCode(reservation.status)}</span></td>
                   <td style={pageStyles.td}>{formatCode(reservation.source_type)}{reservation.source_id ? <><br /><span style={pageStyles.muted}>{reservation.source_id}</span></> : null}</td>
                   <td style={pageStyles.td}>{formatCode(reservation.priority || 'normal')}</td>
@@ -1140,7 +1151,8 @@ export default function InventoryReservationsPage() {
                   <td style={pageStyles.td}>{formatNumber(reservation.open_reserved_quantity_total)}</td>
                   <td style={pageStyles.td}><button type="button" style={pageStyles.secondaryButton} onClick={() => handleSelectReservation(reservation.id)}>{ui("Open")}</button></td>
                 </tr>
-              ))}
+                );
+              })}
               {!reservations.length ? <tr><td style={pageStyles.td} colSpan={7}>{reservationsQuery.isLoading ? ui('Loading reservations…') : ui('No reservations match these filters.')}</td></tr> : null}
             </tbody>
           </table>
@@ -1421,9 +1433,15 @@ export default function InventoryReservationsPage() {
           <table style={pageStyles.table}>
             <thead><tr><th style={pageStyles.th}>{ui("Reservation")}</th><th style={pageStyles.th}>{ui("Product")}</th><th style={pageStyles.th}>{ui("Location")}</th><th style={pageStyles.th}>{ui("Reason")}</th><th style={pageStyles.th}>{ui("Remaining")}</th><th style={pageStyles.th}>{ui("Projected free")}</th><th style={pageStyles.th}>{ui("Conflict qty")}</th><th style={pageStyles.th}></th></tr></thead>
             <tbody>
-              {(conflictsQuery.data || []).map((row) => (
-                <tr key={row.reservation_item_id}>
-                  <td style={pageStyles.td}><strong>{row.reservation_number}</strong><br /><span style={pageStyles.muted}>{formatCode(row.priority || 'normal')} · {formatCode(row.status)}</span></td>
+              {(conflictsQuery.data || []).map((row) => {
+                const causesSidebarAttention = reservationConflictAttentionIds.has(row.reservation_id);
+                return (
+                <tr
+                  key={row.reservation_item_id}
+                  style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined}
+                  data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
+                >
+                  <td style={pageStyles.td}><strong>{row.reservation_number}</strong>{causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}<br /><span style={pageStyles.muted}>{formatCode(row.priority || 'normal')} · {formatCode(row.status)}</span></td>
                   <td style={pageStyles.td}>{row.product_name || row.product_id}</td>
                   <td style={pageStyles.td}>{row.storage_location_name || row.storage_location_id || ui('Any location')}</td>
                   <td style={pageStyles.td}><span style={pageStyles.pill}>{formatCode(row.conflict_reason)}</span></td>
@@ -1439,7 +1457,8 @@ export default function InventoryReservationsPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {!conflictsQuery.data?.length ? <tr><td style={pageStyles.td} colSpan={8}>{conflictsQuery.isLoading ? ui('Loading conflicts…') : ui('No allocation conflicts detected.')}</td></tr> : null}
             </tbody>
           </table>

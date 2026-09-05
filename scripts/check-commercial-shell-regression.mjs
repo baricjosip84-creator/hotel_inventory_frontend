@@ -15,6 +15,21 @@ const reliabilityCommandPage = read('src/pages/ReliabilityCommandPage.tsx');
 const alertsPage = read('src/pages/AlertsPage.tsx');
 const learningFeedbackPage = read('src/pages/DecisionLearningFeedbackPage.tsx');
 const procurementRecommendationsPage = read('src/pages/ProcurementRecommendationsPage.tsx');
+const executionRequestsPage = read('src/pages/ExecutionRequestsPage.tsx');
+const usageLedgerPage = read('src/pages/inventoryUsage/InventoryUsageDashboard.tsx');
+const requisitionsPage = read('src/pages/InventoryRequisitionsPage.tsx');
+const executionTasksPage = read('src/pages/ExecutionTasksPage.tsx');
+const reservationsPage = read('src/pages/InventoryReservationsPage.tsx');
+const purchaseOrdersPage = read('src/pages/PurchaseOrdersPage.tsx');
+const shipmentsPage = read('src/pages/ShipmentsPage.tsx');
+const outboundPage = read('src/pages/OutboundPage.tsx');
+const enterpriseInventoryTabs = read('src/components/enterpriseInventory/EnterpriseInventoryTabs.tsx');
+const approvalsTab = read('src/components/enterpriseInventory/tabs/ApprovalsTab.tsx');
+const cycleCountsTab = read('src/components/enterpriseInventory/tabs/CycleCountsTab.tsx');
+const invoicesTab = read('src/components/enterpriseInventory/tabs/InvoicesTab.tsx');
+const supplierReturnsTab = read('src/components/enterpriseInventory/tabs/SupplierReturnsTab.tsx');
+const attentionMarker = read('src/components/ui/SidebarAttentionMarker.tsx');
+const attentionItemsHook = read('src/lib/sidebarAttentionItems.ts');
 
 const commercialRoutes = [
   {
@@ -281,22 +296,6 @@ for (const signal of [
   'shipments',
   'invoice_payment_due_count',
   'inventory_controls',
-  'data-sidebar-attention-explanation=\"true\"',
-  "t('common.attentionBannerTitle')",
-  "t('common.attentionBannerIntro')",
-  "t('common.attentionAlertsManage')",
-  "t('common.attentionExecutionReview')",
-  "t('common.attentionUsagePending')",
-  "t('common.attentionRequisitionApproval')",
-  "t('common.attentionExecutionTasks')",
-  "t('common.attentionReservationExpiration')",
-  "t('common.attentionPurchaseOrderApproval')",
-  "t('common.attentionShipmentDueReceive')",
-  "t('common.attentionShipmentReadyFinalize')",
-  "t('common.attentionOutboundUpdate')",
-  "t('common.attentionInventoryApproval')",
-  "t('common.attentionInventorySupplierReturnApproval')",
-  "t('common.attentionInventoryInvoicePaymentDue')",
   "queryKey: ['decision-learning-feedback', 'navigation-attention'",
   "'/decision-intelligence-feedback/attention-summary'",
   'learningFeedbackAttentionScope',
@@ -305,11 +304,6 @@ for (const signal of [
   "'/reorder-insights/recommendations/attention-summary'",
   'procurementRecommendationAttentionScope',
   'hasProcurementRecommendationAttention',
-  "t('common.attentionLearningFeedbackReview')",
-  "t('common.attentionLearningFeedbackForecast')",
-  "t('common.attentionProcurementDecision')",
-  "t('common.attentionProcurementPoDraft')",
-  "t('common.attentionProcurementRecheck')"
 ]) {
   if (!layout.includes(signal)) {
     failures.push(`AppLayout.tsx is missing the role-aware alert navigation attention signal: ${signal}`);
@@ -365,24 +359,65 @@ for (const approvedPath of approvedSidebarAttentionPaths) {
   }
 }
 
-for (const attentionPathPrefix of [
-  '/alerts',
-  '/execution-requests',
-  '/intelligence-review',
-  '/inventory-usage',
-  '/inventory-requisitions',
-  '/execution-tasks',
-  '/inventory-reservations',
-  '/purchase-orders',
-  '/shipments',
-  '/outbound',
-  '/enterprise-inventory',
-  '/decision-learning-feedback',
-  '/procurement-recommendations'
+// v3.49.124: the vague page-wide explanation banner is intentionally disabled.
+// The actual record(s) that caused the sidebar dot must be marked in the authoritative queue instead.
+if (!layout.includes('v3.49.124: intentionally hidden')) {
+  failures.push('AppLayout.tsx must keep the old page-wide red-dot explanation banner commented out.');
+}
+if (layout.includes('data-sidebar-attention-explanation="true"')) {
+  failures.push('The page-wide red-dot explanation banner must remain hidden; exact queue items now carry attention markers.');
+}
+
+const exactAttentionItemSources = [
+  [alertsPage, 'Alerts'],
+  [executionRequestsPage, 'Execution Requests'],
+  [intelligenceReviewPage, 'Intelligence Review'],
+  [learningFeedbackPage, 'Learning Feedback'],
+  [procurementRecommendationsPage, 'Procurement Recommendations'],
+  [usageLedgerPage, 'Usage Ledger'],
+  [requisitionsPage, 'Requisitions'],
+  [executionTasksPage, 'Execution Tasks'],
+  [reservationsPage, 'Reservations'],
+  [purchaseOrdersPage, 'Purchase Orders'],
+  [shipmentsPage, 'Shipments'],
+  [outboundPage, 'Outbound'],
+  [approvalsTab, 'Inventory Controls approvals'],
+  [cycleCountsTab, 'Inventory Controls cycle counts'],
+  [invoicesTab, 'Inventory Controls invoices'],
+  [supplierReturnsTab, 'Inventory Controls supplier returns']
+];
+for (const [source, label] of exactAttentionItemSources) {
+  if (!source.includes('data-sidebar-attention-item')) failures.push(`${label} must mark the exact row/card responsible for its sidebar red dot.`);
+  if (!source.includes('SidebarAttentionMarker')) failures.push(`${label} must visibly label the exact actionable row/card as Attention required.`);
+}
+if (!attentionMarker.includes('data-sidebar-attention-item-marker="true"')) failures.push('Shared exact-record attention marker is missing.');
+if (!attentionMarker.includes('data-sidebar-attention-tab-marker="true"')) failures.push('Shared sub-tab attention dot is missing.');
+if (!attentionItemsHook.includes('identityKey') || !attentionItemsHook.includes('permissionKey')) failures.push('Exact-record attention queries must include tenant/user/permission identity in their cache key.');
+if (!attentionItemsHook.includes('tenantAccess.hasTenantContext')) failures.push('Exact-record attention queries must fail closed without tenant context.');
+for (const [source, label] of [
+  [outboundPage, 'Outbound'],
+  [enterpriseInventoryTabs, 'Inventory Controls'],
+  [learningFeedbackPage, 'Learning Feedback'],
+  [intelligenceReviewPage, 'Intelligence Review'],
+  [usageLedgerPage, 'Usage Ledger'],
+  [procurementRecommendationsPage, 'Procurement Recommendations'],
+  [executionTasksPage, 'Execution Tasks'],
+  [reservationsPage, 'Reservations'],
+  [purchaseOrdersPage, 'Purchase Orders'],
+  [shipmentsPage, 'Shipments']
 ]) {
-  if (!layout.includes(`attentionPath.startsWith('${attentionPathPrefix}')`)) {
-    failures.push(`On-page attention explanation is missing route coverage for ${attentionPathPrefix}.`);
-  }
+  if (!source.includes('SidebarAttentionTabDot')) failures.push(`${label} must point to the relevant internal tab when attention could otherwise be hidden behind another view.`);
+}
+
+
+if (!learningFeedbackPage.includes("review_item_count || 0") || !learningFeedbackPage.includes("ui('Feedback records')")) {
+  failures.push('Learning Feedback must put a sub-tab attention dot on Feedback records when its human review board has actionable items.');
+}
+if (!intelligenceReviewPage.includes("'/operational-action-center/human-in-loop-ai-reviews/escalation-attention-summary'") || !intelligenceReviewPage.includes('intelligenceAttentionQuery.data?.requires_attention')) {
+  failures.push('Intelligence Review must use the role-aware escalation attention summary to mark Recommendation reviews.');
+}
+if (!usageLedgerPage.includes('usageAttentionItemsQuery.data?.requires_attention') || !usageLedgerPage.includes('ui("Ledger")')) {
+  failures.push('Usage Ledger must mark the Ledger tab when exact review items are actionable.');
 }
 
 for (const [source, signal, message] of [

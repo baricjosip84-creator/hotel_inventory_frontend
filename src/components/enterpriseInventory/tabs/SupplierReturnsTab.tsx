@@ -4,6 +4,8 @@ import { apiRequest } from '../../../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import { getActiveTenantCurrency } from '../../../lib/tenantCurrency';
 import { useAppTranslation } from '../../../i18n/I18nContext';
+import { SidebarAttentionMarker, sidebarAttentionItemStyle } from '../../ui/SidebarAttentionMarker';
+import { useOperationalAttentionItems } from '../../../lib/sidebarAttentionItems';
 import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../../../i18n/formatters';
 import { normalizeError } from '../EnterpriseInventoryFormat';
 import { InputField, SelectField, TextareaField } from '../EnterpriseInventoryShared';
@@ -98,6 +100,10 @@ export function SupplierReturnsTab() {
   const canWrite = hasPermission(TENANT_PERMISSIONS.SUPPLIER_RETURNS_WRITE);
   const canDispatch = hasPermission(TENANT_PERMISSIONS.SUPPLIER_RETURNS_DISPATCH);
   const canApprove = hasPermission(TENANT_PERMISSIONS.APPROVALS_EXECUTE);
+  const inventoryControlAttentionItemsQuery = useOperationalAttentionItems('inventory_controls', canApprove || canDispatch);
+  const approvalAttentionKeys = new Set(inventoryControlAttentionItemsQuery.data?.approval_item_keys || []);
+  const directApprovalAttentionIds = new Set(inventoryControlAttentionItemsQuery.data?.supplier_return_approval_ids || []);
+  const dispatchAttentionIds = new Set(inventoryControlAttentionItemsQuery.data?.supplier_return_dispatch_ids || []);
 
   const [selectedLotId, setSelectedLotId] = useState('');
   const [lineQuantity, setLineQuantity] = useState('');
@@ -396,9 +402,15 @@ export function SupplierReturnsTab() {
             <table style={styles.table}>
               <thead><tr>{['Return', 'Supplier', 'Items', 'Reason', 'Value', 'Status', 'Created', 'Actions'].map((header) => <th key={header} style={styles.th}>{ui(header)}</th>)}</tr></thead>
               <tbody>
-                {(returnsQuery.data ?? []).map((item) => (
-                  <tr key={item.id}>
-                    <td style={styles.td}><strong>{item.return_number}</strong></td>
+                {(returnsQuery.data ?? []).map((item) => {
+                  const causesSidebarAttention = approvalAttentionKeys.has(`supplier_return:${item.id}`) || directApprovalAttentionIds.has(item.id) || dispatchAttentionIds.has(item.id);
+                  return (
+                  <tr
+                    key={item.id}
+                    style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined}
+                    data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
+                  >
+                    <td style={styles.td}><strong>{item.return_number}</strong>{causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}</td>
                     <td style={styles.td}>{item.supplier_name}</td>
                     <td style={styles.td}>{(item.items ?? []).map((line) => (
                       <div key={line.id} style={{ marginBottom: 6 }}>
@@ -424,7 +436,8 @@ export function SupplierReturnsTab() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

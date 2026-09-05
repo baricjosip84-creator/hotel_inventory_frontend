@@ -23,7 +23,7 @@ import { InventoryBrand } from '../components/brand/InventoryBrand';
 import { LanguageSelector } from '../components/i18n/LanguageSelector';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { normalizeAppLocale } from '../i18n/config';
-import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
+import { formatLocalizedDateTime } from '../i18n/formatters';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { fetchTenantCurrencyContext, setActiveTenantCurrency, DEFAULT_INVENTORY_CURRENCY } from '../lib/tenantCurrency';
 
@@ -399,76 +399,13 @@ export default function AppLayout() {
   const hasInventoryControlsAttention = (canExecuteInventoryApprovalQueueForAttention || canApproveSupplierReturnsForAttention || canReconcileCycleCountsForAttention || canDispatchSupplierReturnsForAttention || canManageSupplierInvoicesForAttention)
     && operationalAttention?.inventory_controls.requires_attention === true;
 
-  const attentionCount = (value: number | string | undefined) => {
-    const parsed = Number(value || 0);
-    return Number.isFinite(parsed) ? parsed : 0;
-  };
-  const attentionNumber = (value: number | string | undefined) => formatLocalizedNumber(attentionCount(value), locale, { maximumFractionDigits: 0 });
-  const attentionReasons: string[] = [];
-  const attentionPath = location.pathname;
-
-  if (attentionPath.startsWith('/alerts') && hasAlertAttention && alertAttentionQuery.data) {
-    const alertReason = alertAttentionQuery.data.attention_scope === 'blocking_only'
-      ? t('common.attentionAlertsBlocking')
-      : t('common.attentionAlertsManage');
-    attentionReasons.push(alertReason.replace('{count}', attentionNumber(alertAttentionQuery.data.actionable_count)));
-  }
-  if (attentionPath.startsWith('/execution-requests') && hasExecutionRequestAttention && executionRequestAttentionQuery.data) {
-    if (attentionCount(executionRequestAttentionQuery.data.pending_review_count) > 0) attentionReasons.push(t('common.attentionExecutionReview').replace('{count}', attentionNumber(executionRequestAttentionQuery.data.pending_review_count)));
-    if (attentionCount(executionRequestAttentionQuery.data.approved_waiting_execution_count) > 0) attentionReasons.push(t('common.attentionExecutionExecute').replace('{count}', attentionNumber(executionRequestAttentionQuery.data.approved_waiting_execution_count)));
-    if (attentionCount(executionRequestAttentionQuery.data.retry_ready_count) > 0) attentionReasons.push(t('common.attentionExecutionRetry').replace('{count}', attentionNumber(executionRequestAttentionQuery.data.retry_ready_count)));
-  }
-  if (attentionPath.startsWith('/intelligence-review') && hasIntelligenceReviewAttention && intelligenceReviewAttentionQuery.data) {
-    attentionReasons.push(t('common.attentionIntelligence').replace('{count}', attentionNumber(intelligenceReviewAttentionQuery.data.actionable_count)));
-    if (attentionCount(intelligenceReviewAttentionQuery.data.overdue_count) > 0) attentionReasons.push(t('common.attentionIntelligenceOverdue').replace('{count}', attentionNumber(intelligenceReviewAttentionQuery.data.overdue_count)));
-  }
-  if (attentionPath.startsWith('/decision-learning-feedback') && hasLearningFeedbackAttention && learningFeedbackAttentionQuery.data) {
-    attentionReasons.push(t('common.attentionLearningFeedbackReview').replace('{count}', attentionNumber(learningFeedbackAttentionQuery.data.actionable_count)));
-    if (attentionCount(learningFeedbackAttentionQuery.data.forecast_review_count) > 0) {
-      attentionReasons.push(t('common.attentionLearningFeedbackForecast').replace('{count}', attentionNumber(learningFeedbackAttentionQuery.data.forecast_review_count)));
-    }
-  }
-  if (attentionPath.startsWith('/procurement-recommendations') && hasProcurementRecommendationAttention && procurementRecommendationAttentionQuery.data) {
-    if (attentionCount(procurementRecommendationAttentionQuery.data.high_risk_pending_decision_count) > 0) attentionReasons.push(t('common.attentionProcurementDecision').replace('{count}', attentionNumber(procurementRecommendationAttentionQuery.data.high_risk_pending_decision_count)));
-    if (attentionCount(procurementRecommendationAttentionQuery.data.approved_ready_po_draft_count) > 0) attentionReasons.push(t('common.attentionProcurementPoDraft').replace('{count}', attentionNumber(procurementRecommendationAttentionQuery.data.approved_ready_po_draft_count)));
-    if (attentionCount(procurementRecommendationAttentionQuery.data.approved_recheck_count) > 0) attentionReasons.push(t('common.attentionProcurementRecheck').replace('{count}', attentionNumber(procurementRecommendationAttentionQuery.data.approved_recheck_count)));
-  }
-  if (attentionPath.startsWith('/inventory-usage') && hasUsageLedgerAttention && operationalAttention) {
-    if (attentionCount(operationalAttention.usage_ledger.pending_review_count) > 0) attentionReasons.push(t('common.attentionUsagePending').replace('{count}', attentionNumber(operationalAttention.usage_ledger.pending_review_count)));
-    if (attentionCount(operationalAttention.usage_ledger.follow_up_required_count) > 0) attentionReasons.push(t('common.attentionUsageFollowUp').replace('{count}', attentionNumber(operationalAttention.usage_ledger.follow_up_required_count)));
-  }
-  if (attentionPath.startsWith('/inventory-requisitions') && hasRequisitionAttention && operationalAttention) {
-    if (attentionCount(operationalAttention.requisitions.approval_count) > 0) attentionReasons.push(t('common.attentionRequisitionApproval').replace('{count}', attentionNumber(operationalAttention.requisitions.approval_count)));
-    if (attentionCount(operationalAttention.requisitions.fulfillment_count) > 0) attentionReasons.push(t('common.attentionRequisitionFulfillment').replace('{count}', attentionNumber(operationalAttention.requisitions.fulfillment_count)));
-  }
-  if (attentionPath.startsWith('/execution-tasks') && hasExecutionTaskAttention && operationalAttention) {
-    attentionReasons.push(t('common.attentionExecutionTasks').replace('{count}', attentionNumber(operationalAttention.execution_tasks.actionable_count)));
-  }
-  if (attentionPath.startsWith('/inventory-reservations') && hasReservationAttention && operationalAttention) {
-    if (attentionCount(operationalAttention.reservations.expiration_count) > 0) attentionReasons.push(t('common.attentionReservationExpiration').replace('{count}', attentionNumber(operationalAttention.reservations.expiration_count)));
-    if (operationalAttention.reservations.conflict_requires_attention) attentionReasons.push(t('common.attentionReservationConflict'));
-  }
-  if (attentionPath.startsWith('/purchase-orders') && hasPurchaseOrderAttention && operationalAttention) {
-    attentionReasons.push(t('common.attentionPurchaseOrderApproval').replace('{count}', attentionNumber(operationalAttention.purchase_orders.approval_count)));
-  }
-  if (attentionPath.startsWith('/shipments') && hasShipmentAttention && operationalAttention) {
-    if (attentionCount(operationalAttention.shipments.due_receive_count) > 0) attentionReasons.push(t('common.attentionShipmentDueReceive').replace('{count}', attentionNumber(operationalAttention.shipments.due_receive_count)));
-    if (attentionCount(operationalAttention.shipments.ready_finalize_count) > 0) attentionReasons.push(t('common.attentionShipmentReadyFinalize').replace('{count}', attentionNumber(operationalAttention.shipments.ready_finalize_count)));
-  }
-  if (attentionPath.startsWith('/outbound') && hasOutboundAttention && operationalAttention) {
-    if (attentionCount(operationalAttention.outbound.update_queue_count) > 0) attentionReasons.push(t('common.attentionOutboundUpdate').replace('{count}', attentionNumber(operationalAttention.outbound.update_queue_count)));
-    if (attentionCount(operationalAttention.outbound.dispatch_queue_count) > 0) attentionReasons.push(t('common.attentionOutboundDispatch').replace('{count}', attentionNumber(operationalAttention.outbound.dispatch_queue_count)));
-    if (attentionCount(operationalAttention.outbound.return_receive_queue_count) > 0) attentionReasons.push(t('common.attentionOutboundReturn').replace('{count}', attentionNumber(operationalAttention.outbound.return_receive_queue_count)));
-  }
-  if (attentionPath.startsWith('/enterprise-inventory') && hasInventoryControlsAttention && operationalAttention) {
-    if (attentionCount(operationalAttention.inventory_controls.approval_queue_count) > 0) attentionReasons.push(t('common.attentionInventoryApproval').replace('{count}', attentionNumber(operationalAttention.inventory_controls.approval_queue_count)));
-    if (attentionCount(operationalAttention.inventory_controls.supplier_return_approval_count) > 0) attentionReasons.push(t('common.attentionInventorySupplierReturnApproval').replace('{count}', attentionNumber(operationalAttention.inventory_controls.supplier_return_approval_count)));
-    if (attentionCount(operationalAttention.inventory_controls.cycle_count_reconcile_count) > 0) attentionReasons.push(t('common.attentionInventoryCycleReconcile').replace('{count}', attentionNumber(operationalAttention.inventory_controls.cycle_count_reconcile_count)));
-    if (attentionCount(operationalAttention.inventory_controls.supplier_return_dispatch_count) > 0) attentionReasons.push(t('common.attentionInventoryReturnDispatch').replace('{count}', attentionNumber(operationalAttention.inventory_controls.supplier_return_dispatch_count)));
-    if (attentionCount(operationalAttention.inventory_controls.invoice_match_count) > 0) attentionReasons.push(t('common.attentionInventoryInvoiceMatch').replace('{count}', attentionNumber(operationalAttention.inventory_controls.invoice_match_count)));
-    if (attentionCount(operationalAttention.inventory_controls.invoice_payment_due_count) > 0) attentionReasons.push(t('common.attentionInventoryInvoicePaymentDue').replace('{count}', attentionNumber(operationalAttention.inventory_controls.invoice_payment_due_count)));
-  }
-  const showAttentionExplanation = attentionReasons.length > 0;
+  /*
+   * v3.49.124: the page-wide red-dot explanation banner is intentionally disabled.
+   * It told the user only that a page had actionable work, but not which exact
+   * record(s) caused the sidebar red dot. The authoritative queues now mark the
+   * actionable rows/cards themselves instead. Keep the historical explanation
+   * logic out of the active render path unless a future UX explicitly needs it.
+   */
 
   useEffect(() => {
     const onTenantMutationFeedback = (event: Event) => {
@@ -1097,20 +1034,11 @@ export default function AppLayout() {
             ...(isMobile ? styles.contentMobile : styles.contentDesktop)
           }}
         >
-          {showAttentionExplanation ? (
-            <section style={styles.attentionExplanation} aria-live="polite" data-sidebar-attention-explanation="true">
-              <div style={styles.attentionExplanationHeader}>
-                <span style={styles.attentionExplanationDot} aria-hidden="true" />
-                <div>
-                  <strong style={styles.attentionExplanationTitle}>{t('common.attentionBannerTitle')}</strong>
-                  <div style={styles.attentionExplanationIntro}>{t('common.attentionBannerIntro')}</div>
-                </div>
-              </div>
-              <ul style={styles.attentionExplanationList}>
-                {attentionReasons.map((reason) => <li key={reason}>{reason}</li>)}
-              </ul>
-            </section>
-          ) : null}
+          {/*
+            v3.49.124: intentionally hidden. A page-wide "Why the red dot is showing"
+            banner was too vague because it did not identify the actual records.
+            Red-dot pages now mark the responsible rows/cards in their real queues.
+          */}
           <Outlet />
         </main>
         <CopyrightNotice />

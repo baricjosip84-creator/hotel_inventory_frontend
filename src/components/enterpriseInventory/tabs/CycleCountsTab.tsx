@@ -3,6 +3,8 @@ import { InputField, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import { useAppTranslation } from '../../../i18n/I18nContext';
+import { SidebarAttentionMarker, sidebarAttentionItemStyle } from '../../ui/SidebarAttentionMarker';
+import { useOperationalAttentionItems } from '../../../lib/sidebarAttentionItems';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../../../i18n/formatters';
 import type { CycleCount, CycleCountForm, ProductOption, StorageLocationOption } from '../EnterpriseInventoryTypes';
 
@@ -38,6 +40,9 @@ export function CycleCountsTab({
   const { locale, ui } = useAppTranslation();
   const canCreateCycleCounts = hasPermission(TENANT_PERMISSIONS.CYCLE_COUNTS_WRITE);
   const canApproveCycleCounts = hasPermission(TENANT_PERMISSIONS.CYCLE_COUNTS_APPROVE);
+  const inventoryControlAttentionItemsQuery = useOperationalAttentionItems('inventory_controls', canApproveCycleCounts || hasPermission(TENANT_PERMISSIONS.APPROVALS_EXECUTE));
+  const approvalAttentionKeys = new Set(inventoryControlAttentionItemsQuery.data?.approval_item_keys || []);
+  const reconcileAttentionIds = new Set(inventoryControlAttentionItemsQuery.data?.cycle_count_reconcile_ids || []);
   const evidenceNumber = (value: number | string | null | undefined) => {
     if (value === null || value === undefined || value === '') return '—';
     const parsed = Number(value);
@@ -111,9 +116,14 @@ export function CycleCountsTab({
                   const hasTrustedEvidence = evidence.length > 0 && evidence.every((line) => line.counted_quantity !== null && line.counted_quantity !== undefined && line.snapshot_available !== false);
                   const canSubmitCount = canCreateCycleCounts && item.status === 'draft' && hasTrustedEvidence;
                   const canReconcile = canApproveCycleCounts && item.status === 'approved' && hasTrustedEvidence;
+                  const causesSidebarAttention = approvalAttentionKeys.has(`cycle_count:${item.id}`) || reconcileAttentionIds.has(item.id);
                   return (
-                    <tr key={item.id}>
-                      <td style={styles.td}>{statusLabel(item.status)}</td>
+                    <tr
+                      key={item.id}
+                      style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined}
+                      data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
+                    >
+                      <td style={styles.td}>{statusLabel(item.status)}{causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}</td>
                       <td style={styles.td}>{item.department || '—'}</td>
                       <td style={styles.td}>{item.notes || '—'}</td>
                       <td style={styles.td}>

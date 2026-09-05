@@ -8,6 +8,8 @@ import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedNumber } f
 import { apiRequest, ApiError } from '../lib/api';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
 import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
+import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
+import { useOperationalAttentionItems } from '../lib/sidebarAttentionItems';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
@@ -616,6 +618,8 @@ export default function ShipmentsPage() {
     canAutoReorderShipments,
     canViewPurchaseOrders
   } = getRoleCapabilities();
+  const shipmentAttentionItemsQuery = useOperationalAttentionItems('shipments', canReceiveShipments || canFinalizeShipments);
+  const shipmentAttentionIds = shipmentAttentionItemsQuery.attentionIds;
   const accessRoleLabel = getCurrentAccessRoleLabel();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -2360,7 +2364,7 @@ export default function ShipmentsPage() {
         <OperationalWorkspaceTab
           active={workspaceSection === 'shipments'}
           iconPath="/shipments"
-          label={ui('Shipment list')}
+          label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>{ui('Shipment list')}{shipmentAttentionItemsQuery.data?.requires_attention ? <SidebarAttentionTabDot label={ui('Attention required')} /> : null}</span>}
           count={filteredShipments.length}
           onClick={() => jumpToWorkspaceSection('shipments', 'shipments-list')}
         />
@@ -2500,6 +2504,7 @@ export default function ShipmentsPage() {
                 const isSelected = shipment.id === selectedShipmentId;
                 const ordered = toNumber(shipment.total_ordered_quantity);
                 const received = toNumber(shipment.total_received_quantity);
+                const causesSidebarAttention = shipmentAttentionIds.has(shipment.id);
 
                 return (
                   <button
@@ -2508,8 +2513,10 @@ export default function ShipmentsPage() {
                     onClick={() => selectShipment(shipment.id)}
                     style={{
                       ...styles.shipmentCard,
-                      ...(isSelected ? styles.shipmentCardSelected : {})
+                      ...(isSelected ? styles.shipmentCardSelected : {}),
+                      ...(causesSidebarAttention ? sidebarAttentionItemStyle : {})
                     }}
+                    data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
                   >
                     <div
                       style={{
@@ -2522,6 +2529,7 @@ export default function ShipmentsPage() {
                         <div style={styles.shipmentCardTitle}>
                           {shipment.po_number || ui('No shipment reference')}
                         </div>
+                        {causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}
                         <div style={styles.shipmentCardSubtle}>
                           {ui('Reference: {reference}').replace('{reference}', `${shipment.id.slice(0, 8)}…`)}
                         </div>

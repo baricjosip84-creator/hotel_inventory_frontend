@@ -7,6 +7,7 @@ import { formatLocalizedCurrency, formatLocalizedDateTime } from '../i18n/format
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { getActiveTenantCurrency } from '../lib/tenantCurrency';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
 import {
   OperationalWorkspaceHero,
   // OperationalWorkspaceMetaPill, // hidden from tenant-facing Learning Feedback hero
@@ -3875,9 +3876,19 @@ function FeedbackReviewBoard({
             <tbody>{items.map((item, index) => {
               const reason = item.review_reason_code ? reviewReasonLabels[item.review_reason_code] : item.review_reason;
               const targets = reviewTargets[item.evidence_type || ''] || [];
+              const causesSidebarAttention = canGovern;
               return (
-                <tr key={`${item.evidence_type || 'evidence'}-${item.evidence_key || index}`}>
-                  <td>{item.source_label ? String(item.source_label) : `${ui(formatLabel(item.evidence_type))} / ${formatLabel(item.evidence_key)}`}</td>
+                <tr
+                  key={`${item.evidence_type || 'evidence'}-${item.evidence_key || index}`}
+                  style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined}
+                  data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
+                >
+                  <td>
+                    <div style={{ display: 'grid', gap: 6, justifyItems: 'start' }}>
+                      {causesSidebarAttention ? <SidebarAttentionMarker label={ui('Attention required')} /> : null}
+                      <span>{item.source_label ? String(item.source_label) : `${ui(formatLabel(item.evidence_type))} / ${formatLabel(item.evidence_key)}`}</span>
+                    </div>
+                  </td>
                   <td>{ui(formatLabel(item.domain))}</td>
                   <td>{ui(formatLabel(item.status))}</td>
                   <td>{reason ? ui(reason) : '—'}</td>
@@ -4980,7 +4991,12 @@ export default function DecisionLearningFeedbackPage() {
       </OperationalWorkspaceStats>
 
       <OperationalWorkspaceTabs ariaLabel={ui('Learning Feedback view')}>
-        <OperationalWorkspaceTab active={view === 'feedback'} iconPath="/decision-learning-feedback" label={ui('Feedback records')} onClick={() => setView('feedback')} />
+        <OperationalWorkspaceTab
+          active={view === 'feedback'}
+          iconPath="/decision-learning-feedback"
+          label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>{ui('Feedback records')}{canGovern && Number(summaryQuery.data?.feedback_review_board?.review_item_count || 0) > 0 ? <SidebarAttentionTabDot label={ui('Attention required')} /> : null}</span>}
+          onClick={() => setView('feedback')}
+        />
         {canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label={ui('Readiness checks')} onClick={() => setView('readiness')} /> : null}
       </OperationalWorkspaceTabs>
 

@@ -15,6 +15,7 @@ import {
   OperationalWorkspaceTab,
   OperationalWorkspaceTabs,
 } from "../components/ui/OperationalWorkspace";
+import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from "../components/ui/SidebarAttentionMarker";
 import "./ProcurementRecommendationsPage.css";
 
 type CurrencyTotal = { currency_code: string; amount: number | string };
@@ -235,6 +236,15 @@ type ReplenishmentRecommendationDetail = ReplenishmentRecommendation & {
     warnings?: Array<{ code?: string | null; message?: string | null }>;
     reasoning?: string[];
   };
+};
+
+type ProcurementRecommendationAttentionSummary = {
+  requires_attention: boolean;
+  actionable_count: number | string;
+  high_risk_pending_decision_count: number | string;
+  approved_ready_po_draft_count: number | string;
+  approved_recheck_count: number | string;
+  attention_product_ids?: string[];
 };
 
 type ReplenishmentRecommendationDetailResponse = {
@@ -1477,6 +1487,17 @@ export default function ProcurementRecommendationsPage() {
   const capabilities = getRoleCapabilities();
   const canApproveRecommendations = capabilities.canApprovePurchaseOrders;
   const canCreatePurchaseOrderDrafts = capabilities.canCreatePurchaseOrders;
+  const sidebarAttentionQuery = useQuery({
+    queryKey: ["procurement-recommendations", "page-attention-items", canApproveRecommendations, canCreatePurchaseOrderDrafts],
+    queryFn: () => apiRequest<ProcurementRecommendationAttentionSummary>("/reorder-insights/recommendations/attention-summary"),
+    enabled: canApproveRecommendations || canCreatePurchaseOrderDrafts,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: true,
+  });
+  const sidebarAttentionProductIds = useMemo(
+    () => new Set(sidebarAttentionQuery.data?.attention_product_ids || []),
+    [sidebarAttentionQuery.data?.attention_product_ids],
+  );
   const canViewGeneratedPurchaseOrderDrafts = capabilities.canViewPurchaseOrders;
   const canManageProducts = capabilities.canManageProducts;
   const canViewSuppliers = hasPermission(TENANT_PERMISSIONS.SUPPLIERS_READ);
@@ -1961,7 +1982,7 @@ export default function ProcurementRecommendationsPage() {
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === "queue"}
           iconPath="/procurement-recommendations"
-          label={ui("Recommendations")}
+          label={<span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>{ui("Recommendations")}{sidebarAttentionQuery.data?.requires_attention ? <SidebarAttentionTabDot label={ui("Attention required")} /> : null}</span>}
           count={totalRows}
           onClick={() => navigateWorkspaceSection("queue", queueRef.current)}
         />
@@ -2222,10 +2243,14 @@ export default function ProcurementRecommendationsPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {rows.map((row) => {
+                const causesSidebarAttention = sidebarAttentionProductIds.has(row.product_id);
+                return (
                 <tr
                   key={row.product_id}
                   className={selectedProductId === row.product_id ? "is-selected" : undefined}
+                  style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined}
+                  data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
                 >
                   <td>
                     <input
@@ -2236,6 +2261,7 @@ export default function ProcurementRecommendationsPage() {
                     />
                   </td>
                   <td>
+                    {causesSidebarAttention ? <div style={{ marginBottom: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}
                     <div className="procurement-recommendations-product-name">{row.product_name}</div>
                     <div className="procurement-recommendations-cell-note">
                       {row.category || ui("Uncategorized")} · {row.unit || ui("unit")}
@@ -2325,7 +2351,8 @@ export default function ProcurementRecommendationsPage() {
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {!recommendationsQuery.isLoading && rows.length === 0 ? (
                 <tr>
                   <td className="procurement-recommendations-empty-cell" colSpan={10}>

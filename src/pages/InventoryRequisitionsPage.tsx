@@ -9,6 +9,8 @@ import { ApiError, apiMutationRequest, apiRequest } from '../lib/api';
 import { getRoleCapabilities } from '../lib/permissions';
 import { getCurrentTenantUserId } from '../lib/auth';
 import { scrollToFormSection } from '../lib/scrollToForm';
+import { SidebarAttentionMarker, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
+import { useOperationalAttentionItems } from '../lib/sidebarAttentionItems';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
 import {
   OperationalSectionHeader,
@@ -1448,6 +1450,8 @@ export default function InventoryRequisitionsPage() {
   const approvalThresholdReasonLabel = (value?: string | null) => approvalThresholdReasonDisplay(value, ui);
   const capabilities = getRoleCapabilities();
   const currentUserId = getCurrentTenantUserId();
+  const requisitionAttentionItemsQuery = useOperationalAttentionItems('requisitions', capabilities.canApproveInventoryRequisitions || capabilities.canFulfillInventoryRequisitions);
+  const requisitionAttentionIds = requisitionAttentionItemsQuery.attentionIds;
   const [status, setStatus] = useState('');
   const [dueState, setDueState] = useState('');
   const [fulfillmentState, setFulfillmentState] = useState('');
@@ -3613,8 +3617,13 @@ export default function InventoryRequisitionsPage() {
           {queueRows.map((item) => {
             const bulkSelectable = ['approved', 'partially_fulfilled'].includes(String(item.status));
             const bulkSelected = bulkFulfillmentIds.includes(item.id);
+            const causesSidebarAttention = requisitionAttentionIds.has(item.id);
             return (
-              <div key={item.id} style={styles.queueItemRow}>
+              <div
+                key={item.id}
+                style={{ ...styles.queueItemRow, ...(causesSidebarAttention ? sidebarAttentionItemStyle : {}) }}
+                data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
+              >
                 {capabilities.canFulfillInventoryRequisitions && (
                   <label style={bulkSelectable ? styles.bulkSelectLabel : styles.bulkSelectLabelDisabled} title={bulkSelectable ? ui('Select for bulk all-remaining fulfillment') : ui('Only approved or partially fulfilled requests can be bulk fulfilled')}>
                     <input
@@ -3631,6 +3640,7 @@ export default function InventoryRequisitionsPage() {
                   onClick={() => setSelectedId(item.id)}
                 >
                   <span style={styles.listTitle}>{item.requisition_number}</span>
+                  {causesSidebarAttention ? <SidebarAttentionMarker label={ui('Attention required')} /> : null}
                   <span style={statusStyle(item.status)}>{requisitionStatusLabel(item.status)}</span>
                   <span style={styles.muted}>{item.requesting_department} · {localizedCodeLabel(item.priority, ui)}</span>
                   {item.sla_state && (

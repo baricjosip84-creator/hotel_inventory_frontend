@@ -3,6 +3,8 @@ import { DataTable, InputField, SelectField } from '../EnterpriseInventoryShared
 import { styles } from '../EnterpriseInventoryStyles';
 import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import { useAppTranslation } from '../../../i18n/I18nContext';
+import { SidebarAttentionMarker, sidebarAttentionItemStyle } from '../../ui/SidebarAttentionMarker';
+import { useOperationalAttentionItems } from '../../../lib/sidebarAttentionItems';
 import { formatLocalizedCurrency, formatLocalizedDateTime, formatLocalizedNumber } from '../../../i18n/formatters';
 import type { ApprovalRule, ApprovalRuleForm, CycleCountItem, StorageLocationOption } from '../EnterpriseInventoryTypes';
 
@@ -41,6 +43,8 @@ export function ApprovalsTab({ approvalQueue, approvalRuleForm, approvalRulesQue
   const { locale, ui } = useAppTranslation();
   const canWriteApprovalRules = hasPermission(TENANT_PERMISSIONS.APPROVAL_RULES_WRITE);
   const canExecuteApprovals = hasPermission(TENANT_PERMISSIONS.APPROVALS_EXECUTE);
+  const inventoryControlAttentionItemsQuery = useOperationalAttentionItems('inventory_controls', canExecuteApprovals);
+  const approvalAttentionKeys = new Set(inventoryControlAttentionItemsQuery.data?.approval_item_keys || []);
   const entitySupportsScope = ['department_requisition', 'cycle_count'].includes(approvalRuleForm.entity_type);
   const entityUsesAmount = usesAmountThresholds(approvalRuleForm.entity_type);
   const minimumAmount = Number(approvalRuleForm.min_amount);
@@ -122,10 +126,17 @@ export function ApprovalsTab({ approvalQueue, approvalRuleForm, approvalRulesQue
           {approvalQueue.length ? <div style={styles.tableWrap}>
             <table style={styles.table}>
               <thead><tr>{['Entity', 'Status', 'Created', 'Actions'].map((header) => <th key={header} style={styles.th}>{ui(header)}</th>)}</tr></thead>
-              <tbody>{approvalQueue.map((item) => (
-                <tr key={`${item.entity_type}-${item.entity_id}`}>
+              <tbody>{approvalQueue.map((item) => {
+                const causesSidebarAttention = approvalAttentionKeys.has(`${item.entity_type}:${item.entity_id}`);
+                return (
+                <tr
+                  key={`${item.entity_type}-${item.entity_id}`}
+                  style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined}
+                  data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
+                >
                   <td style={styles.td}>
                     <strong>{item.label}</strong>
+                    {causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}
                     {item.detail ? <div style={styles.helper}>{item.detail}</div> : null}
                     {item.entity_type === 'cycle_count' && item.cycle_count_items?.length ? item.cycle_count_items.map((line, index) => {
                       return <div key={`${line.product_id}-${line.storage_location_id || index}`} style={{ ...styles.helper, marginTop: 4 }}>
@@ -140,7 +151,8 @@ export function ApprovalsTab({ approvalQueue, approvalRuleForm, approvalRulesQue
                     <button type="button" data-skip-global-action-feedback="true" disabled={!canExecuteApprovals || executeApprovalMutation.isPending} title={!canExecuteApprovals ? ui('Requires {permission} permission.').replace('{permission}', TENANT_PERMISSIONS.APPROVALS_EXECUTE) : undefined} style={!canExecuteApprovals || executeApprovalMutation.isPending ? styles.disabledButton : styles.dangerButton} onClick={() => handleApprovalAction(item, 'rejected')}>{ui('Reject')}</button>
                   </div></td>
                 </tr>
-              ))}</tbody>
+                );
+              })}</tbody>
             </table>
           </div> : <p style={styles.helper}>{ui('No items currently waiting for approval.')}</p>}
         </section>

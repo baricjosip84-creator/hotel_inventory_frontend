@@ -7,7 +7,10 @@ import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
 import { getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
+import { getTenantAccessSnapshot } from '../lib/tenantAccess';
+import { getSupportSessionInfo } from '../lib/auth';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
 import {
   OperationalWorkspaceHero,
   // OperationalWorkspaceMetaPill, // hidden tenant-facing redundancy; keep source for easy restoration
@@ -18,6 +21,12 @@ import {
   OperationalWorkspaceTabs
 } from '../components/ui/OperationalWorkspace';
 import './HumanInLoopAIReviewPage.css';
+
+type IntelligenceReviewAttentionSummary = {
+  requires_attention: boolean;
+  actionable_count: number | string;
+  overdue_count: number | string;
+};
 
 
 const UNIFIED_AI_FRONTEND_PANEL_DOM_ANCHORS = [
@@ -3847,6 +3856,7 @@ function describeReviewOrigin(review: HumanAIReview, ui: (englishText: string) =
 
 const HUMAN_AI_REVIEW_QUERY_KEY = 'human-in-loop-ai-review';
 const HUMAN_AI_REVIEW_HISTORY_QUERY_KEY = 'human-in-loop-ai-review-history';
+const INTELLIGENCE_NAVIGATION_ATTENTION_QUERY_KEY = 'intelligence-review';
 const ACTION_CENTER_QUERY_KEY = 'operational-action-center';
 
 const URGENCY_FILTERS: Array<{ value: 'all' | Urgency; label: string }> = [
@@ -4777,6 +4787,28 @@ export default function HumanInLoopAIReviewPage() {
   const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
   const capabilities = getRoleCapabilities();
+  const tenantAccess = getTenantAccessSnapshot();
+  const supportSession = getSupportSessionInfo();
+  const canReadForecastReviews = hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
+  const canReceiveIntelligenceAttention = tenantAccess.hasTenantContext
+    && Boolean(tenantAccess.userId)
+    && !supportSession.isSupportSession
+    && capabilities.canViewOperationalActionCenter
+    && capabilities.canViewDecisionIntelligence
+    && capabilities.canGovernDecisionIntelligence;
+  const intelligenceAttentionScope = [
+    capabilities.role || 'unknown',
+    canReadForecastReviews ? 'forecast-read' : 'no-forecast-read'
+  ].join(':');
+  const intelligenceAttentionQuery = useQuery<IntelligenceReviewAttentionSummary>({
+    queryKey: [INTELLIGENCE_NAVIGATION_ATTENTION_QUERY_KEY, 'navigation-attention', tenantAccess.tenantId, tenantAccess.userId, intelligenceAttentionScope],
+    queryFn: () => apiRequest('/operational-action-center/human-in-loop-ai-reviews/escalation-attention-summary'),
+    enabled: canReceiveIntelligenceAttention,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    retry: 1
+  });
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedSourceActionId = searchParams.get('source_action_id');
   const activeView: IntelligenceReviewView = searchParams.get('view') === 'readiness' ? 'readiness' : 'recommendations';
@@ -4819,7 +4851,7 @@ export default function HumanInLoopAIReviewPage() {
         queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_QUERY_KEY] }),
         queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_HISTORY_QUERY_KEY] }),
         queryClient.invalidateQueries({ queryKey: [ACTION_CENTER_QUERY_KEY] }),
-        queryClient.invalidateQueries({ queryKey: ['intelligence-review', 'navigation-attention'] })
+        queryClient.invalidateQueries({ queryKey: [INTELLIGENCE_NAVIGATION_ATTENTION_QUERY_KEY, 'navigation-attention'] })
       ]);
     },
     onError: (error) => setReviewActionMessage(error instanceof Error ? error.message : ui('Unable to record the intelligence review decision.'))
@@ -5296,7 +5328,12 @@ export default function HumanInLoopAIReviewPage() {
       )}
 
       <OperationalWorkspaceTabs ariaLabel={ui("Intelligence review view")}>
-        <OperationalWorkspaceTab active={activeView === 'recommendations'} iconPath="/intelligence-review" label={ui("Recommendation reviews")} onClick={() => selectView('recommendations')} />
+        <OperationalWorkspaceTab
+          active={activeView === 'recommendations'}
+          iconPath="/intelligence-review"
+          label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>{ui("Recommendation reviews")}{intelligenceAttentionQuery.data?.requires_attention ? <SidebarAttentionTabDot label={ui("Attention required")} /> : null}</span>}
+          onClick={() => selectView('recommendations')}
+        />
         <OperationalWorkspaceTab active={activeView === 'readiness'} iconPath="/reliability-command" label={ui("Readiness & governance")} onClick={() => selectView('readiness')} />
       </OperationalWorkspaceTabs>
 
@@ -8844,6 +8881,12 @@ export default function HumanInLoopAIReviewPage() {
               const isEscalatedReview = lifecycle?.current_status === 'escalated';
               const currentRoleOwnsEscalation = !isEscalatedReview
                 || currentRoleMatchesEscalationTarget(lifecycle?.escalation_target_role, capabilities.role);
+              const causesSidebarAttention = Boolean(
+                capabilities.canGovernDecisionIntelligence
+                && isEscalatedReview
+                && currentRoleOwnsEscalation
+                && (!isForecastReview || hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ))
+              );
               const adminCanReassignEscalation = isEscalatedReview && capabilities.isAdmin && !currentRoleOwnsEscalation;
               const initialDecisionDraft: ReviewDecisionDraft = isEscalatedReview
                 ? {
@@ -8866,8 +8909,16 @@ export default function HumanInLoopAIReviewPage() {
               const decisionValidationMessage = reviewDecisionValidationMessage(selectedDecision, decisionDraft, ui);
               const historyIsSelected = selectedHistorySourceActionId === sourceActionId;
               return (
-                <article className={`card ai-review-page__review-card ai-review-page__review-card--${review.urgency || 'medium'}`} key={review.review_id} id={sourceActionId ? `ai-review-${sourceActionId}` : undefined} tabIndex={-1} style={{ scrollMarginTop: 16 }}>
+                <article
+                  className={`card ai-review-page__review-card ai-review-page__review-card--${review.urgency || 'medium'}`}
+                  key={review.review_id}
+                  id={sourceActionId ? `ai-review-${sourceActionId}` : undefined}
+                  tabIndex={-1}
+                  style={{ scrollMarginTop: 16, ...(causesSidebarAttention ? sidebarAttentionItemStyle : {}) }}
+                  data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
+                >
                   <div className="ai-review-page__review-badges">
+                    {causesSidebarAttention ? <SidebarAttentionMarker label={ui('Attention required')} /> : null}
                     <span className={`ai-review-page__badge ai-review-page__badge--${review.urgency || 'medium'}`}>{recommendationLabel(review.urgency, ui)}</span>
                     <span className="ai-review-page__badge">{recommendationLabel(review.review_state, ui)}</span>
                     <span className="ai-review-page__badge ai-review-page__badge--violet">{recommendationLabel(review.ai_operation_domain, ui)}</span>

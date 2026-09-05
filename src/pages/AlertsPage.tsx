@@ -9,6 +9,7 @@ import type { AppLocale } from '../i18n/config';
 import './OperationalExperiencePages.css';
 import './AlertsPage.css';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { SidebarAttentionMarker, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
 import {
   OperationalWorkspaceHero,
   // OperationalWorkspaceMetaPill, // v3.49.107: tenant title info pills intentionally hidden.
@@ -732,9 +733,18 @@ export default function AlertsPage() {
               const isReopening = reopenMutation.isPending && reopenMutation.variables?.id === alert.id;
               const isEscalating = escalateMutation.isPending && escalateMutation.variables?.id === alert.id;
               const isOverriding = overrideMutation.isPending && overrideMutation.variables?.id === alert.id;
+              const causesSidebarAttention = !alert.resolved
+                && (canManageAlerts || (canOverrideAlerts && isBlockingAlertType(alert.type)));
 
               return (
-                <article style={styles.card} className="alerts-alert-card" data-severity={alert.severity} data-resolved={alert.resolved ? "true" : "false"} key={alert.id}>
+                <article
+                  style={{ ...styles.card, ...(causesSidebarAttention ? sidebarAttentionItemStyle : {}) }}
+                  className="alerts-alert-card"
+                  data-severity={alert.severity}
+                  data-resolved={alert.resolved ? "true" : "false"}
+                  data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
+                  key={alert.id}
+                >
                   <div style={styles.cardTop}>
                     <div style={styles.cardHeaderText}>
                       <div style={styles.cardTitle}>{alertTitle}</div>
@@ -743,6 +753,7 @@ export default function AlertsPage() {
                       </div>
                     </div>
                     <div style={styles.badgeRow} className="alerts-badge-row">
+                      {causesSidebarAttention ? <SidebarAttentionMarker label={ui('Attention required')} /> : null}
                       <span style={severityStyle(alert.severity)}>{severityLabel(alert.severity, ui)}</span>
                       <span style={alert.resolved ? styles.resolvedBadge : alert.acknowledged ? styles.acknowledgedBadge : styles.openBadge}>
                         {alert.resolved ? ui('Resolved') : alert.acknowledged ? ui('Acknowledged') : ui('Open')}

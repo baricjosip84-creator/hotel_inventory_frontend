@@ -231,7 +231,8 @@ for (const required of [
 if (!pageActionsSource.includes('const { locale, ui } = useAppTranslation();') || !pageActionsSource.includes('    ui,')) fail('Enterprise Inventory page actions do not pass locale/translator into shared actions.');
 if (!process.exitCode) pass('Shared Enterprise Inventory query/action presentation remains multilingual.');
 
-if (!tabsSource.includes('const visibleTabs = enterpriseInventoryTabs.filter') || !tabsSource.includes('label={ui(label)}')) fail('Enterprise Inventory tab navigation does not filter by permission and localize live labels.');
+if (!tabsSource.includes('const visibleTabs = enterpriseInventoryTabs.filter') || !tabsSource.includes("{ui(label)}")) fail('Enterprise Inventory tab navigation does not filter by permission and localize live labels.');
+if (!tabsSource.includes('SidebarAttentionTabDot') || !tabsSource.includes('tabNeedsAttention')) fail('Enterprise Inventory attention-bearing sub-tabs must visibly point to the exact work area without replacing localized labels.');
 if (!cleanupSource.includes("'par-levels', 'cycle-counts', 'supplier-returns', 'approvals', 'supplier-catalog',") || !cleanupSource.includes("'invoices', 'labels', 'attachments', 'notifications'") || !cleanupSource.includes("'stock-transfers'")) fail('Enterprise Inventory cleanup checker no longer protects the nine-tab specialized-control surface and dedicated Stock Transfers boundary.');
 if (!process.exitCode) pass('Enterprise Inventory navigation and cleanup guards remain aligned to the nine-tab specialized-control route.');
 

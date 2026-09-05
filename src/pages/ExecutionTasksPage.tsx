@@ -5,6 +5,8 @@ import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatte
 import type { AppLocale } from '../i18n/config';
 import { ApiError, apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
+import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
+import { useOperationalAttentionItems } from '../lib/sidebarAttentionItems';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
@@ -395,6 +397,8 @@ export default function ExecutionTasksPage() {
   const canUpdate = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_UPDATE);
   const canComplete = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_COMPLETE);
   const canCancel = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_CANCEL);
+  const executionTaskAttentionItemsQuery = useOperationalAttentionItems('execution_tasks', canAssign || canUpdate || canComplete);
+  const executionTaskAttentionIds = executionTaskAttentionItemsQuery.attentionIds;
   const canReadOptimization = hasPermission(TENANT_PERMISSIONS.INVENTORY_OPTIMIZATION_READ);
   const canCreateOptimization = hasPermission(TENANT_PERMISSIONS.INVENTORY_OPTIMIZATION_CREATE);
 
@@ -934,7 +938,7 @@ export default function ExecutionTasksPage() {
 
       <OperationalWorkspaceTabs ariaLabel={ui("Execution task work areas")} hint={ui("Jump to the part of the task workflow you need.")}>
         <OperationalWorkspaceTab active={activeWorkspaceSection === 'overview'} iconPath="/dashboard" label={ui("Overview")} onClick={() => navigateWorkspaceSection('overview', document.getElementById('execution-tasks-workspace-top'))} />
-        <OperationalWorkspaceTab active={activeWorkspaceSection === 'queue'} iconPath="/execution-tasks" label={ui("Task queue")} count={formatNumber(summary.matching_task_count, locale)} onClick={() => navigateWorkspaceSection('queue', queueRef.current)} />
+        <OperationalWorkspaceTab active={activeWorkspaceSection === 'queue'} iconPath="/execution-tasks" label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>{ui("Task queue")}{executionTaskAttentionItemsQuery.data?.requires_attention ? <SidebarAttentionTabDot label={ui("Attention required")} /> : null}</span>} count={formatNumber(summary.matching_task_count, locale)} onClick={() => navigateWorkspaceSection('queue', queueRef.current)} />
         <OperationalWorkspaceTab active={activeWorkspaceSection === 'create'} iconPath="/execution-requests" label={ui("Create task")} onClick={() => navigateWorkspaceSection('create', createRef.current)} />
         <OperationalWorkspaceTab active={activeWorkspaceSection === 'detail'} iconPath="/audit" label={ui("Task detail")} onClick={() => navigateWorkspaceSection('detail', detailRef.current)} disabled={!selected} />
         <OperationalWorkspaceTab active={activeWorkspaceSection === 'management'} iconPath="/reliability-command" label={ui("Management insights")} onClick={() => { setAnalyticsOpen(true); navigateWorkspaceSection('management', managementRef.current); }} />
@@ -1033,10 +1037,18 @@ export default function ExecutionTasksPage() {
                 </tr>
               </thead>
               <tbody>
-                {displayedTasks.map((task) => (
-                  <tr key={task.id} className={selected?.id === task.id ? 'is-selected' : ''}>
+                {displayedTasks.map((task) => {
+                  const causesSidebarAttention = executionTaskAttentionIds.has(task.id);
+                  return (
+                  <tr
+                    key={task.id}
+                    className={selected?.id === task.id ? 'is-selected' : ''}
+                    style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined}
+                    data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
+                  >
                     <td>
                       <button type="button" className="execution-tasks-link" onClick={() => selectTask(task)}>{task.task_code}</button>
+                      {causesSidebarAttention ? <SidebarAttentionMarker label={ui('Attention required')} /> : null}
                       <strong>{task.title}</strong>
                       <span>{label(task.task_type, ui)} · {label(task.source_type, ui)}</span>
                     </td>
@@ -1047,7 +1059,8 @@ export default function ExecutionTasksPage() {
                     <td><span>{label(task.due_bucket, ui)}</span></td>
                     <td><TaskActions task={task} saving={saving} canAssign={canAssign} canUpdate={canUpdate} canComplete={canComplete} canCancel={canCancel} onDirectAction={(action) => void runTaskAction(task, action)} onDialogAction={(action) => setActionDialog({ kind: 'task', action, task, value: '', assigneeId: task.assigned_to || '' })} /></td>
                   </tr>
-                ))}
+                  );
+                })}
                 {!displayedTasks.length ? <tr><td colSpan={7} className="execution-tasks-empty-cell">{ui(loading ? 'Loading tasks…' : 'No execution tasks match the current filters.')}</td></tr> : null}
               </tbody>
             </table>

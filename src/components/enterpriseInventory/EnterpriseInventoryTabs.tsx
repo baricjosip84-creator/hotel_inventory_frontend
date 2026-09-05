@@ -5,6 +5,8 @@ import {
   OperationalWorkspaceTabs,
 } from '../ui/OperationalWorkspace';
 import { useAppTranslation } from '../../i18n/I18nContext';
+import { useOperationalAttentionItems } from '../../lib/sidebarAttentionItems';
+import { SidebarAttentionTabDot } from '../ui/SidebarAttentionMarker';
 import {
   enterpriseInventoryTabFeatures,
   enterpriseInventoryTabIconPaths,
@@ -26,6 +28,18 @@ export function EnterpriseInventoryTabs({ activeTab, onChange, subscriptionAcces
     if (!feature) return true;
     return getTenantFeatureEntitlement(subscriptionAccess, feature)?.allowed !== false;
   });
+  const inventoryAttentionQuery = useOperationalAttentionItems(
+    'inventory_controls',
+    visibleTabs.some(([key]) => ['approvals', 'cycle-counts', 'supplier-returns', 'invoices'].includes(key))
+  );
+  const attention = inventoryAttentionQuery.data;
+  const tabNeedsAttention = (key: EnterpriseInventoryTabKey) => {
+    if (key === 'approvals') return Boolean(attention?.approval_item_keys?.length);
+    if (key === 'cycle-counts') return Boolean(attention?.cycle_count_reconcile_ids?.length);
+    if (key === 'supplier-returns') return Boolean(attention?.supplier_return_approval_ids?.length || attention?.supplier_return_dispatch_ids?.length);
+    if (key === 'invoices') return Boolean(attention?.invoice_match_ids?.length || attention?.invoice_payment_due_ids?.length);
+    return false;
+  };
 
   return (
     <OperationalWorkspaceTabs
@@ -36,7 +50,7 @@ export function EnterpriseInventoryTabs({ activeTab, onChange, subscriptionAcces
           key={key}
           active={activeTab === key}
           iconPath={enterpriseInventoryTabIconPaths[key]}
-          label={ui(label)}
+          label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{ui(label)}{tabNeedsAttention(key) ? <SidebarAttentionTabDot label={ui('Attention required')} /> : null}</span>}
           onClick={() => onChange(key)}
           title={ui(label)}
           data-skip-global-action-feedback="true"

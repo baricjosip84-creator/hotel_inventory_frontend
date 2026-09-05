@@ -18,6 +18,7 @@ import {
   OperationalWorkspaceTab,
   OperationalWorkspaceTabs
 } from '../components/ui/OperationalWorkspace';
+import { SidebarAttentionMarker, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
 import type {
   ExecutionAdapterRegistryResponse,
   ExecutionModuleHardeningSummaryResponse,
@@ -1147,9 +1148,31 @@ export default function ExecutionRequestsPage() {
                 </tr>
               </thead>
               <tbody>
-                {requests.map((request) => (
-                  <tr key={request.id} style={selected?.id === request.id ? styles.selectedRow : undefined}>
-                    <td><span style={{ ...styles.badge, ...statusTone(request.status) }}>{label(request.status, ui)}</span></td>
+                {requests.map((request) => {
+                  const causesSidebarAttention = (canReviewExecutionRequests && request.status === 'pending_review')
+                    || (canExecuteExecutionRequests
+                      && request.status === 'approved'
+                      && !request.execution_status
+                      && (!request.adapter?.execution_enabled || canWriteProducts))
+                    || (canExecuteExecutionRequests
+                      && request.status === 'approved'
+                      && request.execution_status === 'failed'
+                      && request.execution_review?.retry_eligibility?.eligible === true);
+                  return (
+                  <tr
+                    key={request.id}
+                    style={{
+                      ...(selected?.id === request.id ? styles.selectedRow : {}),
+                      ...(causesSidebarAttention ? sidebarAttentionItemStyle : {})
+                    }}
+                    data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
+                  >
+                    <td>
+                      <div style={{ display: 'grid', gap: 6, justifyItems: 'start' }}>
+                        <span style={{ ...styles.badge, ...statusTone(request.status) }}>{label(request.status, ui)}</span>
+                        {causesSidebarAttention ? <SidebarAttentionMarker label={ui('Attention required')} /> : null}
+                      </div>
+                    </td>
                     <td><code style={styles.requestId} title={request.id}>{request.id.slice(0, 8)}…</code></td>
                     <td>{request.adapter?.label || label(request.request_type, ui)}</td>
                     <td>{request.request_type === 'system_recommendation' ? ui('System Context recommendation') : getRequestProductLabel(request, ui)}</td>
@@ -1169,7 +1192,8 @@ export default function ExecutionRequestsPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
                 {!loading && !requests.length ? (
                   <tr><td colSpan={8} style={styles.empty}>{ui('No execution requests match the selected filters.')}</td></tr>
                 ) : null}

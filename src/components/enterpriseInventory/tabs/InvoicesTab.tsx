@@ -2,6 +2,8 @@ import { useState, type Dispatch, type FormEvent, type SetStateAction } from 're
 import { getActiveTenantCurrency } from '../../../lib/tenantCurrency';
 import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import { useAppTranslation } from '../../../i18n/I18nContext';
+import { SidebarAttentionMarker, sidebarAttentionItemStyle } from '../../ui/SidebarAttentionMarker';
+import { useOperationalAttentionItems } from '../../../lib/sidebarAttentionItems';
 import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../../../i18n/formatters';
 import { InputField, SelectField, TextareaField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
@@ -55,6 +57,10 @@ export function InvoicesTab({ createSupplierInvoiceMutation, updateSupplierInvoi
   const { locale, ui } = useAppTranslation();
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
   const canWriteInvoices = hasPermission(TENANT_PERMISSIONS.INVOICES_WRITE);
+  const inventoryControlAttentionItemsQuery = useOperationalAttentionItems('inventory_controls', canWriteInvoices || hasPermission(TENANT_PERMISSIONS.APPROVALS_EXECUTE));
+  const approvalAttentionKeys = new Set(inventoryControlAttentionItemsQuery.data?.approval_item_keys || []);
+  const invoiceMatchAttentionIds = new Set(inventoryControlAttentionItemsQuery.data?.invoice_match_ids || []);
+  const invoicePaymentDueAttentionIds = new Set(inventoryControlAttentionItemsQuery.data?.invoice_payment_due_ids || []);
   const invoiceBusy = createSupplierInvoiceMutation.isPending || updateSupplierInvoiceMutation.isPending || supplierInvoiceLifecycleMutation.isPending;
 
   const amount = (value: number | string | null | undefined, currency?: string | null) => {
@@ -198,9 +204,15 @@ export function InvoicesTab({ createSupplierInvoiceMutation, updateSupplierInvoi
           <div style={styles.tableWrap}>
             <table style={styles.table}>
               <thead><tr>{['Invoice', 'Supplier / PO', 'Dates', 'Status', 'Variance', 'Amount', 'Lines', 'Actions'].map((header) => <th key={header} style={styles.th}>{ui(header)}</th>)}</tr></thead>
-              <tbody>{(invoicesQuery.data ?? []).map((invoice) => (
-                <tr key={invoice.id}>
-                  <td style={styles.td}><strong>{invoice.invoice_number}</strong><br/><span style={styles.muted}>{invoice.notes || ''}</span></td>
+              <tbody>{(invoicesQuery.data ?? []).map((invoice) => {
+                const causesSidebarAttention = approvalAttentionKeys.has(`supplier_invoice:${invoice.id}`) || invoiceMatchAttentionIds.has(invoice.id) || invoicePaymentDueAttentionIds.has(invoice.id);
+                return (
+                <tr
+                  key={invoice.id}
+                  style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined}
+                  data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
+                >
+                  <td style={styles.td}><strong>{invoice.invoice_number}</strong>{causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}<br/><span style={styles.muted}>{invoice.notes || ''}</span></td>
                   <td style={styles.td}>{invoice.supplier_name || invoice.supplier_id}<br/><span style={styles.muted}>{invoice.po_number || ui('No linked PO')}</span></td>
                   <td style={styles.td}>{ui('Invoice: {date}').replace('{date}', formatLocalizedDate(invoice.invoice_date, locale))}<br/>{ui('Due: {date}').replace('{date}', invoice.due_date ? formatLocalizedDate(invoice.due_date, locale) : '—')}<br/><span style={styles.muted}>{ui('Updated {date}').replace('{date}', formatLocalizedDateTime(invoice.updated_at || invoice.created_at, locale))}</span></td>
                   <td style={styles.td}>{businessLabel(invoice.status)}</td>
@@ -224,7 +236,8 @@ export function InvoicesTab({ createSupplierInvoiceMutation, updateSupplierInvoi
                     {invoice.cancellation_reason ? <span style={styles.muted}>{ui('Cancelled: {reason}').replace('{reason}', invoice.cancellation_reason)}</span> : null}
                   </td>
                 </tr>
-              ))}</tbody>
+                );
+              })}</tbody>
             </table>
           </div>
         )}

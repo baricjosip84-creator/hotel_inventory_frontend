@@ -6,6 +6,8 @@ import { formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } f
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
+import { useOperationalAttentionItems } from '../lib/sidebarAttentionItems';
 import { OperationalWorkspaceHero, OperationalWorkspaceStatCard, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
 import './OutboundPage.css';
 
@@ -494,6 +496,9 @@ export default function OutboundPage() {
   const canAuditRead = hasPermission(TENANT_PERMISSIONS.AUDIT_READ);
   const canAttachmentRead = hasPermission(TENANT_PERMISSIONS.ATTACHMENTS_READ);
   const canAttachmentWrite = hasPermission(TENANT_PERMISSIONS.ATTACHMENTS_WRITE);
+  const outboundAttentionItemsQuery = useOperationalAttentionItems('outbound', canUpdate || canDispatch || canReturnReceive);
+  const outboundOrderAttentionIds = useMemo(() => new Set(outboundAttentionItemsQuery.data?.order_attention_ids || []), [outboundAttentionItemsQuery.data?.order_attention_ids]);
+  const outboundReturnAttentionIds = useMemo(() => new Set(outboundAttentionItemsQuery.data?.return_receive_ids || []), [outboundAttentionItemsQuery.data?.return_receive_ids]);
 
   const customerDataNeeded = canCustomerRead && (showOrderForm || Boolean(editingOrder));
   const productDataNeeded = canProductRead && (showOrderForm || Boolean(editingOrder));
@@ -1043,9 +1048,9 @@ export default function OutboundPage() {
     </details>
 
     <OperationalWorkspaceTabs ariaLabel={ui('Outbound work areas')} hint={ui('Choose the part of the fulfillment workflow you want to work in.')}>
-      <OperationalWorkspaceTab active={activeTab === 'orders'} iconPath="/outbound" label={ui('Orders')} count={activeOrderCount} onClick={() => setTab('orders')} />
+      <OperationalWorkspaceTab active={activeTab === 'orders'} iconPath="/outbound" label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{ui('Orders')}{outboundOrderAttentionIds.size > 0 ? <SidebarAttentionTabDot label={ui('Attention required')} /> : null}</span>} count={activeOrderCount} onClick={() => setTab('orders')} />
       {showCustomerTab ? <OperationalWorkspaceTab active={activeTab === 'customers'} iconPath="/suppliers" label={ui('Customers')} onClick={() => setTab('customers')} /> : null}
-      {showReturnTab ? <OperationalWorkspaceTab active={activeTab === 'returns'} iconPath="/stock-transfers" label={ui('Customer returns')} count={canReturnRead ? (summary.data?.pending_customer_returns || undefined) : undefined} onClick={() => setTab('returns')} /> : null}
+      {showReturnTab ? <OperationalWorkspaceTab active={activeTab === 'returns'} iconPath="/stock-transfers" label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{ui('Customer returns')}{outboundReturnAttentionIds.size > 0 ? <SidebarAttentionTabDot label={ui('Attention required')} /> : null}</span>} count={canReturnRead ? (summary.data?.pending_customer_returns || undefined) : undefined} onClick={() => setTab('returns')} /> : null}
       <OperationalWorkspaceTab active={activeTab === 'trace'} iconPath="/stock-movements" label={ui('Dispatch trace')} onClick={() => setTab('trace')} />
     </OperationalWorkspaceTabs>
 
@@ -1145,10 +1150,17 @@ export default function OutboundPage() {
             const openPicked = order.items.reduce((sum, item) => sum + toNumber(item.open_picked_quantity), 0);
             const openPacked = order.items.reduce((sum, item) => sum + toNumber(item.open_packed_quantity), 0);
             const isPickingOpen = pickOrderId === order.id;
-            return <article key={order.id} className={`outbound-order-card${isPickingOpen ? ' outbound-order-card--active' : ''}`}>
+            const causesSidebarAttention = outboundOrderAttentionIds.has(order.id);
+            return <article
+              key={order.id}
+              className={`outbound-order-card${isPickingOpen ? ' outbound-order-card--active' : ''}`}
+              style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined}
+              data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
+            >
               <div className="outbound-card-topline">
                 <div>
                   <div className="outbound-card-title">{order.order_number} · {referenceLabel(order.customer_name)}</div>
+                  {causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}
                   <div className="outbound-card-subtitle">{ui('Created')} {formatDate(order.created_at)} {ui('· Requested')} {order.requested_date ? formatDate(order.requested_date, true) : ui('date not set')} · {order.items.length} {ui('line')}{order.items.length === 1 ? '' : ui('s')}</div>
                 </div>
                 <StatusBadge status={order.status} />
@@ -1350,8 +1362,15 @@ export default function OutboundPage() {
         </div>
         {returns.isLoading ? <div className="outbound-empty">{ui('Loading customer returns…')}</div> : returns.isError ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(returns.error, ui('Customer returns could not be loaded.'))}</div> : returnTotal === 0 ? <EmptyState title={returnTotal === 0 && (returnSearch.trim() || returnStatus !== 'all') ? ui('No returns match these filters') : ui('No customer returns yet')} text={returnTotal === 0 && (returnSearch.trim() || returnStatus !== 'all') ? ui('Change the search or status filter.') : ui('Returns will appear here after they are created from dispatched stock.')} /> : <>
           <div className="outbound-list-meta"><span>{ui('Showing')} {((returnPage - 1) * RETURN_PAGE_SIZE) + 1}–{Math.min(returnPage * RETURN_PAGE_SIZE, returnTotal)} {ui('of')} {returnTotal} {ui('return(s).')}</span></div>
-          <div className="outbound-return-list">{pagedReturns.map((row) => <article key={row.id} className="outbound-return-card">
-            <div className="outbound-card-topline"><div><div className="outbound-card-title">{row.return_number} · {referenceLabel(row.customer_name)}</div><div className="outbound-card-subtitle">{ui('Order')} {referenceLabel(row.order_number)} {ui('· Created')} {formatDate(row.created_at)}</div></div><StatusBadge status={row.status} /></div>
+          <div className="outbound-return-list">{pagedReturns.map((row) => {
+            const causesSidebarAttention = outboundReturnAttentionIds.has(row.id);
+            return <article
+              key={row.id}
+              className="outbound-return-card"
+              style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined}
+              data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
+            >
+            <div className="outbound-card-topline"><div><div className="outbound-card-title">{row.return_number} · {referenceLabel(row.customer_name)}</div>{causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}<div className="outbound-card-subtitle">{ui('Order')} {referenceLabel(row.order_number)} {ui('· Created')} {formatDate(row.created_at)}</div></div><StatusBadge status={row.status} /></div>
             <div className="outbound-notes"><strong>{ui('Reason:')}</strong> {row.reason}{row.notes ? <> · {row.notes}</> : null}</div>
             {row.status === 'cancelled' && row.cancellation_reason ? <div className="outbound-alert outbound-alert--error" style={{ marginTop: 8 }}><strong>{ui('Cancellation:')}</strong> {row.cancellation_reason}</div> : null}
             <div className="outbound-return-items">{row.items.map((item) => <div key={item.id}><strong>{referenceLabel(item.product_name)}</strong> · {ui('SKU:')} {referenceLabel(item.product_sku)} · {formatNumber(item.quantity)} {referenceLabel(item.product_unit)} → {formatStatus(item.condition)} @ {referenceLabel(item.storage_location_name)}{item.lot_number || item.batch_number ? ` · ${[item.lot_number ? `${ui('Lot')} ${item.lot_number}` : '', item.batch_number ? `${ui('Batch')} ${item.batch_number}` : ''].filter(Boolean).join(' · ')}` : ''}{item.serial_numbers?.length ? <> · <strong>{ui('Serials:')}</strong> {item.serial_numbers.join(', ')}</> : null}{item.notes ? <> · <strong>{ui('Item note:')}</strong> {item.notes}</> : null}</div>)}</div>
@@ -1375,7 +1394,8 @@ export default function OutboundPage() {
               <div className="outbound-detail-card"><h4>{ui('Email history')}</h4>{(returnCommunications.data ?? []).length ? (returnCommunications.data ?? []).map((comm)=><div key={comm.id} className="outbound-communication-row"><strong>{comm.subject}</strong><span>{comm.recipient_email} · {formatDate(comm.sent_at || comm.attempted_at)}{comm.sent_by_name ? ` · ${comm.sent_by_name}` : ''}</span><small>{comm.delivery_status === 'failed' ? ui('Delivery failed') : comm.delivery_status === 'pending' ? ui('Sending') : comm.sandbox_capture ? ui('Captured in email sandbox') : `${ui('Sent')} · ${comm.delivery_method || ui('Email')}`}</small></div>) : <div className="outbound-muted">{ui('No customer emails sent yet.')}</div>}</div>
               <div className="outbound-detail-card"><h4>{ui('Attachments')}</h4>{canAttachmentRead ? <>{(returnAttachments.data ?? []).map((file)=><div key={file.id} className="outbound-attachment-row"><span>{file.original_filename}</span>{file.can_download ? <button type="button" className="outbound-button" onClick={() => void apiDownloadFile(`/enterprise-inventory/attachments/${file.id}/download`,file.original_filename)}>{ui('Download')}</button> : null}</div>)}{!(returnAttachments.data ?? []).length ? <div className="outbound-muted">{ui('No attachments yet.')}</div> : null}{canAttachmentWrite ? <div className="outbound-attachment-upload"><input type="file" onChange={(event)=>setAttachmentFile(event.target.files?.[0]??null)} /><button type="button" className="outbound-button-primary" disabled={!attachmentFile} onClick={() => void uploadBusinessAttachment('customer_return', row.id)}>{ui('Upload attachment')}</button></div> : null}</> : <div className="outbound-muted">{ui('Your role does not allow viewing attachments.')}</div>}</div>
             </div> : null}
-          </article>)}</div>
+          </article>;
+          })}</div>
           {returnPageCount > 1 ? <div className="outbound-pagination"><button type="button" className="outbound-button" disabled={returnPage <= 1} onClick={() => setReturnPage((page) => Math.max(1, page - 1))}>{ui('Previous')}</button><span>{ui('Page')} {returnPage} {ui('of')} {returnPageCount}</span><button type="button" className="outbound-button" disabled={returnPage >= returnPageCount} onClick={() => setReturnPage((page) => Math.min(returnPageCount, page + 1))}>{ui('Next')}</button></div> : null}
         </>}
       </> : <div className="outbound-alert outbound-alert--info">{ui('Your role can create a return but does not have customer-return read permission, so existing return records are hidden.')}</div>}

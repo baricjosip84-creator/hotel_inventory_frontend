@@ -14,6 +14,8 @@ import type { ProductItem, SupplierItem } from '../types/inventory';
 import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
 import { formatCurrencyAmount, getActiveTenantCurrency, normalizeCurrencyCode } from '../lib/tenantCurrency';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
+import { SidebarAttentionMarker, SidebarAttentionTabDot, sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionMarker';
+import { useOperationalAttentionItems } from '../lib/sidebarAttentionItems';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
@@ -931,6 +933,8 @@ export default function PurchaseOrdersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const capabilities = getRoleCapabilities();
   const currentUserId = getCurrentTenantUserId();
+  const purchaseOrderAttentionItemsQuery = useOperationalAttentionItems('purchase_orders', capabilities.canApprovePurchaseOrders);
+  const purchaseOrderAttentionIds = purchaseOrderAttentionItemsQuery.attentionIds;
 
   const [filters, setFilters] = useState<Filters>(() => filtersFromSearchParams(searchParams));
   const [selectedId, setSelectedId] = useState<string | null>(() =>
@@ -2129,7 +2133,7 @@ export default function PurchaseOrdersPage() {
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'registry'}
           iconPath="/purchase-orders"
-          label={ui("Orders")}
+          label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>{ui("Orders")}{purchaseOrderAttentionItemsQuery.data?.requires_attention ? <SidebarAttentionTabDot label={ui("Attention required")} /> : null}</span>}
           count={displayedPurchaseOrders.length}
           onClick={() => navigateWorkspaceSection('registry', registryRef.current)}
         />
@@ -2392,11 +2396,15 @@ export default function PurchaseOrdersPage() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedPurchaseOrders.map((row) => (
+                {paginatedPurchaseOrders.map((row) => {
+                  const causesSidebarAttention = purchaseOrderAttentionIds.has(row.id);
+                  return (
                   <tr
                     key={row.id}
                     className={row.id === selectedId ? 'purchase-orders-row--selected' : undefined}
                     onClick={() => setSelectedId(row.id)}
+                    style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined}
+                    data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
                   >
                     <td>
                       <button
@@ -2410,6 +2418,7 @@ export default function PurchaseOrdersPage() {
                       >
                         {row.po_number}
                       </button>
+                      {causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}
                       <small>{ui("Created")} {formatDate(row.created_at)}</small>
                     </td>
                     <td>{row.supplier_name}</td>
@@ -2442,7 +2451,8 @@ export default function PurchaseOrdersPage() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
                 {!purchaseOrdersQuery.isLoading && !displayedPurchaseOrders.length ? (
                   <tr><td colSpan={9} className="purchase-orders-empty-cell">{ui("No purchase orders found.")}</td></tr>
                 ) : null}

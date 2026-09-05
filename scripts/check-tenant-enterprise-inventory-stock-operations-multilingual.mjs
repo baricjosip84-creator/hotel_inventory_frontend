@@ -145,7 +145,7 @@ for (const required of [
   "ui('Inventory controls summary')",
   "ui('Inventory control work areas')",
   "ui(activeConfig?.[1] ?? 'None')",
-  'label={ui(label)}',
+  '{ui(label)}',
 ]) if (!(layoutSource + tabsSource + sharedSource).includes(required)) fail(`Enterprise Inventory shared shell translation contract missing: ${required}`);
 if (!process.exitCode) pass('Enterprise Inventory shared hero, workspace summary, and retained tab navigation remain catalog-backed.');
 
