@@ -3597,6 +3597,8 @@ type HumanAIReview = {
   urgency?: string;
   title?: string;
   summary?: string | null;
+  proposal_request_type?: string | null;
+  proposal_title?: string | null;
   confidence_visualization?: {
     confidence_score?: number | null;
     confidence_band?: string;
@@ -3643,6 +3645,9 @@ type HumanAIReview = {
     execution_request_id?: string | null;
     execution_request_status?: string | null;
     execution_request_execution_status?: string | null;
+    purchase_order_id?: string | null;
+    purchase_order_status?: string | null;
+    purchase_order_number?: string | null;
     escalation_target_role?: EscalationTargetRole | null;
     escalation_target_user_id?: string | null;
     escalation_target_user_name?: string | null;
@@ -3672,6 +3677,8 @@ type AIReviewHistoryResponse = {
     summary?: string | null;
     confidence_score?: number | null;
     approval_required?: boolean;
+    proposal_request_type?: string | null;
+    proposal_title?: string | null;
     updated_at?: string | null;
   };
   lifecycle?: HumanAIReview['lifecycle'];
@@ -3689,6 +3696,7 @@ type AIReviewHistoryResponse = {
     actor_name?: string | null;
     actor_email?: string | null;
     execution_request_id?: string | null;
+    purchase_order_id?: string | null;
     metadata?: {
       escalation_target_role?: EscalationTargetRole | null;
       escalation_target_user_id?: string | null;
@@ -3701,6 +3709,7 @@ type AIReviewHistoryResponse = {
     created_at?: string | null;
   }>;
   execution_request?: { id?: string; status?: string; request_type?: string };
+  purchase_order?: { id?: string; status?: string; po_number?: string; commercial_review_required?: boolean };
 };
 
 type ReviewDecisionDraft = {
@@ -4823,6 +4832,13 @@ async function createAIReviewExecutionRequestDraft(sourceActionId: string): Prom
   });
 }
 
+async function createAIReviewPurchaseOrderDraft(sourceActionId: string): Promise<AIReviewHistoryResponse> {
+  return apiRequest<AIReviewHistoryResponse>(`/operational-action-center/human-in-loop-ai-reviews/${encodeURIComponent(sourceActionId)}/purchase-order-draft`, {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+}
+
 async function fetchHumanAIReviewSummary(
   aiOperationDomain: 'all' | AIOperationDomain,
   reviewState: 'all' | ReviewStateFilter,
@@ -4957,6 +4973,28 @@ export default function HumanInLoopAIReviewPage() {
       ]);
     },
     onError: (error) => setReviewActionMessage(error instanceof Error ? error.message : ui('Unable to create the Execution Request draft.'))
+  });
+
+  const purchaseOrderDraftMutation = useMutation({
+    mutationFn: (sourceActionId: string) => createAIReviewPurchaseOrderDraft(sourceActionId),
+    onSuccess: async (result) => {
+      const commercialReviewRequired = Boolean(result.purchase_order?.commercial_review_required);
+      const alreadyLinked = !result.purchase_order && Boolean(result.lifecycle?.purchase_order_id);
+      setReviewActionMessage(alreadyLinked
+        ? ui('A Draft Purchase Order is already linked to this approved replenishment review.')
+        : commercialReviewRequired
+          ? ui('Draft Purchase Order created from the approved replenishment review. Pricing still needs human commercial confirmation before submission.')
+          : ui('Fully prepared Draft Purchase Order created from the approved replenishment review. It is not submitted or approved.'));
+      const sourceActionId = result.source?.source_action_id || selectedHistorySourceActionId;
+      if (sourceActionId) setSelectedHistorySourceActionId(sourceActionId);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_QUERY_KEY] }),
+        queryClient.invalidateQueries({ queryKey: [HUMAN_AI_REVIEW_HISTORY_QUERY_KEY] }),
+        queryClient.invalidateQueries({ queryKey: ['purchase-orders'] }),
+        queryClient.invalidateQueries({ queryKey: [ACTION_CENTER_QUERY_KEY] })
+      ]);
+    },
+    onError: (error) => setReviewActionMessage(error instanceof Error ? error.message : ui('Unable to create the Draft Purchase Order.'))
   });
 
   const readinessQuery = useQuery({
@@ -9001,6 +9039,7 @@ export default function HumanInLoopAIReviewPage() {
               const lifecycle = review.lifecycle;
               const sourceActionId = review.source_action_id || '';
               const isForecastReview = review.source_reference?.source_type === 'probabilistic_forecast_model';
+              const isReplenishmentPOReview = review.proposal_request_type === 'replenishment_purchase_order_draft';
               const isEscalatedReview = lifecycle?.current_status === 'escalated';
               const currentRoleOwnsEscalation = !isEscalatedReview
                 || (lifecycle?.escalation_target_user_id
@@ -9290,6 +9329,13 @@ export default function HumanInLoopAIReviewPage() {
                                 : ui('A linked Execution Request exists.')}
                             </div>
                           ) : null}
+                          {event.purchase_order_id ? (
+                            <div className="card__subtext">
+                              {capabilities.canViewPurchaseOrders
+                                ? <Link to={`/purchase-orders?purchaseOrderId=${encodeURIComponent(event.purchase_order_id)}`}>{ui('Open linked Purchase Order')}</Link>
+                                : ui('A linked Purchase Order exists.')}
+                            </div>
+                          ) : null}
                         </div>
                       ))}
                     </div>
@@ -9311,6 +9357,7 @@ export default function HumanInLoopAIReviewPage() {
                       && capabilities.canCreateExecutionRequests
                       && lifecycle?.current_status === 'approved_for_manual_action'
                       && review.source_reference?.source_type !== 'probabilistic_forecast_model'
+                      && !isReplenishmentPOReview
                       && sourceActionId ? (
                         <button
                           className="button button--primary"
@@ -9322,7 +9369,27 @@ export default function HumanInLoopAIReviewPage() {
                           <TenantNavIcon path="/execution-requests" size={16} />{executionRequestDraftMutation.isPending ? ui('Creating draft…') : ui('Create Execution Request draft')}
                         </button>
                       ) : null}
+                    {capabilities.canGovernDecisionIntelligence
+                      && capabilities.canCreatePurchaseOrders
+                      && lifecycle?.current_status === 'approved_for_manual_action'
+                      && isReplenishmentPOReview
+                      && !lifecycle?.purchase_order_id
+                      && sourceActionId ? (
+                        <button
+                          className="button button--primary"
+                          type="button"
+                          disabled={purchaseOrderDraftMutation.isPending}
+                          data-skip-global-action-feedback="true"
+                          onClick={() => purchaseOrderDraftMutation.mutate(sourceActionId)}
+                        >
+                          <TenantNavIcon path="/purchase-orders" size={16} />{purchaseOrderDraftMutation.isPending ? ui('Preparing Purchase Order draft…') : ui('Prepare Purchase Order Draft')}
+                        </button>
+                      ) : null}
+                    {isReplenishmentPOReview && lifecycle?.current_status === 'approved_for_manual_action' && !lifecycle?.purchase_order_id ? (
+                      <span className="card__subtext">{ui('Procurement will revalidate current stock, reservations, inbound supply, approved PO commitments, supplier, quantity, price, currency, and product version before creating the Draft Purchase Order. It will not submit or approve it.')}</span>
+                    ) : null}
                     {capabilities.canViewExecutionRequests && lifecycle?.execution_request_id ? <Link className="button button--secondary" to={`/execution-requests?request_id=${encodeURIComponent(lifecycle.execution_request_id)}`} data-skip-global-action-feedback="true"><TenantNavIcon path="/execution-requests" size={16} />{ui("Open linked Execution Request")}</Link> : null}
+                    {capabilities.canViewPurchaseOrders && lifecycle?.purchase_order_id ? <Link className="button button--secondary" to={`/purchase-orders?purchaseOrderId=${encodeURIComponent(lifecycle.purchase_order_id)}`} data-skip-global-action-feedback="true"><TenantNavIcon path="/purchase-orders" size={16} />{ui('Open linked Purchase Order')}</Link> : null}
                   </div>
                 </article>
               );

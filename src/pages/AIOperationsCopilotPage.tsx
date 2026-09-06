@@ -69,6 +69,7 @@ type CopilotEvidence = {
   kind: string;
   id?: string | null;
   label: string;
+  href?: string | null;
 };
 
 type CopilotProposal = {
@@ -89,6 +90,20 @@ type CopilotProposal = {
     previous_standard_unit_cost?: number | null;
     reason?: string | null;
     source?: string;
+    suggested_reference_unit_cost?: number | null;
+    suggested_reference_basis?: string | null;
+    supplier_id?: string | null;
+    supplier_name?: string | null;
+    quantity?: number | null;
+    unit?: string | null;
+    units_per_order_package?: number | null;
+    order_package_count?: number | null;
+    unit_cost?: number | null;
+    currency?: string | null;
+    pricing_status?: string | null;
+    estimated_total_cost?: number | null;
+    expected_delivery_date?: string | null;
+    source_copilot_run_id?: string | null;
   };
   evidence?: Record<string, unknown>;
   human_review_required?: boolean;
@@ -127,12 +142,18 @@ type CopilotRun = {
   error_code?: string | null;
   error_message?: string | null;
   execution_request_id?: string | null;
+  purchase_order_id?: string | null;
   requested_by_role?: string | null;
   completed_at?: string | null;
   created_at: string;
   updated_at: string;
   source_action_id?: string | null;
   safety_contract?: Record<string, boolean>;
+  user_feedback?: {
+    rating: 'useful' | 'not_useful';
+    comment?: string | null;
+    updated_at?: string | null;
+  } | null;
 };
 
 type CopilotRunList = {
@@ -163,6 +184,7 @@ type CreateRunInput = {
   proposed_min_stock?: number;
   min_stock_override_reason?: string;
   proposed_standard_unit_cost?: number;
+  standard_cost_override_reason?: string;
   external_processing_confirmed?: boolean;
 };
 
@@ -171,6 +193,11 @@ type ReplenishmentPlan = {
   formula: string;
   target_coverage_days: number;
   current_stock: number;
+  reserved_stock_quantity?: number;
+  available_stock_after_reservations?: number;
+  reservation_data_available?: boolean;
+  approved_po_unshipped_quantity?: number;
+  approved_po_commitment_data_available?: boolean;
   governed_min_stock: number;
   target_stock_quantity: number;
   inventory_position: number;
@@ -190,6 +217,36 @@ type ReplenishmentPlan = {
   recommendation_status: string;
   warnings: string[];
   assumptions: string[];
+};
+
+
+
+type StandardCostEvidence = {
+  product_id: string;
+  product_name: string;
+  tenant_currency?: string | null;
+  current_standard_unit_cost?: number | null;
+  latest_unit_cost?: number | null;
+  latest_cost_at?: string | null;
+  weighted_average_unit_cost_90d?: number | null;
+  min_unit_cost_90d?: number | null;
+  max_unit_cost_90d?: number | null;
+  costed_movement_count_90d?: number;
+  supplier_catalog_unit_cost?: number | null;
+  supplier_catalog_currency?: string | null;
+  supplier_catalog_price_comparable?: boolean;
+  suggested_reference_unit_cost?: number | null;
+  suggested_reference_basis?: string | null;
+  warnings?: string[];
+};
+
+type HistoryFilters = {
+  search: string;
+  intent: '' | CopilotIntent;
+  status: '' | 'pending' | 'completed' | 'failed';
+  productSearch: string;
+  createdFrom: string;
+  createdTo: string;
 };
 
 type MinimumStockRecommendation = {
@@ -313,6 +370,13 @@ function displayCost(value: unknown, locale: AppLocale, ui: UiTranslator): strin
   return formatLocalizedCurrency(amount, getActiveTenantCurrency(), locale, { maximumFractionDigits: 4 });
 }
 
+function displayCurrencyCost(value: unknown, currency: string | null | undefined, locale: AppLocale, ui: UiTranslator): string {
+  if (value === null || value === undefined || value === '') return ui('Not reported');
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return String(value);
+  return formatLocalizedCurrency(amount, currency || getActiveTenantCurrency(), locale, { maximumFractionDigits: 4 });
+}
+
 function displayUnknown(value: unknown, ui: UiTranslator): string {
   if (value === null || value === undefined || value === '') return ui('Not reported');
   if (typeof value === 'boolean') return value ? ui('Yes') : ui('No');
@@ -382,8 +446,15 @@ async function fetchCapabilities(): Promise<CopilotCapabilities> {
   return apiRequest<CopilotCapabilities>('/ai-operations-copilot/capabilities');
 }
 
-async function fetchRuns(offset: number): Promise<CopilotRunList> {
-  return apiRequest<CopilotRunList>(`/ai-operations-copilot/runs?limit=${HISTORY_PAGE_SIZE}&offset=${offset}`);
+async function fetchRuns(offset: number, filters: HistoryFilters): Promise<CopilotRunList> {
+  const params = new URLSearchParams({ limit: String(HISTORY_PAGE_SIZE), offset: String(offset) });
+  if (filters.search.trim()) params.set('search', filters.search.trim());
+  if (filters.intent) params.set('intent', filters.intent);
+  if (filters.status) params.set('status', filters.status);
+  if (filters.productSearch.trim()) params.set('product_search', filters.productSearch.trim());
+  if (filters.createdFrom) params.set('created_from', filters.createdFrom);
+  if (filters.createdTo) params.set('created_to', filters.createdTo);
+  return apiRequest<CopilotRunList>(`/ai-operations-copilot/runs?${params.toString()}`);
 }
 
 async function fetchRun(runId: string): Promise<CopilotRun> {
@@ -392,6 +463,26 @@ async function fetchRun(runId: string): Promise<CopilotRun> {
 
 async function fetchMinimumStockRecommendation(productId: string): Promise<MinimumStockRecommendation> {
   return apiRequest<MinimumStockRecommendation>(`/ai-operations-copilot/minimum-stock-recommendation/${productId}`);
+}
+
+async function fetchStandardCostEvidence(productId: string): Promise<StandardCostEvidence> {
+  return apiRequest<StandardCostEvidence>(`/ai-operations-copilot/standard-cost-evidence/${productId}`);
+}
+
+async function promoteReplenishmentRun(runId: string): Promise<CopilotRun> {
+  return apiRequest<CopilotRun>(`/ai-operations-copilot/runs/${encodeURIComponent(runId)}/replenishment-review-proposal`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+    skipMutationFeedback: true
+  });
+}
+
+async function submitRunFeedback(runId: string, body: { rating: 'useful' | 'not_useful'; comment?: string }): Promise<CopilotRun> {
+  return apiRequest<CopilotRun>(`/ai-operations-copilot/runs/${encodeURIComponent(runId)}/feedback`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+    skipMutationFeedback: true
+  });
 }
 
 async function createRun(input: CreateRunInput): Promise<CopilotRun> {
@@ -446,9 +537,19 @@ export default function AIOperationsCopilotPage() {
   const [minStockOverrideReason, setMinStockOverrideReason] = useState('');
   const [minStockValueTouched, setMinStockValueTouched] = useState(false);
   const [proposedStandardUnitCost, setProposedStandardUnitCost] = useState('');
+  const [standardCostOverrideReason, setStandardCostOverrideReason] = useState('');
+  const [standardCostValueTouched, setStandardCostValueTouched] = useState(false);
   const [externalProcessingConfirmed, setExternalProcessingConfirmed] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(requestedRunId);
   const [historyOffset, setHistoryOffset] = useState(0);
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyIntent, setHistoryIntent] = useState<'' | CopilotIntent>('');
+  const [historyStatus, setHistoryStatus] = useState<'' | 'pending' | 'completed' | 'failed'>('');
+  const [historyProductSearch, setHistoryProductSearch] = useState('');
+  const [historyCreatedFrom, setHistoryCreatedFrom] = useState('');
+  const [historyCreatedTo, setHistoryCreatedTo] = useState('');
+  const [feedbackRating, setFeedbackRating] = useState<'' | 'useful' | 'not_useful'>('');
+  const [feedbackComment, setFeedbackComment] = useState('');
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
 
@@ -457,9 +558,18 @@ export default function AIOperationsCopilotPage() {
     queryFn: fetchCapabilities
   });
 
+  const historyFilters: HistoryFilters = {
+    search: historySearch,
+    intent: historyIntent,
+    status: historyStatus,
+    productSearch: historyProductSearch,
+    createdFrom: historyCreatedFrom,
+    createdTo: historyCreatedTo
+  };
+
   const runsQuery = useQuery({
-    queryKey: ['ai-operations-copilot', 'runs', historyOffset],
-    queryFn: () => fetchRuns(historyOffset)
+    queryKey: ['ai-operations-copilot', 'runs', historyOffset, historySearch, historyIntent, historyStatus, historyProductSearch, historyCreatedFrom, historyCreatedTo],
+    queryFn: () => fetchRuns(historyOffset, historyFilters)
   });
 
   const selectedRunKey = requestedRunId || selectedRunId;
@@ -492,12 +602,24 @@ export default function AIOperationsCopilotPage() {
     enabled: ['prepare_min_stock_proposal', 'product_replenishment_plan'].includes(intent) && Boolean(productId) && Boolean(selectedIntentCapability?.available)
   });
 
+  const standardCostEvidenceQuery = useQuery({
+    queryKey: ['ai-operations-copilot', 'standard-cost-evidence', productId],
+    queryFn: () => fetchStandardCostEvidence(productId),
+    enabled: intent === 'prepare_standard_cost_proposal' && Boolean(productId) && Boolean(selectedIntentCapability?.available)
+  });
+
   const minimumStockRecommendation = minimumStockRecommendationQuery.data;
+  const standardCostEvidence = standardCostEvidenceQuery.data;
   const effectiveProposedMinStock = intent === 'prepare_min_stock_proposal'
     && minimumStockRecommendation
     && !minStockValueTouched
     ? String(minimumStockRecommendation.recommended_min_stock)
     : proposedMinStock;
+  const effectiveProposedStandardUnitCost = intent === 'prepare_standard_cost_proposal'
+    && standardCostEvidence?.suggested_reference_unit_cost != null
+    && !standardCostValueTouched
+    ? String(standardCostEvidence.suggested_reference_unit_cost)
+    : proposedStandardUnitCost;
 
   useEffect(() => {
     setExternalProcessingConfirmed(false);
@@ -508,15 +630,19 @@ export default function AIOperationsCopilotPage() {
     proposedMinStock,
     minStockOverrideReason,
     proposedStandardUnitCost,
-    minimumStockRecommendation?.recommended_min_stock
+    standardCostOverrideReason,
+    minimumStockRecommendation?.recommended_min_stock,
+    standardCostEvidence?.suggested_reference_unit_cost
   ]);
 
   const createMutation = useMutation({
     mutationFn: createRun,
     onSuccess: async (run) => {
-      setActionMessage(run.proposal_snapshot
-        ? ui('Copilot proposal created. It must be reviewed in Intelligence Review before an Execution Request draft can be created.')
-        : ui('Copilot analysis completed. No operational data was changed.'));
+      setActionMessage(run.proposal_snapshot?.request_type === 'replenishment_purchase_order_draft'
+        ? ui('Replenishment proposal prepared for Intelligence Review. No Purchase Order was created.')
+        : run.proposal_snapshot
+          ? ui('Copilot proposal created. It must be reviewed in Intelligence Review before an Execution Request draft can be created.')
+          : ui('Copilot analysis completed. No operational data was changed.'));
       setSelectedRunId(run.id);
       setHistoryOffset(0);
       setSearchParams({ run_id: run.id });
@@ -537,6 +663,44 @@ export default function AIOperationsCopilotPage() {
     }
   });
 
+  const promoteReplenishmentMutation = useMutation({
+    mutationFn: promoteReplenishmentRun,
+    onSuccess: async (run) => {
+      setActionMessage(ui('Fresh replenishment evidence was prepared for Intelligence Review. No Purchase Order was created.'));
+      setSelectedRunId(run.id);
+      setHistoryOffset(0);
+      setSearchParams({ run_id: run.id });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['ai-operations-copilot', 'runs'] }),
+        queryClient.invalidateQueries({ queryKey: ['human-in-loop-ai-review'] })
+      ]);
+    },
+    onError: (error) => {
+      const message = readableError(error, ui);
+      setActionMessage(message);
+      showTenantActionError(message);
+    }
+  });
+
+  const feedbackMutation = useMutation({
+    mutationFn: ({ runId, rating, comment }: { runId: string; rating: 'useful' | 'not_useful'; comment?: string }) => submitRunFeedback(runId, { rating, comment }),
+    onSuccess: async (run) => {
+      setActionMessage(ui('Copilot feedback saved for governed learning review.'));
+      setFeedbackRating(run.user_feedback?.rating || '');
+      setFeedbackComment(run.user_feedback?.comment || '');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['ai-operations-copilot', 'run', run.id] }),
+        queryClient.invalidateQueries({ queryKey: ['ai-operations-copilot', 'runs'] }),
+        queryClient.invalidateQueries({ queryKey: ['decision-learning-feedback'] })
+      ]);
+    },
+    onError: (error) => {
+      const message = readableError(error, ui);
+      setActionMessage(message);
+      showTenantActionError(message);
+    }
+  });
+
   const runRows = runsQuery.data?.rows || [];
   const runTotal = runsQuery.data?.total || 0;
   const historyStart = runRows.length ? historyOffset + 1 : 0;
@@ -546,6 +710,11 @@ export default function AIOperationsCopilotPage() {
   const selectedRun = selectedRunKey
     ? selectedRunQuery.data || null
     : runRows[0] || null;
+
+  useEffect(() => {
+    setFeedbackRating(selectedRun?.user_feedback?.rating || '');
+    setFeedbackComment(selectedRun?.user_feedback?.comment || '');
+  }, [selectedRun?.id, selectedRun?.user_feedback?.rating, selectedRun?.user_feedback?.comment]);
 
   const provider = capabilitiesQuery.data?.provider;
   const modeDetails = capabilitiesQuery.isLoading
@@ -557,7 +726,7 @@ export default function AIOperationsCopilotPage() {
   const selectedProductFromRows = productRows.find((product) => product.id === productId) || null;
   const selectedProduct = selectedProductFromRows || (selectedProductCache?.id === productId ? selectedProductCache : null);
   const minStockValue = Number(effectiveProposedMinStock);
-  const standardCostValue = Number(proposedStandardUnitCost);
+  const standardCostValue = Number(effectiveProposedStandardUnitCost);
   const minStockOverrideApplied = Boolean(
     minimumStockRecommendation
     && effectiveProposedMinStock !== ''
@@ -570,15 +739,24 @@ export default function AIOperationsCopilotPage() {
     && Number.isFinite(minStockValue)
     && Math.abs(minStockValue - minimumStockRecommendation.current_min_stock) <= 0.0001
   );
-  const currentStandardCost = selectedProduct?.standard_unit_cost == null
+  const currentStandardCostValue = standardCostEvidence?.current_standard_unit_cost ?? selectedProduct?.standard_unit_cost;
+  const currentStandardCost = currentStandardCostValue == null
     ? null
-    : Number(selectedProduct.standard_unit_cost);
+    : Number(currentStandardCostValue);
   const standardCostNoChange = Boolean(
     intent === 'prepare_standard_cost_proposal'
     && currentStandardCost !== null
-    && proposedStandardUnitCost !== ''
+    && effectiveProposedStandardUnitCost !== ''
     && Number.isFinite(standardCostValue)
     && Math.abs(currentStandardCost - standardCostValue) <= 0.0001
+  );
+  const suggestedStandardCost = standardCostEvidence?.suggested_reference_unit_cost == null ? null : Number(standardCostEvidence.suggested_reference_unit_cost);
+  const standardCostMaterialOverride = Boolean(
+    suggestedStandardCost !== null
+    && suggestedStandardCost > 0
+    && effectiveProposedStandardUnitCost !== ''
+    && Number.isFinite(standardCostValue)
+    && Math.abs(standardCostValue - suggestedStandardCost) / suggestedStandardCost > 0.10
   );
   const canSubmit = Boolean(
     capabilities.canGovernDecisionIntelligence
@@ -595,7 +773,15 @@ export default function AIOperationsCopilotPage() {
       && !minStockNoChange
       && (!minStockOverrideApplied || minStockOverrideReason.trim().length >= 3)
     ))
-    && (intent !== 'prepare_standard_cost_proposal' || (proposedStandardUnitCost !== '' && Number.isFinite(standardCostValue) && standardCostValue >= 0 && !standardCostNoChange))
+    && (intent !== 'prepare_standard_cost_proposal' || (
+      Boolean(standardCostEvidence)
+      && !standardCostEvidenceQuery.isFetching
+      && effectiveProposedStandardUnitCost !== ''
+      && Number.isFinite(standardCostValue)
+      && standardCostValue >= 0
+      && !standardCostNoChange
+      && (!standardCostMaterialOverride || standardCostOverrideReason.trim().length >= 3)
+    ))
     && (!provider?.external_processing_confirmation_required || externalProcessingConfirmed)
     && !createMutation.isPending
   );
@@ -605,6 +791,8 @@ export default function AIOperationsCopilotPage() {
     setActionMessage(null);
     setMinStockOverrideReason('');
     setMinStockValueTouched(false);
+    setStandardCostOverrideReason('');
+    setStandardCostValueTouched(false);
     setProductSearch('');
     if (nextIntent !== 'prepare_min_stock_proposal') setProposedMinStock('');
     if (nextIntent !== 'prepare_standard_cost_proposal') setProposedStandardUnitCost('');
@@ -632,7 +820,10 @@ export default function AIOperationsCopilotPage() {
       input.proposed_min_stock = minStockValue;
       if (minStockOverrideApplied) input.min_stock_override_reason = minStockOverrideReason.trim();
     }
-    if (intent === 'prepare_standard_cost_proposal') input.proposed_standard_unit_cost = standardCostValue;
+    if (intent === 'prepare_standard_cost_proposal') {
+      input.proposed_standard_unit_cost = standardCostValue;
+      if (standardCostMaterialOverride) input.standard_cost_override_reason = standardCostOverrideReason.trim();
+    }
     input.external_processing_confirmed = provider?.external_processing_confirmation_required
       ? externalProcessingConfirmed
       : false;
@@ -652,6 +843,7 @@ export default function AIOperationsCopilotPage() {
   const proposal = selectedRun?.proposal_snapshot || null;
   const isMinStockProposal = proposal?.request_type === 'product_min_stock_update';
   const isStandardCostProposal = proposal?.request_type === 'cost_standard_update';
+  const isReplenishmentPOProposal = proposal?.request_type === 'replenishment_purchase_order_draft';
   const proposalCurrentValue = isMinStockProposal
     ? proposal?.payload?.previous_min_stock
     : isStandardCostProposal
@@ -670,6 +862,9 @@ export default function AIOperationsCopilotPage() {
   const executionRequestLink = selectedRun?.execution_request_id
     ? `/execution-requests?request_id=${encodeURIComponent(selectedRun.execution_request_id)}`
     : '/execution-requests';
+  const purchaseOrderLink = selectedRun?.purchase_order_id
+    ? `/purchase-orders?purchaseOrderId=${encodeURIComponent(selectedRun.purchase_order_id)}`
+    : '/purchase-orders';
 
   return (
     <div className="ai-copilot-page io-operational-page io-workspace-page io-workspace-legacy-normalized" style={styles.page}>
@@ -823,6 +1018,7 @@ export default function AIOperationsCopilotPage() {
                       <p style={styles.help}>{minimumStockRecommendation.formula}</p>
                       <div style={styles.calculationGrid}>
                         <div><span style={styles.keyLabel}>{ui("Demand used/day")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.inputs.selected_daily_demand, locale)}</strong></div>
+                        <div style={{ gridColumn: "1 / -1" }}><span style={styles.help}>{ui("Demand here means real consumption only. Transfers, write-offs, returns, and stock corrections are not counted as demand.")}</span></div>
                         <div><span style={styles.keyLabel}>{ui("Configured lead time")}</span><strong>{minimumStockRecommendation.inputs.lead_time_configured ? `${formatLocalizedNumber(minimumStockRecommendation.inputs.configured_lead_time_days || 0, locale)} ${ui('days')}` : ui('Not configured')}</strong></div>
                         <div><span style={styles.keyLabel}>{ui("Effective coverage")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.inputs.effective_coverage_days, locale)} {ui('days')}</strong></div>
                         <div><span style={styles.keyLabel}>{ui("Lead-time demand")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.calculation.expected_lead_time_demand, locale)}</strong></div>
@@ -856,11 +1052,14 @@ export default function AIOperationsCopilotPage() {
                           </Badge>
                         </div>
                         <div style={styles.keyValueGrid}>
-                          <div><span style={styles.keyLabel}>{ui("Current stock")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.current_stock, locale)}</strong></div>
-                          <div><span style={styles.keyLabel}>{ui("Reliable inbound")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.reliable_open_inbound_quantity, locale)}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("Physical stock")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.current_stock, locale)}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("Active reservations")}</span><strong>{minimumStockRecommendation.replenishment_plan.reservation_data_available === false ? ui('Unavailable for this role') : formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.reserved_stock_quantity || 0, locale)}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("Available after reservations")}</span><strong>{minimumStockRecommendation.replenishment_plan.reservation_data_available === false ? ui('Unavailable for this role') : formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.available_stock_after_reservations ?? minimumStockRecommendation.replenishment_plan.current_stock, locale)}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("Reliable inbound shipments")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.reliable_open_inbound_quantity, locale)}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("Approved PO not yet shipped")}</span><strong>{minimumStockRecommendation.replenishment_plan.approved_po_commitment_data_available === false ? ui('Unavailable for this role') : formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.approved_po_unshipped_quantity || 0, locale)}</strong></div>
                           <div><span style={styles.keyLabel}>{ui("At-risk inbound")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.at_risk_open_inbound_quantity, locale)}</strong></div>
                           <div><span style={styles.keyLabel}>{ui("Inbound evidence")}</span><strong>{minimumStockRecommendation.replenishment_plan.inbound_data_available === false ? ui('Unavailable for this role') : ui('Available')}</strong></div>
-                          <div><span style={styles.keyLabel}>{ui("Inventory position")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.inventory_position, locale)}</strong></div>
+                          <div><span style={styles.keyLabel}>{ui("True inventory position")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.inventory_position, locale)}</strong></div>
                           <div><span style={styles.keyLabel}>{ui("Target stock")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.target_stock_quantity, locale)}</strong></div>
                           <div><span style={styles.keyLabel}>{ui("Before MOQ")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.pre_moq_reorder_quantity, locale)}</strong></div>
                           <div><span style={styles.keyLabel}>{ui("Minimum order quantity")}</span><strong>{formatLocalizedNumber(minimumStockRecommendation.replenishment_plan.min_order_quantity, locale)}</strong></div>
@@ -929,20 +1128,62 @@ export default function AIOperationsCopilotPage() {
             ) : null}
 
             {intent === 'prepare_standard_cost_proposal' ? (
-              <label style={styles.field}>
-                <span style={styles.label}>{ui("Proposed standard unit cost")}</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="1000000000"
-                  step="0.0001"
-                  value={proposedStandardUnitCost}
-                  onChange={(event) => setProposedStandardUnitCost(event.target.value)}
-                  style={styles.input}
-                />
-                <span style={styles.help}>{ui("The server records the current standard cost and recent cost-bearing movement evidence. This does not update the product.")}</span>
-                {standardCostNoChange ? <span style={styles.fieldError}>{ui("The proposed cost matches the current product cost, so there is no change to propose.")}</span> : null}
-              </label>
+              <div style={styles.recommendationStack}>
+                {standardCostEvidenceQuery.isLoading || standardCostEvidenceQuery.isFetching ? (
+                  <div style={styles.notice}>{ui('Loading current and recent cost evidence…')}</div>
+                ) : standardCostEvidenceQuery.isError ? (
+                  <div style={styles.error}>{readableError(standardCostEvidenceQuery.error, ui)}</div>
+                ) : standardCostEvidence ? (
+                  <div style={styles.recommendationBox}>
+                    <div style={styles.proposalHeader}>
+                      <div>
+                        <div style={styles.eyebrow}>{ui('Cost evidence before proposal')}</div>
+                        <h3 style={styles.proposalTitle}>{ui('Suggested reference:')} {displayCurrencyCost(standardCostEvidence.suggested_reference_unit_cost, standardCostEvidence.tenant_currency, locale, ui)}</h3>
+                      </div>
+                      <Badge tone={standardCostEvidence.suggested_reference_unit_cost == null ? 'warn' : 'good'}>{standardCostEvidence.suggested_reference_unit_cost == null ? ui('Needs human pricing') : ui('Evidence available')}</Badge>
+                    </div>
+                    <div style={styles.keyValueGrid}>
+                      <div><span style={styles.keyLabel}>{ui('Current standard cost')}</span><strong>{displayCurrencyCost(standardCostEvidence.current_standard_unit_cost, standardCostEvidence.tenant_currency, locale, ui)}</strong></div>
+                      <div><span style={styles.keyLabel}>{ui('Latest recorded cost')}</span><strong>{displayCurrencyCost(standardCostEvidence.latest_unit_cost, standardCostEvidence.tenant_currency || standardCostEvidence.tenant_currency, locale, ui)}</strong></div>
+                      <div><span style={styles.keyLabel}>{ui('90-day weighted cost')}</span><strong>{displayCurrencyCost(standardCostEvidence.weighted_average_unit_cost_90d, standardCostEvidence.tenant_currency, locale, ui)}</strong></div>
+                      <div><span style={styles.keyLabel}>{ui('90-day cost range')}</span><strong>{displayCurrencyCost(standardCostEvidence.min_unit_cost_90d, standardCostEvidence.tenant_currency, locale, ui)} – {displayCurrencyCost(standardCostEvidence.max_unit_cost_90d, standardCostEvidence.tenant_currency, locale, ui)}</strong></div>
+                      <div><span style={styles.keyLabel}>{ui('Cost observations')}</span><strong>{formatLocalizedNumber(standardCostEvidence.costed_movement_count_90d || 0, locale)}</strong></div>
+                      <div><span style={styles.keyLabel}>{ui('Current supplier price')}</span><strong>{displayCurrencyCost(standardCostEvidence.supplier_catalog_unit_cost, standardCostEvidence.supplier_catalog_currency || standardCostEvidence.tenant_currency, locale, ui)}</strong></div>
+                      <div><span style={styles.keyLabel}>{ui('Suggestion basis')}</span><strong>{ui(formatLabel(standardCostEvidence.suggested_reference_basis))}</strong></div>
+                      <div><span style={styles.keyLabel}>{ui('Latest cost date')}</span><strong>{formatDateTime(standardCostEvidence.latest_cost_at, locale, ui)}</strong></div>
+                    </div>
+                    {(standardCostEvidence.warnings || []).length ? <ul style={styles.list}>{(standardCostEvidence.warnings || []).map((item) => <li key={item}>{item}</li>)}</ul> : null}
+                  </div>
+                ) : null}
+                <label style={styles.field}>
+                  <span style={styles.label}>{ui("Proposed standard unit cost")}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="1000000000"
+                    step="0.0001"
+                    value={effectiveProposedStandardUnitCost}
+                    onChange={(event) => { setStandardCostValueTouched(true); setProposedStandardUnitCost(event.target.value); }}
+                    style={styles.input}
+                  />
+                  <span style={styles.help}>{ui('The suggested reference is evidence, not an automatic price change. You may propose a different value, but a material override needs an explanation.')}</span>
+                  {standardCostNoChange ? <span style={styles.fieldError}>{ui("The proposed cost matches the current product cost, so there is no change to propose.")}</span> : null}
+                </label>
+                {standardCostMaterialOverride ? (
+                  <label style={styles.field}>
+                    <span style={styles.label}>{ui('Why use a materially different standard cost?')}</span>
+                    <textarea
+                      rows={3}
+                      maxLength={1000}
+                      value={standardCostOverrideReason}
+                      onChange={(event) => setStandardCostOverrideReason(event.target.value)}
+                      style={styles.textarea}
+                      placeholder={ui('Explain the business or pricing evidence for overriding the suggested reference by more than 10%.')}
+                    />
+                    {standardCostOverrideReason.trim().length < 3 ? <span style={styles.fieldError}>{ui('An override explanation is required.')}</span> : null}
+                  </label>
+                ) : null}
+              </div>
             ) : null}
 
             <label style={styles.field}>
@@ -1011,6 +1252,12 @@ export default function AIOperationsCopilotPage() {
               ) : (
                 <>
                   <div style={styles.answer}>{response.answer || ui('No answer was recorded.')}</div>
+                  {selectedRun.intent === 'operational_priority_summary' ? (
+                    <div style={styles.notice}>{ui('Priority counts use the complete permitted set. The explanation shows only the highest-priority sample from each area.')}</div>
+                  ) : null}
+                  {selectedRun.intent === 'supplier_performance_summary' ? (
+                    <div style={styles.notice}>{ui('Supplier comparison uses recent delivery and receiving rates, the number of shipments measured, and the trend versus the previous period—not raw problem counts alone.')}</div>
+                  ) : null}
                   {(response.highlights || []).length ? (
                     <div>
                       <h3 style={styles.sectionTitle}>{ui("Highlights")}</h3>
@@ -1021,17 +1268,45 @@ export default function AIOperationsCopilotPage() {
                     <div>
                       <h3 style={styles.sectionTitle}>{ui("Evidence references")}</h3>
                       <div style={styles.evidenceGrid}>
-                        {(response.evidence || []).map((item, index) => (
-                          <div key={`${item.kind}-${item.id || index}`} style={styles.evidenceCard}>
-                            <strong>{item.label}</strong>
-                            <span style={styles.help}>{ui(formatLabel(item.kind))}{capabilities.canViewTenantDiagnostics && item.id ? ` · ${item.id}` : ''}</span>
-                          </div>
-                        ))}
+                        {(response.evidence || []).map((item, index) => {
+                          const content = (
+                            <>
+                              <strong>{item.label}</strong>
+                              <span style={styles.help}>{ui(formatLabel(item.kind))}{capabilities.canViewTenantDiagnostics && item.id ? ` · ${item.id}` : ''}</span>
+                              {item.href ? <span style={styles.evidenceOpen}>{ui('Open source record')}</span> : null}
+                            </>
+                          );
+                          return item.href ? (
+                            <Link key={`${item.kind}-${item.id || index}`} to={item.href} style={{ ...styles.evidenceCard, ...styles.evidenceLink }} data-skip-global-action-feedback="true">{content}</Link>
+                          ) : (
+                            <div key={`${item.kind}-${item.id || index}`} style={styles.evidenceCard}>{content}</div>
+                          );
+                        })}
                       </div>
                     </div>
                   ) : null}
                 </>
               )}
+
+              {selectedRun.run_status === 'completed' && selectedRun.intent === 'product_replenishment_plan' && !proposal ? (
+                <div style={styles.handoffBox}>
+                  <div>
+                    <strong>{ui('Ready to turn this replenishment analysis into a governed purchasing recommendation?')}</strong>
+                    <p style={styles.help}>{ui('The server will re-read current stock, reservations, incoming shipments, approved Purchase Orders, supplier, package, and price evidence before preparing anything for review. No Purchase Order is created at this step.')}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    style={styles.primaryButton}
+                    disabled={!capabilities.canGovernDecisionIntelligence || promoteReplenishmentMutation.isPending}
+                    onClick={() => promoteReplenishmentMutation.mutate(selectedRun.id)}
+                    data-skip-global-action-feedback="true"
+                  >
+                    <TenantNavIcon path="/intelligence-review" size={16} />
+                    {promoteReplenishmentMutation.isPending ? ui('Preparing fresh review proposal…') : ui('Send recommendation for review')}
+                  </button>
+                </div>
+              ) : null}
 
               {proposal ? (
                 <div style={styles.proposalBox}>
@@ -1045,17 +1320,67 @@ export default function AIOperationsCopilotPage() {
                   <div style={styles.keyValueGrid}>
                     <div><span style={styles.keyLabel}>{ui("Request type")}</span><strong>{ui(formatLabel(proposal.request_type))}</strong></div>
                     <div><span style={styles.keyLabel}>{ui("Product")}</span><strong>{proposal.payload?.product_name || (capabilities.canViewTenantDiagnostics ? proposal.payload?.product_id : null) || ui('Not reported')}</strong></div>
-                    <div><span style={styles.keyLabel}>{ui("Current")} {proposalValueLabel}</span><strong>{isStandardCostProposal ? displayCost(proposalCurrentValue, locale, ui) : displayUnknown(proposalCurrentValue, ui)}</strong></div>
-                    {isMinStockProposal ? <div><span style={styles.keyLabel}>{ui("System recommendation")}</span><strong>{displayUnknown(proposal.payload?.system_recommended_min_stock, ui)}</strong></div> : null}
-                    <div><span style={styles.keyLabel}>{ui("Final proposed")} {proposalValueLabel}</span><strong>{isStandardCostProposal ? displayCost(proposalTargetValue, locale, ui) : displayUnknown(proposalTargetValue, ui)}</strong></div>
-                    {isMinStockProposal ? <div><span style={styles.keyLabel}>{ui("Human override")}</span><strong>{proposal.payload?.user_override_applied ? ui('Yes') : ui('No')}</strong></div> : null}
+                    {isReplenishmentPOProposal ? (
+                      <>
+                        <div><span style={styles.keyLabel}>{ui('Supplier')}</span><strong>{proposal.payload?.supplier_name || ui('Not reported')}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui('Order quantity')}</span><strong>{formatLocalizedNumber(Number(proposal.payload?.quantity || 0), locale)} {proposal.payload?.unit || ''}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui('Package size')}</span><strong>{formatLocalizedNumber(Number(proposal.payload?.units_per_order_package || 1), locale)}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui('Packages to order')}</span><strong>{formatLocalizedNumber(Number(proposal.payload?.order_package_count || 0), locale)}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui('Unit price')}</span><strong>{displayCurrencyCost(proposal.payload?.unit_cost, proposal.payload?.currency, locale, ui)}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui('Estimated total')}</span><strong>{displayCurrencyCost(proposal.payload?.estimated_total_cost, proposal.payload?.currency, locale, ui)}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui('Pricing evidence')}</span><strong>{ui(formatLabel(proposal.payload?.pricing_status))}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui('Expected delivery')}</span><strong>{proposal.payload?.expected_delivery_date || ui('Not reported')}</strong></div>
+                      </>
+                    ) : (
+                      <>
+                        <div><span style={styles.keyLabel}>{ui("Current")} {proposalValueLabel}</span><strong>{isStandardCostProposal ? displayCost(proposalCurrentValue, locale, ui) : displayUnknown(proposalCurrentValue, ui)}</strong></div>
+                        {isMinStockProposal ? <div><span style={styles.keyLabel}>{ui("System recommendation")}</span><strong>{displayUnknown(proposal.payload?.system_recommended_min_stock, ui)}</strong></div> : null}
+                        <div><span style={styles.keyLabel}>{ui("Final proposed")} {proposalValueLabel}</span><strong>{isStandardCostProposal ? displayCost(proposalTargetValue, locale, ui) : displayUnknown(proposalTargetValue, ui)}</strong></div>
+                        {isMinStockProposal ? <div><span style={styles.keyLabel}>{ui("Human override")}</span><strong>{proposal.payload?.user_override_applied ? ui('Yes') : ui('No')}</strong></div> : null}
+                        {isStandardCostProposal && proposal.payload?.suggested_reference_unit_cost != null ? <div><span style={styles.keyLabel}>{ui('Suggested reference')}</span><strong>{displayCost(proposal.payload.suggested_reference_unit_cost, locale, ui)}</strong></div> : null}
+                      </>
+                    )}
                   </div>
                   {isMinStockProposal && proposal.payload?.override_reason ? <p style={styles.help}>{ui("Override reason:")} {proposal.payload.override_reason}</p> : null}
-                  <p style={styles.help}>{ui("No product field has changed. A permitted reviewer must approve this proposal in Intelligence Review before a draft Execution Request can be created.")}</p>
+                  {isStandardCostProposal && proposal.payload?.override_reason ? <p style={styles.help}>{ui('Override reason:')} {proposal.payload.override_reason}</p> : null}
+                  <p style={styles.help}>{isReplenishmentPOProposal
+                    ? ui('No Purchase Order has been created. A permitted reviewer must approve this recommendation in Intelligence Review; Procurement will then revalidate current evidence before it can create a Draft Purchase Order.')
+                    : ui("No product field has changed. A permitted reviewer must approve this proposal in Intelligence Review before a draft Execution Request can be created.")}</p>
                   <div style={styles.actionRow}>
                     <Link to={reviewLink} style={styles.linkButton} data-skip-global-action-feedback="true"><TenantNavIcon path="/intelligence-review" size={16} />{ui("Open in Intelligence Review")}</Link>
                     {selectedRun.execution_request_id ? <Link to={executionRequestLink} style={styles.secondaryLink} data-skip-global-action-feedback="true"><TenantNavIcon path="/execution-requests" size={16} />{ui("Open linked Execution Request")}</Link> : null}
+                    {selectedRun.purchase_order_id ? <Link to={purchaseOrderLink} style={styles.secondaryLink} data-skip-global-action-feedback="true"><TenantNavIcon path="/purchase-orders" size={16} />{ui('Open linked Purchase Order')}</Link> : null}
                   </div>
+                </div>
+              ) : null}
+
+              {selectedRun.run_status === 'completed' ? (
+                <div style={styles.feedbackBox}>
+                  <div>
+                    <strong>{ui('Was this Copilot result useful?')}</strong>
+                    <p style={styles.help}>{ui('Your feedback is saved as governed Learning Feedback. It does not automatically train a model or change inventory.')}</p>
+                  </div>
+                  <div style={styles.actionRow}>
+                    <button type="button" style={feedbackRating === 'useful' ? styles.choiceButtonSelected : styles.choiceButton} onClick={() => setFeedbackRating('useful')}>{ui('Useful')}</button>
+                    <button type="button" style={feedbackRating === 'not_useful' ? styles.choiceButtonSelected : styles.choiceButton} onClick={() => setFeedbackRating('not_useful')}>{ui('Not useful / incorrect')}</button>
+                  </div>
+                  {feedbackRating === 'not_useful' ? (
+                    <label style={styles.field}>
+                      <span style={styles.label}>{ui('What was wrong or missing?')}</span>
+                      <textarea rows={3} maxLength={1000} value={feedbackComment} onChange={(event) => setFeedbackComment(event.target.value)} style={styles.textarea} />
+                      {feedbackComment.trim().length < 3 ? <span style={styles.fieldError}>{ui('Please explain what was wrong or missing.')}</span> : null}
+                    </label>
+                  ) : null}
+                  {feedbackRating ? (
+                    <button
+                      type="button"
+                      style={styles.inlineButton}
+                      disabled={feedbackMutation.isPending || (feedbackRating === 'not_useful' && feedbackComment.trim().length < 3)}
+                      onClick={() => feedbackMutation.mutate({ runId: selectedRun.id, rating: feedbackRating, comment: feedbackComment.trim() || undefined })}
+                    >
+                      {feedbackMutation.isPending ? ui('Saving feedback…') : selectedRun.user_feedback ? ui('Update feedback') : ui('Save feedback')}
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -1078,6 +1403,43 @@ export default function AIOperationsCopilotPage() {
       </div>
 
       <Panel title={ui("Run history")} iconPath="/audit" subtitle={runTotal ? `${ui('Showing')} ${formatLocalizedNumber(historyStart, locale)}–${formatLocalizedNumber(historyEnd, locale)} ${ui('of')} ${formatLocalizedNumber(runTotal, locale)} ${ui('permitted runs.')}` : `${formatLocalizedNumber(0, locale)} ${ui('permitted run(s). Select one to view the saved result above.')}`}>
+        <div style={styles.historyFilters}>
+          <label style={styles.field}>
+            <span style={styles.label}>{ui('Search history')}</span>
+            <input style={styles.input} value={historySearch} onChange={(event) => { setHistorySearch(event.target.value); setHistoryOffset(0); }} placeholder={ui('Search question, answer, or proposal title')} />
+          </label>
+          <label style={styles.field}>
+            <span style={styles.label}>{ui('Analysis type')}</span>
+            <select style={styles.input} value={historyIntent} onChange={(event) => { setHistoryIntent(event.target.value as '' | CopilotIntent); setHistoryOffset(0); }}>
+              <option value="">{ui('All analysis types')}</option>
+              {Object.entries(intentFallbacks).map(([value, copy]) => <option key={value} value={value}>{ui(copy.label)}</option>)}
+            </select>
+          </label>
+          <label style={styles.field}>
+            <span style={styles.label}>{ui('Result')}</span>
+            <select style={styles.input} value={historyStatus} onChange={(event) => { setHistoryStatus(event.target.value as '' | 'pending' | 'completed' | 'failed'); setHistoryOffset(0); }}>
+              <option value="">{ui('All results')}</option>
+              <option value="completed">{ui('Completed')}</option>
+              <option value="failed">{ui('Failed')}</option>
+              <option value="pending">{ui('Pending')}</option>
+            </select>
+          </label>
+          <label style={styles.field}>
+            <span style={styles.label}>{ui('Product')}</span>
+            <input style={styles.input} value={historyProductSearch} onChange={(event) => { setHistoryProductSearch(event.target.value); setHistoryOffset(0); }} placeholder={ui('Filter by product name')} />
+          </label>
+          <label style={styles.field}>
+            <span style={styles.label}>{ui('From date')}</span>
+            <input type="date" style={styles.input} value={historyCreatedFrom} onChange={(event) => { setHistoryCreatedFrom(event.target.value); setHistoryOffset(0); }} />
+          </label>
+          <label style={styles.field}>
+            <span style={styles.label}>{ui('To date')}</span>
+            <input type="date" style={styles.input} value={historyCreatedTo} onChange={(event) => { setHistoryCreatedTo(event.target.value); setHistoryOffset(0); }} />
+          </label>
+          {(historySearch || historyIntent || historyStatus || historyProductSearch || historyCreatedFrom || historyCreatedTo) ? (
+            <button type="button" style={styles.inlineButton} onClick={() => { setHistorySearch(''); setHistoryIntent(''); setHistoryStatus(''); setHistoryProductSearch(''); setHistoryCreatedFrom(''); setHistoryCreatedTo(''); setHistoryOffset(0); }}>{ui('Clear history filters')}</button>
+          ) : null}
+        </div>
         {runsQuery.isError ? <div style={styles.error}>{readableError(runsQuery.error, ui)}</div> : null}
         {runsQuery.isLoading ? <div style={styles.empty}>{ui("Loading Copilot history…")}</div> : null}
         <div className="ai-copilot-history-list" style={styles.historyList}>
@@ -1202,6 +1564,12 @@ const styles: Record<string, CSSProperties> = {
   list: { margin: 0, paddingLeft: 20, display: 'grid', gap: 6, lineHeight: 1.45 },
   evidenceGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 8 },
   evidenceCard: { display: 'grid', gap: 4, padding: 10, borderRadius: 8, border: '1px solid var(--border-color, #dbe3ee)' },
+  evidenceLink: { color: 'inherit', textDecoration: 'none', background: '#ffffff' },
+  evidenceOpen: { fontSize: 12, color: '#2563eb', fontWeight: 800 },
+  handoffBox: { display: 'grid', gap: 10, padding: 14, borderRadius: 12, border: '1px solid rgba(37, 99, 235, 0.28)', background: 'rgba(37, 99, 235, 0.06)' },
+  feedbackBox: { display: 'grid', gap: 10, padding: 14, borderRadius: 12, border: '1px solid #dbe5f1', background: '#f8fafc' },
+  choiceButton: { padding: '8px 11px', borderRadius: 9, border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', fontWeight: 800, cursor: 'pointer' },
+  choiceButtonSelected: { padding: '8px 11px', borderRadius: 9, border: '1px solid #2563eb', background: '#eff6ff', color: '#1d4ed8', fontWeight: 800, cursor: 'pointer' },
   proposalBox: { display: 'grid', gap: 13, padding: 15, borderRadius: 12, border: '1px solid rgba(245, 158, 11, 0.35)', background: 'rgba(245, 158, 11, 0.08)' },
   proposalHeader: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' },
   proposalTitle: { margin: '3px 0 0', fontSize: 17 },
@@ -1211,6 +1579,7 @@ const styles: Record<string, CSSProperties> = {
   linkButton: { display: 'inline-flex', gap: 7, alignItems: 'center', padding: '9px 12px', borderRadius: 9, background: 'var(--primary-color, #2563eb)', color: '#fff', textDecoration: 'none', fontWeight: 800, fontSize: 13 },
   secondaryLink: { display: 'inline-flex', gap: 7, alignItems: 'center', padding: '9px 12px', borderRadius: 9, border: '1px solid #cbd5e1', background: '#ffffff', color: '#1d4ed8', textDecoration: 'none', fontWeight: 800, fontSize: 13 },
   metadataGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, paddingTop: 12, borderTop: '1px solid var(--border-color, #dbe3ee)' },
+  historyFilters: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 14, alignItems: 'end' },
   historyList: { display: 'grid', gap: 8 },
   historyButton: { width: '100%', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#ffffff', color: 'inherit', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14 },
   historyButtonSelected: { borderColor: 'var(--primary-color, #2563eb)', boxShadow: '0 0 0 2px rgba(37, 99, 235, 0.10)' },

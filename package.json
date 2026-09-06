@@ -304,7 +304,8 @@
     "check:mobile-execution-operational-completion-v349160": "node scripts/check-mobile-execution-operational-completion-v349160.mjs",
     "check:operations-feed-operational-completion-v349161": "node scripts/check-operations-feed-operational-completion-v349161.mjs",
     "check:workflow-composer-operational-completion-v349162": "node scripts/check-workflow-composer-operational-completion-v349162.mjs",
-    "check:intelligence-review-operational-completion-v349163": "node scripts/check-intelligence-review-operational-completion-v349163.mjs"
+    "check:intelligence-review-operational-completion-v349163": "node scripts/check-intelligence-review-operational-completion-v349163.mjs",
+    "check:ai-copilot-procurement-decision-completion-v349164": "node scripts/check-ai-copilot-procurement-decision-completion-v349164.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
