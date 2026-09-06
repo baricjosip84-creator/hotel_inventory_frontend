@@ -793,7 +793,7 @@ function buildPurchaseOrderAuditParams(id: string, search: string, limit: number
     limit: String(limit),
     offset: String(offset),
     response_mode: 'page',
-    metadata_mode: 'summary'
+    metadata_mode: 'full'
   });
   if (search.trim()) params.set('search', search.trim());
   return params;
@@ -1067,6 +1067,13 @@ export default function PurchaseOrdersPage() {
     retry: false
   });
 
+  const invalidatePurchaseOrderAudit = useCallback(async (purchaseOrderId: string) => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['purchase-order', 'audit', purchaseOrderId] }),
+      queryClient.invalidateQueries({ queryKey: ['purchase-order', 'audit-summary', purchaseOrderId] })
+    ]);
+  }, [queryClient]);
+
   const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: fetchSuppliers, enabled: purchaseOrdersFeatureReady });
   const productsQuery = useQuery({ queryKey: ['products'], queryFn: fetchProducts, enabled: purchaseOrdersFeatureReady });
   const purchaseOrderCreateOptionsQuery = useQuery({
@@ -1332,6 +1339,7 @@ export default function PurchaseOrdersPage() {
     onSuccess: async (updated) => {
       await queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
       await queryClient.invalidateQueries({ queryKey: ['purchase-order', updated.id] });
+      await invalidatePurchaseOrderAudit(updated.id);
       setSelectedId(updated.id);
       resetForm();
     }
@@ -1343,7 +1351,7 @@ export default function PurchaseOrdersPage() {
     onSuccess: async (updated) => {
       await queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
       await queryClient.invalidateQueries({ queryKey: ['purchase-order', updated.id] });
-      await queryClient.invalidateQueries({ queryKey: ['purchase-order', 'audit', updated.id] });
+      await invalidatePurchaseOrderAudit(updated.id);
       setSelectedId(updated.id);
       setCancelReason('');
       setCloseReason('');
@@ -1428,7 +1436,7 @@ export default function PurchaseOrdersPage() {
       void queryClient.invalidateQueries({ queryKey: ['purchase-order', 'supplier-email-evidence', selectedId] });
       if (selectedId) {
         void queryClient.invalidateQueries({ queryKey: ['purchase-order', selectedId] });
-        void queryClient.invalidateQueries({ queryKey: ['purchase-order', 'audit', selectedId] });
+        void invalidatePurchaseOrderAudit(selectedId);
       }
     },
     onError: (error) => {

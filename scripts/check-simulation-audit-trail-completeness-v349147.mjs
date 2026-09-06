@@ -20,7 +20,7 @@ check('embedded audit page size is explicit', page.includes('const PURCHASE_ORDE
 check('full-history export page size is explicit', page.includes('const PURCHASE_ORDER_AUDIT_EXPORT_PAGE_SIZE = 500;'));
 check('audit request is scoped to purchase order', page.includes("entity_type: 'purchase_order'") && page.includes('entity_id: id'));
 check('audit request uses server page mode', page.includes("response_mode: 'page'"));
-check('audit request uses summary metadata projection', page.includes("metadata_mode: 'summary'"));
+check('audit request preserves full metadata evidence', page.includes("metadata_mode: 'full'") && !page.includes("metadata_mode: 'summary'"));
 check('search is sent to backend', page.includes("if (search.trim()) params.set('search', search.trim());"));
 check('visible audit query keys include search and page', page.includes("['purchase-order', 'audit', selectedId, auditSearch.trim(), auditPageIndex]"));
 check('visible audit fetch uses page API', page.includes('fetchPurchaseOrderAuditPage(selectedId as string, auditSearch, auditPageIndex)'));
@@ -39,6 +39,12 @@ check('CSV export loads complete matching audit', /exportSelectedPurchaseOrderAu
 check('print loads complete matching audit', /printSelectedPurchaseOrderAudit[\s\S]{0,420}fetchAllPurchaseOrderAudit/.test(page));
 check('audit summary shows full matching count', page.includes('<summary>{ui("Audit history")} <span>{auditTotalEvents}'));
 check('tenant audit page still has previous and next navigation', tenantAudit.includes('goToPreviousPage') && tenantAudit.includes('goToNextPage'));
+
+check('audit and summary invalidation helper exists', page.includes('const invalidatePurchaseOrderAudit = useCallback') && page.includes("['purchase-order', 'audit-summary', purchaseOrderId]"));
+check('draft updates refresh embedded audit and total', /updateMutation[\s\S]{0,900}invalidatePurchaseOrderAudit\(updated\.id\)/.test(page));
+check('lifecycle actions refresh embedded audit and total', /actionMutation[\s\S]{0,900}invalidatePurchaseOrderAudit\(updated\.id\)/.test(page));
+check('supplier send refreshes embedded audit and total', /sendPurchaseOrderToSupplierMutation[\s\S]{0,2400}invalidatePurchaseOrderAudit\(selectedId\)/.test(page));
+
 check('v147 checker wired into frontend CI chain', pkg.includes('check:simulation-audit-trail-completeness-v349147'));
 
 let passed = 0;
