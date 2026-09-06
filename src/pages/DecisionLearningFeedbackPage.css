@@ -399,3 +399,7 @@
   overflow-wrap: anywhere;
   font: inherit;
 }
+
+.learning-feedback-page .learning-feedback-history-filters {
+  border-top-color: #cbd5e1;
+}
