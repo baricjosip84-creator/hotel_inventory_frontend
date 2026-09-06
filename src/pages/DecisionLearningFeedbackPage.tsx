@@ -5,6 +5,7 @@ import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedNumber } from '../i18n/formatters';
 import { formatLocalizedCurrency, formatLocalizedDateTime } from '../i18n/formatters';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
+import { getCurrentTenantUserId } from '../lib/auth';
 import { getActiveTenantCurrency } from '../lib/tenantCurrency';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { SidebarAttentionMarker, SidebarAttentionTabDot } from '../components/ui/SidebarAttentionMarker';
@@ -745,6 +746,10 @@ type ContinuousLearningSummary = {
       review_reason_code?: string;
       recommended_resolution?: string;
       source_label?: string;
+      created_by_user_id?: string | null;
+      recorded_by_user_id?: string | null;
+      created_by_user_name?: string | null;
+      recorded_by_user_name?: string | null;
     }>;
     pagination?: PageInfo;
     safety_contract?: Record<string, boolean>;
@@ -3797,6 +3802,8 @@ const reviewReasonLabels: Record<string, string> = {
   optimization_result_review_required: 'This optimization result missed value or drifted and needs a person to review it.'
 };
 
+type FeedbackReviewItem = NonNullable<NonNullable<ContinuousLearningSummary['feedback_review_board']>['review_items']>[number];
+
 const reviewTargets: Record<string, Array<{ status: string; label: string }>> = {
   learning_outcome: [
     { status: 'resolved', label: 'Mark reviewed' },
@@ -3823,14 +3830,18 @@ const reviewTargets: Record<string, Array<{ status: string; label: string }>> = 
 function FeedbackReviewBoard({
   board,
   canGovern,
+  canOverrideIndependentReview,
+  currentUserId,
   reviewing,
   onReview,
   onPage
 }: {
   board: ContinuousLearningSummary['feedback_review_board'];
   canGovern: boolean;
+  canOverrideIndependentReview: boolean;
+  currentUserId: string | null;
   reviewing: boolean;
-  onReview: (evidenceType: string, evidenceKey: string, targetStatus: string) => void;
+  onReview: (item: FeedbackReviewItem, targetStatus: string) => void;
   onPage: (direction: 'previous' | 'next') => void;
 }) {
   const { locale, ui } = useAppTranslation();
@@ -3873,10 +3884,15 @@ function FeedbackReviewBoard({
       {items.length > 0 ? (
         <div style={{ overflowX: 'auto' }}>
           <table className="table">
-            <thead><tr><th>{ui('Evidence')}</th><th>{ui('Domain')}</th><th>{ui('Status')}</th><th>{ui('Reason')}</th>{canGovern ? <th>{ui('Review action')}</th> : null}</tr></thead>
+            <thead><tr><th>{ui('Evidence')}</th><th>{ui('Domain')}</th><th>{ui('Status')}</th><th>{ui('Recorder')}</th><th>{ui('Reason')}</th>{canGovern ? <th>{ui('Review action')}</th> : null}</tr></thead>
             <tbody>{items.map((item, index) => {
               const reason = item.review_reason_code ? reviewReasonLabels[item.review_reason_code] : item.review_reason;
               const targets = reviewTargets[item.evidence_type || ''] || [];
+              const createdById = item.created_by_user_id ? String(item.created_by_user_id) : null;
+              const recordedById = item.recorded_by_user_id ? String(item.recorded_by_user_id) : null;
+              const recorderUnknown = !createdById && !recordedById;
+              const reviewerIsRecorder = Boolean(currentUserId && (currentUserId === createdById || currentUserId === recordedById));
+              const independentReviewBlocked = recorderUnknown || reviewerIsRecorder;
               const causesSidebarAttention = canGovern;
               return (
                 <tr
@@ -3892,9 +3908,15 @@ function FeedbackReviewBoard({
                   </td>
                   <td>{ui(formatLabel(item.domain))}</td>
                   <td>{ui(formatLabel(item.status))}</td>
+                  <td>
+                    <div style={{ display: 'grid', gap: 4 }}>
+                      <span>{item.recorded_by_user_name || item.created_by_user_name || ui('Unknown recorder')}</span>
+                      {independentReviewBlocked ? <span className="card__subtext">{ui('Independent review required')}</span> : null}
+                    </div>
+                  </td>
                   <td>{reason ? ui(reason) : '—'}</td>
                   {canGovern ? <td><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{targets.map((target) => (
-                    <button key={target.status} className="button button--secondary" type="button" disabled={reviewing || !item.evidence_key || !item.evidence_type} onClick={() => onReview(item.evidence_type || '', item.evidence_key || '', target.status)}>{ui(target.label)}</button>
+                    <button key={target.status} className="button button--secondary" type="button" disabled={reviewing || !item.evidence_key || !item.evidence_type || (independentReviewBlocked && !canOverrideIndependentReview)} onClick={() => onReview(item, target.status)}>{ui(target.label)}</button>
                   ))}</div></td> : null}
                 </tr>
               );
@@ -4700,6 +4722,8 @@ export default function DecisionLearningFeedbackPage() {
   const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
   const canGovern = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
+  const canOverrideIndependentReview = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_REVIEW_OVERRIDE);
+  const currentUserId = getCurrentTenantUserId();
   const canReadInsights = hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
   const [view, setView] = useState<LearningFeedbackView>('feedback');
@@ -4755,7 +4779,7 @@ export default function DecisionLearningFeedbackPage() {
   });
 
   const reviewMutation = useMutation({
-    mutationFn: (payload: { evidence_type: string; evidence_key: string; target_status: string }) => apiRequest<Record<string, unknown>>('/decision-intelligence-feedback/review', {
+    mutationFn: (payload: { evidence_type: string; evidence_key: string; target_status: string; independence_override?: boolean; override_reason?: string }) => apiRequest<Record<string, unknown>>('/decision-intelligence-feedback/review', {
       method: 'POST',
       body: JSON.stringify(payload),
       skipMutationFeedback: true
@@ -4954,9 +4978,38 @@ export default function DecisionLearningFeedbackPage() {
     setReviewOffset((current) => Math.max(0, current + (direction === 'next' ? reviewLimit : -reviewLimit)));
   };
 
-  const reviewEvidence = (evidenceType: string, evidenceKey: string, targetStatus: string) => {
-    if (!canGovern) return;
-    reviewMutation.mutate({ evidence_type: evidenceType, evidence_key: evidenceKey, target_status: targetStatus });
+  const reviewEvidence = (item: FeedbackReviewItem, targetStatus: string) => {
+    if (!canGovern || !item.evidence_type || !item.evidence_key) return;
+    const createdById = item.created_by_user_id ? String(item.created_by_user_id) : null;
+    const recordedById = item.recorded_by_user_id ? String(item.recorded_by_user_id) : null;
+    const recorderUnknown = !createdById && !recordedById;
+    const reviewerIsRecorder = Boolean(currentUserId && (currentUserId === createdById || currentUserId === recordedById));
+    const requiresOverride = recorderUnknown || reviewerIsRecorder;
+
+    if (requiresOverride && !canOverrideIndependentReview) {
+      setMessage(recorderUnknown
+        ? ui('Recorder identity is unavailable for this legacy evidence. A governed override is required to resolve it.')
+        : ui('You recorded this evidence. Another authorized user must review it.'));
+      return;
+    }
+
+    if (requiresOverride) {
+      const overrideReason = window.prompt(ui('Explain why independent review cannot be used (at least 10 characters).'), '')?.trim() || '';
+      if (overrideReason.length < 10) {
+        setMessage(ui('Override reason must be at least 10 characters.'));
+        return;
+      }
+      reviewMutation.mutate({
+        evidence_type: item.evidence_type,
+        evidence_key: item.evidence_key,
+        target_status: targetStatus,
+        independence_override: true,
+        override_reason: overrideReason
+      });
+      return;
+    }
+
+    reviewMutation.mutate({ evidence_type: item.evidence_type, evidence_key: item.evidence_key, target_status: targetStatus });
   };
 
   return (
@@ -5524,7 +5577,7 @@ export default function DecisionLearningFeedbackPage() {
           {!summaryQuery.isLoading && !summaryQuery.isError ? (<>
             <FeedbackActionPlan plan={summaryQuery.data?.feedback_action_plan} />
             <LearningImpactAssessment assessment={summaryQuery.data?.learning_impact_assessment} />
-            <FeedbackReviewBoard board={summaryQuery.data?.feedback_review_board} canGovern={canGovern} reviewing={reviewMutation.isPending} onReview={reviewEvidence} onPage={changeReviewPage} />
+            <FeedbackReviewBoard board={summaryQuery.data?.feedback_review_board} canGovern={canGovern} canOverrideIndependentReview={canOverrideIndependentReview} currentUserId={currentUserId} reviewing={reviewMutation.isPending} onReview={reviewEvidence} onPage={changeReviewPage} />
           </>) : null}
 
           <section className={'card learning-feedback-section learning-feedback-safety-card'}>

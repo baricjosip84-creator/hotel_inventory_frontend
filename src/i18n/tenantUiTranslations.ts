@@ -2,6 +2,13 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  ["Recorder", "Erfasst von", "Registrado por", "Enregistré par", "Evidentirao"],
+  ["Unknown recorder", "Unbekannte erfassende Person", "Registrador desconocido", "Auteur de l’enregistrement inconnu", "Nepoznat evidentiratelj"],
+  ["Independent review required", "Unabhängige Prüfung erforderlich", "Se requiere revisión independiente", "Examen indépendant requis", "Potreban je neovisan pregled"],
+  ["Recorder identity is unavailable for this legacy evidence. A governed override is required to resolve it.", "Für diesen Altbestand ist die Identität der erfassenden Person nicht verfügbar. Zum Abschließen ist eine geregelte Ausnahme erforderlich.", "La identidad del registrador no está disponible para esta evidencia heredada. Se requiere una excepción gobernada para resolverla.", "L’identité de l’auteur de cet enregistrement historique n’est pas disponible. Une dérogation gouvernée est requise pour le résoudre.", "Identitet evidentiratelja nije dostupan za ovaj naslijeđeni dokaz. Za njegovo razrješenje potrebno je kontrolirano izuzeće."],
+  ["You recorded this evidence. Another authorized user must review it.", "Sie haben diesen Nachweis erfasst. Eine andere berechtigte Person muss ihn prüfen.", "Usted registró esta evidencia. Otro usuario autorizado debe revisarla.", "Vous avez enregistré cette preuve. Un autre utilisateur autorisé doit l’examiner.", "Vi ste evidentirali ovaj dokaz. Mora ga pregledati drugi ovlašteni korisnik."],
+  ["Explain why independent review cannot be used (at least 10 characters).", "Begründen Sie, warum keine unabhängige Prüfung möglich ist (mindestens 10 Zeichen).", "Explique por qué no se puede usar una revisión independiente (al menos 10 caracteres).", "Expliquez pourquoi un examen indépendant ne peut pas être utilisé (au moins 10 caractères).", "Objasnite zašto nije moguće koristiti neovisan pregled (najmanje 10 znakova)."],
+  ["Override reason must be at least 10 characters.", "Die Begründung für die Ausnahme muss mindestens 10 Zeichen lang sein.", "El motivo de la excepción debe tener al menos 10 caracteres.", "Le motif de la dérogation doit comporter au moins 10 caractères.", "Razlog izuzeća mora imati najmanje 10 znakova."],
   ["Receiving session", "Wareneingangssitzung", "Sesión de recepción", "Session de réception", "Sesija zaprimanja"],
   ["Scans received", "Empfangene Scans", "Escaneos recibidos", "Scans réceptionnés", "Zaprimljena skeniranja"],
   ["Packages received", "Empfangene Pakete", "Paquetes recibidos", "Colis réceptionnés", "Zaprimljena pakiranja"],

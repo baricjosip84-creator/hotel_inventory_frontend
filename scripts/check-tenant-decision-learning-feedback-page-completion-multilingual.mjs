@@ -77,7 +77,7 @@ for (const required of [
   'ui(formatLabel(item.status))',
   "const reason = item.review_reason_code ? reviewReasonLabels[item.review_reason_code] : item.review_reason;",
   "{reason ? ui(reason) : '—'}",
-  "onReview(item.evidence_type || '', item.evidence_key || '', target.status)"
+  "onReview(item, target.status)"
 ]) if (!boardSlice.includes(required)) fail(`Feedback Review Board completion contract missing: ${required}`);
 if (!process.exitCode) pass('Feedback Review Board presentation is localized while backend resolution/reason data stays raw.');
 
