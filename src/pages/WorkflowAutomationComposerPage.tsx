@@ -33,6 +33,7 @@ type WorkflowDomain =
   | 'multi_domain';
 
 type BlueprintUrgency = 'critical' | 'high' | 'medium' | 'low';
+type WorkflowResponsibilityFilter = 'all' | 'mine' | 'unassigned' | 'actionable';
 
 type WorkflowBlueprint = {
   blueprint_id: string;
@@ -45,6 +46,26 @@ type WorkflowBlueprint = {
   source_action_type?: string | null;
   workflow_domain?: string;
   blueprint_type?: string;
+  viewer_can_act?: boolean;
+  responsibility?: {
+    assignment_state?: string;
+    assignee_name?: string | null;
+    responsible_role?: string | null;
+    is_current_user?: boolean;
+  };
+  location_context?: {
+    storage_location_name?: string | null;
+    from_location_name?: string | null;
+    to_location_name?: string | null;
+  };
+  deadline_context?: {
+    due_at?: string | null;
+    sla_due_at?: string | null;
+    effective_due_at?: string | null;
+    due_state?: string | null;
+  };
+  recommended_next_step?: string | null;
+  recommended_next_step_key?: string | null;
   trigger_preview?: {
     trigger_source?: string;
     trigger_reference?: string;
@@ -100,6 +121,7 @@ type WorkflowComposerResponse = {
   filters?: {
     workflow_domain?: string | null;
     urgency?: string | null;
+    responsibility?: string | null;
     limit?: number;
   };
   summary?: {
@@ -152,6 +174,13 @@ const URGENCY_FILTERS: Array<{ value: 'all' | BlueprintUrgency; label: string }>
   { value: 'high', label: 'High' },
   { value: 'medium', label: 'Medium' },
   { value: 'low', label: 'Low' }
+];
+
+const RESPONSIBILITY_FILTERS: Array<{ value: WorkflowResponsibilityFilter; label: string }> = [
+  { value: 'all', label: 'All plans' },
+  { value: 'mine', label: 'Assigned to me' },
+  { value: 'unassigned', label: 'Unassigned work' },
+  { value: 'actionable', label: 'I can act' }
 ];
 
 const USER_SAFETY_ITEMS = [
@@ -220,7 +249,20 @@ const CANONICAL_LABELS: Record<string, string> = {
   enterprise_integration: 'Enterprise integration',
   decision_intelligence: 'Decision intelligence',
   ai_governance: 'AI governance',
-  control_tower: 'Control tower'
+  control_tower: 'Control tower',
+  overdue: 'Overdue',
+  due_soon: 'Due soon',
+  scheduled: 'Scheduled',
+  unscheduled: 'No deadline',
+  none: 'No deadline',
+  unassigned: 'Unassigned',
+  mine: 'Assigned to me',
+  other: 'Another team member',
+  role: 'Assigned role',
+  source_workflow: 'Managed in source workflow',
+  admin: 'Admin',
+  manager: 'Manager',
+  decision_intelligence_reviewer: 'Decision Intelligence Reviewer'
 };
 
 /*
@@ -319,6 +361,40 @@ function sourceDescription(blueprint: WorkflowBlueprint, ui: (englishText: strin
     return ui('A read-only plan showing how an approved external integration could be reviewed and governed.');
   }
   return ui('A suggested human workflow based on an existing open work item.');
+}
+
+function responsibilityText(blueprint: WorkflowBlueprint, ui: (englishText: string) => string): string {
+  const responsibility = blueprint.responsibility;
+  if (responsibility?.assignee_name) {
+    return responsibility.is_current_user
+      ? `${responsibility.assignee_name} (${ui('You')})`
+      : responsibility.assignee_name;
+  }
+  if (responsibility?.responsible_role) {
+    return `${ui('Role:')} ${canonicalLabel(responsibility.responsible_role, ui)}`;
+  }
+  if (responsibility?.assignment_state === 'unassigned') return ui('Unassigned');
+  return ui('Managed in source workflow');
+}
+
+function locationText(blueprint: WorkflowBlueprint, ui: (englishText: string) => string): string | null {
+  const context = blueprint.location_context;
+  const from = String(context?.from_location_name || '').trim();
+  const to = String(context?.to_location_name || '').trim();
+  const location = String(context?.storage_location_name || '').trim();
+  if (from && to && from !== to) return `${ui('From')} ${from} → ${ui('To')} ${to}`;
+  if (to) return to;
+  if (location) return location;
+  if (from) return from;
+  return null;
+}
+
+function deadlineText(blueprint: WorkflowBlueprint, locale: AppLocale, ui: (englishText: string) => string): string {
+  const context = blueprint.deadline_context;
+  const state = String(context?.due_state || 'none');
+  const dueAt = context?.effective_due_at;
+  if (!dueAt) return ui('No deadline');
+  return `${canonicalLabel(state, ui)} · ${formatDateTime(dueAt, locale, ui)}`;
 }
 
 function localizedGuidance(key: string | null | undefined, value: string | null | undefined, fallback: string, ui: (englishText: string) => string): string {
@@ -451,11 +527,13 @@ function localAvailableDomains(): WorkflowDomain[] {
 
 async function fetchWorkflowComposer(
   workflowDomain: 'all' | WorkflowDomain,
-  urgency: 'all' | BlueprintUrgency
+  urgency: 'all' | BlueprintUrgency,
+  responsibility: WorkflowResponsibilityFilter
 ): Promise<WorkflowComposerResponse> {
   const params = new URLSearchParams({ limit: '75' });
   if (workflowDomain !== 'all') params.set('workflow_domain', workflowDomain);
   if (urgency !== 'all') params.set('urgency', urgency);
+  if (responsibility !== 'all') params.set('responsibility', responsibility);
   return apiRequest<WorkflowComposerResponse>(`/operational-action-center/workflow-automation-composer-summary?${params.toString()}`);
 }
 
@@ -463,10 +541,11 @@ export default function WorkflowAutomationComposerPage() {
   const { locale, ui } = useAppTranslation();
   const [workflowDomain, setWorkflowDomain] = useState<'all' | WorkflowDomain>('all');
   const [urgency, setUrgency] = useState<'all' | BlueprintUrgency>('all');
+  const [responsibility, setResponsibility] = useState<WorkflowResponsibilityFilter>('all');
 
   const composerQuery = useQuery({
-    queryKey: ['workflow-automation-composer', workflowDomain, urgency],
-    queryFn: () => fetchWorkflowComposer(workflowDomain, urgency)
+    queryKey: ['workflow-automation-composer', workflowDomain, urgency, responsibility],
+    queryFn: () => fetchWorkflowComposer(workflowDomain, urgency, responsibility)
   });
 
   const response = composerQuery.data;
@@ -487,8 +566,14 @@ export default function WorkflowAutomationComposerPage() {
   }, [response?.access?.available_workflow_domains]);
 
   const visibleDomainOptions = useMemo(() => {
-    return WORKFLOW_DOMAINS.filter((option) => option.value === 'all' || availableDomains.has(option.value));
-  }, [availableDomains]);
+    const assignmentOnly = responsibility === 'mine' || responsibility === 'unassigned';
+    const assignmentDomains = new Set<WorkflowDomain>(['execution', 'reservation', 'procurement', 'fulfillment', 'replenishment', 'transfer']);
+    return WORKFLOW_DOMAINS.filter((option) => {
+      if (option.value === 'all') return true;
+      if (!availableDomains.has(option.value)) return false;
+      return !assignmentOnly || assignmentDomains.has(option.value);
+    });
+  }, [availableDomains, responsibility]);
 
   /* v3.49.46: retained for easy reversal with the commented Technical safety contract UI.
   const safetyEntries = useMemo(() => {
@@ -497,10 +582,10 @@ export default function WorkflowAutomationComposerPage() {
   */
 
   useEffect(() => {
-    if (workflowDomain !== 'all' && !availableDomains.has(workflowDomain)) {
+    if (workflowDomain !== 'all' && !visibleDomainOptions.some((option) => option.value === workflowDomain)) {
       setWorkflowDomain('all');
     }
-  }, [availableDomains, workflowDomain]);
+  }, [visibleDomainOptions, workflowDomain]);
 
   const summaryValue = (value: unknown): number | string => {
     if (hasSnapshot) return formatLocalizedNumber(numberValue(value), locale);
@@ -522,7 +607,7 @@ export default function WorkflowAutomationComposerPage() {
         iconPath="/workflow-composer"
         eyebrow={ui("Human workflow planning")}
         title={ui("Workflow Composer")}
-        description={ui("Read-only suggested workflow plans that explain steps, approvals, and source-page routing. Nothing is published, automated, or executed from this page.")}
+        description={ui("Read-only workflow guidance that explains what happened, who is responsible, where the work belongs, when it is due, and what should happen next. Nothing is published, automated, or executed from this page.")}
         aside={<OperationalWorkspaceStatus value={ui("Guidance only")} label={ui("source workflows remain authoritative")} />}
       />
 
@@ -585,6 +670,18 @@ export default function WorkflowAutomationComposerPage() {
                 ))}
               </select>
             </label>
+            <label className="workflow-composer-page__field">
+              {ui("Responsibility")}
+              <select
+                className="workflow-composer-page__select"
+                value={responsibility}
+                onChange={(event) => setResponsibility(event.target.value as WorkflowResponsibilityFilter)}
+              >
+                {RESPONSIBILITY_FILTERS.map((option) => (
+                  <option key={option.value} value={option.value}>{ui(option.label)}</option>
+                ))}
+              </select>
+            </label>
             <button
               className="button button--secondary workflow-composer-page__toolbar-action"
               type="button"
@@ -625,7 +722,7 @@ export default function WorkflowAutomationComposerPage() {
             <div className="workflow-composer-page__state">
               <span className="workflow-composer-page__intro-icon"><TenantNavIcon path="/workflow-composer" size={17} /></span>
               <div><div className="workflow-composer-page__state-title">{ui("No matching plans")}</div>
-              <p className="card__subtext">{ui("No suggested workflow plan matched the selected work area and urgency.")}</p></div>
+              <p className="card__subtext">{ui("No suggested workflow plan matched the selected work area, urgency, and responsibility filter.")}</p></div>
             </div>
           ) : (
             <div className="workflow-composer-page__blueprint-list">
@@ -663,7 +760,47 @@ export default function WorkflowAutomationComposerPage() {
                       <span className={urgencyClass(urgencyValue)}>{canonicalLabel(urgencyValue, ui)}</span>
                     </div>
 
-                    <p className="card__subtext workflow-composer-page__blueprint-summary">{sourceDescription(blueprint, ui)}</p>
+                    <div className="workflow-composer-page__situation-grid">
+                      <div className="workflow-composer-page__situation-panel">
+                        <div className="workflow-composer-page__context-label">{ui("What happened")}</div>
+                        <p className="card__subtext workflow-composer-page__blueprint-summary">{sourceDescription(blueprint, ui)}</p>
+                      </div>
+                      <div className="workflow-composer-page__situation-panel">
+                        <div className="workflow-composer-page__context-label">{ui("What should happen next")}</div>
+                        <p className="card__subtext workflow-composer-page__blueprint-summary">
+                          {localizedGuidance(
+                            blueprint.recommended_next_step_key,
+                            blueprint.recommended_next_step,
+                            'Follow the suggested steps and continue in the source workflow.',
+                            ui
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="workflow-composer-page__context-grid">
+                      <div className="workflow-composer-page__context-item">
+                        <div className="workflow-composer-page__context-label">{ui("Responsibility")}</div>
+                        <div className="workflow-composer-page__context-value">{responsibilityText(blueprint, ui)}</div>
+                      </div>
+                      {locationText(blueprint, ui) ? (
+                        <div className="workflow-composer-page__context-item">
+                          <div className="workflow-composer-page__context-label">{ui("Location")}</div>
+                          <div className="workflow-composer-page__context-value">{locationText(blueprint, ui)}</div>
+                        </div>
+                      ) : null}
+                      <div className={`workflow-composer-page__context-item ${blueprint.deadline_context?.due_state === 'overdue' ? 'workflow-composer-page__context-item--danger' : ''}`}>
+                        <div className="workflow-composer-page__context-label">{ui("Deadline")}</div>
+                        <div className="workflow-composer-page__context-value">{deadlineText(blueprint, locale, ui)}</div>
+                      </div>
+                      <div className="workflow-composer-page__context-item">
+                        <div className="workflow-composer-page__context-label">{ui("Your access")}</div>
+                        <div className="workflow-composer-page__context-value">
+                          {ui(blueprint.viewer_can_act ? 'Source actions available to your role' : 'View-only source access')}
+                        </div>
+                      </div>
+                    </div>
+
                     <p className="card__subtext workflow-composer-page__updated">
                       {ui("Plan updated")} {formatDateTime(blueprint.updated_at || blueprint.created_at, locale, ui)}
                     </p>
