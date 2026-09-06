@@ -12,6 +12,7 @@ import { normalizeError } from '../EnterpriseInventoryFormat';
 import { InputField, SelectField, TextareaField } from '../EnterpriseInventoryShared';
 import { patchEnterpriseInventoryRequest, postEnterpriseInventoryRequest, postEnterpriseInventoryVersionedRequest } from '../EnterpriseInventoryRequests';
 import { styles } from '../EnterpriseInventoryStyles';
+import { parseSerialNumbersInput } from '../../inventory/serialNumbers';
 import type { SupplierInvoice, SupplierInvoiceItem } from '../EnterpriseInventoryTypes';
 
 type EligibleReturnLot = {
@@ -37,6 +38,8 @@ type EligibleReturnLot = {
   unit_cost?: number | string | null;
   unit_cost_currency?: string | null;
   received_at?: string | null;
+  serial_tracking_enabled?: boolean;
+  serial_numbers?: string[];
 };
 
 type SupplierReturnItem = {
@@ -57,6 +60,7 @@ type SupplierReturnItem = {
   batch_number?: string | null;
   expiry_date?: string | null;
   reason?: string | null;
+  serial_numbers?: string[];
 };
 
 type SupplierReturnCreditItem = {
@@ -125,6 +129,7 @@ type DraftReturnItem = {
   inventory_lot_id: string;
   quantity: number;
   reason: string;
+  serial_numbers: string[];
   lot: EligibleReturnLot;
 };
 
@@ -154,6 +159,7 @@ export function SupplierReturnsTab() {
   const [selectedLotId, setSelectedLotId] = useState('');
   const [lineQuantity, setLineQuantity] = useState('');
   const [lineReason, setLineReason] = useState('');
+  const [lineSerialNumbers, setLineSerialNumbers] = useState('');
   const [returnReason, setReturnReason] = useState('');
   const [notes, setNotes] = useState('');
   const [draftItems, setDraftItems] = useState<DraftReturnItem[]>([]);
@@ -303,6 +309,7 @@ export function SupplierReturnsTab() {
       items: draftItems.map((item) => ({
         inventory_lot_id: item.inventory_lot_id,
         quantity: item.quantity,
+        serial_numbers: item.serial_numbers,
         reason: item.reason.trim() || null,
       })),
     }),
@@ -311,6 +318,7 @@ export function SupplierReturnsTab() {
       setSelectedLotId('');
       setLineQuantity('');
       setLineReason('');
+      setLineSerialNumbers('');
       setReturnReason('');
       setNotes('');
       setError(null);
@@ -510,13 +518,34 @@ export function SupplierReturnsTab() {
       setError(ui('Return quantity cannot exceed {quantity} for this lot.').replace('{quantity}', formatQuantity(returnable)));
       return;
     }
+    const serialNumbers = parseSerialNumbersInput(lineSerialNumbers);
+    if (selectedLot.serial_tracking_enabled) {
+      if (!Number.isInteger(quantity)) {
+        setError(ui('Serial-tracked supplier returns require a whole-number quantity.'));
+        return;
+      }
+      if (serialNumbers.length !== quantity) {
+        setError(ui('Select exactly {count} serial number(s) from this received lot.').replace('{count}', String(quantity)));
+        return;
+      }
+      const availableSerials = new Set(selectedLot.serial_numbers ?? []);
+      const unavailableSerials = serialNumbers.filter((serialNumber) => !availableSerials.has(serialNumber));
+      if (unavailableSerials.length) {
+        setError(ui('One or more selected serial numbers are not available in this received lot.'));
+        return;
+      }
+    } else if (serialNumbers.length) {
+      setError(ui('Serial numbers can only be entered for a serial-tracked product.'));
+      return;
+    }
     setDraftItems((current) => [
       ...current,
-      { inventory_lot_id: selectedLot.inventory_lot_id, quantity, reason: lineReason, lot: selectedLot },
+      { inventory_lot_id: selectedLot.inventory_lot_id, quantity, reason: lineReason, serial_numbers: serialNumbers, lot: selectedLot },
     ]);
     setSelectedLotId('');
     setLineQuantity('');
     setLineReason('');
+    setLineSerialNumbers('');
   };
 
   const runLifecycleAction = (item: SupplierReturn, action: ReturnLifecycleAction) => {
@@ -560,7 +589,7 @@ export function SupplierReturnsTab() {
             <SelectField
               label={ui('Received lot')}
               value={selectedLotId}
-              onChange={setSelectedLotId}
+              onChange={(value) => { setSelectedLotId(value); setLineSerialNumbers(''); }}
               disabled={!canWrite || createReturnMutation.isPending}
               options={availableLotOptions.map((lot) => ({
                 value: lot.inventory_lot_id,
@@ -573,6 +602,13 @@ export function SupplierReturnsTab() {
               }))}
             />
             <InputField label={ui('Return quantity')} type="number" min="0.0001" max={selectedLot ? String(selectedLot.returnable_quantity) : undefined} value={lineQuantity} onChange={setLineQuantity} disabled={!canWrite || createReturnMutation.isPending} />
+            {selectedLot?.serial_tracking_enabled ? (
+              <>
+                <TextareaField label={ui('Serial numbers')} value={lineSerialNumbers} onChange={setLineSerialNumbers} disabled={!canWrite || createReturnMutation.isPending} />
+                <p style={styles.helper}>{ui('Enter one serial number per line.')}</p>
+                <p style={styles.helper}>{ui('Available serials for this lot: {serials}').replace('{serials}', (selectedLot.serial_numbers ?? []).join(', ') || '—')}</p>
+              </>
+            ) : null}
             <InputField label={ui('Line reason (optional)')} value={lineReason} onChange={setLineReason} disabled={!canWrite || createReturnMutation.isPending} />
             {selectedLot ? (
               <p style={styles.helper}>
@@ -597,7 +633,7 @@ export function SupplierReturnsTab() {
             <div style={styles.stack}>
               <div style={styles.tableWrap}>
                 <table style={styles.table}>
-                  <thead><tr>{['Product', 'Condition', 'Lot / batch', 'Quantity', 'Reason', 'Action'].map((header) => <th key={header} style={styles.th}>{ui(header)}</th>)}</tr></thead>
+                  <thead><tr>{['Product', 'Condition', 'Lot / batch', 'Quantity', 'Serial numbers', 'Reason', 'Action'].map((header) => <th key={header} style={styles.th}>{ui(header)}</th>)}</tr></thead>
                   <tbody>
                     {draftItems.map((item) => (
                       <tr key={item.inventory_lot_id}>
@@ -605,6 +641,7 @@ export function SupplierReturnsTab() {
                         <td style={styles.td}>{conditionLabel(item.lot.condition)}</td>
                         <td style={styles.td}>{lotIdentity(item.lot)}<div style={styles.helper}>{ui('Expiry {date}').replace('{date}', item.lot.expiry_date ? formatLocalizedDate(item.lot.expiry_date, locale) : '—')}</div></td>
                         <td style={styles.td}>{formatQuantity(item.quantity)}</td>
+                        <td style={styles.td}>{item.serial_numbers.length ? item.serial_numbers.join(', ') : '—'}</td>
                         <td style={styles.td}>{item.reason || '—'}</td>
                         <td style={styles.td}><button type="button" style={styles.dangerButton} disabled={createReturnMutation.isPending} onClick={() => setDraftItems((current) => current.filter((line) => line.inventory_lot_id !== item.inventory_lot_id))}>{ui('Remove')}</button></td>
                       </tr>
@@ -696,6 +733,7 @@ export function SupplierReturnsTab() {
                       <div key={line.id} style={{ marginBottom: 6 }}>
                         <strong>{line.product_name || ui('Product')}</strong> · {formatQuantity(line.quantity)} · {conditionLabel(line.source_condition)}
                         <div style={styles.helper}>{line.storage_location_name || '—'} · {line.lot_number || line.batch_number || ui('Unnumbered lot')}</div>
+                        {line.serial_numbers?.length ? <div style={styles.helper}>{ui('Serials: {serials}').replace('{serials}', line.serial_numbers.join(', '))}</div> : null}
                       </div>
                     ))}</td>
                     <td style={styles.td}>{item.reason}</td>
