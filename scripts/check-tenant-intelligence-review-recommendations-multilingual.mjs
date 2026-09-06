@@ -114,13 +114,13 @@ const forbiddenTechnicalTranslation = [
 for (const pattern of forbiddenTechnicalTranslation) if (pageSource.includes(pattern)) fail(`Canonical Intelligence Review value must remain language-independent: ${pattern}`);
 
 const apiContracts = [
-  "new URLSearchParams({ limit: sourceActionId ? '1' : '75' })", "params.set('ai_operation_domain', aiOperationDomain)", "params.set('review_state', reviewState)", "params.set('urgency', urgency)",
+  "new URLSearchParams({ limit: sourceActionId ? '1' : '25', offset: sourceActionId ? '0' : String(offset), sort })", "params.set('ai_operation_domain', aiOperationDomain)", "params.set('review_state', reviewState)", "params.set('due_state', 'overdue')", "params.set('search', search.trim())", "params.set('urgency', urgency)",
   'apiRequest<HumanAIReviewResponse>(`/operational-action-center/human-in-loop-ai-operations-summary?${params.toString()}`)',
   '`/operational-action-center/human-in-loop-ai-reviews/${encodeURIComponent(sourceActionId)}/history`',
   '`/operational-action-center/human-in-loop-ai-reviews/${encodeURIComponent(sourceActionId)}/decision`',
   '`/operational-action-center/human-in-loop-ai-reviews/${encodeURIComponent(sourceActionId)}/execution-request-draft`',
   "method: 'POST'", "decision,", "reason_category: draft.reason_category || null", "reviewer_notes: draft.reviewer_notes || null",
-  "override_reason: draft.override_reason || null", "expected_version: review.lifecycle?.version || undefined"
+  "override_reason: draft.override_reason || null", "escalation_target_user_id: decision === 'escalated' ? draft.escalation_target_user_id || null : null", "expected_version: review.lifecycle?.version || undefined"
 ];
 for (const contract of apiContracts) if (!pageSource.includes(contract)) fail(`Intelligence Review recommendation API/lifecycle contract changed during localization: ${contract}`);
 

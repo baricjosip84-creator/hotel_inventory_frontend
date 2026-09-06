@@ -83,6 +83,8 @@ const UNIFIED_AI_FRONTEND_PANEL_DOM_ANCHORS = [
 
 type AIOperationDomain = 'decision_intelligence' | 'ai_governance' | 'remediation' | 'simulation' | 'optimization' | 'multi_domain';
 type ReviewState = 'pending_review' | 'approval_required' | 'escalated' | 'ready_for_human_decision' | 'acknowledged' | 'approved_for_manual_action' | 'rejected' | 'suppressed' | 'execution_request_drafted';
+type ReviewStateFilter = ReviewState | 'overdue';
+type ReviewSort = 'priority' | 'due_soonest' | 'newest' | 'oldest';
 type ReviewDecision = 'acknowledged' | 'approved_for_manual_action' | 'rejected' | 'suppressed' | 'escalated' | 'reopened';
 type EscalationTargetRole = 'admin' | 'manager' | 'decision_intelligence_reviewer';
 type Urgency = 'critical' | 'high' | 'medium' | 'low';
@@ -3590,6 +3592,7 @@ type HumanAIReview = {
     api_surface?: string | null;
   };
   ai_operation_domain?: string;
+  source_scope_domain?: string | null;
   review_state?: string;
   urgency?: string;
   title?: string;
@@ -3641,6 +3644,9 @@ type HumanAIReview = {
     execution_request_status?: string | null;
     execution_request_execution_status?: string | null;
     escalation_target_role?: EscalationTargetRole | null;
+    escalation_target_user_id?: string | null;
+    escalation_target_user_name?: string | null;
+    escalation_target_user_email?: string | null;
     escalation_due_at?: string | null;
     escalation_assigned_at?: string | null;
     escalation_resolved_at?: string | null;
@@ -3685,9 +3691,11 @@ type AIReviewHistoryResponse = {
     execution_request_id?: string | null;
     metadata?: {
       escalation_target_role?: EscalationTargetRole | null;
+      escalation_target_user_id?: string | null;
+      escalation_target_user_name?: string | null;
       escalation_due_at?: string | null;
-      previous_escalation?: { target_role?: EscalationTargetRole | null; due_at?: string | null } | null;
-      resolved_escalation?: { target_role?: EscalationTargetRole | null; due_at?: string | null } | null;
+      previous_escalation?: { target_role?: EscalationTargetRole | null; target_user_id?: string | null; target_user_name?: string | null; due_at?: string | null } | null;
+      resolved_escalation?: { target_role?: EscalationTargetRole | null; target_user_id?: string | null; target_user_name?: string | null; due_at?: string | null } | null;
       reopened_from_execution_request?: { id?: string; status?: string; execution_status?: string | null } | null;
     } | null;
     created_at?: string | null;
@@ -3701,6 +3709,7 @@ type ReviewDecisionDraft = {
   reviewer_notes: string;
   override_reason: string;
   escalation_target_role: '' | EscalationTargetRole;
+  escalation_target_user_id: string;
   escalation_due_at: string;
 };
 
@@ -3717,8 +3726,12 @@ type HumanAIReviewResponse = {
   filters?: {
     ai_operation_domain?: string | null;
     review_state?: string | null;
+    due_state?: string | null;
     urgency?: string | null;
+    search?: string;
+    sort?: ReviewSort;
     limit?: number;
+    offset?: number;
   };
   summary?: {
     total_reviews?: number;
@@ -3743,6 +3756,8 @@ type HumanAIReviewResponse = {
     approval_guidance?: string;
     safety_contract?: Record<string, boolean>;
   };
+  pagination?: { limit?: number; offset?: number; total?: number; from?: number; to?: number; has_more?: boolean; previous_offset?: number | null; next_offset?: number | null };
+  reviewer_directory?: Array<{ id: string; name?: string | null; email?: string | null; role?: string | null; custom_role_id?: string | null; escalation_roles?: EscalationTargetRole[] }>;
   reviews?: HumanAIReview[];
   source_workspace_summary?: Record<string, unknown>;
   source_action_center_summary?: Record<string, unknown>;
@@ -3760,17 +3775,25 @@ const DOMAIN_FILTERS: Array<{ value: 'all' | AIOperationDomain; label: string }>
   { value: 'multi_domain', label: 'Cross-area reviews' }
 ];
 
-const REVIEW_STATE_FILTERS: Array<{ value: 'all' | ReviewState; label: string }> = [
+const REVIEW_STATE_FILTERS: Array<{ value: 'all' | ReviewStateFilter; label: string }> = [
   { value: 'all', label: 'All review states' },
   { value: 'pending_review', label: 'Pending review' },
   { value: 'approval_required', label: 'Approval required' },
   { value: 'escalated', label: 'Escalated' },
+  { value: 'overdue', label: 'Overdue escalations' },
   { value: 'ready_for_human_decision', label: 'Ready for human decision' },
   { value: 'acknowledged', label: 'Acknowledged' },
   { value: 'approved_for_manual_action', label: 'Approved for manual action' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'suppressed', label: 'Suppressed' },
   { value: 'execution_request_drafted', label: 'Execution request drafted' }
+];
+
+const REVIEW_SORT_OPTIONS: Array<{ value: ReviewSort; label: string }> = [
+  { value: 'priority', label: 'Highest priority' },
+  { value: 'due_soonest', label: 'Due soonest' },
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' }
 ];
 
 const REVIEW_DECISION_OPTIONS: Array<{ value: ReviewDecision; label: string }> = [
@@ -3805,6 +3828,7 @@ const defaultReviewDecisionDraft: ReviewDecisionDraft = {
   reviewer_notes: '',
   override_reason: '',
   escalation_target_role: '',
+  escalation_target_user_id: '',
   escalation_due_at: ''
 };
 
@@ -4440,6 +4464,48 @@ function escalationTargetLabel(value: string | null | undefined, ui: (englishTex
   return option ? ui(option.label) : ui('Not assigned');
 }
 
+function escalationOwnerLabel(lifecycle: HumanAIReview['lifecycle'], ui: (englishText: string) => string): string {
+  if (lifecycle?.escalation_target_user_name) return lifecycle.escalation_target_user_name;
+  if (lifecycle?.escalation_target_user_email) return lifecycle.escalation_target_user_email;
+  return escalationTargetLabel(lifecycle?.escalation_target_role, ui);
+}
+
+function escalationDueIndicator(lifecycle: HumanAIReview['lifecycle']): 'overdue' | 'due_soon' | 'scheduled' | null {
+  if (lifecycle?.current_status !== 'escalated' || !lifecycle.escalation_due_at) return null;
+  const due = new Date(lifecycle.escalation_due_at).getTime();
+  if (!Number.isFinite(due)) return null;
+  const remaining = due - Date.now();
+  if (remaining < 0) return 'overdue';
+  if (remaining <= 48 * 60 * 60 * 1000) return 'due_soon';
+  return 'scheduled';
+}
+
+type BusinessImpactRow = { label: string; value: string };
+
+function reviewBusinessImpactRows(review: HumanAIReview, ui: (englishText: string) => string, locale: AppLocale): BusinessImpactRow[] {
+  const metrics = review.simulation_preview?.preview_metrics || {};
+  const rows: BusinessImpactRow[] = [];
+  if (review.source_scope_domain) rows.push({ label: ui('Affected area'), value: formatLabel(review.source_scope_domain) });
+  const knownMetrics: Array<[string, string]> = [
+    ['recommended_reorder_quantity', 'Recommended reorder quantity'],
+    ['target_stock_quantity', 'Target stock quantity'],
+    ['recommended_order_package_count', 'Recommended package count'],
+    ['current_standard_unit_cost', 'Current standard unit cost'],
+    ['proposed_standard_unit_cost', 'Proposed standard unit cost'],
+    ['recommended_adjustment', 'Recommended adjustment'],
+    ['expected_impact', 'Expected impact'],
+    ['high_risk_count', 'High-risk findings'],
+    ['calibration_count', 'Calibration records']
+  ];
+  for (const [key, label] of knownMetrics) {
+    const value = metrics[key];
+    if (value === undefined || value === null || value === '') continue;
+    rows.push({ label: ui(label), value: typeof value === 'number' ? formatLocalizedNumber(value, locale) : typeof value === 'object' ? JSON.stringify(value) : String(value) });
+    if (rows.length >= 4) break;
+  }
+  return rows;
+}
+
 function reviewDecisionMeaning(decision: ReviewDecision | undefined, ui: (englishText: string) => string, sourceType?: string): string {
   if (sourceType === 'probabilistic_forecast_model') {
     if (decision === 'approved_for_manual_action') return ui('Trust this forecast model for advisory forecasting. This does not create operational work or an Execution Request.');
@@ -4759,11 +4825,14 @@ async function createAIReviewExecutionRequestDraft(sourceActionId: string): Prom
 
 async function fetchHumanAIReviewSummary(
   aiOperationDomain: 'all' | AIOperationDomain,
-  reviewState: 'all' | ReviewState,
+  reviewState: 'all' | ReviewStateFilter,
   urgency: 'all' | Urgency,
+  search: string,
+  sort: ReviewSort,
+  offset: number,
   sourceActionId?: string | null
 ): Promise<HumanAIReviewResponse> {
-  const params = new URLSearchParams({ limit: sourceActionId ? '1' : '75' });
+  const params = new URLSearchParams({ limit: sourceActionId ? '1' : '25', offset: sourceActionId ? '0' : String(offset), sort });
 
   if (sourceActionId) {
     params.set('source_action_id', sourceActionId);
@@ -4772,9 +4841,13 @@ async function fetchHumanAIReviewSummary(
       params.set('ai_operation_domain', aiOperationDomain);
     }
 
-    if (reviewState !== 'all') {
+    if (reviewState === 'overdue') {
+      params.set('due_state', 'overdue');
+    } else if (reviewState !== 'all') {
       params.set('review_state', reviewState);
     }
+
+    if (search.trim()) params.set('search', search.trim());
 
     if (urgency !== 'all') {
       params.set('urgency', urgency);
@@ -4814,7 +4887,10 @@ export default function HumanInLoopAIReviewPage() {
   const requestedSourceActionId = searchParams.get('source_action_id');
   const activeView: IntelligenceReviewView = searchParams.get('view') === 'readiness' ? 'readiness' : 'recommendations';
   const [aiOperationDomain, setAiOperationDomain] = useState<'all' | AIOperationDomain>('all');
-  const [reviewState, setReviewState] = useState<'all' | ReviewState>('all');
+  const [reviewState, setReviewState] = useState<'all' | ReviewStateFilter>('all');
+  const [reviewSearch, setReviewSearch] = useState('');
+  const [reviewSort, setReviewSort] = useState<ReviewSort>('priority');
+  const [reviewOffset, setReviewOffset] = useState(0);
   const [urgency, setUrgency] = useState<'all' | Urgency>('all');
   const [selectedReadinessFeatureKey, setSelectedReadinessFeatureKey] = useState<string>('');
   const [selectedHistorySourceActionId, setSelectedHistorySourceActionId] = useState<string | null>(requestedSourceActionId);
@@ -4824,8 +4900,8 @@ export default function HumanInLoopAIReviewPage() {
   const lastAutoScrolledSourceActionId = useRef<string | null>(null);
 
   const reviewQuery = useQuery({
-    queryKey: ['human-in-loop-ai-review', aiOperationDomain, reviewState, urgency, requestedSourceActionId],
-    queryFn: () => fetchHumanAIReviewSummary(aiOperationDomain, reviewState, urgency, requestedSourceActionId),
+    queryKey: ['human-in-loop-ai-review', aiOperationDomain, reviewState, urgency, reviewSearch, reviewSort, reviewOffset, requestedSourceActionId],
+    queryFn: () => fetchHumanAIReviewSummary(aiOperationDomain, reviewState, urgency, reviewSearch, reviewSort, reviewOffset, requestedSourceActionId),
     enabled: activeView === 'recommendations'
   });
 
@@ -4834,6 +4910,15 @@ export default function HumanInLoopAIReviewPage() {
     queryFn: () => fetchAIReviewHistory(selectedHistorySourceActionId || ''),
     enabled: activeView === 'recommendations' && Boolean(selectedHistorySourceActionId)
   });
+
+  useEffect(() => {
+    if (requestedSourceActionId || reviewQuery.isFetching || reviewOffset <= 0) return;
+    const total = numberValue(reviewQuery.data?.pagination?.total);
+    const visibleCount = reviewQuery.data?.reviews?.length || 0;
+    if (total > 0 && visibleCount === 0 && reviewOffset >= total) {
+      setReviewOffset(Math.max(0, reviewOffset - 25));
+    }
+  }, [requestedSourceActionId, reviewQuery.isFetching, reviewQuery.data?.pagination?.total, reviewQuery.data?.reviews?.length, reviewOffset]);
 
   const reviewDecisionMutation = useMutation({
     mutationFn: ({ sourceActionId, body }: { sourceActionId: string; body: Record<string, unknown> }) => recordAIReviewDecision(sourceActionId, body),
@@ -5244,6 +5329,12 @@ export default function HumanInLoopAIReviewPage() {
       || a.label.localeCompare(b.label);
   });
 
+  const readinessCandidateCount = numberValue(readinessSummary.production_candidates);
+  const readinessNotReadyCount = numberValue(readinessSummary.not_production_ready);
+  const readinessNeedsMoreWorkCount = Math.max(0, numberValue(readinessSummary.total_features) - readinessCandidateCount);
+  const readinessOverallStatus = readinessNotReadyCount > 0 || productionBacklog.length > 0 ? 'Needs attention' : 'No blockers reported';
+  const readinessAttentionItems = productionBacklog.slice(0, 3);
+
   const featureDetail = featureDetailQuery.data;
   const selectedFeature = featureDetail?.feature;
   const selectedFeatureTables = selectedFeature?.evidence?.tables || [];
@@ -5276,6 +5367,7 @@ export default function HumanInLoopAIReviewPage() {
         reviewer_notes: draft.reviewer_notes || null,
         override_reason: draft.override_reason || null,
         escalation_target_role: decision === 'escalated' ? draft.escalation_target_role || null : null,
+        escalation_target_user_id: decision === 'escalated' ? draft.escalation_target_user_id || null : null,
         escalation_due_at: decision === 'escalated' && draft.escalation_due_at
           ? dateInputEndOfDayIso(draft.escalation_due_at)
           : null,
@@ -5375,6 +5467,32 @@ export default function HumanInLoopAIReviewPage() {
             </p>
           ) : (
             <>
+              <div className="ai-review-page__readiness-overview">
+                <div>
+                  <div className="card__label">{ui('Overall status')}</div>
+                  <strong>{ui(readinessOverallStatus)}</strong>
+                </div>
+                <div>
+                  <div className="card__label">{ui('Production candidates')}</div>
+                  <strong>{formatLocalizedNumber(readinessCandidateCount, locale)}</strong>
+                </div>
+                <div>
+                  <div className="card__label">{ui('Need more evidence or hardening')}</div>
+                  <strong>{formatLocalizedNumber(readinessNeedsMoreWorkCount, locale)}</strong>
+                </div>
+                <div>
+                  <div className="card__label">{ui('Not production ready')}</div>
+                  <strong>{formatLocalizedNumber(readinessNotReadyCount, locale)}</strong>
+                </div>
+              </div>
+              <div className="ai-review-page__readiness-attention">
+                <div className="card__label">{ui('What needs your attention')}</div>
+                {readinessAttentionItems.length ? (
+                  <ul>
+                    {readinessAttentionItems.map((item) => <li key={`${item.feature_key}-${item.sequence}`}>{localizedReadinessSystemText(item.feature_label, ui)}: {localizedReadinessSystemText(item.gap, ui)}</li>)}
+                  </ul>
+                ) : <p className="card__subtext">{ui('No current readiness backlog items are reported.')}</p>}
+              </div>
               <p className="card__subtext">
                 {ui("This readiness view is read-only. It does not execute recommendations, mutate inventory, approve decisions, call external AI, or train models.")}
               </p>
@@ -8824,20 +8942,24 @@ export default function HumanInLoopAIReviewPage() {
         <div className="card ai-review-page__controls-card">
           <div className="ai-review-page__toolbar" style={toolbarStyle}>
             {!isFocusedReview ? (<>
-              <label className="ai-review-page__field"><span>{ui("Review category")}</span><select aria-label={ui("Review category")} style={selectStyle} value={aiOperationDomain} onChange={(event) => setAiOperationDomain(event.target.value as 'all' | AIOperationDomain)}>
+              <label className="ai-review-page__field"><span>{ui("Review category")}</span><select aria-label={ui("Review category")} style={selectStyle} value={aiOperationDomain} onChange={(event) => { setAiOperationDomain(event.target.value as 'all' | AIOperationDomain); setReviewOffset(0); }}>
                 {DOMAIN_FILTERS.map((option) => (
                   <option key={option.value} value={option.value}>{ui(option.label)}</option>
                 ))}
               </select></label>
-              <label className="ai-review-page__field"><span>{ui("Review state")}</span><select aria-label={ui("Review state")} style={selectStyle} value={reviewState} onChange={(event) => setReviewState(event.target.value as 'all' | ReviewState)}>
+              <label className="ai-review-page__field"><span>{ui("Review state")}</span><select aria-label={ui("Review state")} style={selectStyle} value={reviewState} onChange={(event) => { setReviewState(event.target.value as 'all' | ReviewStateFilter); setReviewOffset(0); }}>
                 {REVIEW_STATE_FILTERS.map((option) => (
                   <option key={option.value} value={option.value}>{ui(option.label)}</option>
                 ))}
               </select></label>
-              <label className="ai-review-page__field"><span>{ui("Urgency")}</span><select aria-label={ui("Review urgency")} style={selectStyle} value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | Urgency)}>
+              <label className="ai-review-page__field"><span>{ui("Urgency")}</span><select aria-label={ui("Review urgency")} style={selectStyle} value={urgency} onChange={(event) => { setUrgency(event.target.value as 'all' | Urgency); setReviewOffset(0); }}>
                 {URGENCY_FILTERS.map((option) => (
                   <option key={option.value} value={option.value}>{ui(option.label)}</option>
                 ))}
+              </select></label>
+              <label className="ai-review-page__field ai-review-page__search-field"><span>{ui('Search reviews')}</span><input aria-label={ui('Search reviews')} value={reviewSearch} onChange={(event) => { setReviewSearch(event.target.value); setReviewOffset(0); }} placeholder={ui('Search title, summary, source, or work area')} /></label>
+              <label className="ai-review-page__field"><span>{ui('Sort')}</span><select aria-label={ui('Sort reviews')} style={selectStyle} value={reviewSort} onChange={(event) => { setReviewSort(event.target.value as ReviewSort); setReviewOffset(0); }}>
+                {REVIEW_SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
               </select></label>
             </>) : (
               <span className="card__subtext">{ui('Showing the exact requested Intelligence Review item. Queue filters do not apply in this focused view.')}</span>
@@ -8881,7 +9003,9 @@ export default function HumanInLoopAIReviewPage() {
               const isForecastReview = review.source_reference?.source_type === 'probabilistic_forecast_model';
               const isEscalatedReview = lifecycle?.current_status === 'escalated';
               const currentRoleOwnsEscalation = !isEscalatedReview
-                || currentRoleMatchesEscalationTarget(lifecycle?.escalation_target_role, capabilities.role);
+                || (lifecycle?.escalation_target_user_id
+                  ? String(lifecycle.escalation_target_user_id) === String(tenantAccess.userId || '')
+                  : currentRoleMatchesEscalationTarget(lifecycle?.escalation_target_role, capabilities.role));
               const causesSidebarAttention = Boolean(
                 capabilities.canGovernDecisionIntelligence
                 && isEscalatedReview
@@ -8894,6 +9018,7 @@ export default function HumanInLoopAIReviewPage() {
                     ...defaultReviewDecisionDraft,
                     decision: 'escalated',
                     escalation_target_role: lifecycle?.escalation_target_role || '',
+                    escalation_target_user_id: lifecycle?.escalation_target_user_id || '',
                     escalation_due_at: dateInputValueFromIso(lifecycle?.escalation_due_at)
                   }
                 : defaultReviewDecisionDraft;
@@ -8909,6 +9034,9 @@ export default function HumanInLoopAIReviewPage() {
                 : visibleDecisionOptions[0]?.value;
               const decisionValidationMessage = reviewDecisionValidationMessage(selectedDecision, decisionDraft, ui);
               const historyIsSelected = selectedHistorySourceActionId === sourceActionId;
+              const businessImpactRows = reviewBusinessImpactRows(review, ui, locale);
+              const dueIndicator = escalationDueIndicator(lifecycle);
+              const eligibleNamedReviewers = (reviewQuery.data?.reviewer_directory || []).filter((reviewer) => !decisionDraft.escalation_target_role || reviewer.escalation_roles?.includes(decisionDraft.escalation_target_role as EscalationTargetRole));
               return (
                 <article
                   className={`card ai-review-page__review-card ai-review-page__review-card--${review.urgency || 'medium'}`}
@@ -8922,6 +9050,7 @@ export default function HumanInLoopAIReviewPage() {
                     {causesSidebarAttention ? <SidebarAttentionMarker label={ui('Attention required')} /> : null}
                     <span className={`ai-review-page__badge ai-review-page__badge--${review.urgency || 'medium'}`}>{recommendationLabel(review.urgency, ui)}</span>
                     <span className="ai-review-page__badge">{recommendationLabel(review.review_state, ui)}</span>
+                    {dueIndicator === 'overdue' ? <span className="ai-review-page__badge ai-review-page__badge--overdue">{ui('OVERDUE')}</span> : dueIndicator === 'due_soon' ? <span className="ai-review-page__badge ai-review-page__badge--amber">{ui('Due soon')}</span> : null}
                     <span className="ai-review-page__badge ai-review-page__badge--violet">{recommendationLabel(review.ai_operation_domain, ui)}</span>
                     {review.governance_approval_guidance?.approval_required && reviewStateIsActive(lifecycle?.current_status || review.review_state) ? <span className="ai-review-page__badge ai-review-page__badge--amber">{ui("Approval required")}</span> : null}
                   </div>
@@ -8955,6 +9084,17 @@ export default function HumanInLoopAIReviewPage() {
                       <p className="card__subtext">{localizedReviewEvidenceSummary(evidencePreview, locale, ui)}</p>
                     </div>
                   ) : null}
+
+                  <div className="ai-review-page__business-impact">
+                    <div className="card__label">{ui('Business impact')}</div>
+                    {businessImpactRows.length ? (
+                      <dl>
+                        {businessImpactRows.map((row) => <div key={`${row.label}-${row.value}`}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}
+                      </dl>
+                    ) : <p className="card__subtext">{ui('No additional business-impact figures were reported by the source.')}</p>}
+                    <p className="card__subtext"><strong>{ui('If approved:')}</strong> {review.source_reference?.source_type === 'probabilistic_forecast_model' ? ui('The forecast can be trusted for advisory use only. No operational work is created automatically.') : ui('The result can continue to controlled manual follow-up. No business record changes automatically.')}</p>
+                    <p className="card__subtext"><strong>{ui('If no action is taken:')}</strong> {ui('This page leaves the current business records unchanged.')}</p>
+                  </div>
 
                   {canViewDiagnostics && review.source_reference?.source_id ? (
                     <div style={{ marginTop: 12 }}>
@@ -8992,8 +9132,10 @@ export default function HumanInLoopAIReviewPage() {
                     </p>
                     {lifecycle?.current_status === 'escalated' ? (
                       <p className="card__subtext">
-                        <strong>{ui('Assigned to')}</strong>: {escalationTargetLabel(lifecycle.escalation_target_role, ui)}
+                        <strong>{ui('Assigned to')}</strong>: {escalationOwnerLabel(lifecycle, ui)}
+                        {lifecycle.escalation_target_user_id ? ` · ${ui('Role:')} ${escalationTargetLabel(lifecycle.escalation_target_role, ui)}` : ''}
                         {lifecycle.escalation_due_at ? ` · ${ui('Due date')}: ${formatDateOnly(lifecycle.escalation_due_at, locale, ui)}` : ''}
+                        {dueIndicator === 'overdue' ? ` · ${ui('OVERDUE')}` : dueIndicator === 'due_soon' ? ` · ${ui('Due soon')}` : ''}
                       </p>
                     ) : null}
                     {lifecycle?.reviewer_notes ? <p className="card__subtext" style={{ marginTop: 8 }}>{ui("Latest notes:")} {lifecycle.reviewer_notes}</p> : null}
@@ -9047,10 +9189,21 @@ export default function HumanInLoopAIReviewPage() {
                             <select
                               style={{ ...selectStyle, width: '100%', marginTop: 4 }}
                               value={decisionDraft.escalation_target_role}
-                              onChange={(event) => updateReviewDecisionDraft(sourceActionId, { escalation_target_role: event.target.value as '' | EscalationTargetRole })}
+                              onChange={(event) => updateReviewDecisionDraft(sourceActionId, { escalation_target_role: event.target.value as '' | EscalationTargetRole, escalation_target_user_id: '' })}
                             >
                               <option value="">{ui('Choose reviewer')}</option>
                               {ESCALATION_TARGET_OPTIONS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
+                            </select>
+                          </label>
+                          <label>
+                            <span className="card__subtext">{ui('Specific reviewer (optional)')}</span>
+                            <select
+                              style={{ ...selectStyle, width: '100%', marginTop: 4 }}
+                              value={decisionDraft.escalation_target_user_id}
+                              onChange={(event) => updateReviewDecisionDraft(sourceActionId, { escalation_target_user_id: event.target.value })}
+                            >
+                              <option value="">{ui('Any eligible reviewer in this role')}</option>
+                              {eligibleNamedReviewers.map((reviewer) => <option key={reviewer.id} value={reviewer.id}>{reviewer.name || reviewer.email || ui('Tenant user')}</option>)}
                             </select>
                           </label>
                           <label>
@@ -9120,15 +9273,15 @@ export default function HumanInLoopAIReviewPage() {
                           {event.reviewer_notes ? <div className="card__subtext">{ui("Notes:")} {event.reviewer_notes}</div> : null}
                           {event.metadata?.escalation_target_role ? (
                             <div className="card__subtext">
-                              {ui('Escalated to:')} {escalationTargetLabel(event.metadata.escalation_target_role, ui)}
+                              {ui('Escalated to:')} {event.metadata.escalation_target_user_name || escalationTargetLabel(event.metadata.escalation_target_role, ui)}
                               {event.metadata.escalation_due_at ? ` · ${ui('Due:')} ${formatDateOnly(event.metadata.escalation_due_at, locale, ui)}` : ''}
                             </div>
                           ) : null}
                           {event.metadata?.previous_escalation?.target_role ? (
-                            <div className="card__subtext">{ui('Previous')} {ui('Assigned to')}: {escalationTargetLabel(event.metadata.previous_escalation.target_role, ui)}</div>
+                            <div className="card__subtext">{ui('Previous')} {ui('Assigned to')}: {event.metadata.previous_escalation.target_user_name || escalationTargetLabel(event.metadata.previous_escalation.target_role, ui)}</div>
                           ) : null}
                           {event.metadata?.resolved_escalation?.target_role ? (
-                            <div className="card__subtext">{ui('Escalation resolved for:')} {escalationTargetLabel(event.metadata.resolved_escalation.target_role, ui)}</div>
+                            <div className="card__subtext">{ui('Escalation resolved for:')} {event.metadata.resolved_escalation.target_user_name || escalationTargetLabel(event.metadata.resolved_escalation.target_role, ui)}</div>
                           ) : null}
                           {event.execution_request_id ? (
                             <div className="card__subtext">
@@ -9176,6 +9329,15 @@ export default function HumanInLoopAIReviewPage() {
             })}
           </div>
         )}
+        {!isFocusedReview && !reviewQuery.isLoading && !reviewQuery.error && numberValue(reviewQuery.data?.pagination?.total) > 0 ? (
+          <div className="ai-review-page__pagination">
+            <span className="card__subtext">{ui('Showing')} {formatLocalizedNumber(numberValue(reviewQuery.data?.pagination?.from), locale)}–{formatLocalizedNumber(numberValue(reviewQuery.data?.pagination?.to), locale)} {ui('of')} {formatLocalizedNumber(numberValue(reviewQuery.data?.pagination?.total), locale)}</span>
+            <div>
+              <button className="button button--secondary" type="button" disabled={reviewQuery.data?.pagination?.previous_offset === null || reviewQuery.data?.pagination?.previous_offset === undefined} onClick={() => setReviewOffset(numberValue(reviewQuery.data?.pagination?.previous_offset))}>{ui('Previous')}</button>
+              <button className="button button--secondary" type="button" disabled={reviewQuery.data?.pagination?.next_offset === null || reviewQuery.data?.pagination?.next_offset === undefined} onClick={() => setReviewOffset(numberValue(reviewQuery.data?.pagination?.next_offset))}>{ui('Next')}</button>
+            </div>
+          </div>
+        ) : null}
       </section>
         </>
       ) : null}
