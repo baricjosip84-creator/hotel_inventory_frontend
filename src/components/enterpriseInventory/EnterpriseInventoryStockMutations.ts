@@ -74,6 +74,18 @@ export function useEnterpriseInventoryStockMutations(
     onError: mutationFeedback.error(ui("Failed to evaluate par levels.")),
   });
 
+  const createReplenishmentExecutionTaskMutation = useMutation({
+    mutationFn: (parLevelId: string) =>
+      postEnterpriseInventoryRequest<{ task_code: string }>(
+        `/execution-tasks/from-par-level/${parLevelId}`,
+      ),
+    onSuccess: mutationFeedback.result(
+      (task: { task_code: string }) => ui("Execution task {taskCode} created from this par level.").replace("{taskCode}", task.task_code),
+      ["execution-tasks", "enterprise-par-levels"],
+    ),
+    onError: mutationFeedback.error(ui("Failed to create a replenishment execution task from this par level.")),
+  });
+
   const createRequisitionMutation = useMutation({
     mutationFn: (input: RequisitionForm) =>
       postEnterpriseInventoryRequest<DepartmentRequisition>(
@@ -215,6 +227,7 @@ export function useEnterpriseInventoryStockMutations(
   return {
     createParLevelMutation,
     evaluateParLevelsMutation,
+    createReplenishmentExecutionTaskMutation,
     createRequisitionMutation,
     submitRequisitionMutation,
     createCycleCountMutation,

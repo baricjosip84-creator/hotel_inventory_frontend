@@ -16,6 +16,8 @@ type ParLevelsTabProps = {
   storageLocations: StorageLocationOption[];
   parLevels: ParLevel[];
   loading: boolean;
+  onCreateExecutionTask: (parLevelId: string) => void;
+  creatingExecutionTaskParLevelId?: string | null;
 };
 
 export function ParLevelsTab({
@@ -26,10 +28,15 @@ export function ParLevelsTab({
   products,
   storageLocations,
   parLevels,
-  loading
+  loading,
+  onCreateExecutionTask,
+  creatingExecutionTaskParLevelId = null
 }: ParLevelsTabProps) {
   const { locale, ui } = useAppTranslation();
   const canWriteParLevels = hasPermission(TENANT_PERMISSIONS.PAR_LEVELS_WRITE);
+  const canCreateReplenishmentTask = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_CREATE)
+    && hasPermission(TENANT_PERMISSIONS.PAR_LEVELS_READ)
+    && hasPermission(TENANT_PERMISSIONS.STOCK_READ);
   const editing = form.expected_version != null;
   const formatQuantity = (value: number | string | null | undefined) => {
     const parsed = Number(value);
@@ -134,7 +141,26 @@ export function ParLevelsTab({
                 <td style={styles.td}>{priorityLabel(item.replenishment_priority)}</td>
                 <td style={styles.td}>{[item.effective_from ? formatLocalizedDate(item.effective_from, locale) : ui('Now'), item.effective_to ? formatLocalizedDate(item.effective_to, locale) : ui('Open')].join(' → ')}</td>
                 <td style={styles.td}>{formatQuantity(item.reorder_quantity)}</td>
-                <td style={styles.td}><button type="button" style={styles.secondarySmallButton} disabled={!canWriteParLevels || isSaving} onClick={() => edit(item)}>{ui('Edit')}</button></td>
+                <td style={styles.td}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button type="button" style={styles.secondarySmallButton} disabled={!canWriteParLevels || isSaving} onClick={() => edit(item)}>{ui('Edit')}</button>
+                    <button
+                      type="button"
+                      style={styles.secondarySmallButton}
+                      disabled={!canCreateReplenishmentTask || !item.active || !item.storage_location_id || Boolean(creatingExecutionTaskParLevelId)}
+                      onClick={() => onCreateExecutionTask(item.id)}
+                      title={!canCreateReplenishmentTask
+                        ? ui('Requires execution-task create, par-level read, and stock read permissions.')
+                        : !item.active
+                          ? ui('Only an active par level can create a replenishment execution task.')
+                          : !item.storage_location_id
+                            ? ui('A storage location is required before creating a replenishment execution task.')
+                            : undefined}
+                    >
+                      {creatingExecutionTaskParLevelId === item.id ? ui('Creating task…') : ui('Create execution task')}
+                    </button>
+                  </div>
+                </td>
               </tr>)}</tbody>
             </table>
           </div>

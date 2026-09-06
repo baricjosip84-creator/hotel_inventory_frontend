@@ -23,6 +23,7 @@ export function EnterpriseInventoryStockOperationsPanels({
   const {
     createCycleCountMutation,
     createParLevelMutation,
+    createReplenishmentExecutionTaskMutation,
     handleCycleCountSubmit,
     handleParLevelSubmit,
     reconcileCycleCountMutation,
@@ -41,6 +42,8 @@ export function EnterpriseInventoryStockOperationsPanels({
           storageLocations={storageLocations}
           parLevels={parLevelsQuery.data ?? []}
           loading={parLevelsQuery.isLoading}
+          onCreateExecutionTask={(parLevelId) => createReplenishmentExecutionTaskMutation.mutate(parLevelId)}
+          creatingExecutionTaskParLevelId={createReplenishmentExecutionTaskMutation.isPending ? createReplenishmentExecutionTaskMutation.variables : null}
         />
       </EnterpriseInventoryTabPanel>
 

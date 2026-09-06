@@ -235,6 +235,12 @@ type ExecutionTaskOptionUser = {
   email: string;
   role: string;
   is_active: boolean;
+  replenishment_capability?: {
+    can_create_stock_transfer: boolean;
+    can_execute_stock_transfer: boolean;
+    can_perform_replenishment: boolean;
+    missing_permissions: string[];
+  };
 };
 
 type ExecutionTaskOptionLocation = {
@@ -285,7 +291,7 @@ const STATUSES: ExecutionTaskStatus[] = ['draft', 'ready', 'assigned', 'in_progr
 const BATCH_STATUSES: ExecutionTaskBatchStatus[] = ['draft', 'released', 'cancelled'];
 const BATCH_TYPES: ExecutionTaskBatchType[] = ['manual', 'reservation_fulfillment', 'receiving', 'replenishment', 'transfer', 'mixed'];
 const SOURCE_TYPES: ExecutionTaskSourceType[] = ['manual', 'reservation', 'requisition', 'purchase_order', 'shipment', 'transfer', 'cycle_count', 'replenishment', 'execution_request'];
-const MANUAL_CREATE_SOURCE_TYPES = SOURCE_TYPES.filter((sourceType): sourceType is Exclude<ExecutionTaskSourceType, 'execution_request'> => sourceType !== 'execution_request');
+const MANUAL_CREATE_SOURCE_TYPES = SOURCE_TYPES.filter((sourceType): sourceType is Exclude<ExecutionTaskSourceType, 'execution_request'> => sourceType !== 'execution_request' && sourceType !== 'replenishment');
 const EMPTY_SUMMARY: ExecutionTaskSummary = {
   matching_task_count: 0,
   open_task_count: 0,
@@ -448,6 +454,11 @@ export default function ExecutionTasksPage() {
 
   const userById = useMemo(() => new Map(options.users.map((user) => [user.id, user])), [options.users]);
   const locationById = useMemo(() => new Map(options.locations.map((location) => [location.id, location])), [options.locations]);
+  const selectedCreateAssignee = form.assigned_to ? userById.get(form.assigned_to) : null;
+  const createAssigneeCapabilityWarning = form.task_type === 'replenishment'
+    && selectedCreateAssignee
+    && selectedCreateAssignee.replenishment_capability
+    && !selectedCreateAssignee.replenishment_capability.can_perform_replenishment;
   const displayedTasks = tasks.slice(0, pageSize);
   const canGoPrevious = offset > 0;
   const visibleStart = displayedTasks.length ? offset + 1 : 0;
@@ -1090,6 +1101,7 @@ export default function ExecutionTasksPage() {
               <label>{ui("Priority")}<select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value as ExecutionTaskPriority })}>{PRIORITIES.map((priority) => <option key={priority} value={priority}>{label(priority, ui)}</option>)}</select></label>
               <label>{ui("Initial state")}<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as 'draft' | 'ready' })}><option value="draft">{ui("Draft")}</option><option value="ready">{ui("Ready")}</option></select></label>
               <label>{ui("Assign to")}<select value={form.assigned_to} onChange={(event) => setForm({ ...form, assigned_to: event.target.value })} disabled={optionsLoading}><option value="">{ui("Unassigned")}</option>{options.active_users.map((user) => <option key={user.id} value={user.id}>{user.name} · {user.email}</option>)}</select></label>
+              {createAssigneeCapabilityWarning ? <div className="execution-tasks-alert execution-tasks-alert--warning execution-tasks-field-wide"><strong>{ui("Assignee cannot complete the inventory movement alone.")}</strong> {ui("This replenishment task can still coordinate the work, but the selected user lacks Stock Transfer create and/or execute permission. An authorized user must record the actual stock transfer.")}</div> : null}
               <label>{ui("Storage location")}<select value={form.storage_location_id} onChange={(event) => setForm({ ...form, storage_location_id: event.target.value })} disabled={optionsLoading}><option value="">{ui("No location")}</option>{options.active_locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select></label>
               <label>{ui("Due at")}<input type="datetime-local" value={form.due_at} onChange={(event) => setForm({ ...form, due_at: event.target.value })} /></label>
               <label>{ui("SLA due at")}<input type="datetime-local" value={form.sla_due_at} onChange={(event) => setForm({ ...form, sla_due_at: event.target.value })} /></label>
@@ -1105,7 +1117,7 @@ export default function ExecutionTasksPage() {
                 {form.source_type !== 'manual' ? <label>{ui("Source ID")}<input value={form.source_id} onChange={(event) => setForm({ ...form, source_id: event.target.value })} placeholder={ui("Required tenant-owned source UUID")} /></label> : null}
                 <label>{ui("Facility ID")}<input value={form.facility_id} onChange={(event) => setForm({ ...form, facility_id: event.target.value })} placeholder={ui("Optional facility UUID")} /></label>
               </div>
-              <p>{ui("For reservations, requisitions, purchase orders, shipments, transfers, cycle counts, or replenishment, creating the task from that source module is preferred. Linked records are still tenant-checked by the backend.")}</p>
+              <p>{ui("For reservations, requisitions, purchase orders, shipments, or cycle counts, creating the task from that source module is preferred. Replenishment tasks are created directly from Par levels so the source is selected for you. Linked records are still tenant-checked by the backend.")}</p>
             </details>
           </section>
         ) : (
@@ -1357,6 +1369,14 @@ function ActionDialogModal({ dialog, users, saving, onChange, onCancel, onConfir
 }) {
   const { ui } = useAppTranslation();
   const taskAction = dialog.kind === 'task' ? dialog.action : null;
+  const selectedAssignee = dialog.kind === 'task' && dialog.assigneeId
+    ? users.find((user) => user.id === dialog.assigneeId) || null
+    : null;
+  const replenishmentAssignmentWarning = dialog.kind === 'task'
+    && dialog.action === 'assign'
+    && dialog.task.task_type === 'replenishment'
+    && selectedAssignee?.replenishment_capability
+    && !selectedAssignee.replenishment_capability.can_perform_replenishment;
   const needsReason = taskAction === 'block' || taskAction === 'cancel' || (dialog.kind === 'batch' && dialog.action === 'cancel');
   const canConfirm = taskAction === 'assign'
     ? Boolean(dialog.kind === 'task' && dialog.assigneeId)
@@ -1368,6 +1388,7 @@ function ActionDialogModal({ dialog, users, saving, onChange, onCancel, onConfir
     <section className="execution-tasks-modal" role="dialog" aria-modal="true" aria-label={title}>
       <div className="execution-tasks-card-header"><div><h3>{title}</h3><p>{ui("Confirm the information that will be written to the task audit trail.")}</p></div><button type="button" className="execution-tasks-close" onClick={onCancel} aria-label={ui("Close")}>×</button></div>
       {dialog.kind === 'task' && dialog.action === 'assign' ? <label>{ui("Assign to")}<select value={dialog.assigneeId} onChange={(event) => onChange({ ...dialog, assigneeId: event.target.value })}><option value="">{ui("Select an active user")}</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name} · {user.email}</option>)}</select></label> : null}
+      {replenishmentAssignmentWarning ? <div className="execution-tasks-alert execution-tasks-alert--warning"><strong>{ui("Assignee cannot complete the inventory movement alone.")}</strong> {ui("This replenishment task can still coordinate the work, but the selected user lacks Stock Transfer create and/or execute permission. An authorized user must record the actual stock transfer.")}</div> : null}
       {dialog.kind === 'task' && dialog.action === 'complete' ? <label>{ui("Completion note (optional)")}<textarea value={dialog.value} maxLength={1000} onChange={(event) => onChange({ ...dialog, value: event.target.value })} /></label> : null}
       {needsReason ? <label>{ui(taskAction === 'block' ? 'Blocked reason' : 'Cancellation reason')}<textarea value={dialog.value} maxLength={1000} onChange={(event) => onChange({ ...dialog, value: event.target.value })} placeholder={ui("Enter at least three characters")} /></label> : null}
       <div className="execution-tasks-actions execution-tasks-modal-actions"><button type="button" className="btn btn-secondary" disabled={saving} onClick={onCancel}>{ui("Back")}</button><button type="button" className={taskAction === 'cancel' || (dialog.kind === 'batch' && dialog.action === 'cancel') ? 'btn btn-danger' : 'btn btn-primary'} disabled={saving || !canConfirm} onClick={onConfirm}>{ui('Confirm {action}').replace('{action}', label(dialog.action, ui).toLocaleLowerCase())}</button></div>

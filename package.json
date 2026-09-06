@@ -295,7 +295,8 @@
     "check:simulation-audit-trail-completeness-v349147": "node scripts/check-simulation-audit-trail-completeness-v349147.mjs",
     "check:simulation-archive-historical-continuity-v349150": "node scripts/check-simulation-archive-historical-continuity-v349150.mjs",
     "check:simulation-procurement-governance-history-v349151": "node scripts/check-simulation-procurement-governance-history-v349151.mjs",
-    "check:simulation-long-lived-data-completeness-v349152": "node scripts/check-simulation-long-lived-data-completeness-v349152.mjs"
+    "check:simulation-long-lived-data-completeness-v349152": "node scripts/check-simulation-long-lived-data-completeness-v349152.mjs",
+    "check:simulation-replenishment-task-delegation-v349153": "node scripts/check-simulation-replenishment-task-delegation-v349153.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
