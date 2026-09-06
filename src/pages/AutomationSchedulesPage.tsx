@@ -96,6 +96,15 @@ const fallbackAutomationTypes: AutomationTypeDefinition[] = [
     creates_execution_requests_later: true,
     executes_actions: false,
     risk_level: 'medium'
+  },
+  {
+    automation_type: 'inventory_replenishment_review',
+    label: 'Inventory & Replenishment Review',
+    description: 'Recurring review of stock position, replenishment signals, and supplier-ready follow-up.',
+    default_request_type: 'inventory_review',
+    creates_execution_requests_later: true,
+    executes_actions: false,
+    risk_level: 'medium'
   }
 ];
 
@@ -470,6 +479,7 @@ export default function AutomationSchedulesPage() {
       const updated = await apiRequest<AutomationSchedule>(`/automation-schedules/${schedule.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
+          expected_version: schedule.version,
           name: editForm.name.trim(),
           description: editForm.description.trim() || null,
           automation_type: editForm.automation_type,

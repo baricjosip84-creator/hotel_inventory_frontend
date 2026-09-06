@@ -117,7 +117,8 @@ export default function TenantPermissionsPage() {
           permissions: draftPermissions
         });
       } else {
-        updated = await saveTenantRolePermissionPolicy(activeRole.role as BuiltInTenantRole, draftPermissions);
+        if (!activeRole.revision) throw new Error(ui('Tenant permissions could not be saved.'));
+        updated = await saveTenantRolePermissionPolicy(activeRole.role as BuiltInTenantRole, draftPermissions, activeRole.revision);
       }
       setDraftByRole((current) => ({ ...current, [selectedRole]: updated.effective_permissions }));
       await reloadAndSelect(updated.role);
@@ -148,7 +149,8 @@ export default function TenantPermissionsPage() {
       if (id) {
         updated = await resetTenantCustomRolePermissions({ id, version: activeRole.version || 1 });
       } else {
-        updated = await resetTenantRolePermissionPolicy(activeRole.role as BuiltInTenantRole);
+        if (!activeRole.revision) throw new Error(ui('Tenant permissions could not be reset.'));
+        updated = await resetTenantRolePermissionPolicy(activeRole.role as BuiltInTenantRole, activeRole.revision);
       }
       setDraftByRole((current) => ({ ...current, [selectedRole]: updated.effective_permissions }));
       await reloadAndSelect(updated.role);

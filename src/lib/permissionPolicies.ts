@@ -188,20 +188,22 @@ export function fetchTenantPermissionPolicyMatrix(): Promise<TenantPermissionPol
 
 export async function saveTenantRolePermissionPolicy(
   role: BuiltInTenantRole,
-  permissions: TenantPermission[]
+  permissions: TenantPermission[],
+  expectedRevision: string
 ): Promise<TenantRolePermissionPolicy> {
   const result = await apiRequest<TenantRolePermissionPolicy>(`/permissions/${role}`, {
     method: 'PUT',
-    body: JSON.stringify({ permissions }),
+    body: JSON.stringify({ permissions, expected_revision: expectedRevision }),
     skipMutationFeedback: true
   });
   await refreshTenantPermissionSnapshot();
   return result;
 }
 
-export async function resetTenantRolePermissionPolicy(role: BuiltInTenantRole): Promise<TenantRolePermissionPolicy> {
+export async function resetTenantRolePermissionPolicy(role: BuiltInTenantRole, expectedRevision: string): Promise<TenantRolePermissionPolicy> {
   const result = await apiRequest<TenantRolePermissionPolicy>(`/permissions/${role}`, {
     method: 'DELETE',
+    body: JSON.stringify({ expected_revision: expectedRevision }),
     skipMutationFeedback: true
   });
   await refreshTenantPermissionSnapshot();

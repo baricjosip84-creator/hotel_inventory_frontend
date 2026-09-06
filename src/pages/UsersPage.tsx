@@ -34,6 +34,7 @@ type UserItem = {
   created_at: string;
   last_login_at?: string | null;
   is_active: boolean;
+  revision: string;
 };
 
 type AssignableRole = {
@@ -100,14 +101,15 @@ async function createUser(input: UserFormState): Promise<UserItem> {
   });
 }
 
-async function updateUser(input: { id: string; values: UserFormState; preserveRole?: boolean }): Promise<UserItem> {
+async function updateUser(input: { id: string; revision: string; values: UserFormState; preserveRole?: boolean }): Promise<UserItem> {
   return apiRequest<UserItem>(`/users/${input.id}`, {
     method: 'PUT',
     body: JSON.stringify({
       name: input.values.name.trim(),
       email: input.values.email.trim().toLowerCase(),
       ...(input.preserveRole ? {} : rolePayload(input.values.roleSelection)),
-      password: input.values.password.trim() ? input.values.password : undefined
+      password: input.values.password.trim() ? input.values.password : undefined,
+      expected_revision: input.revision
     })
   });
 }
@@ -386,6 +388,7 @@ export default function UsersPage() {
     if (editingUser) {
       updateMutation.mutate({
         id: editingUser.id,
+        revision: editingUser.revision,
         values: form,
         preserveRole: Boolean(currentUserId && editingUser.id === currentUserId)
       });

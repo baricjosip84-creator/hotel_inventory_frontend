@@ -41,6 +41,7 @@ export function buildAutomationSchedulePayload(input: AutomationScheduleForm): R
 
 export function buildParLevelPayload(input: ParLevelForm): Record<string, unknown> {
   return {
+    ...(input.expected_version == null ? {} : { expected_version: Number(input.expected_version) }),
     product_id: input.product_id,
     storage_location_id: input.storage_location_id || null,
     department: input.department.trim() || null,
@@ -166,6 +167,7 @@ export function buildProductPayload(input: ProductForm): Record<string, unknown>
 
 export function buildSupplierCatalogPayload(input: SupplierCatalogForm): Record<string, unknown> {
   return {
+    ...(input.expected_version == null ? {} : { expected_version: Number(input.expected_version) }),
     supplier_id: input.supplier_id,
     product_id: input.product_id,
     supplier_sku: input.supplier_sku.trim() || null,

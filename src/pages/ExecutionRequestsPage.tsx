@@ -139,6 +139,14 @@ function getRecommendationEvidenceSnapshot(request: ExecutionRequest): Recommend
   return snapshot as unknown as RecommendationEvidenceSnapshot;
 }
 
+function getAutomationEvidenceSnapshot(request: ExecutionRequest): Record<string, unknown> | null {
+  return recordValue(request.payload?.automation_evidence);
+}
+
+function recordArray(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.map(recordValue).filter((row): row is Record<string, unknown> => Boolean(row)) : [];
+}
+
 const beforeAfterFieldLabels: Record<string, string> = {
   standard_unit_cost: 'Standard Cost',
   standard_cost_updated_at: 'Standard Cost Updated At',
@@ -888,6 +896,15 @@ export default function ExecutionRequestsPage() {
   const canGoPrevious = offset > 0;
   const canGoNext = offset + requests.length < total;
   const selectedRecommendationEvidence = selected ? getRecommendationEvidenceSnapshot(selected) : null;
+  const selectedAutomationEvidence = selected ? getAutomationEvidenceSnapshot(selected) : null;
+  const automationRisk = recordValue(selectedAutomationEvidence?.risk);
+  const automationRiskTotals = recordValue(automationRisk?.totals);
+  const automationValuation = recordValue(selectedAutomationEvidence?.valuation);
+  const automationValuationTotals = recordValue(automationValuation?.totals);
+  const automationReplenishmentSummary = recordValue(selectedAutomationEvidence?.summary);
+  const automationEvaluation = recordValue(selectedAutomationEvidence?.evaluation);
+  const automationRows = recordArray(selectedAutomationEvidence?.rows);
+  const automationHighVarianceRows = recordArray(automationRisk?.high_variance);
 
   return (
     <div
@@ -1278,6 +1295,59 @@ export default function ExecutionRequestsPage() {
                     {selectedRecommendationEvidence.warnings.map((warning) => <div key={warning} style={styles.note}>{warning}</div>)}
                   </div>
                 ) : null}
+              </section>
+            ) : null}
+
+            {selectedAutomationEvidence ? (
+              <section style={styles.recommendationEvidencePanel}>
+                <div style={styles.recommendationEvidenceHeader}>
+                  <strong>{ui('Scheduled review evidence')}</strong>
+                  <span style={styles.meta}>{ui('Evidence captured when this request was created')}</span>
+                </div>
+                <div style={styles.meta}>{ui('Captured')} · {selectedAutomationEvidence.captured_at ? formatDateTime(String(selectedAutomationEvidence.captured_at), locale) : '-'}</div>
+                {selectedAutomationEvidence.redacted ? (
+                  <div style={styles.note}>{ui('Evidence hidden because your role does not have the required source permissions.')}</div>
+                ) : selectedAutomationEvidence.profile === 'cost_risk_review' ? (
+                  <>
+                    <div style={styles.metricsGrid}>
+                      <KeyValue label={ui('High variance products')} value={formatUnknown(automationRiskTotals?.high_variance_products, locale, ui)} />
+                      <KeyValue label={ui('Stocked products missing cost')} value={formatUnknown(automationRiskTotals?.missing_cost_products, locale, ui)} />
+                      <KeyValue label={ui('Inconsistent cost history')} value={formatUnknown(automationRiskTotals?.inconsistent_cost_history_products, locale, ui)} />
+                      <KeyValue label={ui('Estimated inventory value')} value={formatLocalizedCurrency(Number(automationValuationTotals?.total_estimated_inventory_value || 0), getActiveTenantCurrency(), locale, { maximumFractionDigits: 2 })} />
+                      <KeyValue label={ui('Unvalued stocked products')} value={formatUnknown(automationValuationTotals?.unvalued_stocked_products, locale, ui)} />
+                    </div>
+                    {automationHighVarianceRows.length ? (
+                      <div style={styles.recommendationWarnings}>
+                        {automationHighVarianceRows.slice(0, 5).map((row, index) => (
+                          <div key={String(row.id || index)} style={styles.note}>
+                            <strong>{String(row.name || ui('Product'))}</strong> · {ui('Cost variance')} {formatUnknown(row.cost_variance_percent, locale, ui)}%
+                          </div>
+                        ))}
+                      </div>
+                    ) : <div style={styles.note}>{ui('No high-variance products were captured in this bounded snapshot.')}</div>}
+                  </>
+                ) : selectedAutomationEvidence.profile === 'inventory_replenishment_review' ? (
+                  <>
+                    <div style={styles.metricsGrid}>
+                      <KeyValue label={ui('Products evaluated')} value={formatUnknown(automationEvaluation?.products_evaluated, locale, ui)} />
+                      <KeyValue label={ui('Replenishment items')} value={formatUnknown(automationReplenishmentSummary?.recommended_count, locale, ui)} />
+                      <KeyValue label={ui('Critical items')} value={formatUnknown(automationReplenishmentSummary?.critical_count, locale, ui)} />
+                      <KeyValue label={ui('Blocked items')} value={formatUnknown(automationReplenishmentSummary?.blocked_count, locale, ui)} />
+                      <KeyValue label={ui('Estimated procurement cost')} value={formatLocalizedCurrency(Number(automationReplenishmentSummary?.estimated_total_cost || 0), getActiveTenantCurrency(), locale, { maximumFractionDigits: 2 })} />
+                    </div>
+                    {automationRows.length ? (
+                      <div style={styles.recommendationWarnings}>
+                        {automationRows.slice(0, 5).map((row, index) => (
+                          <div key={String(row.product_id || index)} style={styles.note}>
+                            <strong>{String(row.product_name || ui('Product'))}</strong> · {ui('Recommended reorder')} {formatUnknown(row.recommended_reorder_quantity, locale, ui)} · {ui('Urgency')} {label(String(row.urgency || '-'), ui)}
+                          </div>
+                        ))}
+                      </div>
+                    ) : <div style={styles.note}>{ui('No active replenishment recommendations were captured in this bounded snapshot.')}</div>}
+                  </>
+                ) : (
+                  <div style={styles.note}>{ui('This request contains a bounded scheduled-review evidence snapshot.')}</div>
+                )}
               </section>
             ) : null}
 

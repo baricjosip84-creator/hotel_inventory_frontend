@@ -2177,7 +2177,7 @@ export interface ExecutionModuleHardeningSummaryResponse {
 }
 
 export interface AutomationTypeDefinition {
-  automation_type: 'cost_risk_review' | 'cost_governance_review' | 'system_context_review' | 'execution_readiness_review' | string;
+  automation_type: 'cost_risk_review' | 'cost_governance_review' | 'system_context_review' | 'execution_readiness_review' | 'inventory_replenishment_review' | string;
   label: string;
   description: string;
   default_request_type: string;
@@ -2191,11 +2191,12 @@ export interface AutomationSchedule {
   tenant_id: string;
   name: string;
   description?: string | null;
-  automation_type: 'cost_risk_review' | 'cost_governance_review' | 'system_context_review' | 'execution_readiness_review' | string;
+  automation_type: 'cost_risk_review' | 'cost_governance_review' | 'system_context_review' | 'execution_readiness_review' | 'inventory_replenishment_review' | string;
   status: 'draft' | 'active' | 'paused' | 'disabled' | string;
   schedule_kind: 'manual' | 'daily' | 'weekly' | 'monthly' | string;
   schedule_config: Record<string, unknown>;
   request_defaults: Record<string, unknown>;
+  version: number;
   last_run_at?: string | null;
   next_run_at?: string | null;
   created_by?: string | null;

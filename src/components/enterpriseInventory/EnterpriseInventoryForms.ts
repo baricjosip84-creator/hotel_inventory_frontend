@@ -26,6 +26,7 @@ import type {
 } from './EnterpriseInventoryTypes';
 
 export const emptyParLevelForm: ParLevelForm = {
+  expected_version: null,
   product_id: '',
   storage_location_id: '',
   department: '',
@@ -173,6 +174,7 @@ export const emptyBarcodeLabelForm: BarcodeLabelForm = {
 };
 
 export const emptySupplierCatalogForm: SupplierCatalogForm = {
+  expected_version: null,
   supplier_id: '',
   product_id: '',
   supplier_sku: '',

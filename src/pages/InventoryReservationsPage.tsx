@@ -54,6 +54,7 @@ type ReservationStatus =
 
 type InventoryReservation = {
   id: string;
+  version: number | string;
   reservation_number: string;
   status: ReservationStatus;
   source_type?: string | null;
@@ -649,9 +650,9 @@ export default function InventoryReservationsPage() {
   };
 
   const updateDraftMutation = useMutation({
-    mutationFn: async ({ id, draft: payloadDraft }: { id: string; draft: ReservationDraft }) => apiMutationRequest<InventoryReservation>(`/inventory-reservations/${id}`, {
+    mutationFn: async ({ id, version, draft: payloadDraft }: { id: string; version: number | string; draft: ReservationDraft }) => apiMutationRequest<InventoryReservation>(`/inventory-reservations/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'If-Match-Version': String(version) },
       body: JSON.stringify(buildCreatePayload(payloadDraft))
     }),
     onSuccess: (reservation) => {
@@ -1317,7 +1318,7 @@ export default function InventoryReservationsPage() {
                 </div>
                 <div style={{ ...pageStyles.buttonRow, marginTop: '0.75rem' }}>
                   <button type="button" style={pageStyles.secondaryButton} onClick={() => setEditDraft((current) => current ? { ...current, items: [...current.items, emptyLine()] } : current)}>{ui("Add line")}</button>
-                  <button type="button" style={pageStyles.button} disabled={updateDraftMutation.isPending || Boolean(editDraftValidationMessage)} onClick={() => updateDraftMutation.mutate({ id: selectedReservation.id, draft: editDraft })}>
+                  <button type="button" style={pageStyles.button} disabled={updateDraftMutation.isPending || Boolean(editDraftValidationMessage)} onClick={() => updateDraftMutation.mutate({ id: selectedReservation.id, version: selectedReservation.version, draft: editDraft })}>
                     {updateDraftMutation.isPending ? ui('Saving…') : ui('Save draft changes')}
                   </button>
                   {editDraftValidationMessage ? <span style={pageStyles.muted}>{editDraftValidationMessage}</span> : null}

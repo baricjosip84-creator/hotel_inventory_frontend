@@ -1,5 +1,6 @@
 export type ParLevel = {
   id: string;
+  version: number | string;
   product_id: string;
   product_name?: string | null;
   product_unit?: string | null;
@@ -1327,6 +1328,7 @@ export type ShipmentReceivingForm = {
 };
 
 export type ParLevelForm = {
+  expected_version: number | string | null;
   product_id: string;
   storage_location_id: string;
   department: string;
@@ -1427,6 +1429,7 @@ export type BarcodeLabelForm = {
 };
 
 export type SupplierCatalogForm = {
+  expected_version: number | string | null;
   supplier_id: string;
   product_id: string;
   supplier_sku: string;

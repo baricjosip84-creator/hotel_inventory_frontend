@@ -1502,6 +1502,7 @@ export default function InventoryRequisitionsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState<RequisitionFormState>(() => emptyForm());
   const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
+  const [editingDraftVersion, setEditingDraftVersion] = useState<number | string | null>(null);
   const [workflowNotes, setWorkflowNotes] = useState('');
   const [activityComment, setActivityComment] = useState('');
   const [fulfillmentLocationId, setFulfillmentLocationId] = useState('');
@@ -1761,11 +1762,15 @@ export default function InventoryRequisitionsPage() {
   const saveDraftMutation = useMutation({
     mutationFn: () => apiMutationRequest<InventoryRequisition>(editingDraftId ? `/inventory-requisitions/${editingDraftId}` : '/inventory-requisitions', {
       method: editingDraftId ? 'PUT' : 'POST',
+      headers: editingDraftId && editingDraftVersion != null
+        ? { 'If-Match-Version': String(editingDraftVersion) }
+        : undefined,
       body: JSON.stringify(buildCreatePayload(form))
     }),
     onSuccess: async (saved) => {
       setForm(emptyForm());
       setEditingDraftId(null);
+      setEditingDraftVersion(null);
       setSelectedId(saved.id);
       await invalidateRequisitions();
     }
@@ -2221,15 +2226,17 @@ export default function InventoryRequisitionsPage() {
   };
 
   const loadSelectedDraftForEditing = () => {
-    if (!selected || selected.status !== 'draft') return;
+    if (!selected || selected.status !== 'draft' || selected.version == null) return;
     setForm(formFromRequisition(selected));
     setEditingDraftId(selected.id);
+    setEditingDraftVersion(selected.version);
     scrollToFormSection('inventory-requisition-form');
   };
 
   const cancelDraftEditing = () => {
     setForm(emptyForm());
     setEditingDraftId(null);
+    setEditingDraftVersion(null);
   };
 
   const runWorkflow = (action: 'submit' | 'approve' | 'reject' | 'cancel' | 'reopen') => {
