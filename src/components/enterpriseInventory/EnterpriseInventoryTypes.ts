@@ -216,6 +216,14 @@ export type SupplierCatalogItem = {
   version?: number | string | null;
 };
 
+export type NotificationHistoryPagination = {
+  total: number;
+  limit: number;
+  offset: number;
+  returned: number;
+  has_more: boolean;
+};
+
 export type NotificationEvent = {
   id: string;
   event_type: string;
@@ -224,6 +232,11 @@ export type NotificationEvent = {
   title: string;
   message?: string | null;
   created_at: string;
+};
+
+export type NotificationEventPage = {
+  items: NotificationEvent[];
+  pagination: NotificationHistoryPagination;
 };
 
 export type NotificationDelivery = {
@@ -240,10 +253,22 @@ export type NotificationDelivery = {
   next_attempt_at?: string | null;
   last_attempt_at?: string | null;
   delivered_at?: string | null;
+  queued_by_user_id?: string | null;
+  queued_by_name?: string | null;
+  queued_by_email?: string | null;
+  last_process_triggered_by_user_id?: string | null;
+  last_process_triggered_by_name?: string | null;
+  last_process_triggered_by_email?: string | null;
+  last_process_triggered_at?: string | null;
   event_type?: string | null;
   severity?: string | null;
   title?: string | null;
   created_at: string;
+};
+
+export type NotificationDeliveryPage = {
+  items: NotificationDelivery[];
+  pagination: NotificationHistoryPagination;
 };
 
 export type AlertItem = {

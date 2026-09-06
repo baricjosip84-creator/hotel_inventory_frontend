@@ -34,7 +34,9 @@ import type {
   InventoryAnomaliesResponse,
   InventoryValuationReport,
   NotificationDelivery,
+  NotificationDeliveryPage,
   NotificationEvent,
+  NotificationEventPage,
   OperationalHealthResponse,
   ParLevel,
   ProcurementSummaryReport,
@@ -99,12 +101,14 @@ export async function fetchSupplierCatalog(): Promise<SupplierCatalogItem[]> {
   return apiRequest<SupplierCatalogItem[]>('/enterprise-inventory/supplier-catalog');
 }
 
-export async function fetchNotifications(): Promise<NotificationEvent[]> {
-  return apiRequest<NotificationEvent[]>('/enterprise-inventory/notifications');
+export async function fetchNotifications(offset = 0, limit = 50): Promise<NotificationEventPage> {
+  const params = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+  return apiRequest<NotificationEventPage>(`/enterprise-inventory/notifications?${params.toString()}`);
 }
 
-export async function fetchNotificationDeliveries(): Promise<NotificationDelivery[]> {
-  return apiRequest<NotificationDelivery[]>('/enterprise-inventory/notifications/deliveries');
+export async function fetchNotificationDeliveries(offset = 0, limit = 50): Promise<NotificationDeliveryPage> {
+  const params = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+  return apiRequest<NotificationDeliveryPage>(`/enterprise-inventory/notifications/deliveries?${params.toString()}`);
 }
 
 export async function fetchAlerts(filters: AlertFilters): Promise<AlertItem[]> {

@@ -8,7 +8,7 @@ export function EnterpriseInventoryCompliancePanels({
   formState,
   pageData,
 }: EnterpriseInventoryPanelBaseProps) {
-  const { notificationDeliveryForm, setNotificationDeliveryForm } = formState;
+  const { notificationDeliveryForm, notificationDeliveryOffset, notificationEventOffset, setNotificationDeliveryForm, setNotificationDeliveryOffset, setNotificationEventOffset } = formState;
   const { notificationsQuery, notificationDeliveriesQuery } = pageData.queries;
   const {
     handleNotificationDeliverySubmit,
@@ -19,13 +19,19 @@ export function EnterpriseInventoryCompliancePanels({
     <EnterpriseInventoryTabPanel activeTab={activeTab} tab="notifications">
       <NotificationsTab
         notificationDeliveryForm={notificationDeliveryForm}
-        notifications={notificationsQuery.data ?? []}
-        deliveries={notificationDeliveriesQuery.data ?? []}
+        notifications={notificationsQuery.data?.items ?? []}
+        notificationPagination={notificationsQuery.data?.pagination}
+        notificationOffset={notificationEventOffset}
+        deliveries={notificationDeliveriesQuery.data?.items ?? []}
+        deliveryPagination={notificationDeliveriesQuery.data?.pagination}
+        deliveryOffset={notificationDeliveryOffset}
         isLoading={notificationsQuery.isLoading}
         deliveriesLoading={notificationDeliveriesQuery.isLoading}
         isQueueingDelivery={queueNotificationDeliveryMutation.isPending}
         onNotificationDeliveryFormChange={setNotificationDeliveryForm}
         onNotificationDeliverySubmit={handleNotificationDeliverySubmit}
+        onNotificationOffsetChange={setNotificationEventOffset}
+        onDeliveryOffsetChange={setNotificationDeliveryOffset}
       />
     </EnterpriseInventoryTabPanel>
   );

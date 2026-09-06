@@ -12201,6 +12201,11 @@ const rows: readonly TranslationRow[] = [
   ["No supplier email evidence has been recorded for this purchase order yet.", "Für diese Bestellung wurde noch kein Nachweis für Lieferanten-E-Mails erfasst.", "Todavía no se ha registrado evidencia de correo al proveedor para esta orden de compra.", "Aucune preuve d’e-mail fournisseur n’a encore été enregistrée pour ce bon de commande.", "Za ovu narudžbenicu još nisu zabilježeni dokazi e-pošte dobavljaču."],
   ["Download exact sent PDF", "Exakt gesendetes PDF herunterladen", "Descargar el PDF exacto enviado", "Télécharger le PDF exact envoyé", "Preuzmi točan poslani PDF"],
   ["Prepared", "Vorbereitet", "Preparado", "Préparé", "Pripremljeno"],
+  ["Queued by", "Eingereiht von", "Puesta en cola por", "Mis en file par", "Stavio u red"],
+  ["Last processed by", "Zuletzt verarbeitet von", "Procesado por última vez por", "Dernier traitement par", "Posljednji put obradio"],
+  ["System / legacy", "System / Altbestand", "Sistema / heredado", "Système / historique", "Sustav / naslijeđeno"],
+  ["System worker", "System-Worker", "Proceso del sistema", "Traitement système", "Sistemski izvršitelj"],
+  ["0 records", "0 Datensätze", "0 registros", "0 enregistrement", "0 zapisa"],
 
 ];
 

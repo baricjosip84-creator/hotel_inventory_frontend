@@ -106,6 +106,8 @@ export function useEnterpriseInventoryFormState() {
     useState<SupplierInvoiceForm>(emptySupplierInvoiceForm);
   const [notificationDeliveryForm, setNotificationDeliveryForm] =
     useState<NotificationDeliveryForm>(emptyNotificationDeliveryForm);
+  const [notificationEventOffset, setNotificationEventOffset] = useState(0);
+  const [notificationDeliveryOffset, setNotificationDeliveryOffset] = useState(0);
   const [alertForm, setAlertForm] = useState<AlertForm>(emptyAlertForm);
   const [alertFilters, setAlertFilters] =
     useState<AlertFilters>(emptyAlertFilters);
@@ -143,6 +145,8 @@ export function useEnterpriseInventoryFormState() {
     executionFilters,
     lastBarcodeLookup,
     notificationDeliveryForm,
+    notificationDeliveryOffset,
+    notificationEventOffset,
     parLevelForm,
     productForm,
     productPackageForm,
@@ -167,6 +171,8 @@ export function useEnterpriseInventoryFormState() {
     setExecutionFilters,
     setLastBarcodeLookup,
     setNotificationDeliveryForm,
+    setNotificationDeliveryOffset,
+    setNotificationEventOffset,
     setParLevelForm,
     setProductForm,
     setProductPackageForm,

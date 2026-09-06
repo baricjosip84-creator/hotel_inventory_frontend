@@ -121,6 +121,8 @@ type UseEnterpriseInventoryQueriesParams = {
   supplierSearch: string;
   selectedSupplierPerformanceId: string;
   executionFilters: ExecutionFilters;
+  notificationDeliveryOffset: number;
+  notificationEventOffset: number;
   shipmentReceivingShipmentId: string;
   alertFilters: AlertFilters;
   auditFilters: AuditFilters;
@@ -135,6 +137,8 @@ export function useEnterpriseInventoryQueries({
   supplierSearch,
   selectedSupplierPerformanceId,
   executionFilters,
+  notificationDeliveryOffset,
+  notificationEventOffset,
   shipmentReceivingShipmentId,
   alertFilters,
   auditFilters,
@@ -301,8 +305,16 @@ export function useEnterpriseInventoryQueries({
   const supplierReturnsQuery = useQuery({ queryKey: ['enterprise-supplier-returns'], queryFn: fetchSupplierReturns, enabled: canReadSupplierReturns && needsSupplierReturns });
   const invoicesQuery = useQuery({ queryKey: ['enterprise-invoices'], queryFn: fetchSupplierInvoices , enabled: canReadInvoices && needsInvoices });
   const supplierCatalogQuery = useQuery({ queryKey: ['enterprise-supplier-catalog'], queryFn: fetchSupplierCatalog , enabled: canReadSupplierCatalog && tabIs('supplier-catalog') });
-  const notificationsQuery = useQuery({ queryKey: ['enterprise-notifications'], queryFn: fetchNotifications , enabled: canReadNotifications && tabIs('notifications') });
-  const notificationDeliveriesQuery = useQuery({ queryKey: ['enterprise-notification-deliveries'], queryFn: fetchNotificationDeliveries, enabled: canReadNotifications && tabIs('notifications') });
+  const notificationsQuery = useQuery({
+    queryKey: ['enterprise-notifications', notificationEventOffset],
+    queryFn: () => fetchNotifications(notificationEventOffset),
+    enabled: canReadNotifications && tabIs('notifications')
+  });
+  const notificationDeliveriesQuery = useQuery({
+    queryKey: ['enterprise-notification-deliveries', notificationDeliveryOffset],
+    queryFn: () => fetchNotificationDeliveries(notificationDeliveryOffset),
+    enabled: canReadNotifications && tabIs('notifications')
+  });
   const alertsQuery = useQuery({ queryKey: ['enterprise-alerts', alertFilters], queryFn: () => fetchAlerts(alertFilters) , enabled: canReadAlerts && tabIs('alerts') });
   const auditLogsQuery = useQuery({ queryKey: ['enterprise-audit-logs', auditFilters], queryFn: () => fetchAuditLogs(auditFilters) , enabled: canReadAudit && tabIs('audit') });
   const barcodeLabelsQuery = useQuery({ queryKey: ['enterprise-barcode-labels'], queryFn: fetchBarcodeLabels , enabled: canReadBarcodeLabels && tabIs('labels') });
