@@ -42,6 +42,17 @@ type TenantAuditRow = {
   created_at: string;
 };
 
+type TenantAuditPageResponse = {
+  rows: TenantAuditRow[];
+  has_more: boolean;
+  limit: number;
+  offset: number;
+};
+
+type TenantAuditSummary = {
+  total_events: number;
+};
+
 type PurchaseOrderListItem = {
   id: string;
   supplier_id: string;
@@ -772,14 +783,50 @@ async function fetchPurchaseOrder(id: string): Promise<PurchaseOrderDetail> {
   return apiRequest<PurchaseOrderDetail>(`/purchase-orders/${id}`);
 }
 
-async function fetchPurchaseOrderAudit(id: string): Promise<TenantAuditRow[]> {
+const PURCHASE_ORDER_AUDIT_PAGE_SIZE = 100;
+const PURCHASE_ORDER_AUDIT_EXPORT_PAGE_SIZE = 500;
+
+function buildPurchaseOrderAuditParams(id: string, search: string, limit: number, offset: number): URLSearchParams {
   const params = new URLSearchParams({
     entity_type: 'purchase_order',
     entity_id: id,
-    limit: '50'
+    limit: String(limit),
+    offset: String(offset),
+    response_mode: 'page',
+    metadata_mode: 'summary'
   });
+  if (search.trim()) params.set('search', search.trim());
+  return params;
+}
 
-  return apiRequest<TenantAuditRow[]>(`/audit?${params.toString()}`);
+async function fetchPurchaseOrderAuditPage(id: string, search: string, pageIndex: number): Promise<TenantAuditPageResponse> {
+  const offset = pageIndex * PURCHASE_ORDER_AUDIT_PAGE_SIZE;
+  const params = buildPurchaseOrderAuditParams(id, search, PURCHASE_ORDER_AUDIT_PAGE_SIZE, offset);
+  return apiRequest<TenantAuditPageResponse>(`/audit?${params.toString()}`);
+}
+
+async function fetchPurchaseOrderAuditSummary(id: string, search: string): Promise<TenantAuditSummary> {
+  const params = new URLSearchParams({
+    entity_type: 'purchase_order',
+    entity_id: id
+  });
+  if (search.trim()) params.set('search', search.trim());
+  return apiRequest<TenantAuditSummary>(`/audit/summary?${params.toString()}`);
+}
+
+async function fetchAllPurchaseOrderAudit(id: string, search: string): Promise<TenantAuditRow[]> {
+  const rows: TenantAuditRow[] = [];
+  let offset = 0;
+
+  while (true) {
+    const params = buildPurchaseOrderAuditParams(id, search, PURCHASE_ORDER_AUDIT_EXPORT_PAGE_SIZE, offset);
+    const page = await apiRequest<TenantAuditPageResponse>(`/audit?${params.toString()}`);
+    rows.push(...page.rows);
+    if (!page.has_more || !page.rows.length) break;
+    offset += page.rows.length;
+  }
+
+  return rows;
 }
 
 async function fetchSuppliers(): Promise<SupplierItem[]> {
@@ -977,6 +1024,9 @@ export default function PurchaseOrdersPage() {
   const [currentPage, setCurrentPage] = useState<number>(() => pageFromSearchParams(searchParams));
   const [pageSize, setPageSize] = useState<number>(() => pageSizeFromSearchParams(searchParams));
   const [auditSearch, setAuditSearch] = useState('');
+  const [auditPageIndex, setAuditPageIndex] = useState(0);
+  const [auditExporting, setAuditExporting] = useState(false);
+  const [auditPrinting, setAuditPrinting] = useState(false);
   const [activeWorkspaceSection, setActiveWorkspaceSection] = useState<PurchaseOrderWorkspaceSection>('overview');
   const registryRef = useRef<HTMLDivElement>(null);
   const createRef = useRef<HTMLDivElement>(null);
@@ -1004,8 +1054,15 @@ export default function PurchaseOrdersPage() {
   });
 
   const auditQuery = useQuery({
-    queryKey: ['purchase-order', 'audit', selectedId],
-    queryFn: () => fetchPurchaseOrderAudit(selectedId as string),
+    queryKey: ['purchase-order', 'audit', selectedId, auditSearch.trim(), auditPageIndex],
+    queryFn: () => fetchPurchaseOrderAuditPage(selectedId as string, auditSearch, auditPageIndex),
+    enabled: Boolean(selectedId && capabilities.canViewAudit && purchaseOrdersFeatureReady),
+    retry: false
+  });
+
+  const auditSummaryQuery = useQuery({
+    queryKey: ['purchase-order', 'audit-summary', selectedId, auditSearch.trim()],
+    queryFn: () => fetchPurchaseOrderAuditSummary(selectedId as string, auditSearch),
     enabled: Boolean(selectedId && capabilities.canViewAudit && purchaseOrdersFeatureReady),
     retry: false
   });
@@ -1046,23 +1103,15 @@ export default function PurchaseOrdersPage() {
       { label: ui('Cancelled'), value: selectedDetail.cancelled_at, actor: selectedDetail.cancelled_by_user_name }
     ].filter((event) => Boolean(event.value));
   }, [selectedDetail, ui]);
-  const selectedAuditEvents = useMemo(() => {
-    const rows = auditQuery.data || [];
-    const term = auditSearch.trim().toLowerCase();
-    if (!term) return rows;
+  const selectedAuditEvents = auditQuery.data?.rows || [];
+  const auditTotalEvents = Number(auditSummaryQuery.data?.total_events || 0);
+  const auditPageStart = selectedAuditEvents.length ? auditPageIndex * PURCHASE_ORDER_AUDIT_PAGE_SIZE + 1 : 0;
+  const auditPageEnd = auditPageIndex * PURCHASE_ORDER_AUDIT_PAGE_SIZE + selectedAuditEvents.length;
+  const auditHasMore = Boolean(auditQuery.data?.has_more);
 
-    return rows.filter((event) => {
-      const haystack = [
-        event.action,
-        event.entity_type,
-        event.entity_id || '',
-        auditActorLabel(event),
-        auditMetadataSummary(event.metadata),
-        event.created_at
-      ].join(' ').toLowerCase();
-      return haystack.includes(term);
-    });
-  }, [auditQuery.data, auditSearch, auditActorLabel]);
+  useEffect(() => {
+    setAuditPageIndex(0);
+  }, [selectedId, auditSearch]);
 
   const isEditingSelectedDraft = Boolean(editingId && selectedDetail?.status === 'draft');
 
@@ -1507,29 +1556,50 @@ export default function PurchaseOrdersPage() {
     downloadCsv(`purchase-orders-page-${currentPage}-${stamp}.csv`, buildPurchaseOrdersCsvRows(paginatedPurchaseOrders));
   };
 
-  const exportSelectedPurchaseOrderAuditCsv = () => {
-    if (!selectedDetail) return;
+  const exportSelectedPurchaseOrderAuditCsv = async () => {
+    if (!selectedDetail || auditExporting) return;
 
-    const rows = selectedAuditEvents;
-    const stamp = new Date().toISOString().slice(0, 10);
-    downloadCsv(`purchase-order-${selectedDetail.po_number || selectedDetail.id}-audit-${stamp}.csv`, [
-      ['Created At', 'Action', 'Actor', 'Entity Type', 'Entity ID', 'Metadata Summary'],
-      ...rows.map((event) => [
-        event.created_at,
-        event.action,
-        auditActorLabel(event),
-        event.entity_type,
-        event.entity_id ?? '',
-        auditMetadataSummary(event.metadata)
-      ])
-    ]);
+    setAuditExporting(true);
+    setFormError(null);
+    try {
+      const rows = await fetchAllPurchaseOrderAudit(selectedDetail.id, auditSearch);
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadCsv(`purchase-order-${selectedDetail.po_number || selectedDetail.id}-audit-${stamp}.csv`, [
+        ['Created At', 'Action', 'Actor', 'Entity Type', 'Entity ID', 'Metadata Summary'],
+        ...rows.map((event) => [
+          event.created_at,
+          event.action,
+          auditActorLabel(event),
+          event.entity_type,
+          event.entity_id ?? '',
+          auditMetadataSummary(event.metadata)
+        ])
+      ]);
+    } catch (error) {
+      setFormError(normalizeError(error, ui('Failed to load purchase order audit history.'), ui));
+    } finally {
+      setAuditExporting(false);
+    }
   };
 
-  const printSelectedPurchaseOrderAudit = () => {
-    if (!selectedDetail) return;
+  const printSelectedPurchaseOrderAudit = async () => {
+    if (!selectedDetail || auditPrinting) return;
 
-    const rows = selectedAuditEvents;
-    if (!rows.length) return;
+    setAuditPrinting(true);
+    setFormError(null);
+    let rows: TenantAuditRow[] = [];
+    try {
+      rows = await fetchAllPurchaseOrderAudit(selectedDetail.id, auditSearch);
+    } catch (error) {
+      setFormError(normalizeError(error, ui('Failed to load purchase order audit history.'), ui));
+      setAuditPrinting(false);
+      return;
+    }
+
+    if (!rows.length) {
+      setAuditPrinting(false);
+      return;
+    }
 
     const auditRows = rows.map((event) => `
       <tr>
@@ -1545,6 +1615,7 @@ export default function PurchaseOrdersPage() {
     const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1100,height=750');
     if (!printWindow) {
       setFormError(ui('Browser blocked the print window. Allow pop-ups for this site and try again.'));
+      setAuditPrinting(false);
       return;
     }
 
@@ -1588,6 +1659,7 @@ export default function PurchaseOrdersPage() {
       </html>
     `);
     printWindow.document.close();
+    setAuditPrinting(false);
     printWindow.focus();
   };
 
@@ -2956,28 +3028,38 @@ export default function PurchaseOrdersPage() {
 
               {capabilities.canViewAudit ? (
                 <details className="purchase-orders-audit-details">
-                  <summary>{ui("Audit history")} <span>{(auditQuery.data || []).length} {ui("event(s)")}</span></summary>
+                  <summary>{ui("Audit history")} <span>{auditTotalEvents} {ui("event(s)")}</span></summary>
                   <div className="purchase-orders-audit-content">
                     <div className="purchase-orders-audit-toolbar">
                       <label className="purchase-orders-field purchase-orders-field--search"><span>{ui("Search audit history")}</span><input value={auditSearch} onChange={(event) => setAuditSearch(event.target.value)} placeholder={ui("Action, person, or date")} /></label>
-                      <button type="button" className="app-button app-button--secondary" onClick={exportSelectedPurchaseOrderAuditCsv} disabled={auditQuery.isLoading || !selectedAuditEvents.length}>{ui("Export audit CSV")}</button>
-                      <button type="button" className="app-button app-button--secondary" onClick={printSelectedPurchaseOrderAudit} disabled={auditQuery.isLoading || !selectedAuditEvents.length}>{ui("Print audit")}</button>
+                      <button type="button" className="app-button app-button--secondary" onClick={() => void exportSelectedPurchaseOrderAuditCsv()} disabled={auditQuery.isLoading || auditExporting || auditTotalEvents === 0}>{auditExporting ? ui("Exporting…") : ui("Export audit CSV")}</button>
+                      <button type="button" className="app-button app-button--secondary" onClick={() => void printSelectedPurchaseOrderAudit()} disabled={auditQuery.isLoading || auditPrinting || auditTotalEvents === 0}>{ui("Print audit")}</button>
                       {auditSearch ? <button type="button" className="app-button app-button--secondary" onClick={() => setAuditSearch('')}>{ui("Clear search")}</button> : null}
                     </div>
                     {auditQuery.isLoading ? <p className="purchase-orders-muted">{ui("Loading audit history…")}</p> : null}
-                    {auditQuery.error ? <p style={styles.error}>{ui("Failed to load purchase order audit history.")}</p> : null}
+                    {auditQuery.error || auditSummaryQuery.error ? <p style={styles.error}>{ui("Failed to load purchase order audit history.")}</p> : null}
                     {selectedAuditEvents.length ? (
-                      <div className="purchase-orders-audit-list">
-                        {selectedAuditEvents.map((event) => {
-                          const metadataSummary = auditMetadataSummary(event.metadata);
-                          return (
-                            <div key={event.id} className="purchase-orders-audit-item">
-                              <div><strong>{event.action}</strong><span>{formatDateTime(event.created_at)} · {auditActorLabel(event)}</span></div>
-                              {metadataSummary !== '-' ? <details><summary>{ui("Event details")}</summary><p>{metadataSummary}</p></details> : null}
-                            </div>
-                          );
-                        })}
-                      </div>
+                      <>
+                        <div className="purchase-orders-audit-list">
+                          {selectedAuditEvents.map((event) => {
+                            const metadataSummary = auditMetadataSummary(event.metadata);
+                            return (
+                              <div key={event.id} className="purchase-orders-audit-item">
+                                <div><strong>{event.action}</strong><span>{formatDateTime(event.created_at)} · {auditActorLabel(event)}</span></div>
+                                {metadataSummary !== '-' ? <details><summary>{ui("Event details")}</summary><p>{metadataSummary}</p></details> : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="purchase-orders-pagination">
+                          <span>{ui('{start}–{end} of {total}').replace('{start}', formatNumber(auditPageStart)).replace('{end}', formatNumber(auditPageEnd)).replace('{total}', formatNumber(auditTotalEvents))}</span>
+                          <div>
+                            <button type="button" className="app-button app-button--secondary" disabled={auditPageIndex === 0 || auditQuery.isFetching} onClick={() => setAuditPageIndex((page) => Math.max(0, page - 1))}>{ui("Previous")}</button>
+                            <strong>{ui("Page")} {formatNumber(auditPageIndex + 1)}</strong>
+                            <button type="button" className="app-button app-button--secondary" disabled={!auditHasMore || auditQuery.isFetching} onClick={() => setAuditPageIndex((page) => page + 1)}>{ui("Next")}</button>
+                          </div>
+                        </div>
+                      </>
                     ) : !auditQuery.isLoading && !auditQuery.error ? <p className="purchase-orders-muted">{ui("No audit events match the current search.")}</p> : null}
                   </div>
                 </details>
