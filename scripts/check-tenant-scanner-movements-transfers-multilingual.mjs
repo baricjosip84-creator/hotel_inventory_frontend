@@ -71,7 +71,7 @@ for (const [label, source] of [
 }
 
 const representativeRows = [
-  'Receiving Barcode Scanner', 'Shipment QR Scanner', 'Camera permission was denied. Allow camera access in the browser, or use manual entry or image upload.',
+  'Receiving Barcode Scanner', 'Shipment QR Scanner', 'Receiving session', 'Scan Next Item', 'Finish receiving', 'Camera permission was denied. Allow camera access in the browser, or use manual entry or image upload.',
   'Stock movement ledger', 'Movement Ledger', 'Transfer sent', 'Transfer received', 'Shipment item unit cost', 'No linked workflow',
   'Stock transfer workspace', 'Execute this stock transfer?', 'Cancel this stock transfer draft?', 'matching transfers', 'review access', 'available'
 ];
@@ -139,8 +139,8 @@ if (!process.exitCode) console.log('Tenant Scanner/Movements/Transfers multiling
 // Scanner integrity regression contract: business context must be server verified,
 // internal UUIDs must not be normal display text, and ambiguous barcode data must
 // be rejected instead of resolved by arbitrary SQL ordering.
-if (!scannerSource.includes("queryFn: () => apiRequest<ScannerShipmentContext>(`/shipments/${encodeURIComponent(shipmentId)}`)")) {
-  fail('Scanner must load the selected shipment from the server instead of trusting URL display labels.');
+if (!scannerSource.includes("apiRequest<{ shipment: ScannerShipmentContext }>(`/shipments/${encodeURIComponent(shipmentId)}`)") || !scannerSource.includes('return payload.shipment;')) {
+  fail('Scanner must load and unwrap the selected shipment from the server instead of trusting URL display labels.');
 }
 if (!scannerSource.includes("shipment.id !== shipmentId")) {
   fail('Shipment verification mode must reject a QR code for a different shipment.');

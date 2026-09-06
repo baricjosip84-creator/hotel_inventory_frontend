@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, CSSProperties, FormEvent } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { useNavigate, useSearchParams } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, ApiError } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
@@ -97,6 +97,7 @@ type ShipmentLookupResponse = {
 type ScannerShipmentContext = {
   id: string;
   status: string;
+  version: number;
   po_number?: string | null;
   qr_code?: string | null;
 };
@@ -275,6 +276,7 @@ export default function ScannerPage() {
   const cameraDecodeLockRef = useRef(false);
 
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
 
   const mode = (searchParams.get('mode') === 'product' ? 'product' : 'shipment') as ScannerMode;
@@ -285,7 +287,10 @@ export default function ScannerPage() {
   const shipmentContextQuery = useQuery({
     queryKey: ['scanner-shipment-context', shipmentId],
     enabled: Boolean(shipmentId),
-    queryFn: () => apiRequest<ScannerShipmentContext>(`/shipments/${encodeURIComponent(shipmentId)}`)
+    queryFn: async () => {
+      const payload = await apiRequest<{ shipment: ScannerShipmentContext }>(`/shipments/${encodeURIComponent(shipmentId)}`);
+      return payload.shipment;
+    }
   });
   const shipmentOptionsQuery = useQuery({
     queryKey: ['scanner-shipment-options'],
@@ -349,10 +354,15 @@ export default function ScannerPage() {
   const [resolvedUnitsPerPackage, setResolvedUnitsPerPackage] = useState<string | null>(null);
   const [resolvedLabel, setResolvedLabel] = useState<ProductBarcodeLookupResponse['label']>(null);
   const [isResolving, setIsResolving] = useState(false);
+  const [isReceivingScan, setIsReceivingScan] = useState(false);
+  const [sessionScanCount, setSessionScanCount] = useState(0);
+  const [sessionPackageCount, setSessionPackageCount] = useState(0);
+  const [sessionUnitCount, setSessionUnitCount] = useState(0);
+  const [lastReceivedMessage, setLastReceivedMessage] = useState<string | null>(null);
   const [isDecodingImage, setIsDecodingImage] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const scannerInputDisabled = isResolving || isDecodingImage || !productContextReady || !shipmentVerificationReady;
+  const scannerInputDisabled = isResolving || isReceivingScan || isDecodingImage || !productContextReady || !shipmentVerificationReady;
   const liveScannerDisabled = isRunning || isStartingCamera || scannerInputDisabled || Boolean(liveCameraUnavailableReason);
   const manualSubmitDisabled = scannerInputDisabled || !manualCode.trim();
 
@@ -415,10 +425,7 @@ export default function ScannerPage() {
     params.set('itemId', match.shipment_item_id);
     params.set('scannedBarcode', decodedText);
 
-    if (match.match_source) {
-      params.set('matchSource', match.match_source);
-    }
-
+    if (match.match_source) params.set('matchSource', match.match_source);
     if (match.label?.id) {
       params.set('barcodeLabelId', match.label.id);
       params.set('labelBarcode', match.label.barcode_value);
@@ -426,41 +433,111 @@ export default function ScannerPage() {
       if (match.label.batch_number) params.set('labelBatch', match.label.batch_number);
       if (match.label.expiry_date) params.set('labelExpiry', match.label.expiry_date);
     }
-
     if (match.package?.id) {
       params.set('packageId', match.package.id);
       params.set('packageName', match.package.package_name);
       params.set('packageBarcode', match.package.barcode);
       params.set('unitsPerPackage', String(match.package.units_per_package));
     }
-
     if (match.calculated) {
-      params.set(
-        'remainingPackagesEstimate',
-        String(match.calculated.remaining_packages_estimate)
-      );
-      params.set(
-        'canReceiveOneFullPackage',
-        String(match.calculated.can_receive_one_full_package)
-      );
+      params.set('remainingPackagesEstimate', String(match.calculated.remaining_packages_estimate));
+      params.set('canReceiveOneFullPackage', String(match.calculated.can_receive_one_full_package));
     }
-
-    if (match.product?.requires_lot_tracking) {
-      params.set('requiresLotTracking', 'true');
-    }
-
-    if (match.product?.requires_expiry_date) {
-      params.set('requiresExpiryDate', 'true');
-    }
-
-    if (match.serial_tracking?.require_on_receipt) {
-      params.set('requiresSerialOnReceipt', 'true');
-    }
-
+    if (match.product?.requires_lot_tracking) params.set('requiresLotTracking', 'true');
+    if (match.product?.requires_expiry_date) params.set('requiresExpiryDate', 'true');
+    if (match.serial_tracking?.require_on_receipt) params.set('requiresSerialOnReceipt', 'true');
     params.set('locationId', locationId);
 
-    playSuccessFeedback();
-    navigate(`/shipments?${params.toString()}`);
+    const effectiveLotNumber = match.label?.lot_number || '';
+    const effectiveBatchNumber = match.label?.batch_number || '';
+    const effectiveExpiryDate = match.label?.expiry_date ? String(match.label.expiry_date).slice(0, 10) : '';
+    const needsDetailedReceiving = Boolean(
+      match.serial_tracking?.require_on_receipt ||
+      (match.product?.requires_lot_tracking && !effectiveLotNumber && !effectiveBatchNumber) ||
+      (match.product?.requires_expiry_date && !effectiveExpiryDate)
+    );
+
+    if (needsDetailedReceiving) {
+      playSuccessFeedback();
+      navigate(`/shipments?${params.toString()}`);
+      return;
+    }
+
+    const currentVersion = Number(shipmentContextQuery.data?.version);
+    if (!Number.isFinite(currentVersion) || currentVersion < 0) {
+      throw new Error('The selected shipment version could not be verified. Refresh the scanner from Shipments and try again.');
+    }
+
+    const remaining = Number(match.remaining_quantity ?? match.calculated?.remaining_quantity ?? 0);
+    if (!Number.isFinite(remaining) || remaining <= 0) {
+      throw new Error(ui('Scanned item is already fully received.'));
+    }
+
+    const packageUnits = match.package?.id ? Number(match.package.units_per_package) : null;
+    const receiveByPackage = Boolean(match.package?.id && packageUnits && Number.isFinite(packageUnits) && packageUnits > 0);
+    const quantityToReceive = receiveByPackage ? Number(packageUnits) : remaining >= 1 ? 1 : remaining;
+
+    if (receiveByPackage && quantityToReceive > remaining) {
+      throw new Error(
+        ui('{package} contains {packageUnits} base units, but only {remaining} remain on this shipment line.')
+          .replace('{package}', match.package?.package_name || ui('Scanned package'))
+          .replace('{packageUnits}', formatLocalizedNumber(quantityToReceive, locale, { maximumFractionDigits: 2 }))
+          .replace('{remaining}', formatLocalizedNumber(remaining, locale, { maximumFractionDigits: 2 }))
+      );
+    }
+
+    setIsReceivingScan(true);
+    try {
+      await apiRequest(`/shipments/${encodeURIComponent(match.shipment_id)}/receive`, {
+        method: 'POST',
+        headers: { 'If-Match-Version': String(currentVersion) },
+        body: JSON.stringify({
+          items: [
+            receiveByPackage && match.package?.id
+              ? {
+                  product_id: match.product_id,
+                  package_id: match.package.id,
+                  package_count_received: 1,
+                  storage_location_id: locationId,
+                  lot_number: effectiveLotNumber || null,
+                  batch_number: effectiveBatchNumber || null,
+                  expiry_date: effectiveExpiryDate || null
+                }
+              : {
+                  product_id: match.product_id,
+                  quantity_received: quantityToReceive,
+                  storage_location_id: locationId,
+                  lot_number: effectiveLotNumber || null,
+                  batch_number: effectiveBatchNumber || null,
+                  expiry_date: effectiveExpiryDate || null
+                }
+          ]
+        }),
+        skipMutationFeedback: true
+      });
+
+      setSessionScanCount((count) => count + 1);
+      if (receiveByPackage) setSessionPackageCount((count) => count + 1);
+      setSessionUnitCount((count) => count + quantityToReceive);
+      setManualCode('');
+      setLastReceivedMessage(
+        receiveByPackage
+          ? ui('Package received: 1 package ({quantity} base units). Ready for the next scan.')
+              .replace('{quantity}', formatLocalizedNumber(quantityToReceive, locale, { maximumFractionDigits: 2 }))
+          : ui('Received {quantity} unit(s). Ready for the next scan.')
+              .replace('{quantity}', formatLocalizedNumber(quantityToReceive, locale, { maximumFractionDigits: 2 }))
+      );
+      playSuccessFeedback();
+
+      await shipmentContextQuery.refetch();
+      await queryClient.invalidateQueries({ queryKey: ['shipments'] });
+      await queryClient.invalidateQueries({ queryKey: ['shipment-items', match.shipment_id] });
+      await queryClient.invalidateQueries({ queryKey: ['stock'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      await queryClient.invalidateQueries({ queryKey: ['alerts'] });
+    } finally {
+      setIsReceivingScan(false);
+    }
   };
 
   const resolveDecodedValue = async (decodedText: string) => {
@@ -488,6 +565,7 @@ export default function ScannerPage() {
     setResolvedPackageName(null);
     setResolvedUnitsPerPackage(null);
     setResolvedLabel(null);
+    setLastReceivedMessage(null);
     setError(null);
     setIsResolving(true);
 
@@ -825,9 +903,30 @@ export default function ScannerPage() {
           </div>
         </div>
 
+        {mode === 'product' ? (
+          <div style={styles.sessionPanel}>
+            <div style={styles.sessionHeading}>{ui("Receiving session")}</div>
+            <div style={styles.sessionGrid}>
+              <div style={styles.sessionMetric}>
+                <span style={styles.statusLabel}>{ui("Scans received")}</span>
+                <strong>{formatLocalizedNumber(sessionScanCount, locale)}</strong>
+              </div>
+              <div style={styles.sessionMetric}>
+                <span style={styles.statusLabel}>{ui("Packages received")}</span>
+                <strong>{formatLocalizedNumber(sessionPackageCount, locale)}</strong>
+              </div>
+              <div style={styles.sessionMetric}>
+                <span style={styles.statusLabel}>{ui("Units received")}</span>
+                <strong>{formatLocalizedNumber(sessionUnitCount, locale, { maximumFractionDigits: 2 })}</strong>
+              </div>
+            </div>
+            {lastReceivedMessage ? <div className="app-success-state" style={styles.sessionMessage}>{lastReceivedMessage}</div> : null}
+          </div>
+        ) : null}
+
         <div style={mode === 'product' ? styles.operationNoticeWarn : styles.operationNoticeInfo}>
           {mode === 'product'
-            ? ui("A successful barcode scan returns to the selected shipment. Standard items are received immediately; tracked items pause for any required serial, lot/batch, or expiry details.")
+            ? ui("Simple product and package scans are received in this scanner session. Items that need serial, lot/batch, or expiry details open the shipment form so those controls are not bypassed.")
             : isShipmentVerificationMode
               ? ui("Verification mode only opens the selected shipment when its QR code matches. It does not change stock.")
               : ui("Shipment QR lookup only opens the matching shipment. It does not change stock.")}
@@ -871,7 +970,7 @@ export default function ScannerPage() {
               ...(liveScannerDisabled ? styles.disabledButton : {})
             }}
           >
-            {isStartingCamera ? ui("Starting Camera...") : isRunning ? ui("Scanner Running") : ui("Start Camera Scanner")}
+            {isStartingCamera ? ui("Starting Camera...") : isRunning ? ui("Scanner Running") : sessionScanCount > 0 && mode === 'product' ? ui("Scan Next Item") : ui("Start Camera Scanner")}
           </button>
 
           <button
@@ -884,6 +983,19 @@ export default function ScannerPage() {
           >
             {ui("Stop Camera Scanner")}
           </button>
+
+          {mode === 'product' ? (
+            <button
+              type="button"
+              onClick={() => {
+                void stopScanner();
+                navigate(`/shipments?shipmentId=${encodeURIComponent(shipmentId)}`);
+              }}
+              style={styles.secondaryButton}
+            >
+              {ui("Finish receiving")}
+            </button>
+          ) : null}
         </div>
 
         {error ? (
@@ -898,6 +1010,10 @@ export default function ScannerPage() {
               ? ui("Resolving barcode in selected shipment...")
               : ui("Resolving shipment from scanned QR code...")}
           </div>
+        ) : null}
+
+        {isReceivingScan ? (
+          <div className="app-warning-state" style={styles.infoBanner}>{ui("Receiving scanned item...")}</div>
         ) : null}
 
         {isDecodingImage ? (
@@ -1235,6 +1351,34 @@ const styles: Record<string, CSSProperties> = {
     color: '#9a3412',
     lineHeight: 1.5,
     fontWeight: 600
+  },
+  sessionPanel: {
+    display: 'grid',
+    gap: '10px',
+    padding: '12px 14px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '12px',
+    background: '#ffffff'
+  },
+  sessionHeading: {
+    fontWeight: 800,
+    color: '#0f172a'
+  },
+  sessionGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+    gap: '10px'
+  },
+  sessionMetric: {
+    display: 'grid',
+    gap: '4px',
+    padding: '10px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
+    background: '#f8fafc'
+  },
+  sessionMessage: {
+    lineHeight: 1.5
   },
   receivingHint: {
     display: 'flex',
