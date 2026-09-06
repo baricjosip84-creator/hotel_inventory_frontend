@@ -22,6 +22,7 @@ import {
   fetchAuditLogs,
   fetchBarcodeLabels,
   fetchAttachments,
+  fetchAttachmentEntityOptions,
   fetchProducts,
   fetchProductPackages,
   fetchStorageLocations,
@@ -310,6 +311,14 @@ export function useEnterpriseInventoryQueries({
     queryFn: () => fetchAttachments(attachmentEntityType, attachmentEntityId),
     enabled: canReadAttachments && tabIs('attachments') && Boolean(attachmentEntityType && attachmentEntityId)
   });
+  const attachmentEntityOptionsQuery = useQuery({
+    queryKey: ['enterprise-attachment-entity-options', attachmentEntityType],
+    queryFn: () => fetchAttachmentEntityOptions(attachmentEntityType),
+    enabled: canReadAttachments && tabIs('attachments') && (
+      (attachmentEntityType === 'product' && canReadProducts) ||
+      (attachmentEntityType === 'supplier' && canReadSuppliers)
+    )
+  });
 
   return {
     tenantSubscriptionAccessQuery,
@@ -415,5 +424,6 @@ export function useEnterpriseInventoryQueries({
     auditLogsQuery,
     barcodeLabelsQuery,
     attachmentsQuery,
+    attachmentEntityOptionsQuery,
   };
 }

@@ -12,6 +12,7 @@ import type {
   AutomationRunnerStatus,
   AutomationSchedulesResponse,
   AutomationTypesResponse,
+  AttachmentEntityOption,
   BarcodeLabel,
   CycleCount,
   DashboardLowStockRow,
@@ -134,6 +135,12 @@ export async function fetchAttachments(entityType: string, entityId: string): Pr
   if (!entityType || !entityId) return [];
   const params = new URLSearchParams({ entity_type: entityType, entity_id: entityId });
   return apiRequest<EntityAttachment[]>(`/enterprise-inventory/attachments?${params.toString()}`);
+}
+
+export async function fetchAttachmentEntityOptions(entityType: string): Promise<AttachmentEntityOption[]> {
+  if (!['product', 'supplier'].includes(entityType)) return [];
+  const params = new URLSearchParams({ entity_type: entityType });
+  return apiRequest<AttachmentEntityOption[]>(`/enterprise-inventory/attachments/entity-options?${params.toString()}`);
 }
 
 export async function fetchProducts(search = ''): Promise<ProductOption[]> {

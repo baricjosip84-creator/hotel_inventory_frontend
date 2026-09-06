@@ -313,6 +313,13 @@ export type EntityAttachment = {
   created_at: string;
 };
 
+export type AttachmentEntityOption = {
+  id: string;
+  label: string;
+  archived: boolean;
+  attachment_count: number | string;
+};
+
 export type BarcodeLabel = {
   id: string;
   product_id: string;

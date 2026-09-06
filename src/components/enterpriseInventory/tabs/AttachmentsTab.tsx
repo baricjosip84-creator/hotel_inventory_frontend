@@ -6,6 +6,7 @@ import { downloadEnterpriseInventoryFile } from '../EnterpriseInventoryRequests'
 import { InputField, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
 import type {
+  AttachmentEntityOption,
   AttachmentForm,
   DepartmentRequisition,
   EntityAttachment,
@@ -18,6 +19,7 @@ import type {
 } from '../EnterpriseInventoryTypes';
 
 type AttachmentsQuery = { isLoading: boolean; data?: EntityAttachment[] };
+type AttachmentEntityOptionsQuery = { isLoading: boolean; data?: AttachmentEntityOption[] };
 type AttachmentUploadMutation = {
   isPending: boolean;
   mutate: (input: { form: AttachmentForm; file: File; afterSuccess?: () => void }) => void;
@@ -27,6 +29,7 @@ type DeleteAttachmentMutation = { isPending: boolean; mutate: (attachmentId: str
 type AttachmentsTabProps = {
   attachmentForm: AttachmentForm;
   attachmentsQuery: AttachmentsQuery;
+  attachmentEntityOptionsQuery: AttachmentEntityOptionsQuery;
   createAttachmentMutation: AttachmentUploadMutation;
   deleteAttachmentMutation: DeleteAttachmentMutation;
   setAttachmentForm: Dispatch<SetStateAction<AttachmentForm>>;
@@ -72,6 +75,7 @@ const requisitionStatusLabels: Record<string, string> = {
 export function AttachmentsTab({
   attachmentForm,
   attachmentsQuery,
+  attachmentEntityOptionsQuery,
   createAttachmentMutation,
   deleteAttachmentMutation,
   setAttachmentForm,
@@ -96,10 +100,25 @@ export function AttachmentsTab({
   };
   const requisitionStatusLabel = (value: string) => requisitionStatusLabels[value] ? ui(requisitionStatusLabels[value]) : value;
 
+  const attachmentEntityOptions = attachmentEntityOptionsQuery.data ?? [];
+  const selectedHistoricalOption = attachmentEntityOptions.find((item) => item.id === attachmentForm.entity_id) ?? null;
+  const selectedRecordArchived = selectedHistoricalOption?.archived === true;
+  const mergeHistoricalOptions = (active: Array<{ id: string; name: string }>) => {
+    const activeIds = new Set(active.map((item) => item.id));
+    return [
+      ...active.map((item) => ({ value: item.id, label: item.name })),
+      ...attachmentEntityOptions
+        .filter((item) => !activeIds.has(item.id))
+        .map((item) => ({
+          value: item.id,
+          label: item.archived ? `${ui('Archived')} · ${item.label}` : item.label
+        }))
+    ];
+  };
   const entityOptions = (() => {
     switch (attachmentForm.entity_type) {
-      case 'product': return products.map((item) => ({ value: item.id, label: item.name }));
-      case 'supplier': return suppliers.map((item) => ({ value: item.id, label: item.name }));
+      case 'product': return mergeHistoricalOptions(products);
+      case 'supplier': return mergeHistoricalOptions(suppliers);
       case 'purchase_order': return purchaseOrders.map((item) => ({ value: item.id, label: item.po_number || item.id }));
       case 'shipment': return shipments.map((item) => ({ value: item.id, label: `${item.linked_purchase_order_number || item.po_number || ui('Shipment')} · ${String(item.delivery_date).slice(0, 10)}` }));
       case 'supplier_invoice': return invoices.map((item) => ({ value: item.id, label: `${item.invoice_number} · ${item.supplier_name || ui('Supplier')}` }));
@@ -108,6 +127,7 @@ export function AttachmentsTab({
       default: return [];
     }
   })();
+  const canUploadToSelectedRecord = canWriteAttachments && !selectedRecordArchived;
 
   const handleFileChange = (file: File | null) => {
     setFileError(null);
@@ -165,7 +185,7 @@ export function AttachmentsTab({
         <p style={styles.helper}>{ui('Upload the actual PDF, image, spreadsheet, or document. Files are stored with the tenant record and can be downloaded later. Maximum size: 8 MB.')}</p>
         <div style={{ ...styles.formGrid, marginTop: 12 }}>
           <SelectField
-            disabled={!canWriteAttachments || createAttachmentMutation.isPending}
+            disabled={(!canReadAttachments && !canWriteAttachments) || createAttachmentMutation.isPending}
             label={ui('Attach to')}
             value={attachmentForm.entity_type}
             onChange={(value) => setAttachmentForm((current) => ({ ...current, entity_type: value, entity_id: '' }))}
@@ -174,7 +194,7 @@ export function AttachmentsTab({
           />
           {entityOptions.length ? (
             <SelectField
-              disabled={!canWriteAttachments || createAttachmentMutation.isPending}
+              disabled={(!canReadAttachments && !canWriteAttachments) || createAttachmentMutation.isPending || attachmentEntityOptionsQuery.isLoading}
               label={ui('Business record')}
               value={attachmentForm.entity_id}
               onChange={(value) => setAttachmentForm((current) => ({ ...current, entity_id: value }))}
@@ -183,7 +203,7 @@ export function AttachmentsTab({
             />
           ) : (
             <InputField
-              disabled={!canWriteAttachments || createAttachmentMutation.isPending}
+              disabled={(!canReadAttachments && !canWriteAttachments) || createAttachmentMutation.isPending}
               label={ui('Business record ID')}
               value={attachmentForm.entity_id}
               onChange={(value) => setAttachmentForm((current) => ({ ...current, entity_id: value }))}
@@ -197,17 +217,18 @@ export function AttachmentsTab({
             ref={fileInputRef}
             type="file"
             accept={accept}
-            disabled={!canWriteAttachments || createAttachmentMutation.isPending}
+            disabled={!canUploadToSelectedRecord || createAttachmentMutation.isPending}
             onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
           />
         </label>
         {selectedFile ? <p style={styles.helper}>{ui('Selected:')} <strong>{selectedFile.name}</strong> · {formatBytes(selectedFile.size, locale)}</p> : null}
         {fileError ? <div style={styles.error}>{fileError}</div> : null}
         {!canWriteAttachments ? <p style={styles.helper}>{ui('Uploading requires {permission} permission.').replace('{permission}', TENANT_PERMISSIONS.ATTACHMENTS_WRITE)}</p> : null}
+        {selectedRecordArchived ? <p style={styles.helper}>{ui('Archived records remain available for historical attachment review. New uploads and deletion are disabled.')}</p> : null}
         <button
           type="submit"
-          disabled={!canWriteAttachments || createAttachmentMutation.isPending || !attachmentForm.entity_id || !selectedFile}
-          style={canWriteAttachments && !createAttachmentMutation.isPending && attachmentForm.entity_id && selectedFile ? styles.primaryButton : styles.disabledButton}
+          disabled={!canUploadToSelectedRecord || createAttachmentMutation.isPending || !attachmentForm.entity_id || !selectedFile}
+          style={canUploadToSelectedRecord && !createAttachmentMutation.isPending && attachmentForm.entity_id && selectedFile ? styles.primaryButton : styles.disabledButton}
         >
           {createAttachmentMutation.isPending ? ui('Uploading…') : ui('Upload file')}
         </button>
@@ -229,7 +250,7 @@ export function AttachmentsTab({
                     <td style={styles.td}>
                       <div style={styles.actions}>
                         <button type="button" style={item.can_download ? styles.smallButton : styles.disabledButton} disabled={!item.can_download || downloadingId === item.id} onClick={() => void downloadAttachment(item)}>{downloadingId === item.id ? ui('Downloading…') : item.can_download ? ui('Download') : ui('Metadata only')}</button>
-                        <button type="button" style={canWriteAttachments ? styles.dangerButton : styles.disabledButton} disabled={!canWriteAttachments || deleteAttachmentMutation.isPending} onClick={() => { if (window.confirm(ui('Delete attachment "{filename}"?').replace('{filename}', item.original_filename))) deleteAttachmentMutation.mutate(item.id); }}>{ui('Delete')}</button>
+                        <button type="button" style={canWriteAttachments && !selectedRecordArchived ? styles.dangerButton : styles.disabledButton} disabled={!canWriteAttachments || selectedRecordArchived || deleteAttachmentMutation.isPending} onClick={() => { if (window.confirm(ui('Delete attachment "{filename}"?').replace('{filename}', item.original_filename))) deleteAttachmentMutation.mutate(item.id); }}>{ui('Delete')}</button>
                       </div>
                     </td>
                   </tr>

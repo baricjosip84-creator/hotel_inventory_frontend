@@ -23,7 +23,7 @@ export function EnterpriseInventoryCatalogSupportPanels({
 
   const { products, suppliers, purchaseOrders, shipments } = stableData;
 
-  const { attachmentsQuery, barcodeLabelsQuery, invoicesQuery, requisitionsQuery, supplierReturnsQuery } = queries;
+  const { attachmentsQuery, attachmentEntityOptionsQuery, barcodeLabelsQuery, invoicesQuery, requisitionsQuery, supplierReturnsQuery } = queries;
 
 
   const {
@@ -54,6 +54,7 @@ export function EnterpriseInventoryCatalogSupportPanels({
         <AttachmentsTab
           attachmentForm={attachmentForm}
           attachmentsQuery={attachmentsQuery}
+          attachmentEntityOptionsQuery={attachmentEntityOptionsQuery}
           createAttachmentMutation={createAttachmentMutation}
           deleteAttachmentMutation={deleteAttachmentMutation}
           setAttachmentForm={setAttachmentForm}

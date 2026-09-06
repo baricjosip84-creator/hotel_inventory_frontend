@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
-import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
+import { apiDownloadFile, apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
 import { getCurrentTenantUserId } from '../lib/auth';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
 import { getRoleCapabilities } from '../lib/permissions';
@@ -170,6 +170,23 @@ type SendShipmentToSupplierResponse = {
   delivery_method?: string;
   sandbox_capture?: boolean;
   attachments?: Array<{ filename?: string | null; content_type?: string | null }>;
+};
+
+type SupplierEmailDeliveryEvidence = {
+  id: string;
+  shipment_id: string;
+  purchase_order_id?: string | null;
+  recipient_email: string;
+  subject: string;
+  pdf_filename: string;
+  pdf_sha256: string;
+  delivery_status: 'prepared' | 'sent' | 'failed' | string;
+  delivery_provider?: string | null;
+  prepared_at: string;
+  sent_at?: string | null;
+  prepared_by_user_id?: string | null;
+  prepared_by_user_name?: string | null;
+  prepared_by_user_email?: string | null;
 };
 
 type SupplierEmailPreview = {
@@ -863,6 +880,10 @@ async function sendShipmentToSupplier(input: {
   });
 }
 
+async function fetchShipmentSupplierEmailDeliveries(shipmentId: string): Promise<SupplierEmailDeliveryEvidence[]> {
+  return apiRequest<SupplierEmailDeliveryEvidence[]>(`/shipments/${shipmentId}/supplier-email-deliveries`);
+}
+
 /*
  * v3.49.116: Intentionally not exposed on the Purchase Orders page.
  * Kept here as commented compatibility history rather than deleting the previous
@@ -1001,6 +1022,19 @@ export default function PurchaseOrdersPage() {
   const purchaseOrderFormCurrency = purchaseOrderCreateOptionsQuery.data?.purchase_order_currency || getActiveTenantCurrency();
 
   const selectedDetail = detailQuery.data ?? null;
+  const selectedEmailShipmentIds = useMemo(
+    () => (selectedDetail?.linked_shipments ?? []).map((shipment) => shipment.id).filter(Boolean),
+    [selectedDetail]
+  );
+  const supplierEmailEvidenceQuery = useQuery({
+    queryKey: ['purchase-order', 'supplier-email-evidence', selectedId, selectedEmailShipmentIds.join(',')],
+    queryFn: async () => {
+      const groups = await Promise.all(selectedEmailShipmentIds.map((shipmentId) => fetchShipmentSupplierEmailDeliveries(shipmentId)));
+      return groups.flat().sort((left, right) => String(right.prepared_at).localeCompare(String(left.prepared_at)));
+    },
+    enabled: Boolean(selectedId && purchaseOrdersFeatureReady && selectedEmailShipmentIds.length > 0),
+    retry: false
+  });
   const selectedLifecycleEvents = useMemo(() => {
     if (!selectedDetail) return [];
 
@@ -1342,6 +1376,7 @@ export default function PurchaseOrdersPage() {
 
       void queryClient.invalidateQueries({ queryKey: ['shipments'] });
       void queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      void queryClient.invalidateQueries({ queryKey: ['purchase-order', 'supplier-email-evidence', selectedId] });
       if (selectedId) {
         void queryClient.invalidateQueries({ queryKey: ['purchase-order', selectedId] });
         void queryClient.invalidateQueries({ queryKey: ['purchase-order', 'audit', selectedId] });
@@ -2772,6 +2807,36 @@ export default function PurchaseOrdersPage() {
                     {preparePurchaseOrderSupplierEmailMutation.isPending ? ui('Preparing Preview...') : ui('Send to supplier')}
                   </button>
                   {preparePurchaseOrderSupplierEmailMutation.error ? <p style={styles.error}>{normalizeError(preparePurchaseOrderSupplierEmailMutation.error, ui('Failed to prepare supplier email preview.'), ui)}</p> : null}
+                </div>
+              ) : null}
+
+              {selectedEmailShipmentIds.length > 0 ? (
+                <div className="purchase-orders-action-panel">
+                  <div>
+                    <strong>{ui('Supplier email evidence')}</strong>
+                    <span>{ui('Exact supplier-facing PDFs are preserved when an email is prepared, so later Product, Supplier, or tenant master-data changes cannot rewrite what was sent.')}</span>
+                  </div>
+                  {supplierEmailEvidenceQuery.isLoading ? <p className="purchase-orders-muted">{ui('Loading supplier email evidence…')}</p> : null}
+                  {supplierEmailEvidenceQuery.error ? <p style={styles.error}>{ui('Supplier email evidence could not be loaded.')}</p> : null}
+                  {!supplierEmailEvidenceQuery.isLoading && !supplierEmailEvidenceQuery.error && !(supplierEmailEvidenceQuery.data ?? []).length ? (
+                    <p className="purchase-orders-muted">{ui('No supplier email evidence has been recorded for this purchase order yet.')}</p>
+                  ) : null}
+                  {(supplierEmailEvidenceQuery.data ?? []).map((evidence) => (
+                    <div key={evidence.id} className="purchase-orders-note-box">
+                      <strong>{evidence.pdf_filename}</strong>
+                      <p>
+                        {ui('Recipient')}: {evidence.recipient_email} · {ui('Prepared')}: {formatDateTime(evidence.prepared_at)} · {ui('Status')}: {ui(evidence.delivery_status === 'sent' ? 'Sent' : evidence.delivery_status === 'failed' ? 'Failed' : 'Prepared')}
+                      </p>
+                      <p>SHA-256 {evidence.pdf_sha256}</p>
+                      <button
+                        type="button"
+                        className="app-button app-button--secondary"
+                        onClick={() => void apiDownloadFile(`/shipments/${evidence.shipment_id}/supplier-email-deliveries/${evidence.id}/pdf`, evidence.pdf_filename)}
+                      >
+                        {ui('Download exact sent PDF')}
+                      </button>
+                    </div>
+                  ))}
                 </div>
               ) : null}
 

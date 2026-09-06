@@ -396,7 +396,7 @@ export function useEnterpriseInventoryWorkflowMutations({
     },
     onSuccess: mutationFeedback.custom<EntityAttachment, AttachmentUploadInput>(
       ui("File uploaded and attached successfully."),
-      ["enterprise-attachments", "enterprise-notifications"],
+      ["enterprise-attachments", "enterprise-attachment-entity-options", "enterprise-notifications"],
       (attachment, input) => {
         setAttachmentForm((current) => ({
           ...current,
@@ -416,7 +416,7 @@ export function useEnterpriseInventoryWorkflowMutations({
       ),
     onSuccess: mutationFeedback.invalidating(
       ui("Attachment deleted successfully."),
-      ["enterprise-attachments"],
+      ["enterprise-attachments", "enterprise-attachment-entity-options"],
     ),
     onError: mutationFeedback.error(ui("Failed to delete attachment.")),
   });
