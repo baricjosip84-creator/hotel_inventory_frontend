@@ -348,7 +348,7 @@ export function SupplierReturnsTab() {
         return postEnterpriseInventoryVersionedRequest<SupplierReturn>(
           `/enterprise-inventory/supplier-returns/${item.id}/cancel`,
           item.version,
-          { reason: reason || null },
+          { reason: reason?.trim() || '' },
         );
       }
       return postEnterpriseInventoryVersionedRequest<SupplierReturn>(
@@ -558,8 +558,8 @@ export function SupplierReturnsTab() {
     }
     if (action === 'cancel') {
       const reason = window.prompt(ui('Reason for cancelling {returnNumber}:').replace('{returnNumber}', item.return_number));
-      if (reason === null) return;
-      lifecycleMutation.mutate({ item, action, reason });
+      if (!reason?.trim()) return;
+      lifecycleMutation.mutate({ item, action, reason: reason.trim() });
       return;
     }
     const prompts: Partial<Record<ReturnLifecycleAction, string>> = {
@@ -736,7 +736,7 @@ export function SupplierReturnsTab() {
                         {line.serial_numbers?.length ? <div style={styles.helper}>{ui('Serials: {serials}').replace('{serials}', line.serial_numbers.join(', '))}</div> : null}
                       </div>
                     ))}</td>
-                    <td style={styles.td}>{item.reason}</td>
+                    <td style={styles.td}>{item.reason}{item.cancellation_reason ? <div style={styles.helper}>{ui('Cancelled: {reason}').replace('{reason}', item.cancellation_reason)}</div> : null}</td>
                     <td style={styles.td}>{item.valuation_status === 'unavailable' ? ui('Not available') : formatMoney(item.total_amount, item.currency)}</td>
                     <td style={styles.td}>{statusLabel(item.status)}</td>
                     <td style={styles.td}>

@@ -316,9 +316,12 @@ export default function AppLayout() {
   const canDispatchSupplierReturnsForAttention = hasTenantActorForOperationalAttention
     && hasPermission(TENANT_PERMISSIONS.SUPPLIER_RETURNS_READ)
     && hasPermission(TENANT_PERMISSIONS.SUPPLIER_RETURNS_DISPATCH);
-  const canManageSupplierInvoicesForAttention = hasTenantActorForOperationalAttention
+  const canMatchSupplierInvoicesForAttention = hasTenantActorForOperationalAttention
     && hasPermission(TENANT_PERMISSIONS.INVOICES_READ)
-    && hasPermission(TENANT_PERMISSIONS.INVOICES_WRITE);
+    && hasPermission(TENANT_PERMISSIONS.INVOICES_MATCH);
+  const canMarkSupplierInvoicesPaidForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.INVOICES_READ)
+    && hasPermission(TENANT_PERMISSIONS.INVOICES_MARK_PAID);
 
   const canActOnOperationalNavigationQueues = canReviewUsageForAttention
     || canApproveRequisitionsForAttention
@@ -341,7 +344,8 @@ export default function AppLayout() {
     || canApproveSupplierReturnsForAttention
     || canReconcileCycleCountsForAttention
     || canDispatchSupplierReturnsForAttention
-    || canManageSupplierInvoicesForAttention;
+    || canMatchSupplierInvoicesForAttention
+    || canMarkSupplierInvoicesPaidForAttention;
 
   const operationalNavigationAttentionScope = [
     canReviewUsageForAttention ? 'usage-review' : 'no-usage-review',
@@ -369,7 +373,8 @@ export default function AppLayout() {
     canApproveSupplierReturnsForAttention ? `supplier-return-approve-${role || 'unknown'}` : 'no-supplier-return-approve',
     canReconcileCycleCountsForAttention ? 'cycle-reconcile' : 'no-cycle-reconcile',
     canDispatchSupplierReturnsForAttention ? 'supplier-return-dispatch' : 'no-supplier-return-dispatch',
-    canManageSupplierInvoicesForAttention ? 'invoice-write' : 'no-invoice-write'
+    canMatchSupplierInvoicesForAttention ? 'invoice-match' : 'no-invoice-match',
+    canMarkSupplierInvoicesPaidForAttention ? 'invoice-mark-paid' : 'no-invoice-mark-paid'
   ].join(':');
 
   const operationalNavigationAttentionQuery = useQuery({
@@ -396,7 +401,7 @@ export default function AppLayout() {
     && operationalAttention?.shipments.requires_attention === true;
   const hasOutboundAttention = (canUpdateOutboundForAttention || canDispatchOutboundForAttention || canReceiveCustomerReturnsForAttention)
     && operationalAttention?.outbound.requires_attention === true;
-  const hasInventoryControlsAttention = (canExecuteInventoryApprovalQueueForAttention || canApproveSupplierReturnsForAttention || canReconcileCycleCountsForAttention || canDispatchSupplierReturnsForAttention || canManageSupplierInvoicesForAttention)
+  const hasInventoryControlsAttention = (canExecuteInventoryApprovalQueueForAttention || canApproveSupplierReturnsForAttention || canReconcileCycleCountsForAttention || canDispatchSupplierReturnsForAttention || canMatchSupplierInvoicesForAttention || canMarkSupplierInvoicesPaidForAttention)
     && operationalAttention?.inventory_controls.requires_attention === true;
 
   /*

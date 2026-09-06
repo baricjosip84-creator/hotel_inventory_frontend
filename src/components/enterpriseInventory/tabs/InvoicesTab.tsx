@@ -58,7 +58,9 @@ export function InvoicesTab({ createSupplierInvoiceMutation, updateSupplierInvoi
   const { locale, ui } = useAppTranslation();
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
   const canWriteInvoices = hasPermission(TENANT_PERMISSIONS.INVOICES_WRITE);
-  const inventoryControlAttentionItemsQuery = useOperationalAttentionItems('inventory_controls', canWriteInvoices || hasPermission(TENANT_PERMISSIONS.APPROVALS_EXECUTE));
+  const canMatchInvoices = hasPermission(TENANT_PERMISSIONS.INVOICES_MATCH);
+  const canMarkInvoicesPaid = hasPermission(TENANT_PERMISSIONS.INVOICES_MARK_PAID);
+  const inventoryControlAttentionItemsQuery = useOperationalAttentionItems('inventory_controls', canWriteInvoices || canMatchInvoices || canMarkInvoicesPaid || hasPermission(TENANT_PERMISSIONS.APPROVALS_EXECUTE));
   const approvalAttentionKeys = new Set(inventoryControlAttentionItemsQuery.data?.approval_item_keys || []);
   const invoiceMatchAttentionIds = new Set(inventoryControlAttentionItemsQuery.data?.invoice_match_ids || []);
   const invoicePaymentDueAttentionIds = new Set(inventoryControlAttentionItemsQuery.data?.invoice_payment_due_ids || []);
@@ -138,7 +140,8 @@ export function InvoicesTab({ createSupplierInvoiceMutation, updateSupplierInvoi
   };
 
   const runLifecycle = (invoice: SupplierInvoice, action: 'submit' | 'match' | 'pay' | 'cancel' | 'revise') => {
-    if (!canWriteInvoices || supplierInvoiceLifecycleMutation.isPending) return;
+    const authorized = action === 'match' ? canMatchInvoices : action === 'pay' ? canMarkInvoicesPaid : canWriteInvoices;
+    if (!authorized || supplierInvoiceLifecycleMutation.isPending) return;
     if (action === 'cancel') {
       const reason = window.prompt(ui('Cancellation reason'));
       if (!reason?.trim()) return;
@@ -146,9 +149,9 @@ export function InvoicesTab({ createSupplierInvoiceMutation, updateSupplierInvoi
       return;
     }
     if (action === 'pay') {
-      const paymentReference = window.prompt(ui('Payment reference (optional)'), '');
-      if (paymentReference === null) return;
-      supplierInvoiceLifecycleMutation.mutate({ invoice, action, paymentReference });
+      const paymentReference = window.prompt(ui('Payment reference'), '');
+      if (!paymentReference?.trim()) return;
+      supplierInvoiceLifecycleMutation.mutate({ invoice, action, paymentReference: paymentReference.trim() });
       return;
     }
     const prompt = action === 'submit'
@@ -240,9 +243,9 @@ export function InvoicesTab({ createSupplierInvoiceMutation, updateSupplierInvoi
                     <div style={styles.actions}>
                       {invoice.status === 'draft' ? <><button type="button" style={styles.secondarySmallButton} disabled={!canWriteInvoices || invoiceBusy} onClick={() => beginEdit(invoice)}>{ui('Edit')}</button><button type="button" style={styles.smallButton} disabled={!canWriteInvoices || invoiceBusy} onClick={() => runLifecycle(invoice, 'submit')}>{ui('Submit')}</button></> : null}
                       {invoice.status === 'pending_approval' ? <span style={styles.muted}>{ui('Use Approvals tab')}</span> : null}
-                      {invoice.status === 'approved' ? <button type="button" style={styles.smallButton} disabled={!canWriteInvoices || invoiceBusy} onClick={() => runLifecycle(invoice, 'match')}>{ui('Mark matched')}</button> : null}
+                      {invoice.status === 'approved' ? <button type="button" style={styles.smallButton} disabled={!canMatchInvoices || invoiceBusy} title={!canMatchInvoices ? ui('Requires {permission} permission.').replace('{permission}', TENANT_PERMISSIONS.INVOICES_MATCH) : undefined} onClick={() => runLifecycle(invoice, 'match')}>{ui('Mark matched')}</button> : null}
                       {invoice.status === 'rejected' ? <button type="button" style={styles.secondarySmallButton} disabled={!canWriteInvoices || invoiceBusy} onClick={() => runLifecycle(invoice, 'revise')}>{ui('Revise')}</button> : null}
-                      {invoice.status === 'matched' ? <button type="button" style={styles.smallButton} disabled={!canWriteInvoices || invoiceBusy} onClick={() => runLifecycle(invoice, 'pay')}>{ui('Mark paid')}</button> : null}
+                      {invoice.status === 'matched' ? <button type="button" style={styles.smallButton} disabled={!canMarkInvoicesPaid || invoiceBusy} title={!canMarkInvoicesPaid ? ui('Requires {permission} permission.').replace('{permission}', TENANT_PERMISSIONS.INVOICES_MARK_PAID) : undefined} onClick={() => runLifecycle(invoice, 'pay')}>{ui('Mark paid')}</button> : null}
                       {!['paid','cancelled'].includes(invoice.status) ? <button type="button" style={styles.dangerButton} disabled={!canWriteInvoices || invoiceBusy} onClick={() => runLifecycle(invoice, 'cancel')}>{ui('Cancel')}</button> : null}
                     </div>
                     {invoice.payment_reference ? <span style={styles.muted}>{ui('Payment: {reference}').replace('{reference}', invoice.payment_reference)}</span> : null}

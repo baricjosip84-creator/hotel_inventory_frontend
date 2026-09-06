@@ -217,7 +217,7 @@ export function useEnterpriseInventoryWorkflowMutations({
       const body = action === "cancel"
         ? { reason: reason || "Cancelled from supplier invoice workspace" }
         : action === "pay"
-          ? { payment_reference: paymentReference?.trim() || null }
+          ? { payment_reference: paymentReference?.trim() || '' }
           : undefined;
       return postEnterpriseInventoryVersionedRequest<SupplierInvoice>(
         `/enterprise-inventory/supplier-invoices/${invoice.id}/${action}`,
