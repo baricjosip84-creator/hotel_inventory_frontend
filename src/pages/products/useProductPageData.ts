@@ -27,6 +27,7 @@ export function useProductPageData(queries: ProductPageDataQueries, search: stri
     costHistory,
     standardCostHistory,
     costSummary: queries.costHistoryQuery.data?.cost_summary,
+    costHistoryProduct: queries.costHistoryQuery.data?.product ?? queries.standardCostHistoryQuery.data?.product,
     categoryOptions: useMemo(() => buildCategoryOptions(allProducts), [allProducts]),
     summary: useMemo(() => buildProductSummary(allProducts), [allProducts]),
     costingReadiness: useMemo(() => buildCostingReadiness(allProducts), [allProducts]),

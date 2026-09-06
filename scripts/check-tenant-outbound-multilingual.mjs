@@ -138,7 +138,6 @@ for(const required of [
   "ui('Confirmed through partially dispatched')",
   "condition: 'available'",
   "<option value=\"partially_dispatched\">",
-  "<option value=\"available\">",
   "<option value=\"hold\">",
   "<option value=\"quarantine\">",
   "<option value=\"damaged\">",
@@ -147,6 +146,7 @@ for(const required of [
   'body: { reason: cancelOrderReason.trim() }',
   'body: { reason: cancelReturnReason.trim() }'
 ])if(!pageSource.includes(required))fail(`Outbound canonical payload/status value changed or missing: ${required}`);
+if(!/<option value=\"available\"(?:\s+disabled=\{Boolean\(selected\?\.product_archived\)\})?>/.test(pageSource))fail('Outbound canonical available return-condition value changed or missing.');
 for(const required of [
   "`/outbound/orders/${selectedOrderId}/activity?audit_page=${orderAuditPage}&audit_page_size=${AUDIT_PAGE_SIZE}`",
   "`/outbound/returns/${selectedReturnId}/activity?audit_page=${returnAuditPage}&audit_page_size=${AUDIT_PAGE_SIZE}`",

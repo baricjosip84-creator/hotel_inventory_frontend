@@ -28,6 +28,7 @@ export function ProductDetailSectionsPanel(props: ProductDetailSectionsPanelProp
 
       <ProductCostHistoryPanel
         selectedCostProduct={props.selectedCostProduct}
+        costHistoryProduct={props.costHistoryProduct}
         costHistoryQuery={props.costHistoryQuery}
         standardCostHistoryQuery={props.standardCostHistoryQuery}
         costHistory={props.costHistory}

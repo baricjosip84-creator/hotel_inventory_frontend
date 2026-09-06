@@ -68,6 +68,7 @@ export interface ProductItem {
   cost_variance_percent?: number | string | null;
   packages?: ProductPackageItem[];
   created_at: string;
+  deleted_at?: string | null;
   version: number;
 }
 

@@ -20,6 +20,7 @@ type StandardCostHistoryQueryState = {
 
 type ProductCostHistoryPanelProps = {
   selectedCostProduct: ProductItem | ProductCostRiskItem | null;
+  costHistoryProduct?: ProductItem;
   costHistoryQuery: CostHistoryQueryState;
   standardCostHistoryQuery: StandardCostHistoryQueryState;
   costHistory: ProductCostHistoryItem[];
@@ -35,6 +36,7 @@ type ProductCostHistoryPanelProps = {
 
 export function ProductCostHistoryPanel({
   selectedCostProduct,
+  costHistoryProduct,
   costHistoryQuery,
   standardCostHistoryQuery,
   costHistory,
@@ -48,7 +50,8 @@ export function ProductCostHistoryPanel({
   onClearCostHistoryFilters
 }: ProductCostHistoryPanelProps) {
   const { ui, locale } = useAppTranslation();
-  if (!selectedCostProduct) {
+  const historySubject = costHistoryProduct ?? selectedCostProduct;
+  if (!historySubject) {
     return null;
   }
 
@@ -56,9 +59,10 @@ export function ProductCostHistoryPanel({
     <section id="product-cost-history-panel" style={styles.panel}>
       <div style={styles.packageHeader}>
         <div>
-          <h3 style={styles.panelTitle}>{ui("Cost History for")} {selectedCostProduct.name}</h3>
+          <h3 style={styles.panelTitle}>{ui("Cost History for")} {historySubject.name}</h3>
           <p style={styles.panelSubtitle}>
             {ui("Read-only cost audit from stock movements. This does not change inventory value or stock quantities.")}
+            {historySubject.deleted_at ? <> {ui('Archived product — historical evidence remains read-only.')}</> : null}
           </p>
         </div>
         <div style={styles.actionGroup}>
@@ -145,7 +149,7 @@ export function ProductCostHistoryPanel({
             <StatCard
               title={ui("Received Qty")}
               value={String(costSummary?.received_quantity ?? 0)}
-              subtitle={selectedCostProduct.unit}
+              subtitle={historySubject.unit}
             />
             <StatCard
               title={ui("Weighted Avg Cost")}
