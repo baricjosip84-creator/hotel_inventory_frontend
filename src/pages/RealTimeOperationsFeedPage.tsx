@@ -6,6 +6,7 @@ import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
+import { getTenantAccessSnapshot } from '../lib/tenantAccess';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
@@ -17,6 +18,8 @@ import {
 import './RealTimeOperationsFeedPage.css';
 
 type EventUrgency = 'critical' | 'high' | 'medium' | 'low';
+type FeedTimeWindow = 'all' | 'today' | '24h';
+type FeedView = 'all' | 'new';
 
 type EventDomain =
   | 'alerts'
@@ -141,6 +144,20 @@ const URGENCY_FILTERS: Array<{ value: 'all' | EventUrgency; label: string }> = [
   { value: 'medium', label: 'Medium' },
   { value: 'low', label: 'Low' }
 ];
+
+const TIME_WINDOW_FILTERS: Array<{ value: FeedTimeWindow; label: string }> = [
+  { value: 'all', label: 'All shown' },
+  { value: 'today', label: 'Today' },
+  { value: '24h', label: 'Last 24 hours' }
+];
+
+const VIEW_FILTERS: Array<{ value: FeedView; label: string }> = [
+  { value: 'all', label: 'All items' },
+  { value: 'new', label: 'New since last visit' }
+];
+
+const OPERATIONS_FEED_LAST_SEEN_PREFIX = 'inventory_operations_feed_last_seen';
+const OPERATIONS_FEED_AUTO_REFRESH_MS = 60_000;
 
 const USER_SAFETY_LABELS: Record<string, { title: string; description: string }> = {
   read_only: {
@@ -278,6 +295,8 @@ function statusClass(value?: string | null): string {
 
 function sourceSurfaceToAppPath(sourceSurface?: string | null): string | null {
   if (!sourceSurface || !sourceSurface.startsWith('/')) return null;
+  if (sourceSurface === '/control-tower') return '/reliability-command';
+  if (sourceSurface === '/operational-action-center/summary') return '/action-center';
 
   const tenantRoutes = new Set([
     '/action-center',
@@ -287,15 +306,63 @@ function sourceSurfaceToAppPath(sourceSurface?: string | null): string | null {
     '/execution-requests',
     '/alerts',
     '/insights',
+    '/system-context',
+    '/automation-schedules',
     '/inventory-reservations',
     '/inventory-requisitions',
     '/procurement-recommendations',
     '/shipments',
     '/stock-transfers',
-    '/reports'
+    '/reports',
+    '/reliability-command',
+    '/intelligence-review',
+    '/ai-copilot',
+    '/adaptive-policy-engine',
+    '/probabilistic-forecasting'
   ]);
 
   return tenantRoutes.has(sourceSurface) ? sourceSurface : null;
+}
+
+function timelineItemTimestamp(item: TimelineItem): number | null {
+  const timestamps = [item.observed_at, item.updated_at]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => new Date(value).getTime())
+    .filter((value) => Number.isFinite(value));
+  return timestamps.length > 0 ? Math.max(...timestamps) : null;
+}
+
+function timelineItemSearchText(item: TimelineItem, ui: (englishText: string) => string): string {
+  return [
+    item.title,
+    item.summary,
+    item.recommended_next_step,
+    item.event_type,
+    canonicalLabel(item.event_type, ui),
+    item.event_status,
+    canonicalLabel(item.event_status, ui),
+    String(item.timeline_domain || '').replace(/_/g, ' '),
+    canonicalLabel(item.timeline_domain, ui),
+    item.delivery_target
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function buildLastSeenStorageKey(): string | null {
+  const access = getTenantAccessSnapshot();
+  if (!access.tenantId) return null;
+  const userScope = access.userId || `role:${access.role}`;
+  return `${OPERATIONS_FEED_LAST_SEEN_PREFIX}:${access.tenantId}:${userScope}`;
+}
+
+function readLastSeenTimestamp(storageKey: string | null): string | null {
+  if (!storageKey || typeof window === 'undefined') return null;
+  try {
+    const value = window.localStorage.getItem(storageKey);
+    if (!value) return null;
+    return Number.isFinite(new Date(value).getTime()) ? value : null;
+  } catch {
+    return null;
+  }
 }
 
 type FeedLink = { to: string; label: string };
@@ -389,20 +456,60 @@ export default function RealTimeOperationsFeedPage() {
   const { locale, ui } = useAppTranslation();
   const [eventDomain, setEventDomain] = useState<'all' | EventDomain>('all');
   const [urgency, setUrgency] = useState<'all' | EventUrgency>('all');
+  const [searchText, setSearchText] = useState('');
+  const [timeWindow, setTimeWindow] = useState<FeedTimeWindow>('all');
+  const [viewScope, setViewScope] = useState<FeedView>('all');
   const locallyAvailableDomains = useMemo(localAvailableDomains, []);
+  const lastSeenStorageKey = useMemo(buildLastSeenStorageKey, []);
+  const [previousVisitAt] = useState<string | null>(() => readLastSeenTimestamp(lastSeenStorageKey));
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
 
   const feedQuery = useQuery({
     queryKey: ['real-time-operations-feed', eventDomain, urgency],
     queryFn: () => fetchOperationsFeed(eventDomain, urgency),
     refetchOnReconnect: true,
-    refetchOnWindowFocus: true
+    refetchOnWindowFocus: true,
+    refetchInterval: OPERATIONS_FEED_AUTO_REFRESH_MS,
+    refetchIntervalInBackground: false
   });
 
   const response = feedQuery.data;
-  const summary = response?.summary || {};
   const guidance = response?.guidance || {};
   const timeline = response?.timeline || [];
+  const previousVisitTimestamp = useMemo(() => previousVisitAt ? new Date(previousVisitAt).getTime() : null, [previousVisitAt]);
+  const newItemIds = useMemo(() => {
+    if (!Number.isFinite(previousVisitTimestamp)) return new Set<string>();
+    return new Set(timeline.filter((item) => {
+      const timestamp = timelineItemTimestamp(item);
+      return timestamp != null && timestamp > Number(previousVisitTimestamp);
+    }).map((item) => item.timeline_item_id));
+  }, [previousVisitTimestamp, timeline]);
+  const displayTimeline = useMemo(() => {
+    const normalizedSearch = searchText.trim().toLowerCase();
+    const now = new Date();
+    const last24Hours = now.getTime() - (24 * 60 * 60 * 1000);
+
+    return timeline.filter((item) => {
+      if (viewScope === 'new' && !newItemIds.has(item.timeline_item_id)) return false;
+      if (normalizedSearch && !timelineItemSearchText(item, ui).includes(normalizedSearch)) return false;
+      if (timeWindow === 'all') return true;
+
+      const timestamp = timelineItemTimestamp(item);
+      if (timestamp == null) return false;
+      if (timeWindow === '24h') return timestamp >= last24Hours;
+
+      const itemDate = new Date(timestamp);
+      return itemDate.getFullYear() === now.getFullYear()
+        && itemDate.getMonth() === now.getMonth()
+        && itemDate.getDate() === now.getDate();
+    });
+  }, [newItemIds, searchText, timeWindow, timeline, ui, viewScope]);
+  const visibleCriticalCount = displayTimeline.filter((item) => item.urgency === 'critical').length;
+  const visibleBlockedOrFailedCount = displayTimeline.filter((item) => item.event_status === 'blocked' || item.event_status === 'failed').length;
+  const visibleNewCount = displayTimeline.filter((item) => newItemIds.has(item.timeline_item_id)).length;
+  const hasLocalFilters = searchText.trim().length > 0 || timeWindow !== 'all' || viewScope !== 'all';
+  const initialLoadFailed = Boolean(feedQuery.error) && !response;
+  const refreshFailed = Boolean(feedQuery.error) && Boolean(response);
   const backendAvailableDomains = response?.access?.available_event_domains;
   const availableDomains = useMemo(() => {
     const source = Array.isArray(backendAvailableDomains) ? backendAvailableDomains : locallyAvailableDomains;
@@ -427,6 +534,16 @@ export default function RealTimeOperationsFeedPage() {
     if (eventDomain !== 'all' && !availableDomains.has(eventDomain)) setEventDomain('all');
   }, [availableDomains, eventDomain]);
 
+  useEffect(() => {
+    if (!lastSeenStorageKey || !response?.generated_at || typeof window === 'undefined') return;
+    if (!Number.isFinite(new Date(response.generated_at).getTime())) return;
+    try {
+      window.localStorage.setItem(lastSeenStorageKey, response.generated_at);
+    } catch {
+      // Feed awareness must keep working even when browser storage is unavailable.
+    }
+  }, [lastSeenStorageKey, response?.generated_at]);
+
   return (
     <div className="operations-feed-page operations-feed-page--refined io-operational-page io-workspace-page io-workspace-legacy-normalized">
       <OperationalWorkspaceHero
@@ -443,30 +560,30 @@ export default function RealTimeOperationsFeedPage() {
           </>
         }
         */
-        aside={<OperationalWorkspaceStatus value={ui("Snapshot")} label={ui("refresh to load the latest permitted operational events")} />}
+        aside={<OperationalWorkspaceStatus value={feedQuery.isFetching ? ui("Refreshing…") : ui("Auto-refresh on")} label={ui("about every minute while this page is open")} />}
       />
 
       <OperationalWorkspaceStats ariaLabel={ui("Operations feed overview")}>
         <OperationalWorkspaceStatCard
           label={ui("Items shown")}
-          value={formatLocalizedNumber(numberValue(summary.total_timeline_items ?? timeline.length), locale)}
+          value={formatLocalizedNumber(displayTimeline.length, locale)}
           helper={ui("Open work, integration events, and delivery problems matching filters")}
           iconPath="/real-time-operations-feed"
           tone="blue"
         />
         <OperationalWorkspaceStatCard
           label={ui("Critical items")}
-          value={formatLocalizedNumber(numberValue(summary.critical_events), locale)}
+          value={formatLocalizedNumber(visibleCriticalCount, locale)}
           helper={ui("Items that need the fastest human review")}
           iconPath="/alerts"
-          tone={numberValue(summary.critical_events) > 0 ? 'danger' : 'good'}
+          tone={visibleCriticalCount > 0 ? 'danger' : 'good'}
         />
         <OperationalWorkspaceStatCard
           label={ui("Blocked or failed")}
-          value={formatLocalizedNumber(numberValue(summary.blocked_or_failed_events), locale)}
+          value={formatLocalizedNumber(visibleBlockedOrFailedCount, locale)}
           helper={ui("Work or integration events reporting a disruption")}
           iconPath="/reliability-command"
-          tone={numberValue(summary.blocked_or_failed_events) > 0 ? 'warn' : 'good'}
+          tone={visibleBlockedOrFailedCount > 0 ? 'warn' : 'good'}
         />
         <OperationalWorkspaceStatCard
           label={ui("Page mode")}
@@ -474,6 +591,13 @@ export default function RealTimeOperationsFeedPage() {
           helper={ui("Use the source page to perform the real follow-up")}
           iconPath="/workspace"
           tone="neutral"
+        />
+        <OperationalWorkspaceStatCard
+          label={ui("New since last visit")}
+          value={formatLocalizedNumber(visibleNewCount, locale)}
+          helper={previousVisitAt ? ui("Items observed or updated after your previous visit in this browser") : ui("No earlier visit is recorded in this browser yet")}
+          iconPath="/real-time-operations-feed"
+          tone={visibleNewCount > 0 ? 'blue' : 'neutral'}
         />
       </OperationalWorkspaceStats>
 
@@ -496,6 +620,22 @@ export default function RealTimeOperationsFeedPage() {
                 {URGENCY_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
               </select>
             </label>
+            <label className="operations-feed-page__field operations-feed-page__field--search">
+              <span>{ui("Search current feed")}</span>
+              <input className="operations-feed-page__input" type="search" value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder={ui("Search title, summary, status, or work area")} />
+            </label>
+            <label className="operations-feed-page__field">
+              <span>{ui("Time")}</span>
+              <select className="operations-feed-page__select" value={timeWindow} onChange={(event) => setTimeWindow(event.target.value as FeedTimeWindow)}>
+                {TIME_WINDOW_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
+              </select>
+            </label>
+            <label className="operations-feed-page__field">
+              <span>{ui("View")}</span>
+              <select className="operations-feed-page__select" value={viewScope} onChange={(event) => setViewScope(event.target.value as FeedView)}>
+                {VIEW_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
+              </select>
+            </label>
             <button className="button button--secondary operations-feed-page__toolbar-action" type="button" onClick={() => feedQuery.refetch()} disabled={feedQuery.isFetching}>
               <TenantNavIcon path="/real-time-operations-feed" size={14} />{feedQuery.isFetching ? ui('Refreshing…') : ui('Refresh feed')}
             </button>
@@ -505,26 +645,34 @@ export default function RealTimeOperationsFeedPage() {
             */}
           </div>
 
-          {feedQuery.isLoading ? (
+          {feedQuery.isLoading && !response ? (
             <div className="operations-feed-page__state" role="status">
               <span className="operations-feed-page__icon operations-feed-page__icon--blue"><TenantNavIcon path="/real-time-operations-feed" size={17} /></span>
               <div><div className="operations-feed-page__state-title">{ui("Loading the latest operations feed")}</div><p className="card__subtext">{ui("Collecting work and events permitted for the current role.")}</p></div>
             </div>
-          ) : feedQuery.error ? (
+          ) : initialLoadFailed ? (
             <div className="operations-feed-page__state" role="alert">
               <span className="operations-feed-page__icon operations-feed-page__icon--danger"><TenantNavIcon path="/alerts" size={17} /></span>
               <div><div className="operations-feed-page__state-title">{ui("The operations feed could not be loaded")}</div><p className="form-error">{feedQuery.error instanceof ApiError ? feedQuery.error.message : ui('Unable to load the operations feed.')}</p><button className="button button--secondary" type="button" onClick={() => feedQuery.refetch()}>{ui("Try again")}</button></div>
             </div>
           ) : (
-            <div className="operations-feed-page__guidance-grid">
+            <>
+              {refreshFailed ? (
+                <div className="operations-feed-page__state operations-feed-page__state--stale" role="alert">
+                  <span className="operations-feed-page__icon operations-feed-page__icon--warning"><TenantNavIcon path="/alerts" size={17} /></span>
+                  <div><div className="operations-feed-page__state-title">{ui("Refresh failed")}</div><p className="card__subtext">{ui("Showing the last available operations-feed snapshot. Try refreshing again before acting on time-sensitive information.")}</p><p className="form-error">{feedQuery.error instanceof ApiError ? feedQuery.error.message : ui('Unable to refresh the operations feed.')}</p><button className="button button--secondary" type="button" onClick={() => feedQuery.refetch()}>{ui("Try again")}</button></div>
+                </div>
+              ) : null}
+              <div className="operations-feed-page__guidance-grid">
               <div className="operations-feed-page__guidance-item"><span className="operations-feed-page__guidance-icon"><TenantNavIcon path="/permissions" size={15} /></span><div><div className="operations-feed-page__guidance-title">{ui("Safe to review without editing")}</div><p className="card__subtext">{ui("This page does not replay events, publish messages, or update operational records.")}</p></div></div>
               <div className="operations-feed-page__guidance-item"><span className="operations-feed-page__guidance-icon"><TenantNavIcon path="/workspace" size={15} /></span><div><div className="operations-feed-page__guidance-title">{ui("How to follow up")}</div><p className="card__subtext">{guidance.coordination_guidance || ui('Open the source page for the item and complete the work there.')}</p></div></div>
               <div className="operations-feed-page__guidance-item"><span className="operations-feed-page__guidance-icon"><TenantNavIcon path="/real-time-operations-feed" size={15} /></span><div><div className="operations-feed-page__guidance-title">{ui("What the feed contains")}</div><p className="card__subtext">{guidance.incident_timeline_guidance || ui('The feed combines permitted work items and integration event summaries.')}</p></div></div>
               <div className="operations-feed-page__guidance-item"><span className="operations-feed-page__guidance-icon"><TenantNavIcon path="/reliability-command" size={15} /></span><div><div className="operations-feed-page__guidance-title">{ui("When something is blocked or failed")}</div><p className="card__subtext">{guidance.disruption_guidance || ui('Review the source workflow and coordinate a human response.')}</p></div></div>
-            </div>
+              </div>
+            </>
           )}
 
-          {response?.generated_at ? <p className="card__subtext operations-feed-page__updated">{ui("Feed updated")} {formatDateTime(response.generated_at, locale, ui)}. {ui("Press Refresh feed whenever you need the latest snapshot.")}</p> : null}
+          {response?.generated_at ? <p className="card__subtext operations-feed-page__updated">{ui("Feed updated")} {formatDateTime(response.generated_at, locale, ui)}. {ui("The feed refreshes automatically about every minute while this page is open.")}</p> : null}
         </div>
       </section>
 
@@ -532,13 +680,13 @@ export default function RealTimeOperationsFeedPage() {
         <div className="section__title operations-feed-page__section-title">
           <span className="operations-feed-page__section-icon"><TenantNavIcon path="/real-time-operations-feed" size={16} /></span>
           <span>{ui("Operational coordination feed")}</span>
-          {!feedQuery.isLoading && !feedQuery.error ? <span className="operations-feed-page__section-count">{formatLocalizedNumber(timeline.length, locale)}</span> : null}
+          {response ? <span className="operations-feed-page__section-count">{formatLocalizedNumber(displayTimeline.length, locale)}</span> : null}
         </div>
-        {feedQuery.isLoading || feedQuery.error ? null : timeline.length === 0 ? (
-          <div className="card operations-feed-page__state"><span className="operations-feed-page__icon operations-feed-page__icon--blue"><TenantNavIcon path="/real-time-operations-feed" size={17} /></span><div><div className="operations-feed-page__state-title">{ui("No matching items")}</div><p className="card__subtext">{ui("No work or integration event matched the selected work area and urgency.")}</p></div></div>
+        {(feedQuery.isLoading && !response) || initialLoadFailed ? null : displayTimeline.length === 0 ? (
+          <div className="card operations-feed-page__state"><span className="operations-feed-page__icon operations-feed-page__icon--blue"><TenantNavIcon path="/real-time-operations-feed" size={17} /></span><div><div className="operations-feed-page__state-title">{ui("No matching items")}</div><p className="card__subtext">{hasLocalFilters ? ui("No items in the current feed match your search, time, or view filters.") : ui("No work or integration event matched the selected work area and urgency.")}</p></div></div>
         ) : (
           <div className="operations-feed-page__timeline">
-            {timeline.map((item) => {
+            {displayTimeline.map((item) => {
               const sourceLink = sourceItemLink(item, ui);
               const actionCenterPath = relatedActionLink(item);
               const itemDomainIcon = domainIconPath(item.timeline_domain);
@@ -556,6 +704,7 @@ export default function RealTimeOperationsFeedPage() {
                   <p className="card__subtext operations-feed-page__item-summary">{item.summary || ui('No summary was provided.')}</p>
 
                   <div className="operations-feed-page__badge-row">
+                    {newItemIds.has(item.timeline_item_id) ? <span className="operations-feed-page__badge operations-feed-page__badge--new">{ui("New")}</span> : null}
                     <span className={statusClass(item.event_status)}>{ui('Status:')} {canonicalLabel(item.event_status, ui)}</span>
                     <span className="operations-feed-page__badge operations-feed-page__badge--neutral">{ui("Observed")} {formatDateTime(item.observed_at || item.updated_at, locale, ui)}</span>
                     {item.timeline_type === 'event_delivery_disruption' && item.delivery_attempt_count != null && Number.isFinite(Number(item.delivery_attempt_count)) ? <span className="operations-feed-page__badge operations-feed-page__badge--neutral">{ui("Attempts:")} {formatLocalizedNumber(numberValue(item.delivery_attempt_count), locale)}</span> : null}

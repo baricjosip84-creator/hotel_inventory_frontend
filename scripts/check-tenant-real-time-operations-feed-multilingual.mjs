@@ -51,6 +51,7 @@ const dynamicLabels = [
   'All work areas', 'Alerts', 'Inventory events', 'Procurement events', 'Reservation events', 'Execution tasks', 'Optimisation events',
   'Control tower', 'Decision intelligence', 'AI governance', 'Financial events', 'Integration events', 'Audit events', 'All cross-area items',
   'All urgency levels', 'Critical', 'High', 'Medium', 'Low',
+  'All shown', 'Today', 'Last 24 hours', 'All items', 'New since last visit',
   'Nothing is changed here', 'Reading or refreshing the feed does not update tasks, alerts, stock, or integrations.',
   'Only your company’s items', 'The backend collects information only for the company currently signed in.',
   'Role and permission controlled', 'The feed includes only source areas the current user is allowed to read.',
@@ -77,10 +78,10 @@ else pass(`${representativeRows.length} representative Operations Feed rows are 
 if (!pageSource.includes('useAppTranslation()')) fail('Operations Feed must use the shared translation context.');
 if (!pageSource.includes('formatLocalizedDateTime(date, locale)')) fail('Operations Feed timestamps must use locale-aware shared date/time formatting.');
 const localizedNumberContracts = [
-  'formatLocalizedNumber(numberValue(summary.total_timeline_items ?? timeline.length), locale)',
-  'formatLocalizedNumber(numberValue(summary.critical_events), locale)',
-  'formatLocalizedNumber(numberValue(summary.blocked_or_failed_events), locale)',
-  'formatLocalizedNumber(timeline.length, locale)',
+  'formatLocalizedNumber(displayTimeline.length, locale)',
+  'formatLocalizedNumber(visibleCriticalCount, locale)',
+  'formatLocalizedNumber(visibleBlockedOrFailedCount, locale)',
+  'formatLocalizedNumber(visibleNewCount, locale)',
   'formatLocalizedNumber(numberValue(item.delivery_attempt_count), locale)',
   'formatLocalizedNumber(numberValue(item.priority_score), locale)'
 ];
@@ -138,7 +139,11 @@ if (!process.exitCode) pass('Backend titles, summaries, guidance, recommended ne
 
 const readOnlyContracts = [
   'refetchOnReconnect: true', 'refetchOnWindowFocus: true', 'feedQuery.refetch()',
-  "timeline_type === 'event_delivery_disruption'", "timeline_type === 'event_stream_message'"
+  'refetchInterval: OPERATIONS_FEED_AUTO_REFRESH_MS', 'refetchIntervalInBackground: false',
+  "timeline_type === 'event_delivery_disruption'", "timeline_type === 'event_stream_message'",
+  "if (sourceSurface === '/control-tower') return '/reliability-command';",
+  'Showing the last available operations-feed snapshot. Try refreshing again before acting on time-sensitive information.',
+  "viewScope === 'new'", 'timelineItemSearchText(item, ui)', "timeWindow === '24h'"
 ];
 for (const contract of readOnlyContracts) if (!pageSource.includes(contract)) fail(`Operations Feed read-only coordination behavior changed: ${contract}`);
 if (!process.exitCode) pass('Operations Feed remains a read-only coordination surface with source-workflow follow-up.');
