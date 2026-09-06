@@ -112,7 +112,7 @@ else {
 
 for (const required of [
   "<td>{action.rationale || '—'}</td>",
-  '<td>{ui(formatLabel(domain.domain))}</td>'
+  'ui(formatLabel(domain.domain))'
 ]) if (!pageSource.includes(required)) fail(`Expected backend/business-data boundary missing: ${required}`);
 for (const forbidden of [
   'ui(action.rationale)'

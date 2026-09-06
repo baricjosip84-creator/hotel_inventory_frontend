@@ -25,9 +25,11 @@ import './DecisionLearningFeedbackPage.css';
 type FeedbackMode = 'learning-outcomes' | 'forecast-accuracy' | 'policy-effectiveness' | 'optimization-results';
 type LearningFeedbackView = 'feedback' | 'readiness';
 type EvidenceBucket = 'outcomes' | 'forecast_accuracy' | 'policy_effectiveness' | 'optimization_results';
-type FeedbackSourceOption = { id: string; option_key: string; title: string; status: string };
-type FeedbackSource = { id: string; source_key: string; title: string; domain: string; status: string; options?: FeedbackSourceOption[] };
+type FeedbackSourceOption = { id: string; option_key: string; title: string; status: string; summary?: string | null; projected_outcome?: Record<string, unknown>; tradeoff_summary?: Record<string, unknown>; aggregate_score?: number | null; confidence_score?: number | null };
+type FeedbackSource = { id: string; source_key: string; title: string; domain: string; status: string; prefill?: Record<string, unknown>; options?: FeedbackSourceOption[] };
 type FeedbackSourceResponse = { feedback_type: FeedbackMode; sources: FeedbackSource[] };
+type FeedbackReviewer = { id: string; name?: string | null; email?: string | null };
+type FeedbackReviewerResponse = { reviewers?: FeedbackReviewer[] };
 type PageInfo = { total?: number; offset?: number; limit?: number; has_previous?: boolean; has_next?: boolean };
 
 type ContinuousLearningSummary = {
@@ -727,6 +729,10 @@ type ContinuousLearningSummary = {
     domain_count?: number;
     high_priority_domain_count?: number;
     review_readiness_score?: number;
+    overdue_count?: number;
+    due_soon_count?: number;
+    assigned_count?: number;
+    escalated_count?: number;
     review_posture?: string;
     domain_review_summary?: Array<{
       domain?: string;
@@ -750,8 +756,33 @@ type ContinuousLearningSummary = {
       recorded_by_user_id?: string | null;
       created_by_user_name?: string | null;
       recorded_by_user_name?: string | null;
+      assigned_reviewer_user_id?: string | null;
+      assigned_reviewer_user_name?: string | null;
+      review_due_at?: string | null;
+      review_assigned_at?: string | null;
+      escalated_at?: string | null;
+      escalation_reason?: string | null;
+      review_note?: string | null;
+      due_state?: string | null;
     }>;
     pagination?: PageInfo;
+    safety_contract?: Record<string, boolean>;
+  };
+
+  learning_trends?: {
+    window_months?: number;
+    periods?: Array<{
+      period_start?: string;
+      outcome_total?: number;
+      outcome_positive?: number;
+      forecast_total?: number;
+      forecast_average_percentage_error?: number | null;
+      policy_total?: number;
+      policy_positive?: number;
+      optimization_total?: number;
+      optimization_positive?: number;
+      open_review_count?: number;
+    }>;
     safety_contract?: Record<string, boolean>;
   };
 
@@ -1355,6 +1386,9 @@ type FeedbackFormState = {
   optimizationOptionId: string;
   expected: string;
   observed: string;
+  observedAt: string;
+  measurementWindowStart: string;
+  measurementWindowEnd: string;
   recommendationKey: string;
   businessValueScore: string;
   stockImpactScore: string;
@@ -1459,6 +1493,9 @@ const defaultForm: FeedbackFormState = {
   optimizationOptionId: '',
   expected: '',
   observed: '',
+  observedAt: '',
+  measurementWindowStart: '',
+  measurementWindowEnd: '',
   recommendationKey: '',
   businessValueScore: '',
   stockImpactScore: '',
@@ -1530,6 +1567,31 @@ const defaultForm: FeedbackFormState = {
   learningActionCompletedAt: '',
   learningActionEvidence: ''
 };
+
+function nowLocalDateTimeValue(): string {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function toLocalDateTimeValue(value: unknown): string {
+  if (!value) return '';
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) return '';
+  const local = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function toIsoDateTime(value: string): string | undefined {
+  if (!value.trim()) return undefined;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+}
+
+function jsonForForm(value: unknown): string {
+  if (value === undefined || value === null) return '';
+  return typeof value === 'string' ? value : JSON.stringify(value);
+}
 
 function safeJsonObject(value: string): Record<string, unknown> {
   const trimmed = value.trim();
@@ -1611,7 +1673,7 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: str
       forecast_reference: reference,
       observed_value: Number.isFinite(Number(form.observed)) ? Number(form.observed) : undefined,
       predicted_value: Number.isFinite(Number(form.expected)) ? Number(form.expected) : undefined,
-      absolute_error: score === null ? undefined : Math.abs(score)
+      observed_at: toIsoDateTime(form.observedAt)
     };
   }
 
@@ -1626,7 +1688,8 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: str
       baseline_reference: expected,
       measured_result: observed,
       effectiveness_score: score,
-      improvement_score: editing ? undefined : score
+      improvement_score: editing ? undefined : score,
+      observed_at: toIsoDateTime(form.observedAt)
     };
   }
 
@@ -1640,7 +1703,8 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: str
       optimization_reference: reference,
       expected_tradeoff: expected,
       observed_tradeoff: observed,
-      realized_value_score: score
+      realized_value_score: score,
+      observed_at: toIsoDateTime(form.observedAt)
     };
   }
 
@@ -1655,6 +1719,9 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: str
     recommendation_key: form.recommendationKey || undefined,
     expected_result: expected,
     observed_result: observed,
+    observed_at: toIsoDateTime(form.observedAt),
+    measurement_window_start: toIsoDateTime(form.measurementWindowStart),
+    measurement_window_end: toIsoDateTime(form.measurementWindowEnd),
     outcome_score: score,
     business_value_score: optionalScore(form.businessValueScore, editing),
     stock_impact_score: optionalScore(form.stockImpactScore, editing),
@@ -1698,11 +1765,6 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: str
     recommendation_measurement_sample_size: optionalNumber(form.measurementSampleSize, editing),
     recommendation_measurement_data_quality_score: optionalNumber(form.measurementDataQualityScore, editing),
     recommendation_measurement_quality_evidence: optionalJsonObject(form.measurementQualityEvidence, editing),
-    recommendation_outcome_review_status: form.reviewStatus || undefined,
-    recommendation_outcome_review_owner: form.reviewOwner.trim() || undefined,
-    recommendation_outcome_reviewed_at: form.reviewedAt || undefined,
-    recommendation_outcome_review_resolution: form.reviewResolution || undefined,
-    recommendation_outcome_review_evidence: optionalJsonObject(form.reviewEvidence, editing),
     recommendation_outcome_evaluation_due_at: form.evaluationDueAt || undefined,
     recommendation_outcome_evaluation_status: form.evaluationStatus || undefined,
     recommendation_outcome_evaluation_owner: form.evaluationOwner.trim() || undefined,
@@ -1739,8 +1801,9 @@ function validateNumberRange(value: string, label: string, min: number, max: num
 
 function validateFeedbackForm(mode: FeedbackMode, form: FeedbackFormState, sourceId: string, ui: (value: string) => string): string | null {
   if (!sourceId) return ui('Choose the real source record this feedback belongs to.');
+  if (!form.observedAt.trim()) return ui('Choose when the result was observed.');
   const scoreFields: Array<[string, string, number, number]> = [
-    [form.score, 'Score', -1, 1],
+    ...(mode === 'forecast-accuracy' ? [] : [[form.score, 'Score', -1, 1] as [string, string, number, number]]),
     [form.businessValueScore, 'Business value', -1, 1],
     [form.stockImpactScore, 'Stock impact', -1, 1],
     [form.financialImpactScore, 'Financial impact', -1, 1],
@@ -1786,7 +1849,7 @@ function LocalizedLearningStatCard({ label, value, iconPath, tone = 'blue' }: { 
 }
 
 
-function FeedbackActionPlan({ plan }: { plan: ContinuousLearningSummary['feedback_action_plan'] }) {
+function FeedbackActionPlan({ plan, canCreateFollowUp, creatingFollowUp, onCreateFollowUp }: { plan: ContinuousLearningSummary['feedback_action_plan']; canCreateFollowUp: boolean; creatingFollowUp: boolean; onCreateFollowUp: (action: FeedbackActionItem) => void }) {
   const { locale, ui } = useAppTranslation();
   const actions = plan?.recommended_actions || [];
 
@@ -1819,6 +1882,7 @@ function FeedbackActionPlan({ plan }: { plan: ContinuousLearningSummary['feedbac
                 <th>{ui('Owner')}</th>
                 <th>{ui('Mode')}</th>
                 <th>{ui('Rationale')}</th>
+                {canCreateFollowUp ? <th>{ui('Follow-up')}</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -1830,6 +1894,7 @@ function FeedbackActionPlan({ plan }: { plan: ContinuousLearningSummary['feedbac
                   <td>{ui(formatLabel(action.recommended_owner))}</td>
                   <td>{ui(formatLabel(action.execution_mode))}</td>
                   <td>{action.rationale || '—'}</td>
+                  {canCreateFollowUp ? <td><button className="button button--secondary" type="button" disabled={creatingFollowUp} onClick={() => onCreateFollowUp(action)}>{ui('Create draft')}</button></td> : null}
                 </tr>
               ))}
             </tbody>
@@ -3803,6 +3868,7 @@ const reviewReasonLabels: Record<string, string> = {
 };
 
 type FeedbackReviewItem = NonNullable<NonNullable<ContinuousLearningSummary['feedback_review_board']>['review_items']>[number];
+type FeedbackActionItem = NonNullable<NonNullable<ContinuousLearningSummary['feedback_action_plan']>['recommended_actions']>[number];
 
 const reviewTargets: Record<string, Array<{ status: string; label: string }>> = {
   learning_outcome: [
@@ -3832,60 +3898,51 @@ function FeedbackReviewBoard({
   canGovern,
   canOverrideIndependentReview,
   currentUserId,
+  reviewers,
   reviewing,
   onReview,
+  onAssign,
+  onEscalate,
   onPage
 }: {
   board: ContinuousLearningSummary['feedback_review_board'];
   canGovern: boolean;
   canOverrideIndependentReview: boolean;
   currentUserId: string | null;
+  reviewers: FeedbackReviewer[];
   reviewing: boolean;
   onReview: (item: FeedbackReviewItem, targetStatus: string) => void;
+  onAssign: (item: FeedbackReviewItem, reviewerUserId: string | null, dueAt: string | null) => void;
+  onEscalate: (item: FeedbackReviewItem, reason: string) => void;
   onPage: (direction: 'previous' | 'next') => void;
 }) {
   const { locale, ui } = useAppTranslation();
   const domains = board?.domain_review_summary || [];
   const items = board?.review_items || [];
+  const [ownerDrafts, setOwnerDrafts] = useState<Record<string, string>>({});
+  const [dueDrafts, setDueDrafts] = useState<Record<string, string>>({});
+  const itemKey = (item: FeedbackReviewItem) => `${item.evidence_type || 'evidence'}:${item.evidence_key || ''}`;
 
   return (
-    <section className={'card learning-feedback-section learning-feedback-review-board'}>
-      <div className="card__header">
-        <div>
-          <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/intelligence-review" size={18} /></span>{ui('Feedback review board')}</h2>
-          <p className="card__subtext">
-            {ui('Feedback records that still need a person to check, accept, correct, or close.')} {ui('Review actions only change the learning record; they do not carry out recommendations or change operational data.')}
-          </p>
-        </div>
-      </div>
+    <section className="card learning-feedback-section learning-feedback-review-board">
+      <div className="card__header"><div>
+        <h2><span className="learning-feedback-heading-icon"><TenantNavIcon path="/intelligence-review" size={18} /></span>{ui('Feedback review board')}</h2>
+        <p className="card__subtext">{ui('Open feedback reviews can be assigned to an independent reviewer, given a due date, escalated, and closed with an auditable note. Review actions never execute recommendations or change operational data.')}</p>
+      </div></div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <LocalizedLearningStatCard label="Review posture" value={board?.review_posture || 'no_review_items_open'} iconPath="/intelligence-review" tone="blue" />
         <LocalizedLearningStatCard label="Open review items" value={board?.review_item_count ?? 0} iconPath="/alerts" tone="amber" />
-        <LocalizedLearningStatCard label="Domains" value={board?.domain_count ?? 0} iconPath="/enterprise-inventory" tone="violet" />
-        <LocalizedLearningStatCard label="Readiness score" value={board?.review_readiness_score ?? 100} iconPath="/reliability-command" tone="green" />
+        <LocalizedLearningStatCard label="Overdue" value={board?.overdue_count ?? 0} iconPath="/alerts" tone="amber" />
+        <LocalizedLearningStatCard label="Due soon" value={board?.due_soon_count ?? 0} iconPath="/schedules" tone="blue" />
+        <LocalizedLearningStatCard label="Assigned" value={board?.assigned_count ?? 0} iconPath="/users" tone="green" />
+        <LocalizedLearningStatCard label="Escalated" value={board?.escalated_count ?? 0} iconPath="/alerts" tone="violet" />
       </div>
-      {domains.length > 0 ? (
-        <div style={{ overflowX: 'auto', marginBottom: 12 }}>
-          <table className="table">
-            <thead><tr><th>{ui('Domain')}</th><th>{ui('Priority')}</th><th>{ui('Items')}</th><th>{ui('Evidence types')}</th><th>{ui('Statuses')}</th></tr></thead>
-            <tbody>{domains.map((domain, index) => (
-              <tr key={domain.domain || index}>
-                <td>{ui(formatLabel(domain.domain))}</td>
-                <td>{ui(formatLabel(domain.priority))}</td>
-                <td>{formatLocalizedNumber(domain.review_item_count ?? 0, locale)}</td>
-                <td>{(domain.evidence_types || []).map((value) => ui(formatLabel(value))).join(', ') || '—'}</td>
-                <td>{(domain.statuses || []).map((status) => ui(formatLabel(status))).join(', ') || '—'}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </div>
-      ) : <p className="card__subtext">{ui('No domains currently have open learning review items.')}</p>}
-
+      {domains.length > 0 ? <p className="card__subtext" style={{ marginBottom: 12 }}>{ui('Areas with open reviews:')} {domains.map((domain) => `${ui(formatLabel(domain.domain))} (${formatLocalizedNumber(domain.review_item_count ?? 0, locale)})`).join(' · ')}</p> : null}
       {items.length > 0 ? (
-        <div style={{ overflowX: 'auto' }}>
-          <table className="table">
-            <thead><tr><th>{ui('Evidence')}</th><th>{ui('Domain')}</th><th>{ui('Status')}</th><th>{ui('Recorder')}</th><th>{ui('Reason')}</th>{canGovern ? <th>{ui('Review action')}</th> : null}</tr></thead>
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>{ui('Evidence')}</th><th>{ui('Status')}</th><th>{ui('Recorder')}</th><th>{ui('Owner')}</th><th>{ui('Deadline')}</th><th>{ui('Reason')}</th>{canGovern ? <th>{ui('Review action')}</th> : null}</tr></thead>
             <tbody>{items.map((item, index) => {
+              const key = itemKey(item);
               const reason = item.review_reason_code ? reviewReasonLabels[item.review_reason_code] : item.review_reason;
               const targets = reviewTargets[item.evidence_type || ''] || [];
               const createdById = item.created_by_user_id ? String(item.created_by_user_id) : null;
@@ -3893,43 +3950,26 @@ function FeedbackReviewBoard({
               const recorderUnknown = !createdById && !recordedById;
               const reviewerIsRecorder = Boolean(currentUserId && (currentUserId === createdById || currentUserId === recordedById));
               const independentReviewBlocked = recorderUnknown || reviewerIsRecorder;
-              const causesSidebarAttention = canGovern;
-              return (
-                <tr
-                  key={`${item.evidence_type || 'evidence'}-${item.evidence_key || index}`}
-                  style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined}
-                  data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
-                >
-                  <td>
-                    <div style={{ display: 'grid', gap: 6, justifyItems: 'start' }}>
-                      {causesSidebarAttention ? <SidebarAttentionMarker label={ui('Attention required')} /> : null}
-                      <span>{item.source_label ? String(item.source_label) : `${ui(formatLabel(item.evidence_type))} / ${formatLabel(item.evidence_key)}`}</span>
-                    </div>
-                  </td>
-                  <td>{ui(formatLabel(item.domain))}</td>
-                  <td>{ui(formatLabel(item.status))}</td>
-                  <td>
-                    <div style={{ display: 'grid', gap: 4 }}>
-                      <span>{item.recorded_by_user_name || item.created_by_user_name || ui('Unknown recorder')}</span>
-                      {independentReviewBlocked ? <span className="card__subtext">{ui('Independent review required')}</span> : null}
-                    </div>
-                  </td>
-                  <td>{reason ? ui(reason) : '—'}</td>
-                  {canGovern ? <td><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{targets.map((target) => (
-                    <button key={target.status} className="button button--secondary" type="button" disabled={reviewing || !item.evidence_key || !item.evidence_type || (independentReviewBlocked && !canOverrideIndependentReview)} onClick={() => onReview(item, target.status)}>{ui(target.label)}</button>
-                  ))}</div></td> : null}
-                </tr>
-              );
+              const ownerValue = ownerDrafts[key] ?? String(item.assigned_reviewer_user_id || '');
+              const dueValue = dueDrafts[key] ?? toLocalDateTimeValue(item.review_due_at);
+              return <tr key={key || index} style={canGovern ? sidebarAttentionItemStyle : undefined} data-sidebar-attention-item={canGovern ? 'true' : undefined}>
+                <td><div style={{ display: 'grid', gap: 5 }}>{canGovern ? <SidebarAttentionMarker label={ui('Attention required')} /> : null}<span>{item.source_label || formatLabel(item.evidence_key)}</span><small>{ui(formatLabel(item.domain))}</small></div></td>
+                <td><div>{ui(formatLabel(item.status))}</div><small className="card__subtext">{ui(formatLabel(item.due_state || 'no_deadline'))}</small></td>
+                <td><div>{item.recorded_by_user_name || item.created_by_user_name || ui('Unknown recorder')}</div>{independentReviewBlocked ? <small className="card__subtext">{ui('Independent review required')}</small> : null}</td>
+                <td>{canGovern ? <select className="input" value={ownerValue} onChange={(event) => setOwnerDrafts((current) => ({ ...current, [key]: event.target.value }))}><option value="">{ui('Unassigned')}</option>{reviewers.map((reviewer) => <option key={reviewer.id} value={reviewer.id}>{reviewer.name || reviewer.email || reviewer.id}</option>)}</select> : (item.assigned_reviewer_user_name || ui('Unassigned'))}</td>
+                <td>{canGovern ? <input className="input" type="datetime-local" value={dueValue} onChange={(event) => setDueDrafts((current) => ({ ...current, [key]: event.target.value }))} /> : (item.review_due_at ? formatLocalizedDateTime(String(item.review_due_at), locale) : '—')}</td>
+                <td><div>{reason ? ui(String(reason)) : '—'}</div>{item.escalation_reason ? <small className="card__subtext">{ui('Escalated:')} {item.escalation_reason}</small> : null}</td>
+                {canGovern ? <td><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button className="button button--secondary" type="button" disabled={reviewing} onClick={() => onAssign(item, ownerValue || null, dueValue ? toIsoDateTime(dueValue) || null : null)}>{ui('Save owner / due')}</button>
+                  <button className="button button--secondary" type="button" disabled={reviewing} onClick={() => { const reasonText = window.prompt(ui('Why should this review be escalated?'), '')?.trim() || ''; if (reasonText.length >= 3) onEscalate(item, reasonText); }}>{ui('Escalate')}</button>
+                  {targets.map((target) => <button key={target.status} className="button button--secondary" type="button" disabled={reviewing || !item.evidence_key || !item.evidence_type || (independentReviewBlocked && !canOverrideIndependentReview)} onClick={() => onReview(item, target.status)}>{ui(target.label)}</button>)}
+                </div></td> : null}
+              </tr>;
             })}</tbody>
           </table>
         </div>
-      ) : null}
-      {(board?.pagination?.has_previous || board?.pagination?.has_next) ? (
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
-          <button className="button button--secondary" type="button" disabled={!board?.pagination?.has_previous || reviewing} onClick={() => onPage('previous')}>{ui('Newer')}</button>
-          <button className="button button--secondary" type="button" disabled={!board?.pagination?.has_next || reviewing} onClick={() => onPage('next')}>{ui('Older')}</button>
-        </div>
-      ) : null}
+      ) : <p className="card__subtext">{ui('No feedback reviews are waiting for action.')}</p>}
+      {(board?.pagination?.has_previous || board?.pagination?.has_next) ? <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}><button className="button button--secondary" type="button" disabled={!board?.pagination?.has_previous || reviewing} onClick={() => onPage('previous')}>{ui('Newer')}</button><button className="button button--secondary" type="button" disabled={!board?.pagination?.has_next || reviewing} onClick={() => onPage('next')}>{ui('Older')}</button></div> : null}
     </section>
   );
 }
@@ -4625,6 +4665,85 @@ function RecommendationOutcomeFoundation({ foundation }: { foundation?: Continuo
   );
 }
 
+function LearningTrendView({ trends }: { trends: ContinuousLearningSummary['learning_trends'] }) {
+  const { locale, ui } = useAppTranslation();
+  const periods = trends?.periods || [];
+  if (!periods.length) return null;
+  return (
+    <section className="card learning-feedback-section">
+      <div className="card__header"><div>
+        <h2><span className="learning-feedback-heading-icon"><TenantNavIcon path="/insights" size={18} /></span>{ui('Learning trend')}</h2>
+        <p className="card__subtext">{ui('A simple six-month view of whether decision evidence is improving or getting worse. It is read-only and never trains a model or changes business records.')}</p>
+      </div></div>
+      <div className="table-wrap">
+        <table>
+          <thead><tr><th>{ui('Month')}</th><th>{ui('Positive outcomes')}</th><th>{ui('Forecast error')}</th><th>{ui('Effective policies')}</th><th>{ui('Positive optimization')}</th><th>{ui('Open reviews')}</th></tr></thead>
+          <tbody>{periods.map((period, index) => {
+            const ratio = (positive?: number, total?: number) => Number(total || 0) > 0 ? `${formatLocalizedNumber((Number(positive || 0) / Number(total || 1)) * 100, locale, { maximumFractionDigits: 1 })}%` : '—';
+            return <tr key={period.period_start || index}>
+              <td>{period.period_start ? new Intl.DateTimeFormat(locale, { month: 'short', year: 'numeric' }).format(new Date(period.period_start)) : '—'}</td>
+              <td>{ratio(period.outcome_positive, period.outcome_total)}</td>
+              <td>{period.forecast_average_percentage_error === null || period.forecast_average_percentage_error === undefined ? '—' : `${formatLocalizedNumber(period.forecast_average_percentage_error, locale, { maximumFractionDigits: 2 })}%`}</td>
+              <td>{ratio(period.policy_positive, period.policy_total)}</td>
+              <td>{ratio(period.optimization_positive, period.optimization_total)}</td>
+              <td>{formatLocalizedNumber(period.open_review_count ?? 0, locale)}</td>
+            </tr>;
+          })}</tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function EvidenceDetailCard({ detail, canCreateFollowUp, creatingFollowUp, onClose, onCreateFollowUp }: {
+  detail: Record<string, unknown>;
+  canCreateFollowUp: boolean;
+  creatingFollowUp: boolean;
+  onClose: () => void;
+  onCreateFollowUp: () => void;
+}) {
+  const { locale, ui } = useAppTranslation();
+  const valueText = (value: unknown) => {
+    if (value === undefined || value === null || value === '') return '—';
+    if (typeof value === 'object') return JSON.stringify(value, null, 2);
+    return String(value);
+  };
+  const observedAt = detail.observed_at ? formatLocalizedDateTime(String(detail.observed_at), locale) : '—';
+  const status = detail.outcome_status ?? detail.calibration_status ?? detail.effectiveness_status ?? detail.result_status;
+  const expected = detail.expected_result ?? detail.predicted_value ?? detail.baseline_reference ?? detail.expected_tradeoff;
+  const observed = detail.observed_result ?? detail.observed_value ?? detail.measured_result ?? detail.observed_tradeoff;
+  const metric = detail.outcome_score ?? detail.percentage_error ?? detail.effectiveness_score ?? detail.realized_value_score;
+  return (
+    <section className="card learning-feedback-section learning-feedback-detail">
+      <div className="card__header"><div>
+        <h2>{ui('Feedback evidence details')}</h2>
+        <p className="card__subtext">{ui('Full read-only evidence and independent-review information for this record.')}</p>
+      </div><button className="button button--secondary" type="button" onClick={onClose}>{ui('Close')}</button></div>
+      <div className="learning-feedback-detail__grid">
+        <div><strong>{ui('Source')}</strong><div>{valueText(detail.source_label)}</div></div>
+        <div><strong>{ui('Evidence type')}</strong><div>{ui(formatLabel(detail.evidence_type))}</div></div>
+        <div><strong>{ui('Status')}</strong><div>{ui(formatLabel(status))}</div></div>
+        <div><strong>{ui('Observed')}</strong><div>{observedAt}</div></div>
+        <div><strong>{ui('Score / Error')}</strong><div>{typeof metric === 'number' ? formatLocalizedNumber(metric, locale, { maximumFractionDigits: 4 }) : valueText(metric)}</div></div>
+        <div><strong>{ui('Created by')}</strong><div>{valueText(detail.created_by_user_name)}</div></div>
+        <div><strong>{ui('Last recorded by')}</strong><div>{valueText(detail.recorded_by_user_name)}</div></div>
+        <div><strong>{ui('Independent review')}</strong><div>{ui(formatLabel(detail.learning_feedback_review_status || 'unreviewed'))}</div></div>
+        <div><strong>{ui('Assigned reviewer')}</strong><div>{valueText(detail.learning_feedback_assigned_reviewer_user_name)}</div></div>
+        <div><strong>{ui('Review due')}</strong><div>{detail.learning_feedback_review_due_at ? formatLocalizedDateTime(String(detail.learning_feedback_review_due_at), locale) : '—'}</div></div>
+        <div><strong>{ui('Reviewed by')}</strong><div>{valueText(detail.learning_feedback_reviewer_user_name)}</div></div>
+        <div><strong>{ui('Reviewed at')}</strong><div>{detail.learning_feedback_reviewed_at ? formatLocalizedDateTime(String(detail.learning_feedback_reviewed_at), locale) : '—'}</div></div>
+      </div>
+      <div className="learning-feedback-detail__evidence">
+        <div><strong>{ui('Expected')}</strong><pre>{valueText(expected)}</pre></div>
+        <div><strong>{ui('Actual')}</strong><pre>{valueText(observed)}</pre></div>
+        {detail.learning_feedback_review_note ? <div><strong>{ui('Review note')}</strong><p>{String(detail.learning_feedback_review_note)}</p></div> : null}
+        {detail.learning_feedback_escalation_reason ? <div><strong>{ui('Escalation reason')}</strong><p>{String(detail.learning_feedback_escalation_reason)}</p></div> : null}
+      </div>
+      {canCreateFollowUp ? <div style={{ marginTop: 12 }}><button className="button" type="button" disabled={creatingFollowUp} onClick={onCreateFollowUp}>{creatingFollowUp ? ui('Creating draft…') : ui('Create follow-up Execution Request draft')}</button><p className="card__subtext">{ui('Creates a draft follow-up only. It does not execute a recommendation or change inventory.')}</p></div> : null}
+    </section>
+  );
+}
+
 function EvidenceTable({
   title,
   mode,
@@ -4633,6 +4752,7 @@ function EvidenceTable({
   loading,
   unavailable,
   canEdit,
+  onView,
   onEdit,
   onPage
 }: {
@@ -4643,6 +4763,7 @@ function EvidenceTable({
   loading: boolean;
   unavailable: boolean;
   canEdit: boolean;
+  onView: (mode: FeedbackMode, row: Record<string, unknown>) => void;
   onEdit: (mode: FeedbackMode, row: Record<string, unknown>) => void;
   onPage: (direction: 'previous' | 'next') => void;
 }) {
@@ -4673,7 +4794,7 @@ function EvidenceTable({
         <>
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
-              <thead><tr><th>{ui('Record')}</th><th>{ui('Area')}</th><th>{ui('Status')}</th><th>{ui('Score / Error')}</th><th>{ui('Observed')}</th>{canEdit ? <th>{ui('Action')}</th> : null}</tr></thead>
+              <thead><tr><th>{ui('Record')}</th><th>{ui('Area')}</th><th>{ui('Status')}</th><th>{ui('Score / Error')}</th><th>{ui('Observed')}</th><th>{ui('Review')}</th><th>{ui('Action')}</th></tr></thead>
               <tbody>{rows.map((row, index) => {
                 const businessKey = row.outcome_key ?? row.accuracy_key ?? row.effectiveness_key ?? row.result_key;
                 const score = row.outcome_score ?? row.absolute_error ?? row.effectiveness_score ?? row.realized_value_score;
@@ -4684,7 +4805,8 @@ function EvidenceTable({
                     <td>{ui(formatLabel(row.outcome_status ?? row.calibration_status ?? row.effectiveness_status ?? row.result_status))}</td>
                     <td>{typeof score === 'number' ? formatLocalizedNumber(score, locale, { maximumFractionDigits: 4 }) : formatLabel(score)}</td>
                     <td>{row.observed_at ? formatLocalizedDateTime(String(row.observed_at), locale) : '—'}</td>
-                    {canEdit ? <td><button className="button button--secondary" type="button" onClick={() => onEdit(mode, row)}>{ui('Edit')}</button></td> : null}
+                    <td>{ui(formatLabel(row.learning_feedback_review_status || 'unreviewed'))}</td>
+                    <td><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><button className="button button--secondary" type="button" onClick={() => onView(mode, row)}>{ui('View details')}</button>{canEdit ? <button className="button button--secondary" type="button" onClick={() => onEdit(mode, row)}>{ui('Edit')}</button> : null}</div></td>
                   </tr>
                 );
               })}</tbody>
@@ -4726,19 +4848,27 @@ export default function DecisionLearningFeedbackPage() {
   const currentUserId = getCurrentTenantUserId();
   const canReadInsights = hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
+  const canCreateExecutionRequests = hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_CREATE);
   const [view, setView] = useState<LearningFeedbackView>('feedback');
   const [mode, setMode] = useState<FeedbackMode>('learning-outcomes');
-  const [form, setForm] = useState<FeedbackFormState>(() => ({ ...defaultForm, financialImpactCurrency: getActiveTenantCurrency() }));
+  const [form, setForm] = useState<FeedbackFormState>(() => ({ ...defaultForm, observedAt: nowLocalDateTimeValue(), financialImpactCurrency: getActiveTenantCurrency() }));
   const [sourceId, setSourceId] = useState('');
   const [sourceSearch, setSourceSearch] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [pageOffsets, setPageOffsets] = useState<Record<EvidenceBucket, number>>({ outcomes: 0, forecast_accuracy: 0, policy_effectiveness: 0, optimization_results: 0 });
   const [reviewOffset, setReviewOffset] = useState(0);
+  const [evidenceSearch, setEvidenceSearch] = useState('');
+  const [evidenceReviewStatus, setEvidenceReviewStatus] = useState('');
+  const [evidenceDateFrom, setEvidenceDateFrom] = useState('');
+  const [evidenceDateTo, setEvidenceDateTo] = useState('');
+  const [evidenceSort, setEvidenceSort] = useState('newest');
+  const [selectedEvidenceDetail, setSelectedEvidenceDetail] = useState<Record<string, unknown> | null>(null);
+  const [selectedEvidenceMode, setSelectedEvidenceMode] = useState<FeedbackMode | null>(null);
   const pageLimit = 25;
   const reviewLimit = 25;
 
   const summaryQuery = useQuery({
-    queryKey: ['decision-learning-summary', pageOffsets, reviewOffset, view, canViewDiagnostics, canReadInsights],
+    queryKey: ['decision-learning-summary', pageOffsets, reviewOffset, view, canViewDiagnostics, canReadInsights, evidenceSearch, evidenceReviewStatus, evidenceDateFrom, evidenceDateTo, evidenceSort],
     queryFn: () => {
       const params = new URLSearchParams({
         limit: String(pageLimit),
@@ -4748,7 +4878,12 @@ export default function DecisionLearningFeedbackPage() {
         optimization_offset: String(pageOffsets.optimization_results),
         review_offset: String(reviewOffset),
         review_limit: String(reviewLimit),
-        include_diagnostics: String(canViewDiagnostics && view === 'readiness')
+        include_diagnostics: String(canViewDiagnostics && view === 'readiness'),
+        evidence_search: evidenceSearch,
+        evidence_review_status: evidenceReviewStatus,
+        evidence_date_from: evidenceDateFrom ? new Date(`${evidenceDateFrom}T00:00:00`).toISOString() : '',
+        evidence_date_to: evidenceDateTo ? new Date(`${evidenceDateTo}T23:59:59`).toISOString() : '',
+        evidence_sort: evidenceSort
       });
       return apiRequest<ContinuousLearningSummary>(`/decision-intelligence/continuous-learning-summary?${params.toString()}`);
     }
@@ -4763,6 +4898,12 @@ export default function DecisionLearningFeedbackPage() {
     }
   });
 
+  const reviewerQuery = useQuery({
+    queryKey: ['decision-learning-feedback-reviewers'],
+    enabled: canGovern,
+    queryFn: () => apiRequest<FeedbackReviewerResponse>('/decision-intelligence-feedback/reviewers')
+  });
+
   const mutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => apiRequest<Record<string, unknown>>(`/decision-intelligence-feedback/${mode}`, {
       method: 'POST',
@@ -4771,7 +4912,7 @@ export default function DecisionLearningFeedbackPage() {
     }),
     onSuccess: async () => {
       setMessage(form.recordKey ? ui('Feedback evidence updated.') : ui('Feedback evidence recorded. The backend stores this as learning evidence only.'));
-      setForm({ ...defaultForm, subtype: defaultSubtypeForMode(mode), financialImpactCurrency: getActiveTenantCurrency(), status: statusOptions[mode][0] || 'observed' });
+      setForm({ ...defaultForm, observedAt: nowLocalDateTimeValue(), subtype: defaultSubtypeForMode(mode), financialImpactCurrency: getActiveTenantCurrency(), status: statusOptions[mode][0] || 'observed' });
       setSourceId('');
       await queryClient.invalidateQueries({ queryKey: ['decision-learning-summary'] });
     },
@@ -4779,7 +4920,7 @@ export default function DecisionLearningFeedbackPage() {
   });
 
   const reviewMutation = useMutation({
-    mutationFn: (payload: { evidence_type: string; evidence_key: string; target_status: string; independence_override?: boolean; override_reason?: string }) => apiRequest<Record<string, unknown>>('/decision-intelligence-feedback/review', {
+    mutationFn: (payload: { evidence_type: string; evidence_key: string; target_status: string; independence_override?: boolean; override_reason?: string; review_note?: string; assigned_reviewer_user_id?: string | null; review_due_at?: string | null; escalation_reason?: string | null }) => apiRequest<Record<string, unknown>>('/decision-intelligence-feedback/review', {
       method: 'POST',
       body: JSON.stringify(payload),
       skipMutationFeedback: true
@@ -4794,6 +4935,20 @@ export default function DecisionLearningFeedbackPage() {
     onError: (error) => setMessage(error instanceof Error ? error.message : ui('Unable to update the feedback review.'))
   });
 
+  const followUpMutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) => apiRequest<Record<string, unknown>>('/execution-requests', {
+      method: 'POST',
+      body: JSON.stringify({
+        request_type: 'system_recommendation',
+        payload: { ...payload, source: 'decision_learning_feedback' },
+        context_snapshot: { learning_feedback: payload }
+      }),
+      skipMutationFeedback: true
+    }),
+    onSuccess: () => setMessage(ui('Follow-up draft created in Execution Requests. Nothing was executed automatically.')),
+    onError: (error) => setMessage(error instanceof Error ? error.message : ui('Unable to create the follow-up draft.'))
+  });
+
   const governance = summaryQuery.data?.governance;
   const visibleFeedbackModes = useMemo(() => (Object.keys(modeLabels) as FeedbackMode[]).filter((item) => item !== 'forecast-accuracy' || canReadInsights), [canReadInsights]);
   const activeStatusOptions = useMemo(() => statusOptions[mode], [mode]);
@@ -4806,7 +4961,7 @@ export default function DecisionLearningFeedbackPage() {
   const handleModeChange = (nextMode: FeedbackMode) => {
     if (nextMode === 'forecast-accuracy' && !canReadInsights) return;
     setMode(nextMode);
-    setForm({ ...defaultForm, subtype: defaultSubtypeForMode(nextMode), financialImpactCurrency: getActiveTenantCurrency(), status: statusOptions[nextMode][0] || 'observed' });
+    setForm({ ...defaultForm, observedAt: nowLocalDateTimeValue(), subtype: defaultSubtypeForMode(nextMode), financialImpactCurrency: getActiveTenantCurrency(), status: statusOptions[nextMode][0] || 'observed' });
     setSourceId('');
     setSourceSearch('');
     setMessage(null);
@@ -4844,17 +4999,89 @@ export default function DecisionLearningFeedbackPage() {
     setSourceId(nextSourceId);
     const source = (sourceQuery.data?.sources || []).find((item) => item.id === nextSourceId);
     if (source) {
+      const prefill = source.prefill || {};
+      const sourceReference = {
+        source_id: source.id,
+        source_key: source.source_key,
+        title: source.title,
+        ...(mode === 'forecast-accuracy' && prefill.target_reference && typeof prefill.target_reference === 'object' ? { target_reference: prefill.target_reference } : {})
+      };
       setForm((current) => ({
         ...current,
         domain: source.domain || current.domain,
+        reference: JSON.stringify(sourceReference),
         optimizationOptionId: mode === 'optimization-results' && (source.options || []).some((option) => option.id === current.optimizationOptionId)
           ? current.optimizationOptionId
           : '',
-        recommendationKey: mode === 'learning-outcomes' ? source.source_key : current.recommendationKey
+        recommendationKey: mode === 'learning-outcomes' ? source.source_key : current.recommendationKey,
+        expected: mode === 'learning-outcomes'
+          ? jsonForForm(prefill.expected_result)
+          : mode === 'forecast-accuracy'
+            ? formText(prefill.predicted_value)
+            : mode === 'policy-effectiveness'
+              ? jsonForForm(prefill.baseline_reference)
+              : mode === 'optimization-results'
+                ? jsonForForm(prefill.objective_reference)
+                : current.expected,
+        metricUnit: mode === 'forecast-accuracy' ? formText(prefill.unit) : current.metricUnit,
+        measurementWindowStart: mode === 'forecast-accuracy' ? toLocalDateTimeValue(prefill.forecast_period_start) : current.measurementWindowStart,
+        measurementWindowEnd: mode === 'forecast-accuracy' ? toLocalDateTimeValue(prefill.forecast_period_end) : current.measurementWindowEnd
       }));
     } else if (mode === 'optimization-results') {
       setForm((current) => ({ ...current, optimizationOptionId: '' }));
     }
+  };
+
+  const handleOptimizationOptionChange = (optionId: string) => {
+    const source = (sourceQuery.data?.sources || []).find((item) => item.id === sourceId);
+    const option = (source?.options || []).find((item) => item.id === optionId);
+    setForm((current) => ({
+      ...current,
+      optimizationOptionId: optionId,
+      expected: option ? jsonForForm(option.tradeoff_summary || option.projected_outcome || { option: option.title }) : current.expected
+    }));
+  };
+
+  const viewEvidence = async (nextMode: FeedbackMode, row: Record<string, unknown>) => {
+    if (nextMode === 'forecast-accuracy' && !canReadInsights) return;
+    const evidenceKey = recordKeyForMode(nextMode, row);
+    if (!evidenceKey) return;
+    setMessage(ui('Loading feedback record…'));
+    try {
+      const params = new URLSearchParams({ evidence_type: evidenceTypeForMode(nextMode), evidence_key: evidenceKey });
+      const full = await apiRequest<Record<string, unknown>>(`/decision-intelligence-feedback/record?${params.toString()}`);
+      setSelectedEvidenceDetail(full);
+      setSelectedEvidenceMode(nextMode);
+      setMessage(null);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : ui('Unable to load the feedback record.'));
+    }
+  };
+
+  const createEvidenceFollowUp = () => {
+    if (!selectedEvidenceDetail || !selectedEvidenceMode || !canCreateExecutionRequests) return;
+    const evidenceKey = recordKeyForMode(selectedEvidenceMode, selectedEvidenceDetail);
+    followUpMutation.mutate({
+      reason: `Follow up on Learning Feedback evidence ${evidenceKey || selectedEvidenceDetail.source_label || ''}`.trim(),
+      feedback_evidence_type: evidenceTypeForMode(selectedEvidenceMode),
+      feedback_evidence_key: evidenceKey,
+      feedback_source_label: selectedEvidenceDetail.source_label || null,
+      feedback_status: selectedEvidenceDetail.outcome_status ?? selectedEvidenceDetail.calibration_status ?? selectedEvidenceDetail.effectiveness_status ?? selectedEvidenceDetail.result_status ?? null,
+      review_status: selectedEvidenceDetail.learning_feedback_review_status || 'unreviewed'
+    });
+  };
+
+  const createActionPlanFollowUp = (action: FeedbackActionItem) => {
+    if (!canCreateExecutionRequests) return;
+    followUpMutation.mutate({
+      reason: action.rationale || `Follow up on Learning Feedback action ${action.action_key || ''}`.trim(),
+      learning_action_key: action.action_key || null,
+      learning_action_type: action.action_type || null,
+      priority: action.priority || null,
+      affected_domains: action.affected_domains || [],
+      recommended_owner: action.recommended_owner || null,
+      evidence_count: action.evidence_count || 0
+    });
   };
 
   const editEvidence = async (nextMode: FeedbackMode, row: Record<string, unknown>) => {
@@ -4892,6 +5119,9 @@ export default function DecisionLearningFeedbackPage() {
         optimizationOptionId: nextMode === 'optimization-results' && typeof refObject.option_id === 'string' ? refObject.option_id : '',
         expected: typeof expected === 'object' ? JSON.stringify(expected) : String(expected ?? ''),
         observed: typeof observed === 'object' ? JSON.stringify(observed) : String(observed ?? ''),
+        observedAt: toLocalDateTimeValue(full.observed_at),
+        measurementWindowStart: toLocalDateTimeValue(full.measurement_window_start),
+        measurementWindowEnd: toLocalDateTimeValue(full.measurement_window_end),
         recommendationKey: String((full.recommendation_reference as Record<string, unknown> | undefined)?.recommendation_key || sourceKey || ''),
         financialImpactCurrency: String(full.financial_impact_currency || getActiveTenantCurrency()),
         financialImpactAmount: formText(full.financial_impact_amount),
@@ -4985,6 +5215,13 @@ export default function DecisionLearningFeedbackPage() {
     const recorderUnknown = !createdById && !recordedById;
     const reviewerIsRecorder = Boolean(currentUserId && (currentUserId === createdById || currentUserId === recordedById));
     const requiresOverride = recorderUnknown || reviewerIsRecorder;
+    const reviewNote = ['dismissed', 'archived'].includes(targetStatus)
+      ? window.prompt(ui('Add a short review note explaining this decision.'), '')?.trim() || ''
+      : window.prompt(ui('Optional review note'), '')?.trim() || '';
+    if (['dismissed', 'archived'].includes(targetStatus) && reviewNote.length < 3) {
+      setMessage(ui('A short review note is required when dismissing or archiving evidence.'));
+      return;
+    }
 
     if (requiresOverride && !canOverrideIndependentReview) {
       setMessage(recorderUnknown
@@ -4993,24 +5230,40 @@ export default function DecisionLearningFeedbackPage() {
       return;
     }
 
+    const payload: { evidence_type: string; evidence_key: string; target_status: string; review_note?: string; independence_override?: boolean; override_reason?: string } = {
+      evidence_type: item.evidence_type,
+      evidence_key: item.evidence_key,
+      target_status: targetStatus,
+      review_note: reviewNote || undefined
+    };
     if (requiresOverride) {
       const overrideReason = window.prompt(ui('Explain why independent review cannot be used (at least 10 characters).'), '')?.trim() || '';
       if (overrideReason.length < 10) {
         setMessage(ui('Override reason must be at least 10 characters.'));
         return;
       }
-      reviewMutation.mutate({
-        evidence_type: item.evidence_type,
-        evidence_key: item.evidence_key,
-        target_status: targetStatus,
-        independence_override: true,
-        override_reason: overrideReason
-      });
+      reviewMutation.mutate({ ...payload, independence_override: true, override_reason: overrideReason });
       return;
     }
-
-    reviewMutation.mutate({ evidence_type: item.evidence_type, evidence_key: item.evidence_key, target_status: targetStatus });
+    reviewMutation.mutate(payload);
   };
+
+  const assignReview = (item: FeedbackReviewItem, reviewerUserId: string | null, dueAt: string | null) => {
+    if (!canGovern || !item.evidence_type || !item.evidence_key) return;
+    reviewMutation.mutate({
+      evidence_type: item.evidence_type,
+      evidence_key: item.evidence_key,
+      target_status: 'open',
+      assigned_reviewer_user_id: reviewerUserId,
+      review_due_at: dueAt
+    });
+  };
+
+  const escalateReview = (item: FeedbackReviewItem, reason: string) => {
+    if (!canGovern || !item.evidence_type || !item.evidence_key || reason.trim().length < 3) return;
+    reviewMutation.mutate({ evidence_type: item.evidence_type, evidence_key: item.evidence_key, target_status: 'open', escalation_reason: reason.trim() });
+  };
+
 
   return (
     <div className="decision-intelligence-page io-operational-page io-workspace-page io-workspace-legacy-normalized">
@@ -5078,6 +5331,19 @@ export default function DecisionLearningFeedbackPage() {
           </label>
         </div>
 
+        {sourceId ? (() => {
+          const selectedSource = (sourceQuery.data?.sources || []).find((item) => item.id === sourceId);
+          const prefill = selectedSource?.prefill || {};
+          return selectedSource ? <div className="learning-feedback-source-facts">
+            <strong>{ui('Known source facts')}</strong>
+            <span>{selectedSource.title} · {selectedSource.source_key}</span>
+            {mode === 'forecast-accuracy' ? <span>{ui('Predicted:')} {formText(prefill.predicted_value) || '—'} {formText(prefill.unit)} · {ui('Confidence:')} {formText(prefill.confidence_score) || formText(prefill.confidence_level) || '—'}</span> : null}
+            {mode === 'learning-outcomes' && prefill.expected_result ? <span>{ui('Expected guidance is filled from the selected recommendation.')}</span> : null}
+            {mode === 'policy-effectiveness' ? <span>{ui('The policy baseline is filled from the current policy evidence.')}</span> : null}
+            {mode === 'optimization-results' ? <span>{ui('The optimization objective is filled from the selected planning run.')}</span> : null}
+          </div> : null;
+        })() : null}
+
         {mode === 'optimization-results' ? (
           <div className="learning-feedback-source-picker learning-feedback-source-picker--single">
             <label>
@@ -5085,7 +5351,7 @@ export default function DecisionLearningFeedbackPage() {
               <select
                 className="input"
                 value={form.optimizationOptionId}
-                onChange={(event) => updateForm('optimizationOptionId', event.target.value)}
+                onChange={(event) => handleOptimizationOptionChange(event.target.value)}
                 disabled={!sourceId || sourceQuery.isLoading || sourceQuery.isError}
               >
                 <option value="">{!sourceId ? ui('Choose an optimization run first') : ui('Choose the planning option this outcome belongs to')}</option>
@@ -5119,10 +5385,18 @@ export default function DecisionLearningFeedbackPage() {
               {activeStatusOptions.map((status) => <option key={status} value={status}>{ui(formatLabel(status))}</option>)}
             </select>
           </label>
-          <label>
-            <span className="form-label">{ui('Score (-1 to 1)')}</span>
-            <input className="input" value={form.score} onChange={(event) => updateForm('score', event.target.value)} placeholder="0" />
-          </label>
+          {mode === 'forecast-accuracy' ? (
+            <div className="learning-feedback-calculated-error">
+              <span className="form-label">{ui('Calculated forecast error')}</span>
+              <strong>{form.expected.trim() && form.observed.trim() && Number.isFinite(Number(form.expected)) && Number.isFinite(Number(form.observed)) ? formatLocalizedNumber(Math.abs(Number(form.observed) - Number(form.expected)), locale, { maximumFractionDigits: 4 }) : '—'}</strong>
+              <small className="card__subtext">{ui('The backend calculates the official absolute and percentage error from predicted versus actual values.')}</small>
+            </div>
+          ) : (
+            <label>
+              <span className="form-label">{ui('Result score (-1 to 1)')}</span>
+              <input className="input" value={form.score} onChange={(event) => updateForm('score', event.target.value)} placeholder="0" />
+            </label>
+          )}
           {activeSubtypeOptions.length > 0 ? (
             <label>
               <span className="form-label">{ui('Evidence type')}</span>
@@ -5332,36 +5606,8 @@ export default function DecisionLearningFeedbackPage() {
             </label>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
-            <label>
-              <span className="form-label">{ui('Review status')}</span>
-              <select className="input" value={form.reviewStatus} onChange={(event) => updateForm('reviewStatus', event.target.value)}>
-                <option value="">{ui('Decide from the evidence')}</option>
-                {['not_required', 'open', 'in_review', 'resolved', 'rejected', 'deferred'].map((status) => <option key={status} value={status}>{ui(formatLabel(status))}</option>)}
-              </select>
-            </label>
-            <label>
-              <span className="form-label">{ui('Review owner')}</span>
-              <input className="input" value={form.reviewOwner} onChange={(event) => updateForm('reviewOwner', event.target.value)} placeholder={ui('decision governance reviewer')} />
-            </label>
-            <label>
-              <span className="form-label">{ui('Reviewed at')}</span>
-              <input className="input" value={form.reviewedAt} onChange={(event) => updateForm('reviewedAt', event.target.value)} placeholder={ui('ISO timestamp')} />
-            </label>
-            <label>
-              <span className="form-label">{ui('Review resolution')}</span>
-              <select className="input" value={form.reviewResolution} onChange={(event) => updateForm('reviewResolution', event.target.value)}>
-                <option value="">{ui('No resolution yet')}</option>
-                {['accepted', 'corrected', 'overridden', 'invalidated', 'deferred', 'not_actionable'].map((status) => <option key={status} value={status}>{ui(formatLabel(status))}</option>)}
-              </select>
-            </label>
-          </div>
-
-          <div style={{ marginTop: 12 }}>
-            <label>
-              <span className="form-label">{ui('Review resolution evidence JSON')}</span>
-              <textarea className="input" value={form.reviewEvidence} onChange={(event) => updateForm('reviewEvidence', event.target.value)} placeholder='{"resolution_reason":"reviewed against stockout and cost evidence"}' rows={2} />
-            </label>
+          <div className="learning-feedback-review-authority-note" style={{ marginTop: 12 }}>
+            <p className="card__subtext">{ui('Independent review status, reviewer, deadline and resolution are managed only in the Feedback review board below. Editing factual evidence cannot close its own review.')}</p>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
@@ -5540,6 +5786,16 @@ export default function DecisionLearningFeedbackPage() {
           </details>
         ) : null}
 
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 12 }}>
+          <label>
+            <span className="form-label">{ui('Result observed on')}</span>
+            <input className="input" type="datetime-local" value={form.observedAt} onChange={(event) => updateForm('observedAt', event.target.value)} />
+          </label>
+          {mode === 'learning-outcomes' ? <>
+            <label><span className="form-label">{ui('Measurement period from')}</span><input className="input" type="datetime-local" value={form.measurementWindowStart} onChange={(event) => updateForm('measurementWindowStart', event.target.value)} /></label>
+            <label><span className="form-label">{ui('Measurement period to')}</span><input className="input" type="datetime-local" value={form.measurementWindowEnd} onChange={(event) => updateForm('measurementWindowEnd', event.target.value)} /></label>
+          </> : null}
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 12 }}>
           {canViewDiagnostics ? (
             <label>
@@ -5547,14 +5803,13 @@ export default function DecisionLearningFeedbackPage() {
               <textarea className="input" rows={4} value={form.reference} onChange={(event) => updateForm('reference', event.target.value)} placeholder='{"source":"recommendation-review"}' />
             </label>
           ) : null}
-          <label>
-            <span className="form-label">{ui('Expected result / predicted value')}</span>
-            <textarea className="input" rows={4} value={form.expected} onChange={(event) => updateForm('expected', event.target.value)} placeholder='{"expected":"lower stockout risk"}' />
-          </label>
-          <label>
-            <span className="form-label">{ui('Observed result / observed value')}</span>
-            <textarea className="input" rows={4} value={form.observed} onChange={(event) => updateForm('observed', event.target.value)} placeholder='{"observed":"risk reduced after review"}' />
-          </label>
+          {mode === 'forecast-accuracy' ? <>
+            <label><span className="form-label">{ui('Predicted value')}</span><input className="input" type="number" step="any" value={form.expected} onChange={(event) => updateForm('expected', event.target.value)} /></label>
+            <label><span className="form-label">{ui('Actual observed value')}</span><input className="input" type="number" step="any" value={form.observed} onChange={(event) => updateForm('observed', event.target.value)} /></label>
+          </> : <>
+            <label><span className="form-label">{ui('Expected result')}</span><textarea className="input" rows={4} value={form.expected} onChange={(event) => updateForm('expected', event.target.value)} placeholder={ui('What did we expect to happen?')} /></label>
+            <label><span className="form-label">{ui('Actual observed result')}</span><textarea className="input" rows={4} value={form.observed} onChange={(event) => updateForm('observed', event.target.value)} placeholder={ui('What actually happened?')} /></label>
+          </>}
         </div>
 
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
@@ -5575,9 +5830,10 @@ export default function DecisionLearningFeedbackPage() {
       {view === 'feedback' ? (
         <>
           {!summaryQuery.isLoading && !summaryQuery.isError ? (<>
-            <FeedbackActionPlan plan={summaryQuery.data?.feedback_action_plan} />
+            <FeedbackActionPlan plan={summaryQuery.data?.feedback_action_plan} canCreateFollowUp={canCreateExecutionRequests} creatingFollowUp={followUpMutation.isPending} onCreateFollowUp={createActionPlanFollowUp} />
             <LearningImpactAssessment assessment={summaryQuery.data?.learning_impact_assessment} />
-            <FeedbackReviewBoard board={summaryQuery.data?.feedback_review_board} canGovern={canGovern} canOverrideIndependentReview={canOverrideIndependentReview} currentUserId={currentUserId} reviewing={reviewMutation.isPending} onReview={reviewEvidence} onPage={changeReviewPage} />
+            <LearningTrendView trends={summaryQuery.data?.learning_trends} />
+            <FeedbackReviewBoard board={summaryQuery.data?.feedback_review_board} canGovern={canGovern} canOverrideIndependentReview={canOverrideIndependentReview} currentUserId={currentUserId} reviewers={reviewerQuery.data?.reviewers || []} reviewing={reviewMutation.isPending} onReview={reviewEvidence} onAssign={assignReview} onEscalate={escalateReview} onPage={changeReviewPage} />
           </>) : null}
 
           <section className={'card learning-feedback-section learning-feedback-safety-card'}>
@@ -5590,10 +5846,24 @@ export default function DecisionLearningFeedbackPage() {
             </p>
           </section>
 
-          <EvidenceTable title={ui('Learning outcomes')} mode="learning-outcomes" rows={summaryQuery.data?.outcomes || []} pageInfo={summaryQuery.data?.pagination?.outcomes} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('outcomes', direction)} />
-          {canReadInsights ? <EvidenceTable title={ui('Forecast accuracy')} mode="forecast-accuracy" rows={summaryQuery.data?.forecast_accuracy || []} pageInfo={summaryQuery.data?.pagination?.forecast_accuracy} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('forecast_accuracy', direction)} /> : null}
-          <EvidenceTable title={ui('Policy effectiveness')} mode="policy-effectiveness" rows={summaryQuery.data?.policy_effectiveness || []} pageInfo={summaryQuery.data?.pagination?.policy_effectiveness} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('policy_effectiveness', direction)} />
-          <EvidenceTable title={ui('Optimization results')} mode="optimization-results" rows={summaryQuery.data?.optimization_results || []} pageInfo={summaryQuery.data?.pagination?.optimization_results} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('optimization_results', direction)} />
+          {selectedEvidenceDetail ? <EvidenceDetailCard detail={selectedEvidenceDetail} canCreateFollowUp={canCreateExecutionRequests} creatingFollowUp={followUpMutation.isPending} onClose={() => { setSelectedEvidenceDetail(null); setSelectedEvidenceMode(null); }} onCreateFollowUp={createEvidenceFollowUp} /> : null}
+
+          <section className="card learning-feedback-section learning-feedback-history-filters">
+            <div className="card__header"><div><h2>{ui('Find recorded feedback')}</h2><p className="card__subtext">{ui('Search and filter the full feedback history, not only the rows currently visible on this page.')}</p></div></div>
+            <div className="learning-feedback-filter-grid">
+              <label><span className="form-label">{ui('Search')}</span><input className="input" value={evidenceSearch} onChange={(event) => { setEvidenceSearch(event.target.value); setPageOffsets({ outcomes: 0, forecast_accuracy: 0, policy_effectiveness: 0, optimization_results: 0 }); }} placeholder={ui('Source, key, area, status, expected or actual result')} /></label>
+              <label><span className="form-label">{ui('Review status')}</span><select className="input" value={evidenceReviewStatus} onChange={(event) => { setEvidenceReviewStatus(event.target.value); setPageOffsets({ outcomes: 0, forecast_accuracy: 0, policy_effectiveness: 0, optimization_results: 0 }); }}><option value="">{ui('All review states')}</option>{['open','resolved','dismissed','archived','unreviewed'].map((value) => <option key={value} value={value}>{ui(formatLabel(value))}</option>)}</select></label>
+              <label><span className="form-label">{ui('Observed from')}</span><input className="input" type="date" value={evidenceDateFrom} onChange={(event) => { setEvidenceDateFrom(event.target.value); setPageOffsets({ outcomes: 0, forecast_accuracy: 0, policy_effectiveness: 0, optimization_results: 0 }); }} /></label>
+              <label><span className="form-label">{ui('Observed to')}</span><input className="input" type="date" value={evidenceDateTo} onChange={(event) => { setEvidenceDateTo(event.target.value); setPageOffsets({ outcomes: 0, forecast_accuracy: 0, policy_effectiveness: 0, optimization_results: 0 }); }} /></label>
+              <label><span className="form-label">{ui('Sort')}</span><select className="input" value={evidenceSort} onChange={(event) => { setEvidenceSort(event.target.value); setPageOffsets({ outcomes: 0, forecast_accuracy: 0, policy_effectiveness: 0, optimization_results: 0 }); }}>{[['newest','Newest'],['oldest','Oldest'],['attention','Needs attention'],['best_result','Best result'],['worst_result','Worst result']].map(([value,label]) => <option key={value} value={value}>{ui(label)}</option>)}</select></label>
+              <div style={{ alignSelf: 'end' }}><button className="button button--secondary" type="button" onClick={() => { setEvidenceSearch(''); setEvidenceReviewStatus(''); setEvidenceDateFrom(''); setEvidenceDateTo(''); setEvidenceSort('newest'); setPageOffsets({ outcomes: 0, forecast_accuracy: 0, policy_effectiveness: 0, optimization_results: 0 }); }}>{ui('Clear filters')}</button></div>
+            </div>
+          </section>
+
+          <EvidenceTable title={ui('Learning outcomes')} mode="learning-outcomes" rows={summaryQuery.data?.outcomes || []} pageInfo={summaryQuery.data?.pagination?.outcomes} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onView={viewEvidence} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('outcomes', direction)} />
+          {canReadInsights ? <EvidenceTable title={ui('Forecast accuracy')} mode="forecast-accuracy" rows={summaryQuery.data?.forecast_accuracy || []} pageInfo={summaryQuery.data?.pagination?.forecast_accuracy} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onView={viewEvidence} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('forecast_accuracy', direction)} /> : null}
+          <EvidenceTable title={ui('Policy effectiveness')} mode="policy-effectiveness" rows={summaryQuery.data?.policy_effectiveness || []} pageInfo={summaryQuery.data?.pagination?.policy_effectiveness} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onView={viewEvidence} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('policy_effectiveness', direction)} />
+          <EvidenceTable title={ui('Optimization results')} mode="optimization-results" rows={summaryQuery.data?.optimization_results || []} pageInfo={summaryQuery.data?.pagination?.optimization_results} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onView={viewEvidence} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('optimization_results', direction)} />
         </>
       ) : canViewDiagnostics ? (
         <>
