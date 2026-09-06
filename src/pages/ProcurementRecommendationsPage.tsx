@@ -527,6 +527,7 @@ type ProcurementExecutionHistoryResponse = {
     offset: number | string;
     decision_total: number | string;
     schedule_run_total: number | string;
+    total: number | string;
     returned: number | string;
     has_more: boolean;
   };
@@ -885,15 +886,21 @@ async function fetchProcurementExecutionDashboard(
 
 
 
-async function fetchProcurementExecutionHistory(): Promise<ProcurementExecutionHistoryResponse> {
+async function fetchProcurementExecutionHistory(
+  offset: number,
+  limit: number,
+): Promise<ProcurementExecutionHistoryResponse> {
   return apiRequest<ProcurementExecutionHistoryResponse>(
-    "/reorder-insights/recommendations/execution-history?limit=50&offset=0",
+    `/reorder-insights/recommendations/execution-history?limit=${limit}&offset=${offset}`,
   );
 }
 
-async function fetchProcurementRecommendationOutcomes(): Promise<ProcurementRecommendationOutcomesResponse> {
+async function fetchProcurementRecommendationOutcomes(
+  offset: number,
+  limit: number,
+): Promise<ProcurementRecommendationOutcomesResponse> {
   return apiRequest<ProcurementRecommendationOutcomesResponse>(
-    "/reorder-insights/recommendations/outcomes?limit=50&offset=0",
+    `/reorder-insights/recommendations/outcomes?limit=${limit}&offset=${offset}`,
   );
 }
 
@@ -1516,6 +1523,9 @@ export default function ProcurementRecommendationsPage() {
   const [scheduledNote, setScheduledNote] = useState("Scheduled procurement recommendation run.");
   const [scheduledConvertToPo, setScheduledConvertToPo] = useState(false);
   const [governanceOpen, setGovernanceOpen] = useState(false);
+  const [executionHistoryOffset, setExecutionHistoryOffset] = useState(0);
+  const [recommendationOutcomesOffset, setRecommendationOutcomesOffset] = useState(0);
+  const governanceHistoryPageSize = 50;
   const [confirmation, setConfirmation] = useState<ConfirmationState | null>(null);
   const [poDraftOffset, setPoDraftOffset] = useState(0);
   const poDraftLimit = 25;
@@ -1678,15 +1688,15 @@ export default function ProcurementRecommendationsPage() {
 
 
   const executionHistoryQuery = useQuery({
-    queryKey: ["procurement-execution-history"],
+    queryKey: ["procurement-execution-history", executionHistoryOffset, governanceHistoryPageSize],
     enabled: governanceOpen,
-    queryFn: fetchProcurementExecutionHistory,
+    queryFn: () => fetchProcurementExecutionHistory(executionHistoryOffset, governanceHistoryPageSize),
   });
 
   const recommendationOutcomesQuery = useQuery({
-    queryKey: ["procurement-recommendation-outcomes"],
+    queryKey: ["procurement-recommendation-outcomes", recommendationOutcomesOffset, governanceHistoryPageSize],
     enabled: governanceOpen,
-    queryFn: fetchProcurementRecommendationOutcomes,
+    queryFn: () => fetchProcurementRecommendationOutcomes(recommendationOutcomesOffset, governanceHistoryPageSize),
   });
 
 
@@ -3805,7 +3815,7 @@ export default function ProcurementRecommendationsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {executionHistoryQuery.data.timeline.slice(0, 20).map((event, index) => {
+                  {executionHistoryQuery.data.timeline.map((event, index) => {
                     const isRun = event.event_type === "scheduled_run";
                     const subject = isRun
                       ? ui("{mode} · {count} candidates")
@@ -3837,6 +3847,32 @@ export default function ProcurementRecommendationsPage() {
                 </tbody>
               </table>
             </div>
+            <div style={styles.paginationFooter}>
+              <span style={styles.mutedText}>
+                {ui("Showing {start}–{end} of {total}")
+                  .replace("{start}", formatUiNumber(executionHistoryQuery.data.timeline.length ? executionHistoryOffset + 1 : 0, 0))
+                  .replace("{end}", formatUiNumber(executionHistoryOffset + executionHistoryQuery.data.timeline.length, 0))
+                  .replace("{total}", formatUiNumber(executionHistoryQuery.data.pagination.total, 0))}
+              </span>
+              <div style={styles.paginationControls}>
+                <button
+                  type="button"
+                  style={styles.secondaryButton}
+                  disabled={executionHistoryOffset === 0 || executionHistoryQuery.isFetching}
+                  onClick={() => setExecutionHistoryOffset(Math.max(0, executionHistoryOffset - governanceHistoryPageSize))}
+                >
+                  {ui("Previous")}
+                </button>
+                <button
+                  type="button"
+                  style={styles.secondaryButton}
+                  disabled={!executionHistoryQuery.data.pagination.has_more || executionHistoryQuery.isFetching}
+                  onClick={() => setExecutionHistoryOffset(executionHistoryOffset + governanceHistoryPageSize)}
+                >
+                  {ui("Next")}
+                </button>
+              </div>
+            </div>
           </>
         ) : null}
       </section>
@@ -3864,7 +3900,7 @@ export default function ProcurementRecommendationsPage() {
         {recommendationOutcomesQuery.data ? (
           <>
             <div style={styles.bulkGrid}>
-              <StatCard label={ui("Loaded outcomes")} value={formatUiNumber(recommendationOutcomesQuery.data.summary.total, 0)} />
+              <StatCard label={ui("Loaded outcomes")} value={formatUiNumber(recommendationOutcomesQuery.data.rows.length, 0)} />
               <StatCard label={ui("Threshold restored")} value={formatUiNumber(recommendationOutcomesQuery.data.summary.threshold_met_count, 0)} tone="good" />
               <StatCard label={ui("Fully received")} value={formatUiNumber(recommendationOutcomesQuery.data.summary.received_complete_count, 0)} tone="good" />
               <StatCard
@@ -3927,6 +3963,32 @@ export default function ProcurementRecommendationsPage() {
                   ) : null}
                 </tbody>
               </table>
+            </div>
+            <div style={styles.paginationFooter}>
+              <span style={styles.mutedText}>
+                {ui("Showing {start}–{end} of {total}")
+                  .replace("{start}", formatUiNumber(recommendationOutcomesQuery.data.rows.length ? recommendationOutcomesOffset + 1 : 0, 0))
+                  .replace("{end}", formatUiNumber(recommendationOutcomesOffset + recommendationOutcomesQuery.data.rows.length, 0))
+                  .replace("{total}", formatUiNumber(recommendationOutcomesQuery.data.pagination.total, 0))}
+              </span>
+              <div style={styles.paginationControls}>
+                <button
+                  type="button"
+                  style={styles.secondaryButton}
+                  disabled={recommendationOutcomesOffset === 0 || recommendationOutcomesQuery.isFetching}
+                  onClick={() => setRecommendationOutcomesOffset(Math.max(0, recommendationOutcomesOffset - governanceHistoryPageSize))}
+                >
+                  {ui("Previous")}
+                </button>
+                <button
+                  type="button"
+                  style={styles.secondaryButton}
+                  disabled={!recommendationOutcomesQuery.data.pagination.has_more || recommendationOutcomesQuery.isFetching}
+                  onClick={() => setRecommendationOutcomesOffset(recommendationOutcomesOffset + governanceHistoryPageSize)}
+                >
+                  {ui("Next")}
+                </button>
+              </div>
             </div>
           </>
         ) : null}

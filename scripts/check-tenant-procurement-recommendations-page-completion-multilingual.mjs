@@ -121,8 +121,8 @@ if (!process.exitCode) pass('Procurement Recommendations route and insights/prod
 for (const required of [
   '`/reorder-insights/recommendations/execution-dashboard?${params.toString()}`',
   '`/reorder-insights/recommendations/production-review?${params.toString()}`',
-  '"/reorder-insights/recommendations/execution-history?limit=50&offset=0"',
-  '"/reorder-insights/recommendations/outcomes?limit=50&offset=0"',
+  '`/reorder-insights/recommendations/execution-history?limit=${limit}&offset=${offset}`',
+  '`/reorder-insights/recommendations/outcomes?limit=${limit}&offset=${offset}`',
   '`/reorder-insights/recommendations/exceptions?${params.toString()}`',
   '`/reorder-insights/recommendations/exceptions/resolve?${buildRecommendationActionQuery(filters)}`',
   '`/reorder-insights/recommendations/scheduled-run?${buildRecommendationActionQuery(filters)}`',
