@@ -93,6 +93,12 @@ type InventoryUsageDashboardProps = {
   periodClosures: InventoryUsagePeriodClosure[];
   periodClosuresLoading: boolean;
   periodClosuresError?: Error | null;
+  periodClosurePage: number;
+  periodClosureHasPrevious: boolean;
+  periodClosureHasNext: boolean;
+  onPreviousPeriodClosurePage: () => void;
+  onNextPeriodClosurePage: () => void;
+  onLoadAllPeriodClosures: () => Promise<InventoryUsagePeriodClosure[]>;
   periodPreviewing: boolean;
   periodPreviewError?: Error | null;
   periodPreviewResult?: InventoryUsagePeriodClosurePreviewResponse | null;
@@ -224,6 +230,12 @@ export function InventoryUsageDashboard({
   periodClosures,
   periodClosuresLoading,
   periodClosuresError,
+  periodClosurePage,
+  periodClosureHasPrevious,
+  periodClosureHasNext,
+  onPreviousPeriodClosurePage,
+  onNextPeriodClosurePage,
+  onLoadAllPeriodClosures,
   periodPreviewing,
   periodPreviewError,
   periodPreviewResult,
@@ -1289,6 +1301,12 @@ export function InventoryUsageDashboard({
           closures={periodClosures}
           loading={periodClosuresLoading}
           error={periodClosuresError}
+          page={periodClosurePage}
+          hasPrevious={periodClosureHasPrevious}
+          hasNext={periodClosureHasNext}
+          onPreviousPage={onPreviousPeriodClosurePage}
+          onNextPage={onNextPeriodClosurePage}
+          onLoadAllClosures={onLoadAllPeriodClosures}
           previewing={periodPreviewing}
           previewError={periodPreviewError}
           previewResult={periodPreviewResult}

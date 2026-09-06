@@ -95,8 +95,13 @@ for (const displayKey of [
 ]) if (!unique.has(displayKey)) fail(`Inventory Usage completion display label is not catalog-backed: ${displayKey}`);
 if (!process.exitCode) pass('Known period-close states and remaining controller feedback labels are translated while canonical values stay unchanged.');
 
+if (!apiSource.includes('fetchInventoryUsagePeriodClosures(') ||
+    !apiSource.includes("new URLSearchParams({ limit: String(limit), offset: String(offset) })") ||
+    !apiSource.includes('`/stock/usage/period-closures?${params.toString()}`')) {
+  fail('Inventory Usage paged period-closure endpoint contract changed or missing.');
+}
+
 for (const required of [
-  "'/stock/usage/period-closures?limit=100'",
   "'/stock/usage/period-closures/preview'",
   "'/stock/usage/period-closures'",
   "'/stock/consume/barcode/preview'",

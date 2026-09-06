@@ -161,8 +161,26 @@ export async function consumeInventoryUsageTemplate(
   });
 }
 
-export async function fetchInventoryUsagePeriodClosures(): Promise<InventoryUsagePeriodClosure[]> {
-  return apiRequest<InventoryUsagePeriodClosure[]>('/stock/usage/period-closures?limit=100');
+export async function fetchInventoryUsagePeriodClosures(
+  limit = 101,
+  offset = 0
+): Promise<InventoryUsagePeriodClosure[]> {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  return apiRequest<InventoryUsagePeriodClosure[]>(`/stock/usage/period-closures?${params.toString()}`);
+}
+
+export async function fetchAllInventoryUsagePeriodClosures(): Promise<InventoryUsagePeriodClosure[]> {
+  const rows: InventoryUsagePeriodClosure[] = [];
+  let offset = 0;
+
+  for (;;) {
+    const batch = await fetchInventoryUsagePeriodClosures(500, offset);
+    rows.push(...batch);
+    if (batch.length < 500) break;
+    offset += batch.length;
+  }
+
+  return rows;
 }
 
 

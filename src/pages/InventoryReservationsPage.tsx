@@ -333,7 +333,7 @@ function getErrorMessage(error: unknown, ui: (englishText: string) => string): s
   return ui('Unknown request failure.');
 }
 
-function buildReservationQuery(filters: Filters, limit = '100', offset = '0'): string {
+function buildReservationFilterParams(filters: Filters): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.status) params.set('status', filters.status);
   if (filters.sourceType) params.set('source_type', filters.sourceType);
@@ -343,6 +343,11 @@ function buildReservationQuery(filters: Filters, limit = '100', offset = '0'): s
   if (filters.priority) params.set('priority', filters.priority);
   if (filters.productId) params.set('product_id', filters.productId);
   if (filters.search.trim()) params.set('search', filters.search.trim());
+  return params;
+}
+
+function buildReservationQuery(filters: Filters, limit = '100', offset = '0'): string {
+  const params = buildReservationFilterParams(filters);
   params.set('limit', limit);
   params.set('offset', offset);
   return `/inventory-reservations?${params.toString()}`;
@@ -372,8 +377,8 @@ async function fetchReservations(filters: Filters, limit: number, offset: number
 }
 
 function buildReservationExportPath(filters: Filters): string {
-  const query = buildReservationQuery(filters, '5000', '0').replace('/inventory-reservations?', '');
-  return `/inventory-reservations/export.csv?${query}`;
+  const query = buildReservationFilterParams(filters).toString();
+  return `/inventory-reservations/export.csv${query ? `?${query}` : ''}`;
 }
 
 async function downloadReservationCsv(filters: Filters): Promise<void> {

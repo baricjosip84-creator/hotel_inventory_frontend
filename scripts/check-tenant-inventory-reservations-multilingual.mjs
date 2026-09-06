@@ -70,10 +70,14 @@ for (const required of [
 if (!permissionsSource.includes("INVENTORY_RESERVATIONS_READ: 'inventory_reservations.read'")) fail('Reservations frontend permission identifier changed unexpectedly.');
 if (!process.exitCode) pass('Reservations route remains tenant-scoped behind inventory_reservations.read.');
 
+if (!pageSource.includes('function buildReservationExportPath(filters: Filters): string') ||
+    !pageSource.includes('/inventory-reservations/export.csv${query ?')) {
+  fail('Reservations complete CSV export path changed or missing.');
+}
+
 for (const required of [
   "apiRequest<ReservationOptionsResponse>('/inventory-reservations/options')",
   "return `/inventory-reservations?${params.toString()}`;",
-  "return `/inventory-reservations/export.csv?${query}`;",
   "apiRequest<ReservationSummary>('/inventory-reservations/summary')",
   '`/inventory-reservations/source-summary${query ? `?${query}` : \'\'}`',
   '`/inventory-reservations/projected-free-stock?${params.toString()}`',

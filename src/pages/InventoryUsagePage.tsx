@@ -18,6 +18,7 @@ import {
   fetchInventoryUsageLogDetail,
   fetchInventoryUsageLogs,
   fetchInventoryUsagePeriodClosures,
+  fetchAllInventoryUsagePeriodClosures,
   fetchInventoryUsageSummary,
   fetchInventoryUsageOptions,
   fetchInventoryUsageTemplates,
@@ -58,6 +59,7 @@ export default function InventoryUsagePage() {
   const [barcodeCompletion, setBarcodeCompletion] = useState({ key: 0, message: "" });
   const [ledgerPage, setLedgerPage] = useState(1);
   const [ledgerPageSize, setLedgerPageSize] = useState(25);
+  const [periodClosurePage, setPeriodClosurePage] = useState(1);
   const [exportingUsage, setExportingUsage] = useState(false);
   const hasValidDateRange = !filters.start_date
     || !filters.end_date
@@ -103,10 +105,18 @@ export default function InventoryUsagePage() {
     queryFn: fetchInventoryUsageScheduledTemplates,
   });
 
+  const periodClosurePageSize = 100;
   const periodClosuresQuery = useQuery({
-    queryKey: ["inventory-usage-period-closures-page"],
-    queryFn: fetchInventoryUsagePeriodClosures,
+    queryKey: ["inventory-usage-period-closures-page", periodClosurePage],
+    queryFn: () =>
+      fetchInventoryUsagePeriodClosures(
+        periodClosurePageSize + 1,
+        (periodClosurePage - 1) * periodClosurePageSize,
+      ),
   });
+  const periodClosureRows = periodClosuresQuery.data || [];
+  const visiblePeriodClosures = periodClosureRows.slice(0, periodClosurePageSize);
+  const periodClosureHasNext = periodClosureRows.length > periodClosurePageSize;
 
   const usageLogDetailQuery = useQuery<InventoryUsageLogDetail>({
     queryKey: ["inventory-usage-log-detail-page", selectedUsageLogId],
@@ -516,6 +526,7 @@ export default function InventoryUsagePage() {
     mutationFn: (payload: InventoryUsagePeriodClosureDraft) =>
       closeInventoryUsagePeriod(payload),
     onSuccess: () => {
+      setPeriodClosurePage(1);
       queryClient.invalidateQueries({
         queryKey: ["inventory-usage-period-closures-page"],
       });
@@ -980,13 +991,21 @@ export default function InventoryUsagePage() {
       anomaliesLoading={anomaliesQuery.isLoading}
       impact={impactQuery.data}
       impactLoading={impactQuery.isLoading}
-      periodClosures={periodClosuresQuery.data || []}
+      periodClosures={visiblePeriodClosures}
       periodClosuresLoading={periodClosuresQuery.isLoading}
       periodClosuresError={
         periodClosuresQuery.isError
           ? (periodClosuresQuery.error as Error)
           : null
       }
+      periodClosurePage={periodClosurePage}
+      periodClosureHasPrevious={periodClosurePage > 1}
+      periodClosureHasNext={periodClosureHasNext}
+      onPreviousPeriodClosurePage={() => setPeriodClosurePage((current) => Math.max(1, current - 1))}
+      onNextPeriodClosurePage={() => {
+        if (periodClosureHasNext) setPeriodClosurePage((current) => current + 1);
+      }}
+      onLoadAllPeriodClosures={fetchAllInventoryUsagePeriodClosures}
       periodPreviewing={previewPeriodCloseMutation.isPending}
       periodPreviewError={
         previewPeriodCloseMutation.isError

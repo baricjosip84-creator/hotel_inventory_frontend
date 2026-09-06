@@ -5,17 +5,16 @@ import type {
   ProductCostGovernanceClosureSummaryResponse,
   ProductCostGovernanceHandoffSummaryResponse,
   ProductCostGovernanceReviewPackResponse,
-  ProductCostHistoryItem,
   ProductCostReportSummaryResponse,
   ProductCostRiskDetailsResponse,
   ProductCostRiskItem,
   ProductCostValuationDetailsResponse,
   ProductItem,
-  ProductStandardCostHistoryItem
 } from '../../types/inventory';
 import { emptyCostHistoryFilters } from './productFormDefaults';
 import { scrollToFormSection } from '../../lib/scrollToForm';
 import type { CostHistoryFilterState } from './productCostHistoryApi';
+import { fetchAllProductCostHistory, fetchAllProductStandardCostHistory } from './productCostHistoryApi';
 import {
   exportCostActionDetailsCsv,
   exportCostGovernanceAuditCsv,
@@ -35,8 +34,7 @@ import {
 type BuildProductCostHistoryHandlersParams = {
   selectedCostProduct: ProductItem | ProductCostRiskItem | null;
   products: ProductItem[];
-  costHistory: ProductCostHistoryItem[];
-  standardCostHistory: ProductStandardCostHistoryItem[];
+  costHistoryFilters: CostHistoryFilterState;
   costReportSummary?: ProductCostReportSummaryResponse;
   costGovernanceAuditPack?: ProductCostGovernanceAuditPackResponse;
   costGovernanceReviewPack?: ProductCostGovernanceReviewPackResponse;
@@ -54,8 +52,7 @@ type BuildProductCostHistoryHandlersParams = {
 export function buildProductCostHistoryHandlers({
   selectedCostProduct,
   products,
-  costHistory,
-  standardCostHistory,
+  costHistoryFilters,
   costReportSummary,
   costGovernanceAuditPack,
   costGovernanceReviewPack,
@@ -84,12 +81,16 @@ export function buildProductCostHistoryHandlers({
     setCostHistoryFilters(emptyCostHistoryFilters());
   };
 
-  const handleExportCostHistoryCsv = () => {
-    exportCostHistoryCsv(selectedCostProduct, costHistory, ui);
+  const handleExportCostHistoryCsv = async () => {
+    if (!selectedCostProduct) return;
+    const completeHistory = await fetchAllProductCostHistory(selectedCostProduct.id, costHistoryFilters);
+    exportCostHistoryCsv(selectedCostProduct, completeHistory, ui);
   };
 
-  const handleExportStandardCostHistoryCsv = () => {
-    exportStandardCostHistoryCsv(selectedCostProduct, standardCostHistory, ui);
+  const handleExportStandardCostHistoryCsv = async () => {
+    if (!selectedCostProduct) return;
+    const completeHistory = await fetchAllProductStandardCostHistory(selectedCostProduct.id);
+    exportStandardCostHistoryCsv(selectedCostProduct, completeHistory, ui);
   };
 
   const handleExportProductsCsv = () => {

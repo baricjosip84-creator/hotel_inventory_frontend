@@ -66,8 +66,7 @@ export function useProductPageActions({
   const costHistoryHandlers = buildProductCostHistoryHandlers({
     selectedCostProduct: productPageState.selectedCostProduct,
     products: productPageData.products,
-    costHistory: productPageData.costHistory,
-    standardCostHistory: productPageData.standardCostHistory,
+    costHistoryFilters: productPageState.costHistoryFilters,
     costReportSummary: productPageData.costReportSummary,
     costGovernanceAuditPack: productPageData.costGovernanceAuditPack,
     costGovernanceReviewPack: productPageData.costGovernanceReviewPack,

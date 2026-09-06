@@ -20,6 +20,12 @@ type InventoryUsagePeriodClosuresPanelProps = {
   closures: InventoryUsagePeriodClosure[];
   loading: boolean;
   error?: Error | null;
+  page: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
+  onPreviousPage: () => void;
+  onNextPage: () => void;
+  onLoadAllClosures: () => Promise<InventoryUsagePeriodClosure[]>;
   previewing: boolean;
   previewError?: Error | null;
   previewResult?: InventoryUsagePeriodClosurePreviewResponse | null;
@@ -53,6 +59,12 @@ export function InventoryUsagePeriodClosuresPanel({
   closures,
   loading,
   error,
+  page,
+  hasPrevious,
+  hasNext,
+  onPreviousPage,
+  onNextPage,
+  onLoadAllClosures,
   previewing,
   previewError,
   previewResult,
@@ -65,6 +77,7 @@ export function InventoryUsagePeriodClosuresPanel({
   const [periodStart, setPeriodStart] = useState(defaultPeriodStart);
   const [periodEnd, setPeriodEnd] = useState(defaultPeriodEnd);
   const [notes, setNotes] = useState("");
+  const [exportingClosures, setExportingClosures] = useState(false);
   const { locale, ui } = useAppTranslation();
   const formatNumber = (value: number | string | null | undefined, maximumFractionDigits = 2) => {
     if (value === null || value === undefined || value === "") return "—";
@@ -197,12 +210,19 @@ export function InventoryUsagePeriodClosuresPanel({
     );
   };
 
-  const handleExportClosuresCsv = () => {
-    if (!closures.length) {
+  const handleExportClosuresCsv = async () => {
+    if (exportingClosures) {
       return;
     }
 
-    const headers = [
+    setExportingClosures(true);
+    try {
+      const allClosures = await onLoadAllClosures();
+      if (!allClosures.length) {
+        return;
+      }
+
+      const headers = [
       "period_closure_id",
       "period_start",
       "period_end",
@@ -220,28 +240,31 @@ export function InventoryUsagePeriodClosuresPanel({
       "notes",
     ];
 
-    downloadCsv(
-      `inventory-usage-period-closures-${new Date().toISOString().slice(0, 10)}.csv`,
-      headers,
-      closures.map((closure) => ({
-        period_closure_id: closure.id,
-        period_start: closure.period_start,
-        period_end: closure.period_end,
-        usage_count: closure.usage_count ?? "",
-        total_quantity: closure.total_quantity ?? "",
-        estimated_usage_value: closure.estimated_usage_value ?? "",
-        currency_code: closure.currency_code || "",
-        exception_count: closure.exception_count ?? "",
-        reversed_count: closure.reversed_count ?? "",
-        follow_up_count: closure.follow_up_count ?? "",
-        closed_by:
-          closure.closed_by_user_name || closure.closed_by_user_id || ui("System"),
-        closed_by_user_id: closure.closed_by_user_id || "",
-        closed_at: closure.closed_at || "",
-        created_at: closure.created_at || "",
-        notes: closure.notes || "",
-      })),
-    );
+      downloadCsv(
+        `inventory-usage-period-closures-${new Date().toISOString().slice(0, 10)}.csv`,
+        headers,
+        allClosures.map((closure) => ({
+          period_closure_id: closure.id,
+          period_start: closure.period_start,
+          period_end: closure.period_end,
+          usage_count: closure.usage_count ?? "",
+          total_quantity: closure.total_quantity ?? "",
+          estimated_usage_value: closure.estimated_usage_value ?? "",
+          currency_code: closure.currency_code || "",
+          exception_count: closure.exception_count ?? "",
+          reversed_count: closure.reversed_count ?? "",
+          follow_up_count: closure.follow_up_count ?? "",
+          closed_by:
+            closure.closed_by_user_name || closure.closed_by_user_id || ui("System"),
+          closed_by_user_id: closure.closed_by_user_id || "",
+          closed_at: closure.closed_at || "",
+          created_at: closure.created_at || "",
+          notes: closure.notes || "",
+        })),
+      );
+    } finally {
+      setExportingClosures(false);
+    }
   };
 
   const handleSubmit = () => {
@@ -330,10 +353,10 @@ export function InventoryUsagePeriodClosuresPanel({
         <button
           type="button"
           style={styles.secondaryButton}
-          onClick={handleExportClosuresCsv}
-          disabled={!closures.length}
+          onClick={() => void handleExportClosuresCsv()}
+          disabled={exportingClosures}
         >
-          {ui("Export closures CSV")}
+          {exportingClosures ? ui("Exporting…") : ui("Export closures CSV")}
         </button>
         {currentPeriodAlreadyClosed ? (
           <span style={styles.warningText}>
@@ -421,8 +444,9 @@ export function InventoryUsagePeriodClosuresPanel({
       ) : !closures.length ? (
         <p style={styles.emptyState}>{ui("No usage periods have been closed yet.")}</p>
       ) : (
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
+        <>
+          <div style={styles.tableWrap}>
+            <table style={styles.table}>
             <thead>
               <tr>
                 <th style={styles.th}>{ui("Period")}</th>
@@ -466,9 +490,31 @@ export function InventoryUsagePeriodClosuresPanel({
                   <td style={styles.td}>{closure.notes || "-"}</td>
                 </tr>
               ))}
-            </tbody>
-          </table>
-        </div>
+              </tbody>
+            </table>
+          </div>
+          <div style={styles.inlineActions}>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={onPreviousPage}
+              disabled={!hasPrevious || loading}
+            >
+              {ui("Previous")}
+            </button>
+            <span style={styles.sectionDescription}>
+              {ui("Page")} {formatNumber(page, 0)}
+            </span>
+            <button
+              type="button"
+              style={styles.secondaryButton}
+              onClick={onNextPage}
+              disabled={!hasNext || loading}
+            >
+              {ui("Next")}
+            </button>
+          </div>
+        </>
       )}
     </section>
   );

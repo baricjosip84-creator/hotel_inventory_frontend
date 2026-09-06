@@ -40,7 +40,6 @@ type StockMovement = {
   user_id?: string | null;
   user_name?: string | null;
   created_at: string;
-  created_at_cursor?: string | null;
   package_id?: string | null;
   package_count_received?: number | string | null;
   package_name?: string | null;
@@ -190,14 +189,9 @@ function buildMovementParams(filters: FiltersState, paging?: { limit: number; of
 async function fetchStockMovements(
   filters: FiltersState,
   limit: number,
-  offset: number,
-  cursor?: { createdAt: string; id: string }
+  offset: number
 ): Promise<StockMovement[]> {
   const params = buildMovementParams(filters, { limit, offset });
-  if (cursor) {
-    params.set('cursor_created_at', cursor.createdAt);
-    params.set('cursor_id', cursor.id);
-  }
   return apiRequest<StockMovement[]>(`/stock/movements?${params.toString()}`);
 }
 
@@ -616,14 +610,12 @@ export default function StockMovementsPage() {
     setExportError('');
     try {
       const allRows: StockMovement[] = [];
-      let cursor: { createdAt: string; id: string } | undefined;
+      let offset = 0;
       for (;;) {
-        const batch = await fetchStockMovements(filters, 500, 0, cursor);
+        const batch = await fetchStockMovements(filters, 500, offset);
         allRows.push(...batch);
         if (batch.length < 500) break;
-        const last = batch[batch.length - 1];
-        if (!last?.created_at_cursor || !last.id) throw new Error(ui('Could not export the filtered movement ledger.'));
-        cursor = { createdAt: last.created_at_cursor, id: last.id };
+        offset += batch.length;
       }
       exportRows(allRows, locale, ui);
     } catch (error) {

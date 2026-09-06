@@ -1241,9 +1241,18 @@ export interface ProductCostSummary {
   latest_cost_at?: string | null;
 }
 
+export interface ProductHistoryPagination {
+  total: number | string;
+  limit: number | string;
+  offset: number | string;
+  returned: number | string;
+  has_more: boolean;
+}
+
 export interface ProductCostHistoryResponse {
   product: ProductItem;
   cost_summary?: ProductCostSummary;
+  pagination?: ProductHistoryPagination;
   cost_history: ProductCostHistoryItem[];
 }
 
@@ -1263,6 +1272,8 @@ export interface ProductStandardCostHistoryItem {
 export interface ProductStandardCostHistoryResponse {
   product: ProductItem;
   limit: number | string;
+  offset?: number | string;
+  pagination?: ProductHistoryPagination;
   standard_cost_history: ProductStandardCostHistoryItem[];
 }
 

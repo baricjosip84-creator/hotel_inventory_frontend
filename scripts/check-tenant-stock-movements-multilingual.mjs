@@ -78,10 +78,9 @@ for (const anchor of [
   "movement.product_name || ui(\"Historical Product name unavailable\")",
   "movement.storage_location_name || ui(\"Historical location unavailable\")",
   "disabled={isExporting || (summaryAvailable && totalRows === 0)}",
-  "params.set('cursor_created_at', cursor.createdAt)",
-  "params.set('cursor_id', cursor.id)",
-  "fetchStockMovements(filters, 500, 0, cursor)",
-  "cursor = { createdAt: last.created_at_cursor, id: last.id }",
+  "let offset = 0;",
+  "fetchStockMovements(filters, 500, offset)",
+  "offset += batch.length;",
   "ui('Reference')",
   "ui('Units per Package')",
   "movement.cost_source ? ui(costSourceLabel(movement.cost_source)) : ''",
@@ -100,7 +99,7 @@ for (const anchor of [
   "if (type === 'unproven_legacy') return UUID_TEXT_PATTERN.test(detail) ? ui('Legacy technical reason unavailable') : detail;",
   "const displayedDetail = safeReasonDetailDisplay(movement, ui);"
 ]) if (!page.includes(anchor)) fail(`Stock Movements audit-safe presentation contract missing: ${anchor}`);
-if (!process.exitCode) pass('Stock Movements preserves unknown/operator evidence and uses keyset-based export independent from summary health.');
+if (!process.exitCode) pass('Stock Movements preserves unknown/operator evidence and uses complete offset-paged export independent from summary health.');
 
 for (const forbidden of [
   'ui(humanizeCode(filters.reason))',
