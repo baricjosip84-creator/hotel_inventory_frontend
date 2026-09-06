@@ -504,3 +504,81 @@
     flex-direction: column;
   }
 }
+
+/* v3.49.160 — ownership, location, deadline, pagination and evidence controls. */
+.mobile-execution-hidden-file {
+  display: none;
+}
+
+.mobile-execution-scope-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mobile-execution-scope-button--active {
+  border-color: currentColor !important;
+  font-weight: 800 !important;
+  background: #f8fafc !important;
+}
+
+.mobile-execution-task-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mobile-execution-task-fact {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.mobile-execution-task-fact strong {
+  color: #0f172a;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.mobile-execution-due--overdue {
+  color: #b91c1c !important;
+}
+
+.mobile-execution-assignment-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.mobile-execution-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+@media (max-width: 720px) {
+  .mobile-execution-task-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-execution-scope-tabs,
+  .mobile-execution-pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mobile-execution-scope-tabs .button,
+  .mobile-execution-pagination .button {
+    width: 100%;
+  }
+}

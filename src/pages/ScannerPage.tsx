@@ -151,7 +151,25 @@ type ProductBarcodeLookupResponse = {
   };
 };
 
-type ScannerMode = 'shipment' | 'product';
+type TaskBarcodeVerifyResponse = {
+  verified: boolean;
+  task_id: string;
+  task_code?: string | null;
+  task_type?: string | null;
+  source_type?: string | null;
+  source_id?: string | null;
+  source_route?: string | null;
+  product_id: string;
+  product_name?: string | null;
+  product_unit?: string | null;
+  package_id?: string | null;
+  package_name?: string | null;
+  units_per_package?: number | null;
+  match_source?: string | null;
+  barcode_label_id?: string | null;
+};
+
+type ScannerMode = 'shipment' | 'product' | 'task';
 
 const MAX_SCANNED_CODE_LENGTH = 512;
 const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -185,6 +203,7 @@ function scannerResolutionError(error: unknown, mode: ScannerMode): string {
     return error.message;
   }
 
+  if (mode === 'task') return 'The barcode could not be verified against the selected execution task.';
   return mode === 'product'
     ? 'The barcode could not be resolved in the selected shipment.'
     : 'The shipment QR code could not be resolved.';
@@ -231,17 +250,34 @@ function shouldRetryWithSoftCameraConstraint(error: unknown): boolean {
 }
 
 function modeLabel(mode: ScannerMode): string {
-  return mode === 'product' ? 'Receiving Barcode Scanner' : 'Shipment QR Scanner';
+  if (mode === 'product') return 'Receiving Barcode Scanner';
+  if (mode === 'task') return 'Execution Task Scanner';
+  return 'Shipment QR Scanner';
 }
 
 function modeDescription(mode: ScannerMode): string {
-  return mode === 'product'
-    ? 'Scan a product, package, or inventory label barcode for the currently selected shipment.'
-    : 'Scan a shipment QR code to open that shipment directly.';
+  if (mode === 'product') return 'Scan a product, package, or inventory label barcode for the currently selected shipment.';
+  if (mode === 'task') return 'Scan a product, package, or inventory label to verify that it belongs to the selected execution task.';
+  return 'Scan a shipment QR code to open that shipment directly.';
+}
+
+function executionTaskSourceUrl(verification: TaskBarcodeVerifyResponse): string {
+  const route = verification.source_route || '/execution-tasks';
+  const sourceId = verification.source_id;
+  if (!sourceId) return route;
+
+  const params = new URLSearchParams();
+  if (verification.source_type === 'shipment') params.set('shipmentId', sourceId);
+  else if (verification.source_type === 'purchase_order') params.set('purchaseOrderId', sourceId);
+  else if (verification.source_type === 'reservation') params.set('reservationId', sourceId);
+  else if (verification.source_type === 'transfer') params.set('transferId', sourceId);
+  else return route;
+
+  return `${route}?${params.toString()}`;
 }
 
 function getFormatsToSupport(mode: ScannerMode): Html5QrcodeSupportedFormats[] {
-  if (mode === 'product') {
+  if (mode === 'product' || mode === 'task') {
     return [
       Html5QrcodeSupportedFormats.CODE_128,
       Html5QrcodeSupportedFormats.CODE_39,
@@ -279,10 +315,13 @@ export default function ScannerPage() {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
 
-  const mode = (searchParams.get('mode') === 'product' ? 'product' : 'shipment') as ScannerMode;
+  const requestedMode = searchParams.get('mode');
+  const mode = (requestedMode === 'product' || requestedMode === 'task' ? requestedMode : 'shipment') as ScannerMode;
   const shipmentId = searchParams.get('shipmentId') || '';
   const locationId = searchParams.get('locationId') || '';
+  const executionTaskId = searchParams.get('executionTaskId') || '';
   const canReceiveShipments = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_RECEIVE);
+  const canVerifyExecutionTasks = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_UPDATE) && hasPermission(TENANT_PERMISSIONS.PRODUCTS_READ);
   const isShipmentVerificationMode = mode === 'shipment' && Boolean(shipmentId);
   const shipmentContextQuery = useQuery({
     queryKey: ['scanner-shipment-context', shipmentId],
@@ -321,6 +360,15 @@ export default function ScannerPage() {
                 : shipmentOptionsQuery.isSuccess && !verifiedLocation
                   ? ui('The selected storage location is no longer available. Return to Shipments and choose another location.')
                   : null;
+  const taskModeUnavailableReason = mode !== 'task'
+    ? null
+    : !canVerifyExecutionTasks
+      ? ui('Execution-task update and Product read permissions are required for task barcode verification.')
+      : !executionTaskId
+        ? ui('Open the scanner from a Mobile Execution task so the task can be verified.')
+        : null;
+  const taskModeReady = mode !== 'task' || (canVerifyExecutionTasks && Boolean(executionTaskId));
+
   const shipmentVerificationUnavailableReason = !isShipmentVerificationMode
     ? null
     : shipmentContextQuery.isError
@@ -359,10 +407,11 @@ export default function ScannerPage() {
   const [sessionPackageCount, setSessionPackageCount] = useState(0);
   const [sessionUnitCount, setSessionUnitCount] = useState(0);
   const [lastReceivedMessage, setLastReceivedMessage] = useState<string | null>(null);
+  const [taskVerification, setTaskVerification] = useState<TaskBarcodeVerifyResponse | null>(null);
   const [isDecodingImage, setIsDecodingImage] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const scannerInputDisabled = isResolving || isReceivingScan || isDecodingImage || !productContextReady || !shipmentVerificationReady;
+  const scannerInputDisabled = isResolving || isReceivingScan || isDecodingImage || !productContextReady || !shipmentVerificationReady || !taskModeReady;
   const liveScannerDisabled = isRunning || isStartingCamera || scannerInputDisabled || Boolean(liveCameraUnavailableReason);
   const manualSubmitDisabled = scannerInputDisabled || !manualCode.trim();
 
@@ -540,6 +589,22 @@ export default function ScannerPage() {
     }
   };
 
+  const resolveExecutionTaskBarcode = async (decodedText: string) => {
+    if (!executionTaskId) throw new Error(ui('No execution task was selected for barcode verification.'));
+    const verified = await apiRequest<TaskBarcodeVerifyResponse>(
+      `/execution-tasks/${encodeURIComponent(executionTaskId)}/mobile-scan-verify`,
+      { method: 'POST', body: JSON.stringify({ barcode: decodedText }), skipMutationFeedback: true }
+    );
+    setTaskVerification(verified);
+    setSessionScanCount((count) => count + 1);
+    setResolvedProductName(verified.product_name || null);
+    setResolvedPackageName(verified.package_name || null);
+    setResolvedUnitsPerPackage(verified.units_per_package ? String(verified.units_per_package) : null);
+    setManualCode('');
+    setLastReceivedMessage(ui('Task item verified. Complete the real source workflow before completing the execution task.'));
+    playSuccessFeedback();
+  };
+
   const resolveDecodedValue = async (decodedText: string) => {
     if (scanInFlightRef.current) {
       return;
@@ -565,6 +630,7 @@ export default function ScannerPage() {
     setResolvedPackageName(null);
     setResolvedUnitsPerPackage(null);
     setResolvedLabel(null);
+    setTaskVerification(null);
     setLastReceivedMessage(null);
     setError(null);
     setIsResolving(true);
@@ -572,6 +638,8 @@ export default function ScannerPage() {
     try {
       if (mode === 'product') {
         await resolveProductBarcode(cleanValue);
+      } else if (mode === 'task') {
+        await resolveExecutionTaskBarcode(cleanValue);
       } else {
         await resolveShipmentCode(cleanValue);
       }
@@ -615,6 +683,10 @@ export default function ScannerPage() {
       setError(productModeUnavailableReason);
       return;
     }
+    if (taskModeUnavailableReason) {
+      setError(taskModeUnavailableReason);
+      return;
+    }
 
     if (liveCameraUnavailableReason) {
       setError(liveCameraUnavailableReason);
@@ -627,6 +699,7 @@ export default function ScannerPage() {
     setResolvedPackageName(null);
     setResolvedUnitsPerPackage(null);
     setResolvedLabel(null);
+    setTaskVerification(null);
     setIsStartingCamera(true);
 
     const availableWidth = typeof window === 'undefined'
@@ -634,7 +707,7 @@ export default function ScannerPage() {
       : Math.max(240, window.innerWidth - 72);
     const productScanWidth = Math.max(220, Math.min(360, availableWidth));
     const shipmentScanSize = Math.max(200, Math.min(280, availableWidth));
-    const scanConfig = mode === 'product'
+    const scanConfig = mode === 'product' || mode === 'task'
       ? {
           fps: 15,
           aspectRatio: 1.7777778,
@@ -822,7 +895,7 @@ export default function ScannerPage() {
         <OperationalSectionHeader
           iconPath="/scanner"
           title={ui("Scan controls")}
-          description={mode === 'product' ? ui("Scan a product or package barcode inside the selected shipment receiving context.") : ui("Scan a shipment QR code to open the matching shipment without changing stock.")}
+          description={mode === 'product' ? ui("Scan a product or package barcode inside the selected shipment receiving context.") : mode === 'task' ? ui("Verify the physical Product or package against the selected execution task before doing the real source-workflow action.") : ui("Scan a shipment QR code to open the matching shipment without changing stock.")}
         />
 
         {mode === 'product' ? (
@@ -866,6 +939,28 @@ export default function ScannerPage() {
           </div>
         ) : null}
 
+        {mode === 'task' && !taskModeUnavailableReason ? (
+          <div style={styles.contextPanel}>
+            <div style={styles.contextGrid}>
+              <div style={styles.contextCard}>
+                <div style={styles.contextLabel}>{ui('Execution task')}</div>
+                <div style={styles.contextValue}>{executionTaskId}</div>
+              </div>
+              <div style={styles.contextCard}>
+                <div style={styles.contextLabel}>{ui('Verification boundary')}</div>
+                <div style={styles.contextValue}>{ui('Scanning verifies the item belongs to this task. It does not perform the stock movement or source-workflow action.')}</div>
+              </div>
+              <div style={styles.contextCard}>
+                <div style={styles.contextLabel}>{ui('Return path')}</div>
+                <button type="button" onClick={() => navigate('/mobile-execution')} style={styles.inlineButton}>{ui('Back to Mobile Execution')}</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {mode === 'task' && taskModeUnavailableReason ? (
+          <div className="form-error">{taskModeUnavailableReason}</div>
+        ) : null}
         {mode === 'product' && productContextLoading ? (
           <div className="app-warning-state" style={styles.infoBanner}>{ui("Loading and verifying the selected receiving context…")}</div>
         ) : null}
@@ -889,7 +984,7 @@ export default function ScannerPage() {
         <div style={styles.statusStrip}>
           <div style={styles.statusItem}>
             <span style={styles.statusLabel}>{ui("Mode")}</span>
-            <strong>{mode === 'product' ? ui("Receiving barcode") : ui("Shipment QR lookup")}</strong>
+            <strong>{mode === 'product' ? ui("Receiving barcode") : mode === 'task' ? ui("Execution task barcode verification") : ui("Shipment QR lookup")}</strong>
           </div>
           <div style={styles.statusItem}>
             <span style={styles.statusLabel}>{ui("Camera")}</span>
@@ -927,9 +1022,11 @@ export default function ScannerPage() {
         <div style={mode === 'product' ? styles.operationNoticeWarn : styles.operationNoticeInfo}>
           {mode === 'product'
             ? ui("Simple product and package scans are received in this scanner session. Items that need serial, lot/batch, or expiry details open the shipment form so those controls are not bypassed.")
-            : isShipmentVerificationMode
-              ? ui("Verification mode only opens the selected shipment when its QR code matches. It does not change stock.")
-              : ui("Shipment QR lookup only opens the matching shipment. It does not change stock.")}
+            : mode === 'task'
+              ? ui("Task verification records that the scanned Product belongs to the selected execution task. The actual Transfer, Count, Reservation, Requisition, Replenishment, or Receiving workflow must still be completed in its source page.")
+              : isShipmentVerificationMode
+                ? ui("Verification mode only opens the selected shipment when its QR code matches. It does not change stock.")
+                : ui("Shipment QR lookup only opens the matching shipment. It does not change stock.")}
         </div>
 
         {mode === 'shipment' ? (
@@ -947,7 +1044,7 @@ export default function ScannerPage() {
         <details style={styles.helpDetails}>
           <summary style={styles.helpSummary}>{ui("Scanning help")}</summary>
           <div style={styles.helpBody}>
-            {mode === 'product' ? (
+            {mode === 'product' || mode === 'task' ? (
               <>
                 <div>{ui("Hold the barcode horizontally inside the wide scan area and avoid glare.")}</div>
                 <div>{ui("Move slightly farther back if a 1D barcode will not focus.")}</div>
@@ -964,13 +1061,13 @@ export default function ScannerPage() {
           <button
             onClick={() => void startScanner()}
             disabled={liveScannerDisabled}
-            title={productModeUnavailableReason || liveCameraUnavailableReason || undefined}
+            title={productModeUnavailableReason || taskModeUnavailableReason || liveCameraUnavailableReason || undefined}
             style={{
               ...styles.primaryButton,
               ...(liveScannerDisabled ? styles.disabledButton : {})
             }}
           >
-            {isStartingCamera ? ui("Starting Camera...") : isRunning ? ui("Scanner Running") : sessionScanCount > 0 && mode === 'product' ? ui("Scan Next Item") : ui("Start Camera Scanner")}
+            {isStartingCamera ? ui("Starting Camera...") : isRunning ? ui("Scanner Running") : sessionScanCount > 0 && (mode === 'product' || mode === 'task') ? ui("Scan Next Item") : ui("Start Camera Scanner")}
           </button>
 
           <button
@@ -1008,7 +1105,9 @@ export default function ScannerPage() {
           <div className="app-warning-state" style={styles.infoBanner}>
             {mode === 'product'
               ? ui("Resolving barcode in selected shipment...")
-              : ui("Resolving shipment from scanned QR code...")}
+              : mode === 'task'
+                ? ui('Verifying barcode against the selected execution task...')
+                : ui("Resolving shipment from scanned QR code...")}
           </div>
         ) : null}
 
@@ -1032,7 +1131,7 @@ export default function ScannerPage() {
             id="scanner-container"
             style={{
               ...styles.scannerContainer,
-              ...(mode === 'product' ? styles.scannerContainerWide : styles.scannerContainerSquare)
+              ...((mode === 'product' || mode === 'task') ? styles.scannerContainerWide : styles.scannerContainerSquare)
             }}
           />
         </div>
@@ -1071,9 +1170,9 @@ export default function ScannerPage() {
               spellCheck={false}
               enterKeyHint="go"
               onChange={(event) => setManualCode(event.target.value)}
-              placeholder={mode === 'product' ? ui("Enter product, package, or inventory-label barcode") : ui("Enter shipment QR text")}
+              placeholder={mode === 'product' || mode === 'task' ? ui("Enter product, package, or inventory-label barcode") : ui("Enter shipment QR text")}
               disabled={scannerInputDisabled}
-              title={productModeUnavailableReason || undefined}
+              title={productModeUnavailableReason || taskModeUnavailableReason || undefined}
               style={{
                 ...styles.input,
                 ...(scannerInputDisabled ? styles.disabledInput : {})
@@ -1090,8 +1189,8 @@ export default function ScannerPage() {
               data-skip-global-action-feedback="true"
               disabled={manualSubmitDisabled}
               title={
-                productModeUnavailableReason
-                  ? productModeUnavailableReason
+                productModeUnavailableReason || taskModeUnavailableReason
+                  ? (productModeUnavailableReason || taskModeUnavailableReason || undefined)
                   : !manualCode.trim()
                     ? ui("Enter a barcode first")
                     : undefined
@@ -1109,7 +1208,7 @@ export default function ScannerPage() {
               data-skip-global-action-feedback="true"
               onClick={handleChooseImage}
               disabled={scannerInputDisabled}
-              title={productModeUnavailableReason || undefined}
+              title={productModeUnavailableReason || taskModeUnavailableReason || undefined}
               style={{
                 ...styles.secondaryButton,
                 ...(scannerInputDisabled ? styles.disabledButton : {})
@@ -1175,6 +1274,13 @@ export default function ScannerPage() {
               </div>
             ) : null}
 
+            {taskVerification ? (
+              <div style={styles.resultCardSuccess}>
+                <div style={styles.resultLabel}>{ui('Verified execution task')}</div>
+                <div style={styles.resultValue}>{taskVerification.task_code || taskVerification.task_id}</div>
+              </div>
+            ) : null}
+
             {resolvedPackageName ? (
               <div style={styles.resultCardSuccess}>
                 <div style={styles.resultLabel}>{ui("Matched package")}</div>
@@ -1197,6 +1303,21 @@ export default function ScannerPage() {
               </div>
             ) : null}
           </div>
+
+          {taskVerification ? (
+            <div className="app-actions" style={styles.formActions}>
+              <button
+                type="button"
+                onClick={() => navigate(executionTaskSourceUrl(taskVerification))}
+                style={styles.primaryButton}
+              >
+                {ui('Open source workflow')}
+              </button>
+              <button type="button" onClick={() => navigate('/mobile-execution')} style={styles.secondaryButton}>
+                {ui('Back to Mobile Execution')}
+              </button>
+            </div>
+          ) : null}
         </section>
       ) : null}
     </div>
