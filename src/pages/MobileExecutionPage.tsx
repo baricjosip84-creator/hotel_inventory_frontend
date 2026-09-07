@@ -45,6 +45,7 @@ type MobileExecutionTask = {
   is_overdue?: boolean;
   is_due_soon?: boolean;
   step_label?: string | null;
+  step_label_key?: string | null;
   scan_supported?: boolean;
   scan_mode?: string | null;
   expected_product_count?: number;
@@ -173,6 +174,11 @@ function formatLabel(value?: string | null): string {
 function canonicalLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
   const raw = String(value || 'unknown');
   return ui(CANONICAL_LABELS[raw] || formatLabel(raw).replace(/^./, (character) => character.toUpperCase()));
+}
+
+function localizedSystemText(key: string | null | undefined, value: string | null | undefined, fallback: string, ui: (englishText: string) => string): string {
+  const text = String(value || '').trim();
+  return text ? (key ? ui(text) : text) : ui(fallback);
 }
 
 function formatDateTime(value: string | null | undefined, locale: AppLocale, ui: (englishText: string) => string): string {
@@ -585,7 +591,7 @@ export default function MobileExecutionPage() {
             const locationTo = task.compact_payload?.to_location;
             return <article className={`card mobile-execution-task-card mobile-execution-task-card--${urgencyClass}`} key={task.id}>
               <div className="mobile-execution-task-header"><div className="mobile-execution-task-lead"><span className={`mobile-execution-icon mobile-execution-icon--${urgencyClass}`}><TenantNavIcon path={task.source_route || '/execution-tasks'} size={17} /></span><div className="mobile-execution-task-heading"><div className="card__label">{canonicalLabel(task.status, ui)} · {task.task_code || ui('Execution task')}</div><h3>{task.title || ui('Untitled mobile task')}</h3></div></div><span className={`mobile-execution-urgency-pill mobile-execution-urgency-pill--${urgencyClass}`}>{canonicalLabel(task.urgency, ui)}</span></div>
-              <p className="card__subtext mobile-execution-task-summary">{task.description || task.step_label || ui('No task summary was provided.')}</p>
+              <p className="card__subtext mobile-execution-task-summary">{task.description || localizedSystemText(task.step_label_key, task.step_label, 'No task summary was provided.', ui)}</p>
 
               <div className="mobile-execution-task-facts">
                 <div className="mobile-execution-task-fact"><span className="card__label">{ui('Assigned to')}</span><strong>{assignment === 'mine' ? ui('You') : assignment === 'unassigned' ? ui('Unassigned') : task.assigned_to_name || ui('Another team member')}</strong></div>

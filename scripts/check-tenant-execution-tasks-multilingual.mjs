@@ -150,15 +150,16 @@ for (const forbidden of [
 if (!process.exitCode) pass('Technical CSV filenames and stored optimization request title remain canonical data.');
 
 for (const required of [
-  'task.task_code', 'task.title', 'task.description', 'task.step_label', 'task.blocked_reason', 'task.cancellation_reason', 'task.completion_note',
+  'task.task_code', 'task.title', 'task.description', 'task.step_label', 'task.step_label_key', 'task.blocked_reason', 'task.cancellation_reason', 'task.completion_note',
   'user.name', 'user.email', 'location.name', 'batch.batch_code', 'batch.title', 'item.recommendation', 'item.rationale',
   'row.action', 'String(value)', 'error.message',
 ]) if (!pageSource.includes(required)) fail(`Execution Tasks business/server-data evidence missing unexpectedly: ${required}`);
 for (const forbidden of [
-  'ui(task.title)', 'ui(task.description)', 'ui(task.step_label)', 'ui(task.blocked_reason)', 'ui(task.cancellation_reason)', 'ui(task.completion_note)',
+  'ui(task.title)', 'ui(task.description)', 'ui(task.blocked_reason)', 'ui(task.cancellation_reason)', 'ui(task.completion_note)',
   'ui(user.name)', 'ui(user.email)', 'ui(location.name)', 'ui(batch.title)', 'ui(item.recommendation)', 'ui(item.rationale)', 'ui(error.message)',
 ]) if (pageSource.includes(forbidden)) fail(`Execution Tasks translates business/server data unexpectedly: ${forbidden}`);
-if (!process.exitCode) pass('Task/batch/operator/location/recommendation/audit/error business and server data remain raw.');
+if (!pageSource.includes('task.step_label_key ? ui(task.step_label) : task.step_label')) fail('Execution Tasks mobile queue must localize only backend-owned keyed step labels.');
+if (!process.exitCode) pass('Task/batch/operator/location/recommendation/audit/error business data remain raw while keyed mobile step guidance is localized.');
 
 for (const required of [
   'Operational task queue', 'Task queue', 'Create operational task', 'Task detail', 'Management insights',

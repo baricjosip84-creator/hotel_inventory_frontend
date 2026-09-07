@@ -150,6 +150,7 @@ type MobileExecutionQueueTask = {
   is_overdue?: boolean;
   action_hint: string;
   step_label: string;
+  step_label_key?: string | null;
   scan_required: boolean;
   compact_payload: {
     product_name?: string | null;
@@ -1170,7 +1171,7 @@ export default function ExecutionTasksPage() {
               {mobileQueue?.tasks.map((task) => (
                 <button key={task.id} type="button" disabled={saving} onClick={() => void openTaskById(task.id)}>
                   <strong>{task.task_code} · {task.title}</strong>
-                  <span>{task.step_label} · {label(task.action_hint, ui)} {ui("· score")} {task.priority_score == null ? '—' : formatNumber(task.priority_score, locale)}</span>
+                  <span>{task.step_label_key ? ui(task.step_label) : task.step_label} · {label(task.action_hint, ui)} {ui("· score")} {task.priority_score == null ? '—' : formatNumber(task.priority_score, locale)}</span>
                   <span>{label(task.status, ui)} · {ui(task.scan_required ? 'Scan required' : 'No scan required')} · {dateTime(task.sla_due_at || task.due_at, locale, ui)}</span>
                 </button>
               )) ?? null}

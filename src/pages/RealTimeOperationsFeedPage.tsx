@@ -45,7 +45,9 @@ type TimelineItem = {
   urgency?: EventUrgency | string;
   priority_score?: number;
   title?: string;
+  title_key?: string | null;
   summary?: string | null;
+  summary_key?: string | null;
   correlation_id?: string | null;
   source_reference?: {
     source_type?: string | null;
@@ -53,6 +55,7 @@ type TimelineItem = {
   };
   source_surface?: string | null;
   recommended_next_step?: string | null;
+  recommended_next_step_key?: string | null;
   payload_material_present?: boolean;
   payload_material_redacted?: boolean;
   delivery_attempt_count?: number | null;
@@ -99,8 +102,11 @@ type RealTimeOperationsFeedResponse = {
     next_event_domain?: string | null;
     next_event_urgency?: string | null;
     coordination_guidance?: string;
+    coordination_guidance_key?: string | null;
     incident_timeline_guidance?: string;
+    incident_timeline_guidance_key?: string | null;
     disruption_guidance?: string;
+    disruption_guidance_key?: string | null;
     safety_contract?: Record<string, boolean>;
   };
   timeline?: TimelineItem[];
@@ -264,11 +270,24 @@ function formatDateTime(value: string | null | undefined, locale: AppLocale, ui:
   return Number.isNaN(date.getTime()) ? value : formatLocalizedDateTime(date, locale);
 }
 
+function localizedSystemText(key: string | null | undefined, value: string | null | undefined, fallback: string, ui: (englishText: string) => string): string {
+  const text = String(value || '').trim();
+  return text ? (key ? ui(text) : text) : ui(fallback);
+}
+
 function itemTitle(item: TimelineItem, ui: (englishText: string) => string): string {
   const title = String(item.title || '').trim();
-  if (title) return title;
+  if (title) return item.title_key ? ui(title) : title;
   if (item.event_type) return canonicalLabel(item.event_type, ui);
   return ui('Untitled item');
+}
+
+function itemSummary(item: TimelineItem, ui: (englishText: string) => string): string {
+  return localizedSystemText(item.summary_key, item.summary, 'No summary was provided.', ui);
+}
+
+function itemRecommendedNextStep(item: TimelineItem, ui: (englishText: string) => string): string {
+  return localizedSystemText(item.recommended_next_step_key, item.recommended_next_step, 'Open the source page and review the item there.', ui);
 }
 
 function itemSourceLabel(item: TimelineItem, ui: (englishText: string) => string): string {
@@ -335,8 +354,11 @@ function timelineItemTimestamp(item: TimelineItem): number | null {
 function timelineItemSearchText(item: TimelineItem, ui: (englishText: string) => string): string {
   return [
     item.title,
+    itemTitle(item, ui),
     item.summary,
+    itemSummary(item, ui),
     item.recommended_next_step,
+    itemRecommendedNextStep(item, ui),
     item.event_type,
     canonicalLabel(item.event_type, ui),
     item.event_status,
@@ -687,9 +709,9 @@ export default function RealTimeOperationsFeedPage() {
               ) : null}
               <div className="operations-feed-page__guidance-grid">
               <div className="operations-feed-page__guidance-item"><span className="operations-feed-page__guidance-icon"><TenantNavIcon path="/permissions" size={15} /></span><div><div className="operations-feed-page__guidance-title">{ui("Safe to review without editing")}</div><p className="card__subtext">{ui("This page does not replay events, publish messages, or update operational records.")}</p></div></div>
-              <div className="operations-feed-page__guidance-item"><span className="operations-feed-page__guidance-icon"><TenantNavIcon path="/workspace" size={15} /></span><div><div className="operations-feed-page__guidance-title">{ui("How to follow up")}</div><p className="card__subtext">{guidance.coordination_guidance || ui('Open the source page for the item and complete the work there.')}</p></div></div>
-              <div className="operations-feed-page__guidance-item"><span className="operations-feed-page__guidance-icon"><TenantNavIcon path="/real-time-operations-feed" size={15} /></span><div><div className="operations-feed-page__guidance-title">{ui("What the feed contains")}</div><p className="card__subtext">{guidance.incident_timeline_guidance || ui('The feed combines permitted work items and integration event summaries.')}</p></div></div>
-              <div className="operations-feed-page__guidance-item"><span className="operations-feed-page__guidance-icon"><TenantNavIcon path="/reliability-command" size={15} /></span><div><div className="operations-feed-page__guidance-title">{ui("When something is blocked or failed")}</div><p className="card__subtext">{guidance.disruption_guidance || ui('Review the source workflow and coordinate a human response.')}</p></div></div>
+              <div className="operations-feed-page__guidance-item"><span className="operations-feed-page__guidance-icon"><TenantNavIcon path="/workspace" size={15} /></span><div><div className="operations-feed-page__guidance-title">{ui("How to follow up")}</div><p className="card__subtext">{localizedSystemText(guidance.coordination_guidance_key, guidance.coordination_guidance, 'Open the source page for the item and complete the work there.', ui)}</p></div></div>
+              <div className="operations-feed-page__guidance-item"><span className="operations-feed-page__guidance-icon"><TenantNavIcon path="/real-time-operations-feed" size={15} /></span><div><div className="operations-feed-page__guidance-title">{ui("What the feed contains")}</div><p className="card__subtext">{localizedSystemText(guidance.incident_timeline_guidance_key, guidance.incident_timeline_guidance, 'The feed combines permitted work items and integration event summaries.', ui)}</p></div></div>
+              <div className="operations-feed-page__guidance-item"><span className="operations-feed-page__guidance-icon"><TenantNavIcon path="/reliability-command" size={15} /></span><div><div className="operations-feed-page__guidance-title">{ui("When something is blocked or failed")}</div><p className="card__subtext">{localizedSystemText(guidance.disruption_guidance_key, guidance.disruption_guidance, 'Review the source workflow and coordinate a human response.', ui)}</p></div></div>
               </div>
             </>
           )}
@@ -723,7 +745,7 @@ export default function RealTimeOperationsFeedPage() {
                     <span className={urgencyClass(item.urgency)}>{canonicalLabel(item.urgency, ui)}</span>
                   </div>
 
-                  <p className="card__subtext operations-feed-page__item-summary">{item.summary || ui('No summary was provided.')}</p>
+                  <p className="card__subtext operations-feed-page__item-summary">{itemSummary(item, ui)}</p>
 
                   <div className="operations-feed-page__badge-row">
                     {newItemIds.has(item.timeline_item_id) ? <span className="operations-feed-page__badge operations-feed-page__badge--new">{ui("New")}</span> : null}
@@ -733,7 +755,7 @@ export default function RealTimeOperationsFeedPage() {
                     {item.timeline_type === 'event_delivery_disruption' && item.next_retry_at ? <span className="operations-feed-page__badge operations-feed-page__badge--neutral">{ui("Next planned retry:")} {formatDateTime(item.next_retry_at, locale, ui)}</span> : null}
                   </div>
 
-                  <div className="operations-feed-page__next-step"><div className="card__label">{ui("Recommended next step")}</div><p className="card__subtext operations-feed-page__item-summary">{item.recommended_next_step || ui('Open the source page and review the item there.')}</p></div>
+                  <div className="operations-feed-page__next-step"><div className="card__label">{ui("Recommended next step")}</div><p className="card__subtext operations-feed-page__item-summary">{itemRecommendedNextStep(item, ui)}</p></div>
 
                   {canViewDiagnostics ? (
                     <details className="operations-feed-page__details"><summary><TenantNavIcon path="/system-context" size={14} />{ui("Technical event details")}</summary><dl className="operations-feed-page__details-grid"><dt>{ui("Timeline item")}</dt><dd>{item.timeline_item_id}</dd><dt>{ui("Correlation")}</dt><dd>{item.correlation_id || ui('Not reported')}</dd><dt>{ui("Priority score")}</dt><dd>{formatLocalizedNumber(numberValue(item.priority_score), locale)}</dd><dt>{ui("Source type")}</dt><dd>{item.source_reference?.source_type || ui('Not reported')}</dd><dt>{ui("Source record")}</dt><dd>{item.source_reference?.source_id || ui('Not reported')}</dd><dt>{ui("Payload information")}</dt><dd>{item.payload_material_redacted ? ui('Not included in this feed') : item.payload_material_present ? ui('Reported as present') : ui('Not reported')}</dd></dl></details>

@@ -122,20 +122,24 @@ for (const contract of routerContracts) if (!routerSource.includes(contract)) fa
 if (!process.exitCode) pass('Operations Feed route, query filters, source links, and permission contracts remain language-independent.');
 
 const serverContentContracts = [
-  'if (title) return title;', "item.summary || ui('No summary was provided.')",
-  "guidance.coordination_guidance || ui('Open the source page for the item and complete the work there.')",
-  "guidance.incident_timeline_guidance || ui('The feed combines permitted work items and integration event summaries.')",
-  "guidance.disruption_guidance || ui('Review the source workflow and coordinate a human response.')",
-  "item.recommended_next_step || ui('Open the source page and review the item there.')",
+  'title_key?: string | null', 'summary_key?: string | null', 'recommended_next_step_key?: string | null',
+  'coordination_guidance_key?: string | null', 'incident_timeline_guidance_key?: string | null', 'disruption_guidance_key?: string | null',
+  "return text ? (key ? ui(text) : text) : ui(fallback);",
+  'if (title) return item.title_key ? ui(title) : title;',
+  "return localizedSystemText(item.summary_key, item.summary, 'No summary was provided.', ui);",
+  "return localizedSystemText(item.recommended_next_step_key, item.recommended_next_step, 'Open the source page and review the item there.', ui);",
+  "localizedSystemText(guidance.coordination_guidance_key, guidance.coordination_guidance, 'Open the source page for the item and complete the work there.', ui)",
+  "localizedSystemText(guidance.incident_timeline_guidance_key, guidance.incident_timeline_guidance, 'The feed combines permitted work items and integration event summaries.', ui)",
+  "localizedSystemText(guidance.disruption_guidance_key, guidance.disruption_guidance, 'Review the source workflow and coordinate a human response.', ui)",
   'feedQuery.error instanceof ApiError ? feedQuery.error.message'
 ];
-for (const contract of serverContentContracts) if (!pageSource.includes(contract)) fail(`Operations Feed backend/business content display contract changed: ${contract}`);
+for (const contract of serverContentContracts) if (!pageSource.includes(contract)) fail(`Operations Feed keyed system/business content display contract changed: ${contract}`);
 const forbiddenServerContentTranslation = [
   'ui(item.title)', 'ui(item.summary)', 'ui(item.recommended_next_step)', 'ui(guidance.coordination_guidance)',
   'ui(guidance.incident_timeline_guidance)', 'ui(guidance.disruption_guidance)', 'ui(feedQuery.error.message)'
 ];
-for (const pattern of forbiddenServerContentTranslation) if (pageSource.includes(pattern)) fail(`Backend-returned Operations Feed content must not be blindly translated as a UI key: ${pattern}`);
-if (!process.exitCode) pass('Backend titles, summaries, guidance, recommended next steps, identifiers, and errors remain data while frontend-owned labels and fallbacks are localized.');
+for (const pattern of forbiddenServerContentTranslation) if (pageSource.includes(pattern)) fail(`Backend-returned Operations Feed content must not be blindly translated without a stable system key: ${pattern}`);
+if (!process.exitCode) pass('Operations Feed localizes backend-owned keyed system text while arbitrary business/source text, identifiers, and errors remain raw.');
 
 const readOnlyContracts = [
   'refetchOnReconnect: true', 'refetchOnWindowFocus: true', 'feedQuery.refetch()',
