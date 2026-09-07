@@ -563,6 +563,7 @@ export default function StockPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedProductId = searchParams.get('product_id')?.trim() || '';
+  const requestedStockId = searchParams.get('stock_id')?.trim() || '';
   const {
     canConsumeStock,
     canCountStock: canCount,
@@ -662,7 +663,7 @@ export default function StockPage() {
     setLocationFilter('all');
     setCategoryFilter('all');
     setStatusFilter('all');
-  }, [requestedProductId]);
+  }, [requestedProductId, requestedStockId]);
 
   const locationOptions = useMemo(() => {
     const values = new Map<string, string>();
@@ -691,6 +692,10 @@ export default function StockPage() {
 
     return rows
       .filter((row) => {
+        if (requestedStockId && row.id !== requestedStockId) {
+          return false;
+        }
+
         if (requestedProductId && row.product_id !== requestedProductId) {
           return false;
         }
@@ -739,9 +744,13 @@ export default function StockPage() {
 
         return leftName.localeCompare(rightName);
       });
-  }, [categoryFilter, locationFilter, requestedProductId, rows, searchText, statusFilter]);
+  }, [categoryFilter, locationFilter, requestedProductId, requestedStockId, rows, searchText, statusFilter]);
 
   const [selectedStockId, setSelectedStockId] = useState<string>('');
+  useEffect(() => {
+    if (!requestedStockId) return;
+    if (filteredRows.some((row) => row.id === requestedStockId)) setSelectedStockId(requestedStockId);
+  }, [filteredRows, requestedStockId]);
   const selectedRow = useMemo(
     () => filteredRows.find((row) => row.id === selectedStockId) ?? null,
     [filteredRows, selectedStockId]

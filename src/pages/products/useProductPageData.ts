@@ -5,9 +5,9 @@ import type { useProductPageQueries } from './productQueries';
 
 type ProductPageDataQueries = ReturnType<typeof useProductPageQueries>;
 
-export function useProductPageData(queries: ProductPageDataQueries, search: string) {
+export function useProductPageData(queries: ProductPageDataQueries, search: string, focusedProductId = '') {
   const allProducts = useMemo(() => queries.productsQuery.data ?? [], [queries.productsQuery.data]);
-  const products = useMemo(() => filterProductsBySearch(allProducts, search), [allProducts, search]);
+  const products = useMemo(() => focusedProductId ? allProducts.filter((product) => product.id === focusedProductId) : filterProductsBySearch(allProducts, search), [allProducts, focusedProductId, search]);
   const suppliers = useMemo(() => queries.suppliersQuery.data ?? [], [queries.suppliersQuery.data]);
   const packages = useMemo(() => queries.packagesQuery.data ?? [], [queries.packagesQuery.data]);
   const costHistory = useMemo(

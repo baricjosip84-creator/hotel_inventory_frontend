@@ -32,6 +32,7 @@ export function useProductPageState() {
     return isProductWorkspaceView(requestedView) ? requestedView : 'catalog';
   });
   const [search, setSearch] = useState(() => searchParams.get('search')?.trim() || '');
+  const [focusedProductId, setFocusedProductId] = useState(() => searchParams.get('product_id')?.trim() || '');
   const [categoryFilter, setCategoryFilter] = useState(() => searchParams.get('category')?.trim() || '');
   const [supplierFilter, setSupplierFilter] = useState(() => searchParams.get('supplier_id')?.trim() || '');
   const [costStatusFilter, setCostStatusFilter] = useState(() => searchParams.get('cost_status')?.trim() || '');
@@ -63,6 +64,7 @@ export function useProductPageState() {
       const requestedView = searchParams.get('view');
       setWorkspaceView(isProductWorkspaceView(requestedView) ? requestedView : 'catalog');
       setSearch(searchParams.get('search')?.trim() || '');
+      setFocusedProductId(searchParams.get('product_id')?.trim() || '');
       setCategoryFilter(searchParams.get('category')?.trim() || '');
       setSupplierFilter(searchParams.get('supplier_id')?.trim() || '');
       setCostStatusFilter(searchParams.get('cost_status')?.trim() || '');
@@ -81,6 +83,7 @@ export function useProductPageState() {
 
     setOrDelete('view', workspaceView, 'catalog');
     setOrDelete('search', search);
+    setOrDelete('product_id', focusedProductId);
     setOrDelete('category', categoryFilter);
     setOrDelete('supplier_id', supplierFilter);
     setOrDelete('cost_status', costStatusFilter);
@@ -96,6 +99,7 @@ export function useProductPageState() {
     costBasisFilter,
     costStatusFilter,
     costVarianceStatusFilter,
+    focusedProductId,
     search,
     searchParams,
     setSearchParams,
@@ -108,6 +112,8 @@ export function useProductPageState() {
     setWorkspaceView,
     search,
     setSearch,
+    focusedProductId,
+    setFocusedProductId,
     categoryFilter,
     setCategoryFilter,
     supplierFilter,

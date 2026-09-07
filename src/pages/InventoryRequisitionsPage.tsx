@@ -2,6 +2,7 @@ import { getActiveTenantCurrency } from '../lib/tenantCurrency';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
@@ -1438,6 +1439,8 @@ function formFromRequisition(requisition: InventoryRequisition): RequisitionForm
 
 export default function InventoryRequisitionsPage() {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const requestedRequisitionId = searchParams.get('requisitionId')?.trim() || searchParams.get('requisition_id')?.trim() || '';
   const { locale, ui } = useAppTranslation();
   const formatDateTime = (value: string | null | undefined): string => {
     if (!value) return '-';
@@ -1499,7 +1502,10 @@ export default function InventoryRequisitionsPage() {
   const [productCategoryFilter, setProductCategoryFilter] = useState('');
   const [queueSearch, setQueueSearch] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => requestedRequisitionId || null);
+  useEffect(() => {
+    if (requestedRequisitionId) setSelectedId(requestedRequisitionId);
+  }, [requestedRequisitionId]);
   const [form, setForm] = useState<RequisitionFormState>(() => emptyForm());
   const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
   const [editingDraftVersion, setEditingDraftVersion] = useState<number | string | null>(null);

@@ -141,6 +141,7 @@ export default function StorageLocationsPage() {
   const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const requestedLocationId = searchParams.get('location_id')?.trim() || '';
   const { canManageStorageLocations } = getRoleCapabilities();
   const canReadStock = hasPermission(TENANT_PERMISSIONS.STOCK_READ);
   const accessRoleLabel = getCurrentAccessRoleLabel();
@@ -233,6 +234,7 @@ export default function StorageLocationsPage() {
   }, [locations]);
 
   const filteredLocations = useMemo(() => {
+    if (requestedLocationId) return locations.filter((location) => location.id === requestedLocationId);
     const normalizedSearch = normalizeText(search);
     const normalizedZone = normalizeText(zoneFilter);
 
@@ -248,7 +250,7 @@ export default function StorageLocationsPage() {
       })
       .sort((left, right) => left.rank - right.rank || left.location.name.localeCompare(right.location.name))
       .map(({ location }) => location);
-  }, [locations, search, zoneFilter]);
+  }, [locations, requestedLocationId, search, zoneFilter]);
 
   const summary = useMemo(() => {
     const withStock = canReadStock

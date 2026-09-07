@@ -252,6 +252,7 @@ export default function SuppliersPage() {
   const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const requestedSupplierId = searchParams.get('supplier_id')?.trim() || '';
 
   const { canManageSuppliers } = getRoleCapabilities();
   const canViewShipmentPerformance = hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ);
@@ -376,6 +377,7 @@ export default function SuppliersPage() {
   const slaBreaches = useMemo(() => normalizeBreaches(slaBreachesQuery.data), [slaBreachesQuery.data]);
 
   const filteredSuppliers = useMemo(() => {
+    if (requestedSupplierId) return suppliers.filter((supplier) => supplier.id === requestedSupplierId);
     const normalizedSearch = search.trim().toLocaleLowerCase();
     if (!normalizedSearch) return suppliers;
 
@@ -387,7 +389,7 @@ export default function SuppliersPage() {
       .filter((entry) => Number.isFinite(entry.rank))
       .sort((left, right) => left.rank - right.rank || left.supplier.name.localeCompare(right.supplier.name))
       .map((entry) => entry.supplier);
-  }, [search, suppliers]);
+  }, [requestedSupplierId, search, suppliers]);
 
   const summary = useMemo(() => {
     const withEmail = suppliers.filter(

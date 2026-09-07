@@ -43,7 +43,7 @@ export function useProductPageViewModel() {
     costActionDetailFilters: productPageState.costActionDetailFilters
   });
 
-  const productPageData = useProductPageData(queries, productPageState.search);
+  const productPageData = useProductPageData(queries, productPageState.search, productPageState.focusedProductId);
 
   const productPageActions = useProductPageActions({
     queryClient,
