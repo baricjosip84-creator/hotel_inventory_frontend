@@ -42,9 +42,22 @@ const canonicalStart = pageSource.indexOf('const CANONICAL_LABELS');
 const canonicalEnd = pageSource.indexOf('const REVIEW_SECTIONS', canonicalStart + 1);
 if (canonicalStart < 0 || canonicalEnd <= canonicalStart) fail('Unable to isolate Cross-Domain canonical label block.');
 else for (const match of pageSource.slice(canonicalStart, canonicalEnd).matchAll(/: '([^']+)'/g)) dynamicKeys.add(match[1]);
-const missing = [...new Set([...literals, ...dynamicKeys].filter((key) => !unique.has(key)))];
+const displayKeys = [...new Set([...literals, ...dynamicKeys])];
+const missing = displayKeys.filter((key) => !unique.has(key));
 if (missing.length) fail(`Cross-Domain Optimization display keys missing catalog rows: ${missing.join(' | ')}`);
-else pass(`${new Set(literals).size + dynamicKeys.size} Cross-Domain Optimization display keys are catalog-backed.`);
+else pass(`${displayKeys.length} Cross-Domain Optimization display keys are catalog-backed.`);
+
+const rowsByEnglishKey = new Map(rows.map((row) => [row[0], row]));
+const untranslatedPlaceholders = displayKeys.filter((key) => {
+  const row = rowsByEnglishKey.get(key);
+  if (!row || key.length < 4 || !/[A-Za-z]/.test(key)) return false;
+  return row.slice(1).every((translated) => translated === row[0]);
+});
+if (untranslatedPlaceholders.length) {
+  fail(`Cross-Domain Optimization contains English placeholder translations in all five locale columns: ${untranslatedPlaceholders.join(' | ')}`);
+} else {
+  pass('Cross-Domain Optimization has no substantial display key duplicated as English across all five locale columns.');
+}
 
 const rawText = pageSource.split(/\r?\n/).flatMap((line) => {
   const matches = [...line.matchAll(/<(?:h[1-6]|p|th|td|summary|span|option|button|label)\b[^>]*>\s*([A-Za-z][^<>{}]*)\s*</g)];
