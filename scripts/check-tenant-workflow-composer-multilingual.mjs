@@ -134,9 +134,9 @@ for (const contract of routerContracts) if (!routerSource.includes(contract)) fa
 if (!process.exitCode) pass('Workflow Composer route, query filters, source links, permissions, and blueprint identifiers remain language-independent.');
 
 const serverContentContracts = [
-  "blueprint.source_action_domain === 'alerts' ? displayTitleText(blueprint.source_title) : blueprint.source_title",
+  "blueprint.source_title_key ? ui(blueprint.source_title) : blueprint.source_action_domain === 'alerts' ? displayTitleText(blueprint.source_title) : blueprint.source_title",
   "return `${ui('Integration plan:')} ${workflowDomainLabel(blueprint.workflow_domain, ui)}`;",
-  'if (blueprint.source_summary) return blueprint.source_summary;',
+  'if (blueprint.source_summary) return blueprint.source_summary_key ? ui(blueprint.source_summary) : blueprint.source_summary;',
   'nextBlueprintTitle(guidance, blueprints, ui)',
   'localizedGuidance(guidance.composer_guidance_key, guidance.composer_guidance',
   'localizedGuidance(guidance.approval_chain_guidance_key, guidance.approval_chain_guidance',
@@ -151,7 +151,7 @@ const serverContentContracts = [
 for (const contract of serverContentContracts) if (!pageSource.includes(contract)) fail(`Workflow Composer backend/business content display contract changed: ${contract}`);
 if (pageSource.includes('blueprint.source_contract_key ? formatLabel')) fail('Workflow Composer must not use technical contract keys as normal-user plan titles.');
 const forbiddenServerContentTranslation = [
-  'ui(blueprint.source_title)', 'ui(blueprint.source_summary)', 'ui(guidance.next_blueprint_title)', 'ui(guidance.composer_guidance)',
+  'ui(guidance.next_blueprint_title)', 'ui(guidance.composer_guidance)',
   'ui(guidance.approval_chain_guidance)', 'ui(guidance.event_trigger_guidance)', 'ui(guidance.integration_routing_guidance)',
   'ui(composerQuery.error.message)'
 ];

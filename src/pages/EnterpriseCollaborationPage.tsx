@@ -43,7 +43,9 @@ type CollaborationThread = {
   thread_type?: string;
   urgency?: string;
   title?: string;
+  title_key?: string | null;
   summary?: string | null;
+  summary_key?: string | null;
   coordination_reason?: {
     text?: string | null;
     key?: string | null;
@@ -212,6 +214,9 @@ const DOMAIN_LABELS: Record<string, string> = {
   execution: 'Execution',
   control_tower: 'Control tower',
   decision_intelligence: 'Decision intelligence',
+  probabilistic_forecast_model: 'Probabilistic forecast',
+  adaptive_policy_recommendation: 'Adaptive policy recommendation',
+  ai_copilot_run: 'AI Copilot analysis',
   ai_governance: 'AI governance',
   event_coordination: 'Operational events',
   multi_domain: 'Multiple areas'
@@ -242,6 +247,9 @@ const BUSINESS_AREA_LABELS: Record<string, string> = {
   execution: 'Execution',
   control_tower: 'Control tower',
   decision_intelligence: 'Decision intelligence',
+  probabilistic_forecast_model: 'Probabilistic forecast',
+  adaptive_policy_recommendation: 'Adaptive policy recommendation',
+  ai_copilot_run: 'AI Copilot analysis',
   ai_governance: 'AI governance',
   ai_review_escalation: 'Intelligence review',
   remediation_workflow: 'Remediation',
@@ -667,8 +675,8 @@ export default function EnterpriseCollaborationPage() {
                     </div>
 
                     <div className="collaboration-thread-copy">
-                      <h3>{thread.title || ui('Coordination item')}</h3>
-                      <p className="card__subtext">{thread.summary || ui('No additional summary was provided.')}</p>
+                      <h3>{thread.title ? localizedSystemGuidance(thread.title_key, thread.title, 'Coordination item', ui) : ui('Coordination item')}</h3>
+                      <p className="card__subtext">{thread.summary ? localizedSystemGuidance(thread.summary_key, thread.summary, 'No additional summary was provided.', ui) : ui('No additional summary was provided.')}</p>
                     </div>
 
                     <div className="collaboration-guidance-block collaboration-guidance-block--reason">

@@ -106,7 +106,7 @@ for (const required of [
   'foundation.completion_definition || ui(',
   "item.recommendation_label || `${ui('Recommendation')} ${formatLocalizedNumber(index + 1, locale)}`", '<td>{formatLabel(item.learning_domain)}</td>',
   "item.outcome_label || `${ui('Recorded item')} ${formatLocalizedNumber(index + 1, locale)}`", "item.recommendation_label || ui('Recommendation')",
-  '<td>{formatLabel(item.learning_signal)}</td>', '<td>{formatLabel(item.learning_action_owner)}</td>', '<td>{formatLabel(item.escalation_reason)}</td>',
+  '<td>{formatLabel(item.learning_signal)}</td>', '<td>{learningOwnerLabel(item.learning_action_owner, ui, locale)}</td>', '<td>{formatLabel(item.escalation_reason)}</td>',
   "{ui('Next phase:')} {formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.next_phase)}",
   "{ui('Implemented capabilities:')} {(foundation.recommendation_outcome_phase_a_closure_evidence.implemented_capabilities || []).map(formatLabel).join(', ')}",
   "formatLabel(blocker.blocker_label || blocker.blocker_key || 'blocker')",

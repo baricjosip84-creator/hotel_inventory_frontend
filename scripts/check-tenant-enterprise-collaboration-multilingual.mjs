@@ -31,8 +31,8 @@ for(const required of ['const { locale, ui } = useAppTranslation();','formatLoca
 if(!process.exitCode)pass('Recommendation counts, limits, summary metrics, and timestamps use the tenant locale.');
 for(const required of [
   'collaborationQuery.error.message',
-  'thread.title || ui(',
-  'thread.summary || ui(',
+  "localizedSystemGuidance(thread.title_key, thread.title, 'Coordination item', ui)",
+  "localizedSystemGuidance(thread.summary_key, thread.summary, 'No additional summary was provided.', ui)",
   'localizedSystemGuidance(guidance.collaboration_guidance_key, guidance.collaboration_guidance,',
   'localizedSystemGuidance(thread.coordination_context?.recommended_next_step_key, thread.coordination_context?.recommended_next_step,',
   'localizedSystemGuidance(guidance.escalation_thread_guidance_key, guidance.escalation_thread_guidance,',

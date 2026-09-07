@@ -41,7 +41,9 @@ type WorkflowBlueprint = {
   source_contract_id?: string;
   source_contract_key?: string;
   source_title?: string | null;
+  source_title_key?: string | null;
   source_summary?: string | null;
+  source_summary_key?: string | null;
   source_action_domain?: string | null;
   source_action_type?: string | null;
   workflow_domain?: string;
@@ -347,7 +349,7 @@ function displayTitleText(value?: string | null): string {
 
 function sourceTitle(blueprint: WorkflowBlueprint, ui: (englishText: string) => string): string {
   if (blueprint.source_title) {
-    return blueprint.source_action_domain === 'alerts' ? displayTitleText(blueprint.source_title) : blueprint.source_title;
+    return blueprint.source_title_key ? ui(blueprint.source_title) : blueprint.source_action_domain === 'alerts' ? displayTitleText(blueprint.source_title) : blueprint.source_title;
   }
   if (blueprint.blueprint_type === 'external_workflow_visibility_contract') {
     return `${ui('Integration plan:')} ${workflowDomainLabel(blueprint.workflow_domain, ui)}`;
@@ -356,7 +358,7 @@ function sourceTitle(blueprint: WorkflowBlueprint, ui: (englishText: string) => 
 }
 
 function sourceDescription(blueprint: WorkflowBlueprint, ui: (englishText: string) => string): string {
-  if (blueprint.source_summary) return blueprint.source_summary;
+  if (blueprint.source_summary) return blueprint.source_summary_key ? ui(blueprint.source_summary) : blueprint.source_summary;
   if (blueprint.blueprint_type === 'external_workflow_visibility_contract') {
     return ui('A read-only plan showing how an approved external integration could be reviewed and governed.');
   }

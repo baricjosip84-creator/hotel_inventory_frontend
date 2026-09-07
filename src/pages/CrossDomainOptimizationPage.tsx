@@ -346,7 +346,7 @@ function ReviewCard({ config, section }: { config: ReviewConfig; section?: Optim
         <div className="cross-domain-check-list">
           {checks.map((check, index) => (
             <article className="cross-domain-check" key={`${config.title}-${index}`}>
-              <div><strong>{String(check.check_label || check.label || check.check_key || ui('Review check'))}</strong><p>{String(check.manual_resolution || check.required_next_step || '')}</p></div>
+              <div><strong>{check.check_label || check.label ? ui(String(check.check_label || check.label)) : ui('Review check')}</strong><p>{check.manual_resolution || check.required_next_step ? ui(String(check.manual_resolution || check.required_next_step)) : ''}</p></div>
               <StatusBadge value={String(check.check_status || (check.passed === true ? 'ready' : 'blocked'))} />
             </article>
           ))}

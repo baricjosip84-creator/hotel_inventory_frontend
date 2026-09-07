@@ -3596,7 +3596,9 @@ type HumanAIReview = {
   review_state?: string;
   urgency?: string;
   title?: string;
+  title_key?: string | null;
   summary?: string | null;
+  summary_key?: string | null;
   proposal_request_type?: string | null;
   proposal_title?: string | null;
   confidence_visualization?: {
@@ -9188,8 +9190,8 @@ export default function HumanInLoopAIReviewPage() {
                     <span className="ai-review-page__badge ai-review-page__badge--violet">{recommendationLabel(review.ai_operation_domain, ui)}</span>
                     {review.governance_approval_guidance?.approval_required && reviewStateIsActive(lifecycle?.current_status || review.review_state) ? <span className="ai-review-page__badge ai-review-page__badge--amber">{ui("Approval required")}</span> : null}
                   </div>
-                  <div className="ai-review-page__review-heading"><span className="ai-review-page__review-icon ai-review-page__icon--violet"><TenantNavIcon path="/intelligence-review" size={18} /></span><h3>{review.title || ui('Intelligence review')}</h3></div>
-                  <p className="card__subtext">{review.summary || ui('No review summary was provided.')}</p>
+                  <div className="ai-review-page__review-heading"><span className="ai-review-page__review-icon ai-review-page__icon--violet"><TenantNavIcon path="/intelligence-review" size={18} /></span><h3>{review.title ? (review.title_key ? ui(review.title) : review.title) : ui('Intelligence review')}</h3></div>
+                  <p className="card__subtext">{review.summary ? (review.summary_key ? ui(review.summary) : review.summary) : ui('No review summary was provided.')}</p>
                   <div className="card-grid ai-review-page__evidence-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', marginTop: 12 }}>
                     <div className="ai-review-page__evidence-card">
                       <div className="card__label">{ui("Source confidence")}</div>

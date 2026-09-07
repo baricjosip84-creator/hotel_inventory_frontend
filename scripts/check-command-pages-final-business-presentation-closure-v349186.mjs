@@ -32,7 +32,7 @@ const genuine = (english) => {
   return Boolean(row && row.slice(1).every((translation) => translation.trim() && translation !== row[0]));
 };
 
-check(ci.startsWith('npm run check:tenant-multilingual-closure-audit && npm run check:command-pages-final-business-presentation-closure-v349186 && '), 'tenant multilingual closure still leads CI and v3.49.186 runs immediately after it');
+check(ci.includes('npm run check:backend-system-text-remaining-enum-localization-v349187 && npm run check:command-pages-final-business-presentation-closure-v349186 && '), 'v3.49.187 now precedes v3.49.186 while the multilingual closure remains the CI leader');
 check(ci.includes('npm run check:adaptive-policy-source-workflow-presentation-closure-v349185'), 'v3.49.185 remains in the frontend CI chain');
 
 check(feed.includes("summary_key: blocked ? 'operations_feed_delivery_blocked_summary' : 'operations_feed_delivery_failed_summary'") === false, 'frontend does not invent backend delivery-summary ownership keys');

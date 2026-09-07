@@ -131,15 +131,15 @@ for (const contract of routerContracts) if (!routerSource.includes(contract)) fa
 if (!process.exitCode) pass('Recommendation query filters, lifecycle mutations, route, and permission contracts remain language-independent.');
 
 const serverDataContracts = [
-  "<h3>{review.title || ui('Intelligence review')}</h3>", "review.summary || ui('No review summary was provided.')",
+  "<h3>{review.title ? (review.title_key ? ui(review.title) : review.title) : ui('Intelligence review')}</h3>", "review.summary ? (review.summary_key ? ui(review.summary) : review.summary) : ui('No review summary was provided.')",
   'localizedReviewEvidenceSummary(evidencePreview, locale, ui)',
   "localizedIntelligenceReviewSystemText(guidance.review_queue_guidance_key, guidance.review_queue_guidance, 'Review source confidence, explainability, structured evidence, and approval requirements before acting elsewhere.', ui)",
-  "review.explainability_review.primary_factors.map(formatLabel).join(' · ')", 'lifecycle.reviewer_notes', 'lifecycle.override_reason',
+  "review.explainability_review.primary_factors.map((factor) => explainabilityFactorLabel(factor, ui)).join(' · ')", 'lifecycle.reviewer_notes', 'lifecycle.override_reason',
   'error instanceof Error ? error.message', 'reviewHistoryQuery.error instanceof Error ? reviewHistoryQuery.error.message'
 ];
 for (const contract of serverDataContracts) if (!pageSource.includes(contract)) fail(`Recommendation backend/business-data display boundary changed: ${contract}`);
 const forbiddenServerTranslation = [
-  'ui(review.title)', 'ui(review.summary)', 'ui(evidencePreview.preview_summary)', 'ui(guidance.review_queue_guidance)',
+  'ui(evidencePreview.preview_summary)', 'ui(guidance.review_queue_guidance)',
   'ui(lifecycle.reviewer_notes)', 'ui(lifecycle.override_reason)', 'ui(error.message)', 'ui(reviewHistoryQuery.error.message)'
 ];
 for (const pattern of forbiddenServerTranslation) if (pageSource.includes(pattern)) fail(`Backend-returned review/business content must not be blindly translated: ${pattern}`);

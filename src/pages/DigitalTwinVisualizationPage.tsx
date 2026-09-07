@@ -268,6 +268,7 @@ const STATUS_LABELS: Record<string, string> = {
   review_required: 'Review required',
   mitigation_review_required: 'Mitigation review required',
   stale: 'Stale',
+  validated: 'Validated',
   archived: 'Archived'
 };
 

@@ -384,6 +384,145 @@ function copilotSystemLabel(value: string | null | undefined, ui: UiTranslator):
 
 type UiTranslator = (englishText: string) => string;
 
+
+const COPILOT_EVIDENCE_KIND_LABELS: Record<string, string> = {
+  unresolved_alerts: 'Unresolved alerts',
+  low_stock_products: 'Low-stock products',
+  late_shipments: 'Late shipments',
+  open_execution_requests: 'Open Execution Requests',
+  supplier_performance: 'Supplier performance',
+  product: 'Product'
+};
+
+function copilotEvidenceKindLabel(value: string | null | undefined, ui: UiTranslator): string {
+  if (!value) return ui('Evidence');
+  const canonical = COPILOT_EVIDENCE_KIND_LABELS[value];
+  return canonical ? ui(canonical) : ui('Evidence');
+}
+
+function copilotRecord(value: unknown): Record<string, any> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
+}
+
+function copilotNumber(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function fillCopilotTemplate(template: string, values: Record<string, string | number>): string {
+  return Object.entries(values).reduce((text, [key, value]) => text.replaceAll(`{${key}}`, String(value)), template);
+}
+
+function localRulesPresentation(run: CopilotRun | null | undefined, ui: UiTranslator, locale: AppLocale): { answer: string; highlights: string[] } | null {
+  if (!run || !String(run.provider || '').startsWith('local_rules')) return null;
+  const context = copilotRecord(run.context_snapshot);
+  const product = copilotRecord(context.product);
+  const proposal = run.proposal_snapshot || null;
+  const unit = String(product.unit || proposal?.payload?.unit || '').trim();
+  const n = (value: unknown) => formatLocalizedNumber(copilotNumber(value), locale, { maximumFractionDigits: 2 });
+
+  if (run.intent === 'operational_priority_summary') {
+    const totals = copilotRecord(context.section_totals);
+    const sections = copilotRecord(context.sections);
+    const count = (key: string) => n(totals[key] ?? (Array.isArray(sections[key]) ? sections[key].length : 0));
+    return {
+      answer: fillCopilotTemplate(ui('Permitted operational evidence shows {alerts} unresolved alerts, {lowStock} low-stock products, {lateShipments} late open shipments, and {requests} open Execution Requests.'), {
+        alerts: count('unresolved_alerts'), lowStock: count('low_stock_products'), lateShipments: count('late_shipments'), requests: count('open_execution_requests')
+      }),
+      highlights: [
+        fillCopilotTemplate(ui('{count} unresolved alerts'), { count: count('unresolved_alerts') }),
+        fillCopilotTemplate(ui('{count} low-stock products'), { count: count('low_stock_products') }),
+        fillCopilotTemplate(ui('{count} late open shipments'), { count: count('late_shipments') }),
+        fillCopilotTemplate(ui('{count} open Execution Requests'), { count: count('open_execution_requests') })
+      ]
+    };
+  }
+
+  if (run.intent === 'supplier_performance_summary') {
+    const suppliers = Array.isArray(context.suppliers) ? context.suppliers.map(copilotRecord) : [];
+    const supplier = suppliers[0] || {};
+    const supplierName = String(supplier.name || ui('No supplier evidence available'));
+    const pct = (value: unknown) => typeof value === 'number' || Number.isFinite(Number(value))
+      ? formatLocalizedNumber(Number(value), locale, { style: 'percent', maximumFractionDigits: 1 })
+      : ui('Not enough evidence');
+    return {
+      answer: suppliers.length
+        ? fillCopilotTemplate(ui('The recent supplier comparison includes {count} suppliers. {supplier} currently needs the most review attention based on permitted delivery and receiving evidence.'), { count: n(suppliers.length), supplier: supplierName })
+        : ui('No supplier shipment evidence is available for comparison.'),
+      highlights: suppliers.length ? [
+        fillCopilotTemplate(ui('{count} suppliers compared'), { count: n(suppliers.length) }),
+        fillCopilotTemplate(ui('{supplier}: {rate} late-delivery rate'), { supplier: supplierName, rate: pct(supplier.late_delivery_rate_90d) }),
+        fillCopilotTemplate(ui('{supplier}: {rate} on-time rate'), { supplier: supplierName, rate: pct(supplier.on_time_delivery_rate_90d) }),
+        fillCopilotTemplate(ui('{supplier}: {count} shipments measured'), { supplier: supplierName, count: n(supplier.shipments_90d) })
+      ] : [ui('No supplier shipment evidence is available for comparison.')]
+    };
+  }
+
+  if (run.intent === 'product_replenishment_plan') {
+    const recommendation = copilotRecord(context.minimum_stock_recommendation);
+    const plan = copilotRecord(context.replenishment_plan);
+    const productName = String(product.name || proposal?.payload?.product_name || ui('Product'));
+    return {
+      answer: fillCopilotTemplate(ui('{product} has a governed minimum-stock recommendation of {minimum} {unit}. The separate replenishment plan recommends ordering {order} {unit}. This analysis does not create a Purchase Order.'), {
+        product: productName, minimum: n(recommendation.recommended_min_stock), order: n(plan.recommended_reorder_quantity), unit
+      }),
+      highlights: [
+        fillCopilotTemplate(ui('Current stock: {value}'), { value: n(plan.current_stock ?? product.current_stock) }),
+        fillCopilotTemplate(ui('Target stock: {value}'), { value: n(plan.target_stock_quantity) }),
+        fillCopilotTemplate(ui('Reliable inbound: {value}'), { value: n(plan.reliable_open_inbound_quantity) }),
+        fillCopilotTemplate(ui('Recommended reorder quantity: {value}'), { value: n(plan.recommended_reorder_quantity) })
+      ]
+    };
+  }
+
+  if (run.intent === 'prepare_min_stock_proposal') {
+    const recommendation = copilotRecord(context.minimum_stock_recommendation);
+    const productName = String(product.name || proposal?.payload?.product_name || ui('Product'));
+    const target = proposal?.payload?.min_stock ?? recommendation.recommended_min_stock;
+    return {
+      answer: fillCopilotTemplate(ui('The governed minimum-stock recommendation for {product} is {minimum} {unit}. The proposed threshold is {target}. No product value has been changed; human review and the controlled Execution Request workflow are still required.'), {
+        product: productName, minimum: n(recommendation.recommended_min_stock), unit, target: n(target)
+      }),
+      highlights: [
+        fillCopilotTemplate(ui('Current minimum stock: {value}'), { value: n(product.min_stock ?? proposal?.payload?.previous_min_stock) }),
+        fillCopilotTemplate(ui('System minimum-stock recommendation: {value}'), { value: n(recommendation.recommended_min_stock) }),
+        fillCopilotTemplate(ui('Final proposed minimum stock: {value}'), { value: n(target) })
+      ]
+    };
+  }
+
+  if (run.intent === 'prepare_standard_cost_proposal') {
+    const productName = String(product.name || proposal?.payload?.product_name || ui('Product'));
+    const target = proposal?.payload?.standard_unit_cost;
+    return {
+      answer: fillCopilotTemplate(ui('A governed standard-cost proposal is prepared for {product}. The proposed standard unit cost is {target}. No product value has been changed; Intelligence Review and the controlled Execution Request workflow are still required.'), {
+        product: productName, target: target === null || target === undefined ? ui('Not reported') : n(target)
+      }),
+      highlights: [
+        fillCopilotTemplate(ui('Current standard unit cost: {value}'), { value: proposal?.payload?.previous_standard_unit_cost ?? ui('Not reported') }),
+        fillCopilotTemplate(ui('Proposed standard unit cost: {value}'), { value: target ?? ui('Not reported') }),
+        ui('Human review is still required before any product value can change.')
+      ]
+    };
+  }
+
+  const productName = String(product.name || ui('Product'));
+  const currentStock = copilotNumber(product.current_stock);
+  const minimum = copilotNumber(product.min_stock);
+  const gap = Math.max(minimum - currentStock, 0);
+  return {
+    answer: fillCopilotTemplate(ui('{product} currently has {stock} {unit} in stock against a minimum of {minimum}. The current shortfall is {gap}, with {usage} units of 30-day consumption.'), {
+      product: productName, stock: n(currentStock), unit, minimum: n(minimum), gap: n(gap), usage: n(product.outbound_30d)
+    }),
+    highlights: [
+      fillCopilotTemplate(ui('Current stock: {value}'), { value: n(currentStock) }),
+      fillCopilotTemplate(ui('Minimum stock: {value}'), { value: n(minimum) }),
+      fillCopilotTemplate(ui('Current shortfall: {value}'), { value: n(gap) }),
+      fillCopilotTemplate(ui('30-day consumption: {value}'), { value: n(product.outbound_30d) })
+    ]
+  };
+}
+
 function formatDateTime(value: string | null | undefined, locale: AppLocale, ui: UiTranslator): string {
   if (!value) return ui('Not reported');
   const parsed = new Date(value);
@@ -900,6 +1039,9 @@ export default function AIOperationsCopilotPage() {
       : undefined;
   const proposalValueLabel = isMinStockProposal ? ui('minimum stock') : isStandardCostProposal ? ui('standard unit cost') : ui('value');
   const response = selectedRun?.response_snapshot || {};
+  const localRulesDisplay = localRulesPresentation(selectedRun, ui, locale);
+  const displayedAnswer = localRulesDisplay?.answer || response.answer || ui('No answer was recorded.');
+  const displayedHighlights = localRulesDisplay?.highlights || response.highlights || [];
   const reviewLink = selectedRun?.source_action_id
     ? `/intelligence-review?source_action_id=${encodeURIComponent(selectedRun.source_action_id)}`
     : '/intelligence-review';
@@ -1299,17 +1441,17 @@ export default function AIOperationsCopilotPage() {
                 <div style={styles.error}>{selectedRun.error_message || selectedRun.error_code || ui('Copilot run failed.')}</div>
               ) : (
                 <>
-                  <div style={styles.answer}>{response.answer || ui('No answer was recorded.')}</div>
+                  <div style={styles.answer}>{displayedAnswer}</div>
                   {selectedRun.intent === 'operational_priority_summary' ? (
                     <div style={styles.notice}>{ui('Priority counts use the complete permitted set. The explanation shows only the highest-priority sample from each area.')}</div>
                   ) : null}
                   {selectedRun.intent === 'supplier_performance_summary' ? (
                     <div style={styles.notice}>{ui('Supplier comparison uses recent delivery and receiving rates, the number of shipments measured, and the trend versus the previous period—not raw problem counts alone.')}</div>
                   ) : null}
-                  {(response.highlights || []).length ? (
+                  {displayedHighlights.length ? (
                     <div>
                       <h3 style={styles.sectionTitle}>{ui("Highlights")}</h3>
-                      <ul style={styles.list}>{(response.highlights || []).map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul>
+                      <ul style={styles.list}>{displayedHighlights.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul>
                     </div>
                   ) : null}
                   {(response.evidence || []).length ? (
@@ -1321,7 +1463,7 @@ export default function AIOperationsCopilotPage() {
                           const content = (
                             <>
                               <strong>{item.label}</strong>
-                              <span style={styles.help}>{ui(formatLabel(item.kind))}{capabilities.canViewTenantDiagnostics && item.id ? ` · ${item.id}` : ''}</span>
+                              <span style={styles.help}>{copilotEvidenceKindLabel(item.kind, ui)}{capabilities.canViewTenantDiagnostics && item.id ? ` · ${item.id}` : ''}</span>
                               {permittedHref ? <span style={styles.evidenceOpen}>{ui('Open source record')}</span> : null}
                             </>
                           );

@@ -613,14 +613,14 @@ function CheckList({ title, items, kind }: { title: string; items: CheckItem[] |
             return (
               <article className="adaptive-policy-check-item" key={`${title}-${check.check_id || blocker.blocker_id || index}`}>
                 <div className="adaptive-policy-check-item__heading">
-                  <strong>{check.label ? formatLabel(check.label) : blocker.summary || ui('Review item')}</strong>
+                  <strong>{check.label ? ui(check.label) : blocker.summary || ui('Review item')}</strong>
                   {kind === 'checks' ? (
                     <span className={`adaptive-policy-badge adaptive-policy-badge--${passed ? 'good' : 'warning'}`}>{ui(passed ? 'Passed' : 'Needs attention')}</span>
                   ) : (
                     <StatusBadge value={blocker.severity || 'Review'} tone={blocker.severity === 'high' ? 'danger' : 'warning'} />
                   )}
                 </div>
-                {kind === 'checks' && check.required_next_step ? <p>{check.required_next_step}</p> : null}
+                {kind === 'checks' && check.required_next_step ? <p>{ui(check.required_next_step)}</p> : null}
                 {kind === 'blockers' && blocker.summary ? <p>{blocker.summary}</p> : null}
                 {kind === 'checks' && check.observed_count !== undefined ? (
                   <span className="adaptive-policy-observed">{ui('Evidence records counted: {count}').replace('{count}', formatLocalizedNumber(check.observed_count, locale))}</span>
