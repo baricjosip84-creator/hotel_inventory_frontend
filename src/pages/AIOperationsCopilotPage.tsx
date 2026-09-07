@@ -6,7 +6,7 @@ import { ApiError, apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedCurrency, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
-import { getRoleCapabilities } from '../lib/permissions';
+import { getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { showTenantActionError } from '../lib/actionFeedback';
 import { getActiveTenantCurrency } from '../lib/tenantCurrency';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
@@ -71,6 +71,19 @@ type CopilotEvidence = {
   label: string;
   href?: string | null;
 };
+
+function permittedEvidenceHref(href?: string | null): string | null {
+  if (!href || !href.startsWith('/')) return null;
+  const base = href.split('?')[0];
+  const permission = {
+    '/alerts': TENANT_PERMISSIONS.ALERTS_READ,
+    '/products': TENANT_PERMISSIONS.PRODUCTS_READ,
+    '/shipments': TENANT_PERMISSIONS.SHIPMENTS_READ,
+    '/execution-requests': TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW,
+    '/suppliers': TENANT_PERMISSIONS.SUPPLIERS_READ
+  }[base];
+  return permission && hasPermission(permission) ? href : null;
+}
 
 type CopilotProposal = {
   proposal_type?: string;
@@ -1269,15 +1282,16 @@ export default function AIOperationsCopilotPage() {
                       <h3 style={styles.sectionTitle}>{ui("Evidence references")}</h3>
                       <div style={styles.evidenceGrid}>
                         {(response.evidence || []).map((item, index) => {
+                          const permittedHref = permittedEvidenceHref(item.href);
                           const content = (
                             <>
                               <strong>{item.label}</strong>
                               <span style={styles.help}>{ui(formatLabel(item.kind))}{capabilities.canViewTenantDiagnostics && item.id ? ` · ${item.id}` : ''}</span>
-                              {item.href ? <span style={styles.evidenceOpen}>{ui('Open source record')}</span> : null}
+                              {permittedHref ? <span style={styles.evidenceOpen}>{ui('Open source record')}</span> : null}
                             </>
                           );
-                          return item.href ? (
-                            <Link key={`${item.kind}-${item.id || index}`} to={item.href} style={{ ...styles.evidenceCard, ...styles.evidenceLink }} data-skip-global-action-feedback="true">{content}</Link>
+                          return permittedHref ? (
+                            <Link key={`${item.kind}-${item.id || index}`} to={permittedHref} style={{ ...styles.evidenceCard, ...styles.evidenceLink }} data-skip-global-action-feedback="true">{content}</Link>
                           ) : (
                             <div key={`${item.kind}-${item.id || index}`} style={styles.evidenceCard}>{content}</div>
                           );
@@ -1347,9 +1361,9 @@ export default function AIOperationsCopilotPage() {
                     ? ui('No Purchase Order has been created. A permitted reviewer must approve this recommendation in Intelligence Review; Procurement will then revalidate current evidence before it can create a Draft Purchase Order.')
                     : ui("No product field has changed. A permitted reviewer must approve this proposal in Intelligence Review before a draft Execution Request can be created.")}</p>
                   <div style={styles.actionRow}>
-                    <Link to={reviewLink} style={styles.linkButton} data-skip-global-action-feedback="true"><TenantNavIcon path="/intelligence-review" size={16} />{ui("Open in Intelligence Review")}</Link>
-                    {selectedRun.execution_request_id ? <Link to={executionRequestLink} style={styles.secondaryLink} data-skip-global-action-feedback="true"><TenantNavIcon path="/execution-requests" size={16} />{ui("Open linked Execution Request")}</Link> : null}
-                    {selectedRun.purchase_order_id ? <Link to={purchaseOrderLink} style={styles.secondaryLink} data-skip-global-action-feedback="true"><TenantNavIcon path="/purchase-orders" size={16} />{ui('Open linked Purchase Order')}</Link> : null}
+                    {capabilities.canViewOperationalActionCenter && capabilities.canViewDecisionIntelligence ? <Link to={reviewLink} style={styles.linkButton} data-skip-global-action-feedback="true"><TenantNavIcon path="/intelligence-review" size={16} />{ui("Open in Intelligence Review")}</Link> : null}
+                    {selectedRun.execution_request_id && capabilities.canViewExecutionRequests ? <Link to={executionRequestLink} style={styles.secondaryLink} data-skip-global-action-feedback="true"><TenantNavIcon path="/execution-requests" size={16} />{ui("Open linked Execution Request")}</Link> : null}
+                    {selectedRun.purchase_order_id && capabilities.canViewPurchaseOrders ? <Link to={purchaseOrderLink} style={styles.secondaryLink} data-skip-global-action-feedback="true"><TenantNavIcon path="/purchase-orders" size={16} />{ui('Open linked Purchase Order')}</Link> : null}
                   </div>
                 </div>
               ) : null}

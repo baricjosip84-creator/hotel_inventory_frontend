@@ -494,6 +494,11 @@ function freshnessLabel(source: FreshnessSource, ui: (englishText: string) => st
   return ui('{count} d ago').replace('{count}', formatLocalizedNumber(Math.round(minutes / 1440), locale));
 }
 
+function matchingCountLabel(value: unknown, bounded: boolean, locale: Parameters<typeof formatLocalizedNumber>[1], ui: (englishText: string) => string): string {
+  const formatted = formatLocalizedNumber(numberValue(value), locale);
+  return bounded ? `${ui('At least')} ${formatted}` : formatted;
+}
+
 function DigitalTwinSummaryCard({
   iconPath,
   label,
@@ -631,6 +636,7 @@ export default function DigitalTwinVisualizationPage() {
   const hasContext = nodes.length > 0 || edges.length > 0 || overlays.length > 0;
   const reviewFirstPath = permittedSourcePath(reviewFirst?.source_record_path, reviewFirst?.source_surface);
   const returnedNodeCountLabel = formatLocalizedNumber(nodes.length, locale);
+  const boundedCount = Boolean(coverage?.may_have_more_source_records);
 
   return (
     <div className="io-operational-page io-workspace-page digital-twin-page" data-digital-twin-refined="true">
@@ -642,7 +648,7 @@ export default function DigitalTwinVisualizationPage() {
         meta={undefined}
         aside={<div className="digital-twin-hero-actions">
           <OperationalWorkspaceStatus
-            value={formatLocalizedNumber(numberValue(summary.total_matching_nodes ?? nodes.length), locale)}
+            value={matchingCountLabel(summary.total_matching_nodes ?? nodes.length, boundedCount, locale, ui)}
             label={ui('matching topology points · refreshed {time}').replace('{time}', formatDateTime(response?.generated_at, locale, ui)) + ` · ${ui('{count} returned').replace('{count}', returnedNodeCountLabel)}`}
           />
           <button className="app-button app-button--secondary" type="button" onClick={() => digitalTwinQuery.refetch()} disabled={digitalTwinQuery.isFetching}>
@@ -730,9 +736,9 @@ export default function DigitalTwinVisualizationPage() {
       ) : null}
 
       <section className="digital-twin-summary-grid io-workspace-stats" aria-label={ui('Digital Twin summary')}>
-        <DigitalTwinSummaryCard iconPath="/digital-twin" label="Topology points" value={numberValue(summary.total_matching_nodes ?? summary.total_nodes ?? nodes.length)} copy="Matching permitted business records in the current read-only snapshot." />
-        <DigitalTwinSummaryCard iconPath="/workspace" label="Dependencies" value={numberValue(summary.total_matching_edges ?? summary.total_edges ?? edges.length)} copy="Matching visible relationships and dependency paths between operational points." tone="slate" />
-        <DigitalTwinSummaryCard iconPath="/action-center" label="Operational overlays" value={numberValue(summary.total_matching_overlays ?? summary.total_overlays ?? overlays.length)} copy="Matching Action Center, event, coordination, and knowledge-graph risk context." tone="amber" />
+        <DigitalTwinSummaryCard iconPath="/digital-twin" label="Topology points" value={matchingCountLabel(summary.total_matching_nodes ?? summary.total_nodes ?? nodes.length, boundedCount, locale, ui)} copy="Matching permitted business records in the current read-only snapshot." />
+        <DigitalTwinSummaryCard iconPath="/workspace" label="Dependencies" value={matchingCountLabel(summary.total_matching_edges ?? summary.total_edges ?? edges.length, boundedCount, locale, ui)} copy="Matching visible relationships and dependency paths between operational points." tone="slate" />
+        <DigitalTwinSummaryCard iconPath="/action-center" label="Operational overlays" value={matchingCountLabel(summary.total_matching_overlays ?? summary.total_overlays ?? overlays.length, boundedCount, locale, ui)} copy="Matching Action Center, event, coordination, and knowledge-graph risk context." tone="amber" />
         <DigitalTwinSummaryCard iconPath="/alerts" label="Critical overlays" value={numberValue(summary.critical_overlays)} copy="Critical context on this page that may need prompt source-workflow review." tone="red" />
       </section>
 
@@ -813,7 +819,7 @@ export default function DigitalTwinVisualizationPage() {
                     <span className="digital-twin-heading-icon"><TenantNavIcon path="/digital-twin" size={17} /></span>
                     <div><h3 id="digital-twin-node-title">{ui('Topology points')}</h3><p className="card__subtext">{ui('Click any point to see what it depends on, what depends on it, and the visible impact chain.')}</p></div>
                   </div>
-                  <span className="digital-twin-count-pill">{ui('{count} matching').replace('{count}', formatLocalizedNumber(numberValue(pagination.nodes?.total_matching ?? nodes.length), locale))}</span>
+                  <span className="digital-twin-count-pill">{ui('{count} matching').replace('{count}', matchingCountLabel(pagination.nodes?.total_matching ?? nodes.length, boundedCount, locale, ui))}</span>
                 </div>
                 {nodes.length ? (
                   <div className="digital-twin-node-grid">
@@ -846,7 +852,7 @@ export default function DigitalTwinVisualizationPage() {
               <section className="card digital-twin-context-section" aria-labelledby="digital-twin-edge-title">
                 <div className="digital-twin-section-heading">
                   <div className="digital-twin-section-title"><span className="digital-twin-heading-icon"><TenantNavIcon path="/workspace" size={17} /></span><div><h3 id="digital-twin-edge-title">{ui('Dependencies')}</h3><p className="card__subtext">{ui('Visible relationships and dependency paths, ordered according to the selected review perspective.')}</p></div></div>
-                  <span className="digital-twin-count-pill">{ui('{count} matching').replace('{count}', formatLocalizedNumber(numberValue(pagination.edges?.total_matching ?? edges.length), locale))}</span>
+                  <span className="digital-twin-count-pill">{ui('{count} matching').replace('{count}', matchingCountLabel(pagination.edges?.total_matching ?? edges.length, boundedCount, locale, ui))}</span>
                 </div>
                 {edges.length ? (
                   <div className="digital-twin-dependency-list">
@@ -872,7 +878,7 @@ export default function DigitalTwinVisualizationPage() {
               <section className="digital-twin-overlay-section" aria-labelledby="digital-twin-overlay-title">
                 <div className="digital-twin-section-heading digital-twin-section-heading--outside">
                   <div className="digital-twin-section-title"><span className="digital-twin-heading-icon"><TenantNavIcon path="/action-center" size={17} /></span><div><h3 id="digital-twin-overlay-title">{ui('Operational overlays')}</h3><p className="card__subtext">{ui('Operational pressure, coordination, event, and risk context, ordered according to the selected review perspective.')}</p></div></div>
-                  <span className="digital-twin-count-pill">{ui('{count} matching').replace('{count}', formatLocalizedNumber(numberValue(pagination.overlays?.total_matching ?? overlays.length), locale))}</span>
+                  <span className="digital-twin-count-pill">{ui('{count} matching').replace('{count}', matchingCountLabel(pagination.overlays?.total_matching ?? overlays.length, boundedCount, locale, ui))}</span>
                 </div>
                 {overlays.length ? (
                   <div className="digital-twin-overlay-grid">

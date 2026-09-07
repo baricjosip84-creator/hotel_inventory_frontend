@@ -476,8 +476,11 @@ function blueprintSourceLink(blueprint: WorkflowBlueprint): BlueprintLink | null
 
   if (sourceDomain === 'alerts') {
     const params = new URLSearchParams({ resolved: 'false' });
-    const search = String(blueprint.source_summary || blueprint.source_title || '').trim();
-    if (search) params.set('search', search);
+    if (sourceId) params.set('alert_id', sourceId);
+    else {
+      const search = String(blueprint.source_summary || blueprint.source_title || '').trim();
+      if (search) params.set('search', search);
+    }
     return { to: `/alerts?${params.toString()}`, label: 'Open alert' };
   }
 

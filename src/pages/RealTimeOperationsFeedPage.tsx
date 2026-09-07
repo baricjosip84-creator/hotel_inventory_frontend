@@ -373,8 +373,11 @@ function sourceItemLink(item: TimelineItem, ui: (englishText: string) => string)
 
     if (item.timeline_domain === 'alerts') {
       const params = new URLSearchParams({ resolved: 'false' });
-      const search = String(item.summary || item.title || '').trim();
-      if (search) params.set('search', search);
+      if (sourceId) params.set('alert_id', sourceId);
+      else {
+        const search = String(item.summary || item.title || '').trim();
+        if (search) params.set('search', search);
+      }
       return { to: `/alerts?${params.toString()}`, label: ui('Open alert') };
     }
 

@@ -202,6 +202,44 @@ function readStored<T>(key: string | null, fallback: T): T {
   }
 }
 
+function writeStored(key: string | null, value: unknown): boolean {
+  if (!key) return false;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readStoredRaw(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredRaw(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function mobileStorageAvailable(): boolean {
+  const probe = `${DEVICE_KEY}:probe`;
+  try {
+    localStorage.setItem(probe, '1');
+    localStorage.removeItem(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 type MobileStorageKeys = { cache: string; pending: string };
 
 function getMobileStorageKeys(): MobileStorageKeys | null {
@@ -215,11 +253,15 @@ function getMobileStorageKeys(): MobileStorageKeys | null {
   return { cache: `${CACHE_KEY_PREFIX}:${scope}`, pending: `${PENDING_KEY_PREFIX}:${scope}` };
 }
 
+let fallbackDeviceId: string | null = null;
+
 function getDeviceId(): string {
-  const existing = localStorage.getItem(DEVICE_KEY);
+  const existing = readStoredRaw(DEVICE_KEY);
   if (existing) return existing;
+  if (fallbackDeviceId) return fallbackDeviceId;
   const created = makeId('device');
-  localStorage.setItem(DEVICE_KEY, created);
+  fallbackDeviceId = created;
+  writeStoredRaw(DEVICE_KEY, created);
   return created;
 }
 
@@ -237,14 +279,32 @@ function actionButtonClass(action: MobileAction): string {
   return 'button button--secondary mobile-execution-task-button';
 }
 
-function taskSourceLink(task: MobileExecutionTask): string {
+function canOpenTaskSource(task: MobileExecutionTask): boolean {
+  if (!task.source_type || task.source_type === 'manual') return hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
+  const requiredPermission = {
+    reservation: TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_READ,
+    requisition: TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_READ,
+    purchase_order: TENANT_PERMISSIONS.PURCHASE_ORDERS_READ,
+    shipment: TENANT_PERMISSIONS.SHIPMENTS_READ,
+    transfer: TENANT_PERMISSIONS.STOCK_TRANSFERS_READ,
+    cycle_count: TENANT_PERMISSIONS.CYCLE_COUNTS_READ,
+    replenishment: TENANT_PERMISSIONS.PAR_LEVELS_READ,
+    execution_request: TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW
+  }[task.source_type];
+  return requiredPermission ? hasPermission(requiredPermission) : false;
+}
+
+function taskSourceLink(task: MobileExecutionTask): string | null {
+  if (!canOpenTaskSource(task)) return null;
   const route = task.source_route || '/execution-tasks';
   if (!task.source_id) return route;
   const params = new URLSearchParams();
   if (task.source_type === 'shipment') params.set('shipmentId', task.source_id);
   else if (task.source_type === 'purchase_order') params.set('purchaseOrderId', task.source_id);
   else if (task.source_type === 'reservation') params.set('reservationId', task.source_id);
+  else if (task.source_type === 'requisition') params.set('requisitionId', task.source_id);
   else if (task.source_type === 'transfer') params.set('transfer_id', task.source_id);
+  else if (task.source_type === 'execution_request') params.set('request_id', task.source_id);
   else return route;
   return `${route}?${params.toString()}`;
 }
@@ -288,6 +348,7 @@ export default function MobileExecutionPage() {
   const [sourceType, setSourceType] = useState<'all' | ExecutionTaskSourceType>('all');
   const [page, setPage] = useState(0);
   const [online, setOnline] = useState(() => navigator.onLine);
+  const [storageAvailable, setStorageAvailable] = useState(() => mobileStorageAvailable());
   const [pending, setPending] = useState<OfflineOperation[]>(() => readStored<OfflineOperation[]>(storageKeys?.pending || null, []));
   const [syncing, setSyncing] = useState(false);
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
@@ -325,7 +386,13 @@ export default function MobileExecutionPage() {
     return () => { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); };
   }, []);
 
-  useEffect(() => { LEGACY_KEYS.forEach((key) => localStorage.removeItem(key)); }, []);
+  useEffect(() => {
+    try {
+      LEGACY_KEYS.forEach((key) => localStorage.removeItem(key));
+    } catch {
+      setStorageAvailable(false);
+    }
+  }, []);
 
   useEffect(() => {
     const next = readStored<MobileExecutionResponse | null>(cacheKey, null);
@@ -337,14 +404,17 @@ export default function MobileExecutionPage() {
     if (!mobileExecutionQuery.data) return;
     setCachedResponse(mobileExecutionQuery.data);
     setCachedFilterKey(filterKey);
-    if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(mobileExecutionQuery.data));
+    if (cacheKey && !writeStored(cacheKey, mobileExecutionQuery.data)) setStorageAvailable(false);
   }, [mobileExecutionQuery.data, cacheKey, filterKey]);
 
   useEffect(() => { setPage(0); }, [assignmentScope, urgency, sourceType]);
 
-  const persistPending = (operations: OfflineOperation[]) => {
+  const persistPending = (operations: OfflineOperation[]): boolean => {
     setPending(operations);
-    if (storageKeys) localStorage.setItem(storageKeys.pending, JSON.stringify(operations));
+    if (!storageKeys) return false;
+    const persisted = writeStored(storageKeys.pending, operations);
+    if (!persisted) setStorageAvailable(false);
+    return persisted;
   };
 
   const response = mobileExecutionQuery.data || (cachedFilterKey === filterKey ? cachedResponse : null) || undefined;
@@ -402,8 +472,10 @@ export default function MobileExecutionPage() {
     const operation: OfflineOperation = { operation_id: makeId('op'), task_id: task.id, task_label: task.title || null, action, note: normalizedNote, created_at: new Date().toISOString() };
     setMessage(null); setActionError(null);
     if (!navigator.onLine) {
-      persistPending([...pending, operation]);
-      setMessage(ui('Task action queued on this device. It will synchronize when online.'));
+      const persisted = persistPending([...pending, operation]);
+      setMessage(persisted
+        ? ui('Task action queued on this device. It will synchronize when online.')
+        : ui('Task action is queued for this open page only. Keep this page open until the device is online so it can synchronize.'));
       if (action === 'block') { setBlockReasonTaskId(null); setBlockReason(''); }
       return;
     }
@@ -420,8 +492,10 @@ export default function MobileExecutionPage() {
       await mobileExecutionQuery.refetch();
     } catch (error) {
       if (!(error instanceof ApiError)) {
-        if (!pending.some((queued) => queued.operation_id === operation.operation_id)) persistPending([...pending, operation]);
-        setMessage(ui('Task action queued because synchronization could not be confirmed. It will retry safely without repeating a confirmed action.'));
+        const persisted = pending.some((queued) => queued.operation_id === operation.operation_id) || persistPending([...pending, operation]);
+        setMessage(persisted
+          ? ui('Task action queued because synchronization could not be confirmed. It will retry safely without repeating a confirmed action.')
+          : ui('Task action is waiting in this open page because synchronization could not be confirmed. Keep this page open until it can retry.'));
       } else setActionError(error.message);
     } finally { setBusyTaskId(null); }
   };
@@ -482,6 +556,7 @@ export default function MobileExecutionPage() {
             <button className="button button--secondary mobile-execution-control-button" type="button" onClick={() => void replayPending()} disabled={!online || syncing || pending.length === 0 || !canRunAnyMobileAction}>{syncing ? ui('Synchronizing…') : `${ui('Sync pending')} (${formatLocalizedNumber(pending.length, locale)})`}</button>
             <Link className="button button--secondary mobile-execution-control-button" to="/execution-tasks">{ui('Open execution tasks')}</Link>
           </div>
+          {!storageAvailable ? <p className="form-error">{ui('Offline storage is unavailable. Mobile Execution will continue, but cached queue pages and queued actions are kept only while this page remains open.')}</p> : null}
           {usingOfflineSnapshot ? <p className="card__subtext"><strong>{ui('Offline snapshot:')}</strong> {ui('showing the last successfully downloaded queue page.')}</p> : null}
           {mobileExecutionQuery.error && !response ? <p className="form-error">{mobileExecutionQuery.error instanceof ApiError ? mobileExecutionQuery.error.message : ui('Unable to load the mobile execution queue.')}</p> : null}
           {message ? <p className="form-success">{message}</p> : null}
@@ -500,6 +575,7 @@ export default function MobileExecutionPage() {
             const actions = allowedActions(task, pending).filter((action) => canRunAction(action));
             const urgencyClass = urgencyToneClass(task.urgency);
             const queuedCount = pending.filter((operation) => operation.task_id === task.id).length;
+            const sourceLink = taskSourceLink(task);
             const locationFrom = task.compact_payload?.from_location;
             const locationTo = task.compact_payload?.to_location;
             return <article className={`card mobile-execution-task-card mobile-execution-task-card--${urgencyClass}`} key={task.id}>
@@ -526,7 +602,7 @@ export default function MobileExecutionPage() {
               <div className="mobile-execution-task-actions">
                 {actions.map((action) => <button key={action} className={actionButtonClass(action)} type="button" disabled={busyTaskId === task.id} onClick={() => { if (action === 'block') { setBlockReasonTaskId(task.id); setBlockReason(''); setActionError(null); return; } void runAction(task, action); }}>{ui(ACTION_LABELS[action])}</button>)}
                 {task.scan_supported && canUseScanner ? <Link className="button button--secondary mobile-execution-source-button" to={`/scanner?mode=task&executionTaskId=${encodeURIComponent(task.id)}`}><TenantNavIcon path="/scanner" size={14} />{ui('Scan/verify task item')}</Link> : null}
-                <Link className="button button--secondary mobile-execution-source-button" to={taskSourceLink(task)}><TenantNavIcon path={task.source_route || '/execution-tasks'} size={14} />{ui('Open source workflow')}</Link>
+                {sourceLink ? <Link className="button button--secondary mobile-execution-source-button" to={sourceLink}><TenantNavIcon path={task.source_route || '/execution-tasks'} size={14} />{ui('Open source workflow')}</Link> : null}
                 {canUploadEvidence ? <button className="button button--secondary mobile-execution-source-button" type="button" disabled={evidenceUploading} onClick={() => beginEvidence(task, 'photo')}><TenantNavIcon path="/mobile-execution" size={14} />{ui('Take photo')}</button> : null}
                 {canUploadEvidence ? <button className="button button--secondary mobile-execution-source-button" type="button" disabled={evidenceUploading} onClick={() => beginEvidence(task, 'file')}>{ui('Add evidence')}</button> : null}
               </div>
