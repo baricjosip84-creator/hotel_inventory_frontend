@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import { apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';

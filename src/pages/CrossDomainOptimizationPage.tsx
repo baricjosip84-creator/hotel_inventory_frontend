@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { useAppTranslation } from '../i18n/I18nContext';
