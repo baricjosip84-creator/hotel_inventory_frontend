@@ -675,6 +675,8 @@ export default function AdaptivePolicyEnginePage() {
     : '';
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
   const canGovern = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
+  const canOpenIntelligenceReview = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ)
+    && hasPermission(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ);
   const [view, setView] = useState<AdaptivePolicyView>('evidence');
   const [filters, setFilters] = useState<AdaptivePolicyFilters>(DEFAULT_FILTERS);
   const [applicationDraft, setApplicationDraft] = useState<{
@@ -974,7 +976,8 @@ export default function AdaptivePolicyEnginePage() {
                   <td>{formatStoredConfidence(recommendation.confidence_score, locale)}</td>
                   <td>{formatLocalizedDateTime(recommendation.created_at, locale)}</td>
                   <td>
-                    {recommendation.recommendation_status === 'review_required' && recommendation.source_action_id ? <a className="button button--secondary button--small" href={`/intelligence-review?source_action_id=${encodeURIComponent(recommendation.source_action_id)}`}>{ui('Review')}</a> : null}
+                    {recommendation.recommendation_status === 'review_required' && recommendation.source_action_id && canOpenIntelligenceReview ? <a className="button button--secondary button--small" href={`/intelligence-review?source_action_id=${encodeURIComponent(recommendation.source_action_id)}`}>{ui('Review')}</a> : null}
+                    {recommendation.recommendation_status === 'review_required' && recommendation.source_action_id && !canOpenIntelligenceReview ? ui('Not available') : null}
                     {canGovern && recommendation.recommendation_status === 'approved_for_manual_application' && recommendation.id && recommendation.policy_id ? <button className="button button--secondary button--small" type="button" onClick={() => openApplicationRecorder(recommendation)}>{ui(hasActiveApplication ? 'Record approved recalibration' : 'Record applied change')}</button> : null}
                     {recommendation.recommendation_status !== 'review_required' && recommendation.recommendation_status !== 'approved_for_manual_application' ? ui('No review needed') : null}
                   </td>

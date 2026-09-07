@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router";
 import { useAppTranslation } from "../../i18n/I18nContext";
 import { hasPermission } from "../../lib/permissions";
 import { getTenantFeatureEntitlement, type TenantSubscriptionAccess } from "../../lib/tenantSubscriptionAccess";
@@ -37,6 +38,8 @@ function findInitialEnterpriseInventoryTab() {
 
 export function useEnterpriseInventoryPageController() {
   const { ui } = useAppTranslation();
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab')?.trim() || '';
   const [activeTab, setActiveTab] = useState(findInitialEnterpriseInventoryTab);
   const {
     errorMessage,
@@ -80,6 +83,14 @@ export function useEnterpriseInventoryPageController() {
 
   const { products, storageLocations, purchaseOrders, shipments } = pageData.stableData;
   const subscriptionAccess = pageData.queries.tenantSubscriptionAccessQuery.data;
+
+  useEffect(() => {
+    if (!requestedTab) return;
+    const requestedTabAllowed = enterpriseInventoryTabs.some(([key]) =>
+      key === requestedTab && isEnterpriseInventoryTabAccessible(key, subscriptionAccess)
+    );
+    if (requestedTabAllowed && activeTab !== requestedTab) setActiveTab(requestedTab as (typeof enterpriseInventoryTabs)[number][0]);
+  }, [activeTab, requestedTab, subscriptionAccess]);
 
   useEffect(() => {
     const activeTabAllowed = enterpriseInventoryTabs.some(([key]) =>

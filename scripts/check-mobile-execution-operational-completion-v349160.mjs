@@ -39,7 +39,7 @@ check('scanner recognizes task mode', scanner.includes("type ScannerMode = 'ship
 check('task scanner calls governed verification endpoint', scanner.includes("/execution-tasks/${encodeURIComponent(executionTaskId)}/mobile-scan-verify"));
 check('task scanner does not claim to execute source workflow', scanner.includes('It does not perform the stock movement or source-workflow action.') && scanner.includes('must still be completed in its source page.'));
 check('successful task verification shows task evidence', scanner.includes("ui('Verified execution task')") && scanner.includes('taskVerification.task_code || taskVerification.task_id'));
-check('successful task verification can open the real source workflow', scanner.includes("navigate(executionTaskSourceUrl(taskVerification))") && scanner.includes("ui('Open source workflow')"));
+check('successful task verification can open the real source workflow', scanner.includes("const sourceUrl = executionTaskSourceUrl(taskVerification);") && scanner.includes("if (sourceUrl) navigate(sourceUrl);") && scanner.includes("ui('Open source workflow')"));
 check('successful task verification can return to Mobile Execution', scanner.includes("navigate('/mobile-execution')") && scanner.includes("ui('Back to Mobile Execution')"));
 check('task resolving state is explicit', scanner.includes("ui('Verifying barcode against the selected execution task...')"));
 

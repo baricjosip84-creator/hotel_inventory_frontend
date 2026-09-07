@@ -261,19 +261,43 @@ function modeDescription(mode: ScannerMode): string {
   return 'Scan a shipment QR code to open that shipment directly.';
 }
 
-function executionTaskSourceUrl(verification: TaskBarcodeVerifyResponse): string {
+function canOpenExecutionTaskSource(verification: TaskBarcodeVerifyResponse): boolean {
+  const requiredPermission = {
+    reservation: TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_READ,
+    requisition: TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_READ,
+    purchase_order: TENANT_PERMISSIONS.PURCHASE_ORDERS_READ,
+    shipment: TENANT_PERMISSIONS.SHIPMENTS_READ,
+    transfer: TENANT_PERMISSIONS.STOCK_TRANSFERS_READ,
+    cycle_count: TENANT_PERMISSIONS.CYCLE_COUNTS_READ,
+    replenishment: TENANT_PERMISSIONS.PAR_LEVELS_READ,
+    execution_request: TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW
+  }[String(verification.source_type || '')];
+
+  return requiredPermission
+    ? hasPermission(requiredPermission)
+    : hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
+}
+
+function executionTaskSourceUrl(verification: TaskBarcodeVerifyResponse): string | null {
+  if (!canOpenExecutionTaskSource(verification)) return null;
+
   const route = verification.source_route || '/execution-tasks';
   const sourceId = verification.source_id;
-  if (!sourceId) return route;
-
   const params = new URLSearchParams();
-  if (verification.source_type === 'shipment') params.set('shipmentId', sourceId);
-  else if (verification.source_type === 'purchase_order') params.set('purchaseOrderId', sourceId);
-  else if (verification.source_type === 'reservation') params.set('reservationId', sourceId);
-  else if (verification.source_type === 'transfer') params.set('transferId', sourceId);
-  else return route;
 
-  return `${route}?${params.toString()}`;
+  if (verification.source_type === 'cycle_count') params.set('tab', 'cycle-counts');
+  else if (verification.source_type === 'replenishment') params.set('tab', 'par-levels');
+
+  if (sourceId) {
+    if (verification.source_type === 'shipment') params.set('shipmentId', sourceId);
+    else if (verification.source_type === 'purchase_order') params.set('purchaseOrderId', sourceId);
+    else if (verification.source_type === 'reservation') params.set('reservationId', sourceId);
+    else if (verification.source_type === 'requisition') params.set('requisitionId', sourceId);
+    else if (verification.source_type === 'transfer') params.set('transfer_id', sourceId);
+    else if (verification.source_type === 'execution_request') params.set('request_id', sourceId);
+  }
+
+  return params.size ? `${route}?${params.toString()}` : route;
 }
 
 function getFormatsToSupport(mode: ScannerMode): Html5QrcodeSupportedFormats[] {
@@ -1306,13 +1330,18 @@ export default function ScannerPage() {
 
           {taskVerification ? (
             <div className="app-actions" style={styles.formActions}>
-              <button
-                type="button"
-                onClick={() => navigate(executionTaskSourceUrl(taskVerification))}
-                style={styles.primaryButton}
-              >
-                {ui('Open source workflow')}
-              </button>
+              {executionTaskSourceUrl(taskVerification) ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sourceUrl = executionTaskSourceUrl(taskVerification);
+                    if (sourceUrl) navigate(sourceUrl);
+                  }}
+                  style={styles.primaryButton}
+                >
+                  {ui('Open source workflow')}
+                </button>
+              ) : null}
               <button type="button" onClick={() => navigate('/mobile-execution')} style={styles.secondaryButton}>
                 {ui('Back to Mobile Execution')}
               </button>
