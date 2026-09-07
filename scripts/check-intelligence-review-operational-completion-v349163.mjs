@@ -18,6 +18,10 @@ expect('overdue and due-soon visibility', page.includes("ui('OVERDUE')") && page
 expect('specific reviewer assignment', page.includes("Specific reviewer (optional)") && page.includes('escalation_target_user_id'));
 expect('named ownership controls attention', page.includes("lifecycle?.escalation_target_user_id") && page.includes("tenantAccess.userId"));
 expect('business impact explanation', page.includes("ui('Business impact')") && page.includes('reviewBusinessImpactRows'));
+expect('business impact does not expose raw structured JSON', page.includes('businessImpactMetricValue') && !page.includes("typeof value === 'object' ? JSON.stringify(value)"));
+expect('adaptive policy structured impact is summarized for people', page.includes('adaptivePolicyAdjustmentImpact') && page.includes('expectedImpactSummary'));
+expect('affected area uses known localized system labels', page.includes('value: reviewSystemValueLabel(review.source_scope_domain, ui)'));
+expect('explainability factors use known localized system labels', page.includes('explainabilityFactorLabel(factor, ui)'));
 expect('business impact does not promise mutation', page.includes('No business record changes automatically.') && page.includes('This page leaves the current business records unchanged.'));
 expect('simple readiness overview', page.includes('ai-review-page__readiness-overview') && page.includes("ui('Overall status')") && page.includes("ui('What needs your attention')"));
 expect('detailed governance retained', page.includes('ai-review-page__readiness-details') && page.includes("ui('Governance readiness details')"));

@@ -70,6 +70,9 @@ const dynamicPresentationKeys = [
   'calculated', 'limited history', 'no outbound history',
   'increase', 'decrease', 'keep current',
   'product min stock update', 'cost standard update',
+  'Minimum stock update proposal', 'Standard cost update proposal', 'Purchase Order draft recommendation',
+  'Verified supplier catalog price', 'Previous purchase price', 'Needs price confirmation',
+  '90-day weighted average cost', 'Current supplier catalog price', 'Latest cost-bearing movement',
   'product', 'supplier performance', 'evidence'
 ];
 const missingDynamic = dynamicPresentationKeys.filter((key) => !unique.has(key));
@@ -136,6 +139,14 @@ for (const forbidden of [
   'ui(selectedRun.error_message)'
 ]) if (pageSource.includes(forbidden)) fail(`Backend/business human text must remain raw: ${forbidden}`);
 if (!process.exitCode) pass('Backend-generated guidance, formulas, results, evidence labels, proposal titles, prompts, and API errors remain raw data.');
+
+for (const required of [
+  'const COPILOT_SYSTEM_LABELS: Record<string, string>',
+  'copilotSystemLabel(standardCostEvidence.suggested_reference_basis, ui)',
+  'copilotSystemLabel(proposal.request_type, ui)',
+  'copilotSystemLabel(proposal.payload?.pricing_status, ui)'
+]) if (!pageSource.includes(required)) fail(`Copilot backend-owned enum presentation is not using the explicit multilingual map: ${required}`);
+if (!process.exitCode) pass('Backend-owned proposal, pricing, and cost-basis enums use an explicit five-language presentation map.');
 
 for (const required of [
   'formatLocalizedCurrency(amount, getActiveTenantCurrency(), locale',

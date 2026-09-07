@@ -60,6 +60,7 @@ type TimelineItem = {
   payload_material_redacted?: boolean;
   delivery_attempt_count?: number | null;
   delivery_target?: string | null;
+  delivery_event_name?: string | null;
   next_retry_at?: string | null;
   observed_at?: string | null;
   updated_at?: string | null;
@@ -282,8 +283,34 @@ function itemTitle(item: TimelineItem, ui: (englishText: string) => string): str
   return ui('Untitled item');
 }
 
+function interpolateSystemTemplate(
+  template: string,
+  values: Record<string, string | number>,
+  ui: (englishText: string) => string
+): string {
+  let localized = ui(template);
+  for (const [key, value] of Object.entries(values)) localized = localized.replaceAll(`{${key}}`, String(value));
+  return localized;
+}
+
+function deliveryDisruptionSummary(item: TimelineItem, ui: (englishText: string) => string): string | null {
+  if (!['operations_feed_delivery_blocked_summary', 'operations_feed_delivery_failed_summary'].includes(String(item.summary_key || ''))) return null;
+  const event = String(item.delivery_event_name || item.event_type || ui('Integration event')).trim();
+  const rawTarget = String(item.delivery_target || 'the configured destination').trim();
+  const target = rawTarget === 'the configured destination' ? ui('the configured destination') : rawTarget;
+  const count = Number(item.delivery_attempt_count);
+  const blocked = item.summary_key === 'operations_feed_delivery_blocked_summary';
+  const template = Number.isInteger(count) && count > 1
+    ? (blocked ? '{event} could not be delivered to {target} after {count} delivery attempts.' : '{event} was not delivered to {target} after {count} delivery attempts.')
+    : Number.isInteger(count) && count === 1
+      ? (blocked ? '{event} could not be delivered to {target} after one delivery attempt.' : '{event} was not delivered to {target} after one delivery attempt.')
+      : (blocked ? '{event} could not be delivered to {target}.' : '{event} was not delivered to {target}.');
+  return interpolateSystemTemplate(template, { event, target, count: Number.isInteger(count) ? count : 0 }, ui);
+}
+
 function itemSummary(item: TimelineItem, ui: (englishText: string) => string): string {
-  return localizedSystemText(item.summary_key, item.summary, 'No summary was provided.', ui);
+  return deliveryDisruptionSummary(item, ui)
+    || localizedSystemText(item.summary_key, item.summary, 'No summary was provided.', ui);
 }
 
 function itemRecommendedNextStep(item: TimelineItem, ui: (englishText: string) => string): string {

@@ -363,6 +363,25 @@ function formatLabel(value?: string | null): string {
   return String(value || 'Not reported').replace(/_/g, ' ');
 }
 
+const COPILOT_SYSTEM_LABELS: Record<string, string> = {
+  product_min_stock_update: 'Minimum stock update proposal',
+  cost_standard_update: 'Standard cost update proposal',
+  replenishment_purchase_order_draft: 'Purchase Order draft recommendation',
+  verified_supplier_catalog: 'Verified supplier catalog price',
+  previous_purchase_reference: 'Previous purchase price',
+  needs_confirmation: 'Needs price confirmation',
+  weighted_average_unit_cost_90d: '90-day weighted average cost',
+  current_supplier_catalog_price: 'Current supplier catalog price',
+  latest_cost_bearing_movement: 'Latest cost-bearing movement',
+  current_standard_cost: 'Current standard cost'
+};
+
+function copilotSystemLabel(value: string | null | undefined, ui: UiTranslator): string {
+  if (!value) return ui('Not reported');
+  const canonical = COPILOT_SYSTEM_LABELS[value];
+  return canonical ? ui(canonical) : String(value);
+}
+
 type UiTranslator = (englishText: string) => string;
 
 function formatDateTime(value: string | null | undefined, locale: AppLocale, ui: UiTranslator): string {
@@ -1178,7 +1197,7 @@ export default function AIOperationsCopilotPage() {
                       <div><span style={styles.keyLabel}>{ui('90-day cost range')}</span><strong>{displayCurrencyCost(standardCostEvidence.min_unit_cost_90d, standardCostEvidence.tenant_currency, locale, ui)} – {displayCurrencyCost(standardCostEvidence.max_unit_cost_90d, standardCostEvidence.tenant_currency, locale, ui)}</strong></div>
                       <div><span style={styles.keyLabel}>{ui('Cost observations')}</span><strong>{formatLocalizedNumber(standardCostEvidence.costed_movement_count_90d || 0, locale)}</strong></div>
                       <div><span style={styles.keyLabel}>{ui('Current supplier price')}</span><strong>{displayCurrencyCost(standardCostEvidence.supplier_catalog_unit_cost, standardCostEvidence.supplier_catalog_currency || standardCostEvidence.tenant_currency, locale, ui)}</strong></div>
-                      <div><span style={styles.keyLabel}>{ui('Suggestion basis')}</span><strong>{ui(formatLabel(standardCostEvidence.suggested_reference_basis))}</strong></div>
+                      <div><span style={styles.keyLabel}>{ui('Suggestion basis')}</span><strong>{copilotSystemLabel(standardCostEvidence.suggested_reference_basis, ui)}</strong></div>
                       <div><span style={styles.keyLabel}>{ui('Latest cost date')}</span><strong>{formatDateTime(standardCostEvidence.latest_cost_at, locale, ui)}</strong></div>
                     </div>
                     {(standardCostEvidence.warnings || []).length ? <ul style={styles.list}>{(standardCostEvidence.warnings || []).map((item) => <li key={item}>{item}</li>)}</ul> : null}
@@ -1351,7 +1370,7 @@ export default function AIOperationsCopilotPage() {
                     <Badge tone="warn">{ui("Human review required")}</Badge>
                   </div>
                   <div style={styles.keyValueGrid}>
-                    <div><span style={styles.keyLabel}>{ui("Request type")}</span><strong>{ui(formatLabel(proposal.request_type))}</strong></div>
+                    <div><span style={styles.keyLabel}>{ui("Request type")}</span><strong>{copilotSystemLabel(proposal.request_type, ui)}</strong></div>
                     <div><span style={styles.keyLabel}>{ui("Product")}</span><strong>{proposal.payload?.product_name || (capabilities.canViewTenantDiagnostics ? proposal.payload?.product_id : null) || ui('Not reported')}</strong></div>
                     {isReplenishmentPOProposal ? (
                       <>
@@ -1361,7 +1380,7 @@ export default function AIOperationsCopilotPage() {
                         <div><span style={styles.keyLabel}>{ui('Packages to order')}</span><strong>{formatLocalizedNumber(Number(proposal.payload?.order_package_count || 0), locale)}</strong></div>
                         <div><span style={styles.keyLabel}>{ui('Unit price')}</span><strong>{displayCurrencyCost(proposal.payload?.unit_cost, proposal.payload?.currency, locale, ui)}</strong></div>
                         <div><span style={styles.keyLabel}>{ui('Estimated total')}</span><strong>{displayCurrencyCost(proposal.payload?.estimated_total_cost, proposal.payload?.currency, locale, ui)}</strong></div>
-                        <div><span style={styles.keyLabel}>{ui('Pricing evidence')}</span><strong>{ui(formatLabel(proposal.payload?.pricing_status))}</strong></div>
+                        <div><span style={styles.keyLabel}>{ui('Pricing evidence')}</span><strong>{copilotSystemLabel(proposal.payload?.pricing_status, ui)}</strong></div>
                         <div><span style={styles.keyLabel}>{ui('Expected delivery')}</span><strong>{proposal.payload?.expected_delivery_date || ui('Not reported')}</strong></div>
                       </>
                     ) : (

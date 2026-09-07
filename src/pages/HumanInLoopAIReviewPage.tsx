@@ -3618,7 +3618,7 @@ type HumanAIReview = {
     preview_kind?: string;
     preview_summary_key?: string | null;
     preview_summary?: string;
-    preview_metrics?: Record<string, number | string | boolean | null>;
+    preview_metrics?: Record<string, unknown>;
     preview_execution_mode?: string;
     mutation_allowed_from_preview?: boolean;
   };
@@ -3958,6 +3958,33 @@ const RECOMMENDATION_CANONICAL_LABELS: Record<string, string> = {
   remediation: 'Remediation findings',
   simulation: 'Simulations',
   optimization: 'Optimisation',
+  inventory: 'Inventory',
+  procurement: 'Procurement',
+  reservation: 'Reservation',
+  execution: 'Execution',
+  control_tower: 'Control tower',
+  financial: 'Financial',
+  integration: 'Integration',
+  system: 'System',
+  forecasting: 'Forecasting',
+  operations: 'Operations',
+  supplier_risk: 'Supplier risk',
+  safety: 'Safety',
+  governance: 'Governance',
+  dynamic_replenishment: 'Dynamic replenishment',
+  adaptive_reservation: 'Adaptive reservation',
+  sla_cost_balance: 'SLA / cost balance',
+  labor_allocation: 'Labour allocation',
+  supplier_selection: 'Supplier selection',
+  facility_balancing: 'Facility balancing',
+  working_capital_control: 'Working capital control',
+  integration_throttle: 'Integration throttle',
+  tuning_adjustment: 'Tuning adjustment',
+  threshold_adjustment: 'Threshold adjustment',
+  objective_reweighting: 'Objective reweighting',
+  guardrail_tightening: 'Guardrail tightening',
+  guardrail_relaxation: 'Guardrail relaxation',
+  policy_retirement: 'Policy retirement',
   multi_domain: 'Cross-area reviews',
   pending_review: 'Pending review',
   approval_required: 'Approval required',
@@ -4491,10 +4518,78 @@ function escalationDueIndicator(lifecycle: HumanAIReview['lifecycle']): 'overdue
 
 type BusinessImpactRow = { label: string; value: string };
 
+function reviewSystemValueLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
+  const raw = String(value || 'unknown');
+  const canonical = RECOMMENDATION_CANONICAL_LABELS[raw];
+  return canonical ? ui(canonical) : raw;
+}
+
+function explainabilityFactorLabel(value: string, ui: (englishText: string) => string): string {
+  const raw = String(value || '').trim();
+  if (!raw) return ui('Not reported');
+  const separator = raw.indexOf(':');
+  if (separator > 0 && separator < raw.length - 1) return reviewSystemValueLabel(raw.slice(separator + 1), ui);
+  return reviewSystemValueLabel(raw, ui);
+}
+
+function interpolateReviewTemplate(template: string, values: Record<string, string | number>, ui: (englishText: string) => string): string {
+  let localized = ui(template);
+  for (const [key, value] of Object.entries(values)) localized = localized.replaceAll(`{${key}}`, String(value));
+  return localized;
+}
+
+function adaptivePolicyAdjustmentImpact(value: Record<string, unknown>, ui: (englishText: string) => string): string {
+  const adjustmentKind = String(value.adjustment_kind || '');
+  const byKind: Record<string, string> = {
+    review_replenishment_thresholds_and_supply_position: 'Review replenishment thresholds and supply position because some products still need replenishment after committed supply and location rules are considered.',
+    review_reservation_allocation_rules: 'Review reservation allocation rules because some active reservations have blocked or partial allocation.',
+    review_supplier_selection_and_receiving_rules: 'Review supplier-selection or receiving rules because measured supplier evidence shows delivery or receiving risk.',
+    review_task_routing_or_labor_allocation_rules: 'Review execution task-routing or labor-allocation rules because active work is blocked.',
+    recalibrate_applied_policy: 'Recalibrate applied policy'
+  };
+  if (byKind[adjustmentKind]) return ui(byKind[adjustmentKind]);
+  const products = Number(value.affected_product_count || 0);
+  const locations = Number(value.affected_location_count || 0);
+  const suppliers = Number(value.affected_supplier_count || 0);
+  const reservations = Number(value.affected_reservation_count || 0);
+  const tasks = Number(value.affected_task_count || 0);
+  if (products > 0 || locations > 0) return interpolateReviewTemplate('Proposed review covers {products} product(s) and {locations} location(s).', { products, locations }, ui);
+  if (suppliers > 0) return interpolateReviewTemplate('Proposed review covers {count} supplier(s) with measured delivery or receiving risk.', { count: suppliers }, ui);
+  if (reservations > 0) return interpolateReviewTemplate('Proposed review covers {count} reservation(s) with allocation pressure.', { count: reservations }, ui);
+  if (tasks > 0) return interpolateReviewTemplate('Proposed review covers {count} blocked execution task(s).', { count: tasks }, ui);
+  return ui('Structured evidence available');
+}
+
+function expectedImpactSummary(value: Record<string, unknown>, ui: (englishText: string) => string, locale: AppLocale): string {
+  const current = Number(value.current_issue_ratio);
+  const desired = Number(value.desired_issue_ratio);
+  if (Number.isFinite(current) && Number.isFinite(desired)) {
+    return interpolateReviewTemplate(
+      'Current issue ratio: {current} · desired issue ratio: {desired}',
+      {
+        current: formatLocalizedNumber(current, locale, { style: 'percent', maximumFractionDigits: 1 }),
+        desired: formatLocalizedNumber(desired, locale, { style: 'percent', maximumFractionDigits: 1 })
+      },
+      ui
+    );
+  }
+  const direction = String(value.desired_direction || '');
+  if (direction === 'recover_or_improve_post_application_outcome') return ui('Recover or improve post-application outcome');
+  return ui('Structured evidence available');
+}
+
+function businessImpactMetricValue(key: string, value: unknown, ui: (englishText: string) => string, locale: AppLocale): string {
+  if (typeof value === 'number') return formatLocalizedNumber(value, locale);
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return String(value);
+  if (key === 'recommended_adjustment') return adaptivePolicyAdjustmentImpact(value as Record<string, unknown>, ui);
+  if (key === 'expected_impact') return expectedImpactSummary(value as Record<string, unknown>, ui, locale);
+  return ui('Structured evidence available');
+}
+
 function reviewBusinessImpactRows(review: HumanAIReview, ui: (englishText: string) => string, locale: AppLocale): BusinessImpactRow[] {
   const metrics = review.simulation_preview?.preview_metrics || {};
   const rows: BusinessImpactRow[] = [];
-  if (review.source_scope_domain) rows.push({ label: ui('Affected area'), value: formatLabel(review.source_scope_domain) });
+  if (review.source_scope_domain) rows.push({ label: ui('Affected area'), value: reviewSystemValueLabel(review.source_scope_domain, ui) });
   const knownMetrics: Array<[string, string]> = [
     ['recommended_reorder_quantity', 'Recommended reorder quantity'],
     ['target_stock_quantity', 'Target stock quantity'],
@@ -4509,7 +4604,7 @@ function reviewBusinessImpactRows(review: HumanAIReview, ui: (englishText: strin
   for (const [key, label] of knownMetrics) {
     const value = metrics[key];
     if (value === undefined || value === null || value === '') continue;
-    rows.push({ label: ui(label), value: typeof value === 'number' ? formatLocalizedNumber(value, locale) : typeof value === 'object' ? JSON.stringify(value) : String(value) });
+    rows.push({ label: ui(label), value: businessImpactMetricValue(key, value, ui, locale) });
     if (rows.length >= 4) break;
   }
   return rows;
@@ -9145,7 +9240,7 @@ export default function HumanInLoopAIReviewPage() {
                   {review.explainability_review?.primary_factors?.length ? (
                     <div style={{ marginTop: 12 }}>
                       <div className="card__label">{ui("Explainability factors")}</div>
-                      <p className="card__subtext">{review.explainability_review.primary_factors.map(formatLabel).join(' · ')}</p>
+                      <p className="card__subtext">{review.explainability_review.primary_factors.map((factor) => explainabilityFactorLabel(factor, ui)).join(' · ')}</p>
                     </div>
                   ) : null}
 
