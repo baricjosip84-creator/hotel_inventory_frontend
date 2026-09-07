@@ -1,0 +1,21 @@
+import fs from 'node:fs';
+const page = fs.readFileSync('src/pages/CrossDomainOptimizationPage.tsx', 'utf8');
+const css = fs.readFileSync('src/pages/CrossDomainOptimizationPage.css', 'utf8');
+const oldGuard = fs.readFileSync('scripts/check-tenant-cross-domain-optimization-multilingual.mjs', 'utf8');
+let failed = false;
+const check = (ok, message) => { if (ok) console.log(`PASS: ${message}`); else { console.error(`FAIL: ${message}`); failed = true; } };
+
+check(page.includes("type OptimizationView = 'evidence' | 'plan' | 'readiness'"), 'Selected-plan detail view is present.');
+check(page.includes("params.set('review_run_id', selectedRunId)"), 'Review query is tied to one planning run.');
+check(page.includes("'/decision-intelligence/cross-domain-optimization/reviews'"), 'Create planning review workflow is wired.');
+check(page.includes("`/decision-intelligence/cross-domain-optimization/tradeoffs/${") && page.includes('Record tradeoff decision'), 'Tradeoff governance recording is wired.');
+check(page.includes('Why this option scored this way') && page.includes('objective_targets'), 'Option explanation and objective-target presentation are wired.');
+check(page.includes('Expected result compared with actual result') && page.includes("navigate('/decision-learning-feedback')"), 'Expected-versus-actual outcome presentation and Learning Feedback handoff are wired.');
+check(page.includes("navigate('/intelligence-review')") && page.includes("action: 'request_intelligence_review'"), 'Formal Intelligence Review handoff is wired.');
+check(page.includes('Optimization governance settings') && page.includes("method: 'PUT'"), 'Tenant governance settings editor is wired.');
+check(page.includes('Ownership and next action') && page.includes("action: 'update_ownership'") && page.includes("navigate('/tenant-tasks')") && page.includes("navigate('/execution-requests')"), 'Owner, due date, next action, and existing-workflow handoffs are wired.');
+check(page.includes('People remain responsible for every approval and real business action.') && !page.includes('/purchase-orders') && !page.includes('/stock/movements'), 'UI preserves the no-direct-operational-execution boundary.');
+check(css.includes('cross-domain-option-card--selected') && css.includes('cross-domain-tradeoff-govern') && css.includes('@media (max-width: 900px)'), 'Plan comparison, governance controls, and responsive layout are styled.');
+check(oldGuard.includes('run-scoped, human-governed') && !oldGuard.includes('unexpectedly contains a mutation path'), 'Existing multilingual guard now protects the governed-write contract instead of obsolete read-only behavior.');
+if (failed) process.exit(1);
+console.log('PASS: v3.49.170 Cross-Domain Optimization frontend operational completion guard passed.');

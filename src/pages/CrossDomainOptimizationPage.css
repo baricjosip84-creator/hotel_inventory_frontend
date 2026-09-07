@@ -572,3 +572,56 @@
     width: 100%;
   }
 }
+
+/* v3.49.170 — Cross-Domain Optimization operational completion */
+.cross-domain-page { display: grid; gap: 1rem; }
+.cross-domain-section { display: grid; gap: 1rem; }
+.cross-domain-state { display: flex; gap: .75rem; align-items: flex-start; }
+.cross-domain-filter-grid, .cross-domain-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+.cross-domain-span-2 { grid-column: 1 / -1; }
+.cross-domain-badge { display: inline-flex; align-items: center; width: fit-content; padding: .25rem .55rem; border: 1px solid var(--border-color); border-radius: 999px; font-size: .78rem; font-weight: 650; }
+.cross-domain-badge--ok { background: var(--success-soft, rgba(22, 163, 74, .08)); }
+.cross-domain-badge--warn { background: var(--warning-soft, rgba(245, 158, 11, .10)); }
+.cross-domain-badge--neutral { background: var(--surface-muted, rgba(127,127,127,.06)); }
+.cross-domain-subtext { display: block; margin-top: .25rem; font-size: .82rem; opacity: .72; max-width: 46rem; }
+.cross-domain-muted { opacity: .72; }
+.cross-domain-error { color: var(--danger, #b42318); font-weight: 650; }
+.cross-domain-builder-heading { display: flex; justify-content: space-between; gap: 1rem; align-items: center; margin-top: .25rem; }
+.cross-domain-builder-heading--small { margin-top: .8rem; }
+.cross-domain-builder-heading h3, .cross-domain-builder-heading p { margin: 0; }
+.cross-domain-builder-heading p { opacity: .72; font-size: .88rem; }
+.cross-domain-builder-list { display: grid; gap: .85rem; }
+.cross-domain-builder-card, .cross-domain-objective-card, .cross-domain-option-card, .cross-domain-tradeoff-card, .cross-domain-outcome-card { border: 1px solid var(--border-color); border-radius: .8rem; padding: 1rem; display: grid; gap: .75rem; background: var(--surface, transparent); }
+.cross-domain-option-card--selected { outline: 2px solid var(--focus-ring, currentColor); outline-offset: 1px; }
+.cross-domain-tradeoff-draft { display: grid; grid-template-columns: 1fr 1fr 1fr .7fr 2fr auto; gap: .55rem; align-items: end; }
+.cross-domain-plan-header { grid-template-columns: minmax(0, 1fr) minmax(16rem, .55fr); align-items: start; }
+.cross-domain-plan-meta { display: grid; gap: .4rem; font-size: .88rem; }
+.cross-domain-eyebrow { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; opacity: .7; }
+.cross-domain-objective-grid, .cross-domain-option-grid, .cross-domain-outcome-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+.cross-domain-objective-card p, .cross-domain-option-card p, .cross-domain-tradeoff-card p, .cross-domain-outcome-card p { margin: 0; }
+.cross-domain-option-title, .cross-domain-tradeoff-summary, .cross-domain-outcome-heading { display: flex; justify-content: space-between; gap: .75rem; align-items: flex-start; }
+.cross-domain-score-row { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .5rem; }
+.cross-domain-score-row > div { border: 1px solid var(--border-color); border-radius: .6rem; padding: .65rem; display: grid; gap: .2rem; }
+.cross-domain-score-row span { font-size: .78rem; opacity: .7; }
+.cross-domain-explanation { display: grid; gap: .65rem; }
+.cross-domain-explanation h3 { margin: 0; font-size: .95rem; }
+.cross-domain-driver-grid, .cross-domain-expected-actual { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .7rem; }
+.cross-domain-driver-grid > div, .cross-domain-expected-actual > div { border: 1px solid var(--border-color); border-radius: .6rem; padding: .7rem; }
+.cross-domain-driver-grid ul { margin: .45rem 0 0 1rem; padding: 0; }
+.cross-domain-tradeoff-list { display: grid; gap: .75rem; }
+.cross-domain-tradeoff-govern { display: grid; grid-template-columns: 1fr 2fr 2fr auto; gap: .55rem; align-items: end; }
+.cross-domain-handoffs { display: flex; flex-wrap: wrap; gap: .5rem; }
+.cross-domain-review-summary { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: .65rem; align-items: center; }
+.cross-domain-check-list { display: grid; gap: .55rem; }
+.cross-domain-check { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; padding: .7rem; border: 1px solid var(--border-color); border-radius: .6rem; }
+.cross-domain-check p { margin: .25rem 0 0; opacity: .72; font-size: .84rem; }
+@media (max-width: 900px) {
+  .cross-domain-filter-grid, .cross-domain-form-grid, .cross-domain-plan-header, .cross-domain-objective-grid, .cross-domain-option-grid, .cross-domain-outcome-grid, .cross-domain-driver-grid, .cross-domain-expected-actual { grid-template-columns: 1fr; }
+  .cross-domain-span-2 { grid-column: auto; }
+  .cross-domain-tradeoff-draft, .cross-domain-tradeoff-govern { grid-template-columns: 1fr; }
+}
+.cross-domain-create,
+.cross-domain-filters { align-content: start; }
+.cross-domain-table { width: 100%; }
+.cross-domain-table th,
+.cross-domain-table td { vertical-align: top; }

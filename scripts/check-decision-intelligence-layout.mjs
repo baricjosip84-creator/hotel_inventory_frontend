@@ -55,6 +55,8 @@ const fail = (message) => {
 };
 
 const styles = fs.readFileSync(path.join(root, stylePath), 'utf8');
+const crossDomainStyles = fs.readFileSync(path.join(root, 'src/pages/CrossDomainOptimizationPage.css'), 'utf8');
+for (const match of crossDomainStyles.matchAll(/\.([A-Za-z_][\w-]*)/g)) allowedClasses.add(match[1]);
 if (!styles.includes('.decision-intelligence-page')) {
   fail(`${stylePath} must define the scoped page root.`);
 }
