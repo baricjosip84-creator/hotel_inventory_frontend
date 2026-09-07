@@ -595,3 +595,73 @@
     margin-inline: 12px;
   }
 }
+
+/* v3.49.169 — closed-loop policy application and lifecycle controls. */
+.adaptive-policy-page--refined .adaptive-policy-table__subtext--proposal {
+  font-weight: 600;
+  color: #334155;
+}
+
+.adaptive-policy-page--refined .adaptive-policy-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 220px;
+}
+
+.adaptive-policy-page--refined .adaptive-policy-governance-form {
+  border-top: 3px solid #64748b;
+}
+
+.adaptive-policy-page--refined .adaptive-policy-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.adaptive-policy-page--refined .adaptive-policy-form-grid__wide {
+  grid-column: 1 / -1;
+}
+
+.adaptive-policy-page--refined .adaptive-policy-form-grid label,
+.adaptive-policy-page--refined .adaptive-policy-governance-form > label {
+  display: grid;
+  gap: 6px;
+}
+
+.adaptive-policy-page--refined .adaptive-policy-json-input {
+  min-height: 132px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.adaptive-policy-page--refined .adaptive-policy-governance-form textarea:not(.adaptive-policy-json-input) {
+  min-height: 94px;
+  resize: vertical;
+}
+
+.adaptive-policy-page--refined .adaptive-policy-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.adaptive-policy-page--refined .adaptive-policy-form-error {
+  margin: 12px 0 0;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .adaptive-policy-page--refined .adaptive-policy-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .adaptive-policy-page--refined .adaptive-policy-form-grid__wide {
+    grid-column: auto;
+  }
+}
