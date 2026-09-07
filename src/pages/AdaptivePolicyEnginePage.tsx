@@ -1,5 +1,6 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
@@ -667,6 +668,11 @@ function EvidenceSection({
 
 export default function AdaptivePolicyEnginePage() {
   const { locale, ui } = useAppTranslation();
+  const [searchParams] = useSearchParams();
+  const requestedSourceActionId = searchParams.get('source_action_id')?.trim() || '';
+  const requestedRecommendationId = requestedSourceActionId.startsWith('adaptive_policy_recommendation:')
+    ? requestedSourceActionId.slice('adaptive_policy_recommendation:'.length)
+    : '';
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
   const canGovern = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
   const [view, setView] = useState<AdaptivePolicyView>('evidence');
@@ -687,13 +693,20 @@ export default function AdaptivePolicyEnginePage() {
     Object.entries(filters).forEach(([key, value]) => {
       if (value) params.set(key, value);
     });
+    if (requestedSourceActionId) params.set('source_action_id', requestedSourceActionId);
     return params.toString();
-  }, [filters]);
+  }, [filters, requestedSourceActionId]);
 
   const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: ['adaptive-policy-engine-summary', queryString],
     queryFn: () => apiRequest<AdaptivePolicySummary>(`/decision-intelligence/adaptive-policy-engine-summary?${queryString}`)
   });
+
+  useEffect(() => {
+    if (!requestedRecommendationId || !data?.recommendations?.some((recommendation) => recommendation.id === requestedRecommendationId)) return;
+    const target = document.getElementById(`adaptive-policy-recommendation-${requestedRecommendationId}`);
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [data?.recommendations, requestedRecommendationId]);
 
   const refreshAnalysis = useMutation({
     mutationFn: () => apiRequest<{ refreshed: boolean }>(
@@ -952,7 +965,7 @@ export default function AdaptivePolicyEnginePage() {
               const adjustmentSummary = recommendedAdjustmentSummary(recommendation, ui);
               const hasActiveApplication = (data?.applications || []).some((application) => application.policy_id === recommendation.policy_id && ['applied_monitoring', 'recalibration_review', 'rollback_review'].includes(String(application.application_status)));
               return (
-                <tr key={`${recommendation.recommendation_key || 'recommendation'}-${index}`}>
+                <tr id={recommendation.id ? `adaptive-policy-recommendation-${recommendation.id}` : undefined} className={requestedRecommendationId && recommendation.id === requestedRecommendationId ? 'adaptive-policy-table-row--focused' : undefined} key={`${recommendation.recommendation_key || 'recommendation'}-${index}`}>
                   <td>{formatLabel(recommendation.policy_key)}</td>
                   <td><strong>{formatLabel(recommendation.recommendation_key)}</strong>{recommendationSummary ? <span className="adaptive-policy-table__subtext">{recommendationSummary}</span> : null}{adjustmentSummary ? <span className="adaptive-policy-table__subtext adaptive-policy-table__subtext--proposal">{adjustmentSummary}</span> : null}</td>
                   <td>{formatCanonicalLabel(recommendation.recommendation_type, ui)}</td>

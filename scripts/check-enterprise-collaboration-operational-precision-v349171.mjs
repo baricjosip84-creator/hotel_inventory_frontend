@@ -54,7 +54,7 @@ need(alerts, 'fetchAlertById(requestedAlertId)', 'Alerts can fetch a linked reco
 need(alerts, 'id={`alert-${alert.id}`}', 'Alerts provides a stable focus target for exact navigation.');
 need(alertsCss, '.alerts-alert-card--focused', 'The exact alert is visibly focused.');
 need(feed, "searchParams.get('timeline_item_id')", 'Operations Feed recognizes exact timeline links.');
-need(feed, "focusedTimelineItemId ? '200' : '75'", 'Exact event focus expands only the bounded read window needed for navigation.');
+need(feed, "params.set('timeline_item_id', focusedTimelineItemId)", 'Exact event focus is sent to the backend for exact-record retrieval.');
 need(feed, 'item.timeline_item_id !== requestedTimelineItemId', 'Operations Feed focuses the requested timeline item.');
 need(feedCss, '.operations-feed-page__timeline-card--focused', 'The exact operational event is visibly focused.');
 for (const phrase of [

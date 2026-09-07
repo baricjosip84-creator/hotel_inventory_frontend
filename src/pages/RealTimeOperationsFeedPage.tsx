@@ -447,9 +447,10 @@ async function fetchOperationsFeed(
   urgency: 'all' | EventUrgency,
   focusedTimelineItemId = ''
 ): Promise<RealTimeOperationsFeedResponse> {
-  const params = new URLSearchParams({ limit: focusedTimelineItemId ? '200' : '75' });
+  const params = new URLSearchParams({ limit: focusedTimelineItemId ? '1' : '75' });
   if (eventDomain !== 'all') params.set('event_domain', eventDomain);
   if (urgency !== 'all') params.set('urgency', urgency);
+  if (focusedTimelineItemId) params.set('timeline_item_id', focusedTimelineItemId);
   return apiRequest<RealTimeOperationsFeedResponse>(`/operational-action-center/realtime-event-coordination-summary?${params.toString()}`);
 }
 
