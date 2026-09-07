@@ -452,7 +452,7 @@ for (const mapping of ["unresolved_alerts: 'Unresolved alerts'", "low_stock_prod
 check(page.copilot.includes('copilotEvidenceKindLabel(item.kind, ui)'), 'AI Copilot evidence kinds no longer fall through generic English humanization');
 
 const ci=String(pkg.scripts?.['check:ci']||'');
-check(ci.startsWith('npm run check:tenant-multilingual-closure-audit && npm run check:command-pages-final-producer-renderer-closure-v349188 && npm run check:backend-system-text-remaining-enum-localization-v349187 && '), 'tenant multilingual closure remains first and v3.49.188 precedes v3.49.187 in frontend CI');
+check(ci.startsWith('npm run check:tenant-multilingual-closure-audit && npm run check:command-pages-lint-closure-v349189 && npm run check:command-pages-final-producer-renderer-closure-v349188 && npm run check:backend-system-text-remaining-enum-localization-v349187 && '), 'tenant multilingual closure remains first and v3.49.189/v3.49.188 precede v3.49.187 in frontend CI');
 check(String(pkg.scripts?.['check:backend-system-text-remaining-enum-localization-v349187']||'').includes('check-backend-system-text-remaining-enum-localization-v349187.mjs'), 'v3.49.187 frontend guard is registered');
 
 console.log(`Backend system text & remaining enum localization v3.49.187: ${passCount}/${passCount+failCount} PASS`);
