@@ -17,8 +17,8 @@ function check(label, condition) {
   console.log(`PASS: ${label}`);
 }
 
-check('Control Tower source links resolve to Reliability Command.',
-  page.includes("if (sourceSurface === '/control-tower') return '/reliability-command';"));
+check('Control Tower source links resolve to Action Center.',
+  page.includes("if (sourceSurface === '/control-tower') return '/action-center';"));
 check('Action Center API source surface resolves to the visible Action Center route.',
   page.includes("if (sourceSurface === '/operational-action-center/summary') return '/action-center';"));
 check('Reliability Command is an accepted tenant source route.',

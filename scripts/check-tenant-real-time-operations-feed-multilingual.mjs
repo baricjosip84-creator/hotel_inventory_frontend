@@ -141,7 +141,7 @@ const readOnlyContracts = [
   'refetchOnReconnect: true', 'refetchOnWindowFocus: true', 'feedQuery.refetch()',
   'refetchInterval: OPERATIONS_FEED_AUTO_REFRESH_MS', 'refetchIntervalInBackground: false',
   "timeline_type === 'event_delivery_disruption'", "timeline_type === 'event_stream_message'",
-  "if (sourceSurface === '/control-tower') return '/reliability-command';",
+  "if (sourceSurface === '/control-tower') return '/action-center';",
   'Showing the last available operations-feed snapshot. Try refreshing again before acting on time-sensitive information.',
   "viewScope === 'new'", 'timelineItemSearchText(item, ui)', "timeWindow === '24h'"
 ];

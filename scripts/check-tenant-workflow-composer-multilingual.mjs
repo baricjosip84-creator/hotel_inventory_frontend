@@ -142,7 +142,7 @@ const serverContentContracts = [
   'localizedGuidance(guidance.approval_chain_guidance_key, guidance.approval_chain_guidance',
   'localizedGuidance(guidance.event_trigger_guidance_key, guidance.event_trigger_guidance',
   'localizedGuidance(guidance.integration_routing_guidance_key, guidance.integration_routing_guidance',
-  "if (sourceSurface === '/control-tower') return '/reliability-command';",
+  "if (sourceSurface === '/control-tower') return '/action-center';",
   'const hasSnapshot = Boolean(response);',
   'composerQuery.error && hasSnapshot',
   "Showing the last available Workflow Composer snapshot. Refresh again before relying on time-sensitive plan ordering.",

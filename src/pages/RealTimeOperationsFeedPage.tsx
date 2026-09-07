@@ -295,7 +295,7 @@ function statusClass(value?: string | null): string {
 
 function sourceSurfaceToAppPath(sourceSurface?: string | null): string | null {
   if (!sourceSurface || !sourceSurface.startsWith('/')) return null;
-  if (sourceSurface === '/control-tower') return '/reliability-command';
+  if (sourceSurface === '/control-tower') return '/action-center';
   if (sourceSurface === '/operational-action-center/summary') return '/action-center';
 
   const tenantRoutes = new Set([
@@ -409,7 +409,7 @@ function domainIconPath(domain?: string | null): string {
   if (domain === 'reservation') return '/inventory-reservations';
   if (domain === 'execution') return '/execution-tasks';
   if (domain === 'optimization') return '/cross-domain-optimization';
-  if (domain === 'control_tower') return '/reliability-command';
+  if (domain === 'control_tower') return '/action-center';
   if (domain === 'decision_intelligence' || domain === 'ai_governance') return '/intelligence-review';
   if (domain === 'financial') return '/reports';
   if (domain === 'integration') return '/system-context';

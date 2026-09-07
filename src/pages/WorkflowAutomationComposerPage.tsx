@@ -446,7 +446,7 @@ function linkIconPath(to: string): string {
 
 function sourceSurfaceToAppPath(sourceSurface?: string | null): string | null {
   if (!sourceSurface || !sourceSurface.startsWith('/')) return null;
-  if (sourceSurface === '/control-tower') return '/reliability-command';
+  if (sourceSurface === '/control-tower') return '/action-center';
 
   const tenantRoutes = new Set([
     '/action-center',

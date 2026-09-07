@@ -297,16 +297,21 @@ function canOpenTaskSource(task: MobileExecutionTask): boolean {
 function taskSourceLink(task: MobileExecutionTask): string | null {
   if (!canOpenTaskSource(task)) return null;
   const route = task.source_route || '/execution-tasks';
-  if (!task.source_id) return route;
   const params = new URLSearchParams();
-  if (task.source_type === 'shipment') params.set('shipmentId', task.source_id);
-  else if (task.source_type === 'purchase_order') params.set('purchaseOrderId', task.source_id);
-  else if (task.source_type === 'reservation') params.set('reservationId', task.source_id);
-  else if (task.source_type === 'requisition') params.set('requisitionId', task.source_id);
-  else if (task.source_type === 'transfer') params.set('transfer_id', task.source_id);
-  else if (task.source_type === 'execution_request') params.set('request_id', task.source_id);
-  else return route;
-  return `${route}?${params.toString()}`;
+
+  if (task.source_type === 'cycle_count') params.set('tab', 'cycle-counts');
+  else if (task.source_type === 'replenishment') params.set('tab', 'par-levels');
+
+  if (task.source_id) {
+    if (task.source_type === 'shipment') params.set('shipmentId', task.source_id);
+    else if (task.source_type === 'purchase_order') params.set('purchaseOrderId', task.source_id);
+    else if (task.source_type === 'reservation') params.set('reservationId', task.source_id);
+    else if (task.source_type === 'requisition') params.set('requisitionId', task.source_id);
+    else if (task.source_type === 'transfer') params.set('transfer_id', task.source_id);
+    else if (task.source_type === 'execution_request') params.set('request_id', task.source_id);
+  }
+
+  return params.size ? `${route}?${params.toString()}` : route;
 }
 
 function dueCopy(task: MobileExecutionTask, locale: AppLocale, ui: (englishText: string) => string): string {

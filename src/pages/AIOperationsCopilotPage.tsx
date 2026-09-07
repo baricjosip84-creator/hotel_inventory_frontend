@@ -771,6 +771,17 @@ export default function AIOperationsCopilotPage() {
     && Number.isFinite(standardCostValue)
     && Math.abs(standardCostValue - suggestedStandardCost) / suggestedStandardCost > 0.10
   );
+  const canPromoteReplenishmentForReview = [
+    TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ,
+    TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN,
+    TENANT_PERMISSIONS.PRODUCTS_READ,
+    TENANT_PERMISSIONS.STOCK_READ,
+    TENANT_PERMISSIONS.SHIPMENTS_READ,
+    TENANT_PERMISSIONS.SUPPLIER_CATALOG_READ,
+    TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_READ,
+    TENANT_PERMISSIONS.PURCHASE_ORDERS_READ
+  ].every((permission) => hasPermission(permission));
+
   const canSubmit = Boolean(
     capabilities.canGovernDecisionIntelligence
     && capabilitiesQuery.data?.can_run
@@ -1312,13 +1323,16 @@ export default function AIOperationsCopilotPage() {
                     type="button"
                     className="primary-button"
                     style={styles.primaryButton}
-                    disabled={!capabilities.canGovernDecisionIntelligence || promoteReplenishmentMutation.isPending}
+                    disabled={!canPromoteReplenishmentForReview || promoteReplenishmentMutation.isPending}
                     onClick={() => promoteReplenishmentMutation.mutate(selectedRun.id)}
                     data-skip-global-action-feedback="true"
                   >
                     <TenantNavIcon path="/intelligence-review" size={16} />
                     {promoteReplenishmentMutation.isPending ? ui('Preparing fresh review proposal…') : ui('Send recommendation for review')}
                   </button>
+                  {!canPromoteReplenishmentForReview ? (
+                    <p style={styles.help}>{ui('Additional procurement access is required to send this replenishment recommendation for review.')}</p>
+                  ) : null}
                 </div>
               ) : null}
 

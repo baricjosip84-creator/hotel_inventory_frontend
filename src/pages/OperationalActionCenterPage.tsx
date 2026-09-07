@@ -416,7 +416,7 @@ function sourceSurfaceToAppPath(sourceSurface?: string): string | null {
     return null;
   }
 
-  if (sourceSurface === '/control-tower') return '/reliability-command';
+  if (sourceSurface === '/control-tower') return hasPermission(TENANT_PERMISSIONS.PLATFORM_RELIABILITY_READ) ? '/reliability-command' : null;
 
   const tenantRoutes = new Set([
     '/alerts',

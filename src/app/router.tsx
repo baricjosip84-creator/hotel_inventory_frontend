@@ -19,7 +19,7 @@
   system/admin visibility, and management insights.
 */
 
-import { createBrowserRouter, Navigate, useLocation } from 'react-router';
+import { createBrowserRouter, Navigate, useLocation, useSearchParams } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import AppLayout from '../layouts/AppLayout';
 import { LoginPage } from '../pages/LoginPage';
@@ -190,6 +190,22 @@ function LegacyPlatformBackupRestoreRedirect() {
 function LegacyPlatformLaunchAcceptanceRedirect() {
   const location = useLocation();
   return <Navigate to={`/platform/commercial-launch-acceptance-packet${location.search}${location.hash}`} replace />;
+}
+
+function ScannerProtectedPage() {
+  const [searchParams] = useSearchParams();
+  const mode = searchParams.get('mode');
+  const requiredPermissions = mode === 'task'
+    ? [TENANT_PERMISSIONS.EXECUTION_TASKS_UPDATE, TENANT_PERMISSIONS.PRODUCTS_READ]
+    : mode === 'product'
+      ? [TENANT_PERMISSIONS.SHIPMENTS_READ, TENANT_PERMISSIONS.SHIPMENTS_RECEIVE]
+      : [TENANT_PERMISSIONS.SHIPMENTS_READ];
+
+  return (
+    <ProtectedRoute requiredPermissions={requiredPermissions}>
+      <ScannerPage />
+    </ProtectedRoute>
+  );
 }
 
 const router = createBrowserRouter([
@@ -1673,11 +1689,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'scanner',
-        element: (
-          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.SHIPMENTS_READ]}>
-            <ScannerPage />
-          </ProtectedRoute>
-        )
+        element: <ScannerProtectedPage />
       },
       {
         path: 'sessions',
