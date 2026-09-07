@@ -62,7 +62,6 @@ for (const required of [
   '<LocalizedLearningStatCard label="Blocked checks"',
   '<LocalizedLearningStatCard label="Open review pressure"',
   "{ui('Governance owner:')}",
-  "governance?.governance_note || ui('Manual enterprise rollout governance remains advisory only.')",
   "{ui('No enterprise rollout governance blockers are currently reported.')}",
   "{ui('Manual governance options:')}",
   "{ui('No enterprise rollout governance checks are available yet.')}",
@@ -73,7 +72,6 @@ for (const required of [
   "{ui('Control owner:')}",
   "{ui('Recommended wave mode:')}",
   "{ui('Default wave size:')}",
-  "controls?.rollout_control_note || ui('Manual multi-tenant rollout controls remain advisory only.')",
   "{ui('No multi-tenant rollout control blockers are currently reported.')}",
   "{ui('Manual control options:')}",
   "{ui('No multi-tenant rollout control checks are available yet.')}",
@@ -103,39 +101,25 @@ for (const [name, start, end] of [
   else pass(`${name} slice has no remaining raw JSX presentation text.`);
 }
 
-for (const required of [
-  "governance?.recommended_governance_owner || 'enterprise_rollout_owner'",
-  "formatLabel(governance?.next_governance_focus || 'prepare_manual_enterprise_rollout_governance_approval')",
-  'governance?.governance_note || ui(',
-  'blockers.map(formatLabel).join(',
-  'options.map(formatLabel).join(',
-  '<td>{check.check_label || formatLabel(check.check_key)}</td>',
-  '<td>{formatLabel(check.governance_evidence)}</td>',
-  '<td>{formatLabel(check.manual_governance_task)}</td>',
-  "controls?.recommended_rollout_control_owner || 'enterprise_rollout_owner'",
-  "formatLabel(controls?.next_rollout_control_focus || 'prepare_manual_controlled_tenant_wave_approval')",
-  "formatLabel(policy.recommended_wave_mode || 'pause_multi_tenant_rollout_for_manual_remediation')",
-  "formatLabel(policy.default_wave_size || 'no_new_tenant_wave_until_manual_resolution')",
-  'controls?.rollout_control_note || ui(',
-  '<td>{formatLabel(check.control_evidence)}</td>',
-  '<td>{formatLabel(check.manual_control_task)}</td>'
-]) if (!pageSource.includes(required)) fail(`Expected backend-data boundary missing: ${required}`);
+
+// v3.49.188: backend-owned governance vocabulary must use protected presentation helpers,
+// while arbitrary tenant/business text remains outside blind ui()/formatLabel() translation.
+const protectedSystemFieldsV349188 = ['check_label', 'control_evidence', 'default_wave_size', 'governance_evidence', 'governance_note', 'manual_control_task', 'manual_governance_task', 'next_governance_focus', 'next_rollout_control_focus', 'recommended_wave_mode', 'rollout_control_note'];
+const protectedHelpersV349188 = ['learningOwnedSystemText', 'learningCheckLabel', 'learningDomainLabel', 'learningEvidenceTypeLabel'];
+for (const helper of protectedHelpersV349188) {
+  if (!pageSource.includes(`${helper}(`)) fail(`v3.49.188 Learning Feedback protected helper missing: ${helper}`);
+}
+for (const field of protectedSystemFieldsV349188) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(?:learningOwnedSystemText|learningOwnerLabel|learningCheckLabel|learningDomainLabel|learningEvidenceTypeLabel|learningActionRationale)\\([^\\n]*${escaped}`);
+  if (!pattern.test(pageSource)) fail(`Backend-owned Learning Feedback field is not protected by the v3.49.188 presentation boundary: ${field}`);
+}
 for (const forbidden of [
-  'ui(formatLabel(governance?.recommended_governance_owner',
-  'ui(formatLabel(governance?.next_governance_focus',
-  'ui(governance?.governance_note',
-  'ui(formatLabel(check.check_label || check.check_key))',
-  'ui(formatLabel(check.governance_evidence))',
-  'ui(formatLabel(check.manual_governance_task))',
-  'ui(formatLabel(controls?.recommended_rollout_control_owner',
-  'ui(formatLabel(controls?.next_rollout_control_focus',
-  'ui(formatLabel(policy.recommended_wave_mode',
-  'ui(formatLabel(policy.default_wave_size',
-  'ui(controls?.rollout_control_note',
-  'ui(formatLabel(check.control_evidence))',
-  'ui(formatLabel(check.manual_control_task))'
-]) if (pageSource.includes(forbidden)) fail(`Backend governance/rollout-control data must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend check labels, owners, wave controls, blockers, decision options, evidence, tasks, focus values, notes, and composite business values remain raw.');
+  'ui(formatLabel(check.check_label',
+  'ui(formatLabel(blocker))',
+  'ui(formatLabel(item.learning_domain))'
+]) if (pageSource.includes(forbidden)) fail(`Learning Feedback must not blindly translate backend identifiers: ${forbidden}`);
+if (!process.exitCode) pass('Backend-owned Learning Feedback governance text uses protected localized helpers while arbitrary business text remains outside blind translation.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

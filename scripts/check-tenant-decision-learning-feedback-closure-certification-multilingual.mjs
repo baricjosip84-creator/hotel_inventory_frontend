@@ -82,7 +82,6 @@ for (const required of [
   '<LocalizedLearningStatCard label="Ready checks"',
   '<LocalizedLearningStatCard label="Blocked checks"',
   "{ui('Next focus:')}",
-  "dossier?.certification_note || ui('Manual certification dossier remains advisory only.')",
   "<th>{ui('Check')}</th>",
   "<th>{ui('Current')}</th>",
   "<th>{ui('Required')}</th>",
@@ -112,33 +111,25 @@ for (const [name, start, end] of [
   else pass(`${name} slice has no remaining raw JSX presentation text.`);
 }
 
-for (const required of [
-  "{report?.closure_note ? <p className=\"card__subtext\">{report.closure_note}</p> : null}",
-  "value={formatLabel(report?.recommended_closure_owner || 'platform_admin_or_authorized_business_owner')}",
-  '<td>{formatLabel(item.closure_key)}</td>',
-  '<td>{formatLabel(item.exception_key)}</td>',
-  '<td>{formatLabel(item.closure_evidence_required)}</td>',
-  '<td>{formatLabel(item.closure_validation_task)}</td>',
-  "formatLabel(dossier?.recommended_certification_owner || 'decision_governance_owner')",
-  "formatLabel(dossier?.next_certification_focus || 'prepare_manual_closed_loop_certification_record')",
-  'blockers.slice(0, 6).map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)',
-  "<td>{formatLabel(check.check_label || check.check_key || 'check')}</td>",
-  "<td>{formatLabel(check.manual_certification_task || 'manual_certification_review_required')}</td>"
-]) if (!pageSource.includes(required)) fail(`Expected backend-data boundary missing: ${required}`);
+
+// v3.49.188: backend-owned governance vocabulary must use protected presentation helpers,
+// while arbitrary tenant/business text remains outside blind ui()/formatLabel() translation.
+const protectedSystemFieldsV349188 = ['certification_note', 'check_label', 'closure_evidence_required', 'closure_key', 'closure_note', 'closure_validation_task', 'exception_key', 'manual_certification_task', 'next_certification_focus', 'recommended_certification_owner', 'recommended_closure_owner'];
+const protectedHelpersV349188 = ['learningOwnedSystemText', 'learningOwnerLabel', 'learningCheckLabel', 'learningDomainLabel', 'learningEvidenceTypeLabel'];
+for (const helper of protectedHelpersV349188) {
+  if (!pageSource.includes(`${helper}(`)) fail(`v3.49.188 Learning Feedback protected helper missing: ${helper}`);
+}
+for (const field of protectedSystemFieldsV349188) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(?:learningOwnedSystemText|learningOwnerLabel|learningCheckLabel|learningDomainLabel|learningEvidenceTypeLabel|learningActionRationale)\\([^\\n]*${escaped}`);
+  if (!pattern.test(pageSource)) fail(`Backend-owned Learning Feedback field is not protected by the v3.49.188 presentation boundary: ${field}`);
+}
 for (const forbidden of [
-  'ui(report.closure_note)',
-  'ui(formatLabel(report?.recommended_closure_owner',
-  'ui(formatLabel(item.closure_key))',
-  'ui(formatLabel(item.exception_key))',
-  'ui(formatLabel(item.closure_evidence_required))',
-  'ui(formatLabel(item.closure_validation_task))',
-  'ui(formatLabel(dossier?.recommended_certification_owner',
-  'ui(formatLabel(dossier?.next_certification_focus',
-  'ui(formatLabel(blocker))',
   'ui(formatLabel(check.check_label',
-  'ui(formatLabel(check.manual_certification_task'
-]) if (pageSource.includes(forbidden)) fail(`Backend closure/certification data must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend closure notes, identifiers, owners, evidence requirements, validation tasks, certification blockers/check labels/manual tasks and next focus remain raw.');
+  'ui(formatLabel(blocker))',
+  'ui(formatLabel(item.learning_domain))'
+]) if (pageSource.includes(forbidden)) fail(`Learning Feedback must not blindly translate backend identifiers: ${forbidden}`);
+if (!process.exitCode) pass('Backend-owned Learning Feedback governance text uses protected localized helpers while arbitrary business text remains outside blind translation.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

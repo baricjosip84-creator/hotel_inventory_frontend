@@ -292,6 +292,7 @@ type ContinuousLearningSummary = {
       evidence_count?: number;
       affected_domains?: string[];
       rationale?: string;
+      rationale_key?: string;
       recommended_owner?: string;
       execution_mode?: string;
       autonomous_execution?: boolean;
@@ -1663,6 +1664,47 @@ const LEARNING_FEEDBACK_OWNER_LABELS: Record<string, string> = {
   enterprise_governance_owner: 'Enterprise governance owner'
 };
 
+const LEARNING_FEEDBACK_DOMAIN_LABELS: Record<string, string> = {
+  inventory: 'Inventory',
+  procurement: 'Procurement',
+  reservation: 'Reservations',
+  execution: 'Execution',
+  optimization: 'Optimization',
+  control_tower: 'Control Tower',
+  financial: 'Financial',
+  integration: 'Integration',
+  multi_domain: 'Multiple areas',
+  system: 'System'
+};
+
+const LEARNING_FEEDBACK_EVIDENCE_TYPE_LABELS: Record<string, string> = {
+  learning_outcome: 'Learning outcome',
+  forecast_accuracy: 'Forecast accuracy',
+  policy_effectiveness: 'Policy effectiveness',
+  optimization_result: 'Optimization result'
+};
+
+function learningDomainLabel(value: unknown, ui: LearningUi): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '—';
+  const known = LEARNING_FEEDBACK_DOMAIN_LABELS[raw];
+  return known ? ui(known) : raw;
+}
+
+function learningEvidenceTypeLabel(value: unknown, ui: LearningUi): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '—';
+  const known = LEARNING_FEEDBACK_EVIDENCE_TYPE_LABELS[raw];
+  return known ? ui(known) : raw;
+}
+
+function learningActionRationale(action: { rationale?: string; rationale_key?: string }, ui: LearningUi): string {
+  const text = String(action.rationale || '').trim();
+  if (!text) return '—';
+  return action.rationale_key ? ui(text) : text;
+}
+
+
 function learningOwnedSystemText(value: unknown, fallback: string, ui: LearningUi, locale: string): string {
   const raw = String(value ?? '').trim();
   if (!raw) return '—';
@@ -2021,7 +2063,7 @@ function FeedbackActionPlan({ plan, canCreateFollowUp, creatingFollowUp, onCreat
                   <td>{formatLocalizedNumber(action.evidence_count ?? 0, locale)}</td>
                   <td>{ui(learningOwnerLabel(action.recommended_owner, ui, locale))}</td>
                   <td>{ui(formatLabel(action.execution_mode))}</td>
-                  <td>{action.rationale || '—'}</td>
+                  <td>{learningActionRationale(action, ui)}</td>
                   {canCreateFollowUp ? <td><button className="button button--secondary" type="button" disabled={creatingFollowUp} onClick={() => onCreateFollowUp(action)}>{ui('Create draft')}</button></td> : null}
                 </tr>
               ))}
@@ -2076,7 +2118,7 @@ function LearningImpactAssessment({ assessment }: { assessment: ContinuousLearni
             <tbody>
               {domains.map((domain, index) => (
                 <tr key={domain.domain || index}>
-                  <td>{formatLabel(domain.domain)}</td>
+                  <td>{learningDomainLabel(domain.domain, ui)}</td>
                   <td>{formatLocalizedNumber(domain.evidence_count ?? 0, locale)}</td>
                   <td>{formatLocalizedNumber(domain.review_pressure ?? 0, locale)}</td>
                   <td>{ui(formatLabel(domain.impact_posture))}</td>
@@ -2132,7 +2174,7 @@ function LearningCoverageMatrix({ matrix }: { matrix: ContinuousLearningSummary[
             <tbody>
               {rows.map((row, index) => (
                 <tr key={row.domain || index}>
-                  <td>{formatLabel(row.domain)}</td>
+                  <td>{learningDomainLabel(row.domain, ui)}</td>
                   <td>{formatLocalizedNumber(row.coverage_score ?? 0, locale)}</td>
                   <td>{formatLocalizedNumber(row.total_evidence_count ?? 0, locale)}</td>
                   <td>{formatLocalizedNumber(row.learning_outcome_count ?? 0, locale)}</td>
@@ -2141,7 +2183,7 @@ function LearningCoverageMatrix({ matrix }: { matrix: ContinuousLearningSummary[
                   <td>{formatLocalizedNumber(row.optimization_result_count ?? 0, locale)}</td>
                   <td>{formatLocalizedNumber(row.review_pressure_count ?? 0, locale)}</td>
                   <td>{learningOwnedSystemText(row.recommended_next_capture, 'Continue with the next manual governance step.', ui, locale)}</td>
-                  <td>{(row.missing_evidence_types || []).map(formatLabel).join(', ') || '—'}</td>
+                  <td>{(row.missing_evidence_types || []).map((type) => learningEvidenceTypeLabel(type, ui)).join(', ') || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -2345,7 +2387,7 @@ function ClosedLoopClosureReport({ report }: { report: ContinuousLearningSummary
         <LocalizedLearningStatCard label="Unresolved" value={report?.unresolved_closure_count ?? 0} />
         <OperationalWorkspaceStatCard label={ui('Owner')} value={learningOwnerLabel(report?.recommended_closure_owner || 'platform_admin_or_authorized_business_owner', ui, locale)} />
       </div>
-      {report?.closure_note ? <p className="card__subtext">{report.closure_note}</p> : null}
+      {report?.closure_note ? <p className="card__subtext">{learningOwnedSystemText(report.closure_note, 'Manual closure review remains advisory only.', ui, locale)}</p> : null}
       {items.length > 0 ? (
         <div style={{ overflowX: 'auto' }}>
           <table className="table">
@@ -2399,7 +2441,7 @@ function ClosedLoopAuditLedger({ ledger }: { ledger: ContinuousLearningSummary['
       </div>
       <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Owner:')} {learningOwnerLabel(ledger?.recommended_audit_owner || 'decision_governance_owner', ui, locale)}</p>
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(ledger?.next_audit_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
-      <p className="card__subtext">{ledger?.audit_ledger_note || ui('Manual audit ledger remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(ledger?.audit_ledger_note, 'Manual audit ledger remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{learningOwnedSystemText(blocker, 'Review the blocking condition before continuing.', ui, locale)}</li>)}
@@ -2459,7 +2501,7 @@ function ClosedLoopComplianceAttestation({ attestation }: { attestation: Continu
       </div>
       <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Owner:')} {learningOwnerLabel(attestation?.recommended_attestation_owner || 'platform_governance_owner', ui, locale)}</p>
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(attestation?.next_attestation_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
-      <p className="card__subtext">{attestation?.attestation_note || ui('Manual compliance attestation remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(attestation?.attestation_note, 'Manual compliance attestation remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{learningOwnedSystemText(blocker, 'Review the blocking condition before continuing.', ui, locale)}</li>)}
@@ -2523,7 +2565,7 @@ function ClosedLoopCommercialReadinessPacket({ packet }: { packet: ContinuousLea
       </div>
       <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Executive owner:')} {learningOwnerLabel(packet?.recommended_executive_owner || 'platform_governance_owner', ui, locale)}</p>
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(packet?.next_commercial_readiness_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
-      <p className="card__subtext">{packet?.commercial_readiness_note || ui('Manual commercial readiness remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(packet?.commercial_readiness_note, 'Manual commercial readiness remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{learningOwnedSystemText(blocker, 'Review the blocking condition before continuing.', ui, locale)}</li>)}
@@ -2645,7 +2687,7 @@ function ClosedLoopSignoffPacket({ packet }: { packet: ContinuousLearningSummary
         <OperationalWorkspaceStatCard label={ui('Recommended owner')} value={learningOwnerLabel(packet?.recommended_signoff_owner || 'decision_governance_owner', ui, locale)} tone="green" />
       </div>
       <p className="card__subtext">{ui('Next signoff focus:')} {learningOwnedSystemText(packet?.next_signoff_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
-      <p className="card__subtext">{packet?.release_note || ui('No signoff packet release note available yet.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(packet?.release_note, 'No signoff packet release note available yet.', ui, locale)}</p>
       {sections.length > 0 ? (
         <div style={{ overflowX: 'auto', marginTop: 12 }}>
           <table className="table">
@@ -2708,7 +2750,7 @@ function ClosedLoopReleaseReadinessSnapshot({ snapshot }: { snapshot: Continuous
         <OperationalWorkspaceStatCard label={ui('Owner')} value={learningOwnerLabel(snapshot?.recommended_release_owner || 'decision_governance_owner', ui, locale)} tone="green" />
       </div>
       <p className="card__subtext">{ui('Next release focus:')} {learningOwnedSystemText(snapshot?.next_release_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
-      <p className="card__subtext">{snapshot?.release_note || ui('No release readiness note available yet.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(snapshot?.release_note, 'No release readiness note available yet.', ui, locale)}</p>
       {(snapshot?.release_blockers || []).length > 0 ? (
         <p className="card__subtext">{ui('Release blockers:')} {(snapshot?.release_blockers || []).map(formatLabel).join(', ')}</p>
       ) : (
@@ -2769,7 +2811,7 @@ function ClosedLoopOperationalHandoff({ handoff }: { handoff: ContinuousLearning
         <OperationalWorkspaceStatCard label={ui('Owner')} value={learningOwnerLabel(handoff?.recommended_handoff_owner || 'decision_governance_owner', ui, locale)} tone="green" />
       </div>
       <p className="card__subtext">{ui('Next handoff focus:')} {learningOwnedSystemText(handoff?.next_handoff_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
-      <p className="card__subtext">{handoff?.handoff_note || ui('No operational handoff note available yet.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(handoff?.handoff_note, 'No operational handoff note available yet.', ui, locale)}</p>
       {items.length > 0 ? (
         <div style={{ overflowX: 'auto', marginTop: 12 }}>
           <table className="table">
@@ -2827,7 +2869,7 @@ function ClosedLoopOperationalAcceptance({ acceptance }: { acceptance: Continuou
         <OperationalWorkspaceStatCard label={ui('Owner')} value={learningOwnerLabel(acceptance?.recommended_acceptance_owner || 'decision_governance_owner', ui, locale)} tone="green" />
       </div>
       <p className="card__subtext">{ui('Next acceptance focus:')} {learningOwnedSystemText(acceptance?.next_acceptance_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
-      <p className="card__subtext">{acceptance?.acceptance_note || ui('No operational acceptance note available yet.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(acceptance?.acceptance_note, 'No operational acceptance note available yet.', ui, locale)}</p>
       {criteria.length > 0 ? (
         <div style={{ overflowX: 'auto', marginTop: 12 }}>
           <table className="table">
@@ -2893,7 +2935,7 @@ function ClosedLoopMonitoringReadiness({ readiness }: { readiness: ContinuousLea
       ) : (
         <p className="card__subtext">{ui('No monitoring blockers reported by the backend.')}</p>
       )}
-      {readiness?.monitoring_note ? <p className="card__subtext">{readiness.monitoring_note}</p> : null}
+      {readiness?.monitoring_note ? <p className="card__subtext">{learningOwnedSystemText(readiness.monitoring_note, 'Manual monitoring readiness remains advisory only.', ui, locale)}</p> : null}
       {checks.length > 0 ? (
         <div style={{ overflowX: 'auto', marginTop: 12 }}>
           <table className="table">
@@ -2952,7 +2994,7 @@ function ClosedLoopProductionSurveillance({ surveillance }: { surveillance: Cont
         <LocalizedLearningStatCard label="Blocked checks" value={surveillance?.blocked_check_count ?? 0} />
         <OperationalWorkspaceStatCard label={ui('Cadence')} value={learningOwnedSystemText(surveillance?.suggested_surveillance_cadence, 'Manual review cadence required', ui, locale)} />
       </div>
-      {surveillance?.surveillance_note ? <p className="card__subtext">{surveillance.surveillance_note}</p> : null}
+      {surveillance?.surveillance_note ? <p className="card__subtext">{learningOwnedSystemText(surveillance.surveillance_note, 'Manual production surveillance remains advisory only.', ui, locale)}</p> : null}
       {checks.length > 0 ? (
         <div style={{ overflowX: 'auto' }}>
           <table className="table">
@@ -3012,7 +3054,7 @@ function ClosedLoopCertificationDossier({ dossier }: { dossier: ContinuousLearni
       </div>
       <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Owner')}: {learningOwnerLabel(dossier?.recommended_certification_owner || 'decision_governance_owner', ui, locale)}</p>
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(dossier?.next_certification_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
-      <p className="card__subtext">{dossier?.certification_note || ui('Manual certification dossier remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(dossier?.certification_note, 'Manual certification dossier remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{learningOwnedSystemText(blocker, 'Review the blocking condition before continuing.', ui, locale)}</li>)}
@@ -3074,7 +3116,7 @@ function ClosedLoopCustomerPilotReadiness({ pilot }: { pilot: ContinuousLearning
       </div>
       <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Pilot owner:')} {learningOwnerLabel(pilot?.recommended_pilot_owner || 'customer_success_owner', ui, locale)}</p>
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(pilot?.next_pilot_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
-      <p className="card__subtext">{pilot?.pilot_readiness_note || ui('Manual customer pilot readiness remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(pilot?.pilot_readiness_note, 'Manual customer pilot readiness remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{learningOwnedSystemText(blocker, 'Review the blocking condition before continuing.', ui, locale)}</li>)}
@@ -3138,7 +3180,7 @@ function ClosedLoopCustomerPilotLaunchControl({ launch }: { launch: ContinuousLe
       </div>
       <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Launch owner:')} {learningOwnerLabel(launch?.recommended_launch_owner || 'customer_success_owner', ui, locale)}</p>
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(launch?.next_launch_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
-      <p className="card__subtext">{launch?.launch_control_note || ui('Manual customer pilot launch control remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(launch?.launch_control_note, 'Manual customer pilot launch control remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{learningOwnedSystemText(blocker, 'Review the blocking condition before continuing.', ui, locale)}</li>)}
@@ -3203,7 +3245,7 @@ function ClosedLoopCustomerPilotSuccessCriteria({ success }: { success: Continuo
       </div>
       <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Success owner:')} {learningOwnerLabel(success?.recommended_success_owner || 'customer_success_owner', ui, locale)}</p>
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(success?.next_success_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
-      <p className="card__subtext">{success?.success_criteria_note || ui('Manual customer pilot success criteria remain advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(success?.success_criteria_note, 'Manual customer pilot success criteria remain advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{learningOwnedSystemText(blocker, 'Review the blocking condition before continuing.', ui, locale)}</li>)}
@@ -3271,7 +3313,7 @@ function ClosedLoopCustomerPilotOutcomeReview({ review }: { review: ContinuousLe
       </div>
       <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Outcome review owner:')} {learningOwnerLabel(review?.recommended_outcome_review_owner || 'customer_success_owner', ui, locale)}</p>
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(review?.next_outcome_review_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
-      <p className="card__subtext">{review?.outcome_review_note || ui('Manual customer pilot outcome review remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(review?.outcome_review_note, 'Manual customer pilot outcome review remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{learningOwnedSystemText(blocker, 'Review the blocking condition before continuing.', ui, locale)}</li>)}
@@ -3338,7 +3380,7 @@ function ClosedLoopCustomerPilotExpansionReadiness({ expansion }: { expansion: C
       </div>
       <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Expansion owner:')} {learningOwnerLabel(expansion?.recommended_expansion_owner || 'customer_success_owner', ui, locale)}</p>
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(expansion?.next_expansion_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
-      <p className="card__subtext">{expansion?.expansion_readiness_note || ui('Manual customer pilot expansion readiness remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(expansion?.expansion_readiness_note, 'Manual customer pilot expansion readiness remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <ul className="card__subtext">
           {blockers.slice(0, 6).map((blocker) => <li key={blocker}>{learningOwnedSystemText(blocker, 'Review the blocking condition before continuing.', ui, locale)}</li>)}
@@ -3405,7 +3447,7 @@ function ClosedLoopEnterpriseRolloutReadiness({ rollout }: { rollout: Continuous
       </div>
       <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Rollout owner:')} {learningOwnerLabel(rollout?.recommended_rollout_owner || 'enterprise_rollout_owner', ui, locale)}</p>
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(rollout?.next_rollout_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
-      <p className="card__subtext">{rollout?.rollout_readiness_note || ui('Manual enterprise rollout readiness remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(rollout?.rollout_readiness_note, 'Manual enterprise rollout readiness remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
       ) : <p className="card__subtext">{ui('No enterprise rollout blockers are currently reported.')}</p>}
@@ -3470,7 +3512,7 @@ function ClosedLoopEnterpriseRolloutGovernance({ governance }: { governance: Con
       </div>
       <p className="card__subtext" style={{ marginTop: 12 }}>{ui('Governance owner:')} {governance?.recommended_governance_owner || 'enterprise_rollout_owner'}</p>
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(governance?.next_governance_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
-      <p className="card__subtext">{governance?.governance_note || ui('Manual enterprise rollout governance remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(governance?.governance_note, 'Manual enterprise rollout governance remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
       ) : <p className="card__subtext">{ui('No enterprise rollout governance blockers are currently reported.')}</p>}
@@ -3538,7 +3580,7 @@ function ClosedLoopMultiTenantRolloutControls({ controls }: { controls: Continuo
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(controls?.next_rollout_control_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
       <p className="card__subtext">{ui('Recommended wave mode:')} {learningOwnedSystemText(policy.recommended_wave_mode, 'Manual rollout review required', ui, locale)}</p>
       <p className="card__subtext">{ui('Default wave size:')} {learningOwnedSystemText(policy.default_wave_size, 'Manual rollout review required', ui, locale)}</p>
-      <p className="card__subtext">{controls?.rollout_control_note || ui('Manual multi-tenant rollout controls remain advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(controls?.rollout_control_note, 'Manual multi-tenant rollout controls remain advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
       ) : <p className="card__subtext">{ui('No multi-tenant rollout control blockers are currently reported.')}</p>}
@@ -3606,7 +3648,7 @@ function ClosedLoopEnterpriseAdoptionReadiness({ readiness }: { readiness: Conti
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(readiness?.next_adoption_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
       <p className="card__subtext">{ui('Recommended adoption mode:')} {learningOwnedSystemText(policy.recommended_adoption_mode, 'Manual adoption review required', ui, locale)}</p>
       <p className="card__subtext">{ui('Validated pilot outcomes:')} {formatLocalizedNumber(readiness?.validated_pilot_outcome_count ?? 0, locale)} · {ui('Covered domains:')} {formatLocalizedNumber(readiness?.covered_domain_count ?? 0, locale)}</p>
-      <p className="card__subtext">{readiness?.adoption_note || ui('Manual enterprise adoption readiness remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(readiness?.adoption_note, 'Manual enterprise adoption readiness remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
       ) : <p className="card__subtext">{ui('No enterprise adoption blockers are currently reported.')}</p>}
@@ -3676,7 +3718,7 @@ function ClosedLoopEnterpriseActivationPlan({ plan }: { plan: ContinuousLearning
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(plan?.next_activation_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
       <p className="card__subtext">{ui('Recommended activation mode:')} {learningOwnedSystemText(policy.recommended_activation_mode, 'Manual activation review required', ui, locale)}</p>
       <p className="card__subtext">{ui('Monitoring owner:')} {learningOwnerLabel(policy.monitoring_owner || 'operations_owner', ui, locale)} · {ui('Rollback owner:')} {learningOwnerLabel(policy.rollback_owner || 'enterprise_rollout_owner', ui, locale)}</p>
-      <p className="card__subtext">{plan?.activation_note || ui('Manual enterprise activation planning remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(plan?.activation_note, 'Manual enterprise activation planning remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
       ) : <p className="card__subtext">{ui('No enterprise activation blockers are currently reported.')}</p>}
@@ -3744,7 +3786,7 @@ function ClosedLoopEnterpriseActivationRunbook({ runbook }: { runbook: Continuou
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(runbook?.next_runbook_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
       <p className="card__subtext">{ui('Recommended runbook mode:')} {learningOwnedSystemText(policy.recommended_runbook_mode, 'Manual activation review required', ui, locale)}</p>
       <p className="card__subtext">{ui('Operations owner:')} {learningOwnerLabel(policy.operations_owner || 'operations_owner', ui, locale)} · {ui('Compliance owner:')} {learningOwnerLabel(policy.compliance_owner || 'compliance_owner', ui, locale)} · {ui('Rollback owner:')} {learningOwnerLabel(policy.rollback_owner || 'enterprise_rollout_owner', ui, locale)}</p>
-      <p className="card__subtext">{runbook?.runbook_note || ui('Manual enterprise activation runbook remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(runbook?.runbook_note, 'Manual enterprise activation runbook remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
       ) : <p className="card__subtext">{ui('No enterprise activation runbook blockers are currently reported.')}</p>}
@@ -3812,7 +3854,7 @@ function ClosedLoopEnterpriseActivationRollbackPlan({ plan }: { plan: Continuous
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(plan?.next_rollback_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
       <p className="card__subtext">{ui('Recommended rollback mode:')} {learningOwnedSystemText(policy.recommended_rollback_mode, 'Manual governance decision required', ui, locale)}</p>
       <p className="card__subtext">{ui('Activation owner:')} {learningOwnerLabel(policy.activation_owner || 'enterprise_activation_owner', ui, locale)} · {ui('Operations owner:')} {learningOwnerLabel(policy.operations_owner || 'operations_owner', ui, locale)} · {ui('Governance owner:')} {learningOwnerLabel(policy.governance_owner || 'governance_owner', ui, locale)}</p>
-      <p className="card__subtext">{plan?.rollback_note || ui('Manual activation rollback plan remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(plan?.rollback_note, 'Manual activation rollback plan remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
       ) : <p className="card__subtext">{ui('No enterprise activation rollback blockers are currently reported.')}</p>}
@@ -3880,7 +3922,7 @@ function ClosedLoopEnterpriseActivationCutoverReadiness({ readiness }: { readine
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(readiness?.next_cutover_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
       <p className="card__subtext">{ui('Recommended cutover mode:')} {learningOwnedSystemText(policy.recommended_cutover_mode, 'Manual governance decision required', ui, locale)}</p>
       <p className="card__subtext">{ui('Activation owner:')} {learningOwnerLabel(policy.activation_owner || 'enterprise_activation_owner', ui, locale)} · {ui('Operations owner:')} {learningOwnerLabel(policy.operations_owner || 'operations_owner', ui, locale)} · {ui('Governance owner:')} {learningOwnerLabel(policy.governance_owner || 'governance_owner', ui, locale)}</p>
-      <p className="card__subtext">{readiness?.cutover_note || ui('Manual enterprise activation cutover readiness remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(readiness?.cutover_note, 'Manual enterprise activation cutover readiness remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
       ) : <p className="card__subtext">{ui('No enterprise activation cutover blockers are currently reported.')}</p>}
@@ -3949,7 +3991,7 @@ function ClosedLoopEnterpriseActivationStabilizationPlan({ plan }: { plan: Conti
       <p className="card__subtext">{ui('Recommended stabilization mode:')} {learningOwnedSystemText(policy.recommended_stabilization_mode, 'Manual governance decision required', ui, locale)}</p>
       <p className="card__subtext">{ui('Cadence:')} {learningOwnedSystemText(policy.recommended_review_cadence, 'Manual governance decision required', ui, locale)}</p>
       <p className="card__subtext">{ui('Operations owner:')} {learningOwnerLabel(policy.operations_owner || 'operations_owner', ui, locale)} · {ui('Governance owner:')} {learningOwnerLabel(policy.governance_owner || 'governance_owner', ui, locale)} · {ui('Customer success owner:')} {learningOwnerLabel(policy.customer_success_owner || 'customer_success_owner', ui, locale)}</p>
-      <p className="card__subtext">{plan?.stabilization_note || ui('Manual enterprise activation stabilization remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(plan?.stabilization_note, 'Manual enterprise activation stabilization remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <p className="card__subtext">{ui('Blockers:')} {blockers.map(formatLabel).join(' · ')}</p>
       ) : <p className="card__subtext">{ui('No enterprise activation stabilization blockers are currently reported.')}</p>}
@@ -4064,7 +4106,7 @@ function FeedbackReviewBoard({
         <LocalizedLearningStatCard label="Assigned" value={board?.assigned_count ?? 0} iconPath="/users" tone="green" />
         <LocalizedLearningStatCard label="Escalated" value={board?.escalated_count ?? 0} iconPath="/alerts" tone="violet" />
       </div>
-      {domains.length > 0 ? <p className="card__subtext" style={{ marginBottom: 12 }}>{ui('Areas with open reviews:')} {domains.map((domain) => `${ui(formatLabel(domain.domain))} (${formatLocalizedNumber(domain.review_item_count ?? 0, locale)})`).join(' · ')}</p> : null}
+      {domains.length > 0 ? <p className="card__subtext" style={{ marginBottom: 12 }}>{ui('Areas with open reviews:')} {domains.map((domain) => `${learningDomainLabel(domain.domain, ui)} (${formatLocalizedNumber(domain.review_item_count ?? 0, locale)})`).join(' · ')}</p> : null}
       {items.length > 0 ? (
         <div className="table-wrap">
           <table>
@@ -4081,7 +4123,7 @@ function FeedbackReviewBoard({
               const ownerValue = ownerDrafts[key] ?? String(item.assigned_reviewer_user_id || '');
               const dueValue = dueDrafts[key] ?? toLocalDateTimeValue(item.review_due_at);
               return <tr key={key || index} style={canGovern ? sidebarAttentionItemStyle : undefined} data-sidebar-attention-item={canGovern ? 'true' : undefined}>
-                <td><div style={{ display: 'grid', gap: 5 }}>{canGovern ? <SidebarAttentionMarker label={ui('Attention required')} /> : null}<span>{learningEvidenceDisplayLabel(feedbackModeFromEvidenceType(item.evidence_type), item as Record<string, unknown>, index, locale, ui)}</span><small>{ui(formatLabel(item.domain))}</small></div></td>
+                <td><div style={{ display: 'grid', gap: 5 }}>{canGovern ? <SidebarAttentionMarker label={ui('Attention required')} /> : null}<span>{learningEvidenceDisplayLabel(feedbackModeFromEvidenceType(item.evidence_type), item as Record<string, unknown>, index, locale, ui)}</span><small>{learningDomainLabel(item.domain, ui)}</small></div></td>
                 <td><div>{ui(formatLabel(item.status))}</div><small className="card__subtext">{ui(formatLabel(item.due_state || 'no_deadline'))}</small></td>
                 <td><div>{item.recorded_by_user_name || item.created_by_user_name || ui('Unknown recorder')}</div>{independentReviewBlocked ? <small className="card__subtext">{ui('Independent review required')}</small> : null}</td>
                 <td>{canGovern ? <select className="input" value={ownerValue} onChange={(event) => setOwnerDrafts((current) => ({ ...current, [key]: event.target.value }))}><option value="">{ui('Unassigned')}</option>{reviewers.map((reviewer) => <option key={reviewer.id} value={reviewer.id}>{reviewer.name || reviewer.email || reviewer.id}</option>)}</select> : (item.assigned_reviewer_user_name || ui('Unassigned'))}</td>
@@ -4130,7 +4172,7 @@ function ClosedLoopEnterpriseActivationSupportReadiness({ readiness }: { readine
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(readiness?.next_support_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
       <p className="card__subtext">{ui('Recommended support mode:')} {learningOwnedSystemText(policy.recommended_support_mode, 'Manual governance decision required', ui, locale)}</p>
       <p className="card__subtext">{ui('Review cadence:')} {learningOwnedSystemText(policy.recommended_support_cadence, 'Manual governance decision required', ui, locale)}</p>
-      <p className="card__subtext">{readiness?.support_readiness_note || ui('Manual enterprise activation support readiness remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(readiness?.support_readiness_note, 'Manual enterprise activation support readiness remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <ul>{blockers.map((blocker) => <li key={blocker}>{learningOwnedSystemText(blocker, 'Review the blocking condition before continuing.', ui, locale)}</li>)}</ul>
       ) : <p className="card__subtext">{ui('No enterprise activation support transition blockers are currently reported.')}</p>}
@@ -4198,7 +4240,7 @@ function ClosedLoopEnterpriseActivationValueAssurance({ assurance }: { assurance
       <p className="card__subtext">{ui('Next focus:')} {learningOwnedSystemText(assurance?.next_value_assurance_focus, 'Continue with the next manual governance step.', ui, locale)}</p>
       <p className="card__subtext">{ui('Recommended value claim mode:')} {learningOwnedSystemText(policy.recommended_value_claim_mode, 'Manual governance decision required', ui, locale)}</p>
       <p className="card__subtext">{ui('Review cadence:')} {learningOwnedSystemText(policy.recommended_value_review_cadence, 'Manual governance decision required', ui, locale)}</p>
-      <p className="card__subtext">{assurance?.value_assurance_note || ui('Manual enterprise activation value assurance remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(assurance?.value_assurance_note, 'Manual enterprise activation value assurance remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <ul>{blockers.map((blocker) => <li key={blocker}>{learningOwnedSystemText(blocker, 'Review the blocking condition before continuing.', ui, locale)}</li>)}</ul>
       ) : <p className="card__subtext">{ui('No enterprise activation value assurance blockers are currently reported.')}</p>}
@@ -4267,7 +4309,7 @@ function ClosedLoopEnterpriseActivationValueRealizationReview({ review }: { revi
       <p className="card__subtext">{ui('Recommended realization mode:')} {learningOwnedSystemText(policy.recommended_value_realization_mode, 'Manual governance decision required', ui, locale)}</p>
       <p className="card__subtext">{ui('Review cadence:')} {learningOwnedSystemText(policy.recommended_realization_review_cadence, 'Manual governance decision required', ui, locale)}</p>
       <p className="card__subtext">{ui('Positive score total:')} {formatLocalizedNumber(review?.positive_outcome_score_total ?? 0, locale)} · {ui('Negative score total:')} {formatLocalizedNumber(review?.negative_outcome_score_total ?? 0, locale)}</p>
-      <p className="card__subtext">{review?.value_realization_note || ui('Manual enterprise activation value realization review remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(review?.value_realization_note, 'Manual enterprise activation value realization review remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <ul>{blockers.map((blocker) => <li key={blocker}>{learningOwnedSystemText(blocker, 'Review the blocking condition before continuing.', ui, locale)}</li>)}</ul>
       ) : <p className="card__subtext">{ui('No enterprise activation value realization blockers are currently reported.')}</p>}
@@ -4336,7 +4378,7 @@ function ClosedLoopEnterpriseValueExpansionDecision({ decision }: { decision: Co
       <p className="card__subtext">{ui('Recommended expansion mode:')} {learningOwnedSystemText(policy.recommended_expansion_mode, 'Manual governance decision required', ui, locale)}</p>
       <p className="card__subtext">{ui('Tenant-wave policy:')} {learningOwnedSystemText(policy.tenant_wave_policy, 'Manual governance decision required', ui, locale)}</p>
       <p className="card__subtext">{ui('Validated outcomes:')} {formatLocalizedNumber(decision?.validated_outcome_count ?? 0, locale)} · {ui('Negative outcomes:')} {formatLocalizedNumber(decision?.negative_outcome_count ?? 0, locale)}</p>
-      <p className="card__subtext">{decision?.expansion_note || ui('Manual enterprise value expansion decision remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(decision?.expansion_note, 'Manual enterprise value expansion decision remains advisory only.', ui, locale)}</p>
       {blockers.length > 0 ? (
         <ul>{blockers.map((blocker) => <li key={blocker}>{learningOwnedSystemText(blocker, 'Review the blocking condition before continuing.', ui, locale)}</li>)}</ul>
       ) : <p className="card__subtext">{ui('No enterprise value expansion blockers are currently reported.')}</p>}
@@ -4405,7 +4447,7 @@ function ClosedLoopEnterpriseValueExpansionOperatingModel({ model }: { model: Co
       <p className="card__subtext">{ui('Recommended mode:')} {learningOwnedSystemText(policy.recommended_operating_model_mode, 'Manual governance decision required', ui, locale)}</p>
       <p className="card__subtext">{ui('Ownership policy:')} {learningOwnerLabel(policy.ownership_policy || 'assign_named_rollout_support_operations_and_value_owners_before_scaled_enterprise_expansion', ui, locale)}</p>
       <p className="card__subtext">{ui('Covered domains:')} {formatLocalizedNumber(model?.covered_domain_count ?? 0, locale)} · {ui('Unresolved review pressure:')} {formatLocalizedNumber(model?.unresolved_review_pressure_count ?? 0, locale)}</p>
-      <p className="card__subtext">{model?.operating_model_note || ui('Manual enterprise operating-model handoff remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(model?.operating_model_note, 'Manual enterprise operating-model handoff remains advisory only.', ui, locale)}</p>
       {blockers.length ? (
         <ul>{blockers.map((blocker) => <li key={blocker}>{learningOwnedSystemText(blocker, 'Review the blocking condition before continuing.', ui, locale)}</li>)}</ul>
       ) : <p className="card__subtext">{ui('No enterprise operating-model blockers are currently reported.')}</p>}
@@ -4474,7 +4516,7 @@ function ClosedLoopEnterpriseExpansionGovernanceCadence({ cadence }: { cadence: 
       <p className="card__subtext">{ui('Recommended cadence mode:')} {learningOwnedSystemText(policy.recommended_cadence_mode, 'Manual governance decision required', ui, locale)}</p>
       <p className="card__subtext">{ui('Minimum review cadence:')} {learningOwnedSystemText(policy.minimum_review_cadence, 'Manual governance decision required', ui, locale)}</p>
       <p className="card__subtext">{ui('Unresolved review pressure:')} {formatLocalizedNumber(cadence?.unresolved_review_pressure_count ?? 0, locale)}</p>
-      <p className="card__subtext">{cadence?.cadence_note || ui('Manual enterprise expansion governance cadence remains advisory only.')}</p>
+      <p className="card__subtext">{learningOwnedSystemText(cadence?.cadence_note, 'Manual enterprise expansion governance cadence remains advisory only.', ui, locale)}</p>
       {blockers.length ? (
         <ul>{blockers.map((blocker) => <li key={blocker}>{learningOwnedSystemText(blocker, 'Review the blocking condition before continuing.', ui, locale)}</li>)}</ul>
       ) : <p className="card__subtext">{ui('No enterprise expansion governance cadence blockers are currently reported.')}</p>}
@@ -4697,7 +4739,7 @@ function RecommendationOutcomeFoundation({ foundation }: { foundation?: Continuo
               {(foundation.recommendation_outcome_portfolio_evidence?.portfolio_evidence_items || []).map((item, index) => (
                 <tr key={item.recommendation_portfolio_key || item.learning_domain || 'portfolio'}>
                   <td>{item.recommendation_label || `${ui('Recommendation')} ${formatLocalizedNumber(index + 1, locale)}`}</td>
-                  <td>{formatLabel(item.learning_domain)}</td>
+                  <td>{learningDomainLabel(item.learning_domain, ui)}</td>
                   <td>{formatFoundationNumber(item.outcome_count)}</td>
                   <td>{formatFoundationPercent(item.success_rate_percent)}</td>
                   <td>{formatFoundationPercent(item.acceptance_rate_percent)}</td>
@@ -4931,7 +4973,7 @@ function EvidenceTable({
                 return (
                   <tr key={String(row.id ?? businessKey ?? index)}>
                     <td>{learningEvidenceDisplayLabel(mode, row, index, locale, ui)}</td>
-                    <td>{ui(formatLabel(row.learning_domain ?? row.forecast_domain ?? row.policy_domain ?? row.result_domain))}</td>
+                    <td>{learningDomainLabel(row.learning_domain ?? row.forecast_domain ?? row.policy_domain ?? row.result_domain, ui)}</td>
                     <td>{ui(formatLabel(row.outcome_status ?? row.calibration_status ?? row.effectiveness_status ?? row.result_status))}</td>
                     <td>{typeof score === 'number' ? formatLocalizedNumber(score, locale, { maximumFractionDigits: 4 }) : formatLabel(score)}</td>
                     <td>{row.observed_at ? formatLocalizedDateTime(String(row.observed_at), locale) : '—'}</td>
@@ -5506,7 +5548,7 @@ export default function DecisionLearningFeedbackPage() {
           <label>
             <span className="form-label">{ui('Domain')}</span>
             <select className="input" value={form.domain} onChange={(event) => updateForm('domain', event.target.value)} disabled={Boolean(sourceId)}>
-              {domainOptions.map((domain) => <option key={domain} value={domain}>{ui(formatLabel(domain))}</option>)}
+              {domainOptions.map((domain) => <option key={domain} value={domain}>{learningDomainLabel(domain, ui)}</option>)}
             </select>
           </label>
           <label>

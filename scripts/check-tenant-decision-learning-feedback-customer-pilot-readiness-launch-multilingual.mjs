@@ -70,7 +70,6 @@ for (const required of [
   '<LocalizedLearningStatCard label="Blocked checks"',
   "{ui('Pilot owner:')}",
   "{ui('Next focus:')}",
-  "ui('Manual customer pilot readiness remains advisory only.')",
   "<th>{ui('Check')}</th>",
   "<th>{ui('Status')}</th>",
   "<th>{ui('Current')}</th>",
@@ -83,7 +82,6 @@ for (const required of [
   '<LocalizedLearningStatCard label="Launch decision"',
   '<LocalizedLearningStatCard label="Launch score"',
   "{ui('Launch owner:')}",
-  "ui('Manual customer pilot launch control remains advisory only.')",
   "{ui('No customer pilot launch-control checks are available yet.')}",
   'formatLocalizedNumber(value, locale)'
 ]) if (!pageSource.includes(required)) fail(`Localized customer pilot presentation missing: ${required}`);
@@ -110,34 +108,25 @@ for (const [name, start, end] of [
   else pass(`${name} slice has no remaining raw JSX presentation text.`);
 }
 
-for (const required of [
-  "formatLabel(pilot?.recommended_pilot_owner || 'customer_success_owner')",
-  "formatLabel(pilot?.next_pilot_focus || 'record_manual_customer_pilot_go_no_go_decision')",
-  'pilot?.pilot_readiness_note || ui(',
-  'blockers.slice(0, 6).map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)',
-  '<td>{formatLabel(check.check_label || check.check_key)}</td>',
-  '<td>{formatLabel(check.pilot_evidence)}</td>',
-  '<td>{formatLabel(check.manual_pilot_task)}</td>',
-  "formatLabel(launch?.recommended_launch_owner || 'customer_success_owner')",
-  "formatLabel(launch?.next_launch_focus || 'record_manual_customer_pilot_launch_go_no_go_decision')",
-  'launch?.launch_control_note || ui(',
-  '<td>{formatLabel(check.launch_evidence)}</td>',
-  '<td>{formatLabel(check.manual_launch_task)}</td>'
-]) if (!pageSource.includes(required)) fail(`Expected backend-data boundary missing: ${required}`);
+
+// v3.49.188: backend-owned governance vocabulary must use protected presentation helpers,
+// while arbitrary tenant/business text remains outside blind ui()/formatLabel() translation.
+const protectedSystemFieldsV349188 = ['check_label', 'launch_control_note', 'launch_evidence', 'manual_launch_task', 'manual_pilot_task', 'next_launch_focus', 'next_pilot_focus', 'pilot_evidence', 'pilot_readiness_note', 'recommended_launch_owner', 'recommended_pilot_owner'];
+const protectedHelpersV349188 = ['learningOwnedSystemText', 'learningOwnerLabel', 'learningCheckLabel', 'learningDomainLabel', 'learningEvidenceTypeLabel'];
+for (const helper of protectedHelpersV349188) {
+  if (!pageSource.includes(`${helper}(`)) fail(`v3.49.188 Learning Feedback protected helper missing: ${helper}`);
+}
+for (const field of protectedSystemFieldsV349188) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(?:learningOwnedSystemText|learningOwnerLabel|learningCheckLabel|learningDomainLabel|learningEvidenceTypeLabel|learningActionRationale)\\([^\\n]*${escaped}`);
+  if (!pattern.test(pageSource)) fail(`Backend-owned Learning Feedback field is not protected by the v3.49.188 presentation boundary: ${field}`);
+}
 for (const forbidden of [
-  "ui(formatLabel(pilot?.recommended_pilot_owner",
-  "ui(formatLabel(pilot?.next_pilot_focus",
-  'ui(pilot?.pilot_readiness_note',
-  'ui(formatLabel(check.check_label || check.check_key))',
-  'ui(formatLabel(check.pilot_evidence))',
-  'ui(formatLabel(check.manual_pilot_task))',
-  "ui(formatLabel(launch?.recommended_launch_owner",
-  "ui(formatLabel(launch?.next_launch_focus",
-  'ui(launch?.launch_control_note',
-  'ui(formatLabel(check.launch_evidence))',
-  'ui(formatLabel(check.manual_launch_task))'
-]) if (pageSource.includes(forbidden)) fail(`Backend customer-pilot data must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend check labels, owners, blockers, evidence references, tasks, focus values, and notes remain raw.');
+  'ui(formatLabel(check.check_label',
+  'ui(formatLabel(blocker))',
+  'ui(formatLabel(item.learning_domain))'
+]) if (pageSource.includes(forbidden)) fail(`Learning Feedback must not blindly translate backend identifiers: ${forbidden}`);
+if (!process.exitCode) pass('Backend-owned Learning Feedback governance text uses protected localized helpers while arbitrary business text remains outside blind translation.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

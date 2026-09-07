@@ -69,7 +69,6 @@ for (const required of [
   '<LocalizedLearningStatCard label="Blocked entries"',
   "{ui('Owner:')}",
   "{ui('Next focus:')}",
-  "ledger?.audit_ledger_note || ui('Manual audit ledger remains advisory only.')",
   "<th>{ui('Stage')}</th>",
   "<th>{ui('Retention')}</th>",
   "<th>{ui('Manual audit task')}</th>",
@@ -81,7 +80,6 @@ for (const required of [
   '<LocalizedLearningStatCard label="Attestation decision"',
   '<LocalizedLearningStatCard label="Attestation score"',
   '<LocalizedLearningStatCard label="Attestable checks"',
-  "attestation?.attestation_note || ui('Manual compliance attestation remains advisory only.')",
   'ui(formatLabel(check.check_status))',
   "{ui('No compliance attestation checks are available yet.')}"
 ]) if (!pageSource.includes(required)) fail(`Localized audit/compliance presentation missing: ${required}`);
@@ -108,39 +106,25 @@ for (const [name, start, end] of [
   else pass(`${name} slice has no remaining raw JSX presentation text.`);
 }
 
-for (const required of [
-  "formatLabel(ledger?.recommended_audit_owner || 'decision_governance_owner')",
-  "formatLabel(ledger?.next_audit_focus || 'retain_closed_loop_certification_audit_record')",
-  'blockers.slice(0, 6).map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)',
-  '<td>{formatLabel(entry.ledger_stage || entry.ledger_key)}</td>',
-  '<td>{formatLabel(entry.evidence_reference)}</td>',
-  '<td>{formatLabel(entry.retention_requirement)}</td>',
-  '<td>{formatLabel(entry.manual_audit_task)}</td>',
-  "formatLabel(attestation?.recommended_attestation_owner || 'platform_governance_owner')",
-  "formatLabel(attestation?.next_attestation_focus || 'record_manual_closed_loop_compliance_attestation')",
-  '<td>{formatLabel(check.check_label || check.check_key)}</td>',
-  '<td>{formatLabel(check.current_value)}</td>',
-  '<td>{formatLabel(check.required_value)}</td>',
-  '<td>{formatLabel(check.attestation_evidence)}</td>',
-  '<td>{formatLabel(check.manual_attestation_task)}</td>'
-]) if (!pageSource.includes(required)) fail(`Expected backend-data boundary missing: ${required}`);
+
+// v3.49.188: backend-owned governance vocabulary must use protected presentation helpers,
+// while arbitrary tenant/business text remains outside blind ui()/formatLabel() translation.
+const protectedSystemFieldsV349188 = ['attestation_evidence', 'attestation_note', 'audit_ledger_note', 'check_label', 'evidence_reference', 'ledger_key', 'ledger_stage', 'manual_attestation_task', 'manual_audit_task', 'next_attestation_focus', 'next_audit_focus', 'recommended_attestation_owner', 'recommended_audit_owner', 'retention_requirement'];
+const protectedHelpersV349188 = ['learningOwnedSystemText', 'learningOwnerLabel', 'learningCheckLabel', 'learningDomainLabel', 'learningEvidenceTypeLabel'];
+for (const helper of protectedHelpersV349188) {
+  if (!pageSource.includes(`${helper}(`)) fail(`v3.49.188 Learning Feedback protected helper missing: ${helper}`);
+}
+for (const field of protectedSystemFieldsV349188) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(?:learningOwnedSystemText|learningOwnerLabel|learningCheckLabel|learningDomainLabel|learningEvidenceTypeLabel|learningActionRationale)\\([^\\n]*${escaped}`);
+  if (!pattern.test(pageSource)) fail(`Backend-owned Learning Feedback field is not protected by the v3.49.188 presentation boundary: ${field}`);
+}
 for (const forbidden of [
-  'ui(formatLabel(ledger?.recommended_audit_owner',
-  'ui(formatLabel(ledger?.next_audit_focus',
-  'ui(formatLabel(blocker))',
-  'ui(formatLabel(entry.ledger_stage',
-  'ui(formatLabel(entry.evidence_reference))',
-  'ui(formatLabel(entry.retention_requirement))',
-  'ui(formatLabel(entry.manual_audit_task))',
-  'ui(formatLabel(attestation?.recommended_attestation_owner',
-  'ui(formatLabel(attestation?.next_attestation_focus',
   'ui(formatLabel(check.check_label',
-  'ui(formatLabel(check.current_value))',
-  'ui(formatLabel(check.required_value))',
-  'ui(formatLabel(check.attestation_evidence))',
-  'ui(formatLabel(check.manual_attestation_task))'
-]) if (pageSource.includes(forbidden)) fail(`Backend audit/compliance data must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend ledger stages/evidence/retention/tasks/blockers/owners and attestation checks/current-required/evidence/tasks remain raw.');
+  'ui(formatLabel(blocker))',
+  'ui(formatLabel(item.learning_domain))'
+]) if (pageSource.includes(forbidden)) fail(`Learning Feedback must not blindly translate backend identifiers: ${forbidden}`);
+if (!process.exitCode) pass('Backend-owned Learning Feedback governance text uses protected localized helpers while arbitrary business text remains outside blind translation.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

@@ -131,7 +131,7 @@ for (const contract of routerContracts) if (!routerSource.includes(contract)) fa
 if (!process.exitCode) pass('Recommendation query filters, lifecycle mutations, route, and permission contracts remain language-independent.');
 
 const serverDataContracts = [
-  "<h3>{review.title ? (review.title_key ? ui(review.title) : review.title) : ui('Intelligence review')}</h3>", "review.summary ? (review.summary_key ? ui(review.summary) : review.summary) : ui('No review summary was provided.')",
+  "<h3>{intelligenceReviewTitle(review, ui)}</h3>", "review.summary ? (review.summary_key ? ui(review.summary) : review.summary) : ui('No review summary was provided.')",
   'localizedReviewEvidenceSummary(evidencePreview, locale, ui)',
   "localizedIntelligenceReviewSystemText(guidance.review_queue_guidance_key, guidance.review_queue_guidance, 'Review source confidence, explainability, structured evidence, and approval requirements before acting elsewhere.', ui)",
   "review.explainability_review.primary_factors.map((factor) => explainabilityFactorLabel(factor, ui)).join(' · ')", 'lifecycle.reviewer_notes', 'lifecycle.override_reason',

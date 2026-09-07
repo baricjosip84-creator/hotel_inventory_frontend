@@ -67,7 +67,6 @@ for (const required of [
   '<LocalizedLearningStatCard label="Unresolved sections"',
   "label={ui('Recommended owner')}",
   "{ui('Next signoff focus:')}",
-  "packet?.release_note || ui('No signoff packet release note available yet.')",
   "<th>{ui('Manual signoff')}</th>",
   'ui(formatLabel(section.readiness_status))',
   "ui(section.manual_signoff_required ? 'yes' : 'no')",
@@ -81,7 +80,6 @@ for (const required of [
   '<LocalizedLearningStatCard label="Evidence"',
   "label={ui('Owner')}",
   "{ui('Next release focus:')}",
-  "snapshot?.release_note || ui('No release readiness note available yet.')",
   "{ui('Release blockers:')}",
   "{ui('No release blockers reported by the backend.')}",
   "<th>{ui('Lane')}</th>",
@@ -112,30 +110,25 @@ for (const [name, start, end] of [
   else pass(`${name} slice has no remaining raw JSX presentation text.`);
 }
 
-for (const required of [
-  "value={formatLabel(packet?.recommended_signoff_owner || 'decision_governance_owner')}",
-  "formatLabel(packet?.next_signoff_focus || 'complete_manual_governance_go_no_go_signoff')",
-  '<td>{formatLabel(section.section_label || section.section_key)}</td>',
-  '<td>{formatLabel(section.signoff_instruction)}</td>',
-  "value={formatLabel(snapshot?.recommended_release_owner || 'decision_governance_owner')}",
-  "formatLabel(snapshot?.next_release_focus || 'complete_manual_release_go_no_go_decision')",
-  '(snapshot?.release_blockers || []).map(formatLabel).join(\', \')',
-  '<td>{formatLabel(lane.lane_label || lane.lane_key)}</td>',
-  '<td>{formatLabel(lane.blocking_reason)}</td>',
-  '<td>{formatLabel(lane.manual_action)}</td>'
-]) if (!pageSource.includes(required)) fail(`Expected backend-data boundary missing: ${required}`);
+
+// v3.49.188: backend-owned governance vocabulary must use protected presentation helpers,
+// while arbitrary tenant/business text remains outside blind ui()/formatLabel() translation.
+const protectedSystemFieldsV349188 = ['blocking_reason', 'lane_label', 'manual_action', 'next_release_focus', 'next_signoff_focus', 'recommended_release_owner', 'recommended_signoff_owner', 'release_note', 'section_label', 'signoff_instruction'];
+const protectedHelpersV349188 = ['learningOwnedSystemText', 'learningOwnerLabel', 'learningDomainLabel', 'learningEvidenceTypeLabel'];
+for (const helper of protectedHelpersV349188) {
+  if (!pageSource.includes(`${helper}(`)) fail(`v3.49.188 Learning Feedback protected helper missing: ${helper}`);
+}
+for (const field of protectedSystemFieldsV349188) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(?:learningOwnedSystemText|learningOwnerLabel|learningCheckLabel|learningDomainLabel|learningEvidenceTypeLabel|learningActionRationale)\\([^\\n]*${escaped}`);
+  if (!pattern.test(pageSource)) fail(`Backend-owned Learning Feedback field is not protected by the v3.49.188 presentation boundary: ${field}`);
+}
 for (const forbidden of [
-  'ui(formatLabel(packet?.recommended_signoff_owner',
-  'ui(formatLabel(packet?.next_signoff_focus',
-  'ui(formatLabel(section.section_label || section.section_key))',
-  'ui(formatLabel(section.signoff_instruction))',
-  'ui(formatLabel(snapshot?.recommended_release_owner',
-  'ui(formatLabel(snapshot?.next_release_focus',
-  'ui(formatLabel(lane.lane_label || lane.lane_key))',
-  'ui(formatLabel(lane.blocking_reason))',
-  'ui(formatLabel(lane.manual_action))'
-]) if (pageSource.includes(forbidden)) fail(`Backend signoff/release data must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend signoff/release labels, owners, focus values, instructions, blockers, and manual actions remain raw.');
+  'ui(formatLabel(check.check_label',
+  'ui(formatLabel(blocker))',
+  'ui(formatLabel(item.learning_domain))'
+]) if (pageSource.includes(forbidden)) fail(`Learning Feedback must not blindly translate backend identifiers: ${forbidden}`);
+if (!process.exitCode) pass('Backend-owned Learning Feedback governance text uses protected localized helpers while arbitrary business text remains outside blind translation.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

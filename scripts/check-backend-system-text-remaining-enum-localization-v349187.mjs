@@ -438,7 +438,7 @@ check(page.cross.includes("ui(String(check.manual_resolution || check.required_n
 check(page.workflow.includes('source_title_key?: string | null;') && page.workflow.includes('source_summary_key?: string | null;'), 'Workflow Composer consumes stable source title/summary translation identities');
 check(page.workflow.includes('blueprint.source_title_key ? ui(blueprint.source_title)') && page.workflow.includes('blueprint.source_summary_key ? ui(blueprint.source_summary)'), 'Workflow Composer localizes only explicitly keyed source text');
 check(page.review.includes('title_key?: string | null;') && page.review.includes('summary_key?: string | null;'), 'Intelligence Review accepts keyed system title/summary text');
-check(page.review.includes('review.title_key ? ui(review.title) : review.title') && page.review.includes('review.summary_key ? ui(review.summary) : review.summary'), 'Intelligence Review preserves arbitrary source text while localizing keyed system text');
+check(page.review.includes('intelligenceReviewTitle(review, ui)') && page.review.includes('review.summary_key ? ui(review.summary) : review.summary'), 'Intelligence Review preserves arbitrary source text while localizing keyed system text and governed Copilot proposal titles');
 check(page.collab.includes('title_key?: string | null;') && page.collab.includes('summary_key?: string | null;'), 'Collaboration accepts keyed Action Center title/summary text');
 check(page.collab.includes('localizedSystemGuidance(thread.title_key, thread.title') && page.collab.includes('localizedSystemGuidance(thread.summary_key, thread.summary'), 'Collaboration localizes only system-owned thread title/summary text');
 for (const mapping of ["probabilistic_forecast_model: 'Probabilistic forecast'", "adaptive_policy_recommendation: 'Adaptive policy recommendation'", "ai_copilot_run: 'AI Copilot analysis'"]) check(page.collab.includes(mapping), `Collaboration business-area mapping present: ${mapping}`);
@@ -452,7 +452,7 @@ for (const mapping of ["unresolved_alerts: 'Unresolved alerts'", "low_stock_prod
 check(page.copilot.includes('copilotEvidenceKindLabel(item.kind, ui)'), 'AI Copilot evidence kinds no longer fall through generic English humanization');
 
 const ci=String(pkg.scripts?.['check:ci']||'');
-check(ci.startsWith('npm run check:tenant-multilingual-closure-audit && npm run check:backend-system-text-remaining-enum-localization-v349187 && '), 'tenant multilingual closure remains first and v3.49.187 immediately follows it in frontend CI');
+check(ci.startsWith('npm run check:tenant-multilingual-closure-audit && npm run check:command-pages-final-producer-renderer-closure-v349188 && npm run check:backend-system-text-remaining-enum-localization-v349187 && '), 'tenant multilingual closure remains first and v3.49.188 precedes v3.49.187 in frontend CI');
 check(String(pkg.scripts?.['check:backend-system-text-remaining-enum-localization-v349187']||'').includes('check-backend-system-text-remaining-enum-localization-v349187.mjs'), 'v3.49.187 frontend guard is registered');
 
 console.log(`Backend system text & remaining enum localization v3.49.187: ${passCount}/${passCount+failCount} PASS`);

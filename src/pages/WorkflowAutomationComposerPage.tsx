@@ -341,15 +341,9 @@ function executionModeLabel(value: string | null | undefined, ui: (englishText: 
 }
 */
 
-function displayTitleText(value?: string | null): string {
-  const raw = String(value || '').trim();
-  if (!raw) return 'Not reported';
-  return raw.includes('_') || raw === raw.toUpperCase() ? formatLabel(raw) : raw;
-}
-
 function sourceTitle(blueprint: WorkflowBlueprint, ui: (englishText: string) => string): string {
   if (blueprint.source_title) {
-    return blueprint.source_title_key ? ui(blueprint.source_title) : blueprint.source_action_domain === 'alerts' ? displayTitleText(blueprint.source_title) : blueprint.source_title;
+    return blueprint.source_title_key ? ui(blueprint.source_title) : blueprint.source_title;
   }
   if (blueprint.blueprint_type === 'external_workflow_visibility_contract') {
     return `${ui('Integration plan:')} ${workflowDomainLabel(blueprint.workflow_domain, ui)}`;

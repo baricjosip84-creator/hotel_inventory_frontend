@@ -65,7 +65,6 @@ for (const required of [
   '<LocalizedLearningStatCard label="Blocked items"',
   "label={ui('Owner')}",
   "{ui('Next handoff focus:')}",
-  "handoff?.handoff_note || ui('No operational handoff note available yet.')",
   "<th>{ui('Source lane')}</th>",
   "<th>{ui('Manual task')}</th>",
   'ui(formatLabel(item.handoff_status))',
@@ -77,7 +76,6 @@ for (const required of [
   '<LocalizedLearningStatCard label="Accepted criteria"',
   '<LocalizedLearningStatCard label="Blocked criteria"',
   "{ui('Next acceptance focus:')}",
-  "acceptance?.acceptance_note || ui('No operational acceptance note available yet.')",
   "<th>{ui('Criterion')}</th>",
   "<th>{ui('Manual acceptance task')}</th>",
   'ui(formatLabel(criterion.criterion_status))',
@@ -106,33 +104,25 @@ for (const [name, start, end] of [
   else pass(`${name} slice has no remaining raw JSX presentation text.`);
 }
 
-for (const required of [
-  "value={formatLabel(handoff?.recommended_handoff_owner || 'decision_governance_owner')}",
-  "formatLabel(handoff?.next_handoff_focus || 'complete_manual_operational_acceptance')",
-  '<td>{formatLabel(item.source_lane)}</td>',
-  '<td>{formatLabel(item.owner_role)}</td>',
-  '<td>{formatLabel(item.manual_task)}</td>',
-  '<td>{formatLabel(item.blocking_reason)}</td>',
-  "value={formatLabel(acceptance?.recommended_acceptance_owner || 'decision_governance_owner')}",
-  "formatLabel(acceptance?.next_acceptance_focus || 'record_manual_operational_acceptance')",
-  '<td>{formatLabel(criterion.criterion_label || criterion.criterion_key)}</td>',
-  '<td>{formatLabel(criterion.manual_acceptance_task)}</td>',
-  '<td>{formatLabel(criterion.blocking_reason)}</td>'
-]) if (!pageSource.includes(required)) fail(`Expected backend-data boundary missing: ${required}`);
+
+// v3.49.188: backend-owned governance vocabulary must use protected presentation helpers,
+// while arbitrary tenant/business text remains outside blind ui()/formatLabel() translation.
+const protectedSystemFieldsV349188 = ['acceptance_note', 'blocking_reason', 'criterion_label', 'handoff_note', 'manual_acceptance_task', 'manual_task', 'next_acceptance_focus', 'next_handoff_focus', 'owner_role', 'recommended_acceptance_owner', 'recommended_handoff_owner', 'source_lane'];
+const protectedHelpersV349188 = ['learningOwnedSystemText', 'learningOwnerLabel'];
+for (const helper of protectedHelpersV349188) {
+  if (!pageSource.includes(`${helper}(`)) fail(`v3.49.188 Learning Feedback protected helper missing: ${helper}`);
+}
+for (const field of protectedSystemFieldsV349188) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(?:learningOwnedSystemText|learningOwnerLabel|learningCheckLabel|learningDomainLabel|learningEvidenceTypeLabel|learningActionRationale)\\([^\\n]*${escaped}`);
+  if (!pattern.test(pageSource)) fail(`Backend-owned Learning Feedback field is not protected by the v3.49.188 presentation boundary: ${field}`);
+}
 for (const forbidden of [
-  'ui(formatLabel(handoff?.recommended_handoff_owner',
-  'ui(formatLabel(handoff?.next_handoff_focus',
-  'ui(formatLabel(item.source_lane))',
-  'ui(formatLabel(item.owner_role))',
-  'ui(formatLabel(item.manual_task))',
-  'ui(formatLabel(item.blocking_reason))',
-  'ui(formatLabel(acceptance?.recommended_acceptance_owner',
-  'ui(formatLabel(acceptance?.next_acceptance_focus',
-  'ui(formatLabel(criterion.criterion_label || criterion.criterion_key))',
-  'ui(formatLabel(criterion.manual_acceptance_task))',
-  'ui(formatLabel(criterion.blocking_reason))'
-]) if (pageSource.includes(forbidden)) fail(`Backend operational handoff/acceptance data must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend handoff/acceptance labels, owners, focus values, tasks, blockers, and criterion labels remain raw.');
+  'ui(formatLabel(check.check_label',
+  'ui(formatLabel(blocker))',
+  'ui(formatLabel(item.learning_domain))'
+]) if (pageSource.includes(forbidden)) fail(`Learning Feedback must not blindly translate backend identifiers: ${forbidden}`);
+if (!process.exitCode) pass('Backend-owned Learning Feedback governance text uses protected localized helpers while arbitrary business text remains outside blind translation.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

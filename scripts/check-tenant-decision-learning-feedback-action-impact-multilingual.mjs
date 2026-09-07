@@ -111,13 +111,15 @@ else {
 }
 
 for (const required of [
+  '<td>{learningActionRationale(action, ui)}</td>',
+  'learningDomainLabel(domain.domain, ui)',
+  'rationale_key?: string;'
+]) if (!pageSource.includes(required)) fail(`Expected keyed-system/business-data boundary missing: ${required}`);
+for (const forbidden of [
   "<td>{action.rationale || '—'}</td>",
   'ui(formatLabel(domain.domain))'
-]) if (!pageSource.includes(required)) fail(`Expected backend/business-data boundary missing: ${required}`);
-for (const forbidden of [
-  'ui(action.rationale)'
-]) if (pageSource.includes(forbidden)) fail(`Backend/business data must remain raw in this slice: ${forbidden}`);
-if (!process.exitCode) pass('Backend rationale remains raw while the controlled learning-domain enum is localized.');
+]) if (pageSource.includes(forbidden)) fail(`Application-owned action rationale/domain must use the explicit localization boundary: ${forbidden}`);
+if (!process.exitCode) pass('Application-owned action rationales and bounded learning domains are localized while unknown business text remains raw.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

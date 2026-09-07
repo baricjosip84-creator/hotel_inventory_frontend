@@ -104,7 +104,6 @@ else pass('Recommendation Outcome Foundation slice has no remaining raw JSX pres
 
 for (const required of [
   'foundation.completion_definition || ui(',
-  "item.recommendation_label || `${ui('Recommendation')} ${formatLocalizedNumber(index + 1, locale)}`", '<td>{formatLabel(item.learning_domain)}</td>',
   "item.outcome_label || `${ui('Recorded item')} ${formatLocalizedNumber(index + 1, locale)}`", "item.recommendation_label || ui('Recommendation')",
   '<td>{formatLabel(item.learning_signal)}</td>', '<td>{learningOwnerLabel(item.learning_action_owner, ui, locale)}</td>', '<td>{formatLabel(item.escalation_reason)}</td>',
   "{ui('Next phase:')} {formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.next_phase)}",
@@ -119,6 +118,25 @@ for (const forbidden of [
   'ui(formatLabel(blocker.blocker_label', 'ui(blocker.manual_resolution_task)'
 ]) if (foundationSlice.includes(forbidden)) fail(`Backend Recommendation Outcome Foundation business text must remain raw: ${forbidden}`);
 if (!process.exitCode) pass('Backend completion definitions, friendly recommendation/outcome labels, domain values, learning signals, owners, reasons, next-phase text, capability identifiers, blocker text, and manual resolution tasks preserve their ownership boundary.');
+
+// v3.49.188: backend-owned governance vocabulary must use protected presentation helpers,
+// while arbitrary tenant/business text remains outside blind ui()/formatLabel() translation.
+const protectedSystemFieldsV349188 = ['learning_domain'];
+const protectedHelpersV349188 = ['learningDomainLabel'];
+for (const helper of protectedHelpersV349188) {
+  if (!pageSource.includes(`${helper}(`)) fail(`v3.49.188 Learning Feedback protected helper missing: ${helper}`);
+}
+for (const field of protectedSystemFieldsV349188) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(?:learningOwnedSystemText|learningOwnerLabel|learningCheckLabel|learningDomainLabel|learningEvidenceTypeLabel|learningActionRationale)\\([^\\n]*${escaped}`);
+  if (!pattern.test(pageSource)) fail(`Backend-owned Learning Feedback field is not protected by the v3.49.188 presentation boundary: ${field}`);
+}
+for (const forbidden of [
+  'ui(formatLabel(check.check_label',
+  'ui(formatLabel(blocker))',
+  'ui(formatLabel(item.learning_domain))'
+]) if (pageSource.includes(forbidden)) fail(`Learning Feedback must not blindly translate backend identifiers: ${forbidden}`);
+if (!process.exitCode) pass('Backend-owned Learning Feedback governance text uses protected localized helpers while arbitrary business text remains outside blind translation.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

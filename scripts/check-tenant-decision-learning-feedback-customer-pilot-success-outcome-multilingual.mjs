@@ -64,7 +64,6 @@ for (const required of [
   '<LocalizedLearningStatCard label="Blocked criteria"',
   "{ui('Success owner:')}",
   "{ui('Exit requirements:')}",
-  "ui('Manual customer pilot success criteria remain advisory only.')",
   "{ui('No customer pilot success criteria are available yet.')}",
   "{ui('Closed-loop customer pilot outcome review')}",
   "{ui('Manual pilot outcome-review layer. It compares captured pilot evidence against baselines and prepares an exit recommendation without expanding customers, training models, updating policies, or mutating operational state.')}",
@@ -74,7 +73,6 @@ for (const required of [
   '<LocalizedLearningStatCard label="Open pressure"',
   "{ui('Outcome review owner:')}",
   "{ui('Manual exit options:')}",
-  "ui('Manual customer pilot outcome review remains advisory only.')",
   "{ui('No customer pilot outcome-review checks are available yet.')}",
   'formatLocalizedNumber(value, locale)'
 ]) if (!pageSource.includes(required)) fail(`Localized customer pilot success/outcome presentation missing: ${required}`);
@@ -101,37 +99,25 @@ for (const [name, start, end] of [
   else pass(`${name} slice has no remaining raw JSX presentation text.`);
 }
 
-for (const required of [
-  "formatLabel(success?.recommended_success_owner || 'customer_success_owner')",
-  "formatLabel(success?.next_success_focus || 'track_customer_pilot_outcomes_against_manual_success_criteria')",
-  'success?.success_criteria_note || ui(',
-  'blockers.slice(0, 6).map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)',
-  'exitRequirements.map(formatLabel).join(',
-  '<td>{formatLabel(criterion.criterion_label || criterion.criterion_key)}</td>',
-  '<td>{formatLabel(criterion.pilot_success_evidence)}</td>',
-  '<td>{formatLabel(criterion.manual_success_task)}</td>',
-  "formatLabel(review?.recommended_outcome_review_owner || 'customer_success_owner')",
-  "formatLabel(review?.next_outcome_review_focus || 'conduct_manual_customer_pilot_outcome_review_and_exit_recommendation')",
-  'review?.outcome_review_note || ui(',
-  'exitOptions.map(formatLabel).join(',
-  '<td>{formatLabel(check.check_label || check.check_key)}</td>',
-  '<td>{formatLabel(check.review_evidence)}</td>',
-  '<td>{formatLabel(check.manual_review_task)}</td>'
-]) if (!pageSource.includes(required)) fail(`Expected backend-data boundary missing: ${required}`);
+
+// v3.49.188: backend-owned governance vocabulary must use protected presentation helpers,
+// while arbitrary tenant/business text remains outside blind ui()/formatLabel() translation.
+const protectedSystemFieldsV349188 = ['check_label', 'criterion_label', 'manual_review_task', 'manual_success_task', 'next_outcome_review_focus', 'next_success_focus', 'outcome_review_note', 'pilot_success_evidence', 'recommended_outcome_review_owner', 'recommended_success_owner', 'review_evidence', 'success_criteria_note'];
+const protectedHelpersV349188 = ['learningOwnedSystemText', 'learningOwnerLabel', 'learningCheckLabel', 'learningDomainLabel', 'learningEvidenceTypeLabel'];
+for (const helper of protectedHelpersV349188) {
+  if (!pageSource.includes(`${helper}(`)) fail(`v3.49.188 Learning Feedback protected helper missing: ${helper}`);
+}
+for (const field of protectedSystemFieldsV349188) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(?:learningOwnedSystemText|learningOwnerLabel|learningCheckLabel|learningDomainLabel|learningEvidenceTypeLabel|learningActionRationale)\\([^\\n]*${escaped}`);
+  if (!pattern.test(pageSource)) fail(`Backend-owned Learning Feedback field is not protected by the v3.49.188 presentation boundary: ${field}`);
+}
 for (const forbidden of [
-  "ui(formatLabel(success?.recommended_success_owner",
-  "ui(formatLabel(success?.next_success_focus",
-  'ui(success?.success_criteria_note',
-  'ui(formatLabel(criterion.criterion_label || criterion.criterion_key))',
-  'ui(formatLabel(criterion.pilot_success_evidence))',
-  'ui(formatLabel(criterion.manual_success_task))',
-  "ui(formatLabel(review?.recommended_outcome_review_owner",
-  "ui(formatLabel(review?.next_outcome_review_focus",
-  'ui(review?.outcome_review_note',
-  'ui(formatLabel(check.review_evidence))',
-  'ui(formatLabel(check.manual_review_task))'
-]) if (pageSource.includes(forbidden)) fail(`Backend customer-pilot success/outcome data must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend criterion/check labels, owners, blockers, evidence references, tasks, focus values, exit options/requirements, and notes remain raw.');
+  'ui(formatLabel(check.check_label',
+  'ui(formatLabel(blocker))',
+  'ui(formatLabel(item.learning_domain))'
+]) if (pageSource.includes(forbidden)) fail(`Learning Feedback must not blindly translate backend identifiers: ${forbidden}`);
+if (!process.exitCode) pass('Backend-owned Learning Feedback governance text uses protected localized helpers while arbitrary business text remains outside blind translation.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

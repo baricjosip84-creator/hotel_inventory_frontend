@@ -161,7 +161,9 @@ type DigitalTwinResponse = {
   review_first?: {
     kind?: 'node' | 'overlay' | string;
     title?: string | null;
+    title_key?: string | null;
     summary?: string | null;
+    summary_key?: string | null;
     urgency?: string | null;
     source_surface?: string | null;
     source_record_path?: string | null;
@@ -705,8 +707,8 @@ export default function DigitalTwinVisualizationPage() {
           <div className="digital-twin-review-first-icon"><TenantNavIcon path="/alerts" size={20} /></div>
           <div className="digital-twin-review-first-copy">
             <span className="digital-twin-kicker">{ui('Review this first')}</span>
-            <h2 id="digital-twin-review-first-title">{sourceText(reviewFirst.title, ui('Highest-priority connected context'))}</h2>
-            {reviewFirst.summary ? <p>{reviewFirst.summary}</p> : <p>{ui('This is the highest-priority visible item in the current permitted snapshot.')}</p>}
+            <h2 id="digital-twin-review-first-title">{reviewFirst.title_key ? digitalTwinSystemText(reviewFirst.title_key, reviewFirst.title, ui) : sourceText(reviewFirst.title, ui('Highest-priority connected context'))}</h2>
+            {reviewFirst.summary ? <p>{reviewFirst.summary_key ? digitalTwinSystemText(reviewFirst.summary_key, reviewFirst.summary, ui) : reviewFirst.summary}</p> : <p>{ui('This is the highest-priority visible item in the current permitted snapshot.')}</p>}
             <div className="digital-twin-card-actions">
               {reviewFirst.node_key ? <button className="button button--primary" type="button" onClick={() => setFocusNodeKey(reviewFirst.node_key || null)}>{ui('Review connected context')}</button> : null}
               {reviewFirstPath ? <Link className="button button--secondary digital-twin-link-button" to={reviewFirstPath}><TenantNavIcon path={reviewFirstPath.split('?')[0]} size={16} /> {ui('Open exact source record')}</Link> : null}

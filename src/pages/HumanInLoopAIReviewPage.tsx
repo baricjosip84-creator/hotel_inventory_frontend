@@ -4692,6 +4692,19 @@ const INTELLIGENCE_REVIEW_SYSTEM_TEXT: Record<string, string> = {
   intelligence_review_evidence_persisted_history: 'Persisted review evidence from the governed decision is available for historical review.'
 };
 
+const COPILOT_REVIEW_TITLE_LABELS: Record<string, string> = {
+  replenishment_purchase_order_draft: 'Purchase Order draft recommendation',
+  product_min_stock_update: 'Minimum-stock proposal',
+  cost_standard_update: 'Standard-cost proposal'
+};
+
+function intelligenceReviewTitle(review: HumanAIReview, ui: (englishText: string) => string): string {
+  if (review.title_key && review.title) return ui(review.title);
+  const proposalLabel = review.proposal_request_type ? COPILOT_REVIEW_TITLE_LABELS[review.proposal_request_type] : null;
+  if (proposalLabel) return ui(proposalLabel);
+  return review.title || ui('Intelligence review');
+}
+
 function localizedIntelligenceReviewSystemText(
   key: string | null | undefined,
   value: string | null | undefined,
@@ -9190,7 +9203,7 @@ export default function HumanInLoopAIReviewPage() {
                     <span className="ai-review-page__badge ai-review-page__badge--violet">{recommendationLabel(review.ai_operation_domain, ui)}</span>
                     {review.governance_approval_guidance?.approval_required && reviewStateIsActive(lifecycle?.current_status || review.review_state) ? <span className="ai-review-page__badge ai-review-page__badge--amber">{ui("Approval required")}</span> : null}
                   </div>
-                  <div className="ai-review-page__review-heading"><span className="ai-review-page__review-icon ai-review-page__icon--violet"><TenantNavIcon path="/intelligence-review" size={18} /></span><h3>{review.title ? (review.title_key ? ui(review.title) : review.title) : ui('Intelligence review')}</h3></div>
+                  <div className="ai-review-page__review-heading"><span className="ai-review-page__review-icon ai-review-page__icon--violet"><TenantNavIcon path="/intelligence-review" size={18} /></span><h3>{intelligenceReviewTitle(review, ui)}</h3></div>
                   <p className="card__subtext">{review.summary ? (review.summary_key ? ui(review.summary) : review.summary) : ui('No review summary was provided.')}</p>
                   <div className="card-grid ai-review-page__evidence-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', marginTop: 12 }}>
                     <div className="ai-review-page__evidence-card">

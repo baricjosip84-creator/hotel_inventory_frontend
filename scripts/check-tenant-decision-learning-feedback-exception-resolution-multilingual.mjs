@@ -96,32 +96,25 @@ else {
   else pass('Exception/resolution slice has no remaining raw JSX presentation text.');
 }
 
-for (const required of [
-  '<td>{formatLabel(item.exception_key)}</td>',
-  '<td>{formatLabel(item.exception_source)}</td>',
-  "typeof item.current_value === 'number' ? formatLocalizedNumber(item.current_value, locale) : formatLabel(item.current_value)",
-  "typeof item.required_value === 'number' ? formatLocalizedNumber(item.required_value, locale) : formatLabel(item.required_value)",
-  '<td>{formatLabel(item.manual_resolution || item.exception_reason)}</td>',
-  "{register?.exception_note ? <p className=\"card__subtext\">{register.exception_note}</p> : null}",
-  '<LocalizedLearningStatCard label="Owner" value={register?.recommended_exception_owner',
-  "{plan?.resolution_note ? <p className=\"card__subtext\">{plan.resolution_note}</p> : null}",
-  '<LocalizedLearningStatCard label="Owner" value={plan?.recommended_resolution_owner',
-  '<td>{formatLabel(item.exception_key)}</td>',
-  '<td>{formatLabel(item.manual_resolution_task)}</td>',
-  '<td>{formatLabel(item.evidence_to_capture)}</td>',
-  '<td>{formatLabel(item.expected_resolution_result)}</td>'
-]) if (!pageSource.includes(required)) fail(`Expected backend-data boundary missing: ${required}`);
+
+// v3.49.188: backend-owned governance vocabulary must use protected presentation helpers,
+// while arbitrary tenant/business text remains outside blind ui()/formatLabel() translation.
+const protectedSystemFieldsV349188 = ['evidence_to_capture', 'exception_key', 'exception_note', 'exception_reason', 'exception_source', 'expected_resolution_result', 'manual_resolution', 'manual_resolution_task', 'resolution_note'];
+const protectedHelpersV349188 = ['learningOwnedSystemText'];
+for (const helper of protectedHelpersV349188) {
+  if (!pageSource.includes(`${helper}(`)) fail(`v3.49.188 Learning Feedback protected helper missing: ${helper}`);
+}
+for (const field of protectedSystemFieldsV349188) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(?:learningOwnedSystemText|learningOwnerLabel|learningCheckLabel|learningDomainLabel|learningEvidenceTypeLabel|learningActionRationale)\\([^\\n]*${escaped}`);
+  if (!pattern.test(pageSource)) fail(`Backend-owned Learning Feedback field is not protected by the v3.49.188 presentation boundary: ${field}`);
+}
 for (const forbidden of [
-  'ui(formatLabel(item.exception_key))',
-  'ui(formatLabel(item.exception_source))',
-  'ui(formatLabel(item.manual_resolution || item.exception_reason))',
-  'ui(register.exception_note)',
-  'ui(formatLabel(item.manual_resolution_task))',
-  'ui(formatLabel(item.evidence_to_capture))',
-  'ui(formatLabel(item.expected_resolution_result))',
-  'ui(plan.resolution_note)'
-]) if (pageSource.includes(forbidden)) fail(`Backend exception/resolution data must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend exception identifiers, source/current/required values, notes, owners, manual tasks, evidence guidance and expected results remain raw.');
+  'ui(formatLabel(check.check_label',
+  'ui(formatLabel(blocker))',
+  'ui(formatLabel(item.learning_domain))'
+]) if (pageSource.includes(forbidden)) fail(`Learning Feedback must not blindly translate backend identifiers: ${forbidden}`);
+if (!process.exitCode) pass('Backend-owned Learning Feedback governance text uses protected localized helpers while arbitrary business text remains outside blind translation.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

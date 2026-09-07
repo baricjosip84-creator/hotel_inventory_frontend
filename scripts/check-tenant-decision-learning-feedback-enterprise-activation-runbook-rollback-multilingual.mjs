@@ -83,7 +83,6 @@ for (const required of [
   "{ui('Recommended runbook mode:')}",
   "{ui('Operations owner:')}",
   "{ui('Compliance owner:')}",
-  "runbook?.runbook_note || ui('Manual enterprise activation runbook remains advisory only.')",
   "{ui('No enterprise activation runbook blockers are currently reported.')}",
   "{ui('Manual runbook options:')}",
   "{ui('No enterprise activation runbook steps are available yet.')}",
@@ -96,7 +95,6 @@ for (const required of [
   '<LocalizedLearningStatCard label="Blocked checks"',
   "{ui('Rollback owner:')}",
   "{ui('Recommended rollback mode:')}",
-  "plan?.rollback_note || ui('Manual activation rollback plan remains advisory only.')",
   "{ui('No enterprise activation rollback blockers are currently reported.')}",
   "{ui('Manual rollback options:')}",
   "{ui('No enterprise activation rollback checks are available yet.')}",
@@ -127,51 +125,25 @@ for (const [name, start, end] of [
   else pass(`${name} slice has no remaining raw JSX presentation text.`);
 }
 
-for (const required of [
-  "runbook?.recommended_runbook_owner || 'enterprise_activation_owner'",
-  "formatLabel(runbook?.next_runbook_focus || 'perform_manual_activation_runbook_signoff')",
-  "formatLabel(policy.recommended_runbook_mode || 'pause_activation_runbook_until_manual_remediation')",
-  "formatLabel(policy.operations_owner || 'operations_owner')",
-  "formatLabel(policy.compliance_owner || 'compliance_owner')",
-  "formatLabel(policy.rollback_owner || 'enterprise_rollout_owner')",
-  'runbook?.runbook_note || ui(',
-  'blockers.map(formatLabel).join(',
-  'options.map(formatLabel).join(',
-  '<td>{step.step_label || formatLabel(step.step_key)}</td>',
-  '<td>{formatLabel(step.runbook_evidence)}</td>',
-  '<td>{formatLabel(step.manual_runbook_task)}</td>',
-  "plan?.recommended_rollback_owner || 'enterprise_rollout_owner'",
-  "formatLabel(plan?.next_rollback_focus || 'perform_manual_activation_rollback_signoff')",
-  "formatLabel(policy.recommended_rollback_mode || 'pause_activation_until_manual_rollback_path_is_ready')",
-  "formatLabel(policy.activation_owner || 'enterprise_activation_owner')",
-  "formatLabel(policy.governance_owner || 'governance_owner')",
-  'plan?.rollback_note || ui(',
-  '<td>{check.check_label || formatLabel(check.check_key)}</td>',
-  '<td>{formatLabel(check.rollback_evidence)}</td>',
-  '<td>{formatLabel(check.manual_rollback_task)}</td>'
-]) if (!pageSource.includes(required)) fail(`Expected backend-data boundary missing: ${required}`);
+
+// v3.49.188: backend-owned governance vocabulary must use protected presentation helpers,
+// while arbitrary tenant/business text remains outside blind ui()/formatLabel() translation.
+const protectedSystemFieldsV349188 = ['activation_owner', 'check_label', 'compliance_owner', 'governance_owner', 'manual_rollback_task', 'manual_runbook_task', 'next_rollback_focus', 'next_runbook_focus', 'operations_owner', 'recommended_rollback_mode', 'recommended_runbook_mode', 'rollback_evidence', 'rollback_note', 'rollback_owner', 'runbook_evidence', 'runbook_note', 'step_label'];
+const protectedHelpersV349188 = ['learningOwnedSystemText', 'learningOwnerLabel', 'learningCheckLabel', 'learningDomainLabel', 'learningEvidenceTypeLabel'];
+for (const helper of protectedHelpersV349188) {
+  if (!pageSource.includes(`${helper}(`)) fail(`v3.49.188 Learning Feedback protected helper missing: ${helper}`);
+}
+for (const field of protectedSystemFieldsV349188) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(?:learningOwnedSystemText|learningOwnerLabel|learningCheckLabel|learningDomainLabel|learningEvidenceTypeLabel|learningActionRationale)\\([^\\n]*${escaped}`);
+  if (!pattern.test(pageSource)) fail(`Backend-owned Learning Feedback field is not protected by the v3.49.188 presentation boundary: ${field}`);
+}
 for (const forbidden of [
-  'ui(formatLabel(runbook?.recommended_runbook_owner',
-  'ui(formatLabel(runbook?.next_runbook_focus',
-  'ui(formatLabel(policy.recommended_runbook_mode',
-  'ui(formatLabel(policy.operations_owner',
-  'ui(formatLabel(policy.compliance_owner',
-  'ui(formatLabel(policy.rollback_owner',
-  'ui(runbook?.runbook_note',
-  'ui(formatLabel(step.step_label || step.step_key))',
-  'ui(formatLabel(step.runbook_evidence))',
-  'ui(formatLabel(step.manual_runbook_task))',
-  'ui(formatLabel(plan?.recommended_rollback_owner',
-  'ui(formatLabel(plan?.next_rollback_focus',
-  'ui(formatLabel(policy.recommended_rollback_mode',
-  'ui(formatLabel(policy.activation_owner',
-  'ui(formatLabel(policy.governance_owner',
-  'ui(plan?.rollback_note',
-  'ui(formatLabel(check.check_label || check.check_key))',
-  'ui(formatLabel(check.rollback_evidence))',
-  'ui(formatLabel(check.manual_rollback_task))'
-]) if (pageSource.includes(forbidden)) fail(`Backend activation runbook/rollback data must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend step/check labels, owners, modes, blockers, decision options, evidence, tasks, focus values, notes, and composite business values remain raw.');
+  'ui(formatLabel(check.check_label',
+  'ui(formatLabel(blocker))',
+  'ui(formatLabel(item.learning_domain))'
+]) if (pageSource.includes(forbidden)) fail(`Learning Feedback must not blindly translate backend identifiers: ${forbidden}`);
+if (!process.exitCode) pass('Backend-owned Learning Feedback governance text uses protected localized helpers while arbitrary business text remains outside blind translation.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

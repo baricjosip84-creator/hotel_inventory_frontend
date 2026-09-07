@@ -70,7 +70,6 @@ for (const required of [
   '<LocalizedLearningStatCard label="Ready checks"',
   '<LocalizedLearningStatCard label="Blocked checks"',
   "{ui('Executive owner:')}",
-  "packet?.commercial_readiness_note || ui('Manual commercial readiness remains advisory only.')",
   "<th>{ui('Status')}</th>",
   'ui(formatLabel(check.check_status))',
   'formatCommercialDecisionValue(check.current_value)',
@@ -114,29 +113,25 @@ for (const [name, start, end] of [
   else pass(`${name} slice has no remaining raw JSX presentation text.`);
 }
 
-for (const required of [
-  "formatLabel(packet?.recommended_executive_owner || 'platform_governance_owner')",
-  "formatLabel(packet?.next_commercial_readiness_focus || 'record_manual_commercial_readiness_decision')",
-  'blockers.slice(0, 6).map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)',
-  '<td>{formatLabel(check.check_label || check.check_key)}</td>',
-  '<td>{formatLabel(check.packet_evidence)}</td>',
-  '<td>{formatLabel(check.manual_readiness_task)}</td>',
-  "value={formatLabel(gate?.next_gate_focus || 'prepare_manual_governance_signoff')}",
-  '(gate?.required_manual_resolution || []).map(formatLabel).join(\', \')',
-  '<td>{formatLabel(check.check_label || check.check_key)}</td>',
-  '<td>{formatLabel(check.remediation)}</td>'
-]) if (!pageSource.includes(required)) fail(`Expected backend-data boundary missing: ${required}`);
+
+// v3.49.188: backend-owned governance vocabulary must use protected presentation helpers,
+// while arbitrary tenant/business text remains outside blind ui()/formatLabel() translation.
+const protectedSystemFieldsV349188 = ['check_label', 'commercial_readiness_note', 'manual_readiness_task', 'next_commercial_readiness_focus', 'next_gate_focus', 'packet_evidence', 'recommended_executive_owner', 'remediation'];
+const protectedHelpersV349188 = ['learningOwnedSystemText', 'learningOwnerLabel', 'learningCheckLabel', 'learningDomainLabel', 'learningEvidenceTypeLabel'];
+for (const helper of protectedHelpersV349188) {
+  if (!pageSource.includes(`${helper}(`)) fail(`v3.49.188 Learning Feedback protected helper missing: ${helper}`);
+}
+for (const field of protectedSystemFieldsV349188) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(?:learningOwnedSystemText|learningOwnerLabel|learningCheckLabel|learningDomainLabel|learningEvidenceTypeLabel|learningActionRationale)\\([^\\n]*${escaped}`);
+  if (!pattern.test(pageSource)) fail(`Backend-owned Learning Feedback field is not protected by the v3.49.188 presentation boundary: ${field}`);
+}
 for (const forbidden of [
-  'ui(formatLabel(packet?.recommended_executive_owner',
-  'ui(formatLabel(packet?.next_commercial_readiness_focus',
+  'ui(formatLabel(check.check_label',
   'ui(formatLabel(blocker))',
-  'ui(formatLabel(check.check_label || check.check_key))',
-  'ui(formatLabel(check.packet_evidence))',
-  'ui(formatLabel(check.manual_readiness_task))',
-  'ui(formatLabel(gate?.next_gate_focus',
-  'ui(formatLabel(check.remediation))'
-]) if (pageSource.includes(forbidden)) fail(`Backend commercial/governance data must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend commercial/governance labels, owners, blockers, evidence, tasks, focus values, and remediations remain raw.');
+  'ui(formatLabel(item.learning_domain))'
+]) if (pageSource.includes(forbidden)) fail(`Learning Feedback must not blindly translate backend identifiers: ${forbidden}`);
+if (!process.exitCode) pass('Backend-owned Learning Feedback governance text uses protected localized helpers while arbitrary business text remains outside blind translation.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

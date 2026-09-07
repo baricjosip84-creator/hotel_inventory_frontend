@@ -110,20 +110,18 @@ else {
 }
 
 for (const required of [
-  '<td>{formatLabel(row.domain)}</td>',
-  '<td>{formatLabel(row.recommended_next_capture)}</td>',
-  "<td>{(row.missing_evidence_types || []).map(formatLabel).join(', ') || '—'}</td>",
-  "value={formatLabel(roadmap?.next_maturity_focus || 'maintain_manual_closed_loop_readiness_review')}",
-  "{(roadmap?.blockers || []).map(formatLabel).join(', ')}",
-  '<td>{formatLabel(phase.recommended_next_step)}</td>'
-]) if (!pageSource.includes(required)) fail(`Expected backend-data boundary missing: ${required}`);
+  '<td>{learningDomainLabel(row.domain, ui)}</td>',
+  "learningOwnedSystemText(row.recommended_next_capture, 'Continue with the next manual governance step.', ui, locale)",
+  "(row.missing_evidence_types || []).map((type) => learningEvidenceTypeLabel(type, ui)).join(', ')",
+  "learningOwnedSystemText(roadmap?.next_maturity_focus, 'Continue with the next manual governance step.', ui, locale)",
+  "learningOwnedSystemText(phase.recommended_next_step, 'Continue with the next manual governance step.', ui, locale)"
+]) if (!pageSource.includes(required)) fail(`Expected localized system/bounded-data boundary missing: ${required}`);
 for (const forbidden of [
-  'ui(formatLabel(row.domain))',
-  'ui(formatLabel(row.recommended_next_capture))',
-  'ui(formatLabel(roadmap?.next_maturity_focus',
-  'ui(formatLabel(phase.recommended_next_step))'
-]) if (pageSource.includes(forbidden)) fail(`Backend domain/blocker/recommendation data must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend domain, gap, blocker and recommendation data remain raw while known canonical presentation states are localized.');
+  '<td>{formatLabel(row.domain)}</td>',
+  "<td>{(row.missing_evidence_types || []).map(formatLabel).join(', ') || '—'}</td>",
+  'ui(formatLabel(row.domain))'
+]) if (pageSource.includes(forbidden)) fail(`Bounded learning domain/evidence data must not fall through generic English formatting: ${forbidden}`);
+if (!process.exitCode) pass('Bounded learning domains/evidence types are localized; application-owned guidance uses the system-text boundary; unknown business text remains raw.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

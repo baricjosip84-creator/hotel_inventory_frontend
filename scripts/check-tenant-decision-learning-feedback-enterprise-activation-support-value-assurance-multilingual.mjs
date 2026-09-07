@@ -92,7 +92,6 @@ for (const required of [
   "{ui('Support owner:')}",
   "{ui('Recommended support mode:')}",
   "{ui('Review cadence:')}",
-  "readiness?.support_readiness_note || ui('Manual enterprise activation support readiness remains advisory only.')",
   "{ui('No enterprise activation support transition blockers are currently reported.')}",
   "{ui('Manual support transition options:')}",
   "{ui('No enterprise activation support readiness checks are available yet.')}",
@@ -105,7 +104,6 @@ for (const required of [
   '<LocalizedLearningStatCard label="Negative outcomes"',
   "{ui('Value assurance owner:')}",
   "{ui('Recommended value claim mode:')}",
-  "assurance?.value_assurance_note || ui('Manual enterprise activation value assurance remains advisory only.')",
   "{ui('No enterprise activation value assurance blockers are currently reported.')}",
   "{ui('Manual value assurance options:')}",
   "{ui('No enterprise activation value assurance checks are available yet.')}",
@@ -135,43 +133,25 @@ for (const [name, start, end] of [
   else pass(`${name} slice has no remaining raw JSX presentation text.`);
 }
 
-for (const required of [
-  "readiness?.recommended_support_owner || 'support_operations_owner'",
-  "formatLabel(readiness?.next_support_focus || 'perform_manual_support_transition_signoff')",
-  "formatLabel(policy.recommended_support_mode || 'pause_support_transition_until_manual_blockers_are_resolved')",
-  "formatLabel(policy.recommended_support_cadence || 'daily_support_blocker_review_until_transition_ready')",
-  'readiness?.support_readiness_note || ui(',
-  'blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)',
-  'options.map(formatLabel).join(',
-  '<td>{check.check_label || formatLabel(check.check_key)}</td>',
-  '<td>{formatLabel(check.support_evidence)}</td>',
-  '<td>{formatLabel(check.manual_support_task)}</td>',
-  "assurance?.recommended_value_assurance_owner || 'enterprise_activation_owner'",
-  "formatLabel(assurance?.next_value_assurance_focus || 'perform_manual_enterprise_value_assurance_signoff')",
-  "formatLabel(policy.recommended_value_claim_mode || 'pause_enterprise_value_claims_until_manual_assurance_blockers_are_resolved')",
-  "formatLabel(policy.recommended_value_review_cadence || 'daily_value_assurance_blocker_review_until_ready')",
-  'assurance?.value_assurance_note || ui(',
-  '<td>{formatLabel(check.value_assurance_evidence)}</td>',
-  '<td>{formatLabel(check.manual_value_assurance_task)}</td>'
-]) if (!pageSource.includes(required)) fail(`Expected backend-data boundary missing: ${required}`);
+
+// v3.49.188: backend-owned governance vocabulary must use protected presentation helpers,
+// while arbitrary tenant/business text remains outside blind ui()/formatLabel() translation.
+const protectedSystemFieldsV349188 = ['check_label', 'manual_support_task', 'manual_value_assurance_task', 'next_support_focus', 'next_value_assurance_focus', 'recommended_support_cadence', 'recommended_support_mode', 'recommended_value_claim_mode', 'recommended_value_review_cadence', 'support_evidence', 'support_readiness_note', 'value_assurance_evidence', 'value_assurance_note'];
+const protectedHelpersV349188 = ['learningOwnedSystemText', 'learningCheckLabel', 'learningDomainLabel', 'learningEvidenceTypeLabel'];
+for (const helper of protectedHelpersV349188) {
+  if (!pageSource.includes(`${helper}(`)) fail(`v3.49.188 Learning Feedback protected helper missing: ${helper}`);
+}
+for (const field of protectedSystemFieldsV349188) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(?:learningOwnedSystemText|learningOwnerLabel|learningCheckLabel|learningDomainLabel|learningEvidenceTypeLabel|learningActionRationale)\\([^\\n]*${escaped}`);
+  if (!pattern.test(pageSource)) fail(`Backend-owned Learning Feedback field is not protected by the v3.49.188 presentation boundary: ${field}`);
+}
 for (const forbidden of [
-  'ui(formatLabel(readiness?.recommended_support_owner',
-  'ui(formatLabel(readiness?.next_support_focus',
-  'ui(formatLabel(policy.recommended_support_mode',
-  'ui(formatLabel(policy.recommended_support_cadence',
-  'ui(readiness?.support_readiness_note',
-  'ui(formatLabel(check.check_label || check.check_key))',
-  'ui(formatLabel(check.support_evidence))',
-  'ui(formatLabel(check.manual_support_task))',
-  'ui(formatLabel(assurance?.recommended_value_assurance_owner',
-  'ui(formatLabel(assurance?.next_value_assurance_focus',
-  'ui(formatLabel(policy.recommended_value_claim_mode',
-  'ui(formatLabel(policy.recommended_value_review_cadence',
-  'ui(assurance?.value_assurance_note',
-  'ui(formatLabel(check.value_assurance_evidence))',
-  'ui(formatLabel(check.manual_value_assurance_task))'
-]) if (pageSource.includes(forbidden)) fail(`Backend activation support/value-assurance data must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend check labels, owners, modes, cadence, blockers, decision options, evidence, tasks, focus values, notes, and composite business values remain raw.');
+  'ui(formatLabel(check.check_label',
+  'ui(formatLabel(blocker))',
+  'ui(formatLabel(item.learning_domain))'
+]) if (pageSource.includes(forbidden)) fail(`Learning Feedback must not blindly translate backend identifiers: ${forbidden}`);
+if (!process.exitCode) pass('Backend-owned Learning Feedback governance text uses protected localized helpers while arbitrary business text remains outside blind translation.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

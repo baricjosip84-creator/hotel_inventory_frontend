@@ -72,14 +72,12 @@ for (const required of [
   '<LocalizedLearningStatCard label="Realization decision"', '<LocalizedLearningStatCard label="Realization score"',
   '<LocalizedLearningStatCard label="Validated outcomes"', '<LocalizedLearningStatCard label="Open/rejected outcomes"',
   "{ui('Realization owner:')}", "{ui('Recommended realization mode:')}", "{ui('Positive score total:')}", "{ui('Negative score total:')}",
-  "review?.value_realization_note || ui('Manual enterprise activation value realization review remains advisory only.')",
   "{ui('No enterprise activation value realization blockers are currently reported.')}", "{ui('Manual realization options:')}",
   "{ui('No enterprise activation value realization checks are available yet.')}",
   'function ClosedLoopEnterpriseValueExpansionDecision(', "{ui('Closed-loop enterprise value expansion decision')}",
   '<LocalizedLearningStatCard label="Expansion decision"', '<LocalizedLearningStatCard label="Expansion score"',
   '<LocalizedLearningStatCard label="Ready checks"', '<LocalizedLearningStatCard label="Blocked checks"',
   "{ui('Expansion owner:')}", "{ui('Recommended expansion mode:')}", "{ui('Tenant-wave policy:')}",
-  "decision?.expansion_note || ui('Manual enterprise value expansion decision remains advisory only.')",
   "{ui('No enterprise value expansion blockers are currently reported.')}", "{ui('Manual expansion options:')}",
   "{ui('No enterprise value expansion checks are available yet.')}", 'ui(formatLabel(check.check_status))', 'formatLocalizedNumber(value, locale)'
 ]) if (!pageSource.includes(required)) fail(`Localized value-realization/expansion-decision presentation missing: ${required}`);
@@ -103,30 +101,25 @@ for (const [name, start, end] of [
   else pass(`${name} slice has no remaining raw JSX presentation text.`);
 }
 
-for (const required of [
-  "review?.recommended_value_realization_owner || 'enterprise_value_owner'",
-  "formatLabel(review?.next_value_realization_focus || 'perform_manual_enterprise_value_realization_signoff')",
-  "formatLabel(policy.recommended_value_realization_mode || 'pause_value_realization_claims_until_manual_blockers_are_resolved')",
-  "formatLabel(policy.recommended_realization_review_cadence || 'daily_value_realization_blocker_review_until_ready')",
-  'review?.value_realization_note || ui(', 'blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)',
-  'options.map(formatLabel).join(', '<td>{check.check_label || formatLabel(check.check_key)}</td>',
-  '<td>{formatLabel(check.realization_evidence)}</td>', '<td>{formatLabel(check.manual_realization_task)}</td>',
-  "decision?.recommended_expansion_owner || 'enterprise_value_owner'",
-  "formatLabel(decision?.next_expansion_focus || 'perform_manual_enterprise_value_expansion_approval')",
-  "formatLabel(policy.recommended_expansion_mode || 'pause_enterprise_expansion_until_manual_blockers_are_resolved')",
-  "formatLabel(policy.tenant_wave_policy || 'expand_only_by_named_manual_wave_after_rollout_control_review')",
-  'decision?.expansion_note || ui(', '<td>{formatLabel(check.expansion_evidence)}</td>', '<td>{formatLabel(check.manual_expansion_task)}</td>'
-]) if (!pageSource.includes(required)) fail(`Expected backend-data boundary missing: ${required}`);
+
+// v3.49.188: backend-owned governance vocabulary must use protected presentation helpers,
+// while arbitrary tenant/business text remains outside blind ui()/formatLabel() translation.
+const protectedSystemFieldsV349188 = ['check_label', 'expansion_evidence', 'expansion_note', 'manual_expansion_task', 'manual_realization_task', 'next_expansion_focus', 'next_value_realization_focus', 'realization_evidence', 'recommended_expansion_mode', 'recommended_expansion_owner', 'recommended_realization_review_cadence', 'recommended_value_realization_mode', 'tenant_wave_policy', 'value_realization_note'];
+const protectedHelpersV349188 = ['learningOwnedSystemText', 'learningOwnerLabel', 'learningCheckLabel', 'learningDomainLabel', 'learningEvidenceTypeLabel'];
+for (const helper of protectedHelpersV349188) {
+  if (!pageSource.includes(`${helper}(`)) fail(`v3.49.188 Learning Feedback protected helper missing: ${helper}`);
+}
+for (const field of protectedSystemFieldsV349188) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(?:learningOwnedSystemText|learningOwnerLabel|learningCheckLabel|learningDomainLabel|learningEvidenceTypeLabel|learningActionRationale)\\([^\\n]*${escaped}`);
+  if (!pattern.test(pageSource)) fail(`Backend-owned Learning Feedback field is not protected by the v3.49.188 presentation boundary: ${field}`);
+}
 for (const forbidden of [
-  'ui(formatLabel(review?.recommended_value_realization_owner', 'ui(formatLabel(review?.next_value_realization_focus',
-  'ui(formatLabel(policy.recommended_value_realization_mode', 'ui(formatLabel(policy.recommended_realization_review_cadence',
-  'ui(review?.value_realization_note', 'ui(formatLabel(check.check_label || check.check_key))',
-  'ui(formatLabel(check.realization_evidence))', 'ui(formatLabel(check.manual_realization_task))',
-  'ui(formatLabel(decision?.recommended_expansion_owner', 'ui(formatLabel(decision?.next_expansion_focus',
-  'ui(formatLabel(policy.recommended_expansion_mode', 'ui(formatLabel(policy.tenant_wave_policy',
-  'ui(decision?.expansion_note', 'ui(formatLabel(check.expansion_evidence))', 'ui(formatLabel(check.manual_expansion_task))'
-]) if (pageSource.includes(forbidden)) fail(`Backend value-realization/expansion data must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend check labels, owners, modes, cadence/policy values, blockers, options, evidence, tasks, focus values, notes, and composite business values remain raw.');
+  'ui(formatLabel(check.check_label',
+  'ui(formatLabel(blocker))',
+  'ui(formatLabel(item.learning_domain))'
+]) if (pageSource.includes(forbidden)) fail(`Learning Feedback must not blindly translate backend identifiers: ${forbidden}`);
+if (!process.exitCode) pass('Backend-owned Learning Feedback governance text uses protected localized helpers while arbitrary business text remains outside blind translation.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

@@ -80,7 +80,6 @@ for (const required of [
   "{ui('Recommended adoption mode:')}",
   "{ui('Validated pilot outcomes:')}",
   "{ui('Covered domains:')}",
-  "readiness?.adoption_note || ui('Manual enterprise adoption readiness remains advisory only.')",
   "{ui('No enterprise adoption blockers are currently reported.')}",
   "{ui('Manual adoption options:')}",
   "{ui('No enterprise adoption readiness checks are available yet.')}",
@@ -96,7 +95,6 @@ for (const required of [
   "{ui('Recommended activation mode:')}",
   "{ui('Monitoring owner:')}",
   "{ui('Rollback owner:')}",
-  "plan?.activation_note || ui('Manual enterprise activation planning remains advisory only.')",
   "{ui('No enterprise activation blockers are currently reported.')}",
   "{ui('Manual activation options:')}",
   "{ui('No enterprise activation checks are available yet.')}",
@@ -128,43 +126,25 @@ for (const [name, start, end] of [
   else pass(`${name} slice has no remaining raw JSX presentation text.`);
 }
 
-for (const required of [
-  "readiness?.recommended_adoption_owner || 'enterprise_adoption_owner'",
-  "formatLabel(readiness?.next_adoption_focus || 'prepare_manual_enterprise_adoption_signoff')",
-  "formatLabel(policy.recommended_adoption_mode || 'pause_enterprise_adoption_until_manual_remediation')",
-  'readiness?.adoption_note || ui(',
-  'blockers.map(formatLabel).join(',
-  'options.map(formatLabel).join(',
-  '<td>{check.check_label || formatLabel(check.check_key)}</td>',
-  '<td>{formatLabel(check.adoption_evidence)}</td>',
-  '<td>{formatLabel(check.manual_adoption_task)}</td>',
-  "plan?.recommended_activation_owner || 'enterprise_activation_owner'",
-  "formatLabel(plan?.next_activation_focus || 'prepare_manual_enterprise_activation_runbook')",
-  "formatLabel(policy.recommended_activation_mode || 'pause_enterprise_activation_until_manual_remediation')",
-  "formatLabel(policy.monitoring_owner || 'operations_owner')",
-  "formatLabel(policy.rollback_owner || 'enterprise_rollout_owner')",
-  'plan?.activation_note || ui(',
-  '<td>{formatLabel(check.activation_evidence)}</td>',
-  '<td>{formatLabel(check.manual_activation_task)}</td>'
-]) if (!pageSource.includes(required)) fail(`Expected backend-data boundary missing: ${required}`);
+
+// v3.49.188: backend-owned governance vocabulary must use protected presentation helpers,
+// while arbitrary tenant/business text remains outside blind ui()/formatLabel() translation.
+const protectedSystemFieldsV349188 = ['activation_evidence', 'activation_note', 'adoption_evidence', 'adoption_note', 'check_label', 'manual_activation_task', 'manual_adoption_task', 'monitoring_owner', 'next_activation_focus', 'next_adoption_focus', 'recommended_activation_mode', 'recommended_adoption_mode', 'rollback_owner'];
+const protectedHelpersV349188 = ['learningOwnedSystemText', 'learningOwnerLabel', 'learningCheckLabel', 'learningDomainLabel', 'learningEvidenceTypeLabel'];
+for (const helper of protectedHelpersV349188) {
+  if (!pageSource.includes(`${helper}(`)) fail(`v3.49.188 Learning Feedback protected helper missing: ${helper}`);
+}
+for (const field of protectedSystemFieldsV349188) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(?:learningOwnedSystemText|learningOwnerLabel|learningCheckLabel|learningDomainLabel|learningEvidenceTypeLabel|learningActionRationale)\\([^\\n]*${escaped}`);
+  if (!pattern.test(pageSource)) fail(`Backend-owned Learning Feedback field is not protected by the v3.49.188 presentation boundary: ${field}`);
+}
 for (const forbidden of [
-  'ui(formatLabel(readiness?.recommended_adoption_owner',
-  'ui(formatLabel(readiness?.next_adoption_focus',
-  'ui(formatLabel(policy.recommended_adoption_mode',
-  'ui(readiness?.adoption_note',
-  'ui(formatLabel(check.check_label || check.check_key))',
-  'ui(formatLabel(check.adoption_evidence))',
-  'ui(formatLabel(check.manual_adoption_task))',
-  'ui(formatLabel(plan?.recommended_activation_owner',
-  'ui(formatLabel(plan?.next_activation_focus',
-  'ui(formatLabel(policy.recommended_activation_mode',
-  'ui(formatLabel(policy.monitoring_owner',
-  'ui(formatLabel(policy.rollback_owner',
-  'ui(plan?.activation_note',
-  'ui(formatLabel(check.activation_evidence))',
-  'ui(formatLabel(check.manual_activation_task))'
-]) if (pageSource.includes(forbidden)) fail(`Backend adoption/activation-plan data must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend check labels, owners, modes, blockers, decision options, evidence, tasks, focus values, notes, and composite business values remain raw.');
+  'ui(formatLabel(check.check_label',
+  'ui(formatLabel(blocker))',
+  'ui(formatLabel(item.learning_domain))'
+]) if (pageSource.includes(forbidden)) fail(`Learning Feedback must not blindly translate backend identifiers: ${forbidden}`);
+if (!process.exitCode) pass('Backend-owned Learning Feedback governance text uses protected localized helpers while arbitrary business text remains outside blind translation.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

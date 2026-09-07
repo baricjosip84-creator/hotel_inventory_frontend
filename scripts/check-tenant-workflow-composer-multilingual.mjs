@@ -134,7 +134,7 @@ for (const contract of routerContracts) if (!routerSource.includes(contract)) fa
 if (!process.exitCode) pass('Workflow Composer route, query filters, source links, permissions, and blueprint identifiers remain language-independent.');
 
 const serverContentContracts = [
-  "blueprint.source_title_key ? ui(blueprint.source_title) : blueprint.source_action_domain === 'alerts' ? displayTitleText(blueprint.source_title) : blueprint.source_title",
+  "blueprint.source_title_key ? ui(blueprint.source_title) : blueprint.source_title",
   "return `${ui('Integration plan:')} ${workflowDomainLabel(blueprint.workflow_domain, ui)}`;",
   'if (blueprint.source_summary) return blueprint.source_summary_key ? ui(blueprint.source_summary) : blueprint.source_summary;',
   'nextBlueprintTitle(guidance, blueprints, ui)',

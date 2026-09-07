@@ -104,28 +104,25 @@ for (const [name, start, end] of [
   else pass(`${name} slice has no remaining raw JSX presentation text.`);
 }
 
-for (const required of [
-  "value={formatLabel(readiness?.suggested_monitoring_cadence || 'manual_review_required')}",
-  "formatLabel(readiness?.recommended_monitoring_owner || 'decision_governance_owner')",
-  "formatLabel(readiness?.next_monitoring_focus || 'complete_manual_monitoring_readiness_review')",
-  '(readiness?.monitoring_blockers || []).map(formatLabel)',
-  '<td>{formatLabel(check.check_label || check.check_key)}</td>',
-  '<td>{formatLabel(check.recommended_monitoring_control)}</td>',
-  '<td>{formatLabel(check.blocking_reason)}</td>',
-  "value={formatLabel(surveillance?.suggested_surveillance_cadence || 'daily_manual_blocker_resolution_until_surveillance_ready')}",
-  '<td>{formatLabel(check.recommended_surveillance_control)}</td>'
-]) if (!pageSource.includes(required)) fail(`Expected backend-data boundary missing: ${required}`);
+
+// v3.49.188: backend-owned governance vocabulary must use protected presentation helpers,
+// while arbitrary tenant/business text remains outside blind ui()/formatLabel() translation.
+const protectedSystemFieldsV349188 = ['blocking_reason', 'check_label', 'next_monitoring_focus', 'recommended_monitoring_control', 'recommended_monitoring_owner', 'recommended_surveillance_control', 'suggested_monitoring_cadence', 'suggested_surveillance_cadence'];
+const protectedHelpersV349188 = ['learningOwnedSystemText', 'learningOwnerLabel', 'learningCheckLabel', 'learningDomainLabel', 'learningEvidenceTypeLabel'];
+for (const helper of protectedHelpersV349188) {
+  if (!pageSource.includes(`${helper}(`)) fail(`v3.49.188 Learning Feedback protected helper missing: ${helper}`);
+}
+for (const field of protectedSystemFieldsV349188) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(?:learningOwnedSystemText|learningOwnerLabel|learningCheckLabel|learningDomainLabel|learningEvidenceTypeLabel|learningActionRationale)\\([^\\n]*${escaped}`);
+  if (!pattern.test(pageSource)) fail(`Backend-owned Learning Feedback field is not protected by the v3.49.188 presentation boundary: ${field}`);
+}
 for (const forbidden of [
-  "ui(formatLabel(readiness?.suggested_monitoring_cadence",
-  "ui(formatLabel(readiness?.recommended_monitoring_owner",
-  "ui(formatLabel(readiness?.next_monitoring_focus",
-  'ui(formatLabel(check.check_label || check.check_key))',
-  'ui(formatLabel(check.recommended_monitoring_control))',
-  'ui(formatLabel(check.blocking_reason))',
-  "ui(formatLabel(surveillance?.suggested_surveillance_cadence",
-  'ui(formatLabel(check.recommended_surveillance_control))'
-]) if (pageSource.includes(forbidden)) fail(`Backend monitoring/surveillance data must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend check labels, controls, blockers, owners, cadence/focus values, and notes remain raw.');
+  'ui(formatLabel(check.check_label',
+  'ui(formatLabel(blocker))',
+  'ui(formatLabel(item.learning_domain))'
+]) if (pageSource.includes(forbidden)) fail(`Learning Feedback must not blindly translate backend identifiers: ${forbidden}`);
+if (!process.exitCode) pass('Backend-owned Learning Feedback governance text uses protected localized helpers while arbitrary business text remains outside blind translation.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');

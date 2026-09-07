@@ -376,6 +376,21 @@ const COPILOT_SYSTEM_LABELS: Record<string, string> = {
   current_standard_cost: 'Current standard cost'
 };
 
+const COPILOT_PROPOSAL_TITLE_LABELS: Record<string, string> = {
+  replenishment_purchase_order_draft: 'Purchase Order draft recommendation',
+  product_min_stock_update: 'Minimum-stock proposal',
+  cost_standard_update: 'Standard-cost proposal'
+};
+
+function governedProposalTitle(proposal: CopilotProposal | null | undefined, ui: (englishText: string) => string): string {
+  if (!proposal) return ui('Governed proposal');
+  const label = COPILOT_PROPOSAL_TITLE_LABELS[String(proposal.request_type || '')];
+  if (!label) return proposal.title || ui('Governed proposal');
+  const productName = String(proposal.payload?.product_name || '').trim();
+  return productName ? `${ui(label)} — ${productName}` : ui(label);
+}
+
+
 function copilotSystemLabel(value: string | null | undefined, ui: UiTranslator): string {
   if (!value) return ui('Not reported');
   const canonical = COPILOT_SYSTEM_LABELS[value];
@@ -1507,7 +1522,7 @@ export default function AIOperationsCopilotPage() {
                   <div style={styles.proposalHeader}>
                     <div>
                       <div style={styles.eyebrow}>{ui("Structured proposal")}</div>
-                      <h3 style={styles.proposalTitle}>{proposal.title || ui('Governed proposal')}</h3>
+                      <h3 style={styles.proposalTitle}>{governedProposalTitle(proposal, ui)}</h3>
                     </div>
                     <Badge tone="warn">{ui("Human review required")}</Badge>
                   </div>

@@ -71,14 +71,12 @@ for (const required of [
   '<LocalizedLearningStatCard label="Ready checks"', '<LocalizedLearningStatCard label="Blocked checks"',
   "{ui('Operating-model owner:')}", "{ui('Recommended mode:')}", "{ui('Ownership policy:')}",
   "{ui('Covered domains:')}", "{ui('Unresolved review pressure:')}",
-  "model?.operating_model_note || ui('Manual enterprise operating-model handoff remains advisory only.')",
   "{ui('No enterprise operating-model blockers are currently reported.')}", "{ui('Manual operating-model options:')}",
   "{ui('No enterprise operating-model checks are available yet.')}",
   'function ClosedLoopEnterpriseExpansionGovernanceCadence(',
   "{ui('Closed-loop enterprise expansion governance cadence')}",
   '<LocalizedLearningStatCard label="Cadence decision"', '<LocalizedLearningStatCard label="Cadence score"',
   "{ui('Cadence owner:')}", "{ui('Recommended cadence mode:')}", "{ui('Minimum review cadence:')}",
-  "cadence?.cadence_note || ui('Manual enterprise expansion governance cadence remains advisory only.')",
   "{ui('No enterprise expansion governance cadence blockers are currently reported.')}", "{ui('Manual cadence options:')}",
   "{ui('No enterprise expansion governance cadence checks are available yet.')}",
   'ui(formatLabel(check.check_status))', 'formatLocalizedNumber(value, locale)'
@@ -103,30 +101,25 @@ for (const [name, start, end] of [
   else pass(`${name} slice has no remaining raw JSX presentation text.`);
 }
 
-for (const required of [
-  "model?.recommended_operating_model_owner || 'enterprise_value_owner'",
-  "formatLabel(model?.next_operating_model_focus || 'perform_manual_enterprise_operating_model_handoff')",
-  "formatLabel(policy.recommended_operating_model_mode || 'pause_operating_model_handoff_until_manual_blockers_are_resolved')",
-  "formatLabel(policy.ownership_policy || 'assign_named_rollout_support_operations_and_value_owners_before_scaled_enterprise_expansion')",
-  'model?.operating_model_note || ui(', 'blockers.map((blocker) => <li key={blocker}>{formatLabel(blocker)}</li>)',
-  'options.map(formatLabel).join(', '<td>{check.check_label || formatLabel(check.check_key)}</td>',
-  '<td>{formatLabel(check.operating_model_evidence)}</td>', '<td>{formatLabel(check.manual_operating_model_task)}</td>',
-  "cadence?.recommended_cadence_owner || 'enterprise_governance_owner'",
-  "formatLabel(cadence?.next_cadence_focus || 'start_manual_enterprise_expansion_governance_cadence')",
-  "formatLabel(policy.recommended_cadence_mode || 'pause_expansion_governance_cadence_until_manual_blockers_are_resolved')",
-  "formatLabel(policy.minimum_review_cadence || 'daily_until_ready')",
-  'cadence?.cadence_note || ui(', '<td>{formatLabel(check.cadence_evidence)}</td>', '<td>{formatLabel(check.manual_cadence_task)}</td>'
-]) if (!pageSource.includes(required)) fail(`Expected backend-data boundary missing: ${required}`);
+
+// v3.49.188: backend-owned governance vocabulary must use protected presentation helpers,
+// while arbitrary tenant/business text remains outside blind ui()/formatLabel() translation.
+const protectedSystemFieldsV349188 = ['cadence_evidence', 'cadence_note', 'check_label', 'manual_cadence_task', 'manual_operating_model_task', 'minimum_review_cadence', 'next_cadence_focus', 'next_operating_model_focus', 'operating_model_evidence', 'operating_model_note', 'ownership_policy', 'recommended_cadence_mode', 'recommended_operating_model_mode'];
+const protectedHelpersV349188 = ['learningOwnedSystemText', 'learningOwnerLabel', 'learningCheckLabel', 'learningDomainLabel', 'learningEvidenceTypeLabel'];
+for (const helper of protectedHelpersV349188) {
+  if (!pageSource.includes(`${helper}(`)) fail(`v3.49.188 Learning Feedback protected helper missing: ${helper}`);
+}
+for (const field of protectedSystemFieldsV349188) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(?:learningOwnedSystemText|learningOwnerLabel|learningCheckLabel|learningDomainLabel|learningEvidenceTypeLabel|learningActionRationale)\\([^\\n]*${escaped}`);
+  if (!pattern.test(pageSource)) fail(`Backend-owned Learning Feedback field is not protected by the v3.49.188 presentation boundary: ${field}`);
+}
 for (const forbidden of [
-  'ui(formatLabel(model?.recommended_operating_model_owner', 'ui(formatLabel(model?.next_operating_model_focus',
-  'ui(formatLabel(policy.recommended_operating_model_mode', 'ui(formatLabel(policy.ownership_policy',
-  'ui(model?.operating_model_note', 'ui(formatLabel(check.check_label || check.check_key))',
-  'ui(formatLabel(check.operating_model_evidence))', 'ui(formatLabel(check.manual_operating_model_task))',
-  'ui(formatLabel(cadence?.recommended_cadence_owner', 'ui(formatLabel(cadence?.next_cadence_focus',
-  'ui(formatLabel(policy.recommended_cadence_mode', 'ui(formatLabel(policy.minimum_review_cadence',
-  'ui(cadence?.cadence_note', 'ui(formatLabel(check.cadence_evidence))', 'ui(formatLabel(check.manual_cadence_task))'
-]) if (pageSource.includes(forbidden)) fail(`Backend enterprise expansion operating-model/governance-cadence data must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend check labels, owners, modes, cadence/policies, blockers, options, evidence, tasks, focus values, notes, and composite business values remain raw.');
+  'ui(formatLabel(check.check_label',
+  'ui(formatLabel(blocker))',
+  'ui(formatLabel(item.learning_domain))'
+]) if (pageSource.includes(forbidden)) fail(`Learning Feedback must not blindly translate backend identifiers: ${forbidden}`);
+if (!process.exitCode) pass('Backend-owned Learning Feedback governance text uses protected localized helpers while arbitrary business text remains outside blind translation.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');
