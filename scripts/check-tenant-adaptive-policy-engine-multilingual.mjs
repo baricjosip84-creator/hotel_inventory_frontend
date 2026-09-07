@@ -64,7 +64,7 @@ for (const match of pageSource.matchAll(/headers=\{\[([^\]]+)\]\}/g)) {
   for (const item of match[1].matchAll(/'([^']+)'/g)) dynamicKeys.add(item[1]);
 }
 for (const match of pageSource.matchAll(/label="([^"]+)"/g)) dynamicKeys.add(match[1]);
-for (const blockName of ['const GENERATED_POLICY_COPY', 'const GENERATED_RECOMMENDATION_COPY']) {
+for (const blockName of ['const GENERATED_POLICY_COPY', 'const GENERATED_RECOMMENDATION_COPY', 'const SIGNAL_TYPE_LABELS', 'const MEASUREMENT_TYPE_LABELS']) {
   const start = pageSource.indexOf(blockName);
   const end = pageSource.indexOf('};', start + 1);
   const block = start >= 0 && end > start ? pageSource.slice(start, end) : '';
@@ -100,8 +100,12 @@ let serverBoundaryMissing = false;
 for (const required of [
   'policyDisplayCopy(policy, ui)',
   'recommendationDisplaySummary(recommendation, ui)',
-  '{formatLabel(signal.signal_type)}',
-  '{formatLabel(measurement.measurement_type)}',
+  'policyTitleFromKey(signal.policy_key, data?.policies, ui)',
+  'formatKnownSystemLabel(signal.signal_type, SIGNAL_TYPE_LABELS, ui)',
+  'recommendationDisplayLabel(recommendation.recommendation_key, ui)',
+  'policyTitleFromKey(application.policy_key, data?.policies, ui)',
+  'measurementDisplayLabel(measurement.measurement_key, ui)',
+  'formatKnownSystemLabel(measurement.measurement_type, MEASUREMENT_TYPE_LABELS, ui)',
   'canViewDiagnostics ? (',
   "<CheckList title={ui('What needs attention')} items={blockers} kind=\"blockers\" />",
   "<CheckList title={ui('Evidence checks')} items={checks} kind=\"checks\" />",
@@ -112,7 +116,7 @@ for (const required of [
     fail(`Adaptive Policy Engine server/technical data boundary changed unexpectedly: ${required}`);
   }
 }
-if (!serverBoundaryMissing) pass('Generated policy copy is localized in the frontend while raw readiness diagnostics remain restricted to diagnostic users.');
+if (!serverBoundaryMissing) pass('Known Adaptive Policy system labels use localized business presentation while arbitrary tenant/server text remains verbatim and raw diagnostics remain restricted to diagnostic users.');
 
 for (const required of [
   "apiRequest<AdaptivePolicySummary>(`/decision-intelligence/adaptive-policy-engine-summary?${queryString}`)",

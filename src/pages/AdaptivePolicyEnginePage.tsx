@@ -376,10 +376,21 @@ const GENERATED_RECOMMENDATION_COPY: Record<string, string> = {
   'live:execution:task-flow:tuning-review': 'Review execution task-routing or labor-allocation rules because active work is blocked.'
 };
 
+const SIGNAL_TYPE_LABELS: Record<string, string> = {
+  risk_indicator: 'Risk indicator',
+  service_indicator: 'Service indicator',
+  performance_indicator: 'Performance indicator',
+  capacity_indicator: 'Capacity indicator'
+};
+
+const MEASUREMENT_TYPE_LABELS: Record<string, string> = {
+  policy_effectiveness: 'Policy effectiveness'
+};
+
 function policyDisplayCopy(policy: AdaptivePolicyRecord, ui: (key: string) => string) {
   const generated = policy.policy_key ? GENERATED_POLICY_COPY[policy.policy_key] : undefined;
   return {
-    title: generated ? ui(generated.title) : (policy.title || formatLabel(policy.policy_key)),
+    title: generated ? ui(generated.title) : (policy.title || (policy.policy_key ? String(policy.policy_key) : ui('Not reported'))),
     summary: generated ? ui(generated.summary) : policy.summary
   };
 }
@@ -387,6 +398,36 @@ function policyDisplayCopy(policy: AdaptivePolicyRecord, ui: (key: string) => st
 function recommendationDisplaySummary(recommendation: PolicyRecommendationRecord, ui: (key: string) => string) {
   const generated = recommendation.recommendation_key ? GENERATED_RECOMMENDATION_COPY[recommendation.recommendation_key] : undefined;
   return generated ? ui(generated) : recommendation.explanation_summary;
+}
+
+function policyTitleFromKey(policyKey: unknown, policies: AdaptivePolicyRecord[] | undefined, ui: (key: string) => string): string {
+  if (policyKey === null || policyKey === undefined || policyKey === '') return ui('Not reported');
+  const text = String(policyKey);
+  const policy = (policies || []).find((item) => item.policy_key === text);
+  if (policy) return policyDisplayCopy(policy, ui).title;
+  const generated = GENERATED_POLICY_COPY[text];
+  return generated ? ui(generated.title) : text;
+}
+
+function recommendationDisplayLabel(recommendationKey: unknown, ui: (key: string) => string): string {
+  if (recommendationKey === null || recommendationKey === undefined || recommendationKey === '') return ui('Not reported');
+  const text = String(recommendationKey);
+  if (text.endsWith(':tuning-review')) return ui('Tuning review');
+  if (text.includes(':recalibration:')) return ui('Recalibration review');
+  return text;
+}
+
+function measurementDisplayLabel(measurementKey: unknown, ui: (key: string) => string): string {
+  if (measurementKey === null || measurementKey === undefined || measurementKey === '') return ui('Not reported');
+  const text = String(measurementKey);
+  return text.includes(':analysis:') ? ui('Effectiveness measurement') : text;
+}
+
+function formatKnownSystemLabel(value: unknown, labels: Record<string, string>, ui: (key: string) => string): string {
+  if (value === null || value === undefined || value === '') return ui('Not reported');
+  const text = String(value);
+  const label = labels[text];
+  return label ? ui(label) : text;
 }
 
 function recommendedAdjustmentSummary(recommendation: PolicyRecommendationRecord, ui: (key: string) => string): string | null {
@@ -944,9 +985,9 @@ export default function AdaptivePolicyEnginePage() {
               const signal = row as PolicySignalRecord;
               return (
                 <tr key={`${signal.policy_key || 'signal'}-${index}`}>
-                  <td><strong>{formatLabel(signal.policy_key)}</strong></td>
+                  <td><strong>{policyTitleFromKey(signal.policy_key, data?.policies, ui)}</strong></td>
                   <td>{formatCanonicalLabel(signal.signal_domain, ui)}</td>
-                  <td>{formatLabel(signal.signal_type)}</td>
+                  <td>{formatKnownSystemLabel(signal.signal_type, SIGNAL_TYPE_LABELS, ui)}</td>
                   <td>{formatDelta(signal.variance_score, locale)}</td>
                   <td>{formatNumber(signal.weight, locale)}</td>
                   <td>{formatStoredConfidence(signal.confidence_score, locale)}</td>
@@ -968,8 +1009,8 @@ export default function AdaptivePolicyEnginePage() {
               const hasActiveApplication = (data?.applications || []).some((application) => application.policy_id === recommendation.policy_id && ['applied_monitoring', 'recalibration_review', 'rollback_review'].includes(String(application.application_status)));
               return (
                 <tr id={recommendation.id ? `adaptive-policy-recommendation-${recommendation.id}` : undefined} className={requestedRecommendationId && recommendation.id === requestedRecommendationId ? 'adaptive-policy-table-row--focused' : undefined} key={`${recommendation.recommendation_key || 'recommendation'}-${index}`}>
-                  <td>{formatLabel(recommendation.policy_key)}</td>
-                  <td><strong>{formatLabel(recommendation.recommendation_key)}</strong>{recommendationSummary ? <span className="adaptive-policy-table__subtext">{recommendationSummary}</span> : null}{adjustmentSummary ? <span className="adaptive-policy-table__subtext adaptive-policy-table__subtext--proposal">{adjustmentSummary}</span> : null}</td>
+                  <td>{policyTitleFromKey(recommendation.policy_key, data?.policies, ui)}</td>
+                  <td><strong>{recommendationDisplayLabel(recommendation.recommendation_key, ui)}</strong>{recommendationSummary ? <span className="adaptive-policy-table__subtext">{recommendationSummary}</span> : null}{adjustmentSummary ? <span className="adaptive-policy-table__subtext adaptive-policy-table__subtext--proposal">{adjustmentSummary}</span> : null}</td>
                   <td>{formatCanonicalLabel(recommendation.recommendation_type, ui)}</td>
                   <td><StatusBadge value={recommendation.recommendation_status} /></td>
                   <td><StatusBadge value={recommendation.risk_level} tone={['high', 'critical'].includes(String(recommendation.risk_level)) ? 'danger' : 'neutral'} /></td>
@@ -995,7 +1036,7 @@ export default function AdaptivePolicyEnginePage() {
               const application = row as PolicyApplicationRecord;
               return (
                 <tr key={`${application.id || 'application'}-${index}`}>
-                  <td><strong>{formatLabel(application.policy_key)}</strong></td>
+                  <td><strong>{policyTitleFromKey(application.policy_key, data?.policies, ui)}</strong></td>
                   <td><StatusBadge value={application.application_status} /></td>
                   <td><strong>{application.change_summary || ui('Not reported')}</strong>{application.source_workflow ? <span className="adaptive-policy-table__subtext">{ui('Source workflow')}: {formatLabel(application.source_workflow)}</span> : null}</td>
                   <td><span className="adaptive-policy-table__subtext">{summarizePolicyValue(application.applied_value, ui)}</span></td>
@@ -1021,9 +1062,9 @@ export default function AdaptivePolicyEnginePage() {
               const measurement = row as PolicyEffectivenessRecord;
               return (
                 <tr key={`${measurement.measurement_key || 'measurement'}-${index}`}>
-                  <td>{formatLabel(measurement.policy_key)}</td>
-                  <td><strong>{formatLabel(measurement.measurement_key)}</strong></td>
-                  <td>{formatLabel(measurement.measurement_type)}</td>
+                  <td>{policyTitleFromKey(measurement.policy_key, data?.policies, ui)}</td>
+                  <td><strong>{measurementDisplayLabel(measurement.measurement_key, ui)}</strong></td>
+                  <td>{formatKnownSystemLabel(measurement.measurement_type, MEASUREMENT_TYPE_LABELS, ui)}</td>
                   <td>{formatNumber(measurement.baseline_score, locale)}</td>
                   <td>{formatNumber(measurement.observed_score, locale)}</td>
                   <td>{formatDelta(measurement.delta_score, locale)}</td>
