@@ -595,3 +595,8 @@
     width: 100%;
   }
 }
+
+.operations-feed-page__timeline-card--focused {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}

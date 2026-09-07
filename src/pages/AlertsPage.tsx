@@ -118,6 +118,10 @@ async function fetchAlerts(filters: AlertFilters): Promise<AlertRow[]> {
   return apiRequest<AlertRow[]>(`/alerts?${params.toString()}`);
 }
 
+async function fetchAlertById(alertId: string): Promise<AlertRow> {
+  return apiRequest<AlertRow>(`/alerts/${encodeURIComponent(alertId)}`);
+}
+
 async function fetchProductOptions(): Promise<ProductOption[]> {
   return apiRequest<ProductOption[]>('/products');
 }
@@ -310,6 +314,7 @@ export default function AlertsPage() {
   const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const requestedAlertId = searchParams.get('alert_id')?.trim() || '';
   const { canManageAlerts, canOverrideAlerts } = getRoleCapabilities();
   const canReadProducts = hasPermission(TENANT_PERMISSIONS.PRODUCTS_READ);
   const accessRoleLabel = getCurrentAccessRoleLabel();
@@ -331,6 +336,13 @@ export default function AlertsPage() {
   const alertsQuery = useQuery({
     queryKey: ['alerts', filters],
     queryFn: () => fetchAlerts(filters)
+  });
+
+  const focusedAlertQuery = useQuery({
+    queryKey: ['alerts', 'focused', requestedAlertId],
+    queryFn: () => fetchAlertById(requestedAlertId),
+    enabled: Boolean(requestedAlertId),
+    retry: false
   });
 
   const productsQuery = useQuery({
@@ -431,7 +443,18 @@ export default function AlertsPage() {
     }
   });
 
-  const alerts = useMemo(() => alertsQuery.data ?? [], [alertsQuery.data]);
+  const alerts = useMemo(() => {
+    const baseAlerts = alertsQuery.data ?? [];
+    const focusedAlert = focusedAlertQuery.data;
+    if (!focusedAlert) return baseAlerts;
+    return [focusedAlert, ...baseAlerts.filter((alert) => alert.id !== focusedAlert.id)];
+  }, [alertsQuery.data, focusedAlertQuery.data]);
+
+  useEffect(() => {
+    if (!requestedAlertId || !focusedAlertQuery.data) return;
+    const target = document.getElementById(`alert-${requestedAlertId}`);
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focusedAlertQuery.data, requestedAlertId]);
   const summary = useMemo(
     () => ({
       total: alerts.length,
@@ -741,8 +764,9 @@ export default function AlertsPage() {
 
               return (
                 <article
+                  id={`alert-${alert.id}`}
                   style={{ ...styles.card, ...(causesSidebarAttention ? sidebarAttentionItemStyle : {}) }}
-                  className="alerts-alert-card"
+                  className={`alerts-alert-card${requestedAlertId === alert.id ? ' alerts-alert-card--focused' : ''}`}
                   data-severity={alert.severity}
                   data-resolved={alert.resolved ? "true" : "false"}
                   data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}

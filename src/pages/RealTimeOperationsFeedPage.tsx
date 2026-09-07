@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
@@ -444,9 +444,10 @@ function localAvailableDomains(): EventDomain[] {
 
 async function fetchOperationsFeed(
   eventDomain: 'all' | EventDomain,
-  urgency: 'all' | EventUrgency
+  urgency: 'all' | EventUrgency,
+  focusedTimelineItemId = ''
 ): Promise<RealTimeOperationsFeedResponse> {
-  const params = new URLSearchParams({ limit: '75' });
+  const params = new URLSearchParams({ limit: focusedTimelineItemId ? '200' : '75' });
   if (eventDomain !== 'all') params.set('event_domain', eventDomain);
   if (urgency !== 'all') params.set('urgency', urgency);
   return apiRequest<RealTimeOperationsFeedResponse>(`/operational-action-center/realtime-event-coordination-summary?${params.toString()}`);
@@ -454,8 +455,18 @@ async function fetchOperationsFeed(
 
 export default function RealTimeOperationsFeedPage() {
   const { locale, ui } = useAppTranslation();
-  const [eventDomain, setEventDomain] = useState<'all' | EventDomain>('all');
-  const [urgency, setUrgency] = useState<'all' | EventUrgency>('all');
+  const [searchParams] = useSearchParams();
+  const requestedTimelineItemId = searchParams.get('timeline_item_id')?.trim() || '';
+  const requestedDomain = searchParams.get('event_domain')?.trim() || '';
+  const requestedUrgency = searchParams.get('urgency')?.trim() || '';
+  const initialDomain = EVENT_DOMAIN_FILTERS.some((option) => option.value === requestedDomain)
+    ? requestedDomain as 'all' | EventDomain
+    : 'all';
+  const initialUrgency = ['critical', 'high', 'medium', 'low'].includes(requestedUrgency)
+    ? requestedUrgency as EventUrgency
+    : 'all';
+  const [eventDomain, setEventDomain] = useState<'all' | EventDomain>(initialDomain);
+  const [urgency, setUrgency] = useState<'all' | EventUrgency>(initialUrgency);
   const [searchText, setSearchText] = useState('');
   const [timeWindow, setTimeWindow] = useState<FeedTimeWindow>('all');
   const [viewScope, setViewScope] = useState<FeedView>('all');
@@ -465,8 +476,8 @@ export default function RealTimeOperationsFeedPage() {
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
 
   const feedQuery = useQuery({
-    queryKey: ['real-time-operations-feed', eventDomain, urgency],
-    queryFn: () => fetchOperationsFeed(eventDomain, urgency),
+    queryKey: ['real-time-operations-feed', eventDomain, urgency, requestedTimelineItemId],
+    queryFn: () => fetchOperationsFeed(eventDomain, urgency, requestedTimelineItemId),
     refetchOnReconnect: true,
     refetchOnWindowFocus: true,
     refetchInterval: OPERATIONS_FEED_AUTO_REFRESH_MS,
@@ -490,6 +501,7 @@ export default function RealTimeOperationsFeedPage() {
     const last24Hours = now.getTime() - (24 * 60 * 60 * 1000);
 
     return timeline.filter((item) => {
+      if (requestedTimelineItemId && item.timeline_item_id !== requestedTimelineItemId) return false;
       if (viewScope === 'new' && !newItemIds.has(item.timeline_item_id)) return false;
       if (normalizedSearch && !timelineItemSearchText(item, ui).includes(normalizedSearch)) return false;
       if (timeWindow === 'all') return true;
@@ -503,7 +515,13 @@ export default function RealTimeOperationsFeedPage() {
         && itemDate.getMonth() === now.getMonth()
         && itemDate.getDate() === now.getDate();
     });
-  }, [newItemIds, searchText, timeWindow, timeline, ui, viewScope]);
+  }, [newItemIds, requestedTimelineItemId, searchText, timeWindow, timeline, ui, viewScope]);
+
+  useEffect(() => {
+    if (!requestedTimelineItemId || !displayTimeline.some((item) => item.timeline_item_id === requestedTimelineItemId)) return;
+    const target = document.getElementById(`timeline-item-${requestedTimelineItemId}`);
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [displayTimeline, requestedTimelineItemId]);
   const visibleCriticalCount = displayTimeline.filter((item) => item.urgency === 'critical').length;
   const visibleBlockedOrFailedCount = displayTimeline.filter((item) => item.event_status === 'blocked' || item.event_status === 'failed').length;
   const visibleNewCount = displayTimeline.filter((item) => newItemIds.has(item.timeline_item_id)).length;
@@ -692,7 +710,7 @@ export default function RealTimeOperationsFeedPage() {
               const itemDomainIcon = domainIconPath(item.timeline_domain);
               const urgencyTone = String(item.urgency || 'low').toLowerCase();
               return (
-                <article className={`card operations-feed-page__timeline-card operations-feed-page__timeline-card--${urgencyTone}`} key={item.timeline_item_id}>
+                <article id={`timeline-item-${item.timeline_item_id}`} className={`card operations-feed-page__timeline-card operations-feed-page__timeline-card--${urgencyTone}${requestedTimelineItemId === item.timeline_item_id ? ' operations-feed-page__timeline-card--focused' : ''}`} key={item.timeline_item_id}>
                   <div className="operations-feed-page__item-header">
                     <div className="operations-feed-page__item-heading">
                       <span className={`operations-feed-page__icon operations-feed-page__icon--${urgencyTone === 'critical' ? 'danger' : urgencyTone === 'high' ? 'warning' : urgencyTone === 'medium' ? 'amber' : 'green'}`}><TenantNavIcon path={itemDomainIcon} size={17} /></span>

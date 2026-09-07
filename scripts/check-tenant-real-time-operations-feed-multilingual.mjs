@@ -105,7 +105,7 @@ const forbiddenTechnicalTranslation = [
 for (const pattern of forbiddenTechnicalTranslation) if (pageSource.includes(pattern)) fail(`Canonical Operations Feed technical value must remain language-independent: ${pattern}`);
 
 const canonicalContracts = [
-  "new URLSearchParams({ limit: '75' })", "params.set('event_domain', eventDomain)", "params.set('urgency', urgency)",
+  "new URLSearchParams({ limit: focusedTimelineItemId ? '200' : '75' })", "params.set('event_domain', eventDomain)", "params.set('urgency', urgency)",
   'apiRequest<RealTimeOperationsFeedResponse>(`/operational-action-center/realtime-event-coordination-summary?${params.toString()}`)',
   "new URLSearchParams({ resolved: 'false' })", "params.set('search', search)",
   "new URLSearchParams({ task_id: sourceId })", "new URLSearchParams({ source_action_id: item.correlation_id })",

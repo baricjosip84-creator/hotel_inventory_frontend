@@ -25,7 +25,9 @@ for(const m of pageSource.matchAll(/\blabel: '([^']+)'/g))dynamic.add(m[1]);
 for(const [st,en] of [['const ROLE_LABELS','const CADENCE_LABELS'],['const CADENCE_LABELS','const THREAD_TYPE_LABELS'],['const THREAD_TYPE_LABELS','const DOMAIN_LABELS'],['const DOMAIN_LABELS','const TOPIC_LABELS'],['const TOPIC_LABELS','const SOURCE_LABELS'],['const SOURCE_LABELS','function numberValue']]){const a=pageSource.indexOf(st),b=pageSource.indexOf(en,a+1);if(a<0||b<=a)fail(`Unable to isolate label block ${st}`);const block=a>=0&&b>a?pageSource.slice(a,b):'';for(const m of block.matchAll(/: '([^']+)'/g))dynamic.add(m[1]);}
 for(const m of pageSource.matchAll(/\b(?:label|description)="([^"]+)"/g))dynamic.add(m[1]);
 const missingDynamic=[...dynamic].filter((k)=>!unique.has(k));if(missingDynamic.length)fail(`Enterprise Collaboration dynamic display keys missing translations: ${missingDynamic.join(' | ')}`);else pass(`${dynamic.size} filter, role, topic, source, summary, and cadence display keys are catalog-backed.`);
-for(const required of ['const { locale, ui } = useAppTranslation();','formatLocalizedDateTime(date, locale)','formatLocalizedNumber(value, locale)','formatLocalizedNumber(threads.length, locale)','formatLocalizedNumber(appliedLimit, locale)','formatDateTime(thread.updated_at || thread.created_at, locale, ui)'])if(!pageSource.includes(required))fail(`Enterprise Collaboration locale-aware presentation missing: ${required}`);
+for(const required of ['const { locale, ui } = useAppTranslation();','formatLocalizedDateTime(date, locale)','formatLocalizedNumber(value, locale)','formatLocalizedNumber(threads.length, locale)','formatLocalizedNumber(totalMatching, locale)',
+  'formatLocalizedNumber(shownFrom, locale)',
+  'formatLocalizedNumber(shownTo, locale)','formatDateTime(thread.updated_at || thread.created_at, locale, ui)'])if(!pageSource.includes(required))fail(`Enterprise Collaboration locale-aware presentation missing: ${required}`);
 if(!process.exitCode)pass('Recommendation counts, limits, summary metrics, and timestamps use the tenant locale.');
 for(const required of [
   'collaborationQuery.error.message',
@@ -43,7 +45,18 @@ const systemGuidanceKeys=[
   'No collaboration context candidates currently match the requested filters.',
   'Escalation threads are guidance-only and must be handled through existing alert, execution, control-tower, or governance workflows.',
   'War-room candidates are suggested for human coordination only; this endpoint does not provision channels or notify participants.',
-  'Supplier or partner coordination remains visibility-only here and never dispatches supplier, carrier, or external workflow actions.'
+  'Supplier or partner coordination remains visibility-only here and never dispatches supplier, carrier, or external workflow actions.',
+  'This execution task is blocked and cannot progress normally.',
+  'This execution task is overdue and needs follow-up.',
+  'This execution task has no assignee.',
+  'This source item has already been escalated and needs coordinated follow-up.',
+  'A governed human review or approval is required before the work can proceed safely.',
+  'This source item is critical and may need sustained human coordination.',
+  'This source item is high urgency and may need owner or escalation review.',
+  'This source item needs human follow-up in its authoritative workflow.',
+  'This operational event is blocked or failed and needs human follow-up.',
+  'This is a critical operational event that needs prompt human coordination.',
+  'This operational event needs human follow-up.'
 ];
 const missingSystemGuidance=systemGuidanceKeys.filter((key)=>!unique.has(key));
 if(missingSystemGuidance.length)fail(`Enterprise Collaboration system-owned guidance missing translations: ${missingSystemGuidance.join(' | ')}`);else pass('Collaboration-owned guidance is localized only when the backend marks it with a stable system key; business/source text and API errors remain verbatim.');
