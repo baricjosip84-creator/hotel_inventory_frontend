@@ -1524,7 +1524,10 @@ const router = createBrowserRouter([
       {
         path: 'probabilistic-forecasting',
         element: (
-          <ProtectedRoute requiredPermissions={[TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ]}>
+          <ProtectedRoute requiredPermissions={[
+            TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ,
+            TENANT_PERMISSIONS.INSIGHTS_READ
+          ]}>
             <ProbabilisticForecastingPage />
           </ProtectedRoute>
         )

@@ -118,7 +118,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/adaptive-policy-engine',
         label: 'Adaptive Policy Engine',
-        description: 'Read-only review of policy signals, recommendations, measured outcomes, and manual safety checks. It does not change policies.',
+        description: 'Reviews policy signals, recommendations, measured outcomes, and approved manual-application evidence, with human-controlled lifecycle records. It does not change business rules automatically.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
       },
@@ -133,7 +133,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/cross-domain-optimization',
         label: 'Cross-Domain Optimization',
-        description: 'Read-only comparison of cross-area planning options, tradeoffs, and actual outcomes recorded through Learning Feedback.',
+        description: 'Creates and reviews cross-area planning options and tradeoffs, records human governance decisions, and compares expected results with actual outcomes without executing the plan.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
       },
