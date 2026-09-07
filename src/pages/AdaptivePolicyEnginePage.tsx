@@ -387,6 +387,17 @@ const MEASUREMENT_TYPE_LABELS: Record<string, string> = {
   policy_effectiveness: 'Policy effectiveness'
 };
 
+const SOURCE_WORKFLOW_LABELS: Record<string, string> = {
+  manual_business_rule_change: 'Manual business rule change'
+};
+
+function sourceWorkflowDisplayLabel(value: unknown, ui: (key: string) => string): string {
+  if (value === null || value === undefined || value === '') return ui('Not reported');
+  const text = String(value);
+  const label = SOURCE_WORKFLOW_LABELS[text];
+  return label ? ui(label) : text;
+}
+
 function policyDisplayCopy(policy: AdaptivePolicyRecord, ui: (key: string) => string) {
   const generated = policy.policy_key ? GENERATED_POLICY_COPY[policy.policy_key] : undefined;
   return {
@@ -1038,7 +1049,7 @@ export default function AdaptivePolicyEnginePage() {
                 <tr key={`${application.id || 'application'}-${index}`}>
                   <td><strong>{policyTitleFromKey(application.policy_key, data?.policies, ui)}</strong></td>
                   <td><StatusBadge value={application.application_status} /></td>
-                  <td><strong>{application.change_summary || ui('Not reported')}</strong>{application.source_workflow ? <span className="adaptive-policy-table__subtext">{ui('Source workflow')}: {formatLabel(application.source_workflow)}</span> : null}</td>
+                  <td><strong>{application.change_summary || ui('Not reported')}</strong>{application.source_workflow ? <span className="adaptive-policy-table__subtext">{ui('Source workflow')}: {sourceWorkflowDisplayLabel(application.source_workflow, ui)}</span> : null}</td>
                   <td><span className="adaptive-policy-table__subtext">{summarizePolicyValue(application.applied_value, ui)}</span></td>
                   <td>{formatNumber(application.baseline_score, locale)}</td>
                   <td>{formatLocalizedDateTime(application.applied_at, locale)}</td>
@@ -1080,7 +1091,7 @@ export default function AdaptivePolicyEnginePage() {
               <div className="card__header"><div><h2>{ui('Record an actually applied policy change')}</h2><p className="card__subtext">{ui('Use this only after the approved business-rule change was really made outside the Adaptive Policy Engine. Approval alone is not application.')}</p></div></div>
               <div className="adaptive-policy-form-grid">
                 <label><span className="form-label">{ui('Policy')}</span><input className="input" value={applicationDraft.policyLabel} readOnly /></label>
-                <label><span className="form-label">{ui('Source workflow')}</span><input className="input" value={applicationDraft.sourceWorkflow} onChange={(event) => setApplicationDraft((current) => current ? { ...current, sourceWorkflow: event.target.value } : current)} /></label>
+                <label><span className="form-label">{ui('Source workflow')}</span><input className="input" value={sourceWorkflowDisplayLabel(applicationDraft.sourceWorkflow, ui)} onChange={(event) => setApplicationDraft((current) => current ? { ...current, sourceWorkflow: event.target.value } : current)} /></label>
                 <label className="adaptive-policy-form-grid__wide"><span className="form-label">{ui('Previous rule value')}</span><textarea className="input adaptive-policy-json-input" value={applicationDraft.previousValue} onChange={(event) => setApplicationDraft((current) => current ? { ...current, previousValue: event.target.value } : current)} /></label>
                 <label className="adaptive-policy-form-grid__wide"><span className="form-label">{ui('Actually applied rule value')}</span><textarea className="input adaptive-policy-json-input" value={applicationDraft.appliedValue} onChange={(event) => setApplicationDraft((current) => current ? { ...current, appliedValue: event.target.value } : current)} /></label>
                 <label className="adaptive-policy-form-grid__wide"><span className="form-label">{ui('What was actually changed?')}</span><textarea className="input" value={applicationDraft.changeSummary} onChange={(event) => setApplicationDraft((current) => current ? { ...current, changeSummary: event.target.value } : current)} maxLength={2000} /></label>

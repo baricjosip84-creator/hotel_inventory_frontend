@@ -64,7 +64,7 @@ for (const match of pageSource.matchAll(/headers=\{\[([^\]]+)\]\}/g)) {
   for (const item of match[1].matchAll(/'([^']+)'/g)) dynamicKeys.add(item[1]);
 }
 for (const match of pageSource.matchAll(/label="([^"]+)"/g)) dynamicKeys.add(match[1]);
-for (const blockName of ['const GENERATED_POLICY_COPY', 'const GENERATED_RECOMMENDATION_COPY', 'const SIGNAL_TYPE_LABELS', 'const MEASUREMENT_TYPE_LABELS']) {
+for (const blockName of ['const GENERATED_POLICY_COPY', 'const GENERATED_RECOMMENDATION_COPY', 'const SIGNAL_TYPE_LABELS', 'const MEASUREMENT_TYPE_LABELS', 'const SOURCE_WORKFLOW_LABELS']) {
   const start = pageSource.indexOf(blockName);
   const end = pageSource.indexOf('};', start + 1);
   const block = start >= 0 && end > start ? pageSource.slice(start, end) : '';
@@ -106,6 +106,8 @@ for (const required of [
   'policyTitleFromKey(application.policy_key, data?.policies, ui)',
   'measurementDisplayLabel(measurement.measurement_key, ui)',
   'formatKnownSystemLabel(measurement.measurement_type, MEASUREMENT_TYPE_LABELS, ui)',
+  'sourceWorkflowDisplayLabel(application.source_workflow, ui)',
+  'sourceWorkflowDisplayLabel(applicationDraft.sourceWorkflow, ui)',
   'canViewDiagnostics ? (',
   "<CheckList title={ui('What needs attention')} items={blockers} kind=\"blockers\" />",
   "<CheckList title={ui('Evidence checks')} items={checks} kind=\"checks\" />",
