@@ -781,6 +781,7 @@ export default function AIOperationsCopilotPage() {
     TENANT_PERMISSIONS.INVENTORY_RESERVATIONS_READ,
     TENANT_PERMISSIONS.PURCHASE_ORDERS_READ
   ].every((permission) => hasPermission(permission));
+  const canOpenProcurementRecommendations = hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
 
   const canSubmit = Boolean(
     capabilities.canGovernDecisionIntelligence
@@ -1100,9 +1101,13 @@ export default function AIOperationsCopilotPage() {
                           </ul>
                         </details>
                         <div style={styles.actionRow}>
-                          <Link to="/procurement-recommendations" style={styles.linkButton} data-skip-global-action-feedback="true">
-                            {ui("Open all-products replenishment workbench")}
-                          </Link>
+                          {canOpenProcurementRecommendations ? (
+                            <Link to="/procurement-recommendations" style={styles.linkButton} data-skip-global-action-feedback="true">
+                              {ui("Open all-products replenishment workbench")}
+                            </Link>
+                          ) : (
+                            <span style={styles.help}>{ui("Insights access is required to open the all-products replenishment workbench.")}</span>
+                          )}
                         </div>
                       </div>
                     ) : null}
