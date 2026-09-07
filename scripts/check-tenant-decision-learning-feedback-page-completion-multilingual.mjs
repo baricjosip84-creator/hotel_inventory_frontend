@@ -90,7 +90,7 @@ for (const required of [
   "ui('Older')",
   "ui('No feedback evidence has been recorded in this category yet.')",
   "<th>{ui('Score / Error')}</th>",
-  "`${ui('Recorded item')} ${formatLocalizedNumber(index + 1, locale)}`",
+  'learningEvidenceDisplayLabel(mode, row, index, locale, ui)',
   'ui(formatLabel(row.outcome_status ?? row.calibration_status ?? row.effectiveness_status ?? row.result_status))',
   "formatLocalizedDateTime(String(row.observed_at), locale)"
 ]) if (!evidenceSlice.includes(required)) fail(`EvidenceTable completion contract missing: ${required}`);

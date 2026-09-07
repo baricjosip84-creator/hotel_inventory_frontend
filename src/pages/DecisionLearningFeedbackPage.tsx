@@ -170,8 +170,10 @@ type ContinuousLearningSummary = {
       escalation_required_count?: number;
       escalation_items?: Array<{
         outcome_key?: string;
+        outcome_label?: string | null;
         recommendation_id?: string | null;
         recommendation_key?: string | null;
+        recommendation_label?: string | null;
         learning_signal?: string;
         learning_action_status?: string;
         learning_action_owner?: string | null;
@@ -188,6 +190,7 @@ type ContinuousLearningSummary = {
       portfolio_posture?: string;
       portfolio_evidence_items?: Array<{
         recommendation_portfolio_key?: string;
+        recommendation_label?: string | null;
         learning_domain?: string;
         outcome_count?: number;
         successful_count?: number;
@@ -752,6 +755,9 @@ type ContinuousLearningSummary = {
       review_reason_code?: string;
       recommended_resolution?: string;
       source_label?: string;
+      source_key?: string | null;
+      source_forecast_period_start?: string | null;
+      source_forecast_period_end?: string | null;
       created_by_user_id?: string | null;
       recorded_by_user_id?: string | null;
       created_by_user_name?: string | null;
@@ -1636,6 +1642,88 @@ function numberOrNull(value: string): number | null {
 function formatLabel(value: unknown): string {
   if (value === undefined || value === null || value === '') return '—';
   return String(value).replace(/_/g, ' ');
+}
+
+const LEARNING_FEEDBACK_GENERATED_POLICY_TITLES: Record<string, string> = {
+  'live:inventory:dynamic-replenishment': 'Dynamic replenishment policy',
+  'live:reservation:allocation': 'Reservation allocation policy',
+  'live:procurement:supplier-selection': 'Supplier delivery policy',
+  'live:execution:task-flow': 'Execution task flow policy'
+};
+
+function recordObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function feedbackModeFromEvidenceType(value: unknown): FeedbackMode {
+  const type = String(value || '');
+  if (type === 'forecast_accuracy') return 'forecast-accuracy';
+  if (type === 'policy_effectiveness') return 'policy-effectiveness';
+  if (type === 'optimization_result') return 'optimization-results';
+  return 'learning-outcomes';
+}
+
+function evidenceSourceKey(mode: FeedbackMode, row: Record<string, unknown>): string {
+  if (row.source_key) return String(row.source_key);
+  const reference = mode === 'forecast-accuracy'
+    ? recordObject(row.forecast_reference)
+    : mode === 'policy-effectiveness'
+      ? recordObject(row.policy_reference)
+      : mode === 'optimization-results'
+        ? recordObject(row.optimization_reference)
+        : Object.keys(recordObject(row.source_reference)).length
+          ? recordObject(row.source_reference)
+          : recordObject(row.recommendation_reference);
+  return String(reference.source_key || reference.recommendation_key || '');
+}
+
+function formatLearningEvidencePeriod(start: unknown, end: unknown, locale: string): string {
+  const formatDate = (value: unknown) => {
+    if (!value) return '';
+    const date = new Date(String(value));
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'short', day: 'numeric' }).format(date);
+  };
+  const startText = formatDate(start);
+  const endText = formatDate(end);
+  if (startText && endText) return startText === endText ? startText : `${startText} – ${endText}`;
+  return startText || endText;
+}
+
+function learningEvidenceDisplayLabel(mode: FeedbackMode, row: Record<string, unknown>, index: number | null, locale: string, ui: (key: string) => string): string {
+  const sourceKey = evidenceSourceKey(mode, row);
+  if (mode === 'policy-effectiveness' && LEARNING_FEEDBACK_GENERATED_POLICY_TITLES[sourceKey]) {
+    return ui(LEARNING_FEEDBACK_GENERATED_POLICY_TITLES[sourceKey]);
+  }
+
+  const sourceLabel = row.source_label ? String(row.source_label).trim() : '';
+  if (sourceLabel) {
+    if (mode === 'forecast-accuracy') {
+      const reference = recordObject(row.forecast_reference);
+      const period = formatLearningEvidencePeriod(
+        row.source_forecast_period_start ?? reference.forecast_period_start,
+        row.source_forecast_period_end ?? reference.forecast_period_end,
+        locale
+      );
+      return period ? `${sourceLabel} · ${period}` : sourceLabel;
+    }
+    return sourceLabel;
+  }
+
+  return index === null
+    ? ui('Recorded item')
+    : `${ui('Recorded item')} ${formatLocalizedNumber(index + 1, locale)}`;
+}
+
+function feedbackSourceDisplayLabel(source: FeedbackSource, mode: FeedbackMode, locale: string, ui: (key: string) => string): string {
+  if (mode === 'policy-effectiveness' && LEARNING_FEEDBACK_GENERATED_POLICY_TITLES[source.source_key]) {
+    return ui(LEARNING_FEEDBACK_GENERATED_POLICY_TITLES[source.source_key]);
+  }
+  if (mode === 'forecast-accuracy') {
+    const period = formatLearningEvidencePeriod(source.prefill?.forecast_period_start, source.prefill?.forecast_period_end, locale);
+    return period ? `${source.title} · ${period}` : source.title;
+  }
+  return source.title;
 }
 
 function formText(value: unknown): string {
@@ -3953,7 +4041,7 @@ function FeedbackReviewBoard({
               const ownerValue = ownerDrafts[key] ?? String(item.assigned_reviewer_user_id || '');
               const dueValue = dueDrafts[key] ?? toLocalDateTimeValue(item.review_due_at);
               return <tr key={key || index} style={canGovern ? sidebarAttentionItemStyle : undefined} data-sidebar-attention-item={canGovern ? 'true' : undefined}>
-                <td><div style={{ display: 'grid', gap: 5 }}>{canGovern ? <SidebarAttentionMarker label={ui('Attention required')} /> : null}<span>{item.source_label || formatLabel(item.evidence_key)}</span><small>{ui(formatLabel(item.domain))}</small></div></td>
+                <td><div style={{ display: 'grid', gap: 5 }}>{canGovern ? <SidebarAttentionMarker label={ui('Attention required')} /> : null}<span>{learningEvidenceDisplayLabel(feedbackModeFromEvidenceType(item.evidence_type), item as Record<string, unknown>, index, locale, ui)}</span><small>{ui(formatLabel(item.domain))}</small></div></td>
                 <td><div>{ui(formatLabel(item.status))}</div><small className="card__subtext">{ui(formatLabel(item.due_state || 'no_deadline'))}</small></td>
                 <td><div>{item.recorded_by_user_name || item.created_by_user_name || ui('Unknown recorder')}</div>{independentReviewBlocked ? <small className="card__subtext">{ui('Independent review required')}</small> : null}</td>
                 <td>{canGovern ? <select className="input" value={ownerValue} onChange={(event) => setOwnerDrafts((current) => ({ ...current, [key]: event.target.value }))}><option value="">{ui('Unassigned')}</option>{reviewers.map((reviewer) => <option key={reviewer.id} value={reviewer.id}>{reviewer.name || reviewer.email || reviewer.id}</option>)}</select> : (item.assigned_reviewer_user_name || ui('Unassigned'))}</td>
@@ -4566,9 +4654,9 @@ function RecommendationOutcomeFoundation({ foundation }: { foundation?: Continuo
               </tr>
             </thead>
             <tbody>
-              {(foundation.recommendation_outcome_portfolio_evidence?.portfolio_evidence_items || []).map((item) => (
+              {(foundation.recommendation_outcome_portfolio_evidence?.portfolio_evidence_items || []).map((item, index) => (
                 <tr key={item.recommendation_portfolio_key || item.learning_domain || 'portfolio'}>
-                  <td>{formatLabel(item.recommendation_portfolio_key)}</td>
+                  <td>{item.recommendation_label || `${ui('Recommendation')} ${formatLocalizedNumber(index + 1, locale)}`}</td>
                   <td>{formatLabel(item.learning_domain)}</td>
                   <td>{formatFoundationNumber(item.outcome_count)}</td>
                   <td>{formatFoundationPercent(item.success_rate_percent)}</td>
@@ -4603,8 +4691,8 @@ function RecommendationOutcomeFoundation({ foundation }: { foundation?: Continuo
             <tbody>
               {(foundation.recommendation_outcome_learning_action_escalation_evidence?.escalation_items || []).map((item, index) => (
                 <tr key={item.outcome_key || index}>
-                  <td>{formatLabel(item.outcome_key)}</td>
-                  <td>{formatLabel(item.recommendation_key || item.recommendation_id)}</td>
+                  <td>{item.outcome_label || `${ui('Recorded item')} ${formatLocalizedNumber(index + 1, locale)}`}</td>
+                  <td>{item.recommendation_label || ui('Recommendation')}</td>
                   <td>{formatLabel(item.learning_signal)}</td>
                   <td>{ui(formatLabel(item.learning_action_status))}</td>
                   <td>{formatLabel(item.learning_action_owner)}</td>
@@ -4713,6 +4801,8 @@ function EvidenceDetailCard({ detail, canCreateFollowUp, creatingFollowUp, onClo
   const expected = detail.expected_result ?? detail.predicted_value ?? detail.baseline_reference ?? detail.expected_tradeoff;
   const observed = detail.observed_result ?? detail.observed_value ?? detail.measured_result ?? detail.observed_tradeoff;
   const metric = detail.outcome_score ?? detail.percentage_error ?? detail.effectiveness_score ?? detail.realized_value_score;
+  const detailMode = feedbackModeFromEvidenceType(detail.evidence_type);
+  const sourceDisplayLabel = learningEvidenceDisplayLabel(detailMode, detail, null, locale, ui);
   return (
     <section className="card learning-feedback-section learning-feedback-detail">
       <div className="card__header"><div>
@@ -4720,7 +4810,7 @@ function EvidenceDetailCard({ detail, canCreateFollowUp, creatingFollowUp, onClo
         <p className="card__subtext">{ui('Full read-only evidence and independent-review information for this record.')}</p>
       </div><button className="button button--secondary" type="button" onClick={onClose}>{ui('Close')}</button></div>
       <div className="learning-feedback-detail__grid">
-        <div><strong>{ui('Source')}</strong><div>{valueText(detail.source_label)}</div></div>
+        <div><strong>{ui('Source')}</strong><div>{sourceDisplayLabel}</div></div>
         <div><strong>{ui('Evidence type')}</strong><div>{ui(formatLabel(detail.evidence_type))}</div></div>
         <div><strong>{ui('Status')}</strong><div>{ui(formatLabel(status))}</div></div>
         <div><strong>{ui('Observed')}</strong><div>{observedAt}</div></div>
@@ -4800,7 +4890,7 @@ function EvidenceTable({
                 const score = row.outcome_score ?? row.absolute_error ?? row.effectiveness_score ?? row.realized_value_score;
                 return (
                   <tr key={String(row.id ?? businessKey ?? index)}>
-                    <td>{row.source_label ? String(row.source_label) : businessKey ? formatLabel(businessKey) : `${ui('Recorded item')} ${formatLocalizedNumber(index + 1, locale)}`}</td>
+                    <td>{learningEvidenceDisplayLabel(mode, row, index, locale, ui)}</td>
                     <td>{ui(formatLabel(row.learning_domain ?? row.forecast_domain ?? row.policy_domain ?? row.result_domain))}</td>
                     <td>{ui(formatLabel(row.outcome_status ?? row.calibration_status ?? row.effectiveness_status ?? row.result_status))}</td>
                     <td>{typeof score === 'number' ? formatLocalizedNumber(score, locale, { maximumFractionDigits: 4 }) : formatLabel(score)}</td>
@@ -5326,7 +5416,7 @@ export default function DecisionLearningFeedbackPage() {
             <span className="form-label">{ui('Source record')}</span>
             <select className="input" value={sourceId} onChange={(event) => handleSourceChange(event.target.value)} disabled={sourceQuery.isLoading || sourceQuery.isError}>
               <option value="">{sourceQuery.isLoading ? ui('Loading sources…') : sourceQuery.isError ? ui('Sources unavailable') : ui('Choose a source record')}</option>
-              {(sourceQuery.data?.sources || []).map((source) => <option key={source.id} value={source.id}>{source.title} · {source.source_key} · {ui(formatLabel(source.status))}</option>)}
+              {(sourceQuery.data?.sources || []).map((source) => <option key={source.id} value={source.id}>{feedbackSourceDisplayLabel(source, mode, locale, ui)} · {ui(formatLabel(source.status))}</option>)}
             </select>
           </label>
         </div>
@@ -5336,7 +5426,7 @@ export default function DecisionLearningFeedbackPage() {
           const prefill = selectedSource?.prefill || {};
           return selectedSource ? <div className="learning-feedback-source-facts">
             <strong>{ui('Known source facts')}</strong>
-            <span>{selectedSource.title} · {selectedSource.source_key}</span>
+            <span>{feedbackSourceDisplayLabel(selectedSource, mode, locale, ui)}</span>
             {mode === 'forecast-accuracy' ? <span>{ui('Predicted:')} {formText(prefill.predicted_value) || '—'} {formText(prefill.unit)} · {ui('Confidence:')} {formText(prefill.confidence_score) || formText(prefill.confidence_level) || '—'}</span> : null}
             {mode === 'learning-outcomes' && prefill.expected_result ? <span>{ui('Expected guidance is filled from the selected recommendation.')}</span> : null}
             {mode === 'policy-effectiveness' ? <span>{ui('The policy baseline is filled from the current policy evidence.')}</span> : null}
@@ -5356,7 +5446,7 @@ export default function DecisionLearningFeedbackPage() {
               >
                 <option value="">{!sourceId ? ui('Choose an optimization run first') : ui('Choose the planning option this outcome belongs to')}</option>
                 {((sourceQuery.data?.sources || []).find((source) => source.id === sourceId)?.options || []).map((option) => (
-                  <option key={option.id} value={option.id}>{option.title} · {option.option_key} · {ui(formatLabel(option.status))}</option>
+                  <option key={option.id} value={option.id}>{option.title} · {ui(formatLabel(option.status))}</option>
                 ))}
               </select>
               {sourceId && !sourceQuery.isLoading && !sourceQuery.isError && !((sourceQuery.data?.sources || []).find((source) => source.id === sourceId)?.options || []).length ? (

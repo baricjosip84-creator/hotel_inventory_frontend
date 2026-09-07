@@ -104,7 +104,8 @@ else pass('Recommendation Outcome Foundation slice has no remaining raw JSX pres
 
 for (const required of [
   'foundation.completion_definition || ui(',
-  '<td>{formatLabel(item.recommendation_portfolio_key)}</td>', '<td>{formatLabel(item.learning_domain)}</td>',
+  "item.recommendation_label || `${ui('Recommendation')} ${formatLocalizedNumber(index + 1, locale)}`", '<td>{formatLabel(item.learning_domain)}</td>',
+  "item.outcome_label || `${ui('Recorded item')} ${formatLocalizedNumber(index + 1, locale)}`", "item.recommendation_label || ui('Recommendation')",
   '<td>{formatLabel(item.learning_signal)}</td>', '<td>{formatLabel(item.learning_action_owner)}</td>', '<td>{formatLabel(item.escalation_reason)}</td>',
   "{ui('Next phase:')} {formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.next_phase)}",
   "{ui('Implemented capabilities:')} {(foundation.recommendation_outcome_phase_a_closure_evidence.implemented_capabilities || []).map(formatLabel).join(', ')}",
@@ -112,12 +113,12 @@ for (const required of [
   "blocker.manual_resolution_task || ui('Resolve evidence gap before Phase A closure.')"
 ]) if (!foundationSlice.includes(required)) fail(`Expected Recommendation Outcome Foundation backend-data boundary missing: ${required}`);
 for (const forbidden of [
-  'ui(foundation.completion_definition', 'ui(formatLabel(item.recommendation_portfolio_key))', 'ui(formatLabel(item.learning_domain))',
+  'ui(foundation.completion_definition', 'ui(item.recommendation_label)', 'ui(item.outcome_label)', 'ui(formatLabel(item.learning_domain))',
   'ui(formatLabel(item.learning_signal))', 'ui(formatLabel(item.learning_action_owner))', 'ui(formatLabel(item.escalation_reason))',
   'ui(formatLabel(foundation.recommendation_outcome_phase_a_closure_evidence.next_phase))',
   'ui(formatLabel(blocker.blocker_label', 'ui(blocker.manual_resolution_task)'
 ]) if (foundationSlice.includes(forbidden)) fail(`Backend Recommendation Outcome Foundation business text must remain raw: ${forbidden}`);
-if (!process.exitCode) pass('Backend completion definitions, portfolio/domain keys, learning signals, owners, reasons, next-phase text, capability identifiers, blocker text, and manual resolution tasks remain raw.');
+if (!process.exitCode) pass('Backend completion definitions, friendly recommendation/outcome labels, domain values, learning signals, owners, reasons, next-phase text, capability identifiers, blocker text, and manual resolution tasks preserve their ownership boundary.');
 
 if (!pageSource.includes("ui('Loading feedback evidence…')")) fail('Completed-page sentinel must confirm the EvidenceTable saved-records description is localized.');
 else pass('Decision Learning Feedback staged boundary is complete through the final EvidenceTable presentation.');
