@@ -65,7 +65,7 @@ check(pages.twin.includes('title_key?: string | null;') && pages.twin.includes('
 check(pages.twin.includes('reviewFirst.title_key ? digitalTwinSystemText') && pages.twin.includes('reviewFirst.summary_key ? digitalTwinSystemText'), 'Digital Twin Review this first consumes translated system identities');
 
 const ci = String(pkg.scripts?.['check:ci'] || '');
-check(ci.startsWith('npm run check:tenant-multilingual-closure-audit && npm run check:command-pages-final-producer-renderer-closure-v349188 && npm run check:backend-system-text-remaining-enum-localization-v349187 && '), 'tenant multilingual closure remains first and v3.49.188 runs before older command-page closure guards');
+check(ci.startsWith('npm run check:tenant-multilingual-closure-audit && npm run check:command-pages-lint-closure-v349189 && npm run check:command-pages-final-producer-renderer-closure-v349188 && npm run check:backend-system-text-remaining-enum-localization-v349187 && '), 'tenant multilingual closure remains first and v3.49.189/v3.49.188 run before older command-page closure guards');
 check(String(pkg.scripts?.['check:command-pages-final-producer-renderer-closure-v349188'] || '').includes('check-command-pages-final-producer-renderer-closure-v349188.mjs'), 'v3.49.188 frontend guard is registered');
 
 console.log(`Command pages final producer-renderer closure v3.49.188 frontend guard: ${pass}/${pass + fail} PASS`);

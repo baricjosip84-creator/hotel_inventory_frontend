@@ -397,15 +397,16 @@ export default function CrossDomainOptimizationPage() {
     queryFn: () => apiRequest<OptimizationSummary>(`/decision-intelligence/cross-domain-optimization-summary?${queryString}`)
   });
 
+  const selectedRunDetail = data?.run_detail?.run;
+
   useEffect(() => {
-    const run = data?.run_detail?.run;
-    if (!run) return;
+    if (!selectedRunDetail) return;
     setOwnershipDraft({
-      owner_user_id: run.owner_user_id || '',
-      due_at: run.due_at ? String(run.due_at).slice(0, 10) : '',
-      next_action: run.next_action || ''
+      owner_user_id: selectedRunDetail.owner_user_id || '',
+      due_at: selectedRunDetail.due_at ? String(selectedRunDetail.due_at).slice(0, 10) : '',
+      next_action: selectedRunDetail.next_action || ''
     });
-  }, [data?.run_detail?.run?.id, data?.run_detail?.run?.owner_user_id, data?.run_detail?.run?.due_at, data?.run_detail?.run?.next_action]);
+  }, [selectedRunDetail]);
 
   useEffect(() => {
     const settings = data?.governance_settings;

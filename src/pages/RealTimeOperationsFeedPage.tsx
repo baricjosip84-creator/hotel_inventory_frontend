@@ -539,7 +539,7 @@ export default function RealTimeOperationsFeedPage() {
 
   const response = feedQuery.data;
   const guidance = response?.guidance || {};
-  const timeline = response?.timeline || [];
+  const timeline = useMemo(() => response?.timeline || [], [response?.timeline]);
   const previousVisitTimestamp = useMemo(() => previousVisitAt ? new Date(previousVisitAt).getTime() : null, [previousVisitAt]);
   const newItemIds = useMemo(() => {
     if (!Number.isFinite(previousVisitTimestamp)) return new Set<string>();

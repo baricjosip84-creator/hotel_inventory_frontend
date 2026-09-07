@@ -415,8 +415,8 @@ function copilotEvidenceKindLabel(value: string | null | undefined, ui: UiTransl
   return canonical ? ui(canonical) : ui('Evidence');
 }
 
-function copilotRecord(value: unknown): Record<string, any> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
+function copilotRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
 function copilotNumber(value: unknown): number {
