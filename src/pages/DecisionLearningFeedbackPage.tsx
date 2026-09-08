@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
+import type { AppLocale } from '../i18n/config';
 import { formatLocalizedNumber } from '../i18n/formatters';
 import { formatLocalizedCurrency, formatLocalizedDateTime } from '../i18n/formatters';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
@@ -1705,7 +1706,7 @@ function learningActionRationale(action: { rationale?: string; rationale_key?: s
 }
 
 
-function learningOwnedSystemText(value: unknown, fallback: string, ui: LearningUi, locale: string): string {
+function learningOwnedSystemText(value: unknown, fallback: string, ui: LearningUi, locale: AppLocale): string {
   const raw = String(value ?? '').trim();
   if (!raw) return '—';
   if (/^[a-z0-9][a-z0-9_:.-]*$/i.test(raw) && !raw.includes(' ')) return ui(fallback);
@@ -1714,11 +1715,11 @@ function learningOwnedSystemText(value: unknown, fallback: string, ui: LearningU
   return translated;
 }
 
-function learningCheckLabel(value: unknown, ui: LearningUi, locale: string): string {
+function learningCheckLabel(value: unknown, ui: LearningUi, locale: AppLocale): string {
   return learningOwnedSystemText(value, 'Review check', ui, locale);
 }
 
-function learningOwnerLabel(value: unknown, ui: LearningUi, locale: string): string {
+function learningOwnerLabel(value: unknown, ui: LearningUi, locale: AppLocale): string {
   const raw = String(value ?? '').trim();
   if (!raw) return ui('Assigned business owner');
   const known = LEARNING_FEEDBACK_OWNER_LABELS[raw];
@@ -1759,7 +1760,7 @@ function evidenceSourceKey(mode: FeedbackMode, row: Record<string, unknown>): st
   return String(reference.source_key || reference.recommendation_key || '');
 }
 
-function formatLearningEvidencePeriod(start: unknown, end: unknown, locale: string): string {
+function formatLearningEvidencePeriod(start: unknown, end: unknown, locale: AppLocale): string {
   const formatDate = (value: unknown) => {
     if (!value) return '';
     const date = new Date(String(value));
@@ -1772,7 +1773,7 @@ function formatLearningEvidencePeriod(start: unknown, end: unknown, locale: stri
   return startText || endText;
 }
 
-function learningEvidenceDisplayLabel(mode: FeedbackMode, row: Record<string, unknown>, index: number | null, locale: string, ui: (key: string) => string): string {
+function learningEvidenceDisplayLabel(mode: FeedbackMode, row: Record<string, unknown>, index: number | null, locale: AppLocale, ui: (key: string) => string): string {
   const sourceKey = evidenceSourceKey(mode, row);
   if (mode === 'policy-effectiveness' && LEARNING_FEEDBACK_GENERATED_POLICY_TITLES[sourceKey]) {
     return ui(LEARNING_FEEDBACK_GENERATED_POLICY_TITLES[sourceKey]);
@@ -1797,7 +1798,7 @@ function learningEvidenceDisplayLabel(mode: FeedbackMode, row: Record<string, un
     : `${ui('Recorded item')} ${formatLocalizedNumber(index + 1, locale)}`;
 }
 
-function feedbackSourceDisplayLabel(source: FeedbackSource, mode: FeedbackMode, locale: string, ui: (key: string) => string): string {
+function feedbackSourceDisplayLabel(source: FeedbackSource, mode: FeedbackMode, locale: AppLocale, ui: (key: string) => string): string {
   if (mode === 'policy-effectiveness' && LEARNING_FEEDBACK_GENERATED_POLICY_TITLES[source.source_key]) {
     return ui(LEARNING_FEEDBACK_GENERATED_POLICY_TITLES[source.source_key]);
   }
@@ -1828,10 +1829,6 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: str
   const observed = safeJsonObject(form.observed);
   const editing = Boolean(form.recordKey);
   const score = optionalScore(form.score, editing);
-
-  if (mode === 'optimization-results' && !form.optimizationOptionId) {
-    return ui('Choose the planning option this outcome belongs to.');
-  }
 
   if (mode === 'forecast-accuracy') {
     return {
@@ -1991,6 +1988,10 @@ function validateFeedbackForm(mode: FeedbackMode, form: FeedbackFormState, sourc
 
   if (form.financialImpactCurrency.trim() && !/^[A-Za-z]{3}$/.test(form.financialImpactCurrency.trim())) {
     return ui('Currency must use a three-letter code such as EUR.');
+  }
+
+  if (mode === 'optimization-results' && !form.optimizationOptionId) {
+    return ui('Choose the planning option this outcome belongs to.');
   }
 
   if (mode === 'forecast-accuracy') {
@@ -2367,7 +2368,7 @@ function ClosedLoopResolutionPlan({ plan }: { plan: ContinuousLearningSummary['c
 
 
 function ClosedLoopClosureReport({ report }: { report: ContinuousLearningSummary['closed_loop_closure_report'] }) {
-  const { ui } = useAppTranslation();
+  const { locale, ui } = useAppTranslation();
   const items = report?.closure_items || [];
 
   return (
@@ -2481,7 +2482,7 @@ function ClosedLoopAuditLedger({ ledger }: { ledger: ContinuousLearningSummary['
 
 
 function ClosedLoopComplianceAttestation({ attestation }: { attestation: ContinuousLearningSummary['closed_loop_compliance_attestation'] }) {
-  const { ui } = useAppTranslation();
+  const { locale, ui } = useAppTranslation();
   const checks = attestation?.attestation_checks || [];
   const blockers = attestation?.attestation_blockers || [];
 
@@ -2790,7 +2791,7 @@ function ClosedLoopReleaseReadinessSnapshot({ snapshot }: { snapshot: Continuous
 
 
 function ClosedLoopOperationalHandoff({ handoff }: { handoff: ContinuousLearningSummary['closed_loop_operational_handoff'] }) {
-  const { ui } = useAppTranslation();
+  const { locale, ui } = useAppTranslation();
   const items = handoff?.handoff_items || [];
 
   return (
