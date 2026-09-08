@@ -111,7 +111,7 @@ if (fs.existsSync(frontendPackagePath)) {
       failures.push(`frontend package script ${scriptName} is missing or misaligned`);
     }
   }
-  if (scripts.prebuild !== 'npm run check:unified-ai-contract-suite && npm run typecheck:ci') {
+  if (scripts.prebuild !== 'npm run check:unified-ai-contract-suite && npm run check:learning-feedback-locale-runtime-closure-v349192 && npm run check:advanced-tenant-pages-final-audit-closure-v349193 && npm run typecheck:ci') {
     failures.push('frontend prebuild script must run the unified AI contract suite and pilot-critical TypeScript gate before Vite build');
   }
   if (scripts.build !== 'vite build') {
@@ -123,7 +123,7 @@ if (fs.existsSync(frontendPackagePath)) {
   if (scripts['pretest:e2e:ui'] !== 'npm run check:unified-ai-contract-suite') {
     failures.push('frontend pretest:e2e:ui script must run check:unified-ai-contract-suite before Playwright e2e UI tests');
   }
-  if (scripts.prelint !== 'npm run check:unified-ai-contract-suite') {
+  if (scripts.prelint !== 'npm run check:unified-ai-contract-suite && npm run check:learning-feedback-locale-runtime-closure-v349192 && npm run check:advanced-tenant-pages-final-audit-closure-v349193') {
     failures.push('frontend prelint script must run check:unified-ai-contract-suite before ESLint');
   }
   if (scripts.predev !== 'npm run check:unified-ai-contract-suite') {

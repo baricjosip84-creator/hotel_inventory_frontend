@@ -744,6 +744,7 @@ type UnifiedAIRouteExposureAudit = {
     frontend_query_key?: string;
     response_contract?: string;
     required_permission?: string;
+    additional_required_permission?: string;
     route_contract_status?: string;
     frontend_query_contract_status?: string;
     breaking_change_rule?: string;
@@ -3204,6 +3205,37 @@ type IntelligenceProductionReadinessResponse = {
   features?: IntelligenceProductionFeature[];
 };
 
+type IntelligenceBusinessReadinessFeature = {
+  feature_key?: string;
+  feature_label?: string;
+  production_priority?: string;
+  readiness_score?: number;
+  readiness_status_key?: string;
+  readiness_status?: string;
+  owner_area_key?: string;
+  owner_area?: string;
+  attention_required?: boolean;
+  blocker_count?: number;
+  next_action_key?: string;
+  next_action?: string;
+};
+
+type IntelligenceBusinessReadinessResponse = {
+  generated_at?: string;
+  scope?: string;
+  advisory_only?: boolean;
+  summary?: {
+    total_features?: number;
+    needs_attention?: number;
+    controlled_validation_candidates?: number;
+    average_readiness_score?: number;
+  };
+  priority_items?: IntelligenceBusinessReadinessFeature[];
+  features?: IntelligenceBusinessReadinessFeature[];
+  safety_message_key?: string;
+  safety_message?: string;
+};
+
 type IntelligenceProductionReadinessAuditPackResponse = {
   generated_at?: string;
   tenant_id?: string;
@@ -4873,6 +4905,10 @@ function sourceReviewToAppPath(review: HumanAIReview): string | null {
 }
 
 
+async function fetchIntelligenceBusinessReadiness(forceRefresh = false): Promise<IntelligenceBusinessReadinessResponse> {
+  return apiRequest<IntelligenceBusinessReadinessResponse>(`/intelligence-readiness/business-readiness-summary${forceRefresh ? '?refresh=true' : ''}`);
+}
+
 async function fetchIntelligenceProductionReadiness(forceRefresh = false): Promise<IntelligenceProductionReadinessResponse> {
   return apiRequest<IntelligenceProductionReadinessResponse>(`/intelligence-readiness/production-readiness-summary${forceRefresh ? '?refresh=true' : ''}`);
 }
@@ -4990,6 +5026,7 @@ export default function HumanInLoopAIReviewPage() {
   const tenantAccess = getTenantAccessSnapshot();
   const supportSession = getSupportSessionInfo();
   const canReadForecastReviews = hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
+  const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
   const canReceiveIntelligenceAttention = tenantAccess.hasTenantContext
     && Boolean(tenantAccess.userId)
     && !supportSession.isSupportSession
@@ -5107,82 +5144,88 @@ export default function HumanInLoopAIReviewPage() {
     onError: (error) => setReviewActionMessage(error instanceof Error ? error.message : ui('Unable to create the Draft Purchase Order.'))
   });
 
+  const businessReadinessQuery = useQuery({
+    queryKey: ['intelligence-business-readiness-summary'],
+    queryFn: () => fetchIntelligenceBusinessReadiness(false),
+    enabled: activeView === 'readiness'
+  });
+
   const readinessQuery = useQuery({
     queryKey: ['intelligence-production-readiness-summary'],
     queryFn: fetchIntelligenceProductionReadiness,
-    enabled: activeView === 'readiness'
+    enabled: activeView === 'readiness' && canViewDiagnostics
   });
 
   const readinessAuditPackQuery = useQuery({
     queryKey: ['intelligence-production-readiness-audit-pack'],
     queryFn: fetchIntelligenceProductionReadinessAuditPack,
-    enabled: activeView === 'readiness'
+    enabled: activeView === 'readiness' && canViewDiagnostics
   });
 
   const hardeningPlanQuery = useQuery({
     queryKey: ['intelligence-production-hardening-plan'],
     queryFn: fetchIntelligenceHardeningPlan,
-    enabled: activeView === 'readiness'
+    enabled: activeView === 'readiness' && canViewDiagnostics
   });
 
   const signoffChecklistQuery = useQuery({
     queryKey: ['intelligence-production-signoff-checklist'],
     queryFn: fetchIntelligenceSignoffChecklist,
-    enabled: activeView === 'readiness'
+    enabled: activeView === 'readiness' && canViewDiagnostics
   });
 
 
   const releaseDecisionBoardQuery = useQuery({
     queryKey: ['intelligence-production-release-decision-board'],
     queryFn: fetchIntelligenceReleaseDecisionBoard,
-    enabled: activeView === 'readiness'
+    enabled: activeView === 'readiness' && canViewDiagnostics
   });
 
   const operationalRunbookQuery = useQuery({
     queryKey: ['intelligence-production-operational-runbook'],
     queryFn: fetchIntelligenceOperationalRunbook,
-    enabled: activeView === 'readiness'
+    enabled: activeView === 'readiness' && canViewDiagnostics
   });
 
 
   const validationSuiteQuery = useQuery({
     queryKey: ['intelligence-production-validation-suite'],
     queryFn: fetchIntelligenceValidationSuite,
-    enabled: activeView === 'readiness'
+    enabled: activeView === 'readiness' && canViewDiagnostics
   });
 
 
   const enablementManifestQuery = useQuery({
     queryKey: ['intelligence-production-enablement-manifest'],
     queryFn: fetchIntelligenceEnablementManifest,
-    enabled: activeView === 'readiness'
+    enabled: activeView === 'readiness' && canViewDiagnostics
   });
 
 
   const monitoringContractQuery = useQuery({
     queryKey: ['intelligence-production-monitoring-contract'],
     queryFn: fetchIntelligenceMonitoringContract,
-    enabled: activeView === 'readiness'
+    enabled: activeView === 'readiness' && canViewDiagnostics
   });
 
   const remediationWorkbenchQuery = useQuery({
     queryKey: ['intelligence-production-remediation-workbench'],
     queryFn: fetchIntelligenceRemediationWorkbench,
-    enabled: activeView === 'readiness'
+    enabled: activeView === 'readiness' && canViewDiagnostics
   });
 
 
   const evidenceMatrixQuery = useQuery({
     queryKey: ['intelligence-production-evidence-matrix'],
     queryFn: fetchIntelligenceEvidenceMatrix,
-    enabled: activeView === 'readiness'
+    enabled: activeView === 'readiness' && canViewDiagnostics
   });
 
 
   const featureDetailQuery = useQuery({
     queryKey: ['intelligence-production-feature-detail', selectedReadinessFeatureKey],
     queryFn: () => fetchIntelligenceFeatureDetail(selectedReadinessFeatureKey),
-    enabled: activeView === 'readiness' && Boolean(selectedReadinessFeatureKey)
+    enabled: activeView === 'readiness' && canViewDiagnostics && Boolean(selectedReadinessFeatureKey)
   });
 
   const recommendationQueries = [
@@ -5191,6 +5234,7 @@ export default function HumanInLoopAIReviewPage() {
   ];
 
   const readinessQueries = [
+    businessReadinessQuery,
     readinessQuery,
     readinessAuditPackQuery,
     hardeningPlanQuery,
@@ -5216,9 +5260,13 @@ export default function HumanInLoopAIReviewPage() {
 
     setIsForcingReadinessRefresh(true);
     try {
-      const freshReadiness = await fetchIntelligenceProductionReadiness(true);
-      queryClient.setQueryData(['intelligence-production-readiness-summary'], freshReadiness);
-      await Promise.all(readinessQueries.slice(1).map((query) => query.refetch()));
+      const freshBusinessReadiness = await fetchIntelligenceBusinessReadiness(true);
+      queryClient.setQueryData(['intelligence-business-readiness-summary'], freshBusinessReadiness);
+      if (canViewDiagnostics) {
+        const freshReadiness = await fetchIntelligenceProductionReadiness(true);
+        queryClient.setQueryData(['intelligence-production-readiness-summary'], freshReadiness);
+        await Promise.all(readinessQueries.slice(2).map((query) => query.refetch()));
+      }
     } finally {
       setIsForcingReadinessRefresh(false);
     }
@@ -5241,7 +5289,6 @@ export default function HumanInLoopAIReviewPage() {
   const summary = response?.summary || {};
   const guidance = response?.guidance || {};
   const reviews = useMemo(() => response?.reviews || [], [response?.reviews]);
-  const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
 
   useEffect(() => {
     if (activeView !== 'recommendations') return;
@@ -5270,6 +5317,12 @@ export default function HumanInLoopAIReviewPage() {
   const safetyEntries = useMemo(() => {
     return Object.entries(response?.definition?.safety_contract || {}).filter(([, enabled]) => enabled);
   }, [response?.definition?.safety_contract]);
+
+  const businessReadiness = businessReadinessQuery.data;
+  const hasBusinessReadinessSnapshot = Boolean(businessReadiness);
+  const businessReadinessSummary = businessReadiness?.summary || {};
+  const businessReadinessFeatures = useMemo(() => businessReadiness?.features || [], [businessReadiness?.features]);
+  const businessReadinessPriorityItems = useMemo(() => businessReadiness?.priority_items || [], [businessReadiness?.priority_items]);
 
   const readiness = readinessQuery.data;
   const hasReadinessSnapshot = Boolean(readiness);
@@ -5530,7 +5583,7 @@ export default function HumanInLoopAIReviewPage() {
   };
 
   const readinessSummaryValue = (value: unknown, percent = false): string => {
-    if (!hasReadinessSnapshot) return readinessQuery.isLoading ? ui('Loading…') : ui('Unavailable');
+    if (!hasBusinessReadinessSnapshot) return businessReadinessQuery.isLoading ? ui('Loading…') : ui('Unavailable');
     const formatted = formatLocalizedNumber(numberValue(value), locale);
     return percent ? `${formatted}%` : formatted;
   };
@@ -5561,10 +5614,10 @@ export default function HumanInLoopAIReviewPage() {
         )
       ) : (
         <OperationalWorkspaceStats ariaLabel={ui("Intelligence readiness summary")}>
-          <OperationalWorkspaceStatCard label={ui("Visible intelligence features")} value={readinessSummaryValue(readinessSummary.total_features)} helper={ui("Registered intelligence and AI-assisted modules available to your role")} iconPath="/intelligence-review" tone="blue" />
-          <OperationalWorkspaceStatCard label={ui("Production candidates")} value={readinessSummaryValue(readinessSummary.production_candidates)} helper={ui("Implemented features still requiring hardening evidence")} iconPath="/reliability-command" tone={hasReadinessSnapshot ? 'warn' : 'neutral'} />
-          <OperationalWorkspaceStatCard label={ui("Tenant-data backed")} value={readinessSummaryValue(readinessSummary.tenant_data_backed_features)} helper={ui("Features with current tenant evidence rows")} iconPath="/system-context" tone="blue" />
-          <OperationalWorkspaceStatCard label={ui("Average readiness")} value={readinessSummaryValue(readinessSummary.average_readiness_score, true)} helper={ui("Production-readiness score across visible features")} iconPath="/reports" tone="neutral" />
+          <OperationalWorkspaceStatCard label={ui("Visible intelligence features")} value={readinessSummaryValue(businessReadinessSummary.total_features)} helper={ui("Intelligence and AI-assisted modules available to your role")} iconPath="/intelligence-review" tone="blue" />
+          <OperationalWorkspaceStatCard label={ui("Needs attention")} value={readinessSummaryValue(businessReadinessSummary.needs_attention)} helper={ui("Business-readiness items that still need review or validation")} iconPath="/alerts" tone={hasBusinessReadinessSnapshot && numberValue(businessReadinessSummary.needs_attention) > 0 ? 'warn' : hasBusinessReadinessSnapshot ? 'good' : 'neutral'} />
+          <OperationalWorkspaceStatCard label={ui("Controlled validation")} value={readinessSummaryValue(businessReadinessSummary.controlled_validation_candidates)} helper={ui("Features ready for controlled business validation before wider use")} iconPath="/permissions" tone="blue" />
+          <OperationalWorkspaceStatCard label={ui("Average readiness")} value={readinessSummaryValue(businessReadinessSummary.average_readiness_score, true)} helper={ui("Business-readiness score across visible features")} iconPath="/reports" tone="neutral" />
         </OperationalWorkspaceStats>
       )}
 
@@ -5598,7 +5651,60 @@ export default function HumanInLoopAIReviewPage() {
       </div>
 
 
-      {activeView === 'readiness' ? (
+      {activeView === 'readiness' && !canViewDiagnostics ? (
+        <section className="section ai-review-page__business-readiness">
+          <div className="section__title">{ui('Business readiness')}</div>
+          <div className="card ai-review-page__readiness-note" style={{ marginBottom: 12 }}>
+            <strong>{ui('What this means:')}</strong> {ui(businessReadiness?.safety_message || 'This readiness view is advisory only. It does not enable, release, approve, or execute an intelligence feature.')}
+          </div>
+          {businessReadinessQuery.isLoading ? (
+            <div className="card"><p className="card__subtext">{ui('Loading business readiness…')}</p></div>
+          ) : businessReadinessQuery.error ? (
+            <div className="card"><p className="form-error">{businessReadinessQuery.error instanceof ApiError ? businessReadinessQuery.error.message : ui('Unable to load business readiness.')}</p></div>
+          ) : (
+            <>
+              <div className="card">
+                <div className="card__header"><div><h2>{ui('What needs attention first')}</h2><p className="card__subtext">{ui('These are the highest-priority business-readiness items. Technical implementation details are intentionally kept out of this view.')}</p></div></div>
+                {businessReadinessPriorityItems.length ? (
+                  <div className="list-stack">
+                    {businessReadinessPriorityItems.slice(0, 8).map((item) => (
+                      <div className="list-row" key={item.feature_key || item.feature_label}>
+                        <div>
+                          <strong>{ui(item.feature_label || 'Intelligence feature')}</strong>
+                          <p className="card__subtext">{ui('Status:')} {ui(item.readiness_status || 'Business readiness review required')} · {ui('Owner area:')} {ui(item.owner_area || 'Business owner')}</p>
+                          <p className="card__subtext">{ui('Next action:')} {ui(item.next_action || 'Complete the remaining business-readiness work before wider use.')}</p>
+                        </div>
+                        <span style={badgeStyle}>{ui('Priority:')} {readinessCoreLabel(item.production_priority, ui)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="card__subtext">{ui('No business-readiness item currently requires priority attention.')}</p>}
+              </div>
+              <div className="card" style={{ marginTop: 16 }}>
+                <div className="card__header"><div><h2>{ui('Readiness by feature')}</h2><p className="card__subtext">{ui('A business-level view of status, responsible area, and the next governed step.')}</p></div></div>
+                <div className="card-grid" style={gridStyle}>
+                  {businessReadinessFeatures.map((item) => (
+                    <div className="card" key={item.feature_key || item.feature_label}>
+                      <div className="card__label">{ui(item.feature_label || 'Intelligence feature')}</div>
+                      <div className="card__value" style={{ fontSize: 18 }}>{formatLocalizedNumber(numberValue(item.readiness_score), locale)}%</div>
+                      <div className="card__subtext"><strong>{ui('Status:')}</strong> {ui(item.readiness_status || 'Business readiness review required')}</div>
+                      <div className="card__subtext"><strong>{ui('Owner area:')}</strong> {ui(item.owner_area || 'Business owner')}</div>
+                      <div className="card__subtext"><strong>{ui('Open readiness items:')}</strong> {formatLocalizedNumber(numberValue(item.blocker_count), locale)}</div>
+                      <div className="card__subtext"><strong>{ui('Next action:')}</strong> {ui(item.next_action || 'Complete the remaining business-readiness work before wider use.')}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="card" style={{ marginTop: 16 }}>
+                <div className="card__label">{ui('Technical diagnostics')}</div>
+                <p className="card__subtext">{ui('Response contracts, DOM anchors, schema/table checks, and other engineering diagnostics require Tenant Diagnostics access and are not shown in the normal business view.')}</p>
+              </div>
+            </>
+          )}
+        </section>
+      ) : null}
+
+      {activeView === 'readiness' && canViewDiagnostics ? (
       <section className="section">
         <div className="section__title">{ui("Intelligence feature readiness")}</div>
         <div className="card ai-review-page__readiness-note" style={{ marginBottom: 12 }}>
@@ -6117,7 +6223,7 @@ export default function HumanInLoopAIReviewPage() {
                     <ul style={{ marginBottom: 0 }}>
                       {aiRouteExposureAudit.route_rows.slice(0, 10).map((row) => (
                         <li key={`${row.sequence}-${row.route_path}`}>
-                          <strong>{row.route_path}</strong>: {row.controller_export} · {row.frontend_query_key} · {row.frontend_api_path || '—'} · {row.frontend_api_path_aligned ? ui('API path aligned') : ui('API path drift')} · {readinessCoreLabel(row.required_permission, ui)}
+                          <strong>{row.route_path}</strong>: {row.controller_export} · {row.frontend_query_key} · {row.frontend_api_path || '—'} · {row.frontend_api_path_aligned ? ui('API path aligned') : ui('API path drift')} · {readinessCoreLabel(row.required_permission, ui)}{row.additional_required_permission ? ` + ${readinessCoreLabel(row.additional_required_permission, ui)}` : ''}
                         </li>
                       ))}
                     </ul>
@@ -9519,7 +9625,7 @@ export default function HumanInLoopAIReviewPage() {
         </>
       ) : null}
 
-      {activeView === 'readiness' ? (
+      {activeView === 'readiness' && canViewDiagnostics ? (
         <>
       <section className="section">
         <div className="section__title">{ui("Production enablement manifest")}</div>

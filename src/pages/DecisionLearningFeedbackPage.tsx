@@ -1596,9 +1596,124 @@ function toIsoDateTime(value: string): string | undefined {
   return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
 }
 
-function jsonForForm(value: unknown): string {
-  if (value === undefined || value === null) return '';
-  return typeof value === 'string' ? value : JSON.stringify(value);
+type BusinessEvidenceSnapshot = { original: unknown; display: string };
+type BusinessEvidenceSnapshots = Partial<Record<
+  'expected' | 'observed' | 'lifecycleEvidence' | 'outcomeReviewReason' | 'businessImpactEvidence' | 'targetEvidence' |
+  'counterfactualReference' | 'attributionEvidence' | 'measurementQualityEvidence' | 'evaluationEvidence' |
+  'acceptanceEvidence' | 'correctiveActionEvidence' | 'learningSignalEvidence' | 'learningActionEvidence',
+  BusinessEvidenceSnapshot
+>>;
+
+function businessEvidenceScalar(value: unknown, locale: AppLocale, ui: LearningUi): string {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value === 'boolean') return value ? ui('Yes') : ui('No');
+  if (typeof value === 'number') return formatLocalizedNumber(value, locale, { maximumFractionDigits: 4 });
+  return String(value).trim();
+}
+
+const BUSINESS_EVIDENCE_FIELD_LABELS: Record<string, string> = {
+  note: 'Note',
+  summary: 'Summary',
+  description: 'Description',
+  reason: 'Reason',
+  evidence: 'Evidence',
+  statement: 'Statement',
+  result: 'Result',
+  value: 'Value',
+  target: 'Target',
+  expected: 'Expected',
+  actual: 'Actual',
+  observed: 'Observed',
+  projected: 'Projected',
+  baseline: 'Baseline',
+  metric: 'Metric',
+  unit: 'Unit',
+  score: 'Score',
+  confidence: 'Confidence',
+  status: 'Status',
+  source: 'Source',
+  owner: 'Owner',
+  action: 'Action',
+  outcome: 'Outcome',
+  observed_at: 'Observed at',
+  due_at: 'Due at'
+};
+
+function businessEvidenceFieldLabel(key: string, ui: LearningUi): string {
+  const systemLabel = BUSINESS_EVIDENCE_FIELD_LABELS[key];
+  return systemLabel ? ui(systemLabel) : key;
+}
+
+function businessEvidenceEntries(value: unknown, locale: AppLocale, ui: LearningUi, prefix = '', depth = 0): Array<{ label: string; value: string }> {
+  if (value === undefined || value === null || value === '') return [];
+  if (depth > 3) return [{ label: prefix, value: ui('Additional structured evidence is available.') }];
+  if (Array.isArray(value)) {
+    const rows: Array<{ label: string; value: string }> = [];
+    for (let index = 0; index < value.length && rows.length < 12; index += 1) {
+      const item = value[index];
+      const itemLabel = prefix ? `${prefix} · ${ui('Item')} ${formatLocalizedNumber(index + 1, locale)}` : `${ui('Item')} ${formatLocalizedNumber(index + 1, locale)}`;
+      if (item && typeof item === 'object') {
+        rows.push(...businessEvidenceEntries(item, locale, ui, itemLabel, depth + 1).slice(0, 12 - rows.length));
+      } else {
+        const text = businessEvidenceScalar(item, locale, ui);
+        if (text) rows.push({ label: value.length > 1 ? itemLabel : prefix, value: text });
+      }
+    }
+    return rows;
+  }
+  if (typeof value !== 'object') {
+    const text = businessEvidenceScalar(value, locale, ui);
+    return text ? [{ label: prefix, value: text }] : [];
+  }
+
+  const record = value as Record<string, unknown>;
+  const semanticKeys = ['note', 'summary', 'description', 'reason', 'evidence', 'statement', 'result', 'value'];
+  if (Object.keys(record).length === 1) {
+    const onlyKey = Object.keys(record)[0];
+    if (semanticKeys.includes(onlyKey)) {
+      const text = businessEvidenceScalar(record[onlyKey], locale, ui);
+      return text ? [{ label: prefix, value: text }] : [];
+    }
+  }
+
+  const rows: Array<{ label: string; value: string }> = [];
+  for (const [key, item] of Object.entries(record)) {
+    if (rows.length >= 12 || item === undefined || item === null || item === '') continue;
+    const keyLabel = businessEvidenceFieldLabel(key, ui);
+    const nextLabel = prefix ? `${prefix} · ${keyLabel}` : keyLabel;
+    if (item && typeof item === 'object') {
+      rows.push(...businessEvidenceEntries(item, locale, ui, nextLabel, depth + 1).slice(0, 12 - rows.length));
+    } else {
+      const text = businessEvidenceScalar(item, locale, ui);
+      if (text) rows.push({ label: nextLabel, value: text });
+    }
+  }
+  return rows;
+}
+
+function businessEvidenceText(value: unknown, locale: AppLocale, ui: LearningUi): string {
+  const rows = businessEvidenceEntries(value, locale, ui);
+  if (!rows.length) return '';
+  if (rows.length === 1 && !rows[0].label) return rows[0].value;
+  return rows.map((row) => row.label ? `${row.label}: ${row.value}` : row.value).join(' · ');
+}
+
+function businessEvidenceSnapshot(value: unknown, locale: AppLocale, ui: LearningUi): BusinessEvidenceSnapshot | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  return { original: value, display: businessEvidenceText(value, locale, ui) };
+}
+
+function businessEvidenceObject(value: string, editing: boolean, snapshot?: BusinessEvidenceSnapshot): Record<string, unknown> | undefined {
+  if (editing && snapshot && value === snapshot.display) {
+    if (snapshot.original && typeof snapshot.original === 'object' && !Array.isArray(snapshot.original)) {
+      return snapshot.original as Record<string, unknown>;
+    }
+    const originalText = snapshot.original === undefined || snapshot.original === null ? '' : String(snapshot.original).trim();
+    return originalText ? { note: originalText } : undefined;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return { note: trimmed };
 }
 
 function safeJsonObject(value: string): Record<string, unknown> {
@@ -1613,8 +1728,8 @@ function safeJsonObject(value: string): Record<string, unknown> {
   }
 }
 
-function optionalJsonObject(value: string, editing: boolean): Record<string, unknown> | undefined {
-  if (!value.trim() && editing) return undefined;
+function optionalJsonObject(value: string, _editing: boolean): Record<string, unknown> | undefined {
+  if (!value.trim()) return undefined;
   return safeJsonObject(value);
 }
 
@@ -1823,11 +1938,15 @@ function formJson(value: unknown): string {
   return String(value);
 }
 
-function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: string): Record<string, unknown> {
+function formBusinessEvidence(value: unknown, locale: AppLocale, ui: LearningUi): string {
+  return businessEvidenceText(value, locale, ui);
+}
+
+function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: string, snapshots: BusinessEvidenceSnapshots = {}): Record<string, unknown> {
   const reference = safeJsonObject(form.reference);
-  const expected = safeJsonObject(form.expected);
-  const observed = safeJsonObject(form.observed);
   const editing = Boolean(form.recordKey);
+  const expected = businessEvidenceObject(form.expected, editing, snapshots.expected) || {};
+  const observed = businessEvidenceObject(form.observed, editing, snapshots.observed) || {};
   const score = optionalScore(form.score, editing);
 
   if (mode === 'forecast-accuracy') {
@@ -1897,23 +2016,23 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: str
     service_level_impact_score: optionalScore(form.serviceLevelImpactScore, editing),
     outcome_confidence_score: optionalScore(form.outcomeConfidenceScore, editing),
     recommendation_lifecycle_status: form.lifecycleStatus || undefined,
-    recommendation_generated_at: form.generatedAt || undefined,
-    recommendation_approved_at: form.approvedAt || undefined,
-    recommendation_executed_at: form.executedAt || undefined,
-    recommendation_measured_at: form.measuredAt || undefined,
-    recommendation_scored_at: form.scoredAt || undefined,
+    recommendation_generated_at: toIsoDateTime(form.generatedAt),
+    recommendation_approved_at: toIsoDateTime(form.approvedAt),
+    recommendation_executed_at: toIsoDateTime(form.executedAt),
+    recommendation_measured_at: toIsoDateTime(form.measuredAt),
+    recommendation_scored_at: toIsoDateTime(form.scoredAt),
     execution_reference: optionalJsonObject(form.executionReference, editing),
-    lifecycle_evidence: optionalJsonObject(form.lifecycleEvidence, editing),
+    lifecycle_evidence: businessEvidenceObject(form.lifecycleEvidence, editing, snapshots.lifecycleEvidence),
     recommendation_outcome_classification: form.outcomeClassification || undefined,
     recommendation_outcome_review_required: form.outcomeReviewRequired === '' ? undefined : form.outcomeReviewRequired === 'true',
-    recommendation_outcome_review_reason: optionalJsonObject(form.outcomeReviewReason, editing),
+    recommendation_outcome_review_reason: businessEvidenceObject(form.outcomeReviewReason, editing, snapshots.outcomeReviewReason),
     financial_impact_amount: optionalNumber(form.financialImpactAmount, editing),
     financial_impact_currency: form.financialImpactCurrency.trim().toUpperCase() || undefined,
     stockout_prevented: form.stockoutPrevented === '' ? undefined : form.stockoutPrevented === 'true',
     overstock_prevented: form.overstockPrevented === '' ? undefined : form.overstockPrevented === 'true',
     waste_reduced_quantity: optionalNumber(form.wasteReducedQuantity, editing),
     service_level_delta_percent: optionalNumber(form.serviceLevelDeltaPercent, editing),
-    recommendation_business_impact_evidence: optionalJsonObject(form.businessImpactEvidence, editing),
+    recommendation_business_impact_evidence: businessEvidenceObject(form.businessImpactEvidence, editing, snapshots.businessImpactEvidence),
     baseline_metric_value: optionalNumber(form.baselineMetricValue, editing),
     target_metric_value: optionalNumber(form.targetMetricValue, editing),
     actual_metric_value: optionalNumber(form.actualMetricValue, editing),
@@ -1921,39 +2040,39 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: str
     target_direction: form.targetDirection || undefined,
     target_tolerance_percent: optionalNumber(form.targetTolerancePercent, editing),
     target_met: form.targetMet === '' ? undefined : form.targetMet === 'true',
-    recommendation_target_evidence: optionalJsonObject(form.targetEvidence, editing),
+    recommendation_target_evidence: businessEvidenceObject(form.targetEvidence, editing, snapshots.targetEvidence),
     recommendation_attribution_method: form.attributionMethod || undefined,
     recommendation_attribution_confidence_score: optionalNumber(form.attributionConfidenceScore, editing),
-    recommendation_counterfactual_reference: optionalJsonObject(form.counterfactualReference, editing),
-    recommendation_attribution_evidence: optionalJsonObject(form.attributionEvidence, editing),
+    recommendation_counterfactual_reference: businessEvidenceObject(form.counterfactualReference, editing, snapshots.counterfactualReference),
+    recommendation_attribution_evidence: businessEvidenceObject(form.attributionEvidence, editing, snapshots.attributionEvidence),
     recommendation_measurement_method: form.measurementMethod.trim() || undefined,
     recommendation_measurement_source: form.measurementSource.trim() || undefined,
     recommendation_measurement_owner: form.measurementOwner.trim() || undefined,
     recommendation_measurement_sample_size: optionalNumber(form.measurementSampleSize, editing),
     recommendation_measurement_data_quality_score: optionalNumber(form.measurementDataQualityScore, editing),
-    recommendation_measurement_quality_evidence: optionalJsonObject(form.measurementQualityEvidence, editing),
-    recommendation_outcome_evaluation_due_at: form.evaluationDueAt || undefined,
+    recommendation_measurement_quality_evidence: businessEvidenceObject(form.measurementQualityEvidence, editing, snapshots.measurementQualityEvidence),
+    recommendation_outcome_evaluation_due_at: toIsoDateTime(form.evaluationDueAt),
     recommendation_outcome_evaluation_status: form.evaluationStatus || undefined,
     recommendation_outcome_evaluation_owner: form.evaluationOwner.trim() || undefined,
-    recommendation_outcome_evaluation_evidence: optionalJsonObject(form.evaluationEvidence, editing),
+    recommendation_outcome_evaluation_evidence: businessEvidenceObject(form.evaluationEvidence, editing, snapshots.evaluationEvidence),
     recommendation_outcome_acceptance_status: form.acceptanceStatus || undefined,
     recommendation_outcome_acceptance_owner: form.acceptanceOwner.trim() || undefined,
-    recommendation_outcome_accepted_at: form.acceptedAt || undefined,
-    recommendation_outcome_acceptance_evidence: optionalJsonObject(form.acceptanceEvidence, editing),
+    recommendation_outcome_accepted_at: toIsoDateTime(form.acceptedAt),
+    recommendation_outcome_acceptance_evidence: businessEvidenceObject(form.acceptanceEvidence, editing, snapshots.acceptanceEvidence),
     recommendation_outcome_corrective_action_status: form.correctiveActionStatus || undefined,
     recommendation_outcome_corrective_action_owner: form.correctiveActionOwner.trim() || undefined,
-    recommendation_outcome_corrective_action_due_at: form.correctiveActionDueAt || undefined,
-    recommendation_outcome_corrective_action_resolved_at: form.correctiveActionResolvedAt || undefined,
-    recommendation_outcome_corrective_action_evidence: optionalJsonObject(form.correctiveActionEvidence, editing),
+    recommendation_outcome_corrective_action_due_at: toIsoDateTime(form.correctiveActionDueAt),
+    recommendation_outcome_corrective_action_resolved_at: toIsoDateTime(form.correctiveActionResolvedAt),
+    recommendation_outcome_corrective_action_evidence: businessEvidenceObject(form.correctiveActionEvidence, editing, snapshots.correctiveActionEvidence),
     recommendation_outcome_learning_signal: form.learningSignal || undefined,
     recommendation_outcome_learning_signal_reason: form.learningSignalReason.trim() || undefined,
     recommendation_outcome_recommended_next_action: form.learningSignalNextAction.trim() || undefined,
-    recommendation_outcome_learning_signal_evidence: optionalJsonObject(form.learningSignalEvidence, editing),
+    recommendation_outcome_learning_signal_evidence: businessEvidenceObject(form.learningSignalEvidence, editing, snapshots.learningSignalEvidence),
     recommendation_outcome_learning_action_status: form.learningActionStatus || undefined,
     recommendation_outcome_learning_action_owner: form.learningActionOwner.trim() || undefined,
-    recommendation_outcome_learning_action_due_at: form.learningActionDueAt || undefined,
-    recommendation_outcome_learning_action_completed_at: form.learningActionCompletedAt || undefined,
-    recommendation_outcome_learning_action_evidence: optionalJsonObject(form.learningActionEvidence, editing)
+    recommendation_outcome_learning_action_due_at: toIsoDateTime(form.learningActionDueAt),
+    recommendation_outcome_learning_action_completed_at: toIsoDateTime(form.learningActionCompletedAt),
+    recommendation_outcome_learning_action_evidence: businessEvidenceObject(form.learningActionEvidence, editing, snapshots.learningActionEvidence)
   };
 }
 
@@ -4866,9 +4985,10 @@ function LearningTrendView({ trends }: { trends: ContinuousLearningSummary['lear
   );
 }
 
-function EvidenceDetailCard({ detail, canCreateFollowUp, creatingFollowUp, onClose, onCreateFollowUp }: {
+function EvidenceDetailCard({ detail, canCreateFollowUp, canViewDiagnostics, creatingFollowUp, onClose, onCreateFollowUp }: {
   detail: Record<string, unknown>;
   canCreateFollowUp: boolean;
+  canViewDiagnostics: boolean;
   creatingFollowUp: boolean;
   onClose: () => void;
   onCreateFollowUp: () => void;
@@ -4876,8 +4996,18 @@ function EvidenceDetailCard({ detail, canCreateFollowUp, creatingFollowUp, onClo
   const { locale, ui } = useAppTranslation();
   const valueText = (value: unknown) => {
     if (value === undefined || value === null || value === '') return '—';
-    if (typeof value === 'object') return JSON.stringify(value, null, 2);
+    if (typeof value === 'object') return businessEvidenceText(value, locale, ui) || '—';
     return String(value);
+  };
+  const renderBusinessEvidence = (value: unknown) => {
+    const rows = businessEvidenceEntries(value, locale, ui);
+    if (!rows.length) return <p>—</p>;
+    return <div className="learning-feedback-business-evidence">{rows.map((row, index) => (
+      <div key={`${row.label || 'evidence'}-${index}`}>
+        {row.label ? <strong>{row.label}</strong> : null}
+        <p>{row.value}</p>
+      </div>
+    ))}</div>;
   };
   const observedAt = detail.observed_at ? formatLocalizedDateTime(String(detail.observed_at), locale) : '—';
   const status = detail.outcome_status ?? detail.calibration_status ?? detail.effectiveness_status ?? detail.result_status;
@@ -4907,11 +5037,20 @@ function EvidenceDetailCard({ detail, canCreateFollowUp, creatingFollowUp, onClo
         <div><strong>{ui('Reviewed at')}</strong><div>{detail.learning_feedback_reviewed_at ? formatLocalizedDateTime(String(detail.learning_feedback_reviewed_at), locale) : '—'}</div></div>
       </div>
       <div className="learning-feedback-detail__evidence">
-        <div><strong>{ui('Expected')}</strong><pre>{valueText(expected)}</pre></div>
-        <div><strong>{ui('Actual')}</strong><pre>{valueText(observed)}</pre></div>
+        <div><strong>{ui('Expected')}</strong>{renderBusinessEvidence(expected)}</div>
+        <div><strong>{ui('Actual')}</strong>{renderBusinessEvidence(observed)}</div>
         {detail.learning_feedback_review_note ? <div><strong>{ui('Review note')}</strong><p>{String(detail.learning_feedback_review_note)}</p></div> : null}
         {detail.learning_feedback_escalation_reason ? <div><strong>{ui('Escalation reason')}</strong><p>{String(detail.learning_feedback_escalation_reason)}</p></div> : null}
       </div>
+      {canViewDiagnostics ? (
+        <details className="learning-feedback-advanced" style={{ marginTop: 12 }}>
+          <summary>{ui('Technical structured evidence')}</summary>
+          <div className="learning-feedback-advanced__body">
+            <p className="card__subtext">{ui('Raw structured values are shown only for diagnostics and support investigation.')}</p>
+            <pre>{JSON.stringify({ expected, observed }, null, 2)}</pre>
+          </div>
+        </details>
+      ) : null}
       {canCreateFollowUp ? <div style={{ marginTop: 12 }}><button className="button" type="button" disabled={creatingFollowUp} onClick={onCreateFollowUp}>{creatingFollowUp ? ui('Creating draft…') : ui('Create follow-up Execution Request draft')}</button><p className="card__subtext">{ui('Creates a draft follow-up only. It does not execute a recommendation or change inventory.')}</p></div> : null}
     </section>
   );
@@ -5025,6 +5164,7 @@ export default function DecisionLearningFeedbackPage() {
   const [view, setView] = useState<LearningFeedbackView>('feedback');
   const [mode, setMode] = useState<FeedbackMode>('learning-outcomes');
   const [form, setForm] = useState<FeedbackFormState>(() => ({ ...defaultForm, observedAt: nowLocalDateTimeValue(), financialImpactCurrency: getActiveTenantCurrency() }));
+  const [businessEvidenceSnapshots, setBusinessEvidenceSnapshots] = useState<BusinessEvidenceSnapshots>({});
   const [sourceId, setSourceId] = useState('');
   const [sourceSearch, setSourceSearch] = useState('');
   const [message, setMessage] = useState<string | null>(null);
@@ -5087,6 +5227,7 @@ export default function DecisionLearningFeedbackPage() {
       setMessage(form.recordKey ? ui('Feedback evidence updated.') : ui('Feedback evidence recorded. The backend stores this as learning evidence only.'));
       setForm({ ...defaultForm, observedAt: nowLocalDateTimeValue(), subtype: defaultSubtypeForMode(mode), financialImpactCurrency: getActiveTenantCurrency(), status: statusOptions[mode][0] || 'observed' });
       setSourceId('');
+      setBusinessEvidenceSnapshots({});
       await queryClient.invalidateQueries({ queryKey: ['decision-learning-summary'] });
     },
     onError: (error) => setMessage(error instanceof Error ? error.message : ui('Unable to record feedback evidence.'))
@@ -5137,6 +5278,7 @@ export default function DecisionLearningFeedbackPage() {
     setForm({ ...defaultForm, observedAt: nowLocalDateTimeValue(), subtype: defaultSubtypeForMode(nextMode), financialImpactCurrency: getActiveTenantCurrency(), status: statusOptions[nextMode][0] || 'observed' });
     setSourceId('');
     setSourceSearch('');
+    setBusinessEvidenceSnapshots({});
     setMessage(null);
   };
 
@@ -5165,7 +5307,7 @@ export default function DecisionLearningFeedbackPage() {
       setMessage(validationError);
       return;
     }
-    mutation.mutate(buildPayload(mode, form, sourceId));
+    mutation.mutate(buildPayload(mode, form, sourceId, businessEvidenceSnapshots));
   };
 
   const handleSourceChange = (nextSourceId: string) => {
@@ -5188,18 +5330,36 @@ export default function DecisionLearningFeedbackPage() {
           : '',
         recommendationKey: mode === 'learning-outcomes' ? source.source_key : current.recommendationKey,
         expected: mode === 'learning-outcomes'
-          ? jsonForForm(prefill.expected_result)
+          ? formBusinessEvidence(prefill.expected_result, locale, ui)
           : mode === 'forecast-accuracy'
             ? formText(prefill.predicted_value)
             : mode === 'policy-effectiveness'
-              ? jsonForForm(prefill.baseline_reference)
+              ? formBusinessEvidence(prefill.baseline_reference, locale, ui)
               : mode === 'optimization-results'
-                ? jsonForForm(prefill.objective_reference)
+                ? formBusinessEvidence(prefill.objective_reference, locale, ui)
                 : current.expected,
         metricUnit: mode === 'forecast-accuracy' ? formText(prefill.unit) : current.metricUnit,
         measurementWindowStart: mode === 'forecast-accuracy' ? toLocalDateTimeValue(prefill.forecast_period_start) : current.measurementWindowStart,
         measurementWindowEnd: mode === 'forecast-accuracy' ? toLocalDateTimeValue(prefill.forecast_period_end) : current.measurementWindowEnd
       }));
+      if (mode !== 'forecast-accuracy') {
+        const sourceExpected = mode === 'learning-outcomes'
+          ? prefill.expected_result
+          : mode === 'policy-effectiveness'
+            ? prefill.baseline_reference
+            : mode === 'optimization-results'
+              ? prefill.objective_reference
+              : undefined;
+        const expectedSnapshot = businessEvidenceSnapshot(sourceExpected, locale, ui);
+        setBusinessEvidenceSnapshots((current) => {
+          const next = form.recordKey ? { ...current } : {};
+          if (expectedSnapshot) next.expected = expectedSnapshot;
+          else delete next.expected;
+          return next;
+        });
+      } else {
+        setBusinessEvidenceSnapshots((current) => form.recordKey ? current : {});
+      }
     } else if (mode === 'optimization-results') {
       setForm((current) => ({ ...current, optimizationOptionId: '' }));
     }
@@ -5208,11 +5368,14 @@ export default function DecisionLearningFeedbackPage() {
   const handleOptimizationOptionChange = (optionId: string) => {
     const source = (sourceQuery.data?.sources || []).find((item) => item.id === sourceId);
     const option = (source?.options || []).find((item) => item.id === optionId);
+    const optionExpected = option ? (option.tradeoff_summary || option.projected_outcome || { option: option.title }) : undefined;
     setForm((current) => ({
       ...current,
       optimizationOptionId: optionId,
-      expected: option ? jsonForForm(option.tradeoff_summary || option.projected_outcome || { option: option.title }) : current.expected
+      expected: option ? formBusinessEvidence(optionExpected, locale, ui) : current.expected
     }));
+    const expectedSnapshot = businessEvidenceSnapshot(optionExpected, locale, ui);
+    setBusinessEvidenceSnapshots((current) => ({ ...current, expected: expectedSnapshot }));
   };
 
   const viewEvidence = async (nextMode: FeedbackMode, row: Record<string, unknown>) => {
@@ -5281,6 +5444,28 @@ export default function DecisionLearningFeedbackPage() {
       const sourceKey = typeof refObject.source_key === 'string' ? refObject.source_key : typeof (full.recommendation_reference as Record<string, unknown> | undefined)?.recommendation_key === 'string' ? String((full.recommendation_reference as Record<string, unknown>).recommendation_key) : '';
       setSourceId(nextSourceId);
       setSourceSearch(sourceKey);
+      const nextBusinessEvidenceSnapshots: BusinessEvidenceSnapshots = {};
+      const snapshotSources: Array<[keyof BusinessEvidenceSnapshots, unknown]> = [
+        ['expected', expected],
+        ['observed', observed],
+        ['lifecycleEvidence', full.lifecycle_evidence],
+        ['outcomeReviewReason', full.recommendation_outcome_review_reason],
+        ['businessImpactEvidence', full.recommendation_business_impact_evidence],
+        ['targetEvidence', full.recommendation_target_evidence],
+        ['counterfactualReference', full.recommendation_counterfactual_reference],
+        ['attributionEvidence', full.recommendation_attribution_evidence],
+        ['measurementQualityEvidence', full.recommendation_measurement_quality_evidence],
+        ['evaluationEvidence', full.recommendation_outcome_evaluation_evidence],
+        ['acceptanceEvidence', full.recommendation_outcome_acceptance_evidence],
+        ['correctiveActionEvidence', full.recommendation_outcome_corrective_action_evidence],
+        ['learningSignalEvidence', full.recommendation_outcome_learning_signal_evidence],
+        ['learningActionEvidence', full.recommendation_outcome_learning_action_evidence]
+      ];
+      snapshotSources.forEach(([field, value]) => {
+        const snapshot = businessEvidenceSnapshot(value, locale, ui);
+        if (snapshot) nextBusinessEvidenceSnapshots[field] = snapshot;
+      });
+      setBusinessEvidenceSnapshots(nextBusinessEvidenceSnapshots);
       setForm({
         ...defaultForm,
         recordKey: evidenceKey,
@@ -5290,8 +5475,8 @@ export default function DecisionLearningFeedbackPage() {
         score: score === null || score === undefined ? '' : String(score),
         reference: typeof reference === 'object' ? JSON.stringify(reference) : String(reference || ''),
         optimizationOptionId: nextMode === 'optimization-results' && typeof refObject.option_id === 'string' ? refObject.option_id : '',
-        expected: typeof expected === 'object' ? JSON.stringify(expected) : String(expected ?? ''),
-        observed: typeof observed === 'object' ? JSON.stringify(observed) : String(observed ?? ''),
+        expected: formBusinessEvidence(expected, locale, ui),
+        observed: formBusinessEvidence(observed, locale, ui),
         observedAt: toLocalDateTimeValue(full.observed_at),
         measurementWindowStart: toLocalDateTimeValue(full.measurement_window_start),
         measurementWindowEnd: toLocalDateTimeValue(full.measurement_window_end),
@@ -5305,21 +5490,21 @@ export default function DecisionLearningFeedbackPage() {
         serviceLevelImpactScore: formText(full.service_level_impact_score),
         outcomeConfidenceScore: formText(full.outcome_confidence_score),
         lifecycleStatus: formText(full.recommendation_lifecycle_status),
-        generatedAt: formText(full.recommendation_generated_at),
-        approvedAt: formText(full.recommendation_approved_at),
-        executedAt: formText(full.recommendation_executed_at),
-        measuredAt: formText(full.recommendation_measured_at),
-        scoredAt: formText(full.recommendation_scored_at),
+        generatedAt: toLocalDateTimeValue(full.recommendation_generated_at),
+        approvedAt: toLocalDateTimeValue(full.recommendation_approved_at),
+        executedAt: toLocalDateTimeValue(full.recommendation_executed_at),
+        measuredAt: toLocalDateTimeValue(full.recommendation_measured_at),
+        scoredAt: toLocalDateTimeValue(full.recommendation_scored_at),
         executionReference: formJson(full.execution_reference),
-        lifecycleEvidence: formJson(full.lifecycle_evidence),
+        lifecycleEvidence: formBusinessEvidence(full.lifecycle_evidence, locale, ui),
         outcomeClassification: formText(full.recommendation_outcome_classification),
         outcomeReviewRequired: formBoolean(full.recommendation_outcome_review_required),
-        outcomeReviewReason: formJson(full.recommendation_outcome_review_reason),
+        outcomeReviewReason: formBusinessEvidence(full.recommendation_outcome_review_reason, locale, ui),
         stockoutPrevented: formBoolean(full.stockout_prevented),
         overstockPrevented: formBoolean(full.overstock_prevented),
         wasteReducedQuantity: formText(full.waste_reduced_quantity),
         serviceLevelDeltaPercent: formText(full.service_level_delta_percent),
-        businessImpactEvidence: formJson(full.recommendation_business_impact_evidence),
+        businessImpactEvidence: formBusinessEvidence(full.recommendation_business_impact_evidence, locale, ui),
         baselineMetricValue: formText(full.baseline_metric_value),
         targetMetricValue: formText(full.target_metric_value),
         actualMetricValue: formText(full.actual_metric_value),
@@ -5327,44 +5512,44 @@ export default function DecisionLearningFeedbackPage() {
         targetDirection: formText(full.target_direction),
         targetTolerancePercent: formText(full.target_tolerance_percent),
         targetMet: formBoolean(full.target_met),
-        targetEvidence: formJson(full.recommendation_target_evidence),
+        targetEvidence: formBusinessEvidence(full.recommendation_target_evidence, locale, ui),
         attributionMethod: formText(full.recommendation_attribution_method),
         attributionConfidenceScore: formText(full.recommendation_attribution_confidence_score),
-        counterfactualReference: formJson(full.recommendation_counterfactual_reference),
-        attributionEvidence: formJson(full.recommendation_attribution_evidence),
+        counterfactualReference: formBusinessEvidence(full.recommendation_counterfactual_reference, locale, ui),
+        attributionEvidence: formBusinessEvidence(full.recommendation_attribution_evidence, locale, ui),
         measurementMethod: formText(full.recommendation_measurement_method),
         measurementSource: formText(full.recommendation_measurement_source),
         measurementOwner: formText(full.recommendation_measurement_owner),
         measurementSampleSize: formText(full.recommendation_measurement_sample_size),
         measurementDataQualityScore: formText(full.recommendation_measurement_data_quality_score),
-        measurementQualityEvidence: formJson(full.recommendation_measurement_quality_evidence),
+        measurementQualityEvidence: formBusinessEvidence(full.recommendation_measurement_quality_evidence, locale, ui),
         reviewStatus: formText(full.recommendation_outcome_review_status),
         reviewOwner: formText(full.recommendation_outcome_review_owner),
         reviewedAt: formText(full.recommendation_outcome_reviewed_at),
         reviewResolution: formText(full.recommendation_outcome_review_resolution),
         reviewEvidence: formJson(full.recommendation_outcome_review_evidence),
-        evaluationDueAt: formText(full.recommendation_outcome_evaluation_due_at),
+        evaluationDueAt: toLocalDateTimeValue(full.recommendation_outcome_evaluation_due_at),
         evaluationStatus: formText(full.recommendation_outcome_evaluation_status),
         evaluationOwner: formText(full.recommendation_outcome_evaluation_owner),
-        evaluationEvidence: formJson(full.recommendation_outcome_evaluation_evidence),
+        evaluationEvidence: formBusinessEvidence(full.recommendation_outcome_evaluation_evidence, locale, ui),
         acceptanceStatus: formText(full.recommendation_outcome_acceptance_status),
         acceptanceOwner: formText(full.recommendation_outcome_acceptance_owner),
-        acceptedAt: formText(full.recommendation_outcome_accepted_at),
-        acceptanceEvidence: formJson(full.recommendation_outcome_acceptance_evidence),
+        acceptedAt: toLocalDateTimeValue(full.recommendation_outcome_accepted_at),
+        acceptanceEvidence: formBusinessEvidence(full.recommendation_outcome_acceptance_evidence, locale, ui),
         correctiveActionStatus: formText(full.recommendation_outcome_corrective_action_status),
         correctiveActionOwner: formText(full.recommendation_outcome_corrective_action_owner),
-        correctiveActionDueAt: formText(full.recommendation_outcome_corrective_action_due_at),
-        correctiveActionResolvedAt: formText(full.recommendation_outcome_corrective_action_resolved_at),
-        correctiveActionEvidence: formJson(full.recommendation_outcome_corrective_action_evidence),
+        correctiveActionDueAt: toLocalDateTimeValue(full.recommendation_outcome_corrective_action_due_at),
+        correctiveActionResolvedAt: toLocalDateTimeValue(full.recommendation_outcome_corrective_action_resolved_at),
+        correctiveActionEvidence: formBusinessEvidence(full.recommendation_outcome_corrective_action_evidence, locale, ui),
         learningSignal: formText(full.recommendation_outcome_learning_signal),
         learningSignalReason: formText(full.recommendation_outcome_learning_signal_reason),
         learningSignalNextAction: formText(full.recommendation_outcome_recommended_next_action),
-        learningSignalEvidence: formJson(full.recommendation_outcome_learning_signal_evidence),
+        learningSignalEvidence: formBusinessEvidence(full.recommendation_outcome_learning_signal_evidence, locale, ui),
         learningActionStatus: formText(full.recommendation_outcome_learning_action_status),
         learningActionOwner: formText(full.recommendation_outcome_learning_action_owner),
-        learningActionDueAt: formText(full.recommendation_outcome_learning_action_due_at),
-        learningActionCompletedAt: formText(full.recommendation_outcome_learning_action_completed_at),
-        learningActionEvidence: formJson(full.recommendation_outcome_learning_action_evidence)
+        learningActionDueAt: toLocalDateTimeValue(full.recommendation_outcome_learning_action_due_at),
+        learningActionCompletedAt: toLocalDateTimeValue(full.recommendation_outcome_learning_action_completed_at),
+        learningActionEvidence: formBusinessEvidence(full.recommendation_outcome_learning_action_evidence, locale, ui)
       });
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setMessage(ui('Editing an existing feedback record. Saving will update that record instead of creating a duplicate.'));
@@ -5628,8 +5813,8 @@ export default function DecisionLearningFeedbackPage() {
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">{ui('Outcome review reason JSON')}</span>
-              <textarea className="input" value={form.outcomeReviewReason} onChange={(event) => updateForm('outcomeReviewReason', event.target.value)} placeholder='{"reason":"negative stock impact"}' rows={2} />
+              <span className="form-label">{ui('Outcome review reason')}</span>
+              <textarea className="input" value={form.outcomeReviewReason} onChange={(event) => updateForm('outcomeReviewReason', event.target.value)} placeholder={ui('Explain why the outcome needs review.')} rows={2} />
             </label>
           </div>
 
@@ -5671,8 +5856,8 @@ export default function DecisionLearningFeedbackPage() {
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">{ui('Business impact evidence JSON')}</span>
-              <textarea className="input" value={form.businessImpactEvidence} onChange={(event) => updateForm('businessImpactEvidence', event.target.value)} placeholder='{"evidence":"stockout avoided after reorder recommendation"}' rows={2} />
+              <span className="form-label">{ui('Business impact evidence')}</span>
+              <textarea className="input" value={form.businessImpactEvidence} onChange={(event) => updateForm('businessImpactEvidence', event.target.value)} placeholder={ui('Describe the business evidence that supports this impact.')} rows={2} />
             </label>
           </div>
 
@@ -5719,8 +5904,8 @@ export default function DecisionLearningFeedbackPage() {
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">{ui('Target evidence JSON')}</span>
-              <textarea className="input" value={form.targetEvidence} onChange={(event) => updateForm('targetEvidence', event.target.value)} placeholder='{"metric":"stockout days","baseline":3,"target":0,"actual":0}' rows={2} />
+              <span className="form-label">{ui('Target evidence')}</span>
+              <textarea className="input" value={form.targetEvidence} onChange={(event) => updateForm('targetEvidence', event.target.value)} placeholder={ui('Describe the evidence used to judge whether the target was met.')} rows={2} />
             </label>
           </div>
 
@@ -5740,12 +5925,12 @@ export default function DecisionLearningFeedbackPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
-              <span className="form-label">{ui('Counterfactual reference JSON')}</span>
-              <textarea className="input" value={form.counterfactualReference} onChange={(event) => updateForm('counterfactualReference', event.target.value)} placeholder='{"baseline_period":"previous 30 days","comparison":"similar item"}' rows={2} />
+              <span className="form-label">{ui('Counterfactual comparison')}</span>
+              <textarea className="input" value={form.counterfactualReference} onChange={(event) => updateForm('counterfactualReference', event.target.value)} placeholder={ui('Describe the comparison used to estimate what would have happened otherwise.')} rows={2} />
             </label>
             <label>
-              <span className="form-label">{ui('Attribution evidence JSON')}</span>
-              <textarea className="input" value={form.attributionEvidence} onChange={(event) => updateForm('attributionEvidence', event.target.value)} placeholder='{"why_attributed":"stockout rate dropped after approved min-stock change"}' rows={2} />
+              <span className="form-label">{ui('Attribution evidence')}</span>
+              <textarea className="input" value={form.attributionEvidence} onChange={(event) => updateForm('attributionEvidence', event.target.value)} placeholder={ui('Explain why this result is attributed to the recommendation.')} rows={2} />
             </label>
           </div>
 
@@ -5774,8 +5959,8 @@ export default function DecisionLearningFeedbackPage() {
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">{ui('Measurement quality evidence JSON')}</span>
-              <textarea className="input" value={form.measurementQualityEvidence} onChange={(event) => updateForm('measurementQualityEvidence', event.target.value)} placeholder='{"source":"stock movement report","reviewed_by":"manager"}' rows={2} />
+              <span className="form-label">{ui('Measurement quality evidence')}</span>
+              <textarea className="input" value={form.measurementQualityEvidence} onChange={(event) => updateForm('measurementQualityEvidence', event.target.value)} placeholder={ui('Describe the source and why the measurement is trustworthy.')} rows={2} />
             </label>
           </div>
 
@@ -5786,7 +5971,7 @@ export default function DecisionLearningFeedbackPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
             <label>
               <span className="form-label">{ui('Evaluation due at')}</span>
-              <input className="input" value={form.evaluationDueAt} onChange={(event) => updateForm('evaluationDueAt', event.target.value)} placeholder={ui('ISO timestamp')} />
+              <input className="input" type="datetime-local" value={form.evaluationDueAt} onChange={(event) => updateForm('evaluationDueAt', event.target.value)} />
             </label>
             <label>
               <span className="form-label">{ui('Evaluation status')}</span>
@@ -5803,8 +5988,8 @@ export default function DecisionLearningFeedbackPage() {
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">{ui('Evaluation SLA evidence JSON')}</span>
-              <textarea className="input" value={form.evaluationEvidence} onChange={(event) => updateForm('evaluationEvidence', event.target.value)} placeholder='{"measurement_due_policy":"30 days after execution"}' rows={2} />
+              <span className="form-label">{ui('Evaluation evidence')}</span>
+              <textarea className="input" value={form.evaluationEvidence} onChange={(event) => updateForm('evaluationEvidence', event.target.value)} placeholder={ui('Describe the evidence supporting the evaluation timing or status.')} rows={2} />
             </label>
           </div>
 
@@ -5822,14 +6007,14 @@ export default function DecisionLearningFeedbackPage() {
             </label>
             <label>
               <span className="form-label">{ui('Accepted at')}</span>
-              <input className="input" value={form.acceptedAt} onChange={(event) => updateForm('acceptedAt', event.target.value)} placeholder={ui('ISO timestamp')} />
+              <input className="input" type="datetime-local" value={form.acceptedAt} onChange={(event) => updateForm('acceptedAt', event.target.value)} />
             </label>
           </div>
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">{ui('Outcome acceptance evidence JSON')}</span>
-              <textarea className="input" value={form.acceptanceEvidence} onChange={(event) => updateForm('acceptanceEvidence', event.target.value)} placeholder='{"accepted_by":"commercial owner","reason":"complete lifecycle and measured impact evidence reviewed"}' rows={2} />
+              <span className="form-label">{ui('Outcome acceptance evidence')}</span>
+              <textarea className="input" value={form.acceptanceEvidence} onChange={(event) => updateForm('acceptanceEvidence', event.target.value)} placeholder={ui('Explain why the outcome was accepted, rejected, or deferred.')} rows={2} />
             </label>
           </div>
 
@@ -5847,18 +6032,18 @@ export default function DecisionLearningFeedbackPage() {
             </label>
             <label>
               <span className="form-label">{ui('Corrective due at')}</span>
-              <input className="input" value={form.correctiveActionDueAt} onChange={(event) => updateForm('correctiveActionDueAt', event.target.value)} placeholder={ui('ISO timestamp')} />
+              <input className="input" type="datetime-local" value={form.correctiveActionDueAt} onChange={(event) => updateForm('correctiveActionDueAt', event.target.value)} />
             </label>
             <label>
               <span className="form-label">{ui('Corrective resolved at')}</span>
-              <input className="input" value={form.correctiveActionResolvedAt} onChange={(event) => updateForm('correctiveActionResolvedAt', event.target.value)} placeholder={ui('ISO timestamp')} />
+              <input className="input" type="datetime-local" value={form.correctiveActionResolvedAt} onChange={(event) => updateForm('correctiveActionResolvedAt', event.target.value)} />
             </label>
           </div>
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">{ui('Corrective action evidence JSON')}</span>
-              <textarea className="input" value={form.correctiveActionEvidence} onChange={(event) => updateForm('correctiveActionEvidence', event.target.value)} placeholder='{"corrective_action":"supplier threshold adjusted after missed target","resolution":"reviewed and waived/resolved"}' rows={2} />
+              <span className="form-label">{ui('Corrective action evidence')}</span>
+              <textarea className="input" value={form.correctiveActionEvidence} onChange={(event) => updateForm('correctiveActionEvidence', event.target.value)} placeholder={ui('Describe the corrective action and the evidence that it was resolved or waived.')} rows={2} />
             </label>
           </div>
 
@@ -5882,8 +6067,8 @@ export default function DecisionLearningFeedbackPage() {
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">{ui('Learning signal evidence JSON')}</span>
-              <textarea className="input" value={form.learningSignalEvidence} onChange={(event) => updateForm('learningSignalEvidence', event.target.value)} placeholder='{"signal_basis":"measured outcome converted into future manual recommendation guidance"}' rows={2} />
+              <span className="form-label">{ui('Learning signal evidence')}</span>
+              <textarea className="input" value={form.learningSignalEvidence} onChange={(event) => updateForm('learningSignalEvidence', event.target.value)} placeholder={ui('Describe the evidence behind this learning signal.')} rows={2} />
             </label>
           </div>
 
@@ -5901,18 +6086,18 @@ export default function DecisionLearningFeedbackPage() {
             </label>
             <label>
               <span className="form-label">{ui('Learning action due at')}</span>
-              <input className="input" value={form.learningActionDueAt} onChange={(event) => updateForm('learningActionDueAt', event.target.value)} placeholder={ui('ISO timestamp')} />
+              <input className="input" type="datetime-local" value={form.learningActionDueAt} onChange={(event) => updateForm('learningActionDueAt', event.target.value)} />
             </label>
             <label>
               <span className="form-label">{ui('Learning action completed at')}</span>
-              <input className="input" value={form.learningActionCompletedAt} onChange={(event) => updateForm('learningActionCompletedAt', event.target.value)} placeholder={ui('ISO timestamp')} />
+              <input className="input" type="datetime-local" value={form.learningActionCompletedAt} onChange={(event) => updateForm('learningActionCompletedAt', event.target.value)} />
             </label>
           </div>
 
           <div style={{ marginTop: 12 }}>
             <label>
-              <span className="form-label">{ui('Learning action evidence JSON')}</span>
-              <textarea className="input" value={form.learningActionEvidence} onChange={(event) => updateForm('learningActionEvidence', event.target.value)} placeholder='{"manual_follow_up":"threshold review completed or waived with owner evidence"}' rows={2} />
+              <span className="form-label">{ui('Learning action evidence')}</span>
+              <textarea className="input" value={form.learningActionEvidence} onChange={(event) => updateForm('learningActionEvidence', event.target.value)} placeholder={ui('Describe the evidence that the learning follow-up was completed or waived.')} rows={2} />
             </label>
           </div>
 
@@ -5926,33 +6111,35 @@ export default function DecisionLearningFeedbackPage() {
             </label>
             <label>
               <span className="form-label">{ui('Generated at')}</span>
-              <input className="input" value={form.generatedAt} onChange={(event) => updateForm('generatedAt', event.target.value)} placeholder={ui('ISO timestamp')} />
+              <input className="input" type="datetime-local" value={form.generatedAt} onChange={(event) => updateForm('generatedAt', event.target.value)} />
             </label>
             <label>
               <span className="form-label">{ui('Approved at')}</span>
-              <input className="input" value={form.approvedAt} onChange={(event) => updateForm('approvedAt', event.target.value)} placeholder={ui('ISO timestamp')} />
+              <input className="input" type="datetime-local" value={form.approvedAt} onChange={(event) => updateForm('approvedAt', event.target.value)} />
             </label>
             <label>
               <span className="form-label">{ui('Executed at')}</span>
-              <input className="input" value={form.executedAt} onChange={(event) => updateForm('executedAt', event.target.value)} placeholder={ui('ISO timestamp')} />
+              <input className="input" type="datetime-local" value={form.executedAt} onChange={(event) => updateForm('executedAt', event.target.value)} />
             </label>
             <label>
               <span className="form-label">{ui('Measured at')}</span>
-              <input className="input" value={form.measuredAt} onChange={(event) => updateForm('measuredAt', event.target.value)} placeholder={ui('ISO timestamp')} />
+              <input className="input" type="datetime-local" value={form.measuredAt} onChange={(event) => updateForm('measuredAt', event.target.value)} />
             </label>
             <label>
               <span className="form-label">{ui('Scored at')}</span>
-              <input className="input" value={form.scoredAt} onChange={(event) => updateForm('scoredAt', event.target.value)} placeholder={ui('ISO timestamp')} />
+              <input className="input" type="datetime-local" value={form.scoredAt} onChange={(event) => updateForm('scoredAt', event.target.value)} />
             </label>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 12 }}>
+            {canViewDiagnostics ? (
+              <label>
+                <span className="form-label">{ui('Technical execution reference')}</span>
+                <textarea className="input" rows={3} value={form.executionReference} onChange={(event) => updateForm('executionReference', event.target.value)} placeholder='{"execution_request_id":"..."}' />
+              </label>
+            ) : null}
             <label>
-              <span className="form-label">{ui('Execution reference JSON or note')}</span>
-              <textarea className="input" rows={3} value={form.executionReference} onChange={(event) => updateForm('executionReference', event.target.value)} placeholder='{"execution_request_id":"..."}' />
-            </label>
-            <label>
-              <span className="form-label">{ui('Lifecycle evidence JSON or note')}</span>
-              <textarea className="input" rows={3} value={form.lifecycleEvidence} onChange={(event) => updateForm('lifecycleEvidence', event.target.value)} placeholder='{"reviewer":"manager","evidence":"approved and executed"}' />
+              <span className="form-label">{ui('Lifecycle evidence')}</span>
+              <textarea className="input" rows={3} value={form.lifecycleEvidence} onChange={(event) => updateForm('lifecycleEvidence', event.target.value)} placeholder={ui('Describe the lifecycle evidence in ordinary business language.')} />
             </label>
           </div>
             </div>
@@ -6019,7 +6206,7 @@ export default function DecisionLearningFeedbackPage() {
             </p>
           </section>
 
-          {selectedEvidenceDetail ? <EvidenceDetailCard detail={selectedEvidenceDetail} canCreateFollowUp={canCreateExecutionRequests} creatingFollowUp={followUpMutation.isPending} onClose={() => { setSelectedEvidenceDetail(null); setSelectedEvidenceMode(null); }} onCreateFollowUp={createEvidenceFollowUp} /> : null}
+          {selectedEvidenceDetail ? <EvidenceDetailCard detail={selectedEvidenceDetail} canCreateFollowUp={canCreateExecutionRequests} canViewDiagnostics={canViewDiagnostics} creatingFollowUp={followUpMutation.isPending} onClose={() => { setSelectedEvidenceDetail(null); setSelectedEvidenceMode(null); }} onCreateFollowUp={createEvidenceFollowUp} /> : null}
 
           <section className="card learning-feedback-section learning-feedback-history-filters">
             <div className="card__header"><div><h2>{ui('Find recorded feedback')}</h2><p className="card__subtext">{ui('Search and filter the full feedback history, not only the rows currently visible on this page.')}</p></div></div>

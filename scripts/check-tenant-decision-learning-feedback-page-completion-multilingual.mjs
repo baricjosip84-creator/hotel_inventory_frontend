@@ -144,11 +144,12 @@ for (const required of [
   'source_reference: reference',
   'recommendation_key: form.recommendationKey || undefined',
   'recommendation_outcome_learning_signal: form.learningSignal || undefined',
-  'recommendation_outcome_learning_action_evidence: optionalJsonObject(form.learningActionEvidence, editing)',
+  'recommendation_outcome_learning_action_evidence: businessEvidenceObject(form.learningActionEvidence, editing, snapshots.learningActionEvidence)',
   "placeholder='\u007b\"source\":\"recommendation-review\"\u007d'",
   "placeholder='\u007b\"execution_request_id\":\"...\"\u007d'"
 ]) if (!pageSource.includes(required)) fail(`Canonical payload/technical-example boundary changed unexpectedly: ${required}`);
-if (!process.exitCode) pass('Feedback POST/governance/payload contract and technical JSON examples remain canonical.');
+if (!pageSource.includes('{canViewDiagnostics ? (') || !pageSource.includes('Technical execution reference')) fail('Technical JSON editors must remain inside the diagnostics-only Learning Feedback boundary.');
+if (!process.exitCode) pass('Feedback POST/governance/payload contract remains canonical and technical JSON editors are diagnostics-only.');
 
 if (pageSource.includes('formatTimestamp(')) fail('Legacy locale-agnostic feedback timestamp formatter still remains.');
 else pass('Final feedback evidence timestamps use the locale-aware shared formatter.');

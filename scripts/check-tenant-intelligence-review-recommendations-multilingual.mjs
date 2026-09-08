@@ -73,7 +73,7 @@ if (pageSource.includes('date.toLocaleString()')) fail('Intelligence Review must
 if (!process.exitCode) pass('Recommendation timestamps, confidence percentages, versions, and shared KPI counts use the selected application locale.');
 
 const recommendationStart = pageSource.indexOf('<span>{ui("Recommendation review controls")}</span>');
-const recommendationEnd = pageSource.indexOf("{activeView === 'readiness' ? (", recommendationStart);
+const recommendationEnd = pageSource.indexOf("{activeView === 'readiness' && canViewDiagnostics ? (", recommendationStart);
 if (recommendationStart < 0 || recommendationEnd < 0) {
   fail('Could not isolate the localized Recommendation Reviews workflow for regression checks.');
 } else {
