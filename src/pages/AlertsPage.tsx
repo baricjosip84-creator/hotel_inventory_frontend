@@ -4,9 +4,15 @@ import { Link, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
-import { formatLocalizedDateTime } from '../i18n/formatters';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
-import { formatAlertMessage, formatAlertTypeLabel } from '../lib/alertPresentation';
+import {
+  formatAlertMessage,
+  formatAlertResolutionNote,
+  formatAlertTypeLabel,
+  isAutomaticallyResolvedAlert,
+  isCurrentStateSystemAlert
+} from '../lib/alertPresentation';
 import './OperationalExperiencePages.css';
 import './AlertsPage.css';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
@@ -36,6 +42,12 @@ type AlertRow = {
   product_unit?: string | null;
   storage_location_id?: string | null;
   storage_location_name?: string | null;
+  stock_id?: string | null;
+  current_physical_quantity?: number | string | null;
+  current_usable_quantity?: number | string | null;
+  current_min_quantity?: number | string | null;
+  current_shortage_quantity?: number | string | null;
+  current_condition_status?: 'active' | 'recovered' | 'source_unavailable' | null;
   type: string;
   message: string;
   resolved: boolean;
@@ -180,6 +192,13 @@ function formatDateTime(value: string | null | undefined, locale: AppLocale): st
   return formatLocalizedDateTime(value, locale);
 }
 
+function quantityLabel(value: number | string | null | undefined, locale: AppLocale, unit?: string | null): string {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '—';
+  const formatted = formatLocalizedNumber(numeric, locale, { maximumFractionDigits: 4 });
+  return unit ? `${formatted} ${unit}` : formatted;
+}
+
 function severityLabel(severity: AlertSeverity, ui: (englishText: string) => string): string {
   if (severity === 'critical') return ui('Critical');
   if (severity === 'warning') return ui('Warning');
@@ -250,6 +269,10 @@ function nextActionLink(alert: AlertRow): { to: string; label: string } | null {
 
   if (type === 'SYSTEM_HEALTH_DEGRADED_BLOCKING' && hasPermission(TENANT_PERMISSIONS.SYSTEM_STATUS_READ)) {
     return { to: '/admin-system', label: 'Open Admin System' };
+  }
+
+  if (alert.stock_id && hasPermission(TENANT_PERMISSIONS.STOCK_READ)) {
+    return { to: `/stock?stock_id=${encodeURIComponent(alert.stock_id)}`, label: 'Open Stock' };
   }
 
   if (alert.product_id && hasPermission(TENANT_PERMISSIONS.STOCK_READ)) {
@@ -728,6 +751,9 @@ export default function AlertsPage() {
               const isOverriding = overrideMutation.isPending && overrideMutation.variables?.id === alert.id;
               const causesSidebarAttention = !alert.resolved
                 && (canManageAlerts || (canOverrideAlerts && isBlockingAlertType(alert.type)));
+              const isCurrentStateAlert = isCurrentStateSystemAlert(alert);
+              const autoResolved = isAutomaticallyResolvedAlert(alert);
+              const isLowStockAlert = alert.type.trim().toUpperCase() === 'LOW_STOCK';
 
               return (
                 <article
@@ -764,6 +790,35 @@ export default function AlertsPage() {
 
                   <div style={styles.cardText}>{formatAlertMessage(alert, ui)}</div>
 
+                  {isLowStockAlert && !alert.resolved && alert.current_condition_status ? (
+                    <div className={alert.current_condition_status === 'active' ? 'app-warning-state' : 'app-success-state'} style={styles.currentConditionBox}>
+                      <strong>{ui('Current condition')}</strong>
+                      <span>
+                        {alert.current_condition_status === 'active'
+                          ? ui('Still below minimum')
+                          : alert.current_condition_status === 'recovered'
+                            ? ui('Recovered')
+                            : ui('Stock position no longer available')}
+                      </span>
+                      {alert.current_condition_status !== 'source_unavailable' ? (
+                        <div style={styles.currentConditionGrid}>
+                          <span><strong>{ui('Current usable stock')}:</strong> {quantityLabel(alert.current_usable_quantity, locale, alert.product_unit)}</span>
+                          <span><strong>{ui('Minimum required')}:</strong> {quantityLabel(alert.current_min_quantity, locale, alert.product_unit)}</span>
+                          <span><strong>{ui('Shortage')}:</strong> {quantityLabel(alert.current_shortage_quantity, locale, alert.product_unit)}</span>
+                        </div>
+                      ) : null}
+                      {!alert.resolved && alert.current_condition_status === 'active' ? (
+                        <small>{ui('This system alert closes automatically when the stock position recovers to or above its configured minimum.')}</small>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {isCurrentStateAlert && !isLowStockAlert && !alert.resolved ? (
+                    <div className="app-info-state" style={styles.currentConditionBox}>
+                      <span>{ui('This system alert closes automatically when the underlying condition is no longer active.')}</span>
+                    </div>
+                  ) : null}
+
                   <div style={styles.keyGrid}>
                     <div style={styles.keyCard} className="alerts-key-card">
                       <strong style={styles.keyLabel}>{ui('Ownership')}</strong>
@@ -777,7 +832,7 @@ export default function AlertsPage() {
                     </div>
                     <div style={styles.keyCard} className="alerts-key-card">
                       <strong style={styles.keyLabel}>{ui('Resolution')}</strong>
-                      <div style={styles.keyValue}>{alert.resolved ? alert.resolved_by_name || ui('Resolved') : ui('Open')}</div>
+                      <div style={styles.keyValue}>{alert.resolved ? (autoResolved ? ui('Resolved automatically') : alert.resolved_by_name || ui('Resolved')) : ui('Open')}</div>
                       <small style={styles.keyHelp}>{alert.resolved ? formatDateTime(alert.resolved_at, locale) : ui('No resolution recorded.')}</small>
                     </div>
                   </div>
@@ -785,11 +840,11 @@ export default function AlertsPage() {
                   {alert.resolved && alert.resolution_note ? (
                     <div style={styles.resolutionNoteBox}>
                       <strong>{ui('Resolution note')}</strong>
-                      <span>{alert.resolution_note}</span>
+                      <span>{formatAlertResolutionNote(alert, ui)}</span>
                     </div>
                   ) : null}
 
-                  {!alert.resolved && canManageAlerts ? (
+                  {!alert.resolved && canManageAlerts && !isCurrentStateAlert ? (
                     <label style={styles.fieldLabel}>
                       <span>{ui('Resolution note')}</span>
                       <textarea
@@ -819,7 +874,7 @@ export default function AlertsPage() {
                       </button>
                     ) : null}
 
-                    {canManageAlerts && !alert.resolved ? (
+                    {canManageAlerts && !alert.resolved && !isCurrentStateAlert ? (
                       <button
                         style={styles.primaryButton}
                         onClick={() => resolveMutation.mutate({ id: alert.id, title: alertTitle, resolutionNote })}
@@ -830,7 +885,7 @@ export default function AlertsPage() {
                       </button>
                     ) : null}
 
-                    {canManageAlerts && alert.resolved ? (
+                    {canManageAlerts && alert.resolved && !isCurrentStateAlert ? (
                       <button
                         style={styles.secondaryButton}
                         onClick={() => {
@@ -947,6 +1002,8 @@ const styles: Record<string, CSSProperties> = {
   cardTitle: { fontWeight: 800, fontSize: '1.05rem', color: '#0f172a', wordBreak: 'break-word' },
   cardMeta: { color: '#64748b', fontSize: '0.9rem', marginTop: 4, lineHeight: 1.45, wordBreak: 'break-word' },
   cardText: { color: '#334155', lineHeight: 1.5, wordBreak: 'break-word' },
+  currentConditionBox: { display: 'grid', gap: 8, marginTop: 12 },
+  currentConditionGrid: { display: 'flex', flexWrap: 'wrap', gap: '8px 18px', fontSize: '0.92rem' },
   keyGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10, color: '#334155', minWidth: 0 },
   keyCard: { border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, background: '#f8fafc', minWidth: 0 },
   keyLabel: { display: 'block', marginBottom: 6, color: '#64748b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' },

@@ -76,7 +76,10 @@ const canonicalTypeLabels = [
 ];
 const missingCanonicalLabels = canonicalTypeLabels.filter((key) => !uniqueKeys.has(key));
 if (missingCanonicalLabels.length) fail(`Alerts canonical type display labels are missing translations: ${missingCanonicalLabels.join(' | ')}`);
-if (!alertsSource.includes("import { formatAlertMessage, formatAlertTypeLabel } from '../lib/alertPresentation';")) {
+if (!(alertsSource.includes('formatAlertMessage,')
+  && alertsSource.includes('formatAlertResolutionNote,')
+  && alertsSource.includes('formatAlertTypeLabel,')
+  && alertsSource.includes("from '../lib/alertPresentation';"))) {
   fail('Alerts must use the shared system/custom Alert presentation boundary.');
 } else if (!missingCanonicalLabels.length) {
   pass(`${canonicalTypeLabels.length} backend-reserved Alert types use the shared localized presentation boundary.`);
@@ -129,7 +132,7 @@ if (!process.exitCode) pass('Alerts API routes, canonical filter values, permiss
 const businessDataContracts = [
   '<div style={styles.cardText}>{formatAlertMessage(alert, ui)}</div>',
   "alert.product_name || (alert.product_id ? ui('Linked product unavailable') : ui('No product linked'))",
-  '<span>{alert.resolution_note}</span>'
+  '<span>{formatAlertResolutionNote(alert, ui)}</span>'
 ];
 for (const contract of businessDataContracts) if (!alertsSource.includes(contract)) fail(`Alerts user/business data must remain unmodified at display time: ${contract}`);
 if (!alertsSource.includes("alert.product_name || (alert.product_id ? ui('Linked product unavailable') : ui('No product linked'))")) {
@@ -138,7 +141,8 @@ if (!alertsSource.includes("alert.product_name || (alert.product_id ? ui('Linked
 for (const required of [
   "return systemLabel ? ui(systemLabel) : raw;",
   "if (!SYSTEM_ALERT_TYPE_LABELS[type]) return message;",
-  "return localized ? ui(localized) : message;"
+  "return localized ? ui(localized) : message;",
+  "return isAutomaticallyResolvedAlert(alert) ? ui(note) : note;"
 ]) {
   if (!alertPresentationSource.includes(required)) fail(`Shared Alert system/custom ownership boundary missing: ${required}`);
 }

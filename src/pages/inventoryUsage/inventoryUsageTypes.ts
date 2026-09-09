@@ -637,7 +637,7 @@ export type InventoryUsageTemplateReadinessRow = {
   consumption_reason?: UsageReason | string | null;
   requires_evidence_or_acknowledgement?: boolean | null;
   acknowledgement_required_reasons?: string[];
-  readiness_status: 'ready' | 'missing_stock_row' | 'insufficient_stock' | 'reserved_stock' | 'below_minimum_after_use' | string;
+  readiness_status: 'ready' | 'missing_stock_row' | 'stock_lot_desync' | 'insufficient_stock' | 'insufficient_usable_lot_stock' | 'reserved_stock' | 'below_minimum_after_use' | string;
 };
 
 export type InventoryUsageTemplateReadiness = {
@@ -707,7 +707,7 @@ export type InventoryUsageScheduledTemplateRow = {
   reserved_stock_count?: number | string | null;
   below_minimum_after_use_count?: number | string | null;
   evidence_acknowledgement_required_count?: number | string | null;
-  schedule_status?: 'due' | 'scheduled' | 'ready_with_warnings' | 'missing_stock' | 'insufficient_stock' | 'reserved_stock' | 'missing_evidence_acknowledgement_required' | 'empty' | 'inactive' | string;
+  schedule_status?: 'due' | 'scheduled' | 'ready_with_warnings' | 'missing_stock' | 'stock_lot_desync' | 'insufficient_stock' | 'insufficient_usable_lot_stock' | 'reserved_stock' | 'missing_evidence_acknowledgement_required' | 'empty' | 'inactive' | string;
 };
 
 export type InventoryUsageScheduledTemplates = {

@@ -3,6 +3,7 @@ export type UiTranslator = (englishText: string) => string;
 export type AlertPresentationRecord = {
   type?: string | null;
   message?: string | null;
+  resolution_note?: string | null;
 };
 
 const SYSTEM_ALERT_TYPE_LABELS: Readonly<Record<string, string>> = Object.freeze({
@@ -23,6 +24,33 @@ const SYSTEM_ALERT_TYPE_LABELS: Readonly<Record<string, string>> = Object.freeze
   SYSTEM_HEALTH_DEGRADED_BLOCKING: 'System health degraded'
 });
 
+const AUTO_RESOLUTION_NOTES: Readonly<Record<string, string>> = Object.freeze({
+  LOW_STOCK: 'Automatically resolved: stock recovered to or above the configured location minimum.',
+  EXPIRED_STOCK: 'Automatically resolved: no available expired stock remains for this product.',
+  EXPIRING_STOCK: 'Automatically resolved: no available stock for this product remains inside the 7-day expiry window.',
+  STOCK_LEDGER_DESYNC_BLOCKING: 'Automatically resolved: the stored stock balance and movement ledger are reconciled again.',
+  STOCK_LOT_DESYNC_BLOCKING: 'Automatically resolved: the aggregate stock balance and available lot balance are reconciled again.',
+  FINALIZED_SHIPMENT_INCOMPLETE_BLOCKING: 'Automatically resolved: no finalized shipment remains with an undocumented receiving shortage.',
+  ORPHANED_SHIPMENT_ITEM_BLOCKING: 'Automatically resolved: no shipment item remains without its required parent shipment relationship.',
+  SYSTEM_HEALTH_DEGRADED_BLOCKING: 'Automatically resolved: the tenant application-integrity health evidence is no longer degraded.'
+});
+
+const LEGACY_LOW_STOCK_RESOLUTION_NOTE = 'Automatically resolved: legacy product-level Low Stock tracking was replaced by exact location-based tracking.';
+const LOW_STOCK_SOURCE_UNAVAILABLE_RESOLUTION_NOTE = 'Automatically resolved: the tracked stock position is no longer active or available.';
+const LOW_STOCK_THRESHOLD_INACTIVE_RESOLUTION_NOTE = 'Automatically resolved: this stock position no longer has an active minimum threshold.';
+const NEGATIVE_STOCK_INTEGRITY_MESSAGE = 'Stock quantity is negative (integrity sweep)';
+const NEGATIVE_STOCK_INTEGRITY_RESOLUTION_NOTE = 'Automatically resolved: the exact stock position is no longer negative.';
+const OVER_RECEIVED_INTEGRITY_MESSAGE = 'Received quantity exceeds ordered quantity (integrity sweep)';
+const OVER_RECEIVED_INTEGRITY_RESOLUTION_NOTE = 'Automatically resolved: no active shipment line for this product remains over-received.';
+const SPECIAL_AUTO_RESOLUTION_NOTES: ReadonlyMap<string, string> = new Map([
+  [LEGACY_LOW_STOCK_RESOLUTION_NOTE, 'LOW_STOCK'],
+  [LOW_STOCK_SOURCE_UNAVAILABLE_RESOLUTION_NOTE, 'LOW_STOCK'],
+  [LOW_STOCK_THRESHOLD_INACTIVE_RESOLUTION_NOTE, 'LOW_STOCK'],
+  [NEGATIVE_STOCK_INTEGRITY_RESOLUTION_NOTE, 'NEGATIVE_STOCK_BLOCKING'],
+  [OVER_RECEIVED_INTEGRITY_RESOLUTION_NOTE, 'OVER_RECEIVED_BLOCKING']
+]);
+
+
 function normalizedType(value: string | null | undefined): string {
   return String(value || '').trim().toUpperCase();
 }
@@ -40,6 +68,35 @@ export function formatAlertTypeLabel(
   if (!raw) return ui(fallback);
   const systemLabel = SYSTEM_ALERT_TYPE_LABELS[normalizedType(raw)];
   return systemLabel ? ui(systemLabel) : raw;
+}
+
+export function isCurrentStateSystemAlertType(value: string | null | undefined): boolean {
+  return Boolean(AUTO_RESOLUTION_NOTES[normalizedType(value)]);
+}
+
+export function isCurrentStateSystemAlert(alert: AlertPresentationRecord): boolean {
+  const type = normalizedType(alert.type);
+  const message = String(alert.message || '').trim();
+  if (isCurrentStateSystemAlertType(type)) return true;
+  if (type === 'NEGATIVE_STOCK_BLOCKING' && message === NEGATIVE_STOCK_INTEGRITY_MESSAGE) return true;
+  if (type === 'OVER_RECEIVED_BLOCKING' && message === OVER_RECEIVED_INTEGRITY_MESSAGE) return true;
+  return false;
+}
+
+export function isAutomaticallyResolvedAlert(alert: AlertPresentationRecord): boolean {
+  const type = normalizedType(alert.type);
+  const note = String(alert.resolution_note || '').trim();
+  const expectedNote = AUTO_RESOLUTION_NOTES[type];
+  return (Boolean(expectedNote) && note === expectedNote) || SPECIAL_AUTO_RESOLUTION_NOTES.get(note) === type;
+}
+
+export function formatAlertResolutionNote(
+  alert: AlertPresentationRecord,
+  ui: UiTranslator
+): string {
+  const note = String(alert.resolution_note || '').trim();
+  if (!note) return '';
+  return isAutomaticallyResolvedAlert(alert) ? ui(note) : note;
 }
 
 function fill(template: string, replacements: Record<string, string>): string {

@@ -1109,7 +1109,7 @@ export function InventoryUsageDashboard({
                       <th style={styles.th}>{ui("Product")}</th>
                       <th style={styles.th}>{ui("Location")}</th>
                       <th style={styles.th}>{ui("Used")}</th>
-                      <th style={styles.th}>{ui("Current")}</th>
+                      <th style={styles.th}>{ui("Current usable stock")}</th>
                       <th style={styles.th}>{ui("Minimum")}</th>
                       <th style={styles.th}>{ui("Avg/day")}</th>
                       <th style={styles.th}>{ui("Coverage")}</th>

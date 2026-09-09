@@ -55,7 +55,7 @@ const SYSTEM_CONTEXT_OWNED_TEXT = new Set([
   'Critical unresolved alerts exist for this tenant.',
   'Some stocked products still have no received or standard cost.',
   'Products with material received-vs-standard cost variance exist.',
-  'Products at or below minimum stock exist.',
+  'Products are below a product-level reorder minimum or an active location minimum.',
   'Review critical alerts',
   'Open the alerts queue and resolve or acknowledge critical tenant alerts before automation consumes this context.',
   'Review low stock thresholds',

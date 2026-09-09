@@ -879,7 +879,14 @@ export default function StockPage() {
       queryClient.invalidateQueries({ queryKey: ['stock'] }),
       queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
       queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
-      queryClient.invalidateQueries({ queryKey: ['stock-movements'] })
+      queryClient.invalidateQueries({ queryKey: ['stock-movements'] }),
+      queryClient.invalidateQueries({ queryKey: ['alerts'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard-unresolved-alerts'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }),
+      queryClient.invalidateQueries({ queryKey: ['operational-action-center'] }),
+      queryClient.invalidateQueries({ queryKey: ['tenant-sidebar', 'operational-navigation-attention'] }),
+      queryClient.invalidateQueries({ queryKey: ['admin-system', 'system-status'] }),
+      queryClient.invalidateQueries({ queryKey: ['enterprise-system-status'] })
     ]);
   };
 
@@ -1538,14 +1545,8 @@ export default function StockPage() {
           canImport={canAdjust}
           disabledReason={ui("Stock-adjust permission is required for opening-stock import.")}
           onCommitted={async () => {
-            await Promise.all([
-              queryClient.invalidateQueries({ queryKey: ['stock'] }),
-              queryClient.invalidateQueries({ queryKey: ['inventory-lots'] }),
-              queryClient.invalidateQueries({ queryKey: ['stock-reconciliation'] }),
-              queryClient.invalidateQueries({ queryKey: ['stock-movements'] }),
-              queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }),
-              queryClient.invalidateQueries({ queryKey: ['products'] })
-            ]);
+            await invalidateStockOperationalQueries();
+            await queryClient.invalidateQueries({ queryKey: ['products'] });
           }}
         />
       ) : null}
