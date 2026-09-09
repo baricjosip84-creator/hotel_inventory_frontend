@@ -179,7 +179,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/system-context',
         label: 'System Context',
-        description: 'Read-only overview of what the system knows, what needs attention, and how safe the data is for planning.',
+        description: 'Read-only operational analysis with permission-controlled planning history and governed review-request handoffs.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.SYSTEM_CONTEXT_READ
       }

@@ -384,12 +384,12 @@ export default function ReliabilityCommandPage() {
       .map((dimension) => [String(dimension.key), systemText(dimension.label, systemOwned, ui, 'Reliability dimension')])
   );
   const unassessedDimensionCount = Number(overview.unassessed_dimension_count || 0);
-  const activeFilterCount = Number(readiness !== 'watch') + Number(severity !== 'all') + Number(limit !== '25');
+  const activeFilterCount = Number(readiness !== 'watch') + Number(severity !== 'all') + Number(limit !== '9');
 
   const clearFilters = () => {
     setReadiness('watch');
     setSeverity('all');
-    setLimit('25');
+    setLimit('9');
   };
 
   return (

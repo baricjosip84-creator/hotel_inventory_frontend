@@ -106,14 +106,18 @@ for (const contract of routerContract) if (!routerSource.includes(contract)) fai
 if (!process.exitCode) pass('Action Center route, query filters, permissions, and read-only backend endpoint remain language-independent.');
 
 const serverContentContracts = [
-  '{actionTitleLabel(action)}',
-  "{action.summary || ui('No summary provided.')}",
+  '{actionTitleLabel(action, ui)}',
+  '{actionSummaryLabel(action, ui)}',
   '{actionRecommendedNextStep(action, ui)}',
+  'return action.title_key ? ui(title) : title;',
+  'return action.summary_key ? ui(summary) : summary;',
   'return action.recommended_next_step_key ? ui(text) : text;'
 ];
 for (const contract of serverContentContracts) if (!pageSource.includes(contract)) fail(`Action Center backend-returned content display contract changed: ${contract}`);
 const forbiddenServerContentTranslation = ['ui(action.title)', 'ui(action.summary)', 'ui(action.recommended_next_step)'];
 for (const pattern of forbiddenServerContentTranslation) if (pageSource.includes(pattern)) fail(`Backend-returned Action Center human content must not be blindly translated as a UI key: ${pattern}`);
-if (!process.exitCode) pass('Backend-returned titles/summaries and source-owned guidance remain untouched, while keyed system guidance uses the tenant translation catalog.');
+if (!pageSource.includes("const params = new URLSearchParams({ alert_id: action.source_id });")) fail('Action Center must open the exact Alert record when source_id is available.');
+if (/action\.action_domain === 'alerts'[\s\S]{0,500}params\.set\('search'/.test(pageSource)) fail('Action Center must not fall back to approximate Alert text search.');
+if (!process.exitCode) pass('Backend-returned tenant/business titles and summaries remain verbatim, keyed system text uses the tenant catalog, and Alerts use exact-record handoff.');
 
 if (!process.exitCode) console.log('Tenant Action Center multilingual hardening: PASS');

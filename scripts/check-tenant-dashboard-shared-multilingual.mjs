@@ -8,6 +8,7 @@ const pass = (message) => console.log(`PASS: ${message}`);
 
 const translations = read('src/i18n/tenantUiTranslations.ts');
 const dashboard = read('src/pages/DashboardPage.tsx');
+const alertPresentation = read('src/lib/alertPresentation.ts');
 const protectedRoute = read('src/components/ProtectedRoute.tsx');
 const copyright = read('src/components/CopyrightNotice.tsx');
 const errorFallback = read('src/components/ApplicationErrorFallback.tsx');
@@ -51,5 +52,18 @@ const inventoryTabLabelIsLocalized =
   /label=\{\s*<span\b[\s\S]*?\{ui\(label\)\}[\s\S]*?<\/span>\s*\}/m.test(inventoryTabs);
 if (!inventoryTabLabelIsLocalized) fail('Specialized-inventory tab labels must be localized at display time.');
 else pass('Reusable specialized-inventory workspace primitives are localization-aware.');
+
+
+for (const required of [
+  "import { formatAlertMessage, formatAlertTypeLabel } from '../lib/alertPresentation';",
+  'formatAlertTypeLabel(alert.type, ui)',
+  'formatAlertMessage(alert, ui)',
+  '`/alerts?alert_id=${encodeURIComponent(alert.id)}`',
+  '`/suppliers?supplier_id=${encodeURIComponent(row.supplier_id)}`'
+]) {
+  if (!dashboard.includes(required)) fail(`Dashboard exact-record/Alert presentation contract missing: ${required}`);
+}
+if (!alertPresentation.includes('return systemLabel ? ui(systemLabel) : raw;')) fail('Dashboard shared Alert helper must preserve unknown/manual Alert types verbatim.');
+if (!process.exitCode) pass('Dashboard Alerts and Supplier handoffs use exact IDs and the shared system/custom Alert presentation boundary.');
 
 if (!process.exitCode) console.log('Tenant dashboard/shared multilingual hardening: PASS');

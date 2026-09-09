@@ -156,7 +156,7 @@ type RunDetail = {
 };
 
 type OptimizationSummary = {
-  filters?: Partial<OptimizationFilterState> & { review_run_id?: string; limit?: number };
+  filters?: Omit<Partial<OptimizationFilterState>, 'limit'> & { review_run_id?: string; limit?: number };
   governance?: Record<string, unknown>;
   review_scope?: {
     review_run_required?: boolean;
@@ -278,13 +278,13 @@ function numeric(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function formatPercentage(value: unknown, locale: string): string {
+function formatPercentage(value: unknown, locale: AppLocale): string {
   const parsed = numeric(value);
   if (parsed === null) return '—';
   return `${formatLocalizedNumber(parsed * 100, locale, { maximumFractionDigits: 1 })}%`;
 }
 
-function formatDate(value: unknown, locale: string): string {
+function formatDate(value: unknown, locale: AppLocale): string {
   return typeof value === 'string' && value ? formatLocalizedDateTime(value, locale) : '—';
 }
 

@@ -29,7 +29,9 @@ type OperationalAction = {
   urgency: ActionUrgency | string;
   priority_score?: number | string | null;
   title: string;
+  title_key?: string | null;
   summary?: string | null;
+  summary_key?: string | null;
   source_type?: string | null;
   source_id?: string | null;
   recommended_next_step?: string | null;
@@ -388,12 +390,16 @@ function executionModeLabel(value: string | null | undefined, ui: (englishText: 
   return canonicalLabel(value, ui);
 }
 
-function actionTitleLabel(action: OperationalAction): string {
-  const title = formatLabel(action.title);
-  if (action.action_domain === 'alerts' && title === title.toUpperCase()) {
-    return title.toLowerCase().replace(/\b\w/g, (character) => character.toUpperCase());
-  }
-  return title;
+function actionTitleLabel(action: OperationalAction, ui: (englishText: string) => string): string {
+  const title = String(action.title || '').trim();
+  if (!title) return ui('Action');
+  return action.title_key ? ui(title) : title;
+}
+
+function actionSummaryLabel(action: OperationalAction, ui: (englishText: string) => string): string {
+  const summary = String(action.summary || '').trim();
+  if (!summary) return ui('No summary provided.');
+  return action.summary_key ? ui(summary) : summary;
 }
 
 function actionDomainIconPath(domain?: string | null): string {
@@ -444,10 +450,11 @@ type SourceActionLink = { to: string; label: string };
 
 function sourceActionLink(action: OperationalAction): SourceActionLink | null {
   if (action.action_domain === 'alerts') {
-    const params = new URLSearchParams({ resolved: 'false' });
-    const search = String(action.summary || action.title || '').trim();
-    if (search) params.set('search', search);
-    return { to: `/alerts?${params.toString()}`, label: 'Open alert workflow' };
+    if (action.source_id) {
+      const params = new URLSearchParams({ alert_id: action.source_id });
+      return { to: `/alerts?${params.toString()}`, label: 'Open alert workflow' };
+    }
+    return { to: '/alerts', label: 'Open alert workflow' };
   }
 
   if (action.action_domain === 'execution' && action.source_id) {
@@ -697,8 +704,8 @@ export default function OperationalActionCenterPage() {
                       <div className="action-center-action-lead">
                         <span className={`action-center-icon ${urgencyToneClass(action.urgency)}`}><TenantNavIcon path={actionDomainIconPath(action.action_domain)} size={17} /></span>
                         <div className="action-center-action-title-copy">
-                          <div className="action-center-action-title">{actionTitleLabel(action)}</div>
-                          <div className="card__subtext">{action.summary || ui('No summary provided.')}</div>
+                          <div className="action-center-action-title">{actionTitleLabel(action, ui)}</div>
+                          <div className="card__subtext">{actionSummaryLabel(action, ui)}</div>
                         </div>
                       </div>
                       <div className="action-center-badge-row">

@@ -6,6 +6,7 @@ import { ApiError, apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
+import { formatAlertMessage, formatAlertTypeLabel } from '../lib/alertPresentation';
 import './OperationalExperiencePages.css';
 import './AlertsPage.css';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
@@ -179,40 +180,6 @@ function formatDateTime(value: string | null | undefined, locale: AppLocale): st
   return formatLocalizedDateTime(value, locale);
 }
 
-const CANONICAL_ALERT_TYPE_LABELS: Readonly<Record<string, string>> = {
-  LOW_STOCK: 'Low stock',
-  NEGATIVE_STOCK: 'Negative stock',
-  NEGATIVE_STOCK_BLOCKING: 'Negative stock',
-  EXPIRED_STOCK: 'Expired stock',
-  EXPIRING_STOCK: 'Expiring stock',
-  FINALIZED_SHIPMENT_INCOMPLETE: 'Finalized shipment incomplete',
-  FINALIZED_SHIPMENT_INCOMPLETE_BLOCKING: 'Finalized shipment incomplete',
-  INVENTORY_USAGE_ANOMALY: 'Inventory usage anomaly',
-  INVENTORY_USAGE_DAMAGE_WASTE: 'Inventory usage damage waste',
-  INVENTORY_USAGE_EXCEPTIONS: 'Inventory usage exceptions',
-  ORPHANED_SHIPMENT_ITEM_BLOCKING: 'Orphaned shipment item',
-  OVER_RECEIVED_BLOCKING: 'Over received',
-  PO_OVER_RECEIVED_BLOCKING: 'Purchase order over received',
-  SHIPMENT_IMMUTABLE_BLOCKING: 'Shipment immutable',
-  STOCK_LEDGER_DESYNC_BLOCKING: 'Stock ledger desync',
-  STOCK_LOT_DESYNC_BLOCKING: 'Stock lot desync',
-  SYSTEM_HEALTH_DEGRADED_BLOCKING: 'System health degraded'
-};
-
-function formatAlertType(value: string | null | undefined, ui: (englishText: string) => string): string {
-  if (!value) return ui('Alert');
-
-  const normalized = value.trim();
-  if (!normalized) return ui('Alert');
-
-  const canonicalLabel = CANONICAL_ALERT_TYPE_LABELS[normalized.toUpperCase()];
-  if (canonicalLabel) return ui(canonicalLabel);
-
-  // Unknown/manual alert types are tenant business data. Preserve them exactly
-  // instead of humanizing or translating user-defined labels.
-  return normalized;
-}
-
 function severityLabel(severity: AlertSeverity, ui: (englishText: string) => string): string {
   if (severity === 'critical') return ui('Critical');
   if (severity === 'warning') return ui('Warning');
@@ -286,7 +253,7 @@ function nextActionLink(alert: AlertRow): { to: string; label: string } | null {
   }
 
   if (alert.product_id && hasPermission(TENANT_PERMISSIONS.STOCK_READ)) {
-    return { to: '/stock', label: 'Open Stock' };
+    return { to: `/stock?product_id=${encodeURIComponent(alert.product_id)}`, label: 'Open Stock' };
   }
 
   if (hasPermission(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ)) {
@@ -751,7 +718,7 @@ export default function AlertsPage() {
           <div style={styles.cardList}>
             {alerts.map((alert) => {
               const next = nextActionLink(alert);
-              const alertTitle = formatAlertType(alert.type, ui);
+              const alertTitle = formatAlertTypeLabel(alert.type, ui);
               const resolutionNote = resolutionNoteByAlertId[alert.id] ?? '';
               const overrideReason = overrideReasonByAlertId[alert.id] ?? '';
               const isAcknowledging = acknowledgeMutation.isPending && acknowledgeMutation.variables?.id === alert.id;
@@ -795,7 +762,7 @@ export default function AlertsPage() {
                     </div>
                   </div>
 
-                  <div style={styles.cardText}>{alert.message}</div>
+                  <div style={styles.cardText}>{formatAlertMessage(alert, ui)}</div>
 
                   <div style={styles.keyGrid}>
                     <div style={styles.keyCard} className="alerts-key-card">

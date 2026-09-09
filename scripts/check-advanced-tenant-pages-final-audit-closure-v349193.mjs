@@ -55,9 +55,9 @@ for (const key of ['Business readiness', 'Technical diagnostics', 'Technical str
   check(Boolean(row) && (row.match(/"/g) || []).length >= 10, `${key} has a complete five-language catalog row`);
 }
 check(pkg.scripts['check:advanced-tenant-pages-final-audit-closure-v349193'] === 'node scripts/check-advanced-tenant-pages-final-audit-closure-v349193.mjs', 'v3.49.193 frontend guard is registered');
-check(pkg.scripts.prelint?.endsWith('npm run check:advanced-tenant-pages-final-audit-closure-v349193'), 'v3.49.193 guard runs before lint');
+check(pkg.scripts.prelint?.includes('npm run check:advanced-tenant-pages-final-audit-closure-v349193 && npm run check:command-wide-operational-closure-v349194'), 'v3.49.193 guard remains immediately before the newer v3.49.194 closure before lint');
 check(pkg.scripts.prebuild?.includes('check:advanced-tenant-pages-final-audit-closure-v349193'), 'v3.49.193 guard runs before build');
-check(pkg.scripts['check:ci']?.endsWith('npm run check:advanced-tenant-pages-final-audit-closure-v349193'), 'v3.49.193 guard closes the frontend CI chain');
+check(pkg.scripts['check:ci']?.endsWith('npm run check:advanced-tenant-pages-final-audit-closure-v349193 && npm run check:command-wide-operational-closure-v349194'), 'v3.49.193 guard is followed only by the newer v3.49.194 closure at the frontend CI tail');
 
 const failures = checks.filter((item) => !item.condition);
 for (const item of checks) console.log(`${item.condition ? 'PASS' : 'FAIL'} - ${item.message}`);

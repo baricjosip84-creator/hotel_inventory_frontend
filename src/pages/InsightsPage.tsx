@@ -202,6 +202,9 @@ type SupplierTrustResponse = {
     trust_tier: string;
     trust_evidence_status?: 'rated' | 'insufficient_history';
     total_shipments: number | string;
+    partial_shipments: number | string;
+    overdue_shipments: number | string;
+    total_discrepancy_quantity: number | string;
     total_purchase_orders: number | string;
     completed_purchase_orders: number | string;
     cancelled_purchase_orders: number | string;
@@ -919,7 +922,7 @@ export default function InsightsPage() {
       nextActions.push({
         title: ui('Operational health needs review'),
         detail: ui('Current tenant health is {tier}. Review low stock, overdue shipments, and unresolved alerts first.').replace('{tier}', formatReadableStatus(healthTier)),
-        route: '/dashboard?panel=operational-health',
+        route: '/dashboard',
         linkLabel: ui('Open Dashboard'),
         tone: healthTier === 'critical' ? 'bad' : 'warn'
       });
@@ -930,7 +933,7 @@ export default function InsightsPage() {
       nextActions.push({
         title: ui('Reorder highest urgency product'),
         detail: ui('{product} currently recommends a reorder quantity of {quantity}.').replace('{product}', reorderTop.product_name).replace('{quantity}', formatNumber(reorderTop.recommended_reorder_quantity)),
-        route: reorderTop ? `/products?search=${encodeURIComponent(reorderTop.product_name)}` : '/products',
+        route: `/products?product_id=${encodeURIComponent(reorderTop.product_id)}`,
         linkLabel: ui('Open Products'),
         tone: reorderTop.urgency === 'critical' ? 'bad' : 'warn'
       });
@@ -941,7 +944,7 @@ export default function InsightsPage() {
       nextActions.push({
         title: ui('Protect depletion-risk stock'),
         detail: ui('{product} at {location} is currently one of the highest depletion-risk rows.').replace('{product}', depletionTop.product_name).replace('{location}', depletionTop.storage_location_name),
-        route: depletionTop ? `/stock?product_id=${encodeURIComponent(depletionTop.product_id)}` : '/stock',
+        route: `/stock?stock_id=${encodeURIComponent(depletionTop.stock_id)}`,
         linkLabel: ui('Open Stock'),
         tone: depletionTop.risk_tier === 'critical' ? 'bad' : 'warn'
       });
@@ -966,7 +969,7 @@ export default function InsightsPage() {
       nextActions.push({
         title: ui('Follow up lowest-rated supplier'),
         detail: ui('{supplier} currently scores {score} on supplier performance.').replace('{supplier}', supplierBottom.supplier_name).replace('{score}', formatSupplierTrustScore(supplierBottom)),
-        route: `/suppliers?search=${encodeURIComponent(supplierBottom.supplier_name)}`,
+        route: `/suppliers?supplier_id=${encodeURIComponent(supplierBottom.supplier_id)}`,
         linkLabel: ui('Open Suppliers'),
         tone: toNumber(supplierBottom.trust_score) < 50 ? 'bad' : 'warn'
       });
@@ -2021,7 +2024,7 @@ export default function InsightsPage() {
                   )}
                   <div style={styles.inlineActionGroup}>
                     {canOpenSuppliers ? (
-                      <Link to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`} style={styles.inlineActionLink}>{ui("Open supplier")}</Link>
+                      <Link to={`/suppliers?supplier_id=${encodeURIComponent(row.supplier_id)}`} style={styles.inlineActionLink}>{ui("Open supplier")}</Link>
                     ) : null}
                     {canOpenPurchaseOrders ? (
                       <Link to={`/purchase-orders?supplier_id=${encodeURIComponent(row.supplier_id)}`} style={styles.inlineActionLink}>{ui("Open POs")}</Link>
@@ -2175,7 +2178,7 @@ export default function InsightsPage() {
                   </div>
                   <div style={styles.inlineActionGroup}>
                     {canOpenSuppliers ? (
-                      <Link to={`/suppliers?search=${encodeURIComponent(selectedSupplierTrustRow.supplier_name)}`} style={styles.inlineActionLink}>{ui("Open supplier")}</Link>
+                      <Link to={`/suppliers?supplier_id=${encodeURIComponent(selectedSupplierTrustRow.supplier_id)}`} style={styles.inlineActionLink}>{ui("Open supplier")}</Link>
                     ) : null}
                     {canOpenPurchaseOrders ? (
                       <Link to={`/purchase-orders?supplier_id=${encodeURIComponent(selectedSupplierTrustRow.supplier_id)}`} style={styles.inlineActionLink}>{ui("Open supplier POs")}</Link>
@@ -2221,7 +2224,7 @@ export default function InsightsPage() {
                     {ui('Qty {quantity} · Min {min} · Coverage {coverage}').replace('{quantity}', formatNumber(row.current_quantity)).replace('{min}', formatNumber(row.configured_min_quantity)).replace('{coverage}', row.estimated_days_of_coverage === null ? ui('Not available') : ui('{days} days').replace('{days}', formatNumber(row.estimated_days_of_coverage, 1)))}
                   </div>
                   {canOpenStock ? (
-                    <Link to={`/stock?product_id=${encodeURIComponent(row.product_id)}`} style={styles.inlineActionLink}>{ui("Open in Stock")}</Link>
+                    <Link to={`/stock?stock_id=${encodeURIComponent(row.stock_id)}`} style={styles.inlineActionLink}>{ui("Open in Stock")}</Link>
                   ) : null}
                 </article>
               ))}
@@ -2272,7 +2275,7 @@ export default function InsightsPage() {
                     </ul>
                   </div>
                   {canOpenStock ? (
-                    <Link to={`/stock?product_id=${encodeURIComponent(row.product_id)}`} style={styles.inlineActionLink}>{ui("Open in Stock")}</Link>
+                    <Link to={`/stock?stock_id=${encodeURIComponent(row.stock_id)}`} style={styles.inlineActionLink}>{ui("Open in Stock")}</Link>
                   ) : null}
                 </article>
               ))}
@@ -2293,7 +2296,7 @@ export default function InsightsPage() {
                     {ui('Current {current} · Min {min} · Avg Daily Usage {usage}').replace('{current}', formatNumber(row.current_quantity)).replace('{min}', formatNumber(row.min_stock)).replace('{usage}', formatNumber(row.average_daily_usage))}
                   </div>
                   {canOpenProducts ? (
-                    <Link to={`/products?search=${encodeURIComponent(row.product_name)}`} style={styles.inlineActionLink}>{ui("Open product")}</Link>
+                    <Link to={`/products?product_id=${encodeURIComponent(row.product_id)}`} style={styles.inlineActionLink}>{ui("Open product")}</Link>
                   ) : null}
                 </article>
               ))}

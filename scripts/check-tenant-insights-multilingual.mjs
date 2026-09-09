@@ -205,4 +205,25 @@ if (!page.includes('iconPath={props.iconPath ?? \'/insights\'}') && !page.includ
   fail('Insights explicit icon-path routing contract changed or missing.');
 } else pass('Insights section/icon presentation is independent of translated section titles.');
 
+
+for (const exactHandoff of [
+  "route: '/dashboard',",
+  'route: `/products?product_id=${encodeURIComponent(reorderTop.product_id)}`',
+  'route: `/stock?stock_id=${encodeURIComponent(depletionTop.stock_id)}`',
+  'route: `/suppliers?supplier_id=${encodeURIComponent(supplierBottom.supplier_id)}`',
+  'to={`/suppliers?supplier_id=${encodeURIComponent(row.supplier_id)}`}',
+  'to={`/suppliers?supplier_id=${encodeURIComponent(selectedSupplierTrustRow.supplier_id)}`}',
+  'to={`/stock?stock_id=${encodeURIComponent(row.stock_id)}`}',
+  'to={`/products?product_id=${encodeURIComponent(row.product_id)}`}'
+]) {
+  if (!page.includes(exactHandoff)) fail(`Insights exact-record handoff missing: ${exactHandoff}`);
+}
+for (const staleHandoff of ['/dashboard?panel=operational-health', '/suppliers?search=', '/products?search=', '/stock?product_id=']) {
+  if (page.includes(staleHandoff)) fail(`Insights still contains a stale broad handoff: ${staleHandoff}`);
+}
+for (const supplierContractField of ['partial_shipments: number | string;', 'overdue_shipments: number | string;', 'total_discrepancy_quantity: number | string;']) {
+  if (!page.includes(supplierContractField)) fail(`Insights Supplier Trust API type is missing backend field: ${supplierContractField}`);
+}
+if (!process.exitCode) pass('Insights exact-record handoffs and Supplier Trust frontend/backend response typing are aligned.');
+
 if (!process.exitCode) console.log('Tenant Insights multilingual check passed.');

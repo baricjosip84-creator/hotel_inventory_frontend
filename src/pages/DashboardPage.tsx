@@ -9,6 +9,7 @@ import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { OperationalWorkspaceHero, /* OperationalWorkspaceMetaPill, */ OperationalWorkspaceStatCard } from '../components/ui/OperationalWorkspace';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
+import { formatAlertMessage, formatAlertTypeLabel } from '../lib/alertPresentation';
 
 /**
  * ============================================================================
@@ -1170,7 +1171,7 @@ export default function DashboardPage() {
                           <div style={styles.rowTitle}>{row.supplier_name}</div>
                           {canViewSuppliers ? (
                             <ActionLink
-                              to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`}
+                              to={`/suppliers?supplier_id=${encodeURIComponent(row.supplier_id)}`}
                               label={ui('Open Supplier')}
                               iconPath="/suppliers"
                             />
@@ -1222,7 +1223,7 @@ export default function DashboardPage() {
                   <div style={styles.listCard} key={alert.id}>
                     <div style={styles.listCardHeader}>
                       <div style={styles.listCardHeaderText}>
-                        <div style={styles.listCardTitle}>{enumDisplayLabel(alert.type, ui)}</div>
+                        <div style={styles.listCardTitle}>{formatAlertTypeLabel(alert.type, ui)}</div>
                         <div style={styles.listCardMeta}>
                           {alert.product_name || ui('No product linked')} · {formatDateTime(alert.created_at)}
                         </div>
@@ -1230,10 +1231,10 @@ export default function DashboardPage() {
                       <span style={alertSeverityBadgeStyle(alert.severity)}>{enumDisplayLabel(alert.severity, ui)}</span>
                     </div>
 
-                    <div style={styles.cardText}>{alert.message}</div>
+                    <div style={styles.cardText}>{formatAlertMessage(alert, ui)}</div>
                     {canViewAlerts ? (
                       <ActionLink
-                        to={`/alerts?search=${encodeURIComponent(alert.product_name || alert.type)}`}
+                        to={`/alerts?alert_id=${encodeURIComponent(alert.id)}`}
                         label={ui('Open in Alerts')}
                         iconPath="/alerts"
                       />
@@ -1437,7 +1438,7 @@ export default function DashboardPage() {
                           <div style={styles.rowTitle}>{row.supplier_name}</div>
                           {canViewSuppliers ? (
                             <ActionLink
-                              to={`/suppliers?search=${encodeURIComponent(row.supplier_name)}`}
+                              to={`/suppliers?supplier_id=${encodeURIComponent(row.supplier_id)}`}
                               label={ui('Open Supplier')}
                               iconPath="/suppliers"
                             />

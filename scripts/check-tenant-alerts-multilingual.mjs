@@ -8,6 +8,7 @@ const pass = (message) => console.log(`PASS: ${message}`);
 
 const translationSource = read('src/i18n/tenantUiTranslations.ts');
 const alertsSource = read('src/pages/AlertsPage.tsx');
+const alertPresentationSource = read('src/lib/alertPresentation.ts');
 
 const rows = [];
 for (const line of translationSource.split(/\r?\n/)) {
@@ -68,17 +69,17 @@ if (missingDynamicActions.length) fail(`Alerts next-action labels are missing tr
 else pass(`${dynamicActionLabels.length} dynamic Alerts next-action labels are catalog-backed.`);
 
 const canonicalTypeLabels = [
-  'Low stock', 'Negative stock', 'Expired stock', 'Expiring stock', 'Finalized shipment incomplete',
-  'Inventory usage anomaly', 'Inventory usage damage waste', 'Inventory usage exceptions',
-  'Orphaned shipment item', 'Over received', 'Purchase order over received', 'Shipment immutable',
-  'Stock ledger desync', 'Stock lot desync', 'System health degraded'
+  'Low stock', 'Negative stock blocked', 'Expired stock', 'Stock expiring soon', 'Finalized shipment incomplete',
+  'Inventory usage anomaly', 'Inventory damage or waste recorded', 'Inventory usage exceptions',
+  'Shipment item integrity problem', 'Over-receipt blocked', 'Purchase Order over-receipt blocked', 'Shipment change blocked',
+  'Stock ledger mismatch', 'Stock lot mismatch', 'System health degraded'
 ];
 const missingCanonicalLabels = canonicalTypeLabels.filter((key) => !uniqueKeys.has(key));
 if (missingCanonicalLabels.length) fail(`Alerts canonical type display labels are missing translations: ${missingCanonicalLabels.join(' | ')}`);
-if (!alertsSource.includes('const CANONICAL_ALERT_TYPE_LABELS') || !alertsSource.includes('if (canonicalLabel) return ui(canonicalLabel);')) {
-  fail('Canonical alert types must be translated only at display time through the shared UI catalog.');
+if (!alertsSource.includes("import { formatAlertMessage, formatAlertTypeLabel } from '../lib/alertPresentation';")) {
+  fail('Alerts must use the shared system/custom Alert presentation boundary.');
 } else if (!missingCanonicalLabels.length) {
-  pass(`${canonicalTypeLabels.length} known canonical alert-type display labels are localized without changing stored alert types.`);
+  pass(`${canonicalTypeLabels.length} backend-reserved Alert types use the shared localized presentation boundary.`);
 }
 
 if (!alertsSource.includes('useAppTranslation()')) fail('Alerts workspace must use the shared translation context.');
@@ -126,7 +127,7 @@ for (const contract of canonicalContracts) if (!alertsSource.includes(contract))
 if (!process.exitCode) pass('Alerts API routes, canonical filter values, permissions, blocking semantics, and mutation endpoints remain language-independent.');
 
 const businessDataContracts = [
-  '<div style={styles.cardText}>{alert.message}</div>',
+  '<div style={styles.cardText}>{formatAlertMessage(alert, ui)}</div>',
   "alert.product_name || (alert.product_id ? ui('Linked product unavailable') : ui('No product linked'))",
   '<span>{alert.resolution_note}</span>'
 ];
@@ -134,13 +135,21 @@ for (const contract of businessDataContracts) if (!alertsSource.includes(contrac
 if (!alertsSource.includes("alert.product_name || (alert.product_id ? ui('Linked product unavailable') : ui('No product linked'))")) {
   fail('Alerts must preserve the raw Product name and distinguish a missing readable Product reference from an alert with no Product link.');
 }
-if (!alertsSource.includes('if (canonicalLabel) return ui(canonicalLabel);') || !alertsSource.includes('return normalized;')) {
-  fail('Unknown/manual alert types must remain tenant business text while canonical system alert codes localize at display time.');
+for (const required of [
+  "return systemLabel ? ui(systemLabel) : raw;",
+  "if (!SYSTEM_ALERT_TYPE_LABELS[type]) return message;",
+  "return localized ? ui(localized) : message;"
+]) {
+  if (!alertPresentationSource.includes(required)) fail(`Shared Alert system/custom ownership boundary missing: ${required}`);
+}
+for (const forbiddenType of ['NEGATIVE_STOCK:', 'FINALIZED_SHIPMENT_INCOMPLETE:', 'REMEDIATION_PLAYBOOK_ATTACHED:']) {
+  if (alertPresentationSource.includes(forbiddenType)) fail(`Non-reserved/manual-capable Alert type must not be treated as system-owned: ${forbiddenType}`);
 }
 if (alertsSource.includes('.map((word) => word.toLowerCase())')) {
   fail('Alerts must not normalize or lowercase user-defined alert types at display time.');
 }
-if (!process.exitCode) pass('Alert messages, manual alert types, product names, operator names, and resolution notes remain business data rather than translation keys.');
+if (!alertsSource.includes('`/stock?product_id=${encodeURIComponent(alert.product_id)}`')) fail('Product-linked Alerts must open exact product context in Stock.');
+if (!process.exitCode) pass('System-owned Alert presentation localizes only proven backend-owned shapes; custom/historical Alert evidence remains verbatim and Product context is exact.');
 
 if (alertsSource.includes('This does not notify anyone automatically.')) {
   fail('Alerts still claims manual escalation sends no notification even though the backend queues an in-app notification event.');
