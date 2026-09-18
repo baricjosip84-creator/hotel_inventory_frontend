@@ -1728,7 +1728,7 @@ function safeJsonObject(value: string): Record<string, unknown> {
   }
 }
 
-function optionalJsonObject(value: string, _editing: boolean): Record<string, unknown> | undefined {
+function optionalJsonObject(value: string): Record<string, unknown> | undefined {
   if (!value.trim()) return undefined;
   return safeJsonObject(value);
 }
@@ -2021,7 +2021,7 @@ function buildPayload(mode: FeedbackMode, form: FeedbackFormState, sourceId: str
     recommendation_executed_at: toIsoDateTime(form.executedAt),
     recommendation_measured_at: toIsoDateTime(form.measuredAt),
     recommendation_scored_at: toIsoDateTime(form.scoredAt),
-    execution_reference: optionalJsonObject(form.executionReference, editing),
+    execution_reference: optionalJsonObject(form.executionReference),
     lifecycle_evidence: businessEvidenceObject(form.lifecycleEvidence, editing, snapshots.lifecycleEvidence),
     recommendation_outcome_classification: form.outcomeClassification || undefined,
     recommendation_outcome_review_required: form.outcomeReviewRequired === '' ? undefined : form.outcomeReviewRequired === 'true',

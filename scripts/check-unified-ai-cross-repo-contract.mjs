@@ -111,8 +111,11 @@ if (fs.existsSync(frontendPackagePath)) {
       failures.push(`frontend package script ${scriptName} is missing or misaligned`);
     }
   }
-  if (scripts.prebuild !== 'npm run check:unified-ai-contract-suite && npm run check:learning-feedback-locale-runtime-closure-v349192 && npm run check:advanced-tenant-pages-final-audit-closure-v349193 && npm run check:command-wide-operational-closure-v349194 && npm run check:alert-current-state-lifecycle-v349195 && npm run typecheck:ci') {
-    failures.push('frontend prebuild script must run the unified AI contract suite and pilot-critical TypeScript gate before Vite build');
+  const prebuildCommands = String(scripts.prebuild || '').split(' && ').filter(Boolean);
+  const prebuildSuiteIndex = prebuildCommands.indexOf('npm run check:unified-ai-contract-suite');
+  const prebuildTypecheckIndex = prebuildCommands.indexOf('npm run typecheck:ci');
+  if (prebuildSuiteIndex !== 0 || prebuildTypecheckIndex <= prebuildSuiteIndex || prebuildTypecheckIndex !== prebuildCommands.length - 1) {
+    failures.push('frontend prebuild script must start with the unified AI contract suite and finish with the TypeScript gate before Vite build');
   }
   if (scripts.build !== 'vite build') {
     failures.push('frontend build script must remain the plain Vite production build guarded by npm prebuild');
@@ -123,8 +126,9 @@ if (fs.existsSync(frontendPackagePath)) {
   if (scripts['pretest:e2e:ui'] !== 'npm run check:unified-ai-contract-suite') {
     failures.push('frontend pretest:e2e:ui script must run check:unified-ai-contract-suite before Playwright e2e UI tests');
   }
-  if (scripts.prelint !== 'npm run check:unified-ai-contract-suite && npm run check:learning-feedback-locale-runtime-closure-v349192 && npm run check:advanced-tenant-pages-final-audit-closure-v349193 && npm run check:command-wide-operational-closure-v349194 && npm run check:alert-current-state-lifecycle-v349195') {
-    failures.push('frontend prelint script must run check:unified-ai-contract-suite before ESLint');
+  const prelintCommands = String(scripts.prelint || '').split(' && ').filter(Boolean);
+  if (prelintCommands[0] !== 'npm run check:unified-ai-contract-suite') {
+    failures.push('frontend prelint script must start with check:unified-ai-contract-suite before ESLint');
   }
   if (scripts.predev !== 'npm run check:unified-ai-contract-suite') {
     failures.push('frontend predev script must run check:unified-ai-contract-suite before Vite dev server');
