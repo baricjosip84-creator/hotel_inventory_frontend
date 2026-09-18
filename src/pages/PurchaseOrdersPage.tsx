@@ -1012,6 +1012,7 @@ export default function PurchaseOrdersPage() {
   );
   const [form, setForm] = useState<PurchaseOrderFormState>(() => emptyForm());
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [createdDraftId, setCreatedDraftId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [closeReason, setCloseReason] = useState('');
@@ -1242,6 +1243,7 @@ export default function PurchaseOrdersPage() {
   const resetForm = () => {
     setForm(emptyForm());
     setEditingId(null);
+    setCreatedDraftId(null);
     setFormError(null);
   };
 
@@ -1316,21 +1318,16 @@ export default function PurchaseOrdersPage() {
       queryClient.setQueryData(['purchase-order', created.id], created);
       setSelectedId(created.id);
       setEditingId(null);
+      setCreatedDraftId(created.id);
       setFormError(null);
-      setActiveWorkspaceSection('detail');
+      setActiveWorkspaceSection('create');
+      showTenantActionSuccess(ui('PO draft created'));
 
-      // Refresh the registry in the background. Do not block the UI or cause a
-      // second detail fetch before the newly-created order can be shown.
+      // Keep the completed form in place and locked after success. This prevents a
+      // long multi-item form from collapsing under the user's viewport. The operator
+      // can deliberately open Order detail or clear the form to start another order.
+      // Refresh the registry in the background without moving the viewport.
       void queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
-
-      // Clear the draft only after the new detail target exists. This avoids the
-      // create form collapsing before the destination is selected.
-      window.requestAnimationFrame(() => {
-        setForm(emptyForm());
-        window.requestAnimationFrame(() => {
-          detailRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' });
-        });
-      });
     }
   });
 
@@ -1966,6 +1963,7 @@ export default function PurchaseOrdersPage() {
 
   const startEdit = () => {
     if (!selectedDetail || selectedDetail.status !== 'draft') return;
+    setCreatedDraftId(null);
     setEditingId(selectedDetail.id);
     setForm(detailToForm(selectedDetail));
     setFormError(null);
@@ -2183,7 +2181,10 @@ export default function PurchaseOrdersPage() {
             type="button"
             className="app-button app-button--primary"
             disabled={!capabilities.canCreatePurchaseOrders}
-            onClick={() => navigateWorkspaceSection('create', createRef.current)}
+            onClick={() => {
+            if (createdDraftId && !editingId) resetForm();
+            navigateWorkspaceSection('create', createRef.current);
+          }}
           >
             {ui("Create purchase order")}
           </button>
@@ -2260,7 +2261,10 @@ export default function PurchaseOrdersPage() {
           iconPath="/purchase-orders"
           label={editingId ? ui('Edit draft') : ui('Create order')}
           disabled={!capabilities.canCreatePurchaseOrders && !capabilities.canUpdatePurchaseOrders}
-          onClick={() => navigateWorkspaceSection('create', createRef.current)}
+          onClick={() => {
+            if (createdDraftId && !editingId) resetForm();
+            navigateWorkspaceSection('create', createRef.current);
+          }}
         />
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'detail'}
@@ -2656,9 +2660,9 @@ export default function PurchaseOrdersPage() {
             iconPath="/purchase-orders"
             title={editingId ? ui('Edit purchase order draft') : ui('Create purchase order')}
             description={editingId ? ui('Update the selected draft before it is submitted for approval.') : ui('Create a draft supplier order. Submit it, approve it, send it to the supplier, then receive the delivery later.')}
-            actions={<button type="button" className="app-button app-button--secondary" onClick={addItem}>{ui("Add item")}</button>}
           />
 
+          <fieldset className="purchase-orders-form-fields" disabled={Boolean(createdDraftId && !editingId)}>
           <div className="purchase-orders-form-grid">
             <label className="purchase-orders-field purchase-orders-field--wide">
               <span>{ui("Supplier")}</span>
@@ -2694,6 +2698,7 @@ export default function PurchaseOrdersPage() {
 
           <div className="purchase-orders-items-heading">
             <div><strong>{ui("Order items")}</strong><span>{ui("Add the products, quantities, ordering units, and supplier purchase prices for this order.")}</span></div>
+            <button type="button" className="app-button app-button--secondary" onClick={addItem}>{ui("Add item")}</button>
           </div>
 
           <div className="purchase-orders-item-list">
@@ -2735,7 +2740,7 @@ export default function PurchaseOrdersPage() {
                       </option>
                       {supplierProducts.map((product) => <option key={product.id} value={product.id}>{product.name} ({product.unit})</option>)}
                     </select>
-                    <small className="purchase-orders-field-help">{form.supplier_id ? (supplierProducts.length ? ui('Only products assigned to the selected supplier are shown.') : ui('No products are assigned to this supplier. Assign products to the supplier on the Products page first.')) : ui('Choose a supplier before selecting products.')}</small>
+                    <small className="purchase-orders-field-help">{form.supplier_id ? (supplierProducts.length ? ui('Only products currently supplied by the selected supplier are shown.') : ui('No products are currently supplied by this supplier. Configure the Supplier Catalog or Product default supplier first.')) : ui('Choose a supplier before selecting products.')}</small>
                   </label>
                   <label className="purchase-orders-field">
                     <span>{ui("Quantity")}</span>
@@ -2800,17 +2805,34 @@ export default function PurchaseOrdersPage() {
             ))}
           </div>
 
+          <div className="purchase-orders-items-actions">
+            <button type="button" className="app-button app-button--secondary" onClick={addItem}>{ui('Add another item')}</button>
+          </div>
+          </fieldset>
+
           {formError ? <p style={styles.error}>{formError}</p> : null}
           {(createMutation.error || updateMutation.error) ? <p style={styles.error}>{formMutationError}</p> : null}
 
           <div className="purchase-orders-form-footer">
-            <span>{ui("Draft purchase orders do not change stock. Stock is received later through linked shipments.")}</span>
-            <div>
-              {editingId ? <button type="button" className="app-button app-button--secondary" onClick={resetForm}>{ui("Cancel edit")}</button> : null}
-              <button type="submit" className="app-button app-button--primary" disabled={createMutation.isPending || updateMutation.isPending || (!editingId && !capabilities.canCreatePurchaseOrders) || Boolean(editingId && !capabilities.canUpdatePurchaseOrders)}>
-                {editingId ? ui('Save draft') : ui('Create draft')}
-              </button>
-            </div>
+            {createdDraftId && !editingId ? (
+              <>
+                <span>{ui('PO draft created')}</span>
+                <div>
+                  <button type="button" className="app-button app-button--secondary" onClick={() => navigateWorkspaceSection('detail', detailRef.current)}>{ui('Order detail')}</button>
+                  <button type="button" className="app-button app-button--primary" onClick={resetForm}>{ui('Create order')}</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <span>{ui("Draft purchase orders do not change stock. Stock is received later through linked shipments.")}</span>
+                <div>
+                  {editingId ? <button type="button" className="app-button app-button--secondary" onClick={resetForm}>{ui("Cancel edit")}</button> : null}
+                  <button type="submit" className="app-button app-button--primary" disabled={createMutation.isPending || updateMutation.isPending || (!editingId && !capabilities.canCreatePurchaseOrders) || Boolean(editingId && !capabilities.canUpdatePurchaseOrders)}>
+                    {editingId ? ui('Save draft') : ui('Create draft')}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </form>
       </div>

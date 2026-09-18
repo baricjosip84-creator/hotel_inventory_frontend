@@ -95,6 +95,7 @@ type ProductOption = {
   supplier_id?: string | null;
   supplier_name?: string | null;
   barcode?: string | null;
+  eligible_supplier_ids?: string[];
 };
 
 type StorageLocationOption = {
@@ -1092,15 +1093,15 @@ export default function ShipmentsPage() {
       : null;
 
     return allProducts.filter((product) => {
-      if (linkedProductIds && !linkedProductIds.has(product.id)) {
-        return false;
+      if (linkedProductIds) {
+        return linkedProductIds.has(product.id);
       }
 
-      if (!product.supplier_id) {
-        return true;
+      if (product.eligible_supplier_ids) {
+        return product.eligible_supplier_ids.includes(selectedShipment.supplier_id);
       }
 
-      return product.supplier_id === selectedShipment.supplier_id;
+      return !product.supplier_id || product.supplier_id === selectedShipment.supplier_id;
     });
   }, [approvedPurchaseOrders, products, selectedShipment]);
 
@@ -1993,12 +1994,9 @@ export default function ShipmentsPage() {
       return;
     }
 
-    if (
-      selectedProduct?.supplier_id &&
-      selectedProduct.supplier_id !== selectedShipment.supplier_id
-    ) {
+    if (!shipmentProductOptions.some((product) => product.id === selectedProduct.id)) {
       setPageError(
-        ui('Product supplier does not match the selected shipment supplier. Choose a product from this supplier, or use an unassigned product.')
+        ui('Product is not supplied by the selected shipment supplier. Choose a Product supplied by this supplier, or use the linked Purchase Order.')
       );
       return;
     }
@@ -3172,7 +3170,6 @@ export default function ShipmentsPage() {
                     {shipmentProductOptions.map((product) => (
                       <option key={product.id} value={product.id}>
                         {product.name}
-                        {product.supplier_name ? ` · ${product.supplier_name}` : ''}
                         {product.barcode ? ` · ${product.barcode}` : ''}
                       </option>
                     ))}
@@ -3180,8 +3177,8 @@ export default function ShipmentsPage() {
                   {selectedShipment ? (
                     <div style={styles.inlineHint}>
                       {selectedShipment.purchase_order_id
-                        ? ui('List is limited to products on the linked Purchase Order that are compatible with this supplier.')
-                        : ui('List is limited to products from this shipment supplier, plus products without supplier assignment.')}
+                        ? ui('List is limited to Products on the linked Purchase Order.')
+                        : ui('List is limited to Products currently supplied by this shipment supplier.')}
                     </div>
                   ) : null}
                 </div>

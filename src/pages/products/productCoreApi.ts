@@ -62,6 +62,10 @@ export async function fetchProducts(filters: {
   return apiRequest<ProductItem[]>(`/products${suffix}`);
 }
 
+export async function fetchArchivedProducts(): Promise<ProductItem[]> {
+  return apiRequest<ProductItem[]>('/products/archived');
+}
+
 
 export async function fetchSuppliers(): Promise<SupplierItem[]> {
   return apiRequest<SupplierItem[]>('/suppliers');
@@ -121,5 +125,15 @@ export async function deleteProduct(product: ProductItem): Promise<void> {
     headers: {
       'If-Match-Version': String(product.version)
     }
+  });
+}
+
+export async function restoreProduct(product: ProductItem): Promise<ProductItem> {
+  return apiRequest<ProductItem>(`/products/${product.id}/restore`, {
+    method: 'POST',
+    headers: {
+      'If-Match-Version': String(product.version)
+    },
+    body: JSON.stringify({})
   });
 }

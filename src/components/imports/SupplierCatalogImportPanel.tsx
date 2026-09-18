@@ -87,7 +87,9 @@ export function SupplierCatalogImportPanel({ suppliers, canImport, canCreateProd
     if (!row) return ui('Not validated');
     const known: Record<string, string> = {
       exact_supplier_sku: 'Exact supplier SKU', exact_internal_sku: 'Exact internal SKU', exact_barcode: 'Exact barcode', create_product: 'Create Product',
-      matched_existing: 'Matched existing', created: 'Created', updated: 'Updated', unchanged: 'Unchanged', deactivated: 'Deactivated', skipped: 'Skipped', none: 'None'
+      restore_product: 'Restore Product', update_catalog: 'Update catalog item', match_product: 'Match Product',
+      matched_existing: 'Matched existing', create: 'Create catalog item', update: 'Update catalog item', reactivate: 'Reactivate', unchanged: 'Unchanged',
+      deactivate: 'Deactivate', skip: 'Skip', created: 'Created', updated: 'Updated', deactivated: 'Deactivated', skipped: 'Skipped', none: 'None'
     };
     const resolutionRaw = String(row.resolution || '-');
     const changeRaw = String(row.catalog_change || '-');
@@ -168,14 +170,15 @@ export function SupplierCatalogImportPanel({ suppliers, canImport, canCreateProd
 
   const commitRows = async () => {
     if (!batch || batch.status !== 'validated' || !canImport) return;
-    if (!window.confirm(ui('Commit {count} validated supplier-catalog rows? This may create Products, update supplier pricing, or deactivate catalog items according to the reviewed actions.').replace('{count}', number(batch.row_count)))) return;
+    if (!window.confirm(ui('Commit {count} validated supplier-catalog rows? This may create or restore Products, update supplier pricing, or deactivate catalog items according to the reviewed actions.').replace('{count}', number(batch.row_count)))) return;
     setBusy(true); setError(null); setMessage(null);
     try {
       const committed = await commitInventoryImport(batch);
       setBatch(committed);
       const summary = committed.result_summary || {};
-      setMessage(ui('Catalog committed. Products created: {products} · Catalog items created: {created} · Updated: {updated} · Unchanged: {unchanged} · Deactivated: {deactivated} · Skipped: {skipped}.')
+      setMessage(ui('Catalog committed. Products created: {products} · Products restored: {restored} · Catalog items created: {created} · Updated: {updated} · Unchanged: {unchanged} · Deactivated: {deactivated} · Skipped: {skipped}.')
         .replace('{products}', number(Number(summary.created_products || 0)))
+        .replace('{restored}', number(Number(summary.restored_products || 0)))
         .replace('{created}', number(Number(summary.created_catalog_items || 0)))
         .replace('{updated}', number(Number(summary.updated_catalog_items || 0)))
         .replace('{unchanged}', number(Number(summary.unchanged_catalog_items || 0)))
@@ -212,9 +215,9 @@ export function SupplierCatalogImportPanel({ suppliers, canImport, canCreateProd
   return (
     <section style={panel} aria-label={ui('Supplier catalog import')}>
       <h3 style={{ margin: 0 }}>{ui('Import supplier catalog')}</h3>
-      <p style={{ margin: '6px 0 0' }}>{ui('Select the supplier once, upload its CSV, then review how every row should be handled. Auto updates an existing supplier SKU or safely matches an exact internal SKU/barcode. It never creates a Product by itself.')}</p>
-      <p style={{ margin: '6px 0 0', fontSize: 13 }}>{ui('Use Create only for items you actually want in your Product master. Use Match for an existing Product, Deactivate for a discontinued supplier item, or Skip for products you do not stock.')}</p>
-      {!canCreateProducts ? <p style={{ ...messageBox, fontSize: 13 }}>{ui('Your role may update/match catalog items, but creating new Products additionally requires Products write permission.')}</p> : null}
+      <p style={{ margin: '6px 0 0' }}>{ui('Select the supplier once, upload its CSV, then review how every row should be handled. Auto can update an existing supplier SKU, match an exact active Product, or prepare Restore for an exact archived Product. It never creates a new Product by itself.')}</p>
+      <p style={{ margin: '6px 0 0', fontSize: 13 }}>{ui('Use Create only for new Products. Use Restore when the Product was archived, Match for an active Product, Deactivate for a discontinued supplier item, or Skip for products you do not stock.')}</p>
+      {!canCreateProducts ? <p style={{ ...messageBox, fontSize: 13 }}>{ui('Your role may update/match catalog items, but creating or restoring Products additionally requires Products write permission.')}</p> : null}
 
       <div style={rowStyle}>
         <label>{ui('Supplier')}<br />
@@ -247,7 +250,7 @@ export function SupplierCatalogImportPanel({ suppliers, canImport, canCreateProd
               <td style={cell}>{catalogRow.supplier_product_name || '—'}</td>
               <td style={cell}>{catalogRow.barcode || '—'}</td>
               <td style={cell}><select value={catalogRow.action} onChange={(event) => updateRow(index, { action: event.target.value })} disabled={busy || batch?.status === 'committed'} style={input}>
-                <option value="auto">{ui('Auto')}</option><option value="match">{ui('Match')}</option><option value="create" disabled={!canCreateProducts}>{ui('Create Product')}</option><option value="deactivate">{ui('Deactivate')}</option><option value="skip">{ui('Skip')}</option>
+                <option value="auto">{ui('Auto')}</option><option value="match">{ui('Match')}</option><option value="create" disabled={!canCreateProducts}>{ui('Create Product')}</option><option value="restore" disabled={!canCreateProducts}>{ui('Restore Product')}</option><option value="deactivate">{ui('Deactivate')}</option><option value="skip">{ui('Skip')}</option>
               </select></td>
               <td style={cell}><input value={catalogRow.internal_sku} onChange={(event) => updateRow(index, { internal_sku: event.target.value })} disabled={busy || batch?.status === 'committed'} style={input} placeholder={ui('Existing/new SKU')} /></td>
               <td style={cell}><input value={catalogRow.product_name} onChange={(event) => updateRow(index, { product_name: event.target.value })} disabled={busy || batch?.status === 'committed'} style={input} placeholder={ui('Required for Create')} /></td>

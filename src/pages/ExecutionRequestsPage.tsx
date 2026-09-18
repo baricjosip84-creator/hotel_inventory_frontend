@@ -324,6 +324,14 @@ export default function ExecutionRequestsPage() {
     }
   }, [query, ui]);
 
+  const applyReturnedRequest = useCallback((updated: ExecutionRequest) => {
+    setSelected((current) => current?.id === updated.id ? { ...current, ...updated } : updated);
+    setData((current) => current ? {
+      ...current,
+      rows: current.rows.map((row) => row.id === updated.id ? { ...row, ...updated } : row)
+    } : current);
+  }, []);
+
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       void loadRequests();
@@ -560,7 +568,7 @@ export default function ExecutionRequestsPage() {
         method: 'POST',
         body: JSON.stringify({ note: 'Submitted for human review from the registry UI.' })
       });
-      setSelected(updated);
+      applyReturnedRequest(updated);
       await loadRequests();
       refreshNavigationAttention();
       showTenantActionSuccess(ui('Execution request submitted for review.'));
@@ -584,7 +592,7 @@ export default function ExecutionRequestsPage() {
         method: 'POST',
         body: JSON.stringify({ review_note: reviewNote.trim() || null })
       });
-      setSelected(updated);
+      applyReturnedRequest(updated);
       await loadRequests();
       refreshNavigationAttention();
       showTenantActionSuccess(ui('Execution request approved.'));
@@ -608,7 +616,7 @@ export default function ExecutionRequestsPage() {
         method: 'POST',
         body: JSON.stringify({ rejection_reason: rejectionReason.trim() })
       });
-      setSelected(updated);
+      applyReturnedRequest(updated);
       await loadRequests();
       refreshNavigationAttention();
       showTenantActionSuccess(ui('Execution request rejected.'));
@@ -635,7 +643,7 @@ export default function ExecutionRequestsPage() {
         method: 'POST',
         body: JSON.stringify({ note: note.trim() || null })
       });
-      setSelected(updated);
+      applyReturnedRequest(updated);
       await loadRequests();
       refreshNavigationAttention();
       if (updated.execution_status === 'failed') {
@@ -665,7 +673,7 @@ export default function ExecutionRequestsPage() {
         method: 'POST',
         body: JSON.stringify({ note: note.trim() || null })
       });
-      setSelected(updated);
+      applyReturnedRequest(updated);
       await loadRequests();
       refreshNavigationAttention();
       showTenantActionSuccess(ui('Request completed without a business-data change.'));
@@ -748,7 +756,7 @@ export default function ExecutionRequestsPage() {
         method: 'POST',
         body: JSON.stringify({ retry_reason: retryReason.trim(), note: note.trim() || null })
       });
-      setSelected(updated);
+      applyReturnedRequest(updated);
       await loadRequests();
       refreshNavigationAttention();
       showTenantActionSuccess(ui('Failed execution prepared for one controlled retry.'));
@@ -772,7 +780,7 @@ export default function ExecutionRequestsPage() {
         method: 'POST',
         body: JSON.stringify({ cancel_reason: cancelReason.trim() })
       });
-      setSelected(updated);
+      applyReturnedRequest(updated);
       await loadRequests();
       refreshNavigationAttention();
       showTenantActionSuccess(ui('Execution request cancelled.'));
@@ -1167,11 +1175,14 @@ export default function ExecutionRequestsPage() {
               </thead>
               <tbody>
                 {requests.map((request) => {
-                  const causesSidebarAttention = (canReviewExecutionRequests && request.status === 'pending_review')
+                  const causesSidebarAttention = (canReviewExecutionRequests
+                    && request.status === 'pending_review'
+                    && !request.action_eligibility?.review?.blocked)
                     || (canExecuteExecutionRequests
                       && request.status === 'approved'
                       && !request.execution_status
-                      && (!request.adapter?.execution_enabled || canWriteProducts))
+                      && (!request.adapter?.execution_enabled || canWriteProducts)
+                      && !request.action_eligibility?.execute?.blocked)
                     || (canExecuteExecutionRequests
                       && request.status === 'approved'
                       && request.execution_status === 'failed'
@@ -1201,10 +1212,26 @@ export default function ExecutionRequestsPage() {
                       <div style={styles.rowActions}>
                         <button type="button" className="btn btn-secondary" disabled={saving} data-skip-global-action-feedback="true" onClick={() => loadRequestDetail(request)}>{ui('Open')}</button>
                         {canSubmitExecutionRequests && request.status === 'draft' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => submitRequest(request)}>{ui('Submit')}</button> : null}
-                        {canReviewExecutionRequests && request.status === 'pending_review' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => approveRequest(request)}>{ui('Approve')}</button> : null}
-                        {canReviewExecutionRequests && request.status === 'pending_review' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => rejectRequest(request)}>{ui('Reject')}</button> : null}
-                        {canExecuteExecutionRequests && canWriteProducts && request.status === 'approved' && !request.execution_status && request.adapter?.execution_enabled ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => executeRequest(request)}>{ui('Execute')}</button> : null}
-                        {canExecuteExecutionRequests && request.status === 'approved' && !request.execution_status && !request.adapter?.execution_enabled ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => executeNoopRequest(request)}>{ui('Complete without change')}</button> : null}
+                        {canReviewExecutionRequests && request.status === 'pending_review' ? <button type="button" className="btn btn-primary" disabled={saving || Boolean(request.action_eligibility?.review?.blocked)} title={request.action_eligibility?.review?.blocked
+                          ? ui('Another authorized user must review this request.')
+                          : request.action_eligibility?.review?.fallback_allowed
+                            ? ui('No other authorized user is available, so you may review this request.')
+                            : undefined} onClick={() => approveRequest(request)}>{ui('Approve')}</button> : null}
+                        {canReviewExecutionRequests && request.status === 'pending_review' ? <button type="button" className="btn btn-secondary" disabled={saving || Boolean(request.action_eligibility?.review?.blocked)} title={request.action_eligibility?.review?.blocked
+                          ? ui('Another authorized user must review this request.')
+                          : request.action_eligibility?.review?.fallback_allowed
+                            ? ui('No other authorized user is available, so you may review this request.')
+                            : undefined} onClick={() => rejectRequest(request)}>{ui('Reject')}</button> : null}
+                        {canExecuteExecutionRequests && canWriteProducts && request.status === 'approved' && !request.execution_status && request.adapter?.execution_enabled ? <button type="button" className="btn btn-primary" disabled={saving || Boolean(request.action_eligibility?.execute?.blocked)} title={request.action_eligibility?.execute?.blocked
+                          ? ui('Another authorized user must execute this request.')
+                          : request.action_eligibility?.execute?.fallback_allowed
+                            ? ui('No other authorized user is available, so you may execute this request.')
+                            : undefined} onClick={() => executeRequest(request)}>{ui('Execute')}</button> : null}
+                        {canExecuteExecutionRequests && request.status === 'approved' && !request.execution_status && !request.adapter?.execution_enabled ? <button type="button" className="btn btn-secondary" disabled={saving || Boolean(request.action_eligibility?.execute?.blocked)} title={request.action_eligibility?.execute?.blocked
+                          ? ui('Another authorized user must execute this request.')
+                          : request.action_eligibility?.execute?.fallback_allowed
+                            ? ui('No other authorized user is available, so you may execute this request.')
+                            : undefined} onClick={() => executeNoopRequest(request)}>{ui('Complete without change')}</button> : null}
                         {canExecuteExecutionRequests && request.status === 'approved' && request.execution_review?.retry_eligibility?.eligible ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => prepareRetryRequest(request)}>{ui('Prepare retry')}</button> : null}
                         {canCancelExecutionRequests && (request.status === 'draft' || request.status === 'pending_review') ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => cancelRequest(request)}>{ui('Cancel')}</button> : null}
                       </div>
@@ -1254,11 +1281,31 @@ export default function ExecutionRequestsPage() {
 
             <div style={styles.detailActions}>
               {canSubmitExecutionRequests && selected.status === 'draft' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => submitRequest(selected)}>{ui('Submit for review')}</button> : null}
-              {canReviewExecutionRequests && selected.status === 'pending_review' ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => approveRequest(selected)}>{ui('Approve')}</button> : null}
-              {canReviewExecutionRequests && selected.status === 'pending_review' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => rejectRequest(selected)}>{ui('Reject')}</button> : null}
-              {canExecuteExecutionRequests && canWriteProducts && selected.status === 'approved' && !selected.execution_status && selected.adapter?.execution_enabled ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => executeRequest(selected)}>{ui('Execute approved change')}</button> : null}
-              {canExecuteExecutionRequests && selected.status === 'approved' && !selected.execution_status && !selected.adapter?.execution_enabled ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => executeNoopRequest(selected)}>{ui('Complete without change')}</button> : null}
+              {canReviewExecutionRequests && selected.status === 'pending_review' ? <button type="button" className="btn btn-primary" disabled={saving || Boolean(selected.action_eligibility?.review?.blocked)} title={selected.action_eligibility?.review?.blocked
+                ? ui('Another authorized user must review this request.')
+                : selected.action_eligibility?.review?.fallback_allowed
+                  ? ui('No other authorized user is available, so you may review this request.')
+                  : undefined} onClick={() => approveRequest(selected)}>{ui('Approve')}</button> : null}
+              {canReviewExecutionRequests && selected.status === 'pending_review' ? <button type="button" className="btn btn-secondary" disabled={saving || Boolean(selected.action_eligibility?.review?.blocked)} title={selected.action_eligibility?.review?.blocked
+                ? ui('Another authorized user must review this request.')
+                : selected.action_eligibility?.review?.fallback_allowed
+                  ? ui('No other authorized user is available, so you may review this request.')
+                  : undefined} onClick={() => rejectRequest(selected)}>{ui('Reject')}</button> : null}
+              {canExecuteExecutionRequests && canWriteProducts && selected.status === 'approved' && !selected.execution_status && selected.adapter?.execution_enabled ? <button type="button" className="btn btn-primary" disabled={saving || Boolean(selected.action_eligibility?.execute?.blocked)} title={selected.action_eligibility?.execute?.blocked
+                ? ui('Another authorized user must execute this request.')
+                : selected.action_eligibility?.execute?.fallback_allowed
+                  ? ui('No other authorized user is available, so you may execute this request.')
+                  : undefined} onClick={() => executeRequest(selected)}>{ui('Execute approved change')}</button> : null}
+              {canExecuteExecutionRequests && selected.status === 'approved' && !selected.execution_status && !selected.adapter?.execution_enabled ? <button type="button" className="btn btn-secondary" disabled={saving || Boolean(selected.action_eligibility?.execute?.blocked)} title={selected.action_eligibility?.execute?.blocked
+                ? ui('Another authorized user must execute this request.')
+                : selected.action_eligibility?.execute?.fallback_allowed
+                  ? ui('No other authorized user is available, so you may execute this request.')
+                  : undefined} onClick={() => executeNoopRequest(selected)}>{ui('Complete without change')}</button> : null}
               {canExecuteExecutionRequests && !canWriteProducts && selected.status === 'approved' && !selected.execution_status && selected.adapter?.execution_enabled ? <span style={styles.meta}>{ui('Applying the approved change also requires product-edit permission.')}</span> : null}
+              {canReviewExecutionRequests && selected.status === 'pending_review' && selected.action_eligibility?.review?.blocked ? <span style={styles.meta}>{ui('Another authorized user must review this request.')}</span> : null}
+              {canReviewExecutionRequests && selected.status === 'pending_review' && selected.action_eligibility?.review?.fallback_allowed ? <span style={styles.meta}>{ui('No other authorized user is available, so you may review this request.')}</span> : null}
+              {canExecuteExecutionRequests && selected.status === 'approved' && (selected.adapter?.execution_enabled ? canWriteProducts : true) && selected.action_eligibility?.execute?.blocked ? <span style={styles.meta}>{ui('Another authorized user must execute this request.')}</span> : null}
+              {canExecuteExecutionRequests && selected.status === 'approved' && (selected.adapter?.execution_enabled ? canWriteProducts : true) && selected.action_eligibility?.execute?.fallback_allowed ? <span style={styles.meta}>{ui('No other authorized user is available, so you may execute this request.')}</span> : null}
               {canExecuteExecutionRequests && selected.status === 'approved' && selected.execution_review?.retry_eligibility?.eligible ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => prepareRetryRequest(selected)}>{ui('Prepare retry')}</button> : null}
               {canCancelExecutionRequests && (selected.status === 'draft' || selected.status === 'pending_review') ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => cancelRequest(selected)}>{ui('Cancel request')}</button> : null}
               <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => loadRequestDetail(selected)}>{ui('Refresh detail')}</button>
@@ -1545,8 +1592,23 @@ function ExecutionSecurityAuditPanel({ securityAudit }: { securityAudit: Executi
       <KeyValue label={ui('Can Execute')} value={securityAudit.permission_matrix.can_execute ? ui('Yes') : ui('No')} />
       <KeyValue label={ui('Can Update Products')} value={securityAudit.permission_matrix.can_update_products ? ui('Yes') : ui('No')} />
       <KeyValue label={ui('Has Required Execution Permissions')} value={securityAudit.permission_matrix.current_actor_has_required_execution_permissions ? ui('Yes') : ui('No')} />
-      <KeyValue label={ui('Requester / Reviewer Same')} value={securityAudit.separation_of_duties.requester_reviewer_same ? ui('Yes') : ui('No')} />
-      <KeyValue label={ui('Reviewer / Executor Same')} value={securityAudit.separation_of_duties.reviewer_executor_same ? ui('Yes') : ui('No')} />
+      <KeyValue
+        label={ui('Requester / Reviewer Same')}
+        value={securityAudit.separation_of_duties.requester_reviewer_same
+          ? securityAudit.separation_of_duties.requester_reviewer_fallback_recorded
+            ? ui('Yes — staffing fallback recorded')
+            : ui('Yes')
+          : ui('No')}
+      />
+      <KeyValue
+        label={ui('Reviewer / Executor Same')}
+        value={securityAudit.separation_of_duties.reviewer_executor_same
+          ? securityAudit.separation_of_duties.reviewer_executor_fallback_recorded
+            ? ui('Yes — staffing fallback recorded')
+            : ui('Yes')
+          : ui('No')}
+      />
+      <KeyValue label={ui('Staffing fallback used')} value={securityAudit.separation_of_duties.staffing_fallback_used ? ui('Yes') : ui('No')} />
       <KeyValue label={ui('Recommended For Real Execution')} value={securityAudit.separation_of_duties.recommended_for_real_execution ? ui('Yes') : ui('Review recommended')} />
       <h3 style={styles.subheading}>{ui('Checks')}</h3>
       <div style={styles.auditTrail}>

@@ -1967,6 +1967,18 @@ export interface ExecutionRequest {
   recommendation_group_codes?: string[];
   execution_result?: Record<string, unknown> | null;
   execution_review?: ExecutionRequestExecutionReview | null;
+  action_eligibility?: {
+    review?: {
+      blocked: boolean;
+      fallback_allowed: boolean;
+      other_eligible_user_count: number;
+    };
+    execute?: {
+      blocked: boolean;
+      fallback_allowed: boolean;
+      other_eligible_user_count: number;
+    };
+  };
   payload: Record<string, unknown>;
   adapter?: ExecutionAdapterDefinition | null;
   gate_snapshot?: Record<string, unknown> | null;
@@ -2054,6 +2066,9 @@ export interface ExecutionRequestSecurityAuditResponse {
     requester_reviewer_same: boolean;
     reviewer_executor_same: boolean;
     requester_executor_same: boolean;
+    requester_reviewer_fallback_recorded: boolean;
+    reviewer_executor_fallback_recorded: boolean;
+    staffing_fallback_used: boolean;
     recommended_for_real_execution: boolean;
   };
   checks: Array<{

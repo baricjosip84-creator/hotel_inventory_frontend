@@ -4,6 +4,7 @@ import { getCurrentAccessRoleLabel } from '../../lib/permissions';
 import { styles } from './productStyles';
 import { ProductFormPanel } from './ProductFormPanel';
 import { ProductListPanel } from './ProductListPanel';
+import { ArchivedProductsPanel } from './ArchivedProductsPanel';
 import { InventoryCsvImportPanel } from '../../components/imports/InventoryCsvImportPanel';
 import { useAppTranslation } from '../../i18n/I18nContext';
 
@@ -124,6 +125,8 @@ export function ProductManagementSectionsPanel({
         onStartEdit={handleStartEdit}
         onDelete={handleDelete}
       />
+
+      <ArchivedProductsPanel canManageProducts={canManageProducts} />
     </>
   );
 }
