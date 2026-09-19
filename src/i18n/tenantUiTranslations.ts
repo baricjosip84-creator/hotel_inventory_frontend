@@ -13333,6 +13333,11 @@ const rows: readonly TranslationRow[] = [
   ["No other authorized user is available, so you may execute this request.", "Es ist kein anderer berechtigter Benutzer verfügbar, daher dürfen Sie diese Anfrage ausführen.", "No hay otro usuario autorizado disponible, por lo que puedes ejecutar esta solicitud.", "Aucun autre utilisateur autorisé n’est disponible, vous pouvez donc exécuter cette demande.", "Nema drugog dostupnog ovlaštenog korisnika pa ovaj zahtjev možete izvršiti vi."],
   ["Yes — staffing fallback recorded", "Ja — Personal-Ausnahme protokolliert", "Sí — excepción por dotación registrada", "Oui — dérogation liée aux effectifs enregistrée", "Da — evidentirano izuzeće zbog broja ovlaštenih korisnika"],
   ["Staffing fallback used", "Personal-Ausnahme verwendet", "Se usó una excepción por dotación", "Dérogation liée aux effectifs utilisée", "Korišteno izuzeće zbog broja ovlaštenih korisnika"],
+  ["Close Picking", "Kommissionierung schließen", "Cerrar preparación", "Fermer le prélèvement", "Zatvori komisioniranje"],
+  ["Can complete", "Kann abschließen", "Puede completar", "Peut terminer", "Može dovršiti"],
+  ["Cannot complete task", "Aufgabe kann nicht abgeschlossen werden", "No puede completar la tarea", "Ne peut pas terminer la tâche", "Ne može dovršiti zadatak"],
+  ["Select a user who can work and complete execution tasks.", "Wählen Sie einen Benutzer aus, der Ausführungsaufgaben bearbeiten und abschließen kann.", "Selecciona un usuario que pueda trabajar y completar tareas de ejecución.", "Sélectionnez un utilisateur capable de traiter et de terminer les tâches d’exécution.", "Odaberite korisnika koji može raditi na zadacima izvršenja i dovršiti ih."],
+  ["This user cannot be assigned because they cannot currently work and complete execution tasks.", "Dieser Benutzer kann nicht zugewiesen werden, weil er Ausführungsaufgaben derzeit nicht bearbeiten und abschließen kann.", "Este usuario no se puede asignar porque actualmente no puede trabajar y completar tareas de ejecución.", "Cet utilisateur ne peut pas être affecté car il ne peut pas actuellement traiter et terminer les tâches d’exécution.", "Ovaj korisnik ne može biti dodijeljen jer trenutačno ne može raditi na zadacima izvršenja i dovršiti ih."],
 ];
 
 const indexes: Record<AppLocale, number> = { 'en-GB': 0, 'de-DE': 1, 'es-ES': 2, 'fr-FR': 3, 'hr-HR': 4 };

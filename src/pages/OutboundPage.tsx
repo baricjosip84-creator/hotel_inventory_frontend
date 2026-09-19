@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, apiDownloadFile, apiMutationRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
@@ -454,6 +454,7 @@ export default function OutboundPage() {
   const [orderForm, setOrderForm] = useState<OrderForm>(emptyOrder);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [pickOrderId, setPickOrderId] = useState<string>('');
+  const pickingWorkbenchRef = useRef<HTMLElement | null>(null);
   const [pickDrafts, setPickDrafts] = useState<Record<string, { quantity: string; inventory_lot_id: string; serial_numbers: string[] }>>({});
   const [returnForm, setReturnForm] = useState<ReturnForm>(emptyReturnForm);
   const [orderSearch, setOrderSearch] = useState('');
@@ -537,6 +538,11 @@ export default function OutboundPage() {
     queryFn: () => apiRequest<PickOptions>(`/outbound/orders/${pickOrderId}/pick-options`),
     enabled: Boolean(pickOrderId) && canStockRead
   });
+  useEffect(() => {
+    if (!pickOrderId) return undefined;
+    const handle = window.setTimeout(() => pickingWorkbenchRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    return () => window.clearTimeout(handle);
+  }, [pickOrderId]);
   const orderActivity = useQuery({ queryKey: ['outbound-order-activity', selectedOrderId, orderAuditPage], queryFn: () => apiRequest<OrderActivity>(`/outbound/orders/${selectedOrderId}/activity?audit_page=${orderAuditPage}&audit_page_size=${AUDIT_PAGE_SIZE}`), enabled: Boolean(selectedOrderId) });
   const orderDocuments = useQuery({ queryKey: ['outbound-order-documents', selectedOrderId], queryFn: () => apiRequest<OutboundDocument[]>(`/outbound/orders/${selectedOrderId}/documents`), enabled: Boolean(selectedOrderId) });
   const orderCommunications = useQuery({ queryKey: ['outbound-order-communications', selectedOrderId], queryFn: () => apiRequest<Communication[]>(`/outbound/orders/${selectedOrderId}/communications`), enabled: Boolean(selectedOrderId) });
@@ -1179,7 +1185,7 @@ export default function OutboundPage() {
                 {order.status === 'draft' && canUpdate && canEditOrderForm ? <button type="button" className="outbound-button" onClick={() => beginOrderEdit(order)} disabled={mutation.isPending}>{ui('Edit Draft')}</button> : null}
                 {order.status === 'draft' && canUpdate ? <button type="button" className="outbound-button-primary" onClick={() => mutation.mutate({ path: `/outbound/orders/${order.id}/confirm`, version: Number(order.version), successMessage: ui('{order} confirmed and stock reserved.').replace('{order}', order.order_number) })} disabled={mutation.isPending}>{ui('Confirm & Reserve Stock')}</button> : null}
                 {['confirmed', 'partially_dispatched'].includes(order.status) && canUpdate ? <button type="button" className="outbound-button-primary" onClick={() => startPicking(order)} disabled={mutation.isPending}>{order.status === 'partially_dispatched' ? ui('Pick Remaining') : ui('Start Picking')}</button> : null}
-                {order.status === 'picking' && canUpdate && canStockRead ? <button type="button" className="outbound-button-primary" onClick={() => setPickOrderId(order.id)}>{isPickingOpen ? ui('Picking Open') : ui('Open Picking')}</button> : null}
+                {order.status === 'picking' && canUpdate && canStockRead ? <button type="button" className="outbound-button-primary" onClick={() => setPickOrderId(isPickingOpen ? '' : order.id)}>{isPickingOpen ? ui('Close Picking') : ui('Open Picking')}</button> : null}
                 {order.status === 'picking' && canUpdate && openPicked > 0 ? <button type="button" className="outbound-button-primary" onClick={() => mutation.mutate({ path: `/outbound/orders/${order.id}/mark-packed`, version: Number(order.version), successMessage: ui('{order} picked stock marked packed.').replace('{order}', order.order_number) }, { onSuccess: () => setPickOrderId('') })} disabled={mutation.isPending}>{ui('Mark Picked Stock Packed')}</button> : null}
                 {['picking', 'packed'].includes(order.status) && canUpdate && openPicked > 0 ? <button type="button" className="outbound-button-danger" onClick={() => { if (window.confirm(ui('Clear the current picked quantities and pick again?'))) mutation.mutate({ path: `/outbound/orders/${order.id}/reset-picks`, version: Number(order.version), successMessage: ui('{order} open picks cleared.').replace('{order}', order.order_number) }, { onSuccess: () => { setPickOrderId(''); setPickDrafts({}); } }); }} disabled={mutation.isPending}>{ui('Clear Picks')}</button> : null}
                 {order.status === 'packed' && canDispatch && openPacked > 0 ? <button type="button" className="outbound-button-primary" onClick={() => { if (window.confirm(ui('Dispatch all currently packed stock? Inventory will be reduced for the packed quantities now.'))) mutation.mutate({ path: `/outbound/orders/${order.id}/dispatch`, version: Number(order.version), successMessage: ui('{order} packed stock dispatched.').replace('{order}', order.order_number) }); }} disabled={mutation.isPending}>{ui('Dispatch Packed Stock')}</button> : null}
@@ -1236,10 +1242,10 @@ export default function OutboundPage() {
         </section>;
       })() : null}
 
-      {pickOrderId && canStockRead ? <section className="outbound-panel">
+      {pickOrderId && canStockRead ? <section ref={pickingWorkbenchRef} className="outbound-panel">
         <div className="outbound-section-heading">
           <div><h3>{ui('Picking workbench')}</h3><p>{ui('Record what was physically picked. This does not reduce stock yet; dispatch is the stock-changing step.')}</p></div>
-          <button type="button" className="outbound-button" onClick={() => setPickOrderId('')}>{ui('Close')}</button>
+          <button type="button" className="outbound-button" onClick={() => setPickOrderId('')}>{ui('Close Picking')}</button>
         </div>
         {pickOptions.isLoading ? <div className="outbound-empty">{ui('Loading pick options…')}</div> : pickOptions.isError || !pickOptions.data ? <div className="outbound-alert outbound-alert--error">{queryErrorMessage(pickOptions.error, ui('Unable to load picking details.'))}</div> : pickOptions.data.items.map((item) => {
           const draft = pickDrafts[item.id] ?? { quantity: '', inventory_lot_id: '', serial_numbers: [] };

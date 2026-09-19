@@ -4,6 +4,7 @@ import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
 import { ApiError, apiRequest } from '../lib/api';
+import { getCurrentTenantUserId } from '../lib/auth';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { SidebarAttentionMarker, SidebarAttentionTabDot } from '../components/ui/SidebarAttentionMarker';
 import { sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionStyles';
@@ -236,6 +237,15 @@ type ExecutionTaskOptionUser = {
   email: string;
   role: string;
   is_active: boolean;
+  is_locked_out?: boolean;
+  can_be_assigned?: boolean;
+  execution_task_capability?: {
+    can_read: boolean;
+    can_update: boolean;
+    can_complete: boolean;
+    can_work_and_complete: boolean;
+    missing_permissions: string[];
+  };
   replenishment_capability?: {
     can_create_stock_transfer: boolean;
     can_execute_stock_transfer: boolean;
@@ -254,6 +264,7 @@ type ExecutionTaskOptionLocation = {
 type ExecutionTaskOptions = {
   users: ExecutionTaskOptionUser[];
   active_users: ExecutionTaskOptionUser[];
+  assignable_users: ExecutionTaskOptionUser[];
   locations: ExecutionTaskOptionLocation[];
   active_locations: ExecutionTaskOptionLocation[];
 };
@@ -301,7 +312,7 @@ const EMPTY_SUMMARY: ExecutionTaskSummary = {
   due_soon_task_count: 0,
   unassigned_task_count: 0
 };
-const EMPTY_OPTIONS: ExecutionTaskOptions = { users: [], active_users: [], locations: [], active_locations: [] };
+const EMPTY_OPTIONS: ExecutionTaskOptions = { users: [], active_users: [], assignable_users: [], locations: [], active_locations: [] };
 const INITIAL_FORM: NewTaskForm = {
   title: '',
   description: '',
@@ -335,6 +346,14 @@ function label(value: string | null | undefined, ui: UiFn): string {
   if (!value) return ui('Not recorded');
   const canonical = CANONICAL_LABELS[value];
   return canonical ? ui(canonical) : value.replace(/_/g, ' ');
+}
+
+function canUserBeAssignedExecutionTask(user: ExecutionTaskOptionUser | null | undefined): boolean {
+  return Boolean(user?.is_active && !user?.is_locked_out && user?.can_be_assigned && user?.execution_task_capability?.can_work_and_complete);
+}
+
+function executionTaskAssigneeOptionLabel(user: ExecutionTaskOptionUser, ui: UiFn): string {
+  return `${user.name} · ${user.email} — ${ui(canUserBeAssignedExecutionTask(user) ? 'Can complete' : 'Cannot complete task')}`;
 }
 
 function dateTime(value: string | null | undefined, locale: AppLocale, ui: UiFn): string {
@@ -392,6 +411,7 @@ function payloadFacts(payload: Record<string, unknown> | undefined, ui: UiFn): A
 
 export default function ExecutionTasksPage() {
   const { locale, ui } = useAppTranslation();
+  const currentUserId = getCurrentTenantUserId();
   const [searchParams] = useSearchParams();
   const requestedTaskId = searchParams.get('task_id')?.trim() || '';
   const queueRef = useRef<HTMLDivElement | null>(null);
@@ -481,8 +501,9 @@ export default function ExecutionTasksPage() {
     if (form.source_type !== 'manual' && !form.source_id.trim()) return ui('A linked source ID is required for a non-manual source.');
     if (form.source_id.trim() && !isUuid(form.source_id.trim())) return ui('Source ID must be a valid UUID.');
     if (form.facility_id.trim() && !isUuid(form.facility_id.trim())) return ui('Facility ID must be a valid UUID.');
+    if (form.assigned_to && !canUserBeAssignedExecutionTask(selectedCreateAssignee)) return ui('Select a user who can work and complete execution tasks.');
     return null;
-  }, [form, ui]);
+  }, [form, selectedCreateAssignee, ui]);
 
   useEffect(() => {
     const handle = window.setTimeout(() => setSearch(searchDraft.trim()), 300);
@@ -1070,7 +1091,7 @@ export default function ExecutionTasksPage() {
                     <td><span className={task.is_overdue ? 'execution-tasks-text-danger' : ''}>{dateTime(task.sla_due_at || task.due_at, locale, ui)}</span></td>
                     <td>{userLabel(task.assigned_to)}</td>
                     <td><span>{label(task.due_bucket, ui)}</span></td>
-                    <td><TaskActions task={task} saving={saving} canAssign={canAssign} canUpdate={canUpdate} canComplete={canComplete} canCancel={canCancel} onDirectAction={(action) => void runTaskAction(task, action)} onDialogAction={(action) => setActionDialog({ kind: 'task', action, task, value: '', assigneeId: task.assigned_to || '' })} /></td>
+                    <td><TaskActions task={task} currentUserId={currentUserId} saving={saving} canAssign={canAssign} canUpdate={canUpdate} canComplete={canComplete} canCancel={canCancel} onDirectAction={(action) => void runTaskAction(task, action)} onDialogAction={(action) => setActionDialog({ kind: 'task', action, task, value: '', assigneeId: task.assigned_to || '' })} /></td>
                   </tr>
                   );
                 })}
@@ -1101,7 +1122,7 @@ export default function ExecutionTasksPage() {
               <label>{ui("Task type")}<select value={form.task_type} onChange={(event) => setForm({ ...form, task_type: event.target.value as ExecutionTaskType })}>{TASK_TYPES.map((type) => <option key={type} value={type}>{label(type, ui)}</option>)}</select></label>
               <label>{ui("Priority")}<select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value as ExecutionTaskPriority })}>{PRIORITIES.map((priority) => <option key={priority} value={priority}>{label(priority, ui)}</option>)}</select></label>
               <label>{ui("Initial state")}<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as 'draft' | 'ready' })}><option value="draft">{ui("Draft")}</option><option value="ready">{ui("Ready")}</option></select></label>
-              <label>{ui("Assign to")}<select value={form.assigned_to} onChange={(event) => setForm({ ...form, assigned_to: event.target.value })} disabled={optionsLoading}><option value="">{ui("Unassigned")}</option>{options.active_users.map((user) => <option key={user.id} value={user.id}>{user.name} · {user.email}</option>)}</select></label>
+              <label>{ui("Assign to")}<select value={form.assigned_to} onChange={(event) => setForm({ ...form, assigned_to: event.target.value })} disabled={optionsLoading}><option value="">{ui("Unassigned")}</option>{options.active_users.map((user) => <option key={user.id} value={user.id} disabled={!canUserBeAssignedExecutionTask(user)}>{executionTaskAssigneeOptionLabel(user, ui)}</option>)}</select></label>
               {createAssigneeCapabilityWarning ? <div className="execution-tasks-alert execution-tasks-alert--warning execution-tasks-field-wide"><strong>{ui("Assignee cannot complete the inventory movement alone.")}</strong> {ui("This replenishment task can still coordinate the work, but the selected user lacks Stock Transfer create and/or execute permission. An authorized user must record the actual stock transfer.")}</div> : null}
               <label>{ui("Storage location")}<select value={form.storage_location_id} onChange={(event) => setForm({ ...form, storage_location_id: event.target.value })} disabled={optionsLoading}><option value="">{ui("No location")}</option>{options.active_locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select></label>
               <label>{ui("Due at")}<input type="datetime-local" value={form.due_at} onChange={(event) => setForm({ ...form, due_at: event.target.value })} /></label>
@@ -1127,7 +1148,7 @@ export default function ExecutionTasksPage() {
       </div>
 
       <section ref={detailRef} id="execution-task-detail" className="execution-tasks-scroll-anchor">
-        <TaskDetail task={selected} auditRows={taskAudit} userLabel={userLabel} locationLabel={locationLabel} saving={saving} canAssign={canAssign} canUpdate={canUpdate} canComplete={canComplete} canCancel={canCancel} onDirectAction={(task, action) => void runTaskAction(task, action)} onDialogAction={(task, action) => setActionDialog({ kind: 'task', action, task, value: '', assigneeId: task.assigned_to || '' })} />
+        <TaskDetail task={selected} currentUserId={currentUserId} auditRows={taskAudit} userLabel={userLabel} locationLabel={locationLabel} saving={saving} canAssign={canAssign} canUpdate={canUpdate} canComplete={canComplete} canCancel={canCancel} onDirectAction={(task, action) => void runTaskAction(task, action)} onDialogAction={(task, action) => setActionDialog({ kind: 'task', action, task, value: '', assigneeId: task.assigned_to || '' })} />
       </section>
 
       <details ref={managementRef} id="execution-task-management" className="execution-tasks-governance execution-tasks-scroll-anchor" open={analyticsOpen} onToggle={(event) => { const open = (event.currentTarget as HTMLDetailsElement).open; setAnalyticsOpen(open); if (open) setActiveWorkspaceSection('management'); }}>
@@ -1240,8 +1261,9 @@ function Distribution({ title, rows }: { title: string; rows: Array<{ label: str
   return <article className="execution-tasks-mini-card"><strong>{title}</strong>{rows.length ? rows.map((row) => <div key={row.label} className="execution-tasks-distribution-row"><span>{row.label}</span><span>{formatNumber(row.count, locale)}</span></div>) : <span>{ui("No data")}</span>}</article>;
 }
 
-function TaskActions({ task, saving, canAssign, canUpdate, canComplete, canCancel, onDirectAction, onDialogAction }: {
+function TaskActions({ task, currentUserId, saving, canAssign, canUpdate, canComplete, canCancel, onDirectAction, onDialogAction }: {
   task: ExecutionTask;
+  currentUserId: string | null;
   saving: boolean;
   canAssign: boolean;
   canUpdate: boolean;
@@ -1252,19 +1274,22 @@ function TaskActions({ task, saving, canAssign, canUpdate, canComplete, canCance
 }) {
   const { ui } = useAppTranslation();
   const terminal = task.status === 'completed' || task.status === 'cancelled';
+  const assignedToAnotherUser = Boolean(task.assigned_to && task.assigned_to !== currentUserId);
+  const canWorkTask = canUpdate && canComplete && !assignedToAnotherUser;
   return <div className="execution-tasks-actions execution-tasks-actions--compact">
     {canUpdate && task.status === 'draft' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => onDirectAction('ready')}>{ui("Mark ready")}</button> : null}
     {canAssign && ['ready', 'assigned', 'blocked'].includes(task.status) ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => onDialogAction('assign')}>{ui("Assign")}</button> : null}
-    {canUpdate && ['ready', 'assigned', 'blocked'].includes(task.status) ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => onDirectAction('start')}>{ui("Start")}</button> : null}
+    {canWorkTask && ['ready', 'assigned', 'blocked'].includes(task.status) ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => onDirectAction('start')}>{ui("Start")}</button> : null}
     {canUpdate && ['ready', 'assigned', 'in_progress'].includes(task.status) ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => onDialogAction('block')}>{ui("Block")}</button> : null}
     {canUpdate && task.status === 'blocked' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => onDirectAction('unblock')}>{ui("Unblock")}</button> : null}
-    {canComplete && ['ready', 'assigned', 'in_progress'].includes(task.status) ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => onDialogAction('complete')}>{ui("Complete")}</button> : null}
+    {canWorkTask && ['ready', 'assigned', 'in_progress'].includes(task.status) ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => onDialogAction('complete')}>{ui("Complete")}</button> : null}
     {canCancel && !terminal ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => onDialogAction('cancel')}>{ui("Cancel")}</button> : null}
   </div>;
 }
 
-function TaskDetail({ task, auditRows, userLabel, locationLabel, saving, canAssign, canUpdate, canComplete, canCancel, onDirectAction, onDialogAction }: {
+function TaskDetail({ task, currentUserId, auditRows, userLabel, locationLabel, saving, canAssign, canUpdate, canComplete, canCancel, onDirectAction, onDialogAction }: {
   task: ExecutionTask | null;
+  currentUserId: string | null;
   auditRows: ExecutionTaskAuditRow[];
   userLabel: (id?: string | null) => string;
   locationLabel: (id?: string | null) => string;
@@ -1295,7 +1320,7 @@ function TaskDetail({ task, auditRows, userLabel, locationLabel, saving, canAssi
       />
 
       <div className="execution-tasks-detail-actions">
-        <TaskActions task={task} saving={saving} canAssign={canAssign} canUpdate={canUpdate} canComplete={canComplete} canCancel={canCancel} onDirectAction={(action) => onDirectAction(task, action)} onDialogAction={(action) => onDialogAction(task, action)} />
+        <TaskActions task={task} currentUserId={currentUserId} saving={saving} canAssign={canAssign} canUpdate={canUpdate} canComplete={canComplete} canCancel={canCancel} onDirectAction={(action) => onDirectAction(task, action)} onDialogAction={(action) => onDialogAction(task, action)} />
       </div>
 
       <div className="execution-tasks-detail-grid">
@@ -1373,6 +1398,10 @@ function ActionDialogModal({ dialog, users, saving, onChange, onCancel, onConfir
   const selectedAssignee = dialog.kind === 'task' && dialog.assigneeId
     ? users.find((user) => user.id === dialog.assigneeId) || null
     : null;
+  const assigneeCapabilityWarning = dialog.kind === 'task'
+    && dialog.action === 'assign'
+    && selectedAssignee
+    && !canUserBeAssignedExecutionTask(selectedAssignee);
   const replenishmentAssignmentWarning = dialog.kind === 'task'
     && dialog.action === 'assign'
     && dialog.task.task_type === 'replenishment'
@@ -1380,7 +1409,7 @@ function ActionDialogModal({ dialog, users, saving, onChange, onCancel, onConfir
     && !selectedAssignee.replenishment_capability.can_perform_replenishment;
   const needsReason = taskAction === 'block' || taskAction === 'cancel' || (dialog.kind === 'batch' && dialog.action === 'cancel');
   const canConfirm = taskAction === 'assign'
-    ? Boolean(dialog.kind === 'task' && dialog.assigneeId)
+    ? Boolean(dialog.kind === 'task' && dialog.assigneeId && canUserBeAssignedExecutionTask(selectedAssignee))
     : needsReason
       ? dialog.value.trim().length >= 3
       : true;
@@ -1388,7 +1417,8 @@ function ActionDialogModal({ dialog, users, saving, onChange, onCancel, onConfir
   return <div className="execution-tasks-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) onCancel(); }}>
     <section className="execution-tasks-modal" role="dialog" aria-modal="true" aria-label={title}>
       <div className="execution-tasks-card-header"><div><h3>{title}</h3><p>{ui("Confirm the information that will be written to the task audit trail.")}</p></div><button type="button" className="execution-tasks-close" onClick={onCancel} aria-label={ui("Close")}>×</button></div>
-      {dialog.kind === 'task' && dialog.action === 'assign' ? <label>{ui("Assign to")}<select value={dialog.assigneeId} onChange={(event) => onChange({ ...dialog, assigneeId: event.target.value })}><option value="">{ui("Select an active user")}</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name} · {user.email}</option>)}</select></label> : null}
+      {dialog.kind === 'task' && dialog.action === 'assign' ? <label>{ui("Assign to")}<select value={dialog.assigneeId} onChange={(event) => onChange({ ...dialog, assigneeId: event.target.value })}><option value="">{ui("Select an active user")}</option>{users.map((user) => <option key={user.id} value={user.id} disabled={!canUserBeAssignedExecutionTask(user)}>{executionTaskAssigneeOptionLabel(user, ui)}</option>)}</select></label> : null}
+      {assigneeCapabilityWarning ? <div className="execution-tasks-alert execution-tasks-alert--warning"><strong>{ui("Cannot complete task")}</strong> {ui("This user cannot be assigned because they cannot currently work and complete execution tasks.")}</div> : null}
       {replenishmentAssignmentWarning ? <div className="execution-tasks-alert execution-tasks-alert--warning"><strong>{ui("Assignee cannot complete the inventory movement alone.")}</strong> {ui("This replenishment task can still coordinate the work, but the selected user lacks Stock Transfer create and/or execute permission. An authorized user must record the actual stock transfer.")}</div> : null}
       {dialog.kind === 'task' && dialog.action === 'complete' ? <label>{ui("Completion note (optional)")}<textarea value={dialog.value} maxLength={1000} onChange={(event) => onChange({ ...dialog, value: event.target.value })} /></label> : null}
       {needsReason ? <label>{ui(taskAction === 'block' ? 'Blocked reason' : 'Cancellation reason')}<textarea value={dialog.value} maxLength={1000} onChange={(event) => onChange({ ...dialog, value: event.target.value })} placeholder={ui("Enter at least three characters")} /></label> : null}
