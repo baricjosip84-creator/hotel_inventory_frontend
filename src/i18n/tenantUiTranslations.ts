@@ -2220,6 +2220,7 @@ const rows: readonly TranslationRow[] = [
   ["Delayed", "Verzögert", "Retrasado", "Retardé", "Odgođeno"],
   ["Delete", "Löschen", "Eliminar", "Supprimer", "Izbriši"],
   ["Delete Line", "Position löschen", "Eliminar línea", "Supprimer la ligne", "Izbriši stavku"],
+  ["Remove shipment line", "Sendungsposition entfernen", "Eliminar línea del envío", "Supprimer la ligne d’expédition", "Ukloni stavku pošiljke"],
   ["Delete Shipment", "Sendung löschen", "Eliminar envío", "Supprimer l’expédition", "Izbriši pošiljku"],
   ["Delete package", "Paket löschen", "Eliminar paquete", "Supprimer le conditionnement", "Izbriši pakiranje"],
   ["Delete product", "Produkt löschen", "Eliminar producto", "Supprimer le produit", "Izbriši proizvod"],
@@ -2379,6 +2380,7 @@ const rows: readonly TranslationRow[] = [
   ["Earliest Overdue Date", "Frühestes Überfälligkeitsdatum", "Primera fecha vencida", "Date de retard la plus ancienne", "Najraniji datum kašnjenja"],
   ["Earliest matching usage event", "Frühestes passendes Verbrauchsereignis", "Evento de consumo coincidente más antiguo", "Événement de consommation correspondant le plus ancien", "Najraniji odgovarajući događaj potrošnje"],
   ["Edit", "Bearbeiten", "Editar", "Modifier", "Uredi"],
+  ["Edit ordered quantity", "Bestellmenge bearbeiten", "Editar cantidad pedida", "Modifier la quantité commandée", "Uredi naručenu količinu"],
   ["Edit Draft", "Entwurf bearbeiten", "Editar borrador", "Modifier le brouillon", "Uredi nacrt"],
   ["Edit Product", "Produkt bearbeiten", "Editar producto", "Modifier le produit", "Uredi proizvod"],
   ["Edit Shipment", "Sendung bearbeiten", "Editar envío", "Modifier l’expédition", "Uredi pošiljku"],
@@ -7040,6 +7042,7 @@ const rows: readonly TranslationRow[] = [
   ["Save Customer", "Kunden speichern", "Guardar cliente", "Enregistrer le client", "Spremi kupca"],
   ["Save Draft", "Entwurf speichern", "Guardar borrador", "Enregistrer le brouillon", "Spremi nacrt"],
   ["Save Line", "Position speichern", "Guardar línea", "Enregistrer la ligne", "Spremi stavku"],
+  ["Save ordered quantity", "Bestellmenge speichern", "Guardar cantidad pedida", "Enregistrer la quantité commandée", "Spremi naručenu količinu"],
   ["Save Shipment", "Lieferung speichern", "Guardar envío", "Enregistrer la livraison", "Spremi pošiljku"],
   ["Save a shortage reason without receiving stock. Use this when the supplier delivered zero or the line will remain short.", "Speichern Sie einen Fehlmengengrund, ohne Bestand zu vereinnahmen. Verwenden Sie dies, wenn der Lieferant nichts geliefert hat oder die Position unvollständig bleibt.", "Guarde un motivo de faltante sin recibir existencias. Úselo cuando el proveedor no haya entregado nada o la línea vaya a quedar incompleta.", "Enregistrez un motif de manque sans réceptionner de stock. Utilisez cette option lorsque le fournisseur n’a rien livré ou que la ligne restera incomplète.", "Spremite razlog manjka bez zaprimanja zalihe. Upotrijebite ovo kada dobavljač nije isporučio ništa ili će stavka ostati nepotpuna."],
   ["Save all decisions first. Before draft creation, the app rechecks current stock, reservations, transfers, inbound supply, products, locations, suppliers, and package rules.", "Speichern Sie zuerst alle Entscheidungen. Vor der Entwurfserstellung prüft die App den aktuellen Bestand, Reservierungen, Umlagerungen, eingehende Lieferungen, Produkte, Standorte, Lieferanten und Verpackungsregeln erneut.", "Guarde primero todas las decisiones. Antes de crear borradores, la aplicación vuelve a comprobar el stock actual, las reservas, las transferencias, el suministro entrante, los productos, las ubicaciones, los proveedores y las reglas de empaquetado.", "Enregistrez d’abord toutes les décisions. Avant la création des brouillons, l’application revérifie le stock actuel, les réservations, les transferts, les approvisionnements entrants, les produits, les emplacements, les fournisseurs et les règles de conditionnement.", "Najprije spremite sve odluke. Prije stvaranja nacrta aplikacija ponovno provjerava trenutačnu zalihu, rezervacije, prijenose, dolaznu opskrbu, proizvode, lokacije, dobavljače i pravila pakiranja."],
@@ -13340,6 +13343,8 @@ const rows: readonly TranslationRow[] = [
   ["Complete the linked Execution Request with real execution or no-op execution before closing this task.", "Schließen Sie die verknüpfte Ausführungsanforderung mit einer echten Ausführung oder einer No-Op-Ausführung ab, bevor Sie diese Aufgabe schließen.", "Complete la solicitud de ejecución vinculada con una ejecución real o una ejecución sin cambios antes de cerrar esta tarea.", "Terminez la demande d’exécution liée par une exécution réelle ou une exécution sans effet avant de clôturer cette tâche.", "Dovršite povezani Zahtjev za izvršenje stvarnim izvršenjem ili izvršenjem bez promjene prije zatvaranja ovog zadatka."],
   ["Select a user who can work and complete execution tasks.", "Wählen Sie einen Benutzer aus, der Ausführungsaufgaben bearbeiten und abschließen kann.", "Selecciona un usuario que pueda trabajar y completar tareas de ejecución.", "Sélectionnez un utilisateur capable de traiter et de terminer les tâches d’exécution.", "Odaberite korisnika koji može raditi na zadacima izvršenja i dovršiti ih."],
   ["This user cannot be assigned because they cannot currently work and complete execution tasks.", "Dieser Benutzer kann nicht zugewiesen werden, weil er Ausführungsaufgaben derzeit nicht bearbeiten und abschließen kann.", "Este usuario no se puede asignar porque actualmente no puede trabajar y completar tareas de ejecución.", "Cet utilisateur ne peut pas être affecté car il ne peut pas actuellement traiter et terminer les tâches d’exécution.", "Ovaj korisnik ne može biti dodijeljen jer trenutačno ne može raditi na zadacima izvršenja i dovršiti ih."],
+  ["Changes the shipment line only; it does not receive stock.", "Ändert nur die Sendungsposition; es wird kein Bestand vereinnahmt.", "Solo cambia la línea del envío; no recibe existencias.", "Modifie uniquement la ligne d’expédition ; aucun stock n’est réceptionné.", "Mijenja samo stavku pošiljke; ne zaprima zalihu."],
+  ["Enter a discrepancy reason first.", "Geben Sie zuerst einen Abweichungsgrund ein.", "Introduzca primero un motivo de discrepancia.", "Saisissez d’abord un motif d’écart.", "Najprije unesite razlog odstupanja."],
 ];
 
 const indexes: Record<AppLocale, number> = { 'en-GB': 0, 'de-DE': 1, 'es-ES': 2, 'fr-FR': 3, 'hr-HR': 4 };

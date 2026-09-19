@@ -1158,24 +1158,30 @@ export default function DashboardPage() {
                     (overdueShipmentsQuery.data ?? []).map((row) => (
                       <tr key={row.id}>
                         <td style={styles.td}>
-                          <div style={styles.rowTitle}>{row.po_number || '-'}</div>
                           {canViewShipments ? (
-                            <ActionLink
+                            <Link
                               to={`/shipments?shipmentId=${encodeURIComponent(row.id)}`}
-                              label={ui('Open Shipment')}
-                              iconPath="/shipments"
-                            />
-                          ) : null}
+                              style={styles.tableRecordLink}
+                              title={ui('Open Shipment')}
+                            >
+                              {row.po_number || '-'}
+                            </Link>
+                          ) : (
+                            <div style={styles.rowTitle}>{row.po_number || '-'}</div>
+                          )}
                         </td>
                         <td style={styles.td}>
-                          <div style={styles.rowTitle}>{row.supplier_name}</div>
                           {canViewSuppliers ? (
-                            <ActionLink
+                            <Link
                               to={`/suppliers?supplier_id=${encodeURIComponent(row.supplier_id)}`}
-                              label={ui('Open Supplier')}
-                              iconPath="/suppliers"
-                            />
-                          ) : null}
+                              style={styles.tableRecordLink}
+                              title={ui('Open Supplier')}
+                            >
+                              {row.supplier_name}
+                            </Link>
+                          ) : (
+                            <div style={styles.rowTitle}>{row.supplier_name}</div>
+                          )}
                         </td>
                         <td style={styles.td}>{formatDate(row.delivery_date)}</td>
                         <td style={styles.td}>
@@ -1854,6 +1860,15 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: '4px',
     color: '#0f172a',
     wordBreak: 'break-word'
+  },
+  tableRecordLink: {
+    display: 'inline',
+    color: '#1d4ed8',
+    fontWeight: 800,
+    textDecoration: 'underline',
+    textDecorationColor: '#bfdbfe',
+    textUnderlineOffset: 2,
+    overflowWrap: 'anywhere'
   },
   rowSubtle: {
     fontSize: '10px',

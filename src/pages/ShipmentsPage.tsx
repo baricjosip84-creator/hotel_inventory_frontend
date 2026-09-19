@@ -3515,6 +3515,10 @@ export default function ShipmentsPage() {
 
                         {canManageShipmentItems && selectedShipmentIsPending ? (
                           <div style={styles.itemManagementPanel}>
+                            <div style={styles.itemManagementHeading}>
+                              <div style={styles.itemManagementTitle}>{ui('Edit ordered quantity')}</div>
+                              <div style={styles.fieldHint}>{ui('Changes the shipment line only; it does not receive stock.')}</div>
+                            </div>
                             <div style={styles.itemManagementInputBlock}>
                               <label style={styles.label}>{ui('Ordered Quantity')}</label>
                               <input
@@ -3533,7 +3537,7 @@ export default function ShipmentsPage() {
                                 onClick={() => handleUpdateShipmentItem(item)}
                                 disabled={updateShipmentItemMutation.isPending}
                               >
-                                {updateShipmentItemMutation.isPending ? ui('Saving...') : ui('Save Line')}
+                                {updateShipmentItemMutation.isPending ? ui('Saving...') : ui('Save ordered quantity')}
                               </button>
                               <button
                                 type="button"
@@ -3541,7 +3545,7 @@ export default function ShipmentsPage() {
                                 onClick={() => handleDeleteShipmentItem(item)}
                                 disabled={deleteShipmentItemMutation.isPending}
                               >
-                                {deleteShipmentItemMutation.isPending ? ui('Deleting...') : ui('Delete Line')}
+                                {deleteShipmentItemMutation.isPending ? ui('Deleting...') : ui('Remove shipment line')}
                               </button>
                             </div>
                           </div>
@@ -3651,21 +3655,54 @@ export default function ShipmentsPage() {
                               <input style={styles.input} type="number" min="0" step="0.01" value={draft.quarantine_quantity} onChange={(event) => updateReceiveDraft(item.id, (current) => ({ ...current, quarantine_quantity: event.target.value }))} />
                             </div>
 
-                            <div style={styles.receiveLineField}>
+                            <div style={styles.receiveLineFieldWide}>
                               <label style={styles.label}>{ui('Discrepancy Reason')}</label>
-                              <input
-                                style={styles.input}
-                                type="text"
-                                placeholder={ui('Required only if this line remains short')}
-                                value={draft.discrepancy_reason}
-                                maxLength={1000}
-                                onChange={(event) =>
-                                  updateReceiveDraft(item.id, (current) => ({
-                                    ...current,
-                                    discrepancy_reason: event.target.value
-                                  }))
-                                }
-                              />
+                              <div style={styles.shortageReasonRow}>
+                                <input
+                                  style={{ ...styles.input, ...styles.shortageReasonInput }}
+                                  type="text"
+                                  placeholder={ui('Required only if this line remains short')}
+                                  value={draft.discrepancy_reason}
+                                  maxLength={1000}
+                                  onChange={(event) =>
+                                    updateReceiveDraft(item.id, (current) => ({
+                                      ...current,
+                                      discrepancy_reason: event.target.value
+                                    }))
+                                  }
+                                />
+                                {remaining > 0 && selectedShipment.status !== 'received' && canReceiveShipments ? (
+                                  <button
+                                    type="button"
+                                    data-skip-global-action-feedback="true"
+                                    style={{
+                                      ...styles.secondaryButton,
+                                      ...((recordReceivingDiscrepancyMutation.isPending || !draft.discrepancy_reason.trim())
+                                        ? styles.secondaryButtonDisabled
+                                        : {})
+                                    }}
+                                    onClick={() => handleSaveShortageReason(item)}
+                                    disabled={
+                                      recordReceivingDiscrepancyMutation.isPending ||
+                                      !draft.discrepancy_reason.trim()
+                                    }
+                                    title={
+                                      !draft.discrepancy_reason.trim()
+                                        ? ui('Enter a discrepancy reason first.')
+                                        : ui('Save a shortage reason without receiving stock. Use this when the supplier delivered zero or the line will remain short.')
+                                    }
+                                  >
+                                    {recordReceivingDiscrepancyMutation.isPending ? ui('Saving reason...') : ui('Save shortage reason')}
+                                  </button>
+                                ) : null}
+                              </div>
+                              {remaining > 0 && canReceiveShipments ? (
+                                <div style={styles.inlineHint}>
+                                  {!draft.discrepancy_reason.trim()
+                                    ? ui('Enter a discrepancy reason first.')
+                                    : ui('If no units arrived, enter the shortage reason and save it without receiving stock.')}
+                                </div>
+                              ) : null}
                             </div>
 
                             <div style={styles.receiveLineField}>
@@ -3699,28 +3736,8 @@ export default function ShipmentsPage() {
                               >
                                 {receiveShipmentMutation.isPending ? ui('Receiving...') : ui('Receive Item')}
                               </button>
-                              {remaining > 0 && selectedShipment.status !== 'received' && canReceiveShipments ? (
-                                <button
-                                  type="button"
-                                  data-skip-global-action-feedback="true"
-                                  style={styles.secondaryButton}
-                                  onClick={() => handleSaveShortageReason(item)}
-                                  disabled={
-                                    recordReceivingDiscrepancyMutation.isPending ||
-                                    !draft.discrepancy_reason.trim()
-                                  }
-                                  title={ui('Save a shortage reason without receiving stock. Use this when the supplier delivered zero or the line will remain short.')}
-                                >
-                                  {recordReceivingDiscrepancyMutation.isPending ? ui('Saving reason...') : ui('Save shortage reason')}
-                                </button>
-                              ) : null}
                               {receiveLineDisabledReason ? (
                                 <div style={styles.inlineHint}>{receiveLineDisabledReason}</div>
-                              ) : null}
-                              {remaining > 0 && canReceiveShipments ? (
-                                <div style={styles.inlineHint}>
-                                  {ui('If no units arrived, enter the shortage reason and save it without receiving stock.')}
-                                </div>
                               ) : null}
                             </div>
                           </div>
@@ -4494,6 +4511,15 @@ const styles: Record<string, CSSProperties> = {
     background: '#f8fafc',
     marginBottom: 14
   },
+  itemManagementHeading: {
+    flex: '1 1 100%',
+    minWidth: 0
+  },
+  itemManagementTitle: {
+    fontWeight: 800,
+    color: '#334155',
+    marginBottom: 2
+  },
   itemManagementInputBlock: {
     flex: '1 1 180px',
     minWidth: 0
@@ -4523,6 +4549,21 @@ const styles: Record<string, CSSProperties> = {
   },
   receiveLineField: {
     minWidth: 0
+  },
+  receiveLineFieldWide: {
+    minWidth: 0,
+    gridColumn: '1 / -1'
+  },
+  shortageReasonRow: {
+    display: 'flex',
+    alignItems: 'stretch',
+    gap: 8,
+    flexWrap: 'wrap'
+  },
+  shortageReasonInput: {
+    flex: '1 1 280px',
+    width: 'auto',
+    minWidth: 'min(280px, 100%)'
   },
   receiveLineActionBlock: {
     display: 'flex',
