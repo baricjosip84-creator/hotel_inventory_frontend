@@ -70,6 +70,9 @@ type ExecutionTask = {
   blocked_reason?: string | null;
   cancellation_reason?: string | null;
   completion_note?: string | null;
+  source_request_status?: string | null;
+  source_execution_status?: string | null;
+  source_completion_ready?: boolean;
   created_at: string;
   updated_at: string;
   priority_score?: number;
@@ -354,6 +357,10 @@ function canUserBeAssignedExecutionTask(user: ExecutionTaskOptionUser | null | u
 
 function executionTaskAssigneeOptionLabel(user: ExecutionTaskOptionUser, ui: UiFn): string {
   return `${user.name} · ${user.email} — ${ui(canUserBeAssignedExecutionTask(user) ? 'Can complete' : 'Cannot complete task')}`;
+}
+
+function executionTaskSourceReady(task: ExecutionTask): boolean {
+  return task.source_type !== 'execution_request' || task.source_completion_ready !== false;
 }
 
 function dateTime(value: string | null | undefined, locale: AppLocale, ui: UiFn): string {
@@ -1275,14 +1282,16 @@ function TaskActions({ task, currentUserId, saving, canAssign, canUpdate, canCom
   const { ui } = useAppTranslation();
   const terminal = task.status === 'completed' || task.status === 'cancelled';
   const assignedToAnotherUser = Boolean(task.assigned_to && task.assigned_to !== currentUserId);
+  const sourceReady = executionTaskSourceReady(task);
   const canWorkTask = canUpdate && canComplete && !assignedToAnotherUser;
   return <div className="execution-tasks-actions execution-tasks-actions--compact">
     {canUpdate && task.status === 'draft' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => onDirectAction('ready')}>{ui("Mark ready")}</button> : null}
     {canAssign && ['ready', 'assigned', 'blocked'].includes(task.status) ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => onDialogAction('assign')}>{ui("Assign")}</button> : null}
-    {canWorkTask && ['ready', 'assigned', 'blocked'].includes(task.status) ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => onDirectAction('start')}>{ui("Start")}</button> : null}
+    {canWorkTask && ['ready', 'assigned', 'blocked'].includes(task.status) && sourceReady ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => onDirectAction('start')}>{ui("Start")}</button> : null}
     {canUpdate && ['ready', 'assigned', 'in_progress'].includes(task.status) ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => onDialogAction('block')}>{ui("Block")}</button> : null}
     {canUpdate && task.status === 'blocked' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => onDirectAction('unblock')}>{ui("Unblock")}</button> : null}
-    {canWorkTask && ['ready', 'assigned', 'in_progress'].includes(task.status) ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => onDialogAction('complete')}>{ui("Complete")}</button> : null}
+    {canWorkTask && ['ready', 'assigned', 'in_progress'].includes(task.status) && sourceReady ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => onDialogAction('complete')}>{ui("Complete")}</button> : null}
+    {!terminal && task.source_type === 'execution_request' && !sourceReady ? <span className="execution-tasks-source-gate">{ui("Waiting for source execution")}</span> : null}
     {canCancel && !terminal ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => onDialogAction('cancel')}>{ui("Cancel")}</button> : null}
   </div>;
 }
@@ -1337,6 +1346,12 @@ function TaskDetail({ task, currentUserId, auditRows, userLabel, locationLabel, 
       {task.blocked_reason ? <div className="execution-tasks-alert execution-tasks-alert--warning"><strong>{ui("Blocked reason:")}</strong> {task.blocked_reason}</div> : null}
       {task.cancellation_reason ? <div className="execution-tasks-alert execution-tasks-alert--warning"><strong>{ui("Cancellation reason:")}</strong> {task.cancellation_reason}</div> : null}
       {task.completion_note ? <div className="execution-tasks-alert execution-tasks-alert--success"><strong>{ui("Completion note:")}</strong> {task.completion_note}</div> : null}
+      {task.source_type === 'execution_request' && !executionTaskSourceReady(task) ? (
+        <div className="execution-tasks-alert execution-tasks-alert--warning">
+          <strong>{ui("Waiting for source execution")}</strong>
+          {' '}{ui("Complete the linked Execution Request with real execution or no-op execution before closing this task.")}
+        </div>
+      ) : null}
 
       {facts.length ? (
         <div className="execution-tasks-detail-section">

@@ -104,6 +104,12 @@
   font-size: 12px;
 }
 
+.execution-tasks-source-gate {
+  font-size: 12px;
+  font-weight: 700;
+  color: #92400e;
+}
+
 .execution-tasks-alert {
   border-radius: 12px;
   padding: 12px 14px;
