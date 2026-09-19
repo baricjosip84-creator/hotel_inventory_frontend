@@ -4644,6 +4644,214 @@ function reviewBusinessImpactRows(review: HumanAIReview, ui: (englishText: strin
   return rows;
 }
 
+function adaptiveEvidenceRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function adaptiveEvidenceRows(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.filter((row): row is Record<string, unknown> => typeof row === 'object' && row !== null && !Array.isArray(row))
+    : [];
+}
+
+function adaptiveEvidenceNumber(value: unknown): number | null {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function adaptiveEvidenceCount(value: unknown, locale: AppLocale, ui: (englishText: string) => string): string {
+  const parsed = adaptiveEvidenceNumber(value);
+  return parsed === null ? ui('Not reported') : formatLocalizedNumber(parsed, locale, { maximumFractionDigits: 0 });
+}
+
+function adaptiveEvidenceQuantity(value: unknown, locale: AppLocale, ui: (englishText: string) => string): string {
+  const parsed = adaptiveEvidenceNumber(value);
+  return parsed === null ? ui('Not reported') : formatLocalizedNumber(parsed, locale, { maximumFractionDigits: 2 });
+}
+
+function adaptiveEvidencePercent(value: unknown, locale: AppLocale, ui: (englishText: string) => string): string {
+  const parsed = adaptiveEvidenceNumber(value);
+  return parsed === null ? ui('Not reported') : formatLocalizedNumber(parsed, locale, { style: 'percent', maximumFractionDigits: 1 });
+}
+
+function AdaptivePolicyEvidencePanel({ review, ui, locale }: { review: HumanAIReview; ui: (englishText: string) => string; locale: AppLocale }) {
+  if (review.source_reference?.source_type !== 'adaptive_policy_recommendation') return null;
+  const metrics = review.simulation_preview?.preview_metrics || {};
+  const signal = adaptiveEvidenceRecord(metrics.signal_observed);
+  const adjustment = adaptiveEvidenceRecord(metrics.recommended_adjustment);
+  const adjustmentKind = String(adjustment.adjustment_kind || '');
+  if (!adjustmentKind) return null;
+
+  const issueRatio = signal.issue_ratio ?? adaptiveEvidenceRecord(metrics.expected_impact).current_issue_ratio;
+  const commonMetricCards = issueRatio === undefined
+    ? []
+    : [{ label: ui('Current issue ratio'), value: adaptiveEvidencePercent(issueRatio, locale, ui) }];
+
+  if (adjustmentKind === 'review_replenishment_thresholds_and_supply_position') {
+    const productsEvaluated = signal.products_evaluated;
+    const productsNeeding = signal.products_needing_replenishment ?? adjustment.affected_product_count;
+    const locationsEvaluated = signal.configured_locations_evaluated;
+    const locationsWithShortage = signal.configured_locations_with_shortage ?? adjustment.affected_location_count;
+    const candidates = adaptiveEvidenceRows(adjustment.replenishment_candidates ?? signal.replenishment_candidates);
+    const thresholdCandidates = adaptiveEvidenceRows(adjustment.threshold_candidates);
+    const evaluatedNumber = adaptiveEvidenceNumber(productsEvaluated);
+    const affectedNumber = adaptiveEvidenceNumber(productsNeeding);
+    const summary = evaluatedNumber !== null && affectedNumber !== null
+      ? interpolateReviewTemplate('{affected} of {evaluated} evaluated products currently need replenishment after reservations and committed supply are considered.', {
+          affected: formatLocalizedNumber(affectedNumber, locale, { maximumFractionDigits: 0 }),
+          evaluated: formatLocalizedNumber(evaluatedNumber, locale, { maximumFractionDigits: 0 })
+        }, ui)
+      : ui('The analysis found products that still need replenishment after reservations and committed supply are considered.');
+
+    return (
+      <section className="ai-review-page__adaptive-evidence">
+        <div className="ai-review-page__adaptive-evidence-heading">
+          <div>
+            <div className="card__label">{ui('Evidence behind this recommendation')}</div>
+            <h4>{ui('Dynamic replenishment evidence')}</h4>
+          </div>
+          <span className="ai-review-page__badge ai-review-page__badge--violet">{ui('Analysis snapshot')}</span>
+        </div>
+        <p className="card__subtext">{summary}</p>
+        <div className="ai-review-page__adaptive-metrics">
+          {[
+            { label: ui('Products evaluated'), value: adaptiveEvidenceCount(productsEvaluated, locale, ui) },
+            { label: ui('Products needing replenishment'), value: adaptiveEvidenceCount(productsNeeding, locale, ui) },
+            { label: ui('Configured locations evaluated'), value: adaptiveEvidenceCount(locationsEvaluated, locale, ui) },
+            { label: ui('Configured locations with shortage'), value: adaptiveEvidenceCount(locationsWithShortage, locale, ui) },
+            ...commonMetricCards
+          ].map((metric) => <div key={metric.label} className="ai-review-page__adaptive-metric"><span>{metric.label}</span><strong>{metric.value}</strong></div>)}
+        </div>
+
+        {candidates.length ? (
+          <div className="ai-review-page__adaptive-subsection">
+            <div className="ai-review-page__adaptive-subsection-heading">
+              <strong>{ui('Products requiring replenishment')}</strong>
+              <span>{ui('Showing the affected Product evidence stored with this analysis snapshot.')}</span>
+            </div>
+            <div className="ai-review-page__adaptive-table-wrap">
+              <table className="ai-review-page__adaptive-table">
+                <thead><tr>
+                  <th>{ui('Product')}</th>
+                  <th>{ui('Current stock')}</th>
+                  <th>{ui('Active reservations')}</th>
+                  <th>{ui('Available after reservations')}</th>
+                  <th>{ui('Reliable inbound')}</th>
+                  <th>{ui('At-risk inbound')}</th>
+                  <th>{ui('Approved PO not yet shipped')}</th>
+                  <th>{ui('Inventory position')}</th>
+                  <th>{ui('Target stock')}</th>
+                  <th>{ui('Recommended reorder')}</th>
+                  <th>{ui('Supplier')}</th>
+                </tr></thead>
+                <tbody>{candidates.map((candidate, index) => (
+                  <tr key={String(candidate.product_id || `${candidate.product_name || 'product'}-${index}`)}>
+                    <td><strong>{String(candidate.product_name || ui('Unnamed product'))}</strong></td>
+                    <td>{adaptiveEvidenceQuantity(candidate.current_stock, locale, ui)}</td>
+                    <td>{adaptiveEvidenceQuantity(candidate.active_reservations, locale, ui)}</td>
+                    <td>{adaptiveEvidenceQuantity(candidate.available_after_reservations, locale, ui)}</td>
+                    <td>{adaptiveEvidenceQuantity(candidate.reliable_inbound, locale, ui)}</td>
+                    <td>{adaptiveEvidenceQuantity(candidate.at_risk_inbound, locale, ui)}</td>
+                    <td>{adaptiveEvidenceQuantity(candidate.approved_po_unshipped, locale, ui)}</td>
+                    <td>{adaptiveEvidenceQuantity(candidate.inventory_position, locale, ui)}</td>
+                    <td>{adaptiveEvidenceQuantity(candidate.target_stock, locale, ui)}</td>
+                    <td><strong>{adaptiveEvidenceQuantity(candidate.recommended_reorder_quantity, locale, ui)}</strong></td>
+                    <td>{candidate.supplier_name ? String(candidate.supplier_name) : ui('Not reported')}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </div>
+        ) : <p className="ai-review-page__adaptive-empty">{ui('No Product-level replenishment candidates were stored with this recommendation.')}</p>}
+
+        {thresholdCandidates.length ? (
+          <div className="ai-review-page__adaptive-subsection">
+            <div className="ai-review-page__adaptive-subsection-heading">
+              <strong>{ui('Thresholds suggested for review')}</strong>
+              <span>{ui('These are review candidates only; no minimum-stock value changes automatically.')}</span>
+            </div>
+            <div className="ai-review-page__adaptive-table-wrap">
+              <table className="ai-review-page__adaptive-table ai-review-page__adaptive-table--compact">
+                <thead><tr>
+                  <th>{ui('Product')}</th>
+                  <th>{ui('Current product minimum')}</th>
+                  <th>{ui('Location minimum total')}</th>
+                  <th>{ui('Governed minimum')}</th>
+                  <th>{ui('Suggested direction')}</th>
+                  <th>{ui('Confidence')}</th>
+                </tr></thead>
+                <tbody>{thresholdCandidates.map((candidate, index) => (
+                  <tr key={String(candidate.product_id || `${candidate.product_name || 'threshold'}-${index}`)}>
+                    <td><strong>{String(candidate.product_name || ui('Unnamed product'))}</strong></td>
+                    <td>{adaptiveEvidenceQuantity(candidate.current_product_min_stock, locale, ui)}</td>
+                    <td>{adaptiveEvidenceQuantity(candidate.effective_location_minimum_total, locale, ui)}</td>
+                    <td>{adaptiveEvidenceQuantity(candidate.governed_min_stock, locale, ui)}</td>
+                    <td>{reviewSystemValueLabel(String(candidate.candidate_direction || 'unknown'), ui)}</td>
+                    <td>{adaptiveEvidencePercent(candidate.confidence_score, locale, ui)}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
+        <p className="ai-review-page__adaptive-footnote">{ui('This evidence is read-only. A review decision does not change stock, thresholds, Purchase Orders, or supplier settings automatically.')}</p>
+      </section>
+    );
+  }
+
+  if (adjustmentKind === 'review_supplier_selection_and_receiving_rules') {
+    const candidates = adaptiveEvidenceRows(adjustment.supplier_review_candidates ?? signal.supplier_review_candidates);
+    return (
+      <section className="ai-review-page__adaptive-evidence">
+        <div className="ai-review-page__adaptive-evidence-heading"><div><div className="card__label">{ui('Evidence behind this recommendation')}</div><h4>{ui('Supplier performance evidence')}</h4></div><span className="ai-review-page__badge ai-review-page__badge--violet">{ui('Analysis snapshot')}</span></div>
+        <div className="ai-review-page__adaptive-metrics">
+          {[
+            { label: ui('Suppliers measured'), value: adaptiveEvidenceCount(signal.suppliers_measured, locale, ui) },
+            { label: ui('Suppliers requiring review'), value: adaptiveEvidenceCount(signal.suppliers_requiring_review ?? adjustment.affected_supplier_count, locale, ui) },
+            ...commonMetricCards
+          ].map((metric) => <div key={metric.label} className="ai-review-page__adaptive-metric"><span>{metric.label}</span><strong>{metric.value}</strong></div>)}
+        </div>
+        {candidates.length ? <div className="ai-review-page__adaptive-table-wrap"><table className="ai-review-page__adaptive-table"><thead><tr><th>{ui('Supplier')}</th><th>{ui('Shipments')}</th><th>{ui('On-time delivery')}</th><th>{ui('Late delivery')}</th><th>{ui('Receiving discrepancy')}</th><th>{ui('Damaged / rejected')}</th><th>{ui('Late open shipments')}</th><th>{ui('Trend')}</th></tr></thead><tbody>{candidates.map((candidate, index) => <tr key={String(candidate.supplier_id || `${candidate.supplier_name || 'supplier'}-${index}`)}><td><strong>{String(candidate.supplier_name || ui('Unnamed supplier'))}</strong></td><td>{adaptiveEvidenceCount(candidate.shipments_90d, locale, ui)}</td><td>{adaptiveEvidencePercent(candidate.on_time_delivery_rate_90d, locale, ui)}</td><td>{adaptiveEvidencePercent(candidate.late_delivery_rate_90d, locale, ui)}</td><td>{adaptiveEvidencePercent(candidate.receiving_discrepancy_rate_90d, locale, ui)}</td><td>{adaptiveEvidencePercent(candidate.damaged_rejected_rate_90d, locale, ui)}</td><td>{adaptiveEvidenceCount(candidate.late_open_shipments, locale, ui)}</td><td>{reviewSystemValueLabel(String(candidate.performance_trend || 'unknown'), ui)}</td></tr>)}</tbody></table></div> : null}
+        <p className="ai-review-page__adaptive-footnote">{ui('This evidence is read-only. A review decision does not change stock, thresholds, Purchase Orders, or supplier settings automatically.')}</p>
+      </section>
+    );
+  }
+
+  if (adjustmentKind === 'review_reservation_allocation_rules') {
+    const samples = adaptiveEvidenceRows(adjustment.sample_reservations ?? signal.sample_reservations);
+    return (
+      <section className="ai-review-page__adaptive-evidence">
+        <div className="ai-review-page__adaptive-evidence-heading"><div><div className="card__label">{ui('Evidence behind this recommendation')}</div><h4>{ui('Reservation allocation evidence')}</h4></div><span className="ai-review-page__badge ai-review-page__badge--violet">{ui('Analysis snapshot')}</span></div>
+        <div className="ai-review-page__adaptive-metrics">{[
+          { label: ui('Active reservations'), value: adaptiveEvidenceCount(signal.active_reservations, locale, ui) },
+          { label: ui('Blocked or partial reservations'), value: adaptiveEvidenceCount(signal.blocked_or_partial_reservations ?? adjustment.affected_reservation_count, locale, ui) },
+          ...commonMetricCards
+        ].map((metric) => <div key={metric.label} className="ai-review-page__adaptive-metric"><span>{metric.label}</span><strong>{metric.value}</strong></div>)}</div>
+        {samples.length ? <div className="ai-review-page__adaptive-record-list">{samples.map((sample, index) => <div key={String(sample.reservation_id || index)}><strong>{String(sample.reservation_id || ui('Reservation'))}</strong><span>{reviewSystemValueLabel(String(sample.status || 'unknown'), ui)}</span></div>)}</div> : null}
+        <p className="ai-review-page__adaptive-footnote">{ui('This evidence is read-only. A review decision does not change stock, thresholds, Purchase Orders, or supplier settings automatically.')}</p>
+      </section>
+    );
+  }
+
+  if (adjustmentKind === 'review_task_routing_or_labor_allocation_rules') {
+    const samples = adaptiveEvidenceRows(adjustment.sample_blocked_tasks ?? signal.sample_blocked_tasks);
+    return (
+      <section className="ai-review-page__adaptive-evidence">
+        <div className="ai-review-page__adaptive-evidence-heading"><div><div className="card__label">{ui('Evidence behind this recommendation')}</div><h4>{ui('Execution task evidence')}</h4></div><span className="ai-review-page__badge ai-review-page__badge--violet">{ui('Analysis snapshot')}</span></div>
+        <div className="ai-review-page__adaptive-metrics">{[
+          { label: ui('Active execution tasks'), value: adaptiveEvidenceCount(signal.active_execution_tasks, locale, ui) },
+          { label: ui('Blocked execution tasks'), value: adaptiveEvidenceCount(signal.blocked_execution_tasks ?? adjustment.affected_task_count, locale, ui) },
+          ...commonMetricCards
+        ].map((metric) => <div key={metric.label} className="ai-review-page__adaptive-metric"><span>{metric.label}</span><strong>{metric.value}</strong></div>)}</div>
+        {samples.length ? <div className="ai-review-page__adaptive-record-list">{samples.map((sample, index) => <div key={String(sample.task_id || index)}><strong>{String(sample.task_id || ui('Execution task'))}</strong><span>{reviewSystemValueLabel(String(sample.status || 'unknown'), ui)}</span></div>)}</div> : null}
+        <p className="ai-review-page__adaptive-footnote">{ui('This evidence is read-only. A review decision does not change stock, thresholds, Purchase Orders, or supplier settings automatically.')}</p>
+      </section>
+    );
+  }
+
+  return null;
+}
+
 function reviewDecisionMeaning(decision: ReviewDecision | undefined, ui: (englishText: string) => string, sourceType?: string): string {
   if (sourceType === 'probabilistic_forecast_model') {
     if (decision === 'approved_for_manual_action') return ui('Trust this forecast model for advisory forecasting. This does not create operational work or an Execution Request.');
@@ -9350,6 +9558,8 @@ export default function HumanInLoopAIReviewPage() {
                     <p className="card__subtext"><strong>{ui('If approved:')}</strong> {review.source_reference?.source_type === 'probabilistic_forecast_model' ? ui('The forecast can be trusted for advisory use only. No operational work is created automatically.') : ui('The result can continue to controlled manual follow-up. No business record changes automatically.')}</p>
                     <p className="card__subtext"><strong>{ui('If no action is taken:')}</strong> {ui('This page leaves the current business records unchanged.')}</p>
                   </div>
+
+                  <AdaptivePolicyEvidencePanel review={review} ui={ui} locale={locale} />
 
                   {canViewDiagnostics && review.source_reference?.source_id ? (
                     <div style={{ marginTop: 12 }}>
