@@ -1491,6 +1491,22 @@ const statusOptions: Record<FeedbackMode, string[]> = {
   'optimization-results': ['observed', 'value_confirmed', 'value_missed', 'tradeoff_drift_detected', 'governance_review_required', 'archived']
 };
 
+function scoreDerivedFromStatus(mode: FeedbackMode, status: string): string | undefined {
+  if (mode === 'policy-effectiveness') {
+    if (status === 'effective') return '1';
+    if (status === 'needs_tuning_review') return '0';
+    if (status === 'ineffective') return '-1';
+    return '';
+  }
+  if (mode === 'optimization-results') {
+    if (status === 'value_confirmed') return '1';
+    if (status === 'value_missed') return '-1';
+    if (status === 'tradeoff_drift_detected' || status === 'governance_review_required') return '0';
+    return '';
+  }
+  return undefined;
+}
+
 const defaultForm: FeedbackFormState = {
   recordKey: '',
   subtype: 'recommendation_outcome',
@@ -5161,6 +5177,11 @@ export default function DecisionLearningFeedbackPage() {
   const canReadInsights = hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
   const canViewDiagnostics = hasPermission(TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ);
   const canCreateExecutionRequests = hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_CREATE);
+  // v3.49.211: Keep the technical/diagnostic implementation in source, but do not expose it in the normal tenant Learning Feedback UI.
+  const showTenantFeedbackTechnicalFields = false;
+  const showTenantLearningFeedbackReadinessChecks = false;
+  // Previous tenant-facing heading retained as commented reference: {ui('Record feedback evidence')}
+  // Previous tenant-facing observation label retained as commented reference: ui('Result observed on')
   const [view, setView] = useState<LearningFeedbackView>('feedback');
   const [mode, setMode] = useState<FeedbackMode>('learning-outcomes');
   const [form, setForm] = useState<FeedbackFormState>(() => ({ ...defaultForm, observedAt: nowLocalDateTimeValue(), financialImpactCurrency: getActiveTenantCurrency() }));
@@ -5630,7 +5651,7 @@ export default function DecisionLearningFeedbackPage() {
         iconPath="/decision-learning-feedback"
         eyebrow={ui('Decision intelligence & learning')}
         title={ui('Learning Feedback')}
-        description={ui('Record what actually happened after a recommendation, forecast, policy, or optimization result so people can review whether it helped. This page does not change stock, execute work, or train an AI model.')}
+        description={ui('Record what happened after you followed or checked a recommendation, forecast, policy, or optimization result.')}
         meta={undefined /* v3.49.55: repetitive technical hero pills intentionally hidden; safety/audit behavior remains enforced. */}
         aside={<><OperationalWorkspaceStatus value={governance?.continuous_learning_posture ? ui(formatLabel(governance.continuous_learning_posture)) : summaryQuery.isLoading ? ui('Loading') : summaryQuery.isError ? ui('Unavailable') : ui('Unknown')} label={`${ui('continuous learning posture')} · ${ui('refreshed')} ${summaryQuery.dataUpdatedAt ? formatLocalizedDateTime(summaryQuery.dataUpdatedAt, locale) : ui('not refreshed yet')}`} /><button className="button button--secondary" type="button" onClick={refreshSummary} disabled={summaryQuery.isFetching}><TenantNavIcon path="/decision-learning-feedback" size={16} />{summaryQuery.isFetching ? ui('Refreshing…') : ui('Refresh summary')}</button></>}
       />
@@ -5662,16 +5683,15 @@ export default function DecisionLearningFeedbackPage() {
           label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>{ui('Feedback records')}{canGovern && Number(summaryQuery.data?.feedback_review_board?.review_item_count || 0) > 0 ? <SidebarAttentionTabDot label={ui('Attention required')} /> : null}</span>}
           onClick={() => setView('feedback')}
         />
-        {canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label={ui('Readiness checks')} onClick={() => setView('readiness')} /> : null}
+        {showTenantLearningFeedbackReadinessChecks && canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label={ui('Readiness checks')} onClick={() => setView('readiness')} /> : null}
       </OperationalWorkspaceTabs>
 
       {view === 'feedback' ? (canGovern ? (
       <section className={'card learning-feedback-form-card'}>
         <div className="card__header">
           <div>
-            <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/decision-learning-feedback" size={18} /></span>{ui('Record feedback evidence')}</h2>
-            <p className="card__subtext">{ui('Choose what was reviewed, identify the source, and describe the expected and actual result. The saved record is added to the audit trail and the summary is refreshed.')}</p>
-            <p className="card__subtext">{ui('Advanced fields are optional. Leave a field blank when the answer is not known; the system will not turn a blank field into a measured result, decision, or assigned action.')}</p>
+            <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/decision-learning-feedback" size={18} /></span>{ui('Record what happened')}</h2>
+            <p className="card__subtext">{ui('Choose what you checked, say whether it worked, and describe what actually happened.')}</p>
           </div>
         </div>
 
@@ -5696,9 +5716,9 @@ export default function DecisionLearningFeedbackPage() {
             <strong>{ui('Known source facts')}</strong>
             <span>{feedbackSourceDisplayLabel(selectedSource, mode, locale, ui)}</span>
             {mode === 'forecast-accuracy' ? <span>{ui('Predicted:')} {formText(prefill.predicted_value) || '—'} {formText(prefill.unit)} · {ui('Confidence:')} {formText(prefill.confidence_score) || formText(prefill.confidence_level) || '—'}</span> : null}
-            {mode === 'learning-outcomes' && prefill.expected_result ? <span>{ui('Expected guidance is filled from the selected recommendation.')}</span> : null}
-            {mode === 'policy-effectiveness' ? <span>{ui('The policy baseline is filled from the current policy evidence.')}</span> : null}
-            {mode === 'optimization-results' ? <span>{ui('The optimization objective is filled from the selected planning run.')}</span> : null}
+            {mode === 'learning-outcomes' && prefill.expected_result ? <span>{ui('The selected recommendation is linked automatically to this feedback record.')}</span> : null}
+            {mode === 'policy-effectiveness' ? <span>{ui('The selected policy is linked automatically to this feedback record.')}</span> : null}
+            {mode === 'optimization-results' ? <span>{ui('The selected planning run is linked automatically to this feedback record.')}</span> : null}
           </div> : null;
         })() : null}
 
@@ -5731,31 +5751,48 @@ export default function DecisionLearningFeedbackPage() {
               {visibleFeedbackModes.map((item) => <option key={item} value={item}>{ui(modeLabels[item])}</option>)}
             </select>
           </label>
+          {showTenantFeedbackTechnicalFields ? (
           <label>
             <span className="form-label">{ui('Domain')}</span>
             <select className="input" value={form.domain} onChange={(event) => updateForm('domain', event.target.value)} disabled={Boolean(sourceId)}>
               {domainOptions.map((domain) => <option key={domain} value={domain}>{learningDomainLabel(domain, ui)}</option>)}
             </select>
           </label>
+          ) : null}
           <label>
             <span className="form-label">{ui('Status')}</span>
-            <select className="input" value={form.status} onChange={(event) => updateForm('status', event.target.value)}>
+            <select className="input" value={form.status} onChange={(event) => {
+              const nextStatus = event.target.value;
+              const derivedScore = scoreDerivedFromStatus(mode, nextStatus);
+              setForm((current) => ({ ...current, status: nextStatus, ...(derivedScore !== undefined ? { score: derivedScore } : {}) }));
+            }}>
               {activeStatusOptions.map((status) => <option key={status} value={status}>{ui(formatLabel(status))}</option>)}
             </select>
           </label>
+          {mode === 'learning-outcomes' ? (
+            <label>
+              <span className="form-label">{ui('Did it help?')}</span>
+              <select className="input" value={form.score} onChange={(event) => updateForm('score', event.target.value)}>
+                <option value="">{ui('Not known')}</option>
+                <option value="1">{ui('Yes')}</option>
+                <option value="0">{ui('Partly / unclear')}</option>
+                <option value="-1">{ui('No')}</option>
+              </select>
+            </label>
+          ) : null}
           {mode === 'forecast-accuracy' ? (
             <div className="learning-feedback-calculated-error">
               <span className="form-label">{ui('Calculated forecast error')}</span>
               <strong>{form.expected.trim() && form.observed.trim() && Number.isFinite(Number(form.expected)) && Number.isFinite(Number(form.observed)) ? formatLocalizedNumber(Math.abs(Number(form.observed) - Number(form.expected)), locale, { maximumFractionDigits: 4 }) : '—'}</strong>
               <small className="card__subtext">{ui('The backend calculates the official absolute and percentage error from predicted versus actual values.')}</small>
             </div>
-          ) : (
+          ) : showTenantFeedbackTechnicalFields ? (
             <label>
               <span className="form-label">{ui('Result score (-1 to 1)')}</span>
               <input className="input" value={form.score} onChange={(event) => updateForm('score', event.target.value)} placeholder="0" />
             </label>
-          )}
-          {activeSubtypeOptions.length > 0 ? (
+          ) : null}
+          {showTenantFeedbackTechnicalFields && activeSubtypeOptions.length > 0 ? (
             <label>
               <span className="form-label">{ui('Evidence type')}</span>
               <select className="input" value={form.subtype} onChange={(event) => updateForm('subtype', event.target.value)}>
@@ -5765,7 +5802,7 @@ export default function DecisionLearningFeedbackPage() {
           ) : null}
         </div>
 
-        {mode === 'learning-outcomes' ? (
+        {showTenantFeedbackTechnicalFields && mode === 'learning-outcomes' ? (
           <details className="learning-feedback-advanced">
             <summary>{ui('Additional recommendation outcome details')}</summary>
             <div className="learning-feedback-advanced__body">
@@ -6148,16 +6185,16 @@ export default function DecisionLearningFeedbackPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 12 }}>
           <label>
-            <span className="form-label">{ui('Result observed on')}</span>
+            <span className="form-label">{ui('Date checked')}</span>
             <input className="input" type="datetime-local" value={form.observedAt} onChange={(event) => updateForm('observedAt', event.target.value)} />
           </label>
-          {mode === 'learning-outcomes' ? <>
+          {showTenantFeedbackTechnicalFields && mode === 'learning-outcomes' ? <>
             <label><span className="form-label">{ui('Measurement period from')}</span><input className="input" type="datetime-local" value={form.measurementWindowStart} onChange={(event) => updateForm('measurementWindowStart', event.target.value)} /></label>
             <label><span className="form-label">{ui('Measurement period to')}</span><input className="input" type="datetime-local" value={form.measurementWindowEnd} onChange={(event) => updateForm('measurementWindowEnd', event.target.value)} /></label>
           </> : null}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 12 }}>
-          {canViewDiagnostics ? (
+          {showTenantFeedbackTechnicalFields && canViewDiagnostics ? (
             <label>
               <span className="form-label">{ui('Technical source reference')}</span>
               <textarea className="input" rows={4} value={form.reference} onChange={(event) => updateForm('reference', event.target.value)} placeholder='{"source":"recommendation-review"}' />
@@ -6167,15 +6204,15 @@ export default function DecisionLearningFeedbackPage() {
             <label><span className="form-label">{ui('Predicted value')}</span><input className="input" type="number" step="any" value={form.expected} onChange={(event) => updateForm('expected', event.target.value)} /></label>
             <label><span className="form-label">{ui('Actual observed value')}</span><input className="input" type="number" step="any" value={form.observed} onChange={(event) => updateForm('observed', event.target.value)} /></label>
           </> : <>
-            <label><span className="form-label">{ui('Expected result')}</span><textarea className="input" rows={4} value={form.expected} onChange={(event) => updateForm('expected', event.target.value)} placeholder={ui('What did we expect to happen?')} /></label>
-            <label><span className="form-label">{ui('Actual observed result')}</span><textarea className="input" rows={4} value={form.observed} onChange={(event) => updateForm('observed', event.target.value)} placeholder={ui('What actually happened?')} /></label>
+            {showTenantFeedbackTechnicalFields ? <label><span className="form-label">{ui('Expected result')}</span><textarea className="input" rows={4} value={form.expected} onChange={(event) => updateForm('expected', event.target.value)} placeholder={ui('What did we expect to happen?')} /></label> : null}
+            <label><span className="form-label">{ui('What happened?')}</span><textarea className="input" rows={4} value={form.observed} onChange={(event) => updateForm('observed', event.target.value)} placeholder={ui('Describe what actually happened after this was checked or applied.')} /></label>
           </>}
         </div>
 
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
           <button className="button" type="button" disabled={mutation.isPending} onClick={submitFeedback}>
             <TenantNavIcon path="/decision-learning-feedback" size={16} />
-            {mutation.isPending ? ui('Saving…') : form.recordKey ? ui('Save feedback changes') : ui('Record feedback evidence')}
+            {mutation.isPending ? ui('Saving…') : form.recordKey ? ui('Save feedback changes') : ui('Save feedback')}
           </button>
           {message ? <span className="card__subtext" role="status">{message}</span> : null}
         </div>
@@ -6225,7 +6262,7 @@ export default function DecisionLearningFeedbackPage() {
           <EvidenceTable title={ui('Policy effectiveness')} mode="policy-effectiveness" rows={summaryQuery.data?.policy_effectiveness || []} pageInfo={summaryQuery.data?.pagination?.policy_effectiveness} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onView={viewEvidence} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('policy_effectiveness', direction)} />
           <EvidenceTable title={ui('Optimization results')} mode="optimization-results" rows={summaryQuery.data?.optimization_results || []} pageInfo={summaryQuery.data?.pagination?.optimization_results} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onView={viewEvidence} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('optimization_results', direction)} />
         </>
-      ) : canViewDiagnostics ? (
+      ) : showTenantLearningFeedbackReadinessChecks && canViewDiagnostics ? (
         <>
           <section className={'card learning-feedback-section learning-feedback-readiness-intro'}>
             <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/reliability-command" size={18} /></span>{ui('Readiness checks')}</h2>
