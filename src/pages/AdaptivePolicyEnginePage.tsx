@@ -20,6 +20,10 @@ import './AdaptivePolicyEnginePage.css';
 
 type AdaptivePolicyView = 'evidence' | 'readiness' | 'diagnostics';
 
+// Tenant-facing simplification (v3.49.213): keep readiness/diagnostics implementation in source, but do not expose it in the normal Adaptive Policy workspace.
+const showTenantAdaptivePolicyReadinessChecks = false;
+const showTenantAdaptivePolicyDiagnostics = false;
+
 type AdaptivePolicyFilters = {
   policy_domain: string;
   policy_type: string;
@@ -893,8 +897,12 @@ export default function AdaptivePolicyEnginePage() {
 
 <OperationalWorkspaceTabs ariaLabel={ui('Adaptive policy page views')}>
         <OperationalWorkspaceTab active={view === 'evidence'} iconPath="/adaptive-policy-engine" label={ui('Policy evidence')} onClick={() => setView('evidence')} />
-        <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label={ui('Readiness checks')} onClick={() => setView('readiness')} />
-        {canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'diagnostics'} iconPath="/admin-system" label={ui('Diagnostics')} onClick={() => setView('diagnostics')} /> : null}
+        {showTenantAdaptivePolicyReadinessChecks ? (
+          <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label={ui('Readiness checks')} onClick={() => setView('readiness')} />
+        ) : null}
+        {showTenantAdaptivePolicyDiagnostics ? (
+          canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'diagnostics'} iconPath="/admin-system" label={ui('Diagnostics')} onClick={() => setView('diagnostics')} /> : null
+        ) : null}
       </OperationalWorkspaceTabs>
 
       <section className="card adaptive-policy-filters" aria-label={ui('Adaptive policy filters')}>
@@ -963,7 +971,7 @@ export default function AdaptivePolicyEnginePage() {
       {view === 'evidence' ? (
         <>
           <p className="adaptive-policy-limit-note"><TenantNavIcon path="/system-context" size={14} />
-            {ui('Lists show up to {limit} matching records in each evidence category. Totals and readiness checks use all matching evidence, not only the rows shown here.').replace('{limit}', formatLocalizedNumber(Number(filters.limit), locale))}
+            {ui('Lists show up to {limit} matching records in each evidence category. Totals use all matching evidence, not only the rows shown here.').replace('{limit}', formatLocalizedNumber(Number(filters.limit), locale))}
           </p>
           <EvidenceSection
             title={ui('Policies')}
@@ -1113,7 +1121,8 @@ export default function AdaptivePolicyEnginePage() {
         </>
       ) : null}
 
-      {view === 'readiness' ? (
+      {showTenantAdaptivePolicyReadinessChecks ? (
+        view === 'readiness' ? (
         hasEvidence ? (
           <>
             <section className="card adaptive-policy-readiness-note">
@@ -1133,9 +1142,11 @@ export default function AdaptivePolicyEnginePage() {
             <p>{ui('At least one adaptive policy evidence record is required before these checks can produce a meaningful result.')}</p></div></div>
           </section>
         )
+      ) : null
       ) : null}
 
-      {view === 'diagnostics' && canViewDiagnostics ? (
+      {showTenantAdaptivePolicyDiagnostics ? (
+      view === 'diagnostics' && canViewDiagnostics ? (
         <section className="card adaptive-policy-diagnostics">
           <div className="card__header">
             <div className="adaptive-policy-section-heading">
@@ -1157,6 +1168,7 @@ export default function AdaptivePolicyEnginePage() {
             <pre>{JSON.stringify(data, null, 2)}</pre>
           </details>
         </section>
+      ) : null
       ) : null}
     </main>
   );

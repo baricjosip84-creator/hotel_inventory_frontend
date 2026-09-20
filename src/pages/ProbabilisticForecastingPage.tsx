@@ -20,6 +20,9 @@ import './ProbabilisticForecastingPage.css';
 
 type ForecastView = 'evidence' | 'readiness' | 'diagnostics';
 
+// Tenant-facing simplification (v3.49.213): retain technical diagnostics implementation, but keep it out of the normal forecasting workspace.
+const showTenantForecastDiagnostics = false;
+
 type ForecastFilterState = {
   forecast_domain: string;
   forecast_type: string;
@@ -886,7 +889,9 @@ export default function ProbabilisticForecastingPage() {
 <OperationalWorkspaceTabs ariaLabel={ui('Probabilistic forecasting page views')}>
         <OperationalWorkspaceTab active={view === 'evidence'} iconPath="/probabilistic-forecasting" label={ui('Forecast evidence')} onClick={() => setView('evidence')} />
         {!focusedMode ? <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label={ui('Review checks')} onClick={() => setView('readiness')} /> : null}
-        {!focusedMode && canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'diagnostics'} iconPath="/admin-system" label={ui('Diagnostics')} onClick={() => setView('diagnostics')} /> : null}
+        {showTenantForecastDiagnostics ? (
+          !focusedMode && canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'diagnostics'} iconPath="/admin-system" label={ui('Diagnostics')} onClick={() => setView('diagnostics')} /> : null
+        ) : null}
       </OperationalWorkspaceTabs>
 
       {focusedModelId ? (
@@ -1168,7 +1173,8 @@ export default function ProbabilisticForecastingPage() {
         )
       ) : null}
 
-      {!focusedMode && view === 'diagnostics' && canViewDiagnostics ? (
+      {showTenantForecastDiagnostics ? (
+      !focusedMode && view === 'diagnostics' && canViewDiagnostics ? (
         <section className="card forecast-diagnostics">
           <div className="card__header">
             <div className="forecast-section-heading">
@@ -1190,6 +1196,7 @@ export default function ProbabilisticForecastingPage() {
             <pre>{JSON.stringify(data, null, 2)}</pre>
           </details>
         </section>
+      ) : null
       ) : null}
     </main>
   );
