@@ -13390,6 +13390,8 @@ const rows: readonly TranslationRow[] = [
 
   ["Did it help?", "Hat es geholfen?", "¿Ayudó?", "Est-ce que cela a aidé ?", "Je li pomoglo?"],
   ["Partly / unclear", "Teilweise / unklar", "Parcialmente / no está claro", "Partiellement / incertain", "Djelomično / nejasno"],
+  ["Choose a source record before saving.", "Wählen Sie vor dem Speichern einen Quelldatensatz aus.", "Elija un registro de origen antes de guardar.", "Choisissez un enregistrement source avant d’enregistrer.", "Odaberite izvorni zapis prije spremanja."],
+  ["Describe what happened before saving.", "Beschreiben Sie vor dem Speichern, was passiert ist.", "Describa lo que ocurrió antes de guardar.", "Décrivez ce qui s’est passé avant d’enregistrer.", "Opišite što se dogodilo prije spremanja."],
 
 ];
 

@@ -426,3 +426,84 @@
 .learning-feedback-page .learning-feedback-history-filters {
   border-top-color: #cbd5e1;
 }
+
+/* v3.49.212: clearer six-month trend presentation without changing trend data. */
+.learning-feedback-page .learning-feedback-trend {
+  border-top-color: #a7f3d0;
+}
+
+.learning-feedback-page .learning-feedback-trend__wrap {
+  overflow-x: auto;
+  border: 1px solid #dbe5f1;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.learning-feedback-page .learning-feedback-trend__table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.learning-feedback-page .learning-feedback-trend__table th {
+  padding: 11px 14px;
+  border-bottom: 1px solid #dbe5f1;
+  color: #475569;
+  background: #f8fafc;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.learning-feedback-page .learning-feedback-trend__table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #edf2f7;
+  vertical-align: middle;
+}
+
+.learning-feedback-page .learning-feedback-trend__table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.learning-feedback-page .learning-feedback-trend__table tbody tr:hover td {
+  background: #fbfdff;
+}
+
+.learning-feedback-page .learning-feedback-trend__month {
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.learning-feedback-page .learning-feedback-trend__value {
+  display: inline-flex;
+  min-width: 52px;
+  justify-content: center;
+  padding: 4px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.learning-feedback-page .learning-feedback-trend__value--positive {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.learning-feedback-page .learning-feedback-trend__value--empty {
+  border-color: transparent;
+  background: transparent;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.learning-feedback-page .learning-feedback-save-hint {
+  color: #64748b;
+}
+

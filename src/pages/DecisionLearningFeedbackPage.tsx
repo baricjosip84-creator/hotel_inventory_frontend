@@ -2102,7 +2102,7 @@ function validateNumberRange(value: string, label: string, min: number, max: num
 }
 
 function validateFeedbackForm(mode: FeedbackMode, form: FeedbackFormState, sourceId: string, ui: (value: string) => string): string | null {
-  if (!sourceId) return ui('Choose the real source record this feedback belongs to.');
+  if (!sourceId) return ui('Choose a source record before saving.');
   if (!form.observedAt.trim()) return ui('Choose when the result was observed.');
   const scoreFields: Array<[string, string, number, number]> = [
     ...(mode === 'forecast-accuracy' ? [] : [[form.score, 'Score', -1, 1] as [string, string, number, number]]),
@@ -2140,7 +2140,7 @@ function validateFeedbackForm(mode: FeedbackMode, form: FeedbackFormState, sourc
   }
 
   if (!form.observed.trim()) {
-    return ui('Describe the observed result before recording feedback.');
+    return ui('Describe what happened before saving.');
   }
 
   return null;
@@ -4976,23 +4976,25 @@ function LearningTrendView({ trends }: { trends: ContinuousLearningSummary['lear
   const periods = trends?.periods || [];
   if (!periods.length) return null;
   return (
-    <section className="card learning-feedback-section">
+    <section className="card learning-feedback-section learning-feedback-trend">
       <div className="card__header"><div>
         <h2><span className="learning-feedback-heading-icon"><TenantNavIcon path="/insights" size={18} /></span>{ui('Learning trend')}</h2>
         <p className="card__subtext">{ui('A simple six-month view of whether decision evidence is improving or getting worse. It is read-only and never trains a model or changes business records.')}</p>
       </div></div>
-      <div className="table-wrap">
-        <table>
+      <div className="table-wrap learning-feedback-trend__wrap">
+        <table className="learning-feedback-trend__table">
           <thead><tr><th>{ui('Month')}</th><th>{ui('Positive outcomes')}</th><th>{ui('Forecast error')}</th><th>{ui('Effective policies')}</th><th>{ui('Positive optimization')}</th><th>{ui('Open reviews')}</th></tr></thead>
           <tbody>{periods.map((period, index) => {
             const ratio = (positive?: number, total?: number) => Number(total || 0) > 0 ? `${formatLocalizedNumber((Number(positive || 0) / Number(total || 1)) * 100, locale, { maximumFractionDigits: 1 })}%` : '—';
+            const formatMetric = (value: string, tone: 'positive' | 'neutral' = 'neutral') => <span className={`learning-feedback-trend__value learning-feedback-trend__value--${value === '—' ? 'empty' : tone}`}>{value}</span>;
+            const openReviews = Number(period.open_review_count ?? 0);
             return <tr key={period.period_start || index}>
-              <td>{period.period_start ? new Intl.DateTimeFormat(locale, { month: 'short', year: 'numeric' }).format(new Date(period.period_start)) : '—'}</td>
-              <td>{ratio(period.outcome_positive, period.outcome_total)}</td>
-              <td>{period.forecast_average_percentage_error === null || period.forecast_average_percentage_error === undefined ? '—' : `${formatLocalizedNumber(period.forecast_average_percentage_error, locale, { maximumFractionDigits: 2 })}%`}</td>
-              <td>{ratio(period.policy_positive, period.policy_total)}</td>
-              <td>{ratio(period.optimization_positive, period.optimization_total)}</td>
-              <td>{formatLocalizedNumber(period.open_review_count ?? 0, locale)}</td>
+              <td><strong className="learning-feedback-trend__month">{period.period_start ? new Intl.DateTimeFormat(locale, { month: 'short', year: 'numeric' }).format(new Date(period.period_start)) : '—'}</strong></td>
+              <td>{formatMetric(ratio(period.outcome_positive, period.outcome_total), 'positive')}</td>
+              <td>{formatMetric(period.forecast_average_percentage_error === null || period.forecast_average_percentage_error === undefined ? '—' : `${formatLocalizedNumber(period.forecast_average_percentage_error, locale, { maximumFractionDigits: 2 })}%`)}</td>
+              <td>{formatMetric(ratio(period.policy_positive, period.policy_total), 'positive')}</td>
+              <td>{formatMetric(ratio(period.optimization_positive, period.optimization_total), 'positive')}</td>
+              <td>{formatMetric(formatLocalizedNumber(openReviews, locale), openReviews === 0 ? 'positive' : 'neutral')}</td>
             </tr>;
           })}</tbody>
         </table>
@@ -5288,8 +5290,10 @@ export default function DecisionLearningFeedbackPage() {
   const visibleFeedbackModes = useMemo(() => (Object.keys(modeLabels) as FeedbackMode[]).filter((item) => item !== 'forecast-accuracy' || canReadInsights), [canReadInsights]);
   const activeStatusOptions = useMemo(() => statusOptions[mode], [mode]);
   const activeSubtypeOptions = useMemo(() => subtypeOptions[mode] || [], [mode]);
+  const feedbackValidationError = canGovern ? validateFeedbackForm(mode, form, sourceId, ui) : null;
 
   const updateForm = (field: keyof FeedbackFormState, value: string) => {
+    setMessage(null);
     setForm((current) => ({ ...current, [field]: value }));
   };
 
@@ -5332,6 +5336,7 @@ export default function DecisionLearningFeedbackPage() {
   };
 
   const handleSourceChange = (nextSourceId: string) => {
+    setMessage(null);
     setSourceId(nextSourceId);
     const source = (sourceQuery.data?.sources || []).find((item) => item.id === nextSourceId);
     if (source) {
@@ -6210,10 +6215,11 @@ export default function DecisionLearningFeedbackPage() {
         </div>
 
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
-          <button className="button" type="button" disabled={mutation.isPending} onClick={submitFeedback}>
+          <button className="button" type="button" disabled={mutation.isPending || Boolean(feedbackValidationError)} onClick={submitFeedback}>
             <TenantNavIcon path="/decision-learning-feedback" size={16} />
             {mutation.isPending ? ui('Saving…') : form.recordKey ? ui('Save feedback changes') : ui('Save feedback')}
           </button>
+          {!mutation.isPending && !message && feedbackValidationError ? <span className="card__subtext learning-feedback-save-hint">{feedbackValidationError}</span> : null}
           {message ? <span className="card__subtext" role="status">{message}</span> : null}
         </div>
       </section>

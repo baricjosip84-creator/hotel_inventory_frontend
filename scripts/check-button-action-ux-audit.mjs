@@ -12,7 +12,8 @@ const requiredProviderMarkers = [
   'findClickedActionElement',
   'isDangerousButtonLabel',
   'getLocalActionFeedbackMessage',
-  "return 'Action started.'",
+  "// return 'Action started.';",
+  'return null;',
   'handleGlobalFormSubmit',
   'navigator.clipboard.writeText',
   'window.print',
@@ -28,7 +29,7 @@ const requiredReportMarkers = [
   'Button and Action UX Audit',
   'Final completion status: complete for the current source tree',
   'Dangerous/destructive actions ask for confirmation',
-  'Every non-navigation, non-benign, non-skipped action has fallback feedback',
+  'Unclassified actions do not show meaningless generic start feedback',
   'Form submissions outside authentication screens show submit feedback',
   'Navigation/sidebar buttons are skipped'
 ];

@@ -30,7 +30,8 @@ The current completion contract requires the global app provider to cover every 
 - Print actions show print-dialog feedback.
 - Form submissions outside authentication screens show submit feedback.
 - Local non-API actions such as refresh, load, view/open, copy, print, export, generate, preview, scan, upload, add, append, replace, reset and selection changes show feedback.
-- Every non-navigation, non-benign, non-skipped action has fallback feedback through the global `Action started.` message.
+<!-- Superseded v3.49.212: Every non-navigation, non-benign, non-skipped action had fallback feedback through the global `Action started.` message. -->
+- Unclassified actions do not show meaningless generic start feedback. They rely on their real success/error state or a specific local action message.
 - Navigation/sidebar buttons are skipped to avoid noisy messages.
 - Auth/login forms are skipped to avoid duplicate or confusing login feedback.
 
@@ -53,7 +54,8 @@ For the current source tree, the feature is complete at implementation level bec
 
 1. global click capture for actionable controls,
 2. global dangerous-action confirmation,
-3. global fallback feedback for otherwise uncovered custom local handlers,
+<!-- Superseded v3.49.212: 3. global fallback feedback for otherwise uncovered custom local handlers, -->
+3. meaningful local feedback for recognized actions, while unknown actions stay silent until a real result is available,
 4. global form-submit feedback,
 5. shared tenant/platform API mutation feedback,
 6. shared tenant/platform download feedback,

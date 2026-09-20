@@ -222,15 +222,16 @@ function getLocalActionFeedbackMessage(label: string): string | null {
   if (normalized.includes('execution review')) return 'Execution review loading.';
 
   /*
-    Final coverage fallback.
-
-    This makes the button/action UX feature exhaustive for rendered controls:
-    every non-navigation, non-benign, non-explicitly-skipped action gets at
-    least one visible response even when an individual page uses a custom local
-    handler that does not call the shared API helpers. API mutations still show
-    their specific success/error messages when the request finishes.
+    v3.49.212: the previous final-coverage fallback is intentionally disabled.
+    Unknown actions should stay silent until a specific local result or shared
+    API success/error message exists; a generic "Action started" toast looks
+    like success even when nothing meaningful happened.
   */
-  return 'Action started.';
+  // v3.49.212: Do not show a meaningless global "Action started" toast for actions
+  // that do not have a specific user-facing message. Keep the previous fallback in
+  // source for audit/history, but deliberately suppress it in normal UX.
+  // return 'Action started.';
+  return null;
 }
 
 function findClickedActionElement(target: EventTarget | null): ActionElement | null {
