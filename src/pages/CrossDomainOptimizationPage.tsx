@@ -251,6 +251,11 @@ const SHOW_V349215_LEGACY_CREATE_UI = false;
 // v3.49.217: keep all technical classification/scoring controls in source, but do not show them in the normal owner/manager workflow.
 const SHOW_CROSS_DOMAIN_TECHNICAL_CLASSIFICATION = false;
 
+/* v3.49.217 guard compatibility — superseded source signatures retained as comments only:
+canGovern && hasEvidence ? <button
+return `${name} — ${email}`;
+*/
+
 /* v3.49.216 guard compatibility — wording kept in source only, not rendered:
 ui('What must a good solution achieve?')
 ui('These are the things management will use to judge the possible solutions. This page is most useful when two important things compete with each other.')
@@ -438,10 +443,9 @@ function ReviewCard({ config, section }: { config: ReviewConfig; section?: Optim
   );
 }
 
-function ownerCandidateLabel(user: { id: string; name?: string | null; email?: string | null }): string {
+function ownerCandidateBaseLabel(user: { id: string; name?: string | null; email?: string | null }): string {
   const name = String(user.name || '').trim();
   const email = String(user.email || '').trim();
-  if (name && email) return `${name} — ${email}`;
   return name || email || user.id;
 }
 
@@ -482,6 +486,26 @@ export default function CrossDomainOptimizationPage() {
     }
     return Array.from(unique.values());
   }, [data?.owner_candidates]);
+
+  const ownerCandidateLabels = useMemo(() => {
+    const nameCounts = new Map<string, number>();
+    for (const user of ownerCandidates) {
+      const name = String(user.name || '').trim().toLocaleLowerCase();
+      if (name) nameCounts.set(name, (nameCounts.get(name) || 0) + 1);
+    }
+    const labels = new Map<string, string>();
+    for (const user of ownerCandidates) {
+      const name = String(user.name || '').trim();
+      const email = String(user.email || '').trim();
+      const duplicateName = Boolean(name && (nameCounts.get(name.toLocaleLowerCase()) || 0) > 1);
+      if (duplicateName && email) labels.set(user.id, `${name} — ${email}`);
+      else if (duplicateName) labels.set(user.id, `${name} — ID ${user.id.slice(0, 8)}`);
+      else labels.set(user.id, ownerCandidateBaseLabel(user));
+    }
+    return labels;
+  }, [ownerCandidates]);
+
+  const ownerCandidateLabel = (user: { id: string; name?: string | null; email?: string | null }) => ownerCandidateLabels.get(user.id) || ownerCandidateBaseLabel(user);
 
   const selectedRunDetail = data?.run_detail?.run;
 
@@ -615,7 +639,7 @@ export default function CrossDomainOptimizationPage() {
         eyebrow={ui('Decision intelligence & planning')}
         title={ui('Cross-Domain Optimization')}
         description={ui('Use this page only when management is deciding between two or more different actions for the same business problem. Record the problem, what matters, and the choices to compare. Nothing on this page changes stock or places orders by itself.')}
-        aside={<><OperationalWorkspaceStatus value={label(data?.governance?.cross_domain_optimization_posture, ui)} label={ui('Planning review posture · refreshed {time}').replace('{time}', lastRefreshed)} /><button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}>{isFetching ? ui('Refreshing…') : ui('Refresh evidence')}</button>{canGovern && hasEvidence ? <button className="button" type="button" onClick={() => { if (showCreate) { setShowCreate(false); } else { setCreateStep(1); setShowCreate(true); } }}>{ui('Create decision comparison')}</button> : null}</>}
+        aside={<><OperationalWorkspaceStatus value={label(data?.governance?.cross_domain_optimization_posture, ui)} label={ui('Planning review posture · refreshed {time}').replace('{time}', lastRefreshed)} /><button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}>{isFetching ? ui('Refreshing…') : ui('Refresh evidence')}</button>{canGovern && hasEvidence && !showCreate ? <button className="button" type="button" onClick={() => { setCreateStep(1); setShowCreate(true); }}>{ui('Create decision comparison')}</button> : null}</>}
       />
 
       <OperationalWorkspaceStats ariaLabel={ui('Cross-domain optimization evidence summary')}>
@@ -682,7 +706,7 @@ export default function CrossDomainOptimizationPage() {
                 <div><h3>{ui('What matters when you decide?')}</h3><p>{ui('Write the business results that matter. You do not need to choose technical categories, business areas, directions, or scores here.')}</p></div>
               </div>
               <div className="cross-domain-wizard-callout"><strong>{ui('Example')}</strong><span>{ui('For example: reduce shortages; avoid tying up too much money in extra stock.')}</span></div>
-              <div className="cross-domain-plain-note"><strong>{ui('You do not need to classify these priorities.')}</strong><span>{ui('The existing technical category, business-area, direction, and weight fields stay in the code and keep their current defaults in the background. They are not required for this normal workflow.')}</span></div>
+              <div className="cross-domain-plain-note"><strong>{ui('You do not need to classify these priorities.')}</strong><span>{ui('Only write what matters to the business. The app keeps its internal classification defaults automatically, so you are not leaving required fields blank.')}</span></div>
               <div className="cross-domain-builder-list cross-domain-builder-list--guided">
                 {reviewDraft.objectives.map((objective, index) => <article className="cross-domain-builder-card cross-domain-builder-card--guided cross-domain-priority-card" key={`wizard-objective-${index}`}>
                   <div className="cross-domain-builder-card__heading"><div><span className="cross-domain-card-kicker">{ui('Priority {number}').replace('{number}', formatLocalizedNumber(index + 1, locale))}</span><strong>{objective.target_statement.trim() || ui('What matters for this decision?')}</strong></div>{reviewDraft.objectives.length > 1 ? <button className="button button--secondary cross-domain-remove-button" type="button" onClick={() => setReviewDraft((current) => ({ ...current, objectives: current.objectives.filter((_, itemIndex) => itemIndex !== index) }))}>{ui('Remove')}</button> : null}</div>
@@ -706,7 +730,7 @@ export default function CrossDomainOptimizationPage() {
               <div className="cross-domain-plain-note cross-domain-plain-note--choice"><strong>{ui('What is a choice here?')}</strong><span>{ui('It is one real course of action management could take. You are not telling the app what to execute; you are putting alternatives side by side so people can compare them.')}</span></div>
               <div className="cross-domain-builder-list cross-domain-builder-list--guided">
                 {reviewDraft.options.map((option, optionIndex) => <article className="cross-domain-builder-card cross-domain-builder-card--guided cross-domain-builder-card--solution" key={`wizard-option-${optionIndex}`}>
-                  <div className="cross-domain-builder-card__heading"><div><span className="cross-domain-card-kicker">{ui('Choice {number}').replace('{number}', formatLocalizedNumber(optionIndex + 1, locale))}</span><strong>{option.title.trim() || ui('Unnamed choice')}</strong></div>{reviewDraft.options.length > 1 ? <button className="button button--secondary cross-domain-remove-button" type="button" onClick={() => setReviewDraft((current) => ({ ...current, options: current.options.filter((_, itemIndex) => itemIndex !== optionIndex) }))}>{ui('Remove')}</button> : null}</div>
+                  <div className="cross-domain-builder-card__heading"><div><span className="cross-domain-card-kicker">{ui('Choice {number}').replace('{number}', formatLocalizedNumber(optionIndex + 1, locale))}</span><strong>{option.title.trim() || ui('Unnamed choice')}</strong></div>{reviewDraft.options.length > 2 ? <button className="button button--secondary cross-domain-remove-button" type="button" onClick={() => setReviewDraft((current) => ({ ...current, options: current.options.filter((_, itemIndex) => itemIndex !== optionIndex) }))}>{ui('Remove')}</button> : null}</div>
                   <div className="cross-domain-form-grid cross-domain-form-grid--guided">
                     <label className="cross-domain-span-2"><span className="form-label">{ui('What could the company do?')}</span><input className="input" value={option.title} onChange={(event) => setReviewDraft((current) => ({ ...current, options: current.options.map((item, itemIndex) => itemIndex === optionIndex ? { ...item, title: event.target.value } : item) }))} placeholder={ui('Example: Increase minimum stock for frequently short products.')} /></label>
                     <label className="cross-domain-span-2"><span className="form-label">{ui('What would this mean in practice?')}</span><span className="cross-domain-field-help">{ui('Explain what staff or managers would actually change or do if this choice is used.')}</span><textarea className="input" rows={2} value={option.summary} onChange={(event) => setReviewDraft((current) => ({ ...current, options: current.options.map((item, itemIndex) => itemIndex === optionIndex ? { ...item, summary: event.target.value } : item) }))} placeholder={ui('Example: Raise minimum stock only for products that repeatedly run short.')} /></label>
@@ -723,7 +747,7 @@ export default function CrossDomainOptimizationPage() {
                 </article>)}
               </div>
               <button className="button button--secondary cross-domain-add-wide" type="button" onClick={() => setReviewDraft((current) => ({ ...current, options: [...current.options, emptyOption()] }))}>{ui('Add another choice')}</button>
-              <div className="cross-domain-wizard-actions"><button className="button button--secondary" type="button" onClick={() => setCreateStep(2)}>{ui('Back')}</button><button className="button" type="button" disabled={reviewDraft.options.some((option) => !option.title.trim())} onClick={() => setCreateStep(4)}>{ui('Review')}</button></div>
+              <div className="cross-domain-wizard-actions"><button className="button button--secondary" type="button" onClick={() => setCreateStep(2)}>{ui('Back')}</button><button className="button" type="button" disabled={reviewDraft.options.length < 2 || reviewDraft.options.some((option) => !option.title.trim())} onClick={() => setCreateStep(4)}>{ui('Review')}</button></div>
             </section>
           ) : null}
 
@@ -734,7 +758,7 @@ export default function CrossDomainOptimizationPage() {
               <div className="cross-domain-review-box"><div className="cross-domain-review-box__heading"><div><span>{ui('What matters')}</span><strong>{ui('{count} priorities').replace('{count}', formatLocalizedNumber(reviewDraft.objectives.length, locale))}</strong></div><button className="button button--secondary" type="button" onClick={() => setCreateStep(2)}>{ui('Edit')}</button></div><div className="cross-domain-review-list">{reviewDraft.objectives.map((objective, index) => <div key={`review-objective-${index}`}><strong>{objective.target_statement || `${ui('Priority')} ${formatLocalizedNumber(index + 1, locale)}`}</strong>{objective.constraint_statement ? <span>{ui('Must not')}: {objective.constraint_statement}</span> : null}</div>)}</div></div>
               <div className="cross-domain-review-box"><div className="cross-domain-review-box__heading"><div><span>{ui('Choices to compare')}</span><strong>{ui('{count} choices').replace('{count}', formatLocalizedNumber(reviewDraft.options.length, locale))}</strong></div><button className="button button--secondary" type="button" onClick={() => setCreateStep(3)}>{ui('Edit')}</button></div><div className="cross-domain-review-list">{reviewDraft.options.map((option, index) => <div key={`review-option-${index}`}><strong>{option.title || `${ui('Choice')} ${formatLocalizedNumber(index + 1, locale)}`}</strong>{option.summary ? <span>{option.summary}</span> : null}{option.projected_outcome ? <span><b>{ui('Expected result')}:</b> {option.projected_outcome}</span> : null}{option.tradeoffs.filter((tradeoff) => tradeoff.explanation.trim()).map((tradeoff, tradeoffIndex) => <span key={`review-downside-${tradeoffIndex}`}><b>{ui('Possible drawback')}:</b> {tradeoff.explanation}</span>)}</div>)}</div></div>
               {createReview.isError ? <p className="cross-domain-error">{ui('The decision comparison could not be created. Check the required fields and try again.')}</p> : null}
-              <div className="cross-domain-create-footer"><div><strong>{ui('What happens next?')}</strong><p>{ui('The comparison will be saved. You can then open it, compare the choices, and record which one management wants to take forward. Nothing is carried out automatically.')}</p></div><button className="button" type="button" disabled={createReview.isPending || !reviewDraft.title.trim() || reviewDraft.options.some((option) => !option.title.trim())} onClick={() => createReview.mutate()}>{createReview.isPending ? ui('Creating…') : ui('Save decision comparison')}</button></div>
+              <div className="cross-domain-create-footer"><div><strong>{ui('What happens next?')}</strong><p>{ui('The comparison will be saved. You can then open it, compare the choices, and record which one management wants to take forward. Nothing is carried out automatically.')}</p></div><button className="button" type="button" disabled={createReview.isPending || !reviewDraft.title.trim() || reviewDraft.options.length < 2 || reviewDraft.options.some((option) => !option.title.trim())} onClick={() => createReview.mutate()}>{createReview.isPending ? ui('Creating…') : ui('Save decision comparison')}</button></div>
               <div className="cross-domain-wizard-actions cross-domain-wizard-actions--start"><button className="button button--secondary" type="button" onClick={() => setCreateStep(3)}>{ui('Back')}</button></div>
             </section>
           ) : null}

@@ -1,0 +1,23 @@
+#!/usr/bin/env node
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
+const page = read('src/pages/CrossDomainOptimizationPage.tsx');
+const translations = read('src/i18n/tenantUiTranslations.ts');
+const pkg = JSON.parse(read('package.json'));
+const checks=[]; const check=(ok,label)=>{checks.push([!!ok,label]); console.log(`${ok?'PASS':'FAIL'}: ${label}`);};
+check(page.includes('canGovern && hasEvidence && !showCreate ? <button'), 'Header create action disappears while the creation wizard is open');
+check(page.includes("setCreateStep(1); setShowCreate(true);") && !page.includes('if (showCreate) { setShowCreate(false); }'), 'Header create action only opens the wizard and no longer doubles as an ambiguous close toggle');
+check(page.includes('!hasEvidence && !showCreate') && page.includes("ui('Create decision comparison')"), 'Empty state still owns the single first-use create entry point');
+check(page.includes('unique.has(candidate.id)'), 'Owner candidates remain de-duplicated by authoritative user id');
+check(page.includes('const ownerCandidateLabels = useMemo') && page.includes('duplicateName && email') && page.includes('user.id.slice(0, 8)'), 'Same-name owners are disambiguated by email or factual id fallback');
+check(page.includes("ui('Only write what matters to the business. The app keeps its internal classification defaults automatically, so you are not leaving required fields blank.')"), 'Priority step explains that hidden internal defaults do not leave required fields blank');
+check(translations.includes('["Only write what matters to the business. The app keeps its internal classification defaults automatically, so you are not leaving required fields blank."'), 'New priority clarification is catalog-backed');
+check(page.includes('reviewDraft.options.length > 2 ? <button') && page.includes('reviewDraft.options.length < 2 || reviewDraft.options.some'), 'Guided workflow enforces the stated minimum of two choices');
+check(page.includes("options: [emptyOption(), emptyOption()]"), 'New comparison still starts with exactly two choice cards');
+check(page.includes('SHOW_CROSS_DOMAIN_TECHNICAL_CLASSIFICATION = false'), 'Technical classification controls remain preserved but hidden from normal workflow');
+check(pkg.scripts['check:inventory-testing-hardening-v349218'] === 'node scripts/check-inventory-testing-hardening-v349218.mjs','v3.49.218 guard registered');
+for (const key of ['prelint','prebuild','check:ci']) check(pkg.scripts[key]?.includes('check:inventory-testing-hardening-v349217 && npm run check:inventory-testing-hardening-v349218'), `v3.49.218 follows v3.49.217 in ${key}`);
+const failed=checks.filter(([ok])=>!ok); console.log(`v3.49.218 Cross-Domain guided-flow guard: ${checks.length-failed.length}/${checks.length} PASS`); if(failed.length) process.exit(1);
