@@ -1270,3 +1270,144 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* v3.49.228 — business-facing source recommendations; no raw planning-engine cards */
+.cross-domain-source-origin-note {
+  display: grid;
+  gap: .3rem;
+  padding: .85rem 1rem;
+  border: 1px solid #cbd5e1;
+  border-left: 4px solid #2563eb;
+  border-radius: .75rem;
+  background: #fff;
+  color: #475569;
+  font-size: .82rem;
+  line-height: 1.5;
+}
+
+.cross-domain-source-origin-note strong {
+  color: #0f172a;
+}
+
+.cross-domain-source-grid--business {
+  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
+  align-items: stretch;
+}
+
+.cross-domain-source-card--business {
+  gap: .75rem;
+  cursor: pointer;
+}
+
+.cross-domain-source-card--business .cross-domain-source-card__top {
+  padding-bottom: .65rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.cross-domain-source-card__origin {
+  color: #2563eb !important;
+  font-size: .72rem !important;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+
+.cross-domain-source-card__section {
+  display: grid;
+  gap: .25rem;
+  min-width: 0;
+}
+
+.cross-domain-source-card__section small {
+  color: #64748b;
+  font-size: .7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.cross-domain-source-card__section b,
+.cross-domain-source-card__section span {
+  color: #0f172a;
+  font-size: .82rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.cross-domain-source-card__section span {
+  color: #475569;
+}
+
+.cross-domain-source-business-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .45rem;
+}
+
+.cross-domain-source-business-facts > span {
+  min-width: 0;
+  padding: .45rem .55rem;
+  border: 1px solid #e2e8f0;
+  border-radius: .55rem;
+  background: #f8fafc;
+  color: #334155;
+  font-size: .75rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.cross-domain-source-business-facts--comparison {
+  margin-top: .7rem;
+}
+
+.cross-domain-common-metric-list {
+  display: grid;
+  gap: .65rem;
+}
+
+.cross-domain-common-metric {
+  display: grid;
+  gap: .5rem;
+  padding: .75rem .85rem;
+  border: 1px solid #e2e8f0;
+  border-radius: .7rem;
+  background: #fff;
+}
+
+.cross-domain-common-metric > strong {
+  color: #0f172a;
+  font-size: .8rem;
+  overflow-wrap: anywhere;
+}
+
+.cross-domain-common-metric > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: .5rem;
+}
+
+.cross-domain-common-metric span {
+  display: grid;
+  gap: .2rem;
+  padding: .5rem .6rem;
+  border-radius: .55rem;
+  background: #f8fafc;
+  min-width: 0;
+}
+
+.cross-domain-common-metric small {
+  color: #64748b;
+  font-size: .68rem;
+  font-weight: 700;
+}
+
+.cross-domain-common-metric b {
+  color: #0f172a;
+  font-size: .78rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .cross-domain-source-business-facts {
+    grid-template-columns: 1fr;
+  }
+}

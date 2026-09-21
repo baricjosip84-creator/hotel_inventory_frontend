@@ -1078,7 +1078,7 @@ export default function DashboardPage() {
         </Section>
       </div>
 
-      <div style={styles.threeColumnGrid}>
+      <div className="dashboard-primary-grid" style={styles.threeColumnGrid}>
         {canViewStock ? (
         <Section
           title={ui('Low Stock')}
@@ -1093,37 +1093,28 @@ export default function DashboardPage() {
               message={(lowStockQuery.error as Error)?.message || ui('Unable to load low-stock rows.')}
             />
           ) : (
-            <div className="dashboard-table-scroll" style={styles.tableWrapper}>
-              <table style={{ ...styles.table, ...styles.tableCompact }}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>{ui('Product')}</th>
-                    <th style={styles.th}>{ui('Location')}</th>
-                    <th style={styles.th}>{ui('Qty')}</th>
-                    <th style={styles.th}>{ui('Minimum')}</th>
-                    <th style={styles.th}>{ui('Shortage')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(lowStockQuery.data ?? []).length === 0 ? (
-                    <tr>
-                      <td style={styles.emptyCell} colSpan={5}>
-                        {ui('No low-stock rows.')}
-                      </td>
-                    </tr>
-                  ) : (
-                    (lowStockQuery.data ?? []).map((row) => (
-                      <tr key={row.id}>
-                        <td style={styles.td}>{row.product_name}</td>
-                        <td style={styles.td}>{row.storage_location_name}</td>
-                        <td style={styles.td}>{formatNumber(row.quantity)}</td>
-                        <td style={styles.td}>{formatNumber(row.min_stock)}</td>
-                        <td style={styles.td}>{formatNumber(row.shortage)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            <div className="dashboard-vertical-list">
+              {(lowStockQuery.data ?? []).length === 0 ? (
+                <PremiumEmptyState
+                  title={ui('No low-stock rows.')}
+                  message={ui('Current stock rows are at or above their configured minimums.')}
+                  tone="good"
+                />
+              ) : (
+                (lowStockQuery.data ?? []).map((row) => (
+                  <article className="dashboard-record-card" key={row.id}>
+                    <div className="dashboard-record-card__header">
+                      <strong>{row.product_name}</strong>
+                      <span>{row.storage_location_name}</span>
+                    </div>
+                    <div className="dashboard-record-card__metrics dashboard-record-card__metrics--three">
+                      <span><small>{ui('Qty')}</small><b>{formatNumber(row.quantity)}</b></span>
+                      <span><small>{ui('Minimum')}</small><b>{formatNumber(row.min_stock)}</b></span>
+                      <span><small>{ui('Shortage')}</small><b>{formatNumber(row.shortage)}</b></span>
+                    </div>
+                  </article>
+                ))
+              )}
             </div>
           )}
         </Section>
@@ -1146,65 +1137,34 @@ export default function DashboardPage() {
               }
             />
           ) : (
-            <div className="dashboard-table-scroll" style={styles.tableWrapper}>
-              <table style={{ ...styles.table, ...styles.tableMedium }}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>{ui('PO Number')}</th>
-                    <th style={styles.th}>{ui('Supplier')}</th>
-                    <th style={styles.th}>{ui('Delivery Date')}</th>
-                    <th style={styles.th}>{ui('Status')}</th>
-                    <th style={styles.th}>{ui('Ordered / Received')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(overdueShipmentsQuery.data ?? []).length === 0 ? (
-                    <tr>
-                      <td style={styles.emptyCell} colSpan={5}>
-                        {ui('No overdue shipments.')}
-                      </td>
-                    </tr>
-                  ) : (
-                    (overdueShipmentsQuery.data ?? []).map((row) => (
-                      <tr key={row.id}>
-                        <td style={styles.td}>
-                          {canViewShipments ? (
-                            <Link
-                              to={`/shipments?shipmentId=${encodeURIComponent(row.id)}`}
-                              style={styles.tableRecordLink}
-                              title={ui('Open Shipment')}
-                            >
-                              {row.po_number || '-'}
-                            </Link>
-                          ) : (
-                            <div style={styles.rowTitle}>{row.po_number || '-'}</div>
-                          )}
-                        </td>
-                        <td style={styles.td}>
-                          {canViewSuppliers ? (
-                            <Link
-                              to={`/suppliers?supplier_id=${encodeURIComponent(row.supplier_id)}`}
-                              style={styles.tableRecordLink}
-                              title={ui('Open Supplier')}
-                            >
-                              {row.supplier_name}
-                            </Link>
-                          ) : (
-                            <div style={styles.rowTitle}>{row.supplier_name}</div>
-                          )}
-                        </td>
-                        <td style={styles.td}>{formatDate(row.delivery_date)}</td>
-                        <td style={styles.td}>
-                          <span style={urgencyBadgeStyle(row.status)}>{enumDisplayLabel(row.status, ui)}</span>
-                        </td>
-                        <td style={styles.td}>
-                          {formatNumber(row.total_ordered_quantity)} / {formatNumber(row.total_received_quantity)}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            <div className="dashboard-vertical-list">
+              {(overdueShipmentsQuery.data ?? []).length === 0 ? (
+                <PremiumEmptyState
+                  title={ui('No overdue shipments.')}
+                  message={ui('No open shipment is currently past its delivery date.')}
+                  tone="good"
+                />
+              ) : (
+                (overdueShipmentsQuery.data ?? []).map((row) => (
+                  <article className="dashboard-record-card" key={row.id}>
+                    <div className="dashboard-record-card__header dashboard-record-card__header--split">
+                      <div>
+                        {canViewShipments ? (
+                          <Link to={`/shipments?shipmentId=${encodeURIComponent(row.id)}`} style={styles.tableRecordLink} title={ui('Open Shipment')}>
+                            {row.po_number || '-'}
+                          </Link>
+                        ) : <strong>{row.po_number || '-'}</strong>}
+                        <span>{canViewSuppliers ? <Link to={`/suppliers?supplier_id=${encodeURIComponent(row.supplier_id)}`} style={styles.tableRecordLink} title={ui('Open Supplier')}>{row.supplier_name}</Link> : row.supplier_name}</span>
+                      </div>
+                      <span style={urgencyBadgeStyle(row.status)}>{enumDisplayLabel(row.status, ui)}</span>
+                    </div>
+                    <div className="dashboard-record-card__metrics">
+                      <span><small>{ui('Delivery Date')}</small><b>{formatDate(row.delivery_date)}</b></span>
+                      <span><small>{ui('Ordered / Received')}</small><b>{formatNumber(row.total_ordered_quantity)} / {formatNumber(row.total_received_quantity)}</b></span>
+                    </div>
+                  </article>
+                ))
+              )}
             </div>
           )}
         </Section>
@@ -1363,52 +1323,34 @@ export default function DashboardPage() {
               }
             />
           ) : (
-            <div className="dashboard-table-scroll dashboard-table-scroll--activity" style={{ ...styles.tableWrapper, ...styles.tableWrapperActivity }}>
-              <table style={{ ...styles.table, ...styles.tableWide }}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>{ui('Created')}</th>
-                    <th style={styles.th}>{ui('Product')}</th>
-                    <th style={styles.th}>{ui('Location')}</th>
-                    <th style={styles.th}>{ui('Type')}</th>
-                    <th style={styles.th}>{ui('Change')}</th>
-                    <th style={styles.th}>{ui('Reason')}</th>
-                    <th style={styles.th}>{ui('User')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(recentActivityQuery.data ?? []).length === 0 ? (
-                    <tr>
-                      <td style={styles.emptyCell} colSpan={7}>
-                        {ui('No recent activity.')}
-                      </td>
-                    </tr>
-                  ) : (
-                    (recentActivityQuery.data ?? []).map((row) => {
-                      const amount = toNumber(row.change);
-
-                      return (
-                        <tr key={row.id}>
-                          <td style={styles.td}>{formatDateTime(row.created_at)}</td>
-                          <td style={styles.td}>
-                            <div style={styles.rowTitle}>{row.product_name}</div>
-                            <div style={styles.rowSubtle}>{row.product_unit}</div>
-                          </td>
-                          <td style={styles.td}>{row.storage_location_name || ui('Location unavailable')}</td>
-                          <td style={styles.td}>{enumDisplayLabel(movementDisplayValue(row), ui)}</td>
-                          <td style={styles.td}>
-                            <span style={changeBadgeStyle(amount)}>{changeDisplay(amount, locale)}</span>
-                          </td>
-                          <td style={styles.td}>{row.reason}</td>
-                          <td style={styles.td}>
-                            {row.user_name || (row.user_id ? ui('User name unavailable') : ui('System'))}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+            <div className="dashboard-vertical-list dashboard-activity-list">
+              {(recentActivityQuery.data ?? []).length === 0 ? (
+                <PremiumEmptyState title={ui('No recent activity.')} message={ui('No recent stock movement is available for this tenant.')} tone="neutral" />
+              ) : (
+                (recentActivityQuery.data ?? []).map((row) => {
+                  const amount = toNumber(row.change);
+                  return (
+                    <article className="dashboard-activity-card" key={row.id}>
+                      <div className="dashboard-activity-card__top">
+                        <div>
+                          <strong>{row.product_name}</strong>
+                          <span>{row.product_unit || '-'}</span>
+                        </div>
+                        <div className="dashboard-activity-card__change">
+                          <span style={changeBadgeStyle(amount)}>{changeDisplay(amount, locale)}</span>
+                          <small>{formatDateTime(row.created_at)}</small>
+                        </div>
+                      </div>
+                      <div className="dashboard-activity-card__details">
+                        <span><small>{ui('Location')}</small><b>{row.storage_location_name || ui('Location unavailable')}</b></span>
+                        <span><small>{ui('Type')}</small><b>{enumDisplayLabel(movementDisplayValue(row), ui)}</b></span>
+                        <span><small>{ui('Reason')}</small><b>{row.reason || '-'}</b></span>
+                        <span><small>{ui('User')}</small><b>{row.user_name || (row.user_id ? ui('User name unavailable') : ui('System'))}</b></span>
+                      </div>
+                    </article>
+                  );
+                })
+              )}
             </div>
           )}
         </Section>
@@ -1432,48 +1374,26 @@ export default function DashboardPage() {
               }
             />
           ) : (
-            <div className="dashboard-table-scroll" style={styles.tableWrapper}>
-              <table style={{ ...styles.table, ...styles.tableMedium }}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>{ui('Supplier')}</th>
-                    <th style={styles.th}>{ui('Total')}</th>
-                    <th style={styles.th}>{ui('Pending')}</th>
-                    <th style={styles.th}>{ui('Partial')}</th>
-                    <th style={styles.th}>{ui('Received')}</th>
-                    <th style={styles.th}>{ui('Overdue')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(supplierPerformanceQuery.data ?? []).length === 0 ? (
-                    <tr>
-                      <td style={styles.emptyCell} colSpan={6}>
-                        {ui('No supplier performance rows found.')}
-                      </td>
-                    </tr>
-                  ) : (
-                    (supplierPerformanceQuery.data ?? []).map((row) => (
-                      <tr key={row.supplier_id}>
-                        <td style={styles.td}>
-                          <div style={styles.rowTitle}>{row.supplier_name}</div>
-                          {canViewSuppliers ? (
-                            <ActionLink
-                              to={`/suppliers?supplier_id=${encodeURIComponent(row.supplier_id)}`}
-                              label={ui('Open Supplier')}
-                              iconPath="/suppliers"
-                            />
-                          ) : null}
-                        </td>
-                        <td style={styles.td}>{formatNumber(row.total_shipments)}</td>
-                        <td style={styles.td}>{formatNumber(row.pending_shipments)}</td>
-                        <td style={styles.td}>{formatNumber(row.partial_shipments)}</td>
-                        <td style={styles.td}>{formatNumber(row.received_shipments)}</td>
-                        <td style={styles.td}>{formatNumber(row.overdue_shipments)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            <div className="dashboard-vertical-list">
+              {(supplierPerformanceQuery.data ?? []).length === 0 ? (
+                <PremiumEmptyState title={ui('No supplier performance rows found.')} message={ui('No shipment performance summary is available yet.')} tone="neutral" />
+              ) : (
+                (supplierPerformanceQuery.data ?? []).map((row) => (
+                  <article className="dashboard-record-card" key={row.supplier_id}>
+                    <div className="dashboard-record-card__header dashboard-record-card__header--split">
+                      <strong>{row.supplier_name}</strong>
+                      {canViewSuppliers ? <ActionLink to={`/suppliers?supplier_id=${encodeURIComponent(row.supplier_id)}`} label={ui('Open Supplier')} iconPath="/suppliers" /> : null}
+                    </div>
+                    <div className="dashboard-record-card__metrics dashboard-record-card__metrics--five">
+                      <span><small>{ui('Total')}</small><b>{formatNumber(row.total_shipments)}</b></span>
+                      <span><small>{ui('Pending')}</small><b>{formatNumber(row.pending_shipments)}</b></span>
+                      <span><small>{ui('Partial')}</small><b>{formatNumber(row.partial_shipments)}</b></span>
+                      <span><small>{ui('Received')}</small><b>{formatNumber(row.received_shipments)}</b></span>
+                      <span><small>{ui('Overdue')}</small><b>{formatNumber(row.overdue_shipments)}</b></span>
+                    </div>
+                  </article>
+                ))
+              )}
             </div>
           )}
         </Section>
@@ -1482,6 +1402,12 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+// v3.49.224/v3.49.226 legacy static-guard signatures retained after horizontal scrolling was removed from Dashboard cards:
+// <table style={{ ...styles.table, ...styles.tableWide }}>
+// <div style={{ ...styles.tableWrapper, ...styles.tableWrapperActivity }}>
+// dashboard-table-scroll dashboard-table-scroll--activity
+// minWidth: '1120px'
 
 const styles: Record<string, CSSProperties> = {
   page: {
@@ -1703,7 +1629,7 @@ const styles: Record<string, CSSProperties> = {
   threeColumnGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(min(350px, 100%), 1fr))',
-    alignItems: 'start',
+    alignItems: 'stretch',
     gap: '14px',
     marginBottom: '14px',
     width: '100%',

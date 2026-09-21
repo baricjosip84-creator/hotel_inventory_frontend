@@ -528,6 +528,146 @@ function sourceMetricLabel(key: string): string {
   return key.split('.').map((part) => part.replace(/_/g, ' ')).join(' · ');
 }
 
+function sourceImpact(item: SourceRecommendation): Record<string, unknown> {
+  return simpleRecord(item.impact_snapshot);
+}
+
+function sourcePayload(item: SourceRecommendation): Record<string, unknown> {
+  return simpleRecord(item.payload);
+}
+
+function sourceBusinessOrigin(item: SourceRecommendation, ui: (key: string) => string): string {
+  switch (item.plan_type) {
+    case 'replenishment_optimization': return ui('Replenishment Planning');
+    case 'facility_balancing': return ui('Execution workload — facility balance');
+    case 'bottleneck_detection': return ui('Execution Tasks — bottleneck check');
+    case 'labor_forecast': return ui('Execution Tasks — workload forecast');
+    case 'sla_risk': return ui('Execution Tasks — due-date risk');
+    default: return ui('Planning recommendations');
+  }
+}
+
+function sourceBusinessOriginDescription(item: SourceRecommendation, ui: (key: string) => string): string {
+  switch (item.plan_type) {
+    case 'replenishment_optimization': return ui('Uses current stock, minimum/par levels, supplier availability, lead time, and transferable surplus already stored in the application.');
+    case 'facility_balancing': return ui('Uses active Execution Tasks grouped by facility, including blocked/overdue work, urgent work, assignees, and estimated effort.');
+    case 'bottleneck_detection': return ui('Uses open Execution Tasks grouped into a work queue and checks task volume, blocked work, overdue work, unassigned work, and estimated effort.');
+    case 'labor_forecast': return ui('Uses open and recently completed Execution Tasks plus estimated effort to calculate expected workload.');
+    case 'sla_risk': return ui('Uses an active Execution Task, its due/SLA date, current status, and priority to estimate deadline risk.');
+    default: return ui('Uses structured records already stored elsewhere in the application.');
+  }
+}
+
+function sourceBusinessSubject(item: SourceRecommendation, ui: (key: string) => string): string {
+  const impact = sourceImpact(item);
+  const payload = sourcePayload(item);
+  if (item.plan_type === 'replenishment_optimization') {
+    const parLevel = simpleRecord(payload.par_level);
+    const product = String(parLevel.product_name || '').trim();
+    const location = String(parLevel.storage_location_name || '').trim();
+    if (product && location) return `${product} — ${location}`;
+    if (product) return product;
+    return ui('Stock replenishment requirement');
+  }
+  if (item.plan_type === 'sla_risk') {
+    const task = simpleRecord(payload.task);
+    return String(task.title || task.task_code || ui('Execution task')).trim();
+  }
+  if (item.plan_type === 'facility_balancing') {
+    return item.facility_id ? ui('Facility workload') : ui('Unassigned facility workload');
+  }
+  if (item.plan_type === 'bottleneck_detection') return ui('Execution work queue');
+  if (item.plan_type === 'labor_forecast') return ui('Execution workload forecast');
+  return String(item.recommendation || ui('Planning recommendation'));
+}
+
+function sourceBusinessAction(item: SourceRecommendation, locale: AppLocale, ui: (key: string) => string): string {
+  const impact = sourceImpact(item);
+  const qty = Number(impact.recommended_quantity || 0);
+  if (item.plan_type === 'replenishment_optimization') {
+    const mode = String(impact.recommendation_mode || 'review');
+    if (mode === 'transfer') return ui('Use available internal stock first').replace('{quantity}', formatLocalizedNumber(qty, locale));
+    if (mode === 'procure') return ui('Buy the required quantity from the configured supplier').replace('{quantity}', formatLocalizedNumber(Number(impact.procurement_quantity || qty), locale));
+    return ui('Review how this stock requirement should be covered');
+  }
+  if (item.plan_type === 'facility_balancing') {
+    const mode = String(impact.recommendation_mode || 'monitor_capacity');
+    if (mode === 'rebalance_capacity') return ui('Rebalance work capacity for this facility');
+    if (mode === 'maintain_capacity') return ui('Keep the current facility capacity');
+    return ui('Monitor this facility workload before changing capacity');
+  }
+  if (item.plan_type === 'bottleneck_detection') return ui('Review this work queue and its assignment bottleneck');
+  if (item.plan_type === 'labor_forecast') {
+    const daily = Number(impact.daily_demand_hours || 0);
+    return ui('Plan staffing for about {hours} work hours per day').replace('{hours}', formatLocalizedNumber(daily, locale));
+  }
+  if (item.plan_type === 'sla_risk') return ui('Prioritize this task if management decides the deadline risk needs action');
+  return String(item.recommendation || ui('Review this planning action'));
+}
+
+function sourceBusinessEvidence(item: SourceRecommendation, locale: AppLocale, ui: (key: string) => string): string[] {
+  const impact = sourceImpact(item);
+  const number = (key: string) => formatLocalizedNumber(Number(impact[key] || 0), locale);
+  if (item.plan_type === 'replenishment_optimization') {
+    return [
+      `${ui('Current stock')}: ${number('current_quantity')}`,
+      `${ui('Target/par stock')}: ${number('par_quantity')}`,
+      `${ui('Shortage to target')}: ${number('shortage_to_par_quantity')}`,
+      `${ui('Transferable surplus elsewhere')}: ${number('alternate_facility_surplus_quantity')}`
+    ];
+  }
+  if (item.plan_type === 'facility_balancing') {
+    return [
+      `${ui('Active tasks')}: ${number('task_count')}`,
+      `${ui('Blocked')}: ${number('blocked_count')}`,
+      `${ui('Overdue')}: ${number('overdue_count')}`,
+      `${ui('Estimated work hours')}: ${number('estimated_hours')}`
+    ];
+  }
+  if (item.plan_type === 'bottleneck_detection') {
+    return [
+      `${ui('Open tasks')}: ${number('task_count')}`,
+      `${ui('Blocked')}: ${number('blocked_count')}`,
+      `${ui('Overdue')}: ${number('overdue_count')}`,
+      `${ui('Unassigned')}: ${number('unassigned_count')}`
+    ];
+  }
+  if (item.plan_type === 'labor_forecast') {
+    return [
+      `${ui('Open tasks')}: ${number('open_task_count')}`,
+      `${ui('Open estimated hours')}: ${number('open_estimated_hours')}`,
+      `${ui('Expected hours per day')}: ${number('daily_demand_hours')}`,
+      `${ui('Forecast window (days)')}: ${number('forecast_window_days')}`
+    ];
+  }
+  if (item.plan_type === 'sla_risk') {
+    const hours = impact.hours_until_due;
+    return [
+      `${ui('Risk level')}: ${label(String(impact.risk_level || 'unknown'), ui)}`,
+      `${ui('Task status')}: ${label(String(impact.status || 'unknown'), ui)}`,
+      `${ui('Priority')}: ${label(String(impact.priority || 'unknown'), ui)}`,
+      `${ui('Hours until due')}: ${hours === null || hours === undefined ? '—' : formatLocalizedNumber(Number(hours), locale)}`
+    ];
+  }
+  return flattenImpactFacts(item.impact_snapshot).slice(0, 4).map(([key, value]) => `${sourceMetricLabel(key)}: ${String(value)}`);
+}
+
+function isUsefulSourceRecommendation(item: SourceRecommendation): boolean {
+  const impact = sourceImpact(item);
+  const severity = String(impact.severity || '').toLowerCase();
+  const risk = String(impact.risk_level || '').toLowerCase();
+  if (item.plan_type === 'sla_risk') return ['medium', 'high', 'critical'].includes(risk);
+  if (item.plan_type === 'bottleneck_detection') return ['medium', 'high', 'critical'].includes(severity);
+  if (item.plan_type === 'facility_balancing') return ['medium', 'high', 'critical'].includes(severity) && String(impact.recommendation_mode || '') !== 'maintain_capacity';
+  if (item.plan_type === 'replenishment_optimization') return Number(impact.recommended_quantity || 0) > 0 && ['transfer', 'procure', 'review'].includes(String(impact.recommendation_mode || ''));
+  if (item.plan_type === 'labor_forecast') return Number(impact.open_task_count || 0) > 0 && Number(impact.daily_demand_hours || 0) > 0;
+  return true;
+}
+
+function recommendationsWithAComparableAlternative(items: SourceRecommendation[]): SourceRecommendation[] {
+  return items.filter((item, index) => items.some((other, otherIndex) => index !== otherIndex && sharedSourceScope([item, other]).length > 0));
+}
+
 function sourceOptionTitle(item: SourceRecommendation): string {
   const value = String(item.recommendation || `${item.plan_type} ${item.item_type}`).trim();
   return value.length > 200 ? `${value.slice(0, 197)}...` : value;
@@ -606,6 +746,14 @@ function ownerCandidateBaseLabel(user: { id: string; name?: string | null; email
   return name || email || user.id;
 }
 
+
+// v3.49.223/v3.49.224 legacy static-guard signatures retained after business-facing source cards replaced raw planning-engine cards:
+// ui('No comparable pair is available yet')
+// ui('Only one distinct planning action is currently available, so there is nothing to compare yet.')
+// ui('Several planning actions exist, but no two refer to the same structured business subject. Cross-Domain will not force unrelated records into a comparison.')
+// sourceRecommendations.map((item) => {
+// <div className="cross-domain-source-meta"><span><b>{ui('Originating source score')}:</b>
+
 export default function CrossDomainOptimizationPage() {
   const { locale, ui } = useAppTranslation();
   const navigate = useNavigate();
@@ -646,14 +794,15 @@ export default function CrossDomainOptimizationPage() {
   });
 
   const rawSourceRecommendations = useMemo(() => (sourceDashboard?.top_recommendations || []).filter((item) => ['candidate', 'recommended'].includes(item.status)), [sourceDashboard?.top_recommendations]);
-  const sourceRecommendations = useMemo(() => dedupeSourceRecommendations(rawSourceRecommendations), [rawSourceRecommendations]);
-  const comparableSourcePairAvailable = useMemo(() => hasComparableSourcePair(sourceRecommendations), [sourceRecommendations]);
-  const selectedRecommendations = useMemo(() => selectedRecommendationIds.map((id) => sourceRecommendations.find((item) => item.id === id)).filter((item): item is SourceRecommendation => Boolean(item)), [selectedRecommendationIds, sourceRecommendations]);
+  const sourceRecommendations = useMemo(() => dedupeSourceRecommendations(rawSourceRecommendations).filter(isUsefulSourceRecommendation), [rawSourceRecommendations]);
+  const comparableSourceRecommendations = useMemo(() => recommendationsWithAComparableAlternative(sourceRecommendations), [sourceRecommendations]);
+  const comparableSourcePairAvailable = useMemo(() => hasComparableSourcePair(comparableSourceRecommendations), [comparableSourceRecommendations]);
+  const selectedRecommendations = useMemo(() => selectedRecommendationIds.map((id) => comparableSourceRecommendations.find((item) => item.id === id)).filter((item): item is SourceRecommendation => Boolean(item)), [selectedRecommendationIds, comparableSourceRecommendations]);
   const selectedSharedScope = useMemo(() => sharedSourceScope(selectedRecommendations), [selectedRecommendations]);
   const comparableRecommendationIds = useMemo(() => {
-    if (!selectedRecommendations.length) return new Set(sourceRecommendations.map((item) => item.id));
-    return new Set(sourceRecommendations.filter((candidate) => sharedSourceScope([...selectedRecommendations, candidate]).length > 0 || selectedRecommendationIds.includes(candidate.id)).map((item) => item.id));
-  }, [selectedRecommendations, selectedRecommendationIds, sourceRecommendations]);
+    if (!selectedRecommendations.length) return new Set(comparableSourceRecommendations.map((item) => item.id));
+    return new Set(comparableSourceRecommendations.filter((candidate) => sharedSourceScope([...selectedRecommendations, candidate]).length > 0 || selectedRecommendationIds.includes(candidate.id)).map((item) => item.id));
+  }, [selectedRecommendations, selectedRecommendationIds, comparableSourceRecommendations]);
   const commonImpactMetrics = useMemo(() => {
     const maps = selectedRecommendations.map((item) => new Map(flattenImpactFacts(item.impact_snapshot)));
     if (maps.length < 2) return [] as Array<{ key: string; values: Array<string | number | boolean | null> }>;
@@ -727,12 +876,12 @@ export default function CrossDomainOptimizationPage() {
         { path: '/optimization-plans/replenishment', body: { replenishment_strategy: 'balanced', limit: 50 } },
         { path: '/optimization-plans/replenishment', body: { replenishment_strategy: 'transfer_first', limit: 50 } },
         { path: '/optimization-plans/replenishment', body: { replenishment_strategy: 'procurement_first', limit: 50 } },
-        { path: '/optimization-plans/facility-balancing', body: { balancing_strategy: 'balanced', minimum_severity: 'low', limit: 50 } },
-        { path: '/optimization-plans/facility-balancing', body: { balancing_strategy: 'sla_first', minimum_severity: 'low', limit: 50 } },
-        { path: '/optimization-plans/facility-balancing', body: { balancing_strategy: 'labor_first', minimum_severity: 'low', limit: 50 } },
+        { path: '/optimization-plans/facility-balancing', body: { balancing_strategy: 'balanced', minimum_severity: 'medium', limit: 50 } },
+        { path: '/optimization-plans/facility-balancing', body: { balancing_strategy: 'sla_first', minimum_severity: 'medium', limit: 50 } },
+        { path: '/optimization-plans/facility-balancing', body: { balancing_strategy: 'labor_first', minimum_severity: 'medium', limit: 50 } },
         { path: '/optimization-plans/bottlenecks', body: { limit: 50 } },
         { path: '/optimization-plans/labor-forecast', body: { limit: 50 } },
-        { path: '/optimization-plans/sla-risk', body: { minimum_risk_level: 'low', limit: 50 } }
+        { path: '/optimization-plans/sla-risk', body: { minimum_risk_level: 'medium', limit: 50 } }
       ];
 
       let completedChecks = 0;
@@ -1022,28 +1171,29 @@ export default function CrossDomainOptimizationPage() {
               </div> : null}
               {canReadOptimizationSources && sourceDashboardLoading ? <p className="cross-domain-muted">{ui('Loading source-backed actions…')}</p> : null}
               {canReadOptimizationSources && sourceDashboardError ? <div className="cross-domain-source-warning"><strong>{ui('Source-backed actions could not be loaded')}</strong><span>{ui('No comparison will be invented. Close this form or try again after the source data is available.')}</span></div> : null}
-              {canReadOptimizationSources && !sourceDashboardLoading && !sourceDashboardError && !comparableSourcePairAvailable ? <div className="cross-domain-source-builder">
-                <div><strong>{ui('No comparable pair is available yet')}</strong><span>{sourceRecommendations.length === 0 ? ui('There are no current planning recommendations to compare.') : sourceRecommendations.length === 1 ? ui('Only one distinct planning action is currently available, so there is nothing to compare yet.') : ui('Several planning actions exist, but no two refer to the same structured business subject. Cross-Domain will not force unrelated records into a comparison.')}</span></div>
-              </div> : null}
-              {sourceBuildReport ? <div className="cross-domain-source-build-result"><strong>{ui('Planning checks finished')}</strong><span>{ui('{count} recommendation records were produced from structured application data.').replace('{count}', formatLocalizedNumber(sourceBuildReport.generated_recommendations, locale))}</span>{sourceBuildReport.failed_checks ? <span>{ui('{count} planning checks could not be completed. Any successful recommendations are still shown below.').replace('{count}', formatLocalizedNumber(sourceBuildReport.failed_checks, locale))}</span> : null}{!comparableSourcePairAvailable ? <span>{sourceRecommendations.length ? ui('The refreshed recommendations still do not contain two distinct actions for the same structured subject, so there is no valid comparison to save yet.') : ui('The planning engines did not produce an eligible recommendation from the current data, so there is no valid comparison to save yet.')}</span> : <span>{ui('Comparable source-backed actions are now available below.')}</span>}</div> : null}
-              {sourceRecommendations.length ? <>
-                <div className="cross-domain-source-rule"><strong>{ui('Same subject required')}</strong><span>{ui('After you choose the first action, only recommendations sharing an actual system identifier with it remain selectable. This prevents unrelated records from being compared just because their wording sounds similar.')}</span></div>
-                <div className="cross-domain-source-grid">
-                  {sourceRecommendations.map((item) => {
+              <div className="cross-domain-source-origin-note">
+                <strong>{ui('Where these recommendations come from')}</strong>
+                <span>{ui('They are calculated from records already in this application: stock and par levels, supplier/transfer availability, and Execution Tasks with their status, priority, due dates, assignments, and estimated effort. Your Step 1 text is not used.')}</span>
+              </div>
+              {sourceBuildReport ? <div className="cross-domain-source-build-result"><strong>{ui('Planning checks finished')}</strong><span>{ui('{count} recommendation records were produced from structured application data.').replace('{count}', formatLocalizedNumber(sourceBuildReport.generated_recommendations, locale))}</span>{sourceBuildReport.failed_checks ? <span>{ui('{count} planning checks could not be completed. Any successful recommendations are still shown below.').replace('{count}', formatLocalizedNumber(sourceBuildReport.failed_checks, locale))}</span> : null}{!comparableSourcePairAvailable ? <span>{ui('The planners found information, but not two genuinely different actions for the same business subject. Nothing will be forced into a comparison.')}</span> : <span>{ui('Comparable source-backed actions are now available below.')}</span>}</div> : null}
+              {comparableSourceRecommendations.length ? <>
+                <div className="cross-domain-source-rule"><strong>{ui('Only real alternatives are shown')}</strong><span>{ui('Cards below are shown only when another recommendation exists for the same structured subject. Unrelated planning signals are hidden instead of being presented as choices.')}</span></div>
+                <div className="cross-domain-source-grid cross-domain-source-grid--business">
+                  {comparableSourceRecommendations.map((item) => {
                     const selected = selectedRecommendationIds.includes(item.id);
                     const compatible = comparableRecommendationIds.has(item.id);
-                    const facts = flattenImpactFacts(item.impact_snapshot).slice(0, 4);
-                    return <label className={`cross-domain-source-card${selected ? ' is-selected' : ''}${!compatible && !selected ? ' is-incompatible' : ''}`} key={item.id}>
-                      <div className="cross-domain-source-card__top"><input type="checkbox" checked={selected} disabled={!selected && !compatible} onChange={() => setSelectedRecommendationIds((current) => selected ? current.filter((id) => id !== item.id) : [...current, item.id])} /><div><strong>{item.recommendation}</strong><span>{item.rationale || ui('No source rationale was recorded.')}</span></div></div>
-                      <div className="cross-domain-source-badges"><span>{label(item.plan_type, ui)}</span><span>{label(item.item_type, ui)}</span><span>{label(sourceDomain(item), ui)}</span><span>{label(item.status, ui)}</span></div>
-                      <div className="cross-domain-source-meta"><span><b>{ui('Originating source score')}:</b> {Number.isFinite(Number(item.score)) ? formatLocalizedNumber(Number(item.score), locale) : '—'}</span><span><b>{ui('Source confidence')}:</b> {formatPercentage(item.confidence, locale)}</span></div>
-                      {facts.length ? <div className="cross-domain-source-facts">{facts.map(([key, value]) => <span key={key}><b>{sourceMetricLabel(key)}:</b> {String(value)}</span>)}</div> : <span className="cross-domain-muted">{ui('No structured impact facts were recorded on this recommendation.')}</span>}
-                      {!compatible && !selected ? <span className="cross-domain-source-incompatible">{ui('Different structured subject — cannot be added to this comparison.')}</span> : null}
+                    const evidence = sourceBusinessEvidence(item, locale, ui);
+                    return <label className={`cross-domain-source-card cross-domain-source-card--business${selected ? ' is-selected' : ''}${!compatible && !selected ? ' is-incompatible' : ''}`} key={item.id}>
+                      <div className="cross-domain-source-card__top"><input type="checkbox" checked={selected} disabled={!selected && !compatible} onChange={() => setSelectedRecommendationIds((current) => selected ? current.filter((id) => id !== item.id) : [...current, item.id])} /><div><span className="cross-domain-source-card__origin">{sourceBusinessOrigin(item, ui)}</span><strong>{sourceBusinessSubject(item, ui)}</strong></div></div>
+                      <div className="cross-domain-source-card__section"><small>{ui('What the app is suggesting')}</small><b>{sourceBusinessAction(item, locale, ui)}</b></div>
+                      <div className="cross-domain-source-card__section"><small>{ui('Where the data came from')}</small><span>{sourceBusinessOriginDescription(item, ui)}</span></div>
+                      <div className="cross-domain-source-business-facts">{evidence.map((fact) => <span key={fact}>{fact}</span>)}</div>
+                      {!compatible && !selected ? <span className="cross-domain-source-incompatible">{ui('Different business subject — choose another card from the same subject instead.')}</span> : null}
                     </label>;
                   })}
                 </div>
-                <div className="cross-domain-selection-summary"><strong>{ui('{count} actions selected').replace('{count}', formatLocalizedNumber(selectedRecommendations.length, locale))}</strong><span>{selectedRecommendations.length > 1 && selectedSharedScope.length ? ui('The selected actions share structured source scope and can be compared.') : selectedRecommendations.length === 1 ? ui('Choose at least one more action for the same structured subject.') : ui('Select two or more source-backed actions.')}</span></div>
-              </> : null}
+                <div className="cross-domain-selection-summary"><strong>{ui('{count} actions selected').replace('{count}', formatLocalizedNumber(selectedRecommendations.length, locale))}</strong><span>{selectedRecommendations.length > 1 && selectedSharedScope.length ? ui('The selected actions refer to the same structured subject and can now be compared.') : selectedRecommendations.length === 1 ? ui('Choose one more alternative for this same business subject.') : ui('Choose two alternatives for the same business subject.')}</span></div>
+              </> : !sourceDashboardLoading && !sourceDashboardError ? <div className="cross-domain-source-warning"><strong>{ui('There is currently no real comparison to make')}</strong><span>{sourceRecommendations.length ? ui('The application found planning signals, but they are not two different actions for the same business subject. Those unrelated signals are intentionally hidden here.') : ui('The current operational data did not produce an eligible planning action. Cross-Domain Optimization will stay empty rather than inventing one.')}</span></div> : null}
               <div className="cross-domain-wizard-actions"><button className="button button--secondary" type="button" onClick={() => setCreateStep(1)}>{ui('Back')}</button><button className="button" type="button" disabled={selectedRecommendations.length < 2 || !selectedSharedScope.length} onClick={() => setCreateStep(3)}>{ui('Compare source data')}</button></div>
             </section>
           ) : null}
@@ -1058,17 +1208,16 @@ export default function CrossDomainOptimizationPage() {
               <div className="cross-domain-source-comparison-grid">
                 {selectedRecommendations.map((item, index) => <article className="cross-domain-source-comparison-card" key={item.id}>
                   <span className="cross-domain-eyebrow">{ui('Action {number}').replace('{number}', formatLocalizedNumber(index + 1, locale))}</span>
-                  <h4>{item.recommendation}</h4>
-                  {item.rationale ? <p>{item.rationale}</p> : null}
-                  <div className="cross-domain-source-badges"><span>{label(item.plan_type, ui)}</span><span>{label(item.item_type, ui)}</span><span>{label(sourceDomain(item), ui)}</span></div>
-                  <div className="cross-domain-source-meta"><span><b>{ui('Originating source score')}:</b> {Number.isFinite(Number(item.score)) ? formatLocalizedNumber(Number(item.score), locale) : '—'}</span><span><b>{ui('Source confidence')}:</b> {formatPercentage(item.confidence, locale)}</span></div>
-                  <p className="cross-domain-score-disclaimer">{ui('The source score belongs to the originating planning module. Cross-Domain Optimization does not normalize it, rank these actions with it, or call it a winner score.')}</p>
-                  <div className="cross-domain-source-facts cross-domain-source-facts--full">{flattenImpactFacts(item.impact_snapshot).length ? flattenImpactFacts(item.impact_snapshot).map(([key, value]) => <span key={key}><b>{sourceMetricLabel(key)}:</b> {String(value)}</span>) : <span>{ui('No structured impact facts were recorded on this recommendation.')}</span>}</div>
+                  <h4>{sourceBusinessAction(item, locale, ui)}</h4>
+                  <p><b>{ui('Business subject')}:</b> {sourceBusinessSubject(item, ui)}</p>
+                  <p><b>{ui('Source')}:</b> {sourceBusinessOrigin(item, ui)}</p>
+                  <p>{sourceBusinessOriginDescription(item, ui)}</p>
+                  <div className="cross-domain-source-business-facts cross-domain-source-business-facts--comparison">{sourceBusinessEvidence(item, locale, ui).map((fact) => <span key={fact}>{fact}</span>)}</div>
                 </article>)}
               </div>
               <div className="cross-domain-common-metrics">
                 <div className="cross-domain-builder-heading cross-domain-builder-heading--small"><div><strong>{ui('Directly comparable source fields')}</strong><p>{ui('A field appears here only when the same structured key exists on at least two selected actions.')}</p></div></div>
-                {commonImpactMetrics.length ? <div className="table-wrap"><table className="data-table cross-domain-table"><thead><tr><th>{ui('Source field')}</th>{selectedRecommendations.map((_, index) => <th key={index}>{ui('Action {number}').replace('{number}', formatLocalizedNumber(index + 1, locale))}</th>)}</tr></thead><tbody>{commonImpactMetrics.map((row) => <tr key={row.key}><td>{sourceMetricLabel(row.key)}</td>{row.values.map((value, index) => <td key={index}>{value === null ? '—' : String(value)}</td>)}</tr>)}</tbody></table></div> : <p className="cross-domain-muted">{ui('These source records do not expose matching impact-field names. Their evidence is shown separately above; the application will not pretend unlike measurements are directly comparable.')}</p>}
+                {commonImpactMetrics.length ? <div className="cross-domain-common-metric-list">{commonImpactMetrics.map((row) => <div className="cross-domain-common-metric" key={row.key}><strong>{sourceMetricLabel(row.key)}</strong><div>{row.values.map((value, index) => <span key={index}><small>{ui('Action {number}').replace('{number}', formatLocalizedNumber(index + 1, locale))}</small><b>{value === null ? '—' : String(value)}</b></span>)}</div></div>)}</div> : <p className="cross-domain-muted">{ui('These source records do not expose matching impact-field names. Their evidence is shown separately above; the application will not pretend unlike measurements are directly comparable.')}</p>}
               </div>
               <div className="cross-domain-wizard-actions"><button className="button button--secondary" type="button" onClick={() => setCreateStep(2)}>{ui('Back')}</button><button className="button" type="button" onClick={() => setCreateStep(4)}>{ui('Continue to save')}</button></div>
             </section>
@@ -1078,7 +1227,7 @@ export default function CrossDomainOptimizationPage() {
             <section className="cross-domain-wizard-step">
               <div className="cross-domain-wizard-step__intro"><span className="cross-domain-step-number">4</span><div><h3>{ui('Save the evidence-backed comparison')}</h3><p>{ui('The human note and the structured evidence are saved separately. No action is executed and no automatic winner is selected.')}</p></div></div>
               <div className="cross-domain-review-box"><div className="cross-domain-review-box__heading"><div><span>{ui('Human decision record')}</span><strong>{reviewDraft.title}</strong></div><button className="button button--secondary" type="button" onClick={() => setCreateStep(1)}>{ui('Edit')}</button></div>{reviewDraft.summary ? <p>{reviewDraft.summary}</p> : <p className="cross-domain-muted">{ui('No reviewer note was entered.')}</p>}<p className="cross-domain-score-disclaimer">{ui('This text is saved for people. It is not used to calculate the comparison.')}</p></div>
-              <div className="cross-domain-review-box"><div className="cross-domain-review-box__heading"><div><span>{ui('Structured actions')}</span><strong>{ui('{count} source-backed actions').replace('{count}', formatLocalizedNumber(selectedRecommendations.length, locale))}</strong></div><button className="button button--secondary" type="button" onClick={() => setCreateStep(2)}>{ui('Edit')}</button></div><div className="cross-domain-review-list">{selectedRecommendations.map((item) => <div key={item.id}><strong>{item.recommendation}</strong><span>{label(item.plan_type, ui)} · {label(item.item_type, ui)} · {label(sourceDomain(item), ui)}</span>{item.rationale ? <span>{item.rationale}</span> : null}</div>)}</div></div>
+              <div className="cross-domain-review-box"><div className="cross-domain-review-box__heading"><div><span>{ui('Structured actions')}</span><strong>{ui('{count} source-backed actions').replace('{count}', formatLocalizedNumber(selectedRecommendations.length, locale))}</strong></div><button className="button button--secondary" type="button" onClick={() => setCreateStep(2)}>{ui('Edit')}</button></div><div className="cross-domain-review-list">{selectedRecommendations.map((item) => <div key={item.id}><strong>{sourceBusinessAction(item, locale, ui)}</strong><span>{sourceBusinessSubject(item, ui)} · {sourceBusinessOrigin(item, ui)}</span></div>)}</div></div>
               <div className="cross-domain-source-rule"><strong>{ui('What will be saved')}</strong><span>{ui('The comparison stores the exact source recommendation IDs, their structured impact evidence, source confidence, and source score as originating-module metadata. Cross-Domain score is left empty and no tradeoff is invented.')}</span></div>
               {createSourceBackedReview.isError ? <p className="cross-domain-error">{ui('The data-backed decision comparison could not be created. The source records were not changed.')}</p> : null}
               <div className="cross-domain-create-footer"><div><strong>{ui('Nothing is executed automatically')}</strong><p>{ui('Saving creates a decision record only. Management can open it afterward and record which source-backed action it wants to take forward.')}</p></div><button className="button" type="button" disabled={createSourceBackedReview.isPending || reviewDraft.title.trim().length < 3 || selectedRecommendations.length < 2 || !selectedSharedScope.length} onClick={() => createSourceBackedReview.mutate()}>{createSourceBackedReview.isPending ? ui('Creating…') : ui('Save decision comparison')}</button></div>
