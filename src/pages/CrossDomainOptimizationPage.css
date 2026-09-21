@@ -1125,3 +1125,43 @@
   border-color: #bfdbfe;
   background: #eff6ff;
 }
+
+/* v3.49.224 — keep Step 1 fields aligned and make source generation impossible to miss */
+.cross-domain-source-primary-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 1.1rem;
+  border: 1px solid #93c5fd;
+  border-radius: .85rem;
+  background: #eff6ff;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, .05);
+}
+.cross-domain-source-primary-action > div {
+  min-width: 0;
+}
+.cross-domain-source-primary-action strong {
+  display: block;
+  color: #0f172a;
+  margin-bottom: .2rem;
+}
+.cross-domain-source-primary-action p {
+  margin: 0;
+  color: #475569;
+  font-size: .82rem;
+  line-height: 1.5;
+}
+.cross-domain-source-primary-action .button {
+  min-width: 210px;
+  justify-content: center;
+}
+@media (max-width: 760px) {
+  .cross-domain-source-primary-action {
+    grid-template-columns: 1fr;
+  }
+  .cross-domain-source-primary-action .button {
+    width: 100%;
+    min-width: 0;
+  }
+}

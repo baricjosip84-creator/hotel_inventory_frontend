@@ -439,10 +439,19 @@ function Section(props: {
   actionHint?: string;
   iconPath?: string;
   iconTone?: 'default' | 'good' | 'warn' | 'danger';
+  wide?: boolean;
+  order?: number;
   children: React.ReactNode;
 }) {
   return (
-    <section className="app-panel app-panel--padded" style={styles.panel}>
+    <section
+      className="app-panel app-panel--padded"
+      style={{
+        ...styles.panel,
+        ...(props.wide ? styles.panelWide : {}),
+        ...(props.order ? { order: props.order } : {})
+      }}
+    >
       <div style={styles.sectionHeader}>
         <div style={styles.sectionHeaderLead}>
           {props.iconPath ? (
@@ -1264,8 +1273,9 @@ export default function DashboardPage() {
         ) : null}
       </div>
 
-      <div style={styles.threeColumnGrid}>
+      <div style={styles.twoColumnGrid}>
         <Section
+          order={1}
           title={ui('Inventory Anomalies')}
           iconPath="/insights"
           iconTone="good"
@@ -1335,6 +1345,8 @@ export default function DashboardPage() {
 
         {canViewStockMovements ? (
         <Section
+          wide
+          order={3}
           title={ui('Recent Activity')}
           iconPath="/stock-movements"
           iconTone="default"
@@ -1350,7 +1362,7 @@ export default function DashboardPage() {
               }
             />
           ) : (
-            <div style={styles.tableWrapper}>
+            <div style={{ ...styles.tableWrapper, ...styles.tableWrapperActivity }}>
               <table style={{ ...styles.table, ...styles.tableWide }}>
                 <thead>
                   <tr>
@@ -1403,6 +1415,7 @@ export default function DashboardPage() {
 
         {canViewSupplierPerformance ? (
         <Section
+          order={2}
           title={ui('Supplier Performance')}
           iconPath="/suppliers"
           iconTone="default"
@@ -1702,6 +1715,9 @@ const styles: Record<string, CSSProperties> = {
     borderColor: '#e2e8f0',
     boxShadow: '0 1px 2px rgba(15, 23, 42, 0.025), 0 8px 22px rgba(15, 23, 42, 0.03)'
   },
+  panelWide: {
+    gridColumn: '1 / -1'
+  },
   sectionHeader: {
     marginBottom: '12px',
     display: 'flex',
@@ -1820,6 +1836,12 @@ const styles: Record<string, CSSProperties> = {
     maxHeight: '330px',
     minWidth: 0,
     scrollbarGutter: 'stable both-edges'
+  },
+  tableWrapperActivity: {
+    height: '300px',
+    overflow: 'scroll',
+    scrollbarGutter: 'stable both-edges',
+    WebkitOverflowScrolling: 'touch'
   },
   table: {
     width: '100%',
