@@ -559,7 +559,6 @@ function sourceBusinessOriginDescription(item: SourceRecommendation, ui: (key: s
 }
 
 function sourceBusinessSubject(item: SourceRecommendation, ui: (key: string) => string): string {
-  const impact = sourceImpact(item);
   const payload = sourcePayload(item);
   if (item.plan_type === 'replenishment_optimization') {
     const parLevel = simpleRecord(payload.par_level);
