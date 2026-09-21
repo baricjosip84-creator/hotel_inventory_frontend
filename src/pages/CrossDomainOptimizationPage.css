@@ -1089,3 +1089,39 @@
   .cross-domain-source-grid,
   .cross-domain-source-comparison-grid { grid-template-columns: 1fr; }
 }
+
+/* v3.49.223 — source discovery is explicit and stays inside the decision workflow */
+.cross-domain-source-builder,
+.cross-domain-source-build-result {
+  display: grid;
+  gap: .55rem;
+  padding: .9rem 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: .8rem;
+  background: #f8fafc;
+  color: #475569;
+  font-size: .82rem;
+  line-height: 1.5;
+}
+.cross-domain-source-builder > div,
+.cross-domain-source-build-result {
+  min-width: 0;
+}
+.cross-domain-source-builder > div {
+  display: grid;
+  gap: .25rem;
+}
+.cross-domain-source-builder strong,
+.cross-domain-source-build-result strong {
+  color: #0f172a;
+}
+.cross-domain-source-builder p {
+  margin: 0;
+}
+.cross-domain-source-builder .button {
+  justify-self: start;
+}
+.cross-domain-source-build-result {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}

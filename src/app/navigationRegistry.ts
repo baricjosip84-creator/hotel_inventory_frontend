@@ -133,7 +133,7 @@ export const tenantNavigationSections: TenantNavigationSection[] = [
       {
         to: '/cross-domain-optimization',
         label: 'Cross-Domain Optimization',
-        description: 'Creates and reviews cross-area planning options and tradeoffs, records human governance decisions, and compares expected results with actual outcomes without executing the plan.',
+        description: 'Compares real planning actions backed by structured application data for the same business subject, records human governance decisions, and keeps human notes as context only without executing the plan.',
         section: 'Command',
         permission: TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ
       },

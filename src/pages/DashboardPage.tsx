@@ -1084,7 +1084,7 @@ export default function DashboardPage() {
             />
           ) : (
             <div style={styles.tableWrapper}>
-              <table style={styles.table}>
+              <table style={{ ...styles.table, ...styles.tableCompact }}>
                 <thead>
                   <tr>
                     <th style={styles.th}>{ui('Product')}</th>
@@ -1137,7 +1137,7 @@ export default function DashboardPage() {
             />
           ) : (
             <div style={styles.tableWrapper}>
-              <table style={styles.table}>
+              <table style={{ ...styles.table, ...styles.tableMedium }}>
                 <thead>
                   <tr>
                     <th style={styles.th}>{ui('PO Number')}</th>
@@ -1351,7 +1351,7 @@ export default function DashboardPage() {
             />
           ) : (
             <div style={styles.tableWrapper}>
-              <table style={styles.table}>
+              <table style={{ ...styles.table, ...styles.tableWide }}>
                 <thead>
                   <tr>
                     <th style={styles.th}>{ui('Created')}</th>
@@ -1419,7 +1419,7 @@ export default function DashboardPage() {
             />
           ) : (
             <div style={styles.tableWrapper}>
-              <table style={styles.table}>
+              <table style={{ ...styles.table, ...styles.tableMedium }}>
                 <thead>
                   <tr>
                     <th style={styles.th}>{ui('Supplier')}</th>
@@ -1816,23 +1816,36 @@ const styles: Record<string, CSSProperties> = {
     background: '#ffffff',
     border: '1px solid #e2e8f0',
     borderRadius: '10px',
-    overflow: 'hidden',
-    overflowX: 'auto',
-    minWidth: 0
+    overflow: 'auto',
+    maxHeight: '330px',
+    minWidth: 0,
+    scrollbarGutter: 'stable both-edges'
   },
   table: {
     width: '100%',
-    borderCollapse: 'collapse',
-    minWidth: '430px'
+    borderCollapse: 'collapse'
+  },
+  tableCompact: {
+    minWidth: '620px'
+  },
+  tableMedium: {
+    minWidth: '760px'
+  },
+  tableWide: {
+    minWidth: '980px'
   },
   th: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 1,
     textAlign: 'left',
     padding: '10px 11px',
     background: '#f8fafc',
     borderBottom: '1px solid #e2e8f0',
     fontSize: '11px',
     fontWeight: 800,
-    color: '#475569'
+    color: '#475569',
+    whiteSpace: 'nowrap'
   },
   td: {
     padding: '10px 11px',
@@ -1840,7 +1853,8 @@ const styles: Record<string, CSSProperties> = {
     fontSize: '12px',
     verticalAlign: 'top',
     color: '#334155',
-    wordBreak: 'break-word'
+    wordBreak: 'normal',
+    overflowWrap: 'break-word'
   },
   emptyCell: {
     padding: '20px',
@@ -1859,7 +1873,8 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 800,
     marginBottom: '4px',
     color: '#0f172a',
-    wordBreak: 'break-word'
+    wordBreak: 'normal',
+    overflowWrap: 'break-word'
   },
   tableRecordLink: {
     display: 'inline',

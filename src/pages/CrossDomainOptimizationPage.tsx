@@ -248,6 +248,17 @@ type OptimizationExecutionDashboard = {
   top_recommendations?: SourceRecommendation[];
 };
 
+type GeneratedOptimizationPlan = {
+  item_count?: number;
+  recommendation_summary?: { recommendation_count?: number; status?: string };
+};
+
+type SourceBuildReport = {
+  completed_checks: number;
+  failed_checks: number;
+  generated_recommendations: number;
+};
+
 type ReviewConfig = {
   key: keyof OptimizationSummary;
   title: string;
@@ -453,6 +464,32 @@ function sharedSourceScope(items: SourceRecommendation[]): string[] {
   return Array.from(sets[0]).filter((token) => sets.slice(1).every((set) => set.has(token)));
 }
 
+function sourceRecommendationIdentity(item: SourceRecommendation): string {
+  const scope = sourceScopeTokens(item).sort().join('|');
+  return [item.plan_type, item.item_type, scope, String(item.recommendation || '').trim().toLocaleLowerCase()].join('::');
+}
+
+function dedupeSourceRecommendations(items: SourceRecommendation[]): SourceRecommendation[] {
+  const seen = new Set<string>();
+  const result: SourceRecommendation[] = [];
+  for (const item of items) {
+    const identity = sourceRecommendationIdentity(item);
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    result.push(item);
+  }
+  return result;
+}
+
+function hasComparableSourcePair(items: SourceRecommendation[]): boolean {
+  for (let left = 0; left < items.length; left += 1) {
+    for (let right = left + 1; right < items.length; right += 1) {
+      if (sharedSourceScope([items[left], items[right]]).length > 0) return true;
+    }
+  }
+  return false;
+}
+
 function sourceDomain(item: SourceRecommendation): string {
   switch (item.source_type) {
     case 'execution_task':
@@ -574,6 +611,7 @@ export default function CrossDomainOptimizationPage() {
   const navigate = useNavigate();
   const canGovern = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
   const canReadOptimizationSources = hasPermission(TENANT_PERMISSIONS.INVENTORY_OPTIMIZATION_READ);
+  const canCreateOptimizationSources = hasPermission(TENANT_PERMISSIONS.INVENTORY_OPTIMIZATION_CREATE);
   const canOpenIntelligenceReview = hasPermission(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ) && hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ);
   const canOpenTasks = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
   const canOpenExecutionRequests = hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW);
@@ -584,6 +622,7 @@ export default function CrossDomainOptimizationPage() {
   const [createStep, setCreateStep] = useState(1);
   const [reviewDraft, setReviewDraft] = useState<DraftReview>(emptyReview());
   const [selectedRecommendationIds, setSelectedRecommendationIds] = useState<string[]>([]);
+  const [sourceBuildReport, setSourceBuildReport] = useState<SourceBuildReport | null>(null);
   const [tradeoffDrafts, setTradeoffDrafts] = useState<Record<string, { status: string; reason: string; conditions: string }>>({});
   const [ownershipDraft, setOwnershipDraft] = useState({ owner_user_id: '', due_at: '', next_action: '' });
   const [settingsDraft, setSettingsDraft] = useState({ high_impact_tradeoff_threshold: '0.5', reusable_pattern_value_threshold: '0.75', scaling_value_threshold: '0.8', weak_value_threshold: '0.5', minimum_objective_count: '2', minimum_business_domain_count: '2', monitoring_cadence: 'weekly_first_30_days_then_monthly' });
@@ -600,13 +639,15 @@ export default function CrossDomainOptimizationPage() {
     queryFn: () => apiRequest<OptimizationSummary>(`/decision-intelligence/cross-domain-optimization-summary?${queryString}`)
   });
 
-  const { data: sourceDashboard, isLoading: sourceDashboardLoading, error: sourceDashboardError } = useQuery({
+  const { data: sourceDashboard, isLoading: sourceDashboardLoading, error: sourceDashboardError, refetch: refetchSourceDashboard } = useQuery({
     queryKey: ['cross-domain-source-recommendations'],
     queryFn: () => apiRequest<OptimizationExecutionDashboard>('/optimization-plans/execution-dashboard?limit=50&minimum_score=0'),
     enabled: showCreate && canGovern && canReadOptimizationSources
   });
 
-  const sourceRecommendations = useMemo(() => (sourceDashboard?.top_recommendations || []).filter((item) => ['candidate', 'recommended'].includes(item.status)), [sourceDashboard?.top_recommendations]);
+  const rawSourceRecommendations = useMemo(() => (sourceDashboard?.top_recommendations || []).filter((item) => ['candidate', 'recommended'].includes(item.status)), [sourceDashboard?.top_recommendations]);
+  const sourceRecommendations = useMemo(() => dedupeSourceRecommendations(rawSourceRecommendations), [rawSourceRecommendations]);
+  const comparableSourcePairAvailable = useMemo(() => hasComparableSourcePair(sourceRecommendations), [sourceRecommendations]);
   const selectedRecommendations = useMemo(() => selectedRecommendationIds.map((id) => sourceRecommendations.find((item) => item.id === id)).filter((item): item is SourceRecommendation => Boolean(item)), [selectedRecommendationIds, sourceRecommendations]);
   const selectedSharedScope = useMemo(() => sharedSourceScope(selectedRecommendations), [selectedRecommendations]);
   const comparableRecommendationIds = useMemo(() => {
@@ -674,6 +715,54 @@ export default function CrossDomainOptimizationPage() {
     });
   }, [data?.governance_settings]);
 
+  const buildAvailableRecommendations = useMutation({
+    mutationFn: async (): Promise<SourceBuildReport> => {
+      const builders: Array<{ path: string; body: Record<string, unknown> }> = [
+        { path: '/optimization-plans/replenishment', body: { replenishment_strategy: 'balanced', limit: 50 } },
+        { path: '/optimization-plans/replenishment', body: { replenishment_strategy: 'transfer_first', limit: 50 } },
+        { path: '/optimization-plans/replenishment', body: { replenishment_strategy: 'procurement_first', limit: 50 } },
+        { path: '/optimization-plans/facility-balancing', body: { balancing_strategy: 'balanced', minimum_severity: 'low', limit: 50 } },
+        { path: '/optimization-plans/facility-balancing', body: { balancing_strategy: 'sla_first', minimum_severity: 'low', limit: 50 } },
+        { path: '/optimization-plans/facility-balancing', body: { balancing_strategy: 'labor_first', minimum_severity: 'low', limit: 50 } },
+        { path: '/optimization-plans/bottlenecks', body: { limit: 50 } },
+        { path: '/optimization-plans/labor-forecast', body: { limit: 50 } },
+        { path: '/optimization-plans/sla-risk', body: { minimum_risk_level: 'low', limit: 50 } }
+      ];
+
+      let completedChecks = 0;
+      let failedChecks = 0;
+      let generatedRecommendations = 0;
+
+      for (const builder of builders) {
+        try {
+          const plan = await apiRequest<GeneratedOptimizationPlan>(builder.path, {
+            method: 'POST',
+            body: JSON.stringify({
+              ...builder.body,
+              payload: { generated_for: 'cross_domain_source_discovery' }
+            }),
+            skipMutationFeedback: true
+          });
+          completedChecks += 1;
+          generatedRecommendations += Number(plan.item_count ?? plan.recommendation_summary?.recommendation_count ?? 0);
+        } catch {
+          failedChecks += 1;
+        }
+      }
+
+      return {
+        completed_checks: completedChecks,
+        failed_checks: failedChecks,
+        generated_recommendations: generatedRecommendations
+      };
+    },
+    onSuccess: async (report) => {
+      setSourceBuildReport(report);
+      setSelectedRecommendationIds([]);
+      await refetchSourceDashboard();
+    }
+  });
+
   const createSourceBackedReview = useMutation({
     mutationFn: () => {
       const domains = Array.from(new Set(selectedRecommendations.map(sourceDomain)));
@@ -738,6 +827,7 @@ export default function CrossDomainOptimizationPage() {
       setCreateStep(1);
       setReviewDraft(emptyReview());
       setSelectedRecommendationIds([]);
+      setSourceBuildReport(null);
       setSelectedRunId(result.optimization_run_id);
       setView('plan');
       await refetch();
@@ -852,7 +942,7 @@ export default function CrossDomainOptimizationPage() {
         eyebrow={ui('Decision intelligence & planning')}
         title={ui('Cross-Domain Optimization')}
         description={ui('Use this page when management must choose between two or more existing actions backed by structured application evidence for the same business subject. Your written note is human context only; it is not analyzed. Nothing on this page changes stock or executes an action.')}
-        aside={<><OperationalWorkspaceStatus value={label(data?.governance?.cross_domain_optimization_posture, ui)} label={ui('Planning review posture · refreshed {time}').replace('{time}', lastRefreshed)} /><button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}>{isFetching ? ui('Refreshing…') : ui('Refresh evidence')}</button>{canGovern && hasEvidence && !showCreate ? <button className="button" type="button" onClick={() => { setCreateStep(1); setShowCreate(true); }}>{ui('Create decision comparison')}</button> : null}</>}
+        aside={<><OperationalWorkspaceStatus value={label(data?.governance?.cross_domain_optimization_posture, ui)} label={ui('Planning review posture · refreshed {time}').replace('{time}', lastRefreshed)} /><button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}>{isFetching ? ui('Refreshing…') : ui('Refresh evidence')}</button>{canGovern && hasEvidence && !showCreate ? <button className="button" type="button" onClick={() => { setCreateStep(1); setSourceBuildReport(null); setShowCreate(true); }}>{ui('Create decision comparison')}</button> : null}</>}
       />
 
       <OperationalWorkspaceStats ariaLabel={ui('Cross-domain optimization evidence summary')}>
@@ -875,16 +965,16 @@ export default function CrossDomainOptimizationPage() {
           <div className="card__header cross-domain-create-header">
             <div>
               <span className="cross-domain-eyebrow">{ui('Decision comparison')}</span>
-              <h2>{ui('Compare actions that already exist in the application data')}</h2>
-              <p className="card__subtext">{ui('Your title and note are for people reading the decision record. Cross-Domain Optimization does not interpret that text. The comparison itself uses structured recommendations and evidence already produced elsewhere in the application.')}</p>
+              <h2>{ui('Compare actions calculated from application data')}</h2>
+              <p className="card__subtext">{ui('Your title and note are for people reading the decision record. Cross-Domain does not interpret that text. The comparison uses structured planning recommendations calculated from application data; if none are ready, Step 2 can ask the existing planning engines to build them.')}</p>
             </div>
-            <button className="button button--secondary" type="button" onClick={() => { setShowCreate(false); setCreateStep(1); setSelectedRecommendationIds([]); }}>{ui('Close')}</button>
+            <button className="button button--secondary" type="button" onClick={() => { setShowCreate(false); setCreateStep(1); setSelectedRecommendationIds([]); setSourceBuildReport(null); }}>{ui('Close')}</button>
           </div>
 
           <div className="cross-domain-wizard-progress" aria-label={ui('Decision comparison steps')}>
             {[
               [1, ui('Decision record')],
-              [2, ui('Source-backed actions')],
+              [2, ui('Build or choose actions')],
               [3, ui('Compare source data')],
               [4, ui('Save comparison')]
             ].map(([step, text]) => (
@@ -915,12 +1005,16 @@ export default function CrossDomainOptimizationPage() {
             <section className="cross-domain-wizard-step">
               <div className="cross-domain-wizard-step__intro">
                 <span className="cross-domain-step-number">2</span>
-                <div><h3>{ui('Choose real actions already supported by application data')}</h3><p>{ui('These are existing planning recommendations from the application. Cross-Domain Optimization does not invent a second action from your note.')}</p></div>
+                <div><h3>{ui('Build or choose real actions from application data')}</h3><p>{ui('Cross-Domain uses planning recommendations calculated from structured operational data. Your note from Step 1 is not sent to these planning engines and is not used to generate an action.')}</p></div>
               </div>
               {!canReadOptimizationSources ? <div className="cross-domain-source-warning"><strong>{ui('Source data is not available with your current access')}</strong><span>{ui('You need access to inventory optimization evidence before a data-backed comparison can be created.')}</span></div> : null}
               {canReadOptimizationSources && sourceDashboardLoading ? <p className="cross-domain-muted">{ui('Loading source-backed actions…')}</p> : null}
               {canReadOptimizationSources && sourceDashboardError ? <div className="cross-domain-source-warning"><strong>{ui('Source-backed actions could not be loaded')}</strong><span>{ui('No comparison will be invented. Close this form or try again after the source data is available.')}</span></div> : null}
-              {canReadOptimizationSources && !sourceDashboardLoading && !sourceDashboardError && !sourceRecommendations.length ? <div className="cross-domain-source-warning"><strong>{ui('No candidate actions are available')}</strong><span>{ui('Cross-Domain Optimization needs at least two existing recommendations for the same structured business subject. It will not create alternatives from free text.')}</span></div> : null}
+              {canReadOptimizationSources && !sourceDashboardLoading && !sourceDashboardError && !comparableSourcePairAvailable ? <div className="cross-domain-source-builder">
+                <div><strong>{ui('No comparable pair is available yet')}</strong><span>{sourceRecommendations.length === 0 ? ui('There are no current planning recommendations to compare.') : sourceRecommendations.length === 1 ? ui('Only one distinct planning action is currently available, so there is nothing to compare yet.') : ui('Several planning actions exist, but no two refer to the same structured business subject. Cross-Domain will not force unrelated records into a comparison.')}</span></div>
+                {canCreateOptimizationSources ? <><p>{ui('Build available recommendations asks the existing planning engines to calculate current replenishment, facility balance, bottleneck, labor forecast, and SLA-risk recommendations from application data. It does not read your note and it does not execute stock, purchasing, transfers, assignments, or tasks.')}</p><button className="button" type="button" disabled={buildAvailableRecommendations.isPending || sourceBuildReport !== null} onClick={() => buildAvailableRecommendations.mutate()}>{buildAvailableRecommendations.isPending ? ui('Building recommendations…') : sourceBuildReport ? ui('Planning checks completed') : ui('Build available recommendations')}</button></> : <p>{ui('Your current access can compare planning recommendations but cannot generate them. A user with Inventory Optimization Create permission must build them first.')}</p>}
+              </div> : null}
+              {sourceBuildReport ? <div className="cross-domain-source-build-result"><strong>{ui('Planning checks finished')}</strong><span>{ui('{count} recommendation records were produced from structured application data.').replace('{count}', formatLocalizedNumber(sourceBuildReport.generated_recommendations, locale))}</span>{sourceBuildReport.failed_checks ? <span>{ui('{count} planning checks could not be completed. Any successful recommendations are still shown below.').replace('{count}', formatLocalizedNumber(sourceBuildReport.failed_checks, locale))}</span> : null}{!comparableSourcePairAvailable ? <span>{sourceRecommendations.length ? ui('The refreshed recommendations still do not contain two distinct actions for the same structured subject, so there is no valid comparison to save yet.') : ui('The planning engines did not produce an eligible recommendation from the current data, so there is no valid comparison to save yet.')}</span> : <span>{ui('Comparable source-backed actions are now available below.')}</span>}</div> : null}
               {sourceRecommendations.length ? <>
                 <div className="cross-domain-source-rule"><strong>{ui('Same subject required')}</strong><span>{ui('After you choose the first action, only recommendations sharing an actual system identifier with it remain selectable. This prevents unrelated records from being compared just because their wording sounds similar.')}</span></div>
                 <div className="cross-domain-source-grid">
@@ -1188,7 +1282,7 @@ export default function CrossDomainOptimizationPage() {
       </section>
 
       </> : null}
-      {!hasEvidence && !showCreate ? <section className="card cross-domain-section cross-domain-first-use"><div><span className="cross-domain-eyebrow">{ui('Start here')}</span><h2>{ui('No decision comparisons yet')}</h2><p>{canGovern ? ui('Create a comparison when at least two existing source-backed recommendations refer to the same structured business subject. Add a human note, choose those source records, and compare the evidence the application actually has.') : ui('No decision comparisons are available for this tenant and filter set.')}</p></div>{canGovern ? <button className="button" type="button" onClick={() => { setCreateStep(1); setShowCreate(true); }}>{ui('Create decision comparison')}</button> : null}</section> : null}
+      {!hasEvidence && !showCreate ? <section className="card cross-domain-section cross-domain-first-use"><div><span className="cross-domain-eyebrow">{ui('Start here')}</span><h2>{ui('No decision comparisons yet')}</h2><p>{canGovern ? ui('Create a comparison, add a human note, then let the application load or build structured planning recommendations. A comparison is available only when at least two distinct actions refer to the same structured business subject.') : ui('No decision comparisons are available for this tenant and filter set.')}</p></div>{canGovern ? <button className="button" type="button" onClick={() => { setCreateStep(1); setSourceBuildReport(null); setShowCreate(true); }}>{ui('Create decision comparison')}</button> : null}</section> : null}
 
       {view === 'evidence' && hasEvidence ? <>
         <EvidenceSection title={ui('Optimization runs')} description={ui('Stored planning exercises. Open one to see its complete decision story.')} rows={(data?.optimization_runs || []) as Array<Record<string, unknown>>} headers={['Run', 'Business area', 'Status', 'Owner', 'Due', 'Updated', 'Action']} renderRow={(row, index) => { const run = row as OptimizationRun; return <tr key={run.id || index}><td><strong>{run.title || run.optimization_label || ui('Planning run {number}').replace('{number}', formatLocalizedNumber(index + 1, locale))}</strong>{run.summary ? <span className="cross-domain-subtext">{run.summary}</span> : null}</td><td>{label(run.optimization_domain, ui)}</td><td><StatusBadge value={run.optimization_status} /></td><td>{run.owner_name || run.owner_email || '—'}</td><td>{formatDate(run.due_at, locale)}</td><td>{formatDate(run.updated_at || run.created_at, locale)}</td><td><button className="button button--secondary" type="button" onClick={() => openRun(run)}>{ui('Open plan')}</button></td></tr>; }} />
