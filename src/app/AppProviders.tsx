@@ -427,6 +427,10 @@ function ActionFeedbackToasts() {
   useEffect(() => {
     const enqueue = (surface: 'tenant' | 'platform', event: Event) => {
       const feedbackEvent = event as ActionFeedbackEvent;
+      // v3.49.220: informational click/form narration is intentionally silent.
+      // Keep success and error feedback, but do not display generic blue Info toasts
+      // such as "Action confirmed.", "Opening details.", or "... submitted.".
+      if (feedbackEvent.detail.type === 'info') return;
       const nextItem: ActionFeedback = {
         id: Date.now() + Math.random(),
         type: feedbackEvent.detail.type,
