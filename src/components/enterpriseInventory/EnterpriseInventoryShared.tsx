@@ -25,7 +25,8 @@ export function InputField({
   required = false,
   min,
   max,
-  disabled = false
+  disabled = false,
+  helper
 }: {
   label: string;
   value: string;
@@ -35,6 +36,7 @@ export function InputField({
   min?: string;
   max?: string;
   disabled?: boolean;
+  helper?: string;
 }) {
   return (
     <label style={styles.field}>
@@ -50,6 +52,7 @@ export function InputField({
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
       />
+      {helper ? <span style={styles.fieldHelper}>{helper}</span> : null}
     </label>
   );
 }

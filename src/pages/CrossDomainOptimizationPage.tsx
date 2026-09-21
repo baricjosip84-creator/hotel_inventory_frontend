@@ -733,6 +733,8 @@ function sourceBusinessEvidence(item: SourceRecommendation, locale: AppLocale, u
   return flattenImpactFacts(item.impact_snapshot).slice(0, 4).map(([key, value]) => `${sourceMetricLabel(key)}: ${String(value)}`);
 }
 
+const CROSS_DOMAIN_MIN_LABOR_REVIEW_HOURS_PER_DAY = 1;
+
 function isUsefulSourceRecommendation(item: SourceRecommendation): boolean {
   const impact = sourceImpact(item);
   const risk = sourceRiskLevel(item);
@@ -750,8 +752,16 @@ function isUsefulSourceRecommendation(item: SourceRecommendation): boolean {
     );
   }
   if (item.plan_type === 'facility_balancing') return ['medium', 'high', 'critical'].includes(risk) && String(impact.recommendation_mode || '') !== 'maintain_capacity';
-  if (item.plan_type === 'replenishment_optimization') return Number(impact.recommended_quantity || impact.shortage_to_par_quantity || 0) > 0 && ['transfer', 'procure', 'review'].includes(String(impact.recommendation_mode || ''));
-  if (item.plan_type === 'labor_forecast') return Number(impact.open_task_count || 0) > 0 && Number(impact.daily_demand_hours || 0) > 0;
+  if (item.plan_type === 'replenishment_optimization') {
+    const strategy = String(sourcePayload(item).strategy || '').trim();
+    return strategy === 'transfer_first'
+      && Number(impact.recommended_quantity || impact.shortage_to_par_quantity || 0) > 0
+      && ['transfer', 'procure', 'review'].includes(String(impact.recommendation_mode || ''));
+  }
+  if (item.plan_type === 'labor_forecast') {
+    const dailyDemandHours = Number(impact.daily_demand_hours || 0);
+    return Number(impact.open_task_count || 0) > 0 && dailyDemandHours >= CROSS_DOMAIN_MIN_LABOR_REVIEW_HOURS_PER_DAY;
+  }
   return false;
 }
 
@@ -982,9 +992,7 @@ export default function CrossDomainOptimizationPage() {
     },
     mutationFn: async (): Promise<SourceBuildReport> => {
       const builders: Array<{ path: string; body: Record<string, unknown> }> = [
-        { path: '/optimization-plans/replenishment', body: { replenishment_strategy: 'balanced', limit: 50 } },
         { path: '/optimization-plans/replenishment', body: { replenishment_strategy: 'transfer_first', limit: 50 } },
-        { path: '/optimization-plans/replenishment', body: { replenishment_strategy: 'procurement_first', limit: 50 } },
         { path: '/optimization-plans/facility-balancing', body: { balancing_strategy: 'balanced', minimum_severity: 'medium', limit: 50 } },
         { path: '/optimization-plans/facility-balancing', body: { balancing_strategy: 'sla_first', minimum_severity: 'medium', limit: 50 } },
         { path: '/optimization-plans/facility-balancing', body: { balancing_strategy: 'labor_first', minimum_severity: 'medium', limit: 50 } },

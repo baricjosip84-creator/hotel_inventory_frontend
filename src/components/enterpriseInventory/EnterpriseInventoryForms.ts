@@ -33,7 +33,7 @@ export const emptyParLevelForm: ParLevelForm = {
   min_quantity: '',
   par_quantity: '',
   max_quantity: '',
-  reorder_quantity: '',
+  reorder_quantity: '0',
   replenishment_priority: 'normal',
   effective_from: '',
   effective_to: '',
