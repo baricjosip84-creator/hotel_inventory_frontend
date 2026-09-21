@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
+const page = read('src/pages/CrossDomainOptimizationPage.tsx');
+const css = read('src/pages/CrossDomainOptimizationPage.css');
+const translations = read('src/i18n/tenantUiTranslations.ts');
+const pkg = JSON.parse(read('package.json'));
+const checks=[]; const check=(ok,label)=>{checks.push([!!ok,label]); console.log(`${ok?'PASS':'FAIL'}: ${label}`);};
+check(page.includes('canGovern && hasEvidence ? <button') && page.includes('!hasEvidence && !showCreate'), 'Empty Cross-Domain state exposes one create entry point instead of duplicate buttons');
+check(page.includes('const ownerCandidates = useMemo') && page.includes('unique.has(candidate.id)'), 'Owner candidates are de-duplicated by authoritative user id');
+check(page.includes('return `${name} — ${email}`;'), 'Same-name owners are distinguishable by email without inventing roles');
+check(page.includes('ownerCandidates.map((user) => <option') && page.includes('ownerCandidateLabel(user)'), 'Owner dropdown uses distinguishable labels');
+check(page.includes('SHOW_CROSS_DOMAIN_TECHNICAL_CLASSIFICATION = false'), 'Technical classification UI is retained in source but hidden from normal workflow');
+check(page.includes("ui('You do not need to classify these priorities.')"), 'Priority step explicitly tells normal users technical classification is not required');
+check(page.includes("ui('What choices do you want management to compare?')"), 'Choice step uses management-decision language instead of unexplained solution jargon');
+check(page.includes("ui('This page does not invent the choices for you. Enter two or more real actions the company is already considering. If there is only one obvious action, you do not need this page.')"), 'Choice step explains what users are expected to supply and when the page is unnecessary');
+check(page.includes("ui('What is a choice here?')") && page.includes("ui('It is one real course of action management could take."), 'Choice meaning is explained before entry fields');
+for (const text of ['What could the company do?','What would this mean in practice?','What result do you expect from this choice?','Possible drawback']) check(page.includes(`ui('${text}')`), `Plain-language choice field retained: ${text}`);
+for (const key of ['Choices','Chosen choice','Choices to compare','What matters when you decide?','You do not need to classify these priorities.','What choices do you want management to compare?','What is a choice here?','What could the company do?','Possible drawback']) check(translations.includes(`["${key}"`), `v3.49.217 UI text catalog-backed: ${key}`);
+check(css.includes('.cross-domain-plain-note') && css.includes('.cross-domain-plain-note--choice'), 'New explanations have bounded visual styling');
+for (const required of ['objective_type: objective.objective_type','objective_domain: objective.objective_domain','weight: Number(objective.weight || 1)','target_direction: objective.target_direction','impact_direction: tradeoff.impact_direction',"impact_score: tradeoff.impact_score === '' ? null : Number(tradeoff.impact_score)"]) check(page.includes(required), `Existing comparison payload preserved: ${required}`);
+check(pkg.scripts['check:inventory-testing-hardening-v349217'] === 'node scripts/check-inventory-testing-hardening-v349217.mjs','v3.49.217 guard registered');
+for (const key of ['prelint','prebuild','check:ci']) check(pkg.scripts[key]?.includes('check:inventory-testing-hardening-v349216 && npm run check:inventory-testing-hardening-v349217'), `v3.49.217 follows v3.49.216 in ${key}`);
+const failed=checks.filter(([ok])=>!ok); console.log(`v3.49.217 Cross-Domain clarity guard: ${checks.length-failed.length}/${checks.length} PASS`); if(failed.length) process.exit(1);

@@ -996,3 +996,22 @@
     width: 100%;
   }
 }
+
+
+/* v3.49.217 — plain-language guidance for owner/manager decision comparison */
+.cross-domain-plain-note {
+  display: grid;
+  gap: .22rem;
+  padding: .78rem .9rem;
+  border: 1px solid #dbe5f1;
+  border-radius: .72rem;
+  background: #f8fafc;
+  color: #475569;
+  font-size: .82rem;
+  line-height: 1.45;
+}
+.cross-domain-plain-note strong { color: #0f172a; }
+.cross-domain-plain-note--choice {
+  border-color: #bfdbfe;
+  background: #f8fbff;
+}
