@@ -22,7 +22,11 @@ check(!stock.includes('return locationMinimum > 0 ? locationMinimum : toNumber(i
 check(stockRisk.includes('return Math.max(toNumber(item.min_quantity), 0);'), 'Enterprise Stock Risk fallback is location-only');
 check(!stockRisk.includes('toNumber(item.product_min_stock)'), 'Enterprise Stock Risk cannot reintroduce Product-per-location fallback');
 check(operations.includes('item.effective_min_quantity ?? item.min_quantity ?? 0'), 'Enterprise Operations Dashboard uses effective location minimum without Product fallback');
-check(dashboard.includes("<th style={styles.th}>{ui('Minimum')}</th>"), 'Dashboard low-stock table presents the configured location minimum explicitly');
+check(
+  dashboard.includes("title={ui('Low Stock')}") &&
+    dashboard.includes("<small>{ui('Minimum')}</small><b>{formatNumber(row.min_stock)}</b>"),
+  'Dashboard low-stock presentation shows the configured location minimum explicitly regardless of table/card layout',
+);
 check(alerts.includes('storage_location_id?: string | null;') && alerts.includes('storage_location_name?: string | null;'), 'Alerts page accepts location-scoped alert evidence');
 check(alerts.includes("alert.storage_location_name ? ` · ${ui('Location:')} ${alert.storage_location_name}` : ''"), 'Alerts queue visibly shows the affected storage location');
 
