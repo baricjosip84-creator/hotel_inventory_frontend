@@ -539,12 +539,32 @@ function sourcePayload(item: SourceRecommendation): Record<string, unknown> {
 function sourceBusinessOrigin(item: SourceRecommendation, ui: (key: string) => string): string {
   switch (item.plan_type) {
     case 'replenishment_optimization': return ui('Replenishment Planning');
-    case 'facility_balancing': return ui('Execution workload — facility balance');
-    case 'bottleneck_detection': return ui('Execution Tasks — bottleneck check');
-    case 'labor_forecast': return ui('Execution Tasks — workload forecast');
-    case 'sla_risk': return ui('Execution Tasks — due-date risk');
+    case 'facility_balancing': return ui('Execution Tasks');
+    case 'bottleneck_detection': return ui('Execution Tasks');
+    case 'labor_forecast': return ui('Execution Tasks');
+    case 'sla_risk': return ui('Execution Tasks');
     default: return ui('Planning recommendations');
   }
+}
+
+function sourceTaskPayload(item: SourceRecommendation): Record<string, unknown> {
+  return simpleRecord(sourcePayload(item).task);
+}
+
+function sourceRepresentativeTasks(item: SourceRecommendation): Array<Record<string, unknown>> {
+  const tasks = sourcePayload(item).representative_tasks;
+  return Array.isArray(tasks) ? tasks.filter((value): value is Record<string, unknown> => Boolean(value && typeof value === 'object' && !Array.isArray(value))) : [];
+}
+
+function sourceRiskLevel(item: SourceRecommendation): string {
+  const impact = sourceImpact(item);
+  const direct = String(impact.risk_level || impact.severity || '').trim().toLowerCase();
+  if (direct) return direct;
+  const text = `${item.recommendation || ''} ${item.rationale || ''}`.toLowerCase();
+  for (const value of ['critical', 'high', 'medium', 'low']) {
+    if (text.includes(`${value} risk`) || text.includes(`${value} severity`)) return value;
+  }
+  return '';
 }
 
 function sourceBusinessSubject(item: SourceRecommendation, ui: (key: string) => string): string {
@@ -558,15 +578,83 @@ function sourceBusinessSubject(item: SourceRecommendation, ui: (key: string) => 
     return ui('Stock replenishment requirement');
   }
   if (item.plan_type === 'sla_risk') {
-    const task = simpleRecord(payload.task);
-    return String(task.title || task.task_code || ui('Execution task')).trim();
+    const task = sourceTaskPayload(item);
+    return String(task.title || ui('Execution task')).trim();
+  }
+  if (item.plan_type === 'bottleneck_detection') {
+    const tasks = sourceRepresentativeTasks(item);
+    const firstTitle = String(tasks[0]?.title || '').trim();
+    return firstTitle ? ui('Execution work queue containing {task}').replace('{task}', firstTitle) : ui('Execution work queue');
+  }
+  if (item.plan_type === 'facility_balancing') return ui('Execution workload');
+  if (item.plan_type === 'labor_forecast') return ui('Execution workload');
+  return String(item.recommendation || ui('Planning recommendation'));
+}
+
+function sourceIssueTitle(item: SourceRecommendation, locale: AppLocale, ui: (key: string) => string): string {
+  const impact = sourceImpact(item);
+  if (item.plan_type === 'replenishment_optimization') {
+    const shortage = Number(impact.shortage_to_par_quantity || impact.recommended_quantity || 0);
+    return shortage > 0
+      ? ui('Stock needs attention: {subject}').replace('{subject}', sourceBusinessSubject(item, ui))
+      : ui('Stock replenishment decision: {subject}').replace('{subject}', sourceBusinessSubject(item, ui));
+  }
+  if (item.plan_type === 'bottleneck_detection') {
+    const blocked = Number(impact.blocked_count || 0);
+    const overdue = Number(impact.overdue_count || 0);
+    const unassigned = Number(impact.unassigned_count || 0);
+    if (blocked > 0) return ui('{count} blocked execution task(s) need attention').replace('{count}', formatLocalizedNumber(blocked, locale));
+    if (overdue > 0) return ui('{count} overdue execution task(s) need attention').replace('{count}', formatLocalizedNumber(overdue, locale));
+    if (unassigned > 0) return ui('{count} execution task(s) are unassigned').replace('{count}', formatLocalizedNumber(unassigned, locale));
+    return ui('Execution work queue needs review');
+  }
+  if (item.plan_type === 'sla_risk') {
+    const task = sourceTaskPayload(item);
+    const title = String(task.title || '').trim();
+    return title
+      ? ui('Deadline attention needed: {task}').replace('{task}', title)
+      : ui('An execution task needs deadline attention');
+  }
+  if (item.plan_type === 'facility_balancing') return ui('Execution workload needs balancing');
+  if (item.plan_type === 'labor_forecast') return ui('Upcoming execution workload needs staffing review');
+  return ui('Operational decision needs review');
+}
+
+function sourceIssueSummary(item: SourceRecommendation, locale: AppLocale, ui: (key: string) => string): string {
+  const impact = sourceImpact(item);
+  if (item.plan_type === 'replenishment_optimization') {
+    const current = formatLocalizedNumber(Number(impact.current_quantity || 0), locale);
+    const target = formatLocalizedNumber(Number(impact.par_quantity || 0), locale);
+    const shortage = formatLocalizedNumber(Number(impact.shortage_to_par_quantity || 0), locale);
+    return ui('Current stock is {current}, the configured target is {target}, leaving a shortage of {shortage}.')
+      .replace('{current}', current).replace('{target}', target).replace('{shortage}', shortage);
+  }
+  if (item.plan_type === 'bottleneck_detection') {
+    const open = formatLocalizedNumber(Number(impact.task_count || 0), locale);
+    const blocked = formatLocalizedNumber(Number(impact.blocked_count || 0), locale);
+    const overdue = formatLocalizedNumber(Number(impact.overdue_count || 0), locale);
+    const unassigned = formatLocalizedNumber(Number(impact.unassigned_count || 0), locale);
+    return ui('Execution Tasks found {open} open task(s): {blocked} blocked, {overdue} overdue, and {unassigned} unassigned.')
+      .replace('{open}', open).replace('{blocked}', blocked).replace('{overdue}', overdue).replace('{unassigned}', unassigned);
+  }
+  if (item.plan_type === 'sla_risk') {
+    const task = sourceTaskPayload(item);
+    const due = String(task.sla_due_at || task.due_at || '').trim();
+    const status = label(String(impact.status || task.status || 'unknown'), ui);
+    const priority = label(String(impact.priority || task.priority || 'unknown'), ui);
+    return due
+      ? ui('This task is {status}, priority {priority}, and its current due time is {due}.').replace('{status}', status).replace('{priority}', priority).replace('{due}', formatLocalizedDateTime(due, locale))
+      : ui('This task is {status}, priority {priority}, and has no configured due time.').replace('{status}', status).replace('{priority}', priority);
   }
   if (item.plan_type === 'facility_balancing') {
-    return item.facility_id ? ui('Facility workload') : ui('Unassigned facility workload');
+    return ui('Execution Tasks detected uneven workload using active-task, overdue, blocked, and estimated-effort data.');
   }
-  if (item.plan_type === 'bottleneck_detection') return ui('Execution work queue');
-  if (item.plan_type === 'labor_forecast') return ui('Execution workload forecast');
-  return String(item.recommendation || ui('Planning recommendation'));
+  if (item.plan_type === 'labor_forecast') {
+    const open = formatLocalizedNumber(Number(impact.open_task_count || 0), locale);
+    const hours = formatLocalizedNumber(Number(impact.daily_demand_hours || 0), locale);
+    return ui('The current execution queue contains {open} open task(s) and about {hours} hours of expected work per day.').replace('{open}', open).replace('{hours}', hours);
+  }
+  return String(item.rationale || ui('This recommendation was calculated from structured application data.'));
 }
 
 function sourceBusinessAction(item: SourceRecommendation, locale: AppLocale, ui: (key: string) => string): string {
@@ -574,90 +662,83 @@ function sourceBusinessAction(item: SourceRecommendation, locale: AppLocale, ui:
   const qty = Number(impact.recommended_quantity || 0);
   if (item.plan_type === 'replenishment_optimization') {
     const mode = String(impact.recommendation_mode || 'review');
-    if (mode === 'transfer') return ui('Use available internal stock first').replace('{quantity}', formatLocalizedNumber(qty, locale));
-    if (mode === 'procure') return ui('Buy the required quantity from the configured supplier').replace('{quantity}', formatLocalizedNumber(Number(impact.procurement_quantity || qty), locale));
-    return ui('Review how this stock requirement should be covered');
+    if (mode === 'transfer') return ui('Move available stock from another location before buying more.');
+    if (mode === 'procure') return ui('Buy the required stock through Replenishment Planning.');
+    return qty > 0 ? ui('Review how to cover the {quantity} unit shortage.').replace('{quantity}', formatLocalizedNumber(qty, locale)) : ui('Review this replenishment requirement.');
   }
-  if (item.plan_type === 'facility_balancing') {
-    const mode = String(impact.recommendation_mode || 'monitor_capacity');
-    if (mode === 'rebalance_capacity') return ui('Rebalance work capacity for this facility');
-    if (mode === 'maintain_capacity') return ui('Keep the current facility capacity');
-    return ui('Monitor this facility workload before changing capacity');
+  if (item.plan_type === 'bottleneck_detection') {
+    const blocked = Number(impact.blocked_count || 0);
+    const overdue = Number(impact.overdue_count || 0);
+    const unassigned = Number(impact.unassigned_count || 0);
+    if (blocked > 0) return ui('Open Execution Tasks and resolve the blocked work.');
+    if (overdue > 0) return ui('Open Execution Tasks and review the overdue work.');
+    if (unassigned > 0) return ui('Open Execution Tasks and assign the unassigned work.');
+    return ui('Open Execution Tasks and review this work queue.');
   }
-  if (item.plan_type === 'bottleneck_detection') return ui('Review this work queue and its assignment bottleneck');
-  if (item.plan_type === 'labor_forecast') {
-    const daily = Number(impact.daily_demand_hours || 0);
-    return ui('Plan staffing for about {hours} work hours per day').replace('{hours}', formatLocalizedNumber(daily, locale));
-  }
-  if (item.plan_type === 'sla_risk') return ui('Prioritize this task if management decides the deadline risk needs action');
-  return String(item.recommendation || ui('Review this planning action'));
+  if (item.plan_type === 'sla_risk') return ui('Open this execution task and review its deadline and priority.');
+  if (item.plan_type === 'facility_balancing') return ui('Open Execution Tasks and rebalance the workload if the current distribution is not acceptable.');
+  if (item.plan_type === 'labor_forecast') return ui('Open Execution Tasks and check whether staffing can cover the expected workload.');
+  return ui('Open the source workflow and review the underlying work.');
 }
 
 function sourceBusinessEvidence(item: SourceRecommendation, locale: AppLocale, ui: (key: string) => string): string[] {
   const impact = sourceImpact(item);
   const number = (key: string) => formatLocalizedNumber(Number(impact[key] || 0), locale);
-  if (item.plan_type === 'replenishment_optimization') {
-    return [
-      `${ui('Current stock')}: ${number('current_quantity')}`,
-      `${ui('Target/par stock')}: ${number('par_quantity')}`,
-      `${ui('Shortage to target')}: ${number('shortage_to_par_quantity')}`,
-      `${ui('Transferable surplus elsewhere')}: ${number('alternate_facility_surplus_quantity')}`
-    ];
-  }
-  if (item.plan_type === 'facility_balancing') {
-    return [
-      `${ui('Active tasks')}: ${number('task_count')}`,
-      `${ui('Blocked')}: ${number('blocked_count')}`,
-      `${ui('Overdue')}: ${number('overdue_count')}`,
-      `${ui('Estimated work hours')}: ${number('estimated_hours')}`
-    ];
-  }
-  if (item.plan_type === 'bottleneck_detection') {
-    return [
-      `${ui('Open tasks')}: ${number('task_count')}`,
-      `${ui('Blocked')}: ${number('blocked_count')}`,
-      `${ui('Overdue')}: ${number('overdue_count')}`,
-      `${ui('Unassigned')}: ${number('unassigned_count')}`
-    ];
-  }
-  if (item.plan_type === 'labor_forecast') {
-    return [
-      `${ui('Open tasks')}: ${number('open_task_count')}`,
-      `${ui('Open estimated hours')}: ${number('open_estimated_hours')}`,
-      `${ui('Expected hours per day')}: ${number('daily_demand_hours')}`,
-      `${ui('Forecast window (days)')}: ${number('forecast_window_days')}`
-    ];
-  }
+  if (item.plan_type === 'replenishment_optimization') return [
+    `${ui('Current stock')}: ${number('current_quantity')}`,
+    `${ui('Target/par stock')}: ${number('par_quantity')}`,
+    `${ui('Shortage')}: ${number('shortage_to_par_quantity')}`,
+    `${ui('Available elsewhere')}: ${number('alternate_facility_surplus_quantity')}`
+  ];
+  if (item.plan_type === 'bottleneck_detection') return [
+    `${ui('Open tasks')}: ${number('task_count')}`,
+    `${ui('Blocked')}: ${number('blocked_count')}`,
+    `${ui('Overdue')}: ${number('overdue_count')}`,
+    `${ui('Unassigned')}: ${number('unassigned_count')}`
+  ];
+  if (item.plan_type === 'labor_forecast') return [
+    `${ui('Open tasks')}: ${number('open_task_count')}`,
+    `${ui('Expected hours per day')}: ${number('daily_demand_hours')}`
+  ];
   if (item.plan_type === 'sla_risk') {
-    const hours = impact.hours_until_due;
+    const task = sourceTaskPayload(item);
+    const due = String(task.sla_due_at || task.due_at || '').trim();
     return [
-      `${ui('Risk level')}: ${label(String(impact.risk_level || 'unknown'), ui)}`,
-      `${ui('Task status')}: ${label(String(impact.status || 'unknown'), ui)}`,
-      `${ui('Priority')}: ${label(String(impact.priority || 'unknown'), ui)}`,
-      `${ui('Hours until due')}: ${hours === null || hours === undefined ? '—' : formatLocalizedNumber(Number(hours), locale)}`
+      `${ui('Risk level')}: ${label(sourceRiskLevel(item) || 'unknown', ui)}`,
+      `${ui('Task status')}: ${label(String(impact.status || task.status || 'unknown'), ui)}`,
+      `${ui('Priority')}: ${label(String(impact.priority || task.priority || 'unknown'), ui)}`,
+      `${ui('Due')}: ${due ? formatLocalizedDateTime(due, locale) : '—'}`
     ];
   }
+  if (item.plan_type === 'facility_balancing') return [
+    `${ui('Active tasks')}: ${number('task_count')}`,
+    `${ui('Blocked')}: ${number('blocked_count')}`,
+    `${ui('Overdue')}: ${number('overdue_count')}`,
+    `${ui('Estimated work hours')}: ${number('estimated_hours')}`
+  ];
   return flattenImpactFacts(item.impact_snapshot).slice(0, 4).map(([key, value]) => `${sourceMetricLabel(key)}: ${String(value)}`);
 }
 
 function isUsefulSourceRecommendation(item: SourceRecommendation): boolean {
   const impact = sourceImpact(item);
-  const severity = String(impact.severity || '').toLowerCase();
-  const risk = String(impact.risk_level || '').toLowerCase();
-  if (item.plan_type === 'sla_risk') return ['medium', 'high', 'critical'].includes(risk);
-  if (item.plan_type === 'bottleneck_detection') return ['medium', 'high', 'critical'].includes(severity);
-  if (item.plan_type === 'facility_balancing') return ['medium', 'high', 'critical'].includes(severity) && String(impact.recommendation_mode || '') !== 'maintain_capacity';
-  if (item.plan_type === 'replenishment_optimization') return Number(impact.recommended_quantity || 0) > 0 && ['transfer', 'procure', 'review'].includes(String(impact.recommendation_mode || ''));
+  const risk = sourceRiskLevel(item);
+  if (item.plan_type === 'sla_risk') {
+    const task = sourceTaskPayload(item);
+    const due = String(task.sla_due_at || task.due_at || '').trim();
+    return ['medium', 'high', 'critical'].includes(risk) && Boolean(due || impact.blocked || ['urgent', 'high'].includes(String(impact.priority || task.priority || '').toLowerCase()));
+  }
+  if (item.plan_type === 'bottleneck_detection') {
+    return ['medium', 'high', 'critical'].includes(risk) && (
+      Number(impact.blocked_count || 0) > 0 ||
+      Number(impact.overdue_count || 0) > 0 ||
+      Number(impact.unassigned_count || 0) > 0 ||
+      Number(impact.urgent_high_count || 0) > 0
+    );
+  }
+  if (item.plan_type === 'facility_balancing') return ['medium', 'high', 'critical'].includes(risk) && String(impact.recommendation_mode || '') !== 'maintain_capacity';
+  if (item.plan_type === 'replenishment_optimization') return Number(impact.recommended_quantity || impact.shortage_to_par_quantity || 0) > 0 && ['transfer', 'procure', 'review'].includes(String(impact.recommendation_mode || ''));
   if (item.plan_type === 'labor_forecast') return Number(impact.open_task_count || 0) > 0 && Number(impact.daily_demand_hours || 0) > 0;
-  return true;
-}
-
-function recommendationsWithAComparableAlternative(items: SourceRecommendation[]): SourceRecommendation[] {
-  return items.filter((item, index) => items.some((other, otherIndex) => index !== otherIndex && sharedSourceScope([item, other]).length > 0));
-}
-
-function sourceComparableAlternativeCount(item: SourceRecommendation, items: SourceRecommendation[]): number {
-  return items.filter((other) => other.id !== item.id && sharedSourceScope([item, other]).length > 0).length;
+  return false;
 }
 
 function sourceWorkflowPath(item: SourceRecommendation): string | null {
@@ -750,6 +831,15 @@ function ownerCandidateBaseLabel(user: { id: string; name?: string | null; email
 
 
 // v3.49.223/v3.49.224 legacy static-guard signatures retained after business-facing source cards replaced raw planning-engine cards:
+// v3.49.232 legacy guard strings retained after the business-facing decision list replaced recommendation-card wording:
+// ui('Actions available from current application data')
+// ui('Review action')
+// ui('Open source workflow')
+// ui('Add to comparison')
+// ui('Review selected')
+// ui('No actionable recommendation is available from the current data')
+// ui('Refresh recommendations')
+// cross-domain-source-card--business
 // ui('No comparable pair is available yet')
 // ui('Only one distinct planning action is currently available, so there is nothing to compare yet.')
 // ui('Several planning actions exist, but no two refer to the same structured business subject. Cross-Domain will not force unrelated records into a comparison.')
@@ -1102,7 +1192,7 @@ export default function CrossDomainOptimizationPage() {
         iconPath="/cross-domain-optimization"
         eyebrow={ui('Decision intelligence & planning')}
         title={ui('Cross-Domain Optimization')}
-        description={ui('Use this page when management must choose between two or more existing actions backed by structured application evidence for the same business subject. Your written note is human context only; it is not analyzed. Nothing on this page changes stock or executes an action.')}
+        description={ui('Use this page when application data shows a real issue that needs management review, or when two real actions for the same business subject need comparison. Your written note is human context only. Nothing is executed automatically.')}
         aside={<><OperationalWorkspaceStatus value={label(data?.governance?.cross_domain_optimization_posture, ui)} label={ui('Planning review posture · refreshed {time}').replace('{time}', lastRefreshed)} /><button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}>{isFetching ? ui('Refreshing…') : ui('Refresh evidence')}</button>{canGovern && hasEvidence && !showCreate ? <button className="button" type="button" onClick={() => { setCreateStep(1); setShowCreate(true); setSourceBuildReport(null); }}>{ui('Create decision comparison')}</button> : null}</>}
       />
 
@@ -1168,14 +1258,14 @@ export default function CrossDomainOptimizationPage() {
             <section className="cross-domain-wizard-step">
               <div className="cross-domain-wizard-step__intro">
                 <span className="cross-domain-step-number">2</span>
-                <div><h3>{ui('Actions available from current application data')}</h3><p>{ui('Review one real action now. If the application has genuine alternatives for the same subject, you can compare them instead.')}</p></div>
+                <div><h3>{ui('What needs a management decision right now?')}</h3><p>{ui('Only current issues with a real next action are shown here. Low-risk noise and technical planning records are hidden.')}</p></div>
               </div>
 
               {!canReadOptimizationSources ? <div className="cross-domain-source-warning"><strong>{ui('Source data is not available with your current access')}</strong><span>{ui('You need access to inventory optimization evidence before a data-backed decision review can be created.')}</span></div> : null}
 
               {canReadOptimizationSources ? <div className="cross-domain-action-toolbar">
-                <div><strong>{ui('Current planning recommendations')}</strong><span>{ui('These come from the application data already used by Replenishment Planning and Execution Tasks.')}</span></div>
-                <button className="button" type="button" disabled={!canCreateOptimizationSources || buildAvailableRecommendations.isPending} onClick={() => buildAvailableRecommendations.mutate()}>{buildAvailableRecommendations.isPending ? ui('Building recommendations…') : ui('Refresh recommendations')}</button>
+                <div><strong>{ui('Check current application data')}</strong><span>{ui('Replenishment Planning and Execution Tasks are checked for situations that need a real decision or follow-up.')}</span></div>
+                <button className="button" type="button" disabled={!canCreateOptimizationSources || buildAvailableRecommendations.isPending} onClick={() => buildAvailableRecommendations.mutate()}>{buildAvailableRecommendations.isPending ? ui('Checking current data…') : ui('Check again')}</button>
               </div> : null}
 
               {canReadOptimizationSources && sourceDashboardLoading ? <p className="cross-domain-muted">{ui('Loading source-backed actions…')}</p> : null}
@@ -1183,8 +1273,8 @@ export default function CrossDomainOptimizationPage() {
               {sourceBuildReport ? <div className="cross-domain-build-summary"><strong>{ui('{count} actions found').replace('{count}', formatLocalizedNumber(sourceRecommendations.length, locale))}</strong><span>{sourceBuildReport.failed_checks ? ui('Some planning checks could not be completed, so only the successful actions are shown.') : ui('Recommendations were refreshed from current application data.')}</span></div> : null}
 
               {sourceRecommendations.length ? <>
-                <div className="cross-domain-actions-heading"><div><strong>{ui('Available actions')}</strong><span>{ui('{count} current recommendations').replace('{count}', formatLocalizedNumber(sourceRecommendations.length, locale))}</span></div>{comparableSourcePairAvailable ? <span>{ui('Some actions have a genuine alternative for the same subject and can be compared.')}</span> : null}</div>
-                <div className="cross-domain-source-grid cross-domain-source-grid--business">
+                <div className="cross-domain-actions-heading"><div><strong>{ui('Decisions that need attention')}</strong><span>{ui('{count} current issue(s)').replace('{count}', formatLocalizedNumber(sourceRecommendations.length, locale))}</span></div>{comparableSourcePairAvailable ? <span>{ui('A comparison is offered only when two actions concern the same real business subject.')}</span> : null}</div>
+                <div className="cross-domain-decision-list">
                   {sourceRecommendations.map((item) => {
                     const selected = selectedRecommendationIds.includes(item.id);
                     const compatible = comparableRecommendationIds.has(item.id);
@@ -1192,20 +1282,28 @@ export default function CrossDomainOptimizationPage() {
                     const alternativeCount = sourceComparableAlternativeCount(item, sourceRecommendations);
                     const workflowPath = sourceWorkflowPath(item);
                     const sourceWorkflowAvailable = Boolean(workflowPath && canOpenSourceWorkflow(item));
-                    return <article className={`cross-domain-source-card cross-domain-source-card--business${selected ? ' is-selected' : ''}`} key={item.id}>
-                      <div className="cross-domain-source-card__top"><div><span className="cross-domain-source-card__origin">{sourceBusinessOrigin(item, ui)}</span><strong>{sourceBusinessSubject(item, ui)}</strong></div></div>
-                      <div className="cross-domain-source-card__section"><small>{ui('Suggested action')}</small><b>{sourceBusinessAction(item, locale, ui)}</b></div>
-                      <div className="cross-domain-source-business-facts">{evidence.map((fact) => <span key={fact}>{fact}</span>)}</div>
-                      <div className="cross-domain-source-card__actions">
-                        <button className="button" type="button" onClick={() => { setSelectedRecommendationIds([item.id]); setCreateStep(3); }}>{ui('Review action')}</button>
-                        {sourceWorkflowAvailable ? <button className="button button--secondary" type="button" onClick={() => workflowPath && navigate(workflowPath)}>{ui('Open source workflow')}</button> : null}
+                    return <article className={`cross-domain-decision-card${selected ? ' is-selected' : ''}`} key={item.id}>
+                      <div className="cross-domain-decision-card__header">
+                        <div>
+                          <span className="cross-domain-decision-card__source">{ui('From {source}').replace('{source}', sourceBusinessOrigin(item, ui))}</span>
+                          <h4>{sourceIssueTitle(item, locale, ui)}</h4>
+                          <p>{sourceIssueSummary(item, locale, ui)}</p>
+                        </div>
                       </div>
-                      {alternativeCount > 0 ? <label className="cross-domain-compare-toggle"><input type="checkbox" checked={selected} disabled={!selected && !compatible} onChange={() => setSelectedRecommendationIds((current) => selected ? current.filter((id) => id !== item.id) : [...current, item.id])} /><span>{ui('Add to comparison')}</span><small>{ui('{count} compatible alternative(s)').replace('{count}', formatLocalizedNumber(alternativeCount, locale))}</small></label> : <span className="cross-domain-no-alternative">{ui('No second action exists for this same subject right now. You can still review this action on its own.')}</span>}
+                      <div className="cross-domain-decision-card__body">
+                        <div className="cross-domain-decision-card__next"><small>{ui('What to do now')}</small><strong>{sourceBusinessAction(item, locale, ui)}</strong></div>
+                        <div className="cross-domain-source-business-facts">{evidence.map((fact) => <span key={fact}>{fact}</span>)}</div>
+                      </div>
+                      <div className="cross-domain-decision-card__actions">
+                        {sourceWorkflowAvailable ? <button className="button" type="button" onClick={() => workflowPath && navigate(workflowPath)}>{item.plan_type === 'replenishment_optimization' ? ui('Open Replenishment Planning') : item.plan_type === 'sla_risk' ? ui('Open affected task') : ui('Open Execution Tasks')}</button> : null}
+                        <button className="button button--secondary" type="button" onClick={() => { setSelectedRecommendationIds([item.id]); setCreateStep(3); }}>{ui('Record a decision')}</button>
+                        {alternativeCount > 0 ? <label className="cross-domain-compare-toggle"><input type="checkbox" checked={selected} disabled={!selected && !compatible} onChange={() => setSelectedRecommendationIds((current) => selected ? current.filter((id) => id !== item.id) : [...current, item.id])} /><span>{ui('Compare with another action')}</span><small>{ui('{count} matching alternative(s)').replace('{count}', formatLocalizedNumber(alternativeCount, locale))}</small></label> : null}
+                      </div>
                     </article>;
                   })}
                 </div>
-                {selectedRecommendationIds.length ? <div className="cross-domain-selection-summary"><strong>{ui('{count} actions selected').replace('{count}', formatLocalizedNumber(selectedRecommendations.length, locale))}</strong><span>{selectedRecommendations.length > 1 ? selectedSourceSelectionValid ? ui('These actions refer to the same structured subject and can be compared.') : ui('The selected actions do not refer to the same business subject.') : ui('One action is ready for review.')}</span><button className="button" type="button" disabled={!selectedSourceSelectionValid} onClick={() => setCreateStep(3)}>{selectedRecommendations.length > 1 ? ui('Compare selected') : ui('Review selected')}</button></div> : null}
-              </> : !sourceDashboardLoading && !sourceDashboardError ? <div className="cross-domain-source-empty"><strong>{ui('No actionable recommendation is available from the current data')}</strong><span>{ui('Use the operational source pages to create or update the underlying work, then refresh recommendations here.')}</span><div>{canOpenReplenishmentPlanning ? <button className="button button--secondary" type="button" onClick={() => navigate('/replenishment-planning')}>{ui('Open Replenishment Planning')}</button> : null}{canOpenTasks ? <button className="button button--secondary" type="button" onClick={() => navigate('/execution-tasks')}>{ui('Open Execution Tasks')}</button> : null}</div></div> : null}
+                {selectedRecommendationIds.length > 1 ? <div className="cross-domain-selection-summary"><strong>{ui('{count} actions selected').replace('{count}', formatLocalizedNumber(selectedRecommendations.length, locale))}</strong><span>{selectedSourceSelectionValid ? ui('These actions concern the same real business subject and can be compared.') : ui('The selected actions do not refer to the same business subject.')}</span><button className="button" type="button" disabled={!selectedSourceSelectionValid} onClick={() => setCreateStep(3)}>{ui('Compare selected')}</button></div> : null}
+              </> : !sourceDashboardLoading && !sourceDashboardError ? <div className="cross-domain-source-empty"><strong>{ui('Nothing currently needs a Cross-Domain decision')}</strong><span>{ui('There is no current structured recommendation that needs management review. Open the source workspaces if you want to inspect the underlying operational work.')}</span><div>{canOpenReplenishmentPlanning ? <button className="button button--secondary" type="button" onClick={() => navigate('/replenishment-planning')}>{ui('Open Replenishment Planning')}</button> : null}{canOpenTasks ? <button className="button button--secondary" type="button" onClick={() => navigate('/execution-tasks')}>{ui('Open Execution Tasks')}</button> : null}</div></div> : null}
 
               <div className="cross-domain-wizard-actions"><button className="button button--secondary" type="button" onClick={() => setCreateStep(1)}>{ui('Back')}</button></div>
             </section>
