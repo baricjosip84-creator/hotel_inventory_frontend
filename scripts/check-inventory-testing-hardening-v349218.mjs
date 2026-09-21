@@ -9,7 +9,7 @@ const translations = read('src/i18n/tenantUiTranslations.ts');
 const pkg = JSON.parse(read('package.json'));
 const checks=[]; const check=(ok,label)=>{checks.push([!!ok,label]); console.log(`${ok?'PASS':'FAIL'}: ${label}`);};
 check(page.includes('canGovern && hasEvidence && !showCreate ? <button'), 'Header create action disappears while the creation wizard is open');
-check(page.includes("setCreateStep(1); setShowCreate(true);") && !page.includes('if (showCreate) { setShowCreate(false); }'), 'Header create action only opens the wizard and no longer doubles as an ambiguous close toggle');
+check(/onClick=\{\(\) => \{[^}]*setCreateStep\(1\);[^}]*setShowCreate\(true\);[^}]*\}\}/s.test(page) && !page.includes('if (showCreate) { setShowCreate(false); }'), 'Header create action only opens the wizard and no longer doubles as an ambiguous close toggle');
 check(page.includes('!hasEvidence && !showCreate') && page.includes("ui('Create decision comparison')"), 'Empty state still owns the single first-use create entry point');
 check(page.includes('unique.has(candidate.id)'), 'Owner candidates remain de-duplicated by authoritative user id');
 check(page.includes('const ownerCandidateLabels = useMemo') && page.includes('duplicateName && email') && page.includes('user.id.slice(0, 8)'), 'Same-name owners are disambiguated by email or factual id fallback');
