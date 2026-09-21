@@ -481,6 +481,20 @@ function dedupeSourceRecommendations(items: SourceRecommendation[]): SourceRecom
   return result;
 }
 
+function recommendationsWithAComparableAlternative(items: SourceRecommendation[]): SourceRecommendation[] {
+  return items.filter((item, index) =>
+    items.some((candidate, candidateIndex) =>
+      candidateIndex !== index && sharedSourceScope([item, candidate]).length > 0
+    )
+  );
+}
+
+function sourceComparableAlternativeCount(item: SourceRecommendation, items: SourceRecommendation[]): number {
+  return items.filter((candidate) =>
+    candidate.id !== item.id && sharedSourceScope([item, candidate]).length > 0
+  ).length;
+}
+
 function hasComparableSourcePair(items: SourceRecommendation[]): boolean {
   for (let left = 0; left < items.length; left += 1) {
     for (let right = left + 1; right < items.length; right += 1) {
