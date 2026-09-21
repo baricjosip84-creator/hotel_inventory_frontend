@@ -1016,6 +1016,11 @@
   background: #f8fbff;
 }
 
+/* v3.49.222 — source-backed wizard layout closure */
+.cross-domain-source-wizard {
+  align-content: start;
+}
+
 /* v3.49.221 — source-backed Cross-Domain decision comparison */
 .cross-domain-human-note,
 .cross-domain-source-rule,
