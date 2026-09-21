@@ -5,8 +5,7 @@ import { apiRequest } from '../lib/api';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { useAppTranslation } from '../i18n/I18nContext';
 import type { AppLocale } from '../i18n/config';
-import { formatLocalizedCurrency, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
-// Historical multilingual guard compatibility: import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import {
   OperationalWorkspaceHero,
@@ -222,96 +221,31 @@ type DraftReview = {
   options: DraftOption[];
 };
 
-
-type ReplenishmentRunListItem = {
+type SourceRecommendation = {
   id: string;
-  status?: string;
-  formula_version?: string;
-  target_coverage_days?: number | string;
-  summary?: Record<string, number | string | null>;
-  created_at?: string;
+  plan_id: string;
+  plan_code?: string | null;
+  plan_type: string;
+  item_type: string;
+  status: string;
+  rank?: number;
+  score?: number;
+  confidence?: number | null;
+  source_type?: string | null;
+  source_id?: string | null;
+  target_type?: string | null;
+  target_id?: string | null;
+  assigned_to?: string | null;
+  facility_id?: string | null;
+  storage_location_id?: string | null;
+  recommendation: string;
+  rationale?: string | null;
+  impact_snapshot?: Record<string, unknown>;
+  payload?: Record<string, unknown>;
 };
 
-type ReplenishmentPlanningItem = {
-  id: string;
-  product_id?: string;
-  product_name: string;
-  product_unit?: string | null;
-  storage_location_id?: string;
-  storage_location_name: string;
-  supplier_id?: string | null;
-  supplier_name?: string | null;
-  shortage_before_transfer: number | string;
-  transfer_covered_quantity: number | string;
-  remaining_purchase_requirement: number | string;
-  recommended_purchase_quantity: number | string;
-  estimated_purchase_cost?: number | string | null;
-  estimated_cost_currency?: string | null;
-  evidence?: {
-    supplier?: {
-      estimated_unit_cost?: number | string | null;
-      min_order_quantity?: number | string | null;
-      units_per_package?: number | string | null;
-      currency?: string | null;
-      lead_time_days?: number | string | null;
-    };
-    [key: string]: unknown;
-  };
-};
-
-type ReplenishmentPlanningTransfer = {
-  id: string;
-  product_name: string;
-  product_unit?: string | null;
-  source_storage_location_name: string;
-  destination_storage_location_name: string;
-  recommended_quantity: number | string;
-  destination_shortage_before: number | string;
-  destination_shortage_after: number | string;
-};
-
-type ReplenishmentPlanningDetail = {
-  run: ReplenishmentRunListItem;
-  items: ReplenishmentPlanningItem[];
-  transfers: ReplenishmentPlanningTransfer[];
-};
-
-type ComparisonCostTotal = {
-  currency: string;
-  amount: number;
-  covered_lines: number;
-};
-
-type ReplenishmentComparisonLine = {
-  item_id: string;
-  product_name: string;
-  storage_location_name: string;
-  unit: string | null;
-  supplier_name: string | null;
-  supplier_configured: boolean;
-  shortage_quantity: number;
-  internal_transfer_quantity: number;
-  transfer_first_purchase_quantity: number;
-  supplier_only_purchase_quantity: number;
-  transfer_first_estimated_cost: number | null;
-  supplier_only_estimated_cost: number | null;
-  currency: string | null;
-};
-
-type ReplenishmentComparison = {
-  run: ReplenishmentRunListItem;
-  shortage_line_count: number;
-  transfer_recommendation_count: number;
-  lines_with_transfer_cover: number;
-  lines_fully_covered_by_transfer: number;
-  transfer_first_purchase_line_count: number;
-  supplier_only_purchase_line_count: number;
-  lines_missing_supplier: number;
-  transfer_first_cost_known_line_count: number;
-  supplier_only_cost_known_line_count: number;
-  transfer_first_cost_totals: ComparisonCostTotal[];
-  supplier_only_cost_totals: ComparisonCostTotal[];
-  lines: ReplenishmentComparisonLine[];
+type OptimizationExecutionDashboard = {
+  top_recommendations?: SourceRecommendation[];
 };
 
 type ReviewConfig = {
@@ -343,12 +277,16 @@ const MONITORING_CADENCE_OPTIONS = ['weekly_first_30_days_then_monthly', 'weekly
 const SHOW_V349215_LEGACY_CREATE_UI = false;
 // v3.49.217: keep all technical classification/scoring controls in source, but do not show them in the normal owner/manager workflow.
 const SHOW_CROSS_DOMAIN_TECHNICAL_CLASSIFICATION = false;
-// v3.49.220: the v3.49.218 text-driven wizard is preserved in source, but normal creation now requires real application evidence.
-const SHOW_V349218_TEXT_DRIVEN_CREATE_UI = false;
+// v3.49.221: keep the v3.49.218 manual prose-driven wizard in source for rollback/history, but do not render it.
+const SHOW_V349218_MANUAL_CREATE_UI = false;
 
 /* v3.49.217 guard compatibility — superseded source signatures retained as comments only:
 canGovern && hasEvidence ? <button
 return `${name} — ${email}`;
+*/
+
+/* v3.49.221 legacy option-card guard compatibility — old wording is not rendered for source-backed comparisons:
+ui('Each option shows its estimated score, what helps it, what hurts it, and any actual outcomes already recorded.')
 */
 
 /* v3.49.216 guard compatibility — wording kept in source only, not rendered:
@@ -390,103 +328,6 @@ function numeric(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-
-function nonNegativeNumber(value: unknown): number {
-  return Math.max(numeric(value) ?? 0, 0);
-}
-
-function roundedMetric(value: number): number {
-  return Number(value.toFixed(4));
-}
-
-function ceilToMultiple(value: number, multiple: number): number {
-  if (value <= 0) return 0;
-  const safeMultiple = Math.max(multiple, 0.0001);
-  return roundedMetric(Math.ceil((value - 1e-9) / safeMultiple) * safeMultiple);
-}
-
-function buildCostTotals(lines: ReplenishmentComparisonLine[], key: 'transfer_first_estimated_cost' | 'supplier_only_estimated_cost'): ComparisonCostTotal[] {
-  const totals = new Map<string, ComparisonCostTotal>();
-  for (const line of lines) {
-    const amount = line[key];
-    const currency = String(line.currency || '').trim();
-    if (amount === null || !currency) continue;
-    const current = totals.get(currency) || { currency, amount: 0, covered_lines: 0 };
-    current.amount = roundedMetric(current.amount + amount);
-    current.covered_lines += 1;
-    totals.set(currency, current);
-  }
-  return Array.from(totals.values()).sort((left, right) => left.currency.localeCompare(right.currency));
-}
-
-function buildReplenishmentComparison(detail: ReplenishmentPlanningDetail | undefined): ReplenishmentComparison | null {
-  if (!detail?.run?.id) return null;
-  const shortageItems = (detail.items || []).filter((item) => nonNegativeNumber(item.shortage_before_transfer) > 0);
-  const lines: ReplenishmentComparisonLine[] = shortageItems.map((item) => {
-    const shortage = nonNegativeNumber(item.shortage_before_transfer);
-    const transferCover = Math.min(shortage, nonNegativeNumber(item.transfer_covered_quantity));
-    const transferFirstPurchase = nonNegativeNumber(item.recommended_purchase_quantity);
-    const currentPlanCost = numeric(item.estimated_purchase_cost);
-    const unitCost = numeric(item.evidence?.supplier?.estimated_unit_cost);
-    const minimumOrderQuantity = nonNegativeNumber(item.evidence?.supplier?.min_order_quantity);
-    const packageSize = Math.max(nonNegativeNumber(item.evidence?.supplier?.units_per_package) || 1, 0.0001);
-    const supplierOnlyPurchase = ceilToMultiple(Math.max(shortage, minimumOrderQuantity), packageSize);
-    const currency = String(item.estimated_cost_currency || item.evidence?.supplier?.currency || '').trim() || null;
-    const supplierOnlyCost = unitCost === null ? null : roundedMetric(unitCost * supplierOnlyPurchase);
-    return {
-      item_id: item.id,
-      product_name: item.product_name,
-      storage_location_name: item.storage_location_name,
-      unit: String(item.product_unit || '').trim() || null,
-      supplier_name: String(item.supplier_name || '').trim() || null,
-      supplier_configured: Boolean(item.supplier_id),
-      shortage_quantity: roundedMetric(shortage),
-      internal_transfer_quantity: roundedMetric(transferCover),
-      transfer_first_purchase_quantity: roundedMetric(transferFirstPurchase),
-      supplier_only_purchase_quantity: supplierOnlyPurchase,
-      transfer_first_estimated_cost: currentPlanCost === null ? null : roundedMetric(currentPlanCost),
-      supplier_only_estimated_cost: supplierOnlyCost,
-      currency
-    };
-  });
-  const transferRows = (detail.transfers || []).filter((row) => nonNegativeNumber(row.recommended_quantity) > 0);
-  return {
-    run: detail.run,
-    shortage_line_count: lines.length,
-    transfer_recommendation_count: transferRows.length,
-    lines_with_transfer_cover: lines.filter((line) => line.internal_transfer_quantity > 0).length,
-    lines_fully_covered_by_transfer: lines.filter((line) => line.shortage_quantity > 0 && line.internal_transfer_quantity >= line.shortage_quantity - 0.0001).length,
-    transfer_first_purchase_line_count: lines.filter((line) => line.transfer_first_purchase_quantity > 0).length,
-    supplier_only_purchase_line_count: lines.filter((line) => line.supplier_only_purchase_quantity > 0).length,
-    lines_missing_supplier: lines.filter((line) => !line.supplier_configured).length,
-    transfer_first_cost_known_line_count: lines.filter((line) => line.transfer_first_estimated_cost !== null && line.currency).length,
-    supplier_only_cost_known_line_count: lines.filter((line) => line.supplier_only_estimated_cost !== null && line.currency).length,
-    transfer_first_cost_totals: buildCostTotals(lines, 'transfer_first_estimated_cost'),
-    supplier_only_cost_totals: buildCostTotals(lines, 'supplier_only_estimated_cost'),
-    lines
-  };
-}
-
-function isReplenishmentProjectedOutcome(value: Record<string, unknown> | undefined): boolean {
-  return value?.data_source === 'replenishment_planning' && Array.isArray(value?.comparison_lines);
-}
-
-function projectedOutcomeLines(value: Record<string, unknown> | undefined): Array<Record<string, unknown>> {
-  return Array.isArray(value?.comparison_lines) ? value.comparison_lines.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object')) : [];
-}
-
-function projectedOutcomeCostTotals(value: Record<string, unknown> | undefined): ComparisonCostTotal[] {
-  const raw = Array.isArray(value?.estimated_purchase_cost_by_currency) ? value.estimated_purchase_cost_by_currency : [];
-  return raw.flatMap((item) => {
-    if (!item || typeof item !== 'object') return [];
-    const record = item as Record<string, unknown>;
-    const currency = String(record.currency || '').trim();
-    const amount = numeric(record.amount);
-    const coveredLines = numeric(record.covered_lines);
-    return currency && amount !== null ? [{ currency, amount, covered_lines: Math.max(0, Math.round(coveredLines ?? 0)) }] : [];
-  });
 }
 
 function formatPercentage(value: unknown, locale: AppLocale): string {
@@ -585,6 +426,93 @@ function comparisonSummaryText(value: unknown, locale: AppLocale, ui: (key: stri
   return parts.length ? parts.join(' · ') : ui('Comparison available in the recorded evidence.');
 }
 
+function simpleRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function sourceScopeTokens(item: SourceRecommendation): string[] {
+  const tokens = new Set<string>();
+  const add = (kind: string, value: unknown) => {
+    const normalized = String(value || '').trim();
+    if (normalized) tokens.add(`${kind}:${normalized}`);
+  };
+  if (item.target_type && item.target_id) add(item.target_type, item.target_id);
+  if (item.source_type && item.source_id) add(item.source_type, item.source_id);
+  add('facility', item.facility_id);
+  add('storage_location', item.storage_location_id);
+  const payload = simpleRecord(item.payload);
+  for (const key of ['product_id', 'reservation_id', 'reservation_item_id', 'task_id', 'purchase_order_id', 'shipment_id', 'transfer_id', 'requisition_id', 'operator_id']) {
+    add(key, payload[key]);
+  }
+  return Array.from(tokens);
+}
+
+function sharedSourceScope(items: SourceRecommendation[]): string[] {
+  if (!items.length) return [];
+  const sets = items.map((item) => new Set(sourceScopeTokens(item)));
+  return Array.from(sets[0]).filter((token) => sets.slice(1).every((set) => set.has(token)));
+}
+
+function sourceDomain(item: SourceRecommendation): string {
+  switch (item.source_type) {
+    case 'execution_task':
+    case 'execution_batch':
+    case 'operator': return 'execution';
+    case 'reservation': return 'reservation';
+    case 'requisition':
+    case 'purchase_order':
+    case 'shipment': return 'procurement';
+    case 'transfer':
+    case 'replenishment': return 'inventory';
+    case 'facility': return 'control_tower';
+    case 'forecast': return 'optimization';
+    default: return item.plan_type === 'facility_balancing' ? 'control_tower' : 'optimization';
+  }
+}
+
+function sourceConfidence(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 && number <= 1 ? number : null;
+}
+
+function flattenImpactFacts(value: unknown, prefix = '', depth = 0): Array<[string, string | number | boolean]> {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || depth > 2) return [];
+  const facts: Array<[string, string | number | boolean]> = [];
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (raw === null || raw === undefined || raw === '') continue;
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'boolean') facts.push([path, raw]);
+    else if (typeof raw === 'object' && !Array.isArray(raw)) facts.push(...flattenImpactFacts(raw, path, depth + 1));
+  }
+  return facts.slice(0, 40);
+}
+
+function sourceMetricLabel(key: string): string {
+  return key.split('.').map((part) => part.replace(/_/g, ' ')).join(' · ');
+}
+
+function sourceOptionTitle(item: SourceRecommendation): string {
+  const value = String(item.recommendation || `${item.plan_type} ${item.item_type}`).trim();
+  return value.length > 200 ? `${value.slice(0, 197)}...` : value;
+}
+
+function sourceOptionProjectedOutcome(item: SourceRecommendation): Record<string, unknown> {
+  return {
+    source_plan_type: item.plan_type,
+    source_item_type: item.item_type,
+    source_status: item.status,
+    source_score: Number.isFinite(Number(item.score)) ? Number(item.score) : null,
+    source_score_note: 'Originating planning-module score; not normalized or ranked by Cross-Domain Optimization.',
+    source_type: item.source_type || null,
+    source_id: item.source_id || null,
+    target_type: item.target_type || null,
+    target_id: item.target_id || null,
+    facility_id: item.facility_id || null,
+    storage_location_id: item.storage_location_id || null,
+    impact_snapshot: simpleRecord(item.impact_snapshot)
+  };
+}
+
 function StatusBadge({ value }: { value?: string | null }) {
   const { ui } = useAppTranslation();
   const normalized = String(value || 'unknown');
@@ -635,38 +563,6 @@ function ReviewCard({ config, section }: { config: ReviewConfig; section?: Optim
   );
 }
 
-function DataBackedOptionEvidence({ outcome, locale, ui }: { outcome: Record<string, unknown>; locale: AppLocale; ui: (key: string) => string }) {
-  const lines = projectedOutcomeLines(outcome);
-  const costs = projectedOutcomeCostTotals(outcome);
-  const strategy = String(outcome.strategy || '');
-  const usesTransfers = strategy === 'transfer_first_then_purchase';
-  const shortageLines = Math.max(0, Math.round(numeric(outcome.shortage_line_count) ?? lines.length));
-  const purchaseLines = Math.max(0, Math.round(numeric(outcome.supplier_purchase_line_count) ?? 0));
-  const transferLines = Math.max(0, Math.round(numeric(outcome.lines_with_transfer_cover) ?? 0));
-  const missingSupplierLines = Math.max(0, Math.round(numeric(outcome.lines_missing_supplier) ?? 0));
-  return (
-    <div className="cross-domain-data-evidence">
-      <div className="cross-domain-data-metrics">
-        <div><span>{ui('Shortage lines')}</span><strong>{formatLocalizedNumber(shortageLines, locale)}</strong></div>
-        <div><span>{ui('Lines using internal transfer')}</span><strong>{formatLocalizedNumber(usesTransfers ? transferLines : 0, locale)}</strong></div>
-        <div><span>{ui('Lines needing supplier purchase')}</span><strong>{formatLocalizedNumber(purchaseLines, locale)}</strong></div>
-        <div><span>{ui('Lines missing a configured supplier')}</span><strong>{formatLocalizedNumber(missingSupplierLines, locale)}</strong></div>
-      </div>
-      <div className="cross-domain-data-costs">
-        <strong>{ui('Estimated supplier purchase cost')}</strong>
-        {costs.length ? costs.map((item) => <span key={item.currency}>{formatLocalizedCurrency(item.amount, item.currency, locale, { maximumFractionDigits: 2 })} · {ui('cost known for {count} line(s)').replace('{count}', formatLocalizedNumber(item.covered_lines, locale))}</span>) : <span>{ui('Cost cannot be calculated for these lines because supplier unit cost evidence is incomplete.')}</span>}
-      </div>
-      {lines.length ? <div className="cross-domain-data-table-wrap"><table className="cross-domain-table cross-domain-data-table"><thead><tr><th>{ui('Product')}</th><th>{ui('Location')}</th><th>{ui('Shortage')}</th><th>{ui('Internal transfer')}</th><th>{ui('Supplier purchase')}</th><th>{ui('Estimated purchase cost')}</th><th>{ui('Supplier')}</th></tr></thead><tbody>{lines.map((line, index) => {
-        const unit = String(line.unit || '').trim();
-        const quantity = (value: unknown) => `${formatLocalizedNumber(numeric(value) ?? 0, locale, { maximumFractionDigits: 4 })}${unit ? ` ${unit}` : ''}`;
-        const currency = String(line.currency || '').trim();
-        const cost = numeric(line.estimated_supplier_purchase_cost);
-        return <tr key={`${String(line.item_id || 'line')}-${index}`}><td><strong>{String(line.product_name || ui('Product'))}</strong></td><td>{String(line.storage_location_name || '—')}</td><td>{quantity(line.shortage_quantity)}</td><td>{quantity(line.internal_transfer_quantity)}</td><td>{quantity(line.supplier_purchase_quantity)}</td><td>{cost !== null && currency ? formatLocalizedCurrency(cost, currency, locale, { maximumFractionDigits: 2 }) : '—'}</td><td>{String(line.supplier_name || ui('Not configured'))}</td></tr>;
-      })}</tbody></table></div> : null}
-    </div>
-  );
-}
-
 function ownerCandidateBaseLabel(user: { id: string; name?: string | null; email?: string | null }): string {
   const name = String(user.name || '').trim();
   const email = String(user.email || '').trim();
@@ -677,6 +573,7 @@ export default function CrossDomainOptimizationPage() {
   const { locale, ui } = useAppTranslation();
   const navigate = useNavigate();
   const canGovern = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
+  const canReadOptimizationSources = hasPermission(TENANT_PERMISSIONS.INVENTORY_OPTIMIZATION_READ);
   const canOpenIntelligenceReview = hasPermission(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ) && hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ);
   const canOpenTasks = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
   const canOpenExecutionRequests = hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW);
@@ -686,7 +583,7 @@ export default function CrossDomainOptimizationPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [createStep, setCreateStep] = useState(1);
   const [reviewDraft, setReviewDraft] = useState<DraftReview>(emptyReview());
-  const [sourceRunId, setSourceRunId] = useState('');
+  const [selectedRecommendationIds, setSelectedRecommendationIds] = useState<string[]>([]);
   const [tradeoffDrafts, setTradeoffDrafts] = useState<Record<string, { status: string; reason: string; conditions: string }>>({});
   const [ownershipDraft, setOwnershipDraft] = useState({ owner_user_id: '', due_at: '', next_action: '' });
   const [settingsDraft, setSettingsDraft] = useState({ high_impact_tradeoff_threshold: '0.5', reusable_pattern_value_threshold: '0.75', scaling_value_threshold: '0.8', weak_value_threshold: '0.5', minimum_objective_count: '2', minimum_business_domain_count: '2', monitoring_cadence: 'weekly_first_30_days_then_monthly' });
@@ -703,80 +600,25 @@ export default function CrossDomainOptimizationPage() {
     queryFn: () => apiRequest<OptimizationSummary>(`/decision-intelligence/cross-domain-optimization-summary?${queryString}`)
   });
 
-
-  const replenishmentRunsQuery = useQuery({
-    queryKey: ['cross-domain-replenishment-source-runs'],
-    queryFn: () => apiRequest<ReplenishmentRunListItem[]>('/replenishment-planning?limit=100'),
-    enabled: showCreate && canGovern,
-    retry: false
+  const { data: sourceDashboard, isLoading: sourceDashboardLoading, error: sourceDashboardError } = useQuery({
+    queryKey: ['cross-domain-source-recommendations'],
+    queryFn: () => apiRequest<OptimizationExecutionDashboard>('/optimization-plans/execution-dashboard?limit=50&minimum_score=0'),
+    enabled: showCreate && canGovern && canReadOptimizationSources
   });
 
-  const replenishmentRunDetailQuery = useQuery({
-    queryKey: ['cross-domain-replenishment-source-run', sourceRunId],
-    queryFn: () => apiRequest<ReplenishmentPlanningDetail>(`/replenishment-planning/${encodeURIComponent(sourceRunId)}`),
-    enabled: showCreate && canGovern && Boolean(sourceRunId),
-    retry: false
-  });
-
-  const replenishmentComparison = useMemo(
-    () => buildReplenishmentComparison(replenishmentRunDetailQuery.data),
-    [replenishmentRunDetailQuery.data]
-  );
-
-
-  const transferFirstPreviewOutcome = useMemo<Record<string, unknown> | null>(() => {
-    const comparison = replenishmentComparison;
-    if (!comparison) return null;
-    return {
-      data_source: 'replenishment_planning',
-      strategy: 'transfer_first_then_purchase',
-      source_run_id: comparison.run.id,
-      shortage_line_count: comparison.shortage_line_count,
-      lines_with_transfer_cover: comparison.lines_with_transfer_cover,
-      supplier_purchase_line_count: comparison.transfer_first_purchase_line_count,
-      lines_missing_supplier: comparison.lines_missing_supplier,
-      estimated_purchase_cost_by_currency: comparison.transfer_first_cost_totals,
-      comparison_lines: comparison.lines.map((line) => ({
-        item_id: line.item_id,
-        product_name: line.product_name,
-        storage_location_name: line.storage_location_name,
-        unit: line.unit,
-        supplier_name: line.supplier_name,
-        shortage_quantity: line.shortage_quantity,
-        internal_transfer_quantity: line.internal_transfer_quantity,
-        supplier_purchase_quantity: line.transfer_first_purchase_quantity,
-        estimated_supplier_purchase_cost: line.transfer_first_estimated_cost,
-        currency: line.currency
-      }))
-    };
-  }, [replenishmentComparison]);
-
-  const supplierOnlyPreviewOutcome = useMemo<Record<string, unknown> | null>(() => {
-    const comparison = replenishmentComparison;
-    if (!comparison) return null;
-    return {
-      data_source: 'replenishment_planning',
-      strategy: 'supplier_purchase_without_recommended_transfers',
-      source_run_id: comparison.run.id,
-      shortage_line_count: comparison.shortage_line_count,
-      lines_with_transfer_cover: 0,
-      supplier_purchase_line_count: comparison.supplier_only_purchase_line_count,
-      lines_missing_supplier: comparison.lines_missing_supplier,
-      estimated_purchase_cost_by_currency: comparison.supplier_only_cost_totals,
-      comparison_lines: comparison.lines.map((line) => ({
-        item_id: line.item_id,
-        product_name: line.product_name,
-        storage_location_name: line.storage_location_name,
-        unit: line.unit,
-        supplier_name: line.supplier_name,
-        shortage_quantity: line.shortage_quantity,
-        internal_transfer_quantity: 0,
-        supplier_purchase_quantity: line.supplier_only_purchase_quantity,
-        estimated_supplier_purchase_cost: line.supplier_only_estimated_cost,
-        currency: line.currency
-      }))
-    };
-  }, [replenishmentComparison]);
+  const sourceRecommendations = useMemo(() => (sourceDashboard?.top_recommendations || []).filter((item) => ['candidate', 'recommended'].includes(item.status)), [sourceDashboard?.top_recommendations]);
+  const selectedRecommendations = useMemo(() => selectedRecommendationIds.map((id) => sourceRecommendations.find((item) => item.id === id)).filter((item): item is SourceRecommendation => Boolean(item)), [selectedRecommendationIds, sourceRecommendations]);
+  const selectedSharedScope = useMemo(() => sharedSourceScope(selectedRecommendations), [selectedRecommendations]);
+  const comparableRecommendationIds = useMemo(() => {
+    if (!selectedRecommendations.length) return new Set(sourceRecommendations.map((item) => item.id));
+    return new Set(sourceRecommendations.filter((candidate) => sharedSourceScope([...selectedRecommendations, candidate]).length > 0 || selectedRecommendationIds.includes(candidate.id)).map((item) => item.id));
+  }, [selectedRecommendations, selectedRecommendationIds, sourceRecommendations]);
+  const commonImpactMetrics = useMemo(() => {
+    const maps = selectedRecommendations.map((item) => new Map(flattenImpactFacts(item.impact_snapshot)));
+    if (maps.length < 2) return [] as Array<{ key: string; values: Array<string | number | boolean | null> }>;
+    const keys = Array.from(new Set(maps.flatMap((map) => Array.from(map.keys()))));
+    return keys.map((key) => ({ key, values: maps.map((map) => map.get(key) ?? null) })).filter((row) => row.values.filter((value) => value !== null).length >= 2).slice(0, 20);
+  }, [selectedRecommendations]);
 
   const ownerCandidates = useMemo(() => {
     const unique = new Map<string, { id: string; name?: string | null; email?: string | null }>();
@@ -810,12 +652,6 @@ export default function CrossDomainOptimizationPage() {
   const selectedRunDetail = data?.run_detail?.run;
 
   useEffect(() => {
-    if (!showCreate || sourceRunId || !replenishmentRunsQuery.data?.length) return;
-    const firstRun = replenishmentRunsQuery.data.find((run) => Boolean(run?.id));
-    if (firstRun?.id) setSourceRunId(firstRun.id);
-  }, [showCreate, sourceRunId, replenishmentRunsQuery.data]);
-
-  useEffect(() => {
     if (!selectedRunDetail) return;
     setOwnershipDraft({
       owner_user_id: selectedRunDetail.owner_user_id || '',
@@ -838,156 +674,70 @@ export default function CrossDomainOptimizationPage() {
     });
   }, [data?.governance_settings]);
 
-  const createDataBackedReview = useMutation({
-    mutationFn: async () => {
-      const comparison = replenishmentComparison;
-      if (!comparison || comparison.shortage_line_count < 1) throw new Error('No actionable replenishment evidence is available for this comparison.');
-      const sourceReference = {
-        source_type: 'replenishment_planning_run',
-        replenishment_run_id: comparison.run.id,
-        formula_version: comparison.run.formula_version || null,
-        target_coverage_days: numeric(comparison.run.target_coverage_days),
-        generated_at: comparison.run.created_at || null,
-        user_text_used_for_analysis: false
-      };
-      const baseOutcome = {
-        data_source: 'replenishment_planning',
-        source_run_id: comparison.run.id,
-        formula_version: comparison.run.formula_version || null,
-        target_coverage_days: numeric(comparison.run.target_coverage_days),
-        shortage_line_count: comparison.shortage_line_count,
-        lines_missing_supplier: comparison.lines_missing_supplier,
-        user_text_used_for_analysis: false
-      };
-      const transferFirstLines = comparison.lines.map((line) => ({
-        item_id: line.item_id,
-        product_name: line.product_name,
-        storage_location_name: line.storage_location_name,
-        unit: line.unit,
-        supplier_name: line.supplier_name,
-        shortage_quantity: line.shortage_quantity,
-        internal_transfer_quantity: line.internal_transfer_quantity,
-        supplier_purchase_quantity: line.transfer_first_purchase_quantity,
-        estimated_supplier_purchase_cost: line.transfer_first_estimated_cost,
-        currency: line.currency
-      }));
-      const supplierOnlyLines = comparison.lines.map((line) => ({
-        item_id: line.item_id,
-        product_name: line.product_name,
-        storage_location_name: line.storage_location_name,
-        unit: line.unit,
-        supplier_name: line.supplier_name,
-        shortage_quantity: line.shortage_quantity,
-        internal_transfer_quantity: 0,
-        supplier_purchase_quantity: line.supplier_only_purchase_quantity,
-        estimated_supplier_purchase_cost: line.supplier_only_estimated_cost,
-        currency: line.currency
+  const createSourceBackedReview = useMutation({
+    mutationFn: () => {
+      const domains = Array.from(new Set(selectedRecommendations.map(sourceDomain)));
+      const objectives = (domains.length ? domains : ['optimization']).map((domain) => ({
+        objective_type: 'general',
+        objective_domain: domain,
+        weight: 1,
+        target_direction: 'balance',
+        target_reference: {
+          source_backed: true,
+          recommendation_ids: selectedRecommendations.filter((item) => sourceDomain(item) === domain).map((item) => item.id)
+        },
+        constraint_reference: {},
+        confidence_score: null
       }));
       return apiRequest<{ optimization_run_id: string }>('/decision-intelligence/cross-domain-optimization/reviews', {
         method: 'POST',
-        skipMutationFeedback: true,
         body: JSON.stringify({
           title: reviewDraft.title.trim(),
           summary: reviewDraft.summary.trim() || null,
-          optimization_domain: 'multi_domain',
+          optimization_domain: domains.length > 1 ? 'multi_domain' : (domains[0] || 'optimization'),
           owner_user_id: reviewDraft.owner_user_id || null,
           due_at: reviewDraft.due_at || null,
-          next_action: reviewDraft.next_action.trim() || 'Review the source figures and select one option before formal human governance review.',
-          source_reference: sourceReference,
-          objective_profile: {
-            generated_from: 'replenishment_planning',
-            evidence_run_id: comparison.run.id,
-            user_text_used_for_analysis: false
+          next_action: reviewDraft.next_action.trim() || null,
+          source_reference: {
+            source_type: 'optimization_plan_recommendation_comparison',
+            recommendation_ids: selectedRecommendations.map((item) => item.id),
+            plan_ids: Array.from(new Set(selectedRecommendations.map((item) => item.plan_id))),
+            shared_scope: selectedSharedScope,
+            human_text_not_analyzed: true
           },
           decision_reference: {
-            comparison_basis: 'structured_replenishment_evidence',
-            user_text_used_for_analysis: false,
-            choices_generated_from_source_data: true
+            comparison_basis: 'structured_application_evidence',
+            human_text_not_analyzed: true,
+            automatic_winner: false
           },
-          objectives: [
-            {
-              objective_type: 'sla_risk',
-              objective_domain: 'inventory',
-              weight: 1,
-              target_direction: 'minimize',
-              target_reference: {
-                metric: 'shortage_lines_needing_action',
-                baseline_count: comparison.shortage_line_count,
-                source_run_id: comparison.run.id
-              },
-              constraint_reference: { facts_only: true, user_text_used_for_analysis: false },
-              confidence_score: null
+          objectives,
+          options: selectedRecommendations.map((item) => ({
+            title: sourceOptionTitle(item),
+            summary: String(item.rationale || '').trim() || null,
+            option_reference: {
+              optimization_plan_item_id: item.id,
+              optimization_plan_id: item.plan_id,
+              plan_code: item.plan_code || null,
+              source_type: item.source_type || null,
+              source_id: item.source_id || null,
+              target_type: item.target_type || null,
+              target_id: item.target_id || null
             },
-            {
-              objective_type: 'working_capital',
-              objective_domain: 'procurement',
-              weight: 1,
-              target_direction: 'minimize',
-              target_reference: {
-                metric: 'supplier_purchase_exposure',
-                source_run_id: comparison.run.id
-              },
-              constraint_reference: {
-                transfer_first_cost_known_lines: comparison.transfer_first_cost_known_line_count,
-                supplier_only_cost_known_lines: comparison.supplier_only_cost_known_line_count,
-                total_shortage_lines: comparison.shortage_line_count,
-                facts_only: true
-              },
-              confidence_score: null
-            }
-          ],
-          options: [
-            {
-              title: 'Use internal transfers first, then buy the remainder',
-              summary: 'Uses the internal-transfer and supplier-purchase quantities already calculated by Replenishment Planning.',
-              option_reference: { strategy: 'transfer_first_then_purchase', source_run_id: comparison.run.id, generated_from_source_data: true },
-              projected_outcome: {
-                ...baseOutcome,
-                strategy: 'transfer_first_then_purchase',
-                transfer_recommendation_count: comparison.transfer_recommendation_count,
-                lines_with_transfer_cover: comparison.lines_with_transfer_cover,
-                lines_fully_covered_by_transfer: comparison.lines_fully_covered_by_transfer,
-                supplier_purchase_line_count: comparison.transfer_first_purchase_line_count,
-                cost_known_line_count: comparison.transfer_first_cost_known_line_count,
-                estimated_purchase_cost_by_currency: comparison.transfer_first_cost_totals,
-                comparison_lines: transferFirstLines
-              },
-              tradeoff_summary: { facts_only: true, unmeasured_effects_not_scored: true },
-              governance_reference: { human_selection_required: true, autonomous_execution: false },
-              aggregate_score: null,
-              confidence_score: null,
-              tradeoffs: []
-            },
-            {
-              title: 'Buy the shortage from suppliers without the recommended transfers',
-              summary: 'Uses the same shortage evidence, but assumes the recommended internal transfers are not used and the shortage is covered through supplier purchasing.',
-              option_reference: { strategy: 'supplier_purchase_without_recommended_transfers', source_run_id: comparison.run.id, generated_from_source_data: true },
-              projected_outcome: {
-                ...baseOutcome,
-                strategy: 'supplier_purchase_without_recommended_transfers',
-                transfer_recommendation_count: 0,
-                lines_with_transfer_cover: 0,
-                lines_fully_covered_by_transfer: 0,
-                supplier_purchase_line_count: comparison.supplier_only_purchase_line_count,
-                cost_known_line_count: comparison.supplier_only_cost_known_line_count,
-                estimated_purchase_cost_by_currency: comparison.supplier_only_cost_totals,
-                comparison_lines: supplierOnlyLines
-              },
-              tradeoff_summary: { facts_only: true, unmeasured_effects_not_scored: true },
-              governance_reference: { human_selection_required: true, autonomous_execution: false },
-              aggregate_score: null,
-              confidence_score: null,
-              tradeoffs: []
-            }
-          ]
+            projected_outcome: sourceOptionProjectedOutcome(item),
+            tradeoff_summary: {},
+            governance_reference: { source_backed: true, cross_domain_score_calculated: false },
+            aggregate_score: null,
+            confidence_score: sourceConfidence(item.confidence),
+            tradeoffs: []
+          }))
         })
       });
     },
     onSuccess: async (result) => {
       setShowCreate(false);
       setCreateStep(1);
-      setSourceRunId('');
       setReviewDraft(emptyReview());
+      setSelectedRecommendationIds([]);
       setSelectedRunId(result.optimization_run_id);
       setView('plan');
       await refetch();
@@ -1034,6 +784,7 @@ export default function CrossDomainOptimizationPage() {
       setShowCreate(false);
       setCreateStep(1);
       setReviewDraft(emptyReview());
+      setSelectedRecommendationIds([]);
       setSelectedRunId(result.optimization_run_id);
       setView('plan');
       await refetch();
@@ -1100,7 +851,7 @@ export default function CrossDomainOptimizationPage() {
         iconPath="/cross-domain-optimization"
         eyebrow={ui('Decision intelligence & planning')}
         title={ui('Cross-Domain Optimization')}
-        description={ui('Compare different operational actions using structured evidence already stored in the application. Human notes stay human notes; they are never treated as analysis. Nothing on this page changes stock or places orders by itself.')}
+        description={ui('Use this page when management must choose between two or more existing actions backed by structured application evidence for the same business subject. Your written note is human context only; it is not analyzed. Nothing on this page changes stock or executes an action.')}
         aside={<><OperationalWorkspaceStatus value={label(data?.governance?.cross_domain_optimization_posture, ui)} label={ui('Planning review posture · refreshed {time}').replace('{time}', lastRefreshed)} /><button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}>{isFetching ? ui('Refreshing…') : ui('Refresh evidence')}</button>{canGovern && hasEvidence && !showCreate ? <button className="button" type="button" onClick={() => { setCreateStep(1); setShowCreate(true); }}>{ui('Create decision comparison')}</button> : null}</>}
       />
 
@@ -1119,22 +870,22 @@ export default function CrossDomainOptimizationPage() {
         <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label={ui('Is it ready?')} disabled={!hasEvidence} title={!hasEvidence ? ui('Create a decision comparison first.') : undefined} onClick={() => setView('readiness')} />
       </OperationalWorkspaceTabs>
 
-      {showCreate && canGovern ? (
-        <section className="card cross-domain-section cross-domain-create cross-domain-create--wizard cross-domain-create--data-backed">
+      {!SHOW_V349218_MANUAL_CREATE_UI && showCreate && canGovern ? (
+        <section className="card cross-domain-section cross-domain-create cross-domain-create--wizard cross-domain-source-wizard">
           <div className="card__header cross-domain-create-header">
             <div>
-              <span className="cross-domain-eyebrow">{ui('Data-backed comparison')}</span>
-              <h2>{ui('Compare actions using facts already in the application')}</h2>
-              <p className="card__subtext">{ui('This workflow starts from a real Replenishment Planning run. Your notes are saved for people to read, but the app does not use your wording to calculate the comparison.')}</p>
+              <span className="cross-domain-eyebrow">{ui('Decision comparison')}</span>
+              <h2>{ui('Compare actions that already exist in the application data')}</h2>
+              <p className="card__subtext">{ui('Your title and note are for people reading the decision record. Cross-Domain Optimization does not interpret that text. The comparison itself uses structured recommendations and evidence already produced elsewhere in the application.')}</p>
             </div>
-            <button className="button button--secondary" type="button" onClick={() => { setShowCreate(false); setCreateStep(1); setSourceRunId(''); }}>{ui('Close')}</button>
+            <button className="button button--secondary" type="button" onClick={() => { setShowCreate(false); setCreateStep(1); setSelectedRecommendationIds([]); }}>{ui('Close')}</button>
           </div>
 
           <div className="cross-domain-wizard-progress" aria-label={ui('Decision comparison steps')}>
             {[
-              [1, ui('Choose real data')],
-              [2, ui('Your notes')],
-              [3, ui('Compare the numbers')],
+              [1, ui('Decision record')],
+              [2, ui('Source-backed actions')],
+              [3, ui('Compare source data')],
               [4, ui('Save comparison')]
             ].map(([step, text]) => (
               <div className={`cross-domain-wizard-progress__step${createStep === step ? ' is-current' : ''}${createStep > Number(step) ? ' is-done' : ''}`} key={String(step)}>
@@ -1143,54 +894,96 @@ export default function CrossDomainOptimizationPage() {
             ))}
           </div>
 
-          {createStep === 1 ? <section className="cross-domain-wizard-step">
-            <div className="cross-domain-wizard-step__intro"><span className="cross-domain-step-number">1</span><div><h3>{ui('Choose the real planning data to compare')}</h3><p>{ui('Cross-Domain Optimization no longer starts from a blank text form. Select a Replenishment Planning run that already contains shortage, transfer, supplier, and cost evidence.')}</p></div></div>
-            <div className="cross-domain-human-text-note"><strong>{ui('What the app analyzes')}</strong><span>{ui('Only the structured quantities, transfer recommendations, supplier links, and available supplier-cost evidence from the selected planning run. It does not analyze any sentence you type.')}</span></div>
-            {replenishmentRunsQuery.isLoading ? <p className="cross-domain-muted">{ui('Loading Replenishment Planning runs…')}</p> : null}
-            {replenishmentRunsQuery.isError ? <div className="cross-domain-source-error"><strong>{ui('Replenishment Planning data is not available to this page.')}</strong><span>{ui('Open Replenishment Planning and make sure your role can read planning runs. A data-backed comparison cannot be created without a readable source run.')}</span><button className="button button--secondary" type="button" onClick={() => navigate('/replenishment-planning')}>{ui('Open Replenishment Planning')}</button></div> : null}
-            {!replenishmentRunsQuery.isLoading && !replenishmentRunsQuery.isError ? <label className="cross-domain-source-select"><span className="form-label">{ui('Replenishment Planning run')}</span><span className="cross-domain-field-help">{ui('Choose the saved calculation whose real shortage and replenishment facts should be compared.')}</span><select className="input" value={sourceRunId} onChange={(event) => setSourceRunId(event.target.value)}><option value="">{ui('Select a planning run')}</option>{(replenishmentRunsQuery.data || []).map((run) => <option key={run.id} value={run.id}>{`${run.created_at ? formatDate(run.created_at, locale) : run.id} · ${ui('Coverage')} ${formatLocalizedNumber(numeric(run.target_coverage_days) ?? 0, locale, { maximumFractionDigits: 1 })} ${ui('days')} · ${label(run.status, ui)}`}</option>)}</select></label> : null}
-            {sourceRunId && replenishmentRunDetailQuery.isLoading ? <p className="cross-domain-muted">{ui('Loading the selected planning evidence…')}</p> : null}
-            {sourceRunId && replenishmentRunDetailQuery.isError ? <p className="cross-domain-error">{ui('The selected planning run could not be loaded. Choose another run or open Replenishment Planning to inspect it.')}</p> : null}
-            {replenishmentComparison ? <div className="cross-domain-source-summary"><div><span>{ui('Shortage lines')}</span><strong>{formatLocalizedNumber(replenishmentComparison.shortage_line_count, locale)}</strong></div><div><span>{ui('Transfer recommendations')}</span><strong>{formatLocalizedNumber(replenishmentComparison.transfer_recommendation_count, locale)}</strong></div><div><span>{ui('Lines fully covered by transfer')}</span><strong>{formatLocalizedNumber(replenishmentComparison.lines_fully_covered_by_transfer, locale)}</strong></div><div><span>{ui('Lines missing a configured supplier')}</span><strong>{formatLocalizedNumber(replenishmentComparison.lines_missing_supplier, locale)}</strong></div></div> : null}
-            {replenishmentComparison && replenishmentComparison.shortage_line_count === 0 ? <div className="cross-domain-source-error"><strong>{ui('This run has no shortage lines to compare.')}</strong><span>{ui('Choose a planning run with an actual shortage. Cross-Domain Optimization will not create an empty or invented comparison.')}</span></div> : null}
-            <div className="cross-domain-wizard-actions cross-domain-wizard-actions--end"><button className="button" type="button" disabled={!replenishmentComparison || replenishmentComparison.shortage_line_count < 1} onClick={() => setCreateStep(2)}>{ui('Continue')}</button></div>
-          </section> : null}
+          {createStep === 1 ? (
+            <section className="cross-domain-wizard-step">
+              <div className="cross-domain-wizard-step__intro">
+                <span className="cross-domain-step-number">1</span>
+                <div><h3>{ui('Describe the decision for the people who will review it')}</h3><p>{ui('This text is a human note only. It is saved with the comparison, but it is not parsed, scored, or used to decide what the application should analyze.')}</p></div>
+              </div>
+              <div className="cross-domain-human-note"><strong>{ui('Human note — not calculation input')}</strong><span>{ui('Write whatever helps your team understand why this decision matters. The application will use only the structured source records you choose in the next step.')}</span></div>
+              <div className="cross-domain-form-grid cross-domain-form-grid--guided">
+                <label className="cross-domain-span-2"><span className="form-label">{ui('Decision title')}</span><span className="cross-domain-field-help">{ui('A short name people can recognize later.')}</span><input className="input" value={reviewDraft.title} onChange={(event) => setReviewDraft((current) => ({ ...current, title: event.target.value }))} /></label>
+                <label className="cross-domain-span-2"><span className="form-label">{ui('Note for reviewers')}</span><span className="cross-domain-field-help">{ui('Optional. This is context for people, not instructions to the application.')}</span><textarea className="input" rows={4} value={reviewDraft.summary} onChange={(event) => setReviewDraft((current) => ({ ...current, summary: event.target.value }))} /></label>
+                <label><span className="form-label">{ui('Responsible person')}</span><select className="input" value={reviewDraft.owner_user_id} onChange={(event) => setReviewDraft((current) => ({ ...current, owner_user_id: event.target.value }))}><option value="">{ui('No owner yet')}</option>{ownerCandidates.map((user) => <option key={user.id} value={user.id}>{ownerCandidateLabel(user)}</option>)}</select></label>
+                <label><span className="form-label">{ui('Decision due date')}</span><span className="cross-domain-field-help">{ui('Optional. Leave it blank if there is no deadline.')}</span><input className="input" type="date" value={reviewDraft.due_at} onChange={(event) => setReviewDraft((current) => ({ ...current, due_at: event.target.value }))} /></label>
+              </div>
+              <div className="cross-domain-wizard-actions cross-domain-wizard-actions--end"><button className="button" type="button" disabled={reviewDraft.title.trim().length < 3} onClick={() => setCreateStep(2)}>{ui('Continue')}</button></div>
+            </section>
+          ) : null}
 
-          {createStep === 2 ? <section className="cross-domain-wizard-step">
-            <div className="cross-domain-wizard-step__intro"><span className="cross-domain-step-number">2</span><div><h3>{ui('Add notes for people')}</h3><p>{ui('These fields help managers understand why the comparison exists and who owns it. They are not inputs to the calculation.')}</p></div></div>
-            <div className="cross-domain-human-text-note cross-domain-human-text-note--strong"><strong>{ui('Your text is not analyzed')}</strong><span>{ui('The title, note, and next step are saved with the record for you and your colleagues. Changing the wording does not change the numbers, the choices, or the comparison.')}</span></div>
-            <div className="cross-domain-form-grid cross-domain-form-grid--guided">
-              <label className="cross-domain-span-2"><span className="form-label">{ui('Comparison title')}</span><span className="cross-domain-field-help">{ui('A name for people to recognize later. This is not analyzed.')}</span><input className="input" value={reviewDraft.title} onChange={(event) => setReviewDraft((current) => ({ ...current, title: event.target.value }))} placeholder={ui('Example: Replenishment choice for current shortages')} /></label>
-              <label className="cross-domain-span-2"><span className="form-label">{ui('Manager note')}</span><span className="cross-domain-field-help">{ui('Optional context for people reading the decision later. The app does not interpret this text.')}</span><textarea className="input" rows={3} value={reviewDraft.summary} onChange={(event) => setReviewDraft((current) => ({ ...current, summary: event.target.value }))} placeholder={ui('Example: We want to decide whether to use available internal stock before buying the shortage from suppliers.')} /></label>
-              <label><span className="form-label">{ui('Responsible person')}</span><select className="input" value={reviewDraft.owner_user_id} onChange={(event) => setReviewDraft((current) => ({ ...current, owner_user_id: event.target.value }))}><option value="">{ui('No owner yet')}</option>{ownerCandidates.map((user) => <option key={user.id} value={user.id}>{ownerCandidateLabel(user)}</option>)}</select></label>
-              <label><span className="form-label">{ui('Decision due date')}</span><input className="input" type="date" value={reviewDraft.due_at} onChange={(event) => setReviewDraft((current) => ({ ...current, due_at: event.target.value }))} /></label>
-              <label className="cross-domain-span-2"><span className="form-label">{ui('Next step for people')}</span><span className="cross-domain-field-help">{ui('Optional reminder of what the team should do after reviewing the comparison. This is not analyzed.')}</span><input className="input" value={reviewDraft.next_action} onChange={(event) => setReviewDraft((current) => ({ ...current, next_action: event.target.value }))} placeholder={ui('Example: Review the two data-backed choices with Purchasing and Operations.')} /></label>
-            </div>
-            <div className="cross-domain-wizard-actions"><button className="button button--secondary" type="button" onClick={() => setCreateStep(1)}>{ui('Back')}</button><button className="button" type="button" disabled={reviewDraft.title.trim().length < 3 || !replenishmentComparison} onClick={() => setCreateStep(3)}>{ui('Compare the numbers')}</button></div>
-          </section> : null}
+          {createStep === 2 ? (
+            <section className="cross-domain-wizard-step">
+              <div className="cross-domain-wizard-step__intro">
+                <span className="cross-domain-step-number">2</span>
+                <div><h3>{ui('Choose real actions already supported by application data')}</h3><p>{ui('These are existing planning recommendations from the application. Cross-Domain Optimization does not invent a second action from your note.')}</p></div>
+              </div>
+              {!canReadOptimizationSources ? <div className="cross-domain-source-warning"><strong>{ui('Source data is not available with your current access')}</strong><span>{ui('You need access to inventory optimization evidence before a data-backed comparison can be created.')}</span></div> : null}
+              {canReadOptimizationSources && sourceDashboardLoading ? <p className="cross-domain-muted">{ui('Loading source-backed actions…')}</p> : null}
+              {canReadOptimizationSources && sourceDashboardError ? <div className="cross-domain-source-warning"><strong>{ui('Source-backed actions could not be loaded')}</strong><span>{ui('No comparison will be invented. Close this form or try again after the source data is available.')}</span></div> : null}
+              {canReadOptimizationSources && !sourceDashboardLoading && !sourceDashboardError && !sourceRecommendations.length ? <div className="cross-domain-source-warning"><strong>{ui('No candidate actions are available')}</strong><span>{ui('Cross-Domain Optimization needs at least two existing recommendations for the same structured business subject. It will not create alternatives from free text.')}</span></div> : null}
+              {sourceRecommendations.length ? <>
+                <div className="cross-domain-source-rule"><strong>{ui('Same subject required')}</strong><span>{ui('After you choose the first action, only recommendations sharing an actual system identifier with it remain selectable. This prevents unrelated records from being compared just because their wording sounds similar.')}</span></div>
+                <div className="cross-domain-source-grid">
+                  {sourceRecommendations.map((item) => {
+                    const selected = selectedRecommendationIds.includes(item.id);
+                    const compatible = comparableRecommendationIds.has(item.id);
+                    const facts = flattenImpactFacts(item.impact_snapshot).slice(0, 4);
+                    return <label className={`cross-domain-source-card${selected ? ' is-selected' : ''}${!compatible && !selected ? ' is-incompatible' : ''}`} key={item.id}>
+                      <div className="cross-domain-source-card__top"><input type="checkbox" checked={selected} disabled={!selected && !compatible} onChange={() => setSelectedRecommendationIds((current) => selected ? current.filter((id) => id !== item.id) : [...current, item.id])} /><div><strong>{item.recommendation}</strong><span>{item.rationale || ui('No source rationale was recorded.')}</span></div></div>
+                      <div className="cross-domain-source-badges"><span>{label(item.plan_type, ui)}</span><span>{label(item.item_type, ui)}</span><span>{label(sourceDomain(item), ui)}</span><span>{label(item.status, ui)}</span></div>
+                      <div className="cross-domain-source-meta"><span><b>{ui('Originating source score')}:</b> {Number.isFinite(Number(item.score)) ? formatLocalizedNumber(Number(item.score), locale) : '—'}</span><span><b>{ui('Source confidence')}:</b> {formatPercentage(item.confidence, locale)}</span></div>
+                      {facts.length ? <div className="cross-domain-source-facts">{facts.map(([key, value]) => <span key={key}><b>{sourceMetricLabel(key)}:</b> {String(value)}</span>)}</div> : <span className="cross-domain-muted">{ui('No structured impact facts were recorded on this recommendation.')}</span>}
+                      {!compatible && !selected ? <span className="cross-domain-source-incompatible">{ui('Different structured subject — cannot be added to this comparison.')}</span> : null}
+                    </label>;
+                  })}
+                </div>
+                <div className="cross-domain-selection-summary"><strong>{ui('{count} actions selected').replace('{count}', formatLocalizedNumber(selectedRecommendations.length, locale))}</strong><span>{selectedRecommendations.length > 1 && selectedSharedScope.length ? ui('The selected actions share structured source scope and can be compared.') : selectedRecommendations.length === 1 ? ui('Choose at least one more action for the same structured subject.') : ui('Select two or more source-backed actions.')}</span></div>
+              </> : null}
+              <div className="cross-domain-wizard-actions"><button className="button button--secondary" type="button" onClick={() => setCreateStep(1)}>{ui('Back')}</button><button className="button" type="button" disabled={selectedRecommendations.length < 2 || !selectedSharedScope.length} onClick={() => setCreateStep(3)}>{ui('Compare source data')}</button></div>
+            </section>
+          ) : null}
 
-          {createStep === 3 ? <section className="cross-domain-wizard-step">
-            <div className="cross-domain-wizard-step__intro"><span className="cross-domain-step-number">3</span><div><h3>{ui('Compare two actions calculated from the same source data')}</h3><p>{ui('The app is not grading your prose and it is not inventing a winner. It is showing how the same shortage changes when recommended internal transfers are used or not used.')}</p></div></div>
-            <div className="cross-domain-comparison-basis"><strong>{ui('Same evidence on both sides')}</strong><span>{ui('Both choices use the selected Replenishment Planning run. Only the treatment of the recommended internal transfers changes.')}</span></div>
-            {transferFirstPreviewOutcome ? <article className="cross-domain-data-choice"><div className="cross-domain-data-choice__heading"><div><span>{ui('Choice A')}</span><h4>{ui('Use internal transfers first, then buy the remainder')}</h4><p>{ui('Uses the transfer and purchase quantities already calculated by Replenishment Planning.')}</p></div><span className="cross-domain-badge cross-domain-badge--ok">{ui('Source data')}</span></div><DataBackedOptionEvidence outcome={transferFirstPreviewOutcome} locale={locale} ui={ui} /></article> : null}
-            {supplierOnlyPreviewOutcome ? <article className="cross-domain-data-choice"><div className="cross-domain-data-choice__heading"><div><span>{ui('Choice B')}</span><h4>{ui('Buy the shortage from suppliers without the recommended transfers')}</h4><p>{ui('Uses the same shortage lines but sets internal transfer coverage to zero, so supplier purchasing must cover the shortage instead.')}</p></div><span className="cross-domain-badge cross-domain-badge--ok">{ui('Source data')}</span></div><DataBackedOptionEvidence outcome={supplierOnlyPreviewOutcome} locale={locale} ui={ui} /></article> : null}
-            <div className="cross-domain-comparison-limit"><strong>{ui('What is not calculated')}</strong><span>{ui('The app does not invent transfer labor cost, handling inconvenience, supplier reliability, or any other value that is missing from the selected source. Missing evidence stays visibly missing instead of being guessed.')}</span></div>
-            <div className="cross-domain-wizard-actions"><button className="button button--secondary" type="button" onClick={() => setCreateStep(2)}>{ui('Back')}</button><button className="button" type="button" disabled={!replenishmentComparison} onClick={() => setCreateStep(4)}>{ui('Continue to save')}</button></div>
-          </section> : null}
+          {createStep === 3 ? (
+            <section className="cross-domain-wizard-step">
+              <div className="cross-domain-wizard-step__intro">
+                <span className="cross-domain-step-number">3</span>
+                <div><h3>{ui('Compare only what the source records actually contain')}</h3><p>{ui('No winner is generated here. The application shows the evidence attached to each selected action and compares only fields that use the same source key.')}</p></div>
+              </div>
+              <div className="cross-domain-source-rule"><strong>{ui('What the application is doing')}</strong><span>{ui('It is lining up structured evidence from the selected records. It is not interpreting your note, guessing missing costs or risks, or converting unrelated measurements into a fake common score.')}</span></div>
+              <div className="cross-domain-source-comparison-grid">
+                {selectedRecommendations.map((item, index) => <article className="cross-domain-source-comparison-card" key={item.id}>
+                  <span className="cross-domain-eyebrow">{ui('Action {number}').replace('{number}', formatLocalizedNumber(index + 1, locale))}</span>
+                  <h4>{item.recommendation}</h4>
+                  {item.rationale ? <p>{item.rationale}</p> : null}
+                  <div className="cross-domain-source-badges"><span>{label(item.plan_type, ui)}</span><span>{label(item.item_type, ui)}</span><span>{label(sourceDomain(item), ui)}</span></div>
+                  <div className="cross-domain-source-meta"><span><b>{ui('Originating source score')}:</b> {Number.isFinite(Number(item.score)) ? formatLocalizedNumber(Number(item.score), locale) : '—'}</span><span><b>{ui('Source confidence')}:</b> {formatPercentage(item.confidence, locale)}</span></div>
+                  <p className="cross-domain-score-disclaimer">{ui('The source score belongs to the originating planning module. Cross-Domain Optimization does not normalize it, rank these actions with it, or call it a winner score.')}</p>
+                  <div className="cross-domain-source-facts cross-domain-source-facts--full">{flattenImpactFacts(item.impact_snapshot).length ? flattenImpactFacts(item.impact_snapshot).map(([key, value]) => <span key={key}><b>{sourceMetricLabel(key)}:</b> {String(value)}</span>) : <span>{ui('No structured impact facts were recorded on this recommendation.')}</span>}</div>
+                </article>)}
+              </div>
+              <div className="cross-domain-common-metrics">
+                <div className="cross-domain-builder-heading cross-domain-builder-heading--small"><div><strong>{ui('Directly comparable source fields')}</strong><p>{ui('A field appears here only when the same structured key exists on at least two selected actions.')}</p></div></div>
+                {commonImpactMetrics.length ? <div className="table-wrap"><table className="data-table cross-domain-table"><thead><tr><th>{ui('Source field')}</th>{selectedRecommendations.map((_, index) => <th key={index}>{ui('Action {number}').replace('{number}', formatLocalizedNumber(index + 1, locale))}</th>)}</tr></thead><tbody>{commonImpactMetrics.map((row) => <tr key={row.key}><td>{sourceMetricLabel(row.key)}</td>{row.values.map((value, index) => <td key={index}>{value === null ? '—' : String(value)}</td>)}</tr>)}</tbody></table></div> : <p className="cross-domain-muted">{ui('These source records do not expose matching impact-field names. Their evidence is shown separately above; the application will not pretend unlike measurements are directly comparable.')}</p>}
+              </div>
+              <div className="cross-domain-wizard-actions"><button className="button button--secondary" type="button" onClick={() => setCreateStep(2)}>{ui('Back')}</button><button className="button" type="button" onClick={() => setCreateStep(4)}>{ui('Continue to save')}</button></div>
+            </section>
+          ) : null}
 
-          {createStep === 4 ? <section className="cross-domain-wizard-step">
-            <div className="cross-domain-wizard-step__intro"><span className="cross-domain-step-number">4</span><div><h3>{ui('Save the data-backed comparison')}</h3><p>{ui('Saving records the source run, the two calculated choices, and your human notes. It does not move stock, create a purchase order, or select a winner.')}</p></div></div>
-            <div className="cross-domain-review-box"><div className="cross-domain-review-box__heading"><div><span>{ui('Source')}</span><strong>{ui('Replenishment Planning run')}</strong></div><button className="button button--secondary" type="button" onClick={() => setCreateStep(1)}>{ui('Change')}</button></div><p>{replenishmentComparison?.run.created_at ? formatDate(replenishmentComparison.run.created_at, locale) : sourceRunId}</p><p className="cross-domain-review-meta">{ui('{count} shortage line(s) are being compared.').replace('{count}', formatLocalizedNumber(replenishmentComparison?.shortage_line_count || 0, locale))}</p></div>
-            <div className="cross-domain-review-box"><div className="cross-domain-review-box__heading"><div><span>{ui('Human notes')}</span><strong>{reviewDraft.title || '—'}</strong></div><button className="button button--secondary" type="button" onClick={() => setCreateStep(2)}>{ui('Edit')}</button></div>{reviewDraft.summary ? <p>{reviewDraft.summary}</p> : <p className="cross-domain-muted">{ui('No manager note was added.')}</p>}<p className="cross-domain-review-meta"><b>{ui('Responsible person')}:</b> {reviewDraft.owner_user_id ? ownerCandidateLabel(ownerCandidates.find((user) => user.id === reviewDraft.owner_user_id) || { id: reviewDraft.owner_user_id }) : ui('Not assigned')} · <b>{ui('Due')}:</b> {reviewDraft.due_at || ui('No deadline')}</p></div>
-            <div className="cross-domain-review-box"><div className="cross-domain-review-box__heading"><div><span>{ui('Calculated choices')}</span><strong>{ui('2 choices from the same planning run')}</strong></div><button className="button button--secondary" type="button" onClick={() => setCreateStep(3)}>{ui('View numbers')}</button></div><div className="cross-domain-review-list"><div><strong>{ui('Use internal transfers first, then buy the remainder')}</strong><span>{ui('Uses the existing transfer recommendations before supplier purchasing.')}</span></div><div><strong>{ui('Buy the shortage from suppliers without the recommended transfers')}</strong><span>{ui('Uses the same shortage evidence with no internal-transfer coverage.')}</span></div></div></div>
-            {createDataBackedReview.isError ? <p className="cross-domain-error">{ui('The data-backed comparison could not be saved. Refresh the source data and try again.')}</p> : null}
-            <div className="cross-domain-create-footer"><div><strong>{ui('What happens next?')}</strong><p>{ui('Open the saved comparison, inspect the actual figures, and let management choose which action to take forward. The application does not choose or execute an option automatically.')}</p></div><button className="button" type="button" disabled={createDataBackedReview.isPending || !replenishmentComparison || reviewDraft.title.trim().length < 3} onClick={() => createDataBackedReview.mutate()}>{createDataBackedReview.isPending ? ui('Saving…') : ui('Save data-backed comparison')}</button></div>
-            <div className="cross-domain-wizard-actions cross-domain-wizard-actions--start"><button className="button button--secondary" type="button" onClick={() => setCreateStep(3)}>{ui('Back')}</button></div>
-          </section> : null}
+          {createStep === 4 ? (
+            <section className="cross-domain-wizard-step">
+              <div className="cross-domain-wizard-step__intro"><span className="cross-domain-step-number">4</span><div><h3>{ui('Save the evidence-backed comparison')}</h3><p>{ui('The human note and the structured evidence are saved separately. No action is executed and no automatic winner is selected.')}</p></div></div>
+              <div className="cross-domain-review-box"><div className="cross-domain-review-box__heading"><div><span>{ui('Human decision record')}</span><strong>{reviewDraft.title}</strong></div><button className="button button--secondary" type="button" onClick={() => setCreateStep(1)}>{ui('Edit')}</button></div>{reviewDraft.summary ? <p>{reviewDraft.summary}</p> : <p className="cross-domain-muted">{ui('No reviewer note was entered.')}</p>}<p className="cross-domain-score-disclaimer">{ui('This text is saved for people. It is not used to calculate the comparison.')}</p></div>
+              <div className="cross-domain-review-box"><div className="cross-domain-review-box__heading"><div><span>{ui('Structured actions')}</span><strong>{ui('{count} source-backed actions').replace('{count}', formatLocalizedNumber(selectedRecommendations.length, locale))}</strong></div><button className="button button--secondary" type="button" onClick={() => setCreateStep(2)}>{ui('Edit')}</button></div><div className="cross-domain-review-list">{selectedRecommendations.map((item) => <div key={item.id}><strong>{item.recommendation}</strong><span>{label(item.plan_type, ui)} · {label(item.item_type, ui)} · {label(sourceDomain(item), ui)}</span>{item.rationale ? <span>{item.rationale}</span> : null}</div>)}</div></div>
+              <div className="cross-domain-source-rule"><strong>{ui('What will be saved')}</strong><span>{ui('The comparison stores the exact source recommendation IDs, their structured impact evidence, source confidence, and source score as originating-module metadata. Cross-Domain score is left empty and no tradeoff is invented.')}</span></div>
+              {createSourceBackedReview.isError ? <p className="cross-domain-error">{ui('The data-backed decision comparison could not be created. The source records were not changed.')}</p> : null}
+              <div className="cross-domain-create-footer"><div><strong>{ui('Nothing is executed automatically')}</strong><p>{ui('Saving creates a decision record only. Management can open it afterward and record which source-backed action it wants to take forward.')}</p></div><button className="button" type="button" disabled={createSourceBackedReview.isPending || reviewDraft.title.trim().length < 3 || selectedRecommendations.length < 2 || !selectedSharedScope.length} onClick={() => createSourceBackedReview.mutate()}>{createSourceBackedReview.isPending ? ui('Creating…') : ui('Save decision comparison')}</button></div>
+              <div className="cross-domain-wizard-actions cross-domain-wizard-actions--start"><button className="button button--secondary" type="button" onClick={() => setCreateStep(3)}>{ui('Back')}</button></div>
+            </section>
+          ) : null}
         </section>
       ) : null}
 
-      {SHOW_V349218_TEXT_DRIVEN_CREATE_UI && showCreate && canGovern ? (
+      {SHOW_V349218_MANUAL_CREATE_UI && showCreate && canGovern ? (
         <section className="card cross-domain-section cross-domain-create cross-domain-create--wizard">
           <div className="card__header cross-domain-create-header">
             <div>
@@ -1395,12 +1188,12 @@ export default function CrossDomainOptimizationPage() {
       </section>
 
       </> : null}
-      {!hasEvidence && !showCreate ? <section className="card cross-domain-section cross-domain-first-use"><div><span className="cross-domain-eyebrow">{ui('Start here')}</span><h2>{ui('No decision comparisons yet')}</h2><p>{canGovern ? ui('Create a comparison from a real Replenishment Planning run. The app will compare structured shortage, transfer, supplier, and available cost evidence; your written notes are only for people reading the decision record.') : ui('No decision comparisons are available for this tenant and filter set.')}</p></div>{canGovern ? <button className="button" type="button" onClick={() => { setCreateStep(1); setShowCreate(true); }}>{ui('Create decision comparison')}</button> : null}</section> : null}
+      {!hasEvidence && !showCreate ? <section className="card cross-domain-section cross-domain-first-use"><div><span className="cross-domain-eyebrow">{ui('Start here')}</span><h2>{ui('No decision comparisons yet')}</h2><p>{canGovern ? ui('Create a comparison when at least two existing source-backed recommendations refer to the same structured business subject. Add a human note, choose those source records, and compare the evidence the application actually has.') : ui('No decision comparisons are available for this tenant and filter set.')}</p></div>{canGovern ? <button className="button" type="button" onClick={() => { setCreateStep(1); setShowCreate(true); }}>{ui('Create decision comparison')}</button> : null}</section> : null}
 
       {view === 'evidence' && hasEvidence ? <>
         <EvidenceSection title={ui('Optimization runs')} description={ui('Stored planning exercises. Open one to see its complete decision story.')} rows={(data?.optimization_runs || []) as Array<Record<string, unknown>>} headers={['Run', 'Business area', 'Status', 'Owner', 'Due', 'Updated', 'Action']} renderRow={(row, index) => { const run = row as OptimizationRun; return <tr key={run.id || index}><td><strong>{run.title || run.optimization_label || ui('Planning run {number}').replace('{number}', formatLocalizedNumber(index + 1, locale))}</strong>{run.summary ? <span className="cross-domain-subtext">{run.summary}</span> : null}</td><td>{label(run.optimization_domain, ui)}</td><td><StatusBadge value={run.optimization_status} /></td><td>{run.owner_name || run.owner_email || '—'}</td><td>{formatDate(run.due_at, locale)}</td><td>{formatDate(run.updated_at || run.created_at, locale)}</td><td><button className="button button--secondary" type="button" onClick={() => openRun(run)}>{ui('Open plan')}</button></td></tr>; }} />
         <EvidenceSection title={ui('Business objectives')} description={ui('The goals, targets, limits, and weights used to compare options.')} rows={(data?.objectives || []) as Array<Record<string, unknown>>} headers={['Run', 'Objective', 'Business area', 'Target', 'Constraint', 'Weight']} renderRow={(row, index) => { const objective = row as OptimizationObjective; return <tr key={objective.id || index}><td>{objective.optimization_label || ui('Linked planning run')}</td><td><strong>{label(objective.objective_type, ui)}</strong><span className="cross-domain-subtext">{label(objective.target_direction, ui)}</span></td><td>{label(objective.objective_domain, ui)}</td><td>{referenceText(objective.target_reference, locale, ui)}</td><td>{referenceText(objective.constraint_reference, locale, ui)}</td><td>{numeric(objective.weight) === null ? '—' : formatLocalizedNumber(Number(objective.weight), locale, { maximumFractionDigits: 2 })}</td></tr>; }} />
-        <EvidenceSection title={ui('Planning options')} description={ui('Alternative actions. New data-backed comparisons show their source basis instead of a fabricated score; older historical records keep any score that was originally recorded.')} rows={(data?.options || []) as Array<Record<string, unknown>>} headers={['Run', 'Option', 'Status', 'Comparison basis', 'Confidence']} renderRow={(row, index) => { const option = row as OptimizationOption; const dataBacked = isReplenishmentProjectedOutcome(option.projected_outcome); return <tr key={option.id || index}><td>{option.optimization_label || ui('Linked planning run')}</td><td><strong>{option.title || option.option_label || ui('Planning option {number}').replace('{number}', formatLocalizedNumber(index + 1, locale))}</strong>{option.summary ? <span className="cross-domain-subtext">{option.summary}</span> : null}</td><td><StatusBadge value={option.option_status} /></td><td>{dataBacked ? ui('Replenishment Planning data') : formatPercentage(option.aggregate_score, locale)}</td><td>{dataBacked ? ui('Not automatically scored') : formatPercentage(option.confidence_score, locale)}</td></tr>; }} />
+        <EvidenceSection title={ui('Planning options')} description={ui('Saved planning choices. Source-backed choices retain their originating evidence; Cross-Domain does not invent a score when none was calculated.')} rows={(data?.options || []) as Array<Record<string, unknown>>} headers={['Run', 'Option', 'Status', 'Projected score', 'Confidence']} renderRow={(row, index) => { const option = row as OptimizationOption; return <tr key={option.id || index}><td>{option.optimization_label || ui('Linked planning run')}</td><td><strong>{option.title || option.option_label || ui('Planning option {number}').replace('{number}', formatLocalizedNumber(index + 1, locale))}</strong>{option.summary ? <span className="cross-domain-subtext">{option.summary}</span> : null}</td><td><StatusBadge value={option.option_status} /></td><td>{formatPercentage(option.aggregate_score, locale)}</td><td>{formatPercentage(option.confidence_score, locale)}</td></tr>; }} />
         <EvidenceSection title={ui('Tradeoffs')} description={ui('Expected benefits and downsides. A formally accepted or mitigated high-impact tradeoff is distinguished from an unresolved one.')} rows={(data?.tradeoffs || []) as Array<Record<string, unknown>>} headers={['Option', 'Objective', 'Business area', 'Direction', 'Impact', 'Governance']} renderRow={(row, index) => { const tradeoff = row as OptimizationTradeoff; return <tr key={tradeoff.id || index}><td>{tradeoff.option_label || ui('Linked planning option')}</td><td>{label(tradeoff.objective_type, ui)}</td><td>{label(tradeoff.tradeoff_domain, ui)}</td><td><StatusBadge value={tradeoff.impact_direction} /></td><td>{formatPercentage(tradeoff.impact_score, locale)}</td><td><StatusBadge value={tradeoff.governance_status} /></td></tr>; }} />
         <EvidenceSection title={ui('Actual optimization outcomes')} description={ui('Results recorded through Learning Feedback after a plan was tried manually.')} rows={(data?.optimization_results || []) as Array<Record<string, unknown>>} headers={['Run', 'Option', 'Outcome', 'Business area', 'Realized value', 'Observed']} renderRow={(row, index) => { const result = row as OptimizationResult; return <tr key={result.id || index}><td>{result.optimization_label || ui('Linked planning run')}</td><td>{result.option_label || ui('No option reference')}</td><td><StatusBadge value={result.result_status} /></td><td>{label(result.result_domain, ui)}</td><td>{formatPercentage(result.realized_value_score, locale)}</td><td>{formatDate(result.observed_at, locale)}</td></tr>; }} />
       </> : null}
@@ -1412,7 +1205,26 @@ export default function CrossDomainOptimizationPage() {
 
         <section className="card cross-domain-section"><div className="card__header"><div><h2>{ui('What this plan is trying to achieve')}</h2><p className="card__subtext">{ui('Targets and constraints are shown directly so a score is not separated from the business goal it is supposed to serve.')}</p></div></div><div className="cross-domain-objective-grid">{(data?.run_detail?.objectives || []).map((objective, index) => <article className="cross-domain-objective-card" key={objective.id || index}><strong>{label(objective.objective_type, ui)}</strong><span>{label(objective.objective_domain, ui)} · {label(objective.target_direction, ui)}</span><p><b>{ui('Target')}:</b> {referenceText(objective.target_reference, locale, ui)}</p><p><b>{ui('Constraint')}:</b> {referenceText(objective.constraint_reference, locale, ui)}</p><p><b>{ui('Weight')}:</b> {numeric(objective.weight) === null ? '—' : formatLocalizedNumber(Number(objective.weight), locale, { maximumFractionDigits: 2 })}</p></article>)}</div></section>
 
-        <section className="card cross-domain-section"><div className="card__header"><div><h2>{ui('Compare the options')}</h2><p className="card__subtext">{ui('Data-backed comparisons show the real source figures used for each action. The application does not invent a winner or score. Older historical records keep their original recorded scoring view.')}</p></div></div><div className="cross-domain-option-grid">{(data?.run_detail?.options || []).map((option, index) => { const explanation = option.score_explanation || {}; const isSelected = selectedRun.selected_option_id === option.id; const dataBacked = isReplenishmentProjectedOutcome(option.projected_outcome); return <article className={`cross-domain-option-card${isSelected ? ' cross-domain-option-card--selected' : ''}`} key={option.id || index}><div className="cross-domain-option-title"><div><strong>{option.title || option.option_label || ui('Planning option {number}').replace('{number}', formatLocalizedNumber(index + 1, locale))}</strong><p>{option.summary || ui('No option summary was recorded.')}</p></div><StatusBadge value={option.option_status} /></div>{dataBacked && option.projected_outcome ? <><div className="cross-domain-comparison-basis"><strong>{ui('Data-backed comparison')}</strong><span>{ui('No automatic winner or score is generated. Compare the source figures and let a person decide which action to take forward.')}</span></div><DataBackedOptionEvidence outcome={option.projected_outcome} locale={locale} ui={ui} /></> : <><div className="cross-domain-score-row"><div><span>{ui('Projected score')}</span><strong>{formatPercentage(option.aggregate_score, locale)}</strong></div><div><span>{ui('Confidence')}</span><strong>{formatPercentage(option.confidence_score, locale)}</strong></div></div><div className="cross-domain-explanation"><h3>{ui('Why this option scored this way')}</h3><p><b>{ui('Expected result')}:</b> {referenceText(explanation.projected_outcome || option.projected_outcome, locale, ui)}</p><div className="cross-domain-driver-grid"><div><strong>{ui('Helps')}</strong>{(explanation.positive_drivers || []).length ? <ul>{(explanation.positive_drivers || []).map((driver, driverIndex) => <li key={driverIndex}>{label(driver.objective_type, ui)} · {label(driver.tradeoff_domain, ui)} · {formatPercentage(driver.impact_score, locale)}</li>)}</ul> : <p>{ui('No positive driver is recorded.')}</p>}</div><div><strong>{ui('Hurts or needs attention')}</strong>{(explanation.downside_drivers || []).length ? <ul>{(explanation.downside_drivers || []).map((driver, driverIndex) => <li key={driverIndex}>{label(driver.objective_type, ui)} · {label(driver.tradeoff_domain, ui)} · {formatPercentage(driver.impact_score, locale)} · {label(driver.governance_status, ui)}</li>)}</ul> : <p>{ui('No negative or mixed driver is recorded.')}</p>}</div></div></div></>}{canGovern && option.id ? <button className="button button--secondary" type="button" disabled={runAction.isPending || isSelected} onClick={() => selectedRun.id && runAction.mutate({ runId: selectedRun.id, body: { action: 'select_option', option_id: option.id } })}>{isSelected ? ui('Selected for review') : ui('Select this option')}</button> : null}</article>; })}</div></section>
+        <section className="card cross-domain-section">
+          <div className="card__header"><div><h2>{ui('Compare the options')}</h2><p className="card__subtext">{ui('Source-backed options show the structured evidence saved from their originating planning records. Cross-Domain does not invent missing evidence or select a winner automatically.')}</p></div></div>
+          <div className="cross-domain-option-grid">{(data?.run_detail?.options || []).map((option, index) => {
+            const explanation = option.score_explanation || {};
+            const projected = simpleRecord(option.projected_outcome);
+            const isSourceBacked = Boolean(projected.source_plan_type || projected.source_item_type || projected.impact_snapshot);
+            const isSelected = selectedRun.selected_option_id === option.id;
+            return <article className={`cross-domain-option-card${isSelected ? ' cross-domain-option-card--selected' : ''}`} key={option.id || index}>
+              <div className="cross-domain-option-title"><div><strong>{option.title || option.option_label || ui('Planning option {number}').replace('{number}', formatLocalizedNumber(index + 1, locale))}</strong><p>{option.summary || ui('No option summary was recorded.')}</p></div><StatusBadge value={option.option_status} /></div>
+              {isSourceBacked ? <>
+                <div className="cross-domain-score-row"><div><span>{ui('Cross-Domain score')}</span><strong>{numeric(option.aggregate_score) === null ? ui('Not calculated') : formatPercentage(option.aggregate_score, locale)}</strong></div><div><span>{ui('Source confidence')}</span><strong>{formatPercentage(option.confidence_score, locale)}</strong></div></div>
+                <div className="cross-domain-explanation"><h3>{ui('What the source data says')}</h3><p><b>{ui('Originating module')}:</b> {label(String(projected.source_plan_type || projected.source_item_type || 'optimization'), ui)}</p><p><b>{ui('Originating source score')}:</b> {projected.source_score === null || projected.source_score === undefined ? '—' : formatLocalizedNumber(Number(projected.source_score), locale)}</p><p className="cross-domain-score-disclaimer">{ui('The source score belongs to the originating planning module. Cross-Domain Optimization does not normalize it, rank these actions with it, or call it a winner score.')}</p><div className="cross-domain-source-facts cross-domain-source-facts--full">{flattenImpactFacts(projected.impact_snapshot).length ? flattenImpactFacts(projected.impact_snapshot).map(([key, value]) => <span key={key}><b>{sourceMetricLabel(key)}:</b> {String(value)}</span>) : <span>{ui('No structured impact facts were recorded on this recommendation.')}</span>}</div></div>
+              </> : <>
+                <div className="cross-domain-score-row"><div><span>{ui('Projected score')}</span><strong>{formatPercentage(option.aggregate_score, locale)}</strong></div><div><span>{ui('Confidence')}</span><strong>{formatPercentage(option.confidence_score, locale)}</strong></div></div>
+                <div className="cross-domain-explanation"><h3>{ui('Why this option scored this way')}</h3><p><b>{ui('Expected result')}:</b> {referenceText(explanation.projected_outcome || option.projected_outcome, locale, ui)}</p><div className="cross-domain-driver-grid"><div><strong>{ui('Helps')}</strong>{(explanation.positive_drivers || []).length ? <ul>{(explanation.positive_drivers || []).map((driver, driverIndex) => <li key={driverIndex}>{label(driver.objective_type, ui)} · {label(driver.tradeoff_domain, ui)} · {formatPercentage(driver.impact_score, locale)}</li>)}</ul> : <p>{ui('No positive driver is recorded.')}</p>}</div><div><strong>{ui('Hurts or needs attention')}</strong>{(explanation.downside_drivers || []).length ? <ul>{(explanation.downside_drivers || []).map((driver, driverIndex) => <li key={driverIndex}>{label(driver.objective_type, ui)} · {label(driver.tradeoff_domain, ui)} · {formatPercentage(driver.impact_score, locale)} · {label(driver.governance_status, ui)}</li>)}</ul> : <p>{ui('No negative or mixed driver is recorded.')}</p>}</div></div></div>
+              </>}
+              {canGovern && option.id ? <button className="button button--secondary" type="button" disabled={runAction.isPending || isSelected} onClick={() => selectedRun.id && runAction.mutate({ runId: selectedRun.id, body: { action: 'select_option', option_id: option.id } })}>{isSelected ? ui('Selected for review') : ui('Select this option')}</button> : null}
+            </article>;
+          })}</div>
+        </section>
 
         <section className="card cross-domain-section"><div className="card__header"><div><h2>{ui('Govern the important tradeoffs')}</h2><p className="card__subtext">{ui('A high-impact downside can be accepted, accepted with conditions, mitigated, or rejected by a person. Accepted or mitigated tradeoffs no longer incorrectly block later review stages.')}</p></div></div>{!(data?.run_detail?.tradeoffs || []).length ? <p className="cross-domain-muted">{ui('No tradeoffs are recorded for this run.')}</p> : <div className="cross-domain-tradeoff-list">{(data?.run_detail?.tradeoffs || []).map((tradeoff, index) => { const draft = tradeoff.id ? tradeoffDrafts[tradeoff.id] : undefined; return <article className="cross-domain-tradeoff-card" key={tradeoff.id || index}><div className="cross-domain-tradeoff-summary"><div><strong>{tradeoff.option_label || ui('Linked planning option')}</strong><p>{label(tradeoff.objective_type, ui)} · {label(tradeoff.tradeoff_domain, ui)} · {label(tradeoff.impact_direction, ui)} · {formatPercentage(tradeoff.impact_score, locale)}</p></div><StatusBadge value={tradeoff.governance_status} /></div>{tradeoff.governance_reason ? <p><b>{ui('Recorded reason')}:</b> {tradeoff.governance_reason}</p> : null}{tradeoff.governance_conditions ? <p><b>{ui('Conditions')}:</b> {tradeoff.governance_conditions}</p> : null}{canGovern && tradeoff.id ? <div className="cross-domain-tradeoff-govern"><select className="input" value={draft?.status || tradeoff.governance_status || 'open'} onChange={(event) => setTradeoffDraft(tradeoff, { status: event.target.value })}>{TRADEOFF_GOVERNANCE_OPTIONS.map((value) => <option key={value} value={value}>{label(value, ui)}</option>)}</select><input className="input" value={draft?.reason ?? tradeoff.governance_reason ?? ''} onChange={(event) => setTradeoffDraft(tradeoff, { reason: event.target.value })} placeholder={ui('Reason for the decision')} /><input className="input" value={draft?.conditions ?? tradeoff.governance_conditions ?? ''} onChange={(event) => setTradeoffDraft(tradeoff, { conditions: event.target.value })} placeholder={ui('Conditions, if any')} /><button className="button" type="button" disabled={governTradeoff.isPending} onClick={() => governTradeoff.mutate({ tradeoffId: tradeoff.id as string, draft: draft || { status: tradeoff.governance_status || 'open', reason: tradeoff.governance_reason || '', conditions: tradeoff.governance_conditions || '' } })}>{ui('Record tradeoff decision')}</button></div> : null}</article>; })}</div>}</section>
 
