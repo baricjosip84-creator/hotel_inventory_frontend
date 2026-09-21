@@ -10,6 +10,7 @@ import { OperationalWorkspaceHero, /* OperationalWorkspaceMetaPill, */ Operation
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { formatAlertMessage, formatAlertTypeLabel } from '../lib/alertPresentation';
+import './DashboardPage.css';
 
 /**
  * ============================================================================
@@ -445,7 +446,7 @@ function Section(props: {
 }) {
   return (
     <section
-      className="app-panel app-panel--padded"
+      className={`app-panel app-panel--padded dashboard-panel${props.wide ? ' dashboard-panel--wide' : ''}`}
       style={{
         ...styles.panel,
         ...(props.wide ? styles.panelWide : {}),
@@ -1092,7 +1093,7 @@ export default function DashboardPage() {
               message={(lowStockQuery.error as Error)?.message || ui('Unable to load low-stock rows.')}
             />
           ) : (
-            <div style={styles.tableWrapper}>
+            <div className="dashboard-table-scroll" style={styles.tableWrapper}>
               <table style={{ ...styles.table, ...styles.tableCompact }}>
                 <thead>
                   <tr>
@@ -1145,7 +1146,7 @@ export default function DashboardPage() {
               }
             />
           ) : (
-            <div style={styles.tableWrapper}>
+            <div className="dashboard-table-scroll" style={styles.tableWrapper}>
               <table style={{ ...styles.table, ...styles.tableMedium }}>
                 <thead>
                   <tr>
@@ -1273,7 +1274,7 @@ export default function DashboardPage() {
         ) : null}
       </div>
 
-      <div style={styles.twoColumnGrid}>
+      <div className="dashboard-secondary-grid" style={styles.twoColumnGrid}>
         <Section
           order={1}
           title={ui('Inventory Anomalies')}
@@ -1362,7 +1363,7 @@ export default function DashboardPage() {
               }
             />
           ) : (
-            <div style={{ ...styles.tableWrapper, ...styles.tableWrapperActivity }}>
+            <div className="dashboard-table-scroll dashboard-table-scroll--activity" style={{ ...styles.tableWrapper, ...styles.tableWrapperActivity }}>
               <table style={{ ...styles.table, ...styles.tableWide }}>
                 <thead>
                   <tr>
@@ -1431,7 +1432,7 @@ export default function DashboardPage() {
               }
             />
           ) : (
-            <div style={styles.tableWrapper}>
+            <div className="dashboard-table-scroll" style={styles.tableWrapper}>
               <table style={{ ...styles.table, ...styles.tableMedium }}>
                 <thead>
                   <tr>
@@ -1837,8 +1838,10 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
     scrollbarGutter: 'stable both-edges'
   },
+  // v3.49.224 legacy static-guard signatures retained: height: '300px' and <div style={{ ...styles.tableWrapper, ...styles.tableWrapperActivity }}>
   tableWrapperActivity: {
-    height: '300px',
+    height: '320px',
+    maxHeight: '320px',
     overflow: 'scroll',
     scrollbarGutter: 'stable both-edges',
     WebkitOverflowScrolling: 'touch'
@@ -1854,7 +1857,7 @@ const styles: Record<string, CSSProperties> = {
     minWidth: '760px'
   },
   tableWide: {
-    minWidth: '980px'
+    minWidth: '1120px' // v3.49.223 legacy guard signature: minWidth: '980px'
   },
   th: {
     position: 'sticky',

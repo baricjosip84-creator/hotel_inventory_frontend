@@ -1165,3 +1165,108 @@
     min-width: 0;
   }
 }
+
+/* v3.49.226 — explicit Step 1 alignment and unmistakable source-building action */
+.cross-domain-owner-due-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.cross-domain-owner-due-field {
+  display: grid;
+  grid-template-rows: auto 42px minmax(1rem, auto);
+  gap: .32rem;
+  align-content: start;
+  min-width: 0;
+}
+
+.cross-domain-owner-due-field .input {
+  width: 100%;
+  height: 42px;
+  min-height: 42px;
+  margin: 0;
+}
+
+.cross-domain-field-help--reserved {
+  min-height: 1rem;
+}
+
+.cross-domain-source-primary-action--prominent {
+  border-width: 2px;
+  border-color: #2563eb;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fbff 100%);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, .10);
+}
+
+.cross-domain-source-primary-action__copy {
+  display: grid;
+  gap: .45rem;
+}
+
+.cross-domain-source-primary-action__eyebrow {
+  color: #1d4ed8;
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.cross-domain-source-primary-action__steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .5rem;
+  margin-top: .3rem;
+}
+
+.cross-domain-source-primary-action__steps span {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  min-width: 0;
+  padding: .5rem .6rem;
+  border: 1px solid #bfdbfe;
+  border-radius: .65rem;
+  background: #fff;
+  color: #334155;
+  font-size: .75rem;
+  line-height: 1.3;
+}
+
+.cross-domain-source-primary-action__steps b {
+  display: inline-flex;
+  width: 1.4rem;
+  height: 1.4rem;
+  flex: 0 0 1.4rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  font-size: .7rem;
+}
+
+.cross-domain-source-primary-action__button {
+  min-height: 44px;
+  font-weight: 800;
+}
+
+.cross-domain-source-primary-action__button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.cross-domain-source-primary-action__permission {
+  color: #9a3412;
+  font-size: .76rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+@media (max-width: 900px) {
+  .cross-domain-owner-due-grid,
+  .cross-domain-source-primary-action__steps {
+    grid-template-columns: 1fr;
+  }
+}
