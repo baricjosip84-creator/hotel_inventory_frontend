@@ -9,6 +9,8 @@ export type OperationalAttentionSurface =
   | 'requisitions'
   | 'execution_tasks'
   | 'reservations'
+  | 'replenishment_planning'
+  | 'stock_transfers'
   | 'purchase_orders'
   | 'shipments'
   | 'outbound'
@@ -19,7 +21,14 @@ export type OperationalAttentionItems = {
   requires_attention: boolean;
   attention_ids?: string[];
   approval_ids?: string[];
+  submission_ids?: string[];
+  send_ids?: string[];
   fulfillment_ids?: string[];
+  run_ids?: string[];
+  pending_transfer_ids?: string[];
+  pending_purchase_ids?: string[];
+  ready_materialize_run_ids?: string[];
+  replenishment_execute_ids?: string[];
   expiration_ids?: string[];
   conflict_reservation_ids?: string[];
   due_receive_ids?: string[];

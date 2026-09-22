@@ -6,6 +6,9 @@ import { apiRequest, ApiError, getVersionConflictMessage, isVersionConflictError
 import { getCurrentAccessRoleLabel, getRoleCapabilities, hasAllPermissions, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { SidebarAttentionMarker } from '../components/ui/SidebarAttentionMarker';
+import { sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionStyles';
+import { useOperationalAttentionItems } from '../lib/sidebarAttentionItems';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
 import { OperationalWorkspaceHero, /* OperationalWorkspaceMetaPill, */ OperationalWorkspaceStatCard, OperationalWorkspaceStatus } from '../components/ui/OperationalWorkspace';
 import { useAppTranslation } from '../i18n/I18nContext';
@@ -483,6 +486,8 @@ export default function StockTransfersPage() {
   const canUpdateStockTransfersOperationally = canUpdateStockTransfers && hasTransferOperationalReads;
   const canReadCurrentStock = hasPermission(TENANT_PERMISSIONS.STOCK_READ);
   const canExecuteStockTransfersOperationally = canExecuteStockTransfers && canReadCurrentStock;
+  const stockTransferAttentionItemsQuery = useOperationalAttentionItems('stock_transfers', canExecuteStockTransfersOperationally);
+  const stockTransferAttentionIds = stockTransferAttentionItemsQuery.attentionIds;
   const accessRoleLabel = getCurrentAccessRoleLabel();
 
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') || '');
@@ -640,6 +645,17 @@ export default function StockTransfersPage() {
   const hasActiveFilters = Boolean(
     statusFilter || searchInput.trim() || fromLocationFilter || toLocationFilter || productFilter
   );
+
+  useEffect(() => {
+    if (selectedTransferId || hasActiveFilters || stockTransferAttentionItemsQuery.isLoading) return;
+    const nextAttentionId = stockTransferAttentionItemsQuery.data?.attention_ids?.[0];
+    if (!nextAttentionId) return;
+    setSelectedTransferId(nextAttentionId);
+    setCancelReason('');
+    setMessage(null);
+    setError(null);
+    window.setTimeout(() => detailSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+  }, [hasActiveFilters, selectedTransferId, stockTransferAttentionItemsQuery.data?.attention_ids, stockTransferAttentionItemsQuery.isLoading]);
 
   useEffect(() => {
     if (totalPages !== null && page > totalPages) setPage(totalPages);
@@ -1435,11 +1451,13 @@ export default function StockTransfersPage() {
         <div style={styles.transferList}>
           {transfers.map((transfer) => {
             const displayNotes = displayTransferNotes(transfer, ui);
+            const causesSidebarAttention = stockTransferAttentionIds.has(transfer.id);
             return (
               <button
                 key={transfer.id}
                 type="button"
-                style={{ ...styles.transferCard, ...(selectedTransferId === transfer.id ? styles.transferCardActive : {}) }}
+                style={{ ...styles.transferCard, ...(causesSidebarAttention ? sidebarAttentionItemStyle : {}), ...(selectedTransferId === transfer.id ? styles.transferCardActive : {}) }}
+                data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
                 onClick={() => selectTransfer(transfer.id)}
                 aria-pressed={selectedTransferId === transfer.id}
               >
@@ -1447,6 +1465,7 @@ export default function StockTransfersPage() {
                   <strong>{historicalName(transfer.from_storage_location_name, ui, 'location')} → {historicalName(transfer.to_storage_location_name, ui, 'location')}</strong>
                   <span style={getStatusBadgeStyle(transfer.status)}>{ui(formatReadableText(transfer.status))}</span>
                 </div>
+                {causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}
                 <div style={styles.transferMeta}>
                   {formatNumber(transfer.item_count, locale)} {ui(Number(transfer.item_count || 0) === 1 ? "line item" : "line items")} {ui("· Created")} {formatDateTime(transfer.created_at, locale, ui)}
                   {` ${ui('by')} ${displayTransferActor(transfer.created_by_user_name, transfer.status, ui)}`}

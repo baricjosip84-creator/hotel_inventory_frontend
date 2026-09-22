@@ -6,6 +6,9 @@ import { formatLocalizedCurrency, formatLocalizedDateTime, formatLocalizedNumber
 import { ApiError, apiRequest } from '../lib/api';
 import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
 import { getRoleCapabilities } from '../lib/permissions';
+import { SidebarAttentionMarker, SidebarAttentionTabDot } from '../components/ui/SidebarAttentionMarker';
+import { sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionStyles';
+import { useOperationalAttentionItems } from '../lib/sidebarAttentionItems';
 import { formatCurrencyAmount, getActiveTenantCurrency, normalizeCurrencyCode } from '../lib/tenantCurrency';
 import {
   OperationalSectionHeader,
@@ -242,6 +245,22 @@ export default function ReplenishmentPlanningPage() {
   const queryClient = useQueryClient();
   const { locale, ui } = useAppTranslation();
   const capabilities = getRoleCapabilities();
+  const replenishmentAttentionItemsQuery = useOperationalAttentionItems(
+    'replenishment_planning',
+    capabilities.canViewInsights && capabilities.canGovernInventoryOptimization
+  );
+  const pendingTransferAttentionIds = useMemo(
+    () => new Set(replenishmentAttentionItemsQuery.data?.pending_transfer_ids || []),
+    [replenishmentAttentionItemsQuery.data?.pending_transfer_ids]
+  );
+  const pendingPurchaseAttentionIds = useMemo(
+    () => new Set(replenishmentAttentionItemsQuery.data?.pending_purchase_ids || []),
+    [replenishmentAttentionItemsQuery.data?.pending_purchase_ids]
+  );
+  const readyMaterializeRunIds = useMemo(
+    () => new Set(replenishmentAttentionItemsQuery.data?.ready_materialize_run_ids || []),
+    [replenishmentAttentionItemsQuery.data?.ready_materialize_run_ids]
+  );
   const formatUiNumber = (value: unknown, maximumFractionDigits = 4): string => formatLocalizedNumber(numberValue(value), locale, { maximumFractionDigits });
   const formatUiDateTime = (value?: string | null): string => value ? formatLocalizedDateTime(value, locale) : ui('Not recorded');
   const formatUiCurrency = (value: unknown, currency?: string | null): string => {
@@ -296,6 +315,12 @@ export default function ReplenishmentPlanningPage() {
 
   const runsQuery = useQuery({ queryKey: ['location-replenishment-runs'], queryFn: listRuns });
   const effectiveRunId = selectedRunId || runsQuery.data?.[0]?.id || '';
+  const currentRunNeedsReviewAttention = Boolean(
+    effectiveRunId
+    && (replenishmentAttentionItemsQuery.data?.run_ids || []).includes(effectiveRunId)
+    && (pendingTransferAttentionIds.size > 0 || pendingPurchaseAttentionIds.size > 0)
+  );
+  const currentRunReadyForDraftAttention = Boolean(effectiveRunId && readyMaterializeRunIds.has(effectiveRunId));
   const detailQuery = useQuery({
     queryKey: ['location-replenishment-run', effectiveRunId],
     queryFn: () => getRun(effectiveRunId),
@@ -641,7 +666,7 @@ export default function ReplenishmentPlanningPage() {
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'review'}
           iconPath="/stock-transfers"
-          label={ui("Review lines")}
+          label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>{ui("Review lines")}{currentRunNeedsReviewAttention ? <SidebarAttentionTabDot label={ui('Attention required')} /> : null}</span>}
           count={formatUiNumber(detail ? detail.transfers.length + actionablePurchaseRows.length : 0, 0)}
           disabled={!detail}
           onClick={() => navigateWorkspaceSection('review', 'replenishment-review-lines')}
@@ -649,7 +674,7 @@ export default function ReplenishmentPlanningPage() {
         <OperationalWorkspaceTab
           active={activeWorkspaceSection === 'drafts'}
           iconPath="/purchase-orders"
-          label={ui("Create drafts")}
+          label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>{ui("Create drafts")}{currentRunReadyForDraftAttention ? <SidebarAttentionTabDot label={ui('Attention required')} /> : null}</span>}
           disabled={!detail}
           onClick={() => navigateWorkspaceSection('drafts', 'replenishment-draft-gate')}
         />
@@ -781,8 +806,9 @@ export default function ReplenishmentPlanningPage() {
                     const key = `transfer:${row.id}`;
                     const draft = drafts[key] ?? { decision: row.decision_status, quantity: String(row.final_quantity), reason: row.decision_reason ?? '' };
                     const disabled = !canGovern || runLocked || Boolean(row.linked_stock_transfer_id);
-                    return <tr key={row.id}>
-                      <td><strong>{row.product_name}</strong><small>{row.product_unit || ui('Unit not recorded')}</small></td>
+                    const causesSidebarAttention = pendingTransferAttentionIds.has(row.id);
+                    return <tr key={row.id} style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined} data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}>
+                      <td><strong>{row.product_name}</strong><small>{row.product_unit || ui('Unit not recorded')}</small>{causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}</td>
                       <td><strong>{row.source_storage_location_name}</strong><small>{ui('to {location}').replace('{location}', row.destination_storage_location_name)}</small></td>
                       <td><strong>{formatUiNumber(row.recommended_quantity)}</strong></td>
                       <td>
@@ -823,8 +849,9 @@ export default function ReplenishmentPlanningPage() {
                     const disabled = !canGovern || runLocked || Boolean(row.linked_purchase_order_id);
                     const supplierMissing = !row.supplier_id;
                     const currency = row.estimated_cost_currency || row.evidence?.supplier?.currency || null;
-                    return <tr key={row.id}>
-                      <td><strong>{row.product_name}</strong><small>{row.storage_location_name} · {row.product_unit || ui('Unit not recorded')}</small></td>
+                    const causesSidebarAttention = pendingPurchaseAttentionIds.has(row.id);
+                    return <tr key={row.id} style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined} data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}>
+                      <td><strong>{row.product_name}</strong><small>{row.storage_location_name} · {row.product_unit || ui('Unit not recorded')}</small>{causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}</td>
                       <td><strong>{formatUiNumber(row.usable_inventory_position)}</strong><small>{ui('On hand {onHand} · reserved {reserved} · inbound {inbound}').replace('{onHand}', formatUiNumber(row.current_stock)).replace('{reserved}', formatUiNumber(row.reserved_quantity)).replace('{inbound}', formatUiNumber(row.reliable_inbound_quantity))}</small></td>
                       <td><strong>{formatUiNumber(row.configured_target_quantity)}</strong><small>{ui('Minimum {count}').replace('{count}', formatUiNumber(row.governed_min_quantity))}</small></td>
                       <td><strong>{formatUiNumber(row.transfer_covered_quantity)}</strong></td>
@@ -844,12 +871,12 @@ export default function ReplenishmentPlanningPage() {
           </section>
         </div>
 
-        <section id="replenishment-draft-gate" className="app-panel replenishment-planning-card replenishment-planning-scroll-anchor">
+        <section id="replenishment-draft-gate" className="app-panel replenishment-planning-card replenishment-planning-scroll-anchor" style={currentRunReadyForDraftAttention ? sidebarAttentionItemStyle : undefined} data-sidebar-attention-item={currentRunReadyForDraftAttention ? "true" : undefined}>
           <OperationalSectionHeader
             iconPath="/purchase-orders"
             title={ui("Review and create drafts")}
             description={ui("Save all decisions first. Before draft creation, the app rechecks current stock, reservations, transfers, inbound supply, products, locations, suppliers, and package rules.")}
-            actions={<StatusBadge value={detail.run.status} label={canonicalDisplayLabel(detail.run.status)} />}
+            actions={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><StatusBadge value={detail.run.status} label={canonicalDisplayLabel(detail.run.status)} />{currentRunReadyForDraftAttention ? <SidebarAttentionMarker label={ui('Attention required')} /> : null}</span>}
           />
           <OperationalWorkspaceStats className="replenishment-planning-gate-stats" ariaLabel={ui("Draft creation readiness")}>
             <OperationalWorkspaceStatCard label={ui('Unsaved changes')} value={changedDecisions.length} helper={ui('Save these decisions first')} tone={changedDecisions.length ? 'warn' : 'good'} iconPath="/audit" />

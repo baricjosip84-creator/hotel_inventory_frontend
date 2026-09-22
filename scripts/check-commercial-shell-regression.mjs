@@ -20,6 +20,8 @@ const usageLedgerPage = read('src/pages/inventoryUsage/InventoryUsageDashboard.t
 const requisitionsPage = read('src/pages/InventoryRequisitionsPage.tsx');
 const executionTasksPage = read('src/pages/ExecutionTasksPage.tsx');
 const reservationsPage = read('src/pages/InventoryReservationsPage.tsx');
+const replenishmentPlanningPage = read('src/pages/ReplenishmentPlanningPage.tsx');
+const stockTransfersPage = read('src/pages/StockTransfersPage.tsx');
 const purchaseOrdersPage = read('src/pages/PurchaseOrdersPage.tsx');
 const shipmentsPage = read('src/pages/ShipmentsPage.tsx');
 const outboundPage = read('src/pages/OutboundPage.tsx');
@@ -342,6 +344,8 @@ const approvedSidebarAttentionPaths = [
   '/inventory-requisitions',
   '/execution-tasks',
   '/inventory-reservations',
+  '/replenishment-planning',
+  '/stock-transfers',
   '/purchase-orders',
   '/shipments',
   '/outbound',
@@ -380,6 +384,8 @@ const exactAttentionItemSources = [
   [requisitionsPage, 'Requisitions'],
   [executionTasksPage, 'Execution Tasks'],
   [reservationsPage, 'Reservations'],
+  [replenishmentPlanningPage, 'Replenishment Planning'],
+  [stockTransfersPage, 'Stock Transfers'],
   [purchaseOrdersPage, 'Purchase Orders'],
   [shipmentsPage, 'Shipments'],
   [outboundPage, 'Outbound'],
@@ -407,6 +413,7 @@ for (const [source, label] of [
   [procurementRecommendationsPage, 'Procurement Recommendations'],
   [executionTasksPage, 'Execution Tasks'],
   [reservationsPage, 'Reservations'],
+  [replenishmentPlanningPage, 'Replenishment Planning'],
   [purchaseOrdersPage, 'Purchase Orders'],
   [shipmentsPage, 'Shipments']
 ]) {
@@ -431,11 +438,23 @@ for (const [source, signal, message] of [
   if (!source.includes(signal)) failures.push(message);
 }
 
+for (const [source, signal, message] of [
+  [replenishmentPlanningPage, "'replenishment_planning'", 'Replenishment Planning must use the exact operational-attention endpoint rather than inventing a local dot.'],
+  [replenishmentPlanningPage, 'pendingTransferAttentionIds', 'Replenishment Planning must trace attention to pending transfer rows.'],
+  [replenishmentPlanningPage, 'pendingPurchaseAttentionIds', 'Replenishment Planning must trace attention to pending purchase rows.'],
+  [replenishmentPlanningPage, 'readyMaterializeRunIds', 'Replenishment Planning must trace attention to the draft-creation handoff.'],
+  [stockTransfersPage, "useOperationalAttentionItems('stock_transfers'", 'Stock Transfers must use replenishment-specific exact attention IDs.'],
+  [stockTransfersPage, 'canExecuteStockTransfersOperationally', 'Stock Transfer attention must be gated by real execution capability.'],
+  [purchaseOrdersPage, "useOperationalAttentionItems('purchase_orders'", 'Purchase Orders must keep exact attention IDs for submit/approve/send work.']
+]) {
+  if (!source.includes(signal)) failures.push(message);
+}
+
 if (/item\.to === ['"]\/action-center['"][\s\S]{0,240}alertIndicatorDot/.test(layout)) {
   failures.push('Action Center must remain an aggregation/routing surface and must not receive a sidebar red dot from its current mixed read/action summary.');
 }
 
-for (const forbiddenAttentionPath of ['/mobile-execution', '/stock-transfers', '/automation-schedules']) {
+for (const forbiddenAttentionPath of ['/mobile-execution', '/automation-schedules']) {
   const escaped = forbiddenAttentionPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(`item\\.to === ['\"]${escaped}['\"][\\s\\S]{0,240}alertIndicatorDot`);
   if (pattern.test(layout)) {

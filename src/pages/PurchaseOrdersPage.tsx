@@ -1003,7 +1003,11 @@ export default function PurchaseOrdersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const capabilities = getRoleCapabilities();
   const currentUserId = getCurrentTenantUserId();
-  const purchaseOrderAttentionItemsQuery = useOperationalAttentionItems('purchase_orders', capabilities.canApprovePurchaseOrders);
+  const canActOnPurchaseOrderAttention = capabilities.canSubmitPurchaseOrders
+    || capabilities.canUpdatePurchaseOrders
+    || capabilities.canApprovePurchaseOrders
+    || (capabilities.canManageShipments && capabilities.canSendShipments);
+  const purchaseOrderAttentionItemsQuery = useOperationalAttentionItems('purchase_orders', canActOnPurchaseOrderAttention);
   const purchaseOrderAttentionIds = purchaseOrderAttentionItemsQuery.attentionIds;
 
   const [filters, setFilters] = useState<Filters>(() => filtersFromSearchParams(searchParams));

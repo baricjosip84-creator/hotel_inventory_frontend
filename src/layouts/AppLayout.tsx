@@ -83,9 +83,20 @@ type NavOperationalAttentionSummary = {
     expiration_count: number | string;
     conflict_requires_attention: boolean;
   };
+  replenishment_planning: {
+    requires_attention: boolean;
+    review_count: number | string;
+    draft_creation_count: number | string;
+  };
+  stock_transfers: {
+    requires_attention: boolean;
+    replenishment_execute_count: number | string;
+  };
   purchase_orders: {
     requires_attention: boolean;
+    submission_count: number | string;
     approval_count: number | string;
+    send_count: number | string;
   };
   shipments: {
     requires_attention: boolean;
@@ -276,6 +287,23 @@ export default function AppLayout() {
   const canApprovePurchaseOrdersForAttention = hasTenantActorForOperationalAttention
     && hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_READ)
     && hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_APPROVE);
+  const canSubmitPurchaseOrdersForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_READ)
+    && hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_SUBMIT);
+  const canPreparePurchaseOrdersForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_READ)
+    && hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_UPDATE);
+  const canSendPurchaseOrdersForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_READ)
+    && hasPermission(TENANT_PERMISSIONS.SHIPMENTS_WRITE)
+    && hasPermission(TENANT_PERMISSIONS.SHIPMENTS_SEND);
+  const canGovernReplenishmentPlanningForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ)
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_OPTIMIZATION_GOVERN);
+  const canExecuteReplenishmentTransfersForAttention = hasTenantActorForOperationalAttention
+    && hasPermission(TENANT_PERMISSIONS.STOCK_TRANSFERS_READ)
+    && hasPermission(TENANT_PERMISSIONS.STOCK_TRANSFERS_EXECUTE)
+    && hasPermission(TENANT_PERMISSIONS.STOCK_READ);
   const canReceiveShipmentsForAttention = hasTenantActorForOperationalAttention
     && hasPermission(TENANT_PERMISSIONS.SHIPMENTS_READ)
     && hasPermission(TENANT_PERMISSIONS.SHIPMENTS_RECEIVE);
@@ -335,6 +363,11 @@ export default function AppLayout() {
     || canCancelOwnReservationsForAttention
     || canCancelAnyReservationsForAttention
     || canApprovePurchaseOrdersForAttention
+    || canSubmitPurchaseOrdersForAttention
+    || canPreparePurchaseOrdersForAttention
+    || canSendPurchaseOrdersForAttention
+    || canGovernReplenishmentPlanningForAttention
+    || canExecuteReplenishmentTransfersForAttention
     || canReceiveShipmentsForAttention
     || canFinalizeShipmentsForAttention
     || canUpdateOutboundForAttention
@@ -359,7 +392,12 @@ export default function AppLayout() {
     canReleaseReservationsForAttention ? 'reservation-release' : 'no-reservation-release',
     canCancelOwnReservationsForAttention ? 'reservation-cancel-own' : 'no-reservation-cancel-own',
     canCancelAnyReservationsForAttention ? 'reservation-cancel-any' : 'no-reservation-cancel-any',
+    canSubmitPurchaseOrdersForAttention ? 'po-submit' : 'no-po-submit',
+    canPreparePurchaseOrdersForAttention ? 'po-prepare' : 'no-po-prepare',
     canApprovePurchaseOrdersForAttention ? `po-approve-${role || 'unknown'}` : 'no-po-approve',
+    canSendPurchaseOrdersForAttention ? 'po-send' : 'no-po-send',
+    canGovernReplenishmentPlanningForAttention ? 'replenishment-govern' : 'no-replenishment-govern',
+    canExecuteReplenishmentTransfersForAttention ? 'replenishment-transfer-execute' : 'no-replenishment-transfer-execute',
     canReceiveShipmentsForAttention ? 'shipment-receive' : 'no-shipment-receive',
     canFinalizeShipmentsForAttention ? 'shipment-finalize' : 'no-shipment-finalize',
     canUpdateOutboundForAttention ? 'outbound-update' : 'no-outbound-update',
@@ -395,7 +433,11 @@ export default function AppLayout() {
     && operationalAttention?.execution_tasks.requires_attention === true;
   const hasReservationAttention = (canExpireReservationsForAttention || canAllocateReservationsForAttention || canReleaseReservationsForAttention || canCancelOwnReservationsForAttention || canCancelAnyReservationsForAttention)
     && operationalAttention?.reservations.requires_attention === true;
-  const hasPurchaseOrderAttention = canApprovePurchaseOrdersForAttention
+  const hasReplenishmentPlanningAttention = canGovernReplenishmentPlanningForAttention
+    && operationalAttention?.replenishment_planning.requires_attention === true;
+  const hasStockTransferAttention = canExecuteReplenishmentTransfersForAttention
+    && operationalAttention?.stock_transfers.requires_attention === true;
+  const hasPurchaseOrderAttention = (canSubmitPurchaseOrdersForAttention || canPreparePurchaseOrdersForAttention || canApprovePurchaseOrdersForAttention || canSendPurchaseOrdersForAttention)
     && operationalAttention?.purchase_orders.requires_attention === true;
   const hasShipmentAttention = (canReceiveShipmentsForAttention || canFinalizeShipmentsForAttention)
     && operationalAttention?.shipments.requires_attention === true;
@@ -854,6 +896,12 @@ export default function AppLayout() {
                     ) : null}
                     {item.to === '/inventory-reservations' && hasReservationAttention ? (
                       <span style={styles.alertIndicatorDot} aria-label={t('common.reservationsAttention')} title={t('common.reservationsAttention')} />
+                    ) : null}
+                    {item.to === '/stock-transfers' && hasStockTransferAttention ? (
+                      <span style={styles.alertIndicatorDot} aria-label={t('common.stockTransfersAttention')} title={t('common.stockTransfersAttention')} />
+                    ) : null}
+                    {item.to === '/replenishment-planning' && hasReplenishmentPlanningAttention ? (
+                      <span style={styles.alertIndicatorDot} aria-label={t('common.replenishmentPlanningAttention')} title={t('common.replenishmentPlanningAttention')} />
                     ) : null}
                     {item.to === '/purchase-orders' && hasPurchaseOrderAttention ? (
                       <span style={styles.alertIndicatorDot} aria-label={t('common.purchaseOrdersAttention')} title={t('common.purchaseOrdersAttention')} />
