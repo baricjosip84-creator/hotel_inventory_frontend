@@ -37,7 +37,7 @@ check(copilot.includes('capabilities.canViewOperationalActionCenter && capabilit
 
 check(!crossDomain.includes("navigate('/tenant-tasks')") && crossDomain.includes("navigate('/execution-tasks')"), 'Cross-Domain Optimization Tasks handoff uses the tenant Execution Tasks route, never the platform tenant-tasks route');
 check(crossDomain.includes('canOpenIntelligenceReview') && crossDomain.includes('TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ') && crossDomain.includes('canOpenTasks') && crossDomain.includes('TENANT_PERMISSIONS.EXECUTION_TASKS_READ') && crossDomain.includes('canOpenExecutionRequests') && crossDomain.includes('TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW'), 'Cross-Domain handoff controls respect destination-page permissions');
-check(crossDomainGuard.includes("navigate('/execution-tasks')") && !crossDomainGuard.includes("navigate('/tenant-tasks')"), 'Cross-Domain v3.49.170 regression guard now protects the correct tenant Tasks route');
+check(crossDomainGuard.includes("page.includes('projectedSourceWorkflowPath')") && crossDomainGuard.includes("page.includes(\"ui('Open Execution Tasks')\")") && !crossDomainGuard.includes("navigate('/tenant-tasks')"), 'Cross-Domain v3.49.170 regression guard protects the current authoritative Execution Tasks handoff without the platform tenant-tasks route');
 
 check(digitalTwin.includes('function matchingCountLabel') && digitalTwin.includes("return bounded ? `${ui('At least')} ${formatted}` : formatted;"), 'Digital Twin headline counts visibly say At least when bounded source coverage may omit older records');
 check((digitalTwin.match(/matchingCountLabel\(/g) || []).length >= 5, 'Digital Twin applies bounded-count wording across hero, summary, and list counts');
