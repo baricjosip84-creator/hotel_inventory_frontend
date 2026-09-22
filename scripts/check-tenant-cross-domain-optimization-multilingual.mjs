@@ -76,7 +76,7 @@ for (const required of [
   "Create planning review",
   "Govern the important tradeoffs",
   "Expected result compared with actual result",
-  "Optimization governance settings",
+  "Advanced governance settings",
   "Send selected option to Intelligence Review"
 ]) if (!pageSource.includes(required)) fail(`Cross-Domain Optimization operational/multilingual wiring missing: ${required}`);
 
