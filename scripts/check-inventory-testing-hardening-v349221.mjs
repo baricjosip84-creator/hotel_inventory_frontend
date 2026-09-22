@@ -25,8 +25,8 @@ check(page.includes('impact_snapshot: simpleRecord(item.impact_snapshot)') && pa
 check(page.includes("objective_type: 'general'") && page.includes('objective_domain: domain') && page.includes('recommendation_ids:'), 'required backend objectives are derived from structured source domains rather than user prose');
 check(page.includes('selectedSourceSelectionValid = selectedRecommendations.length === 1') && page.includes('selected_option_index: selectedRecommendations.length === 1 ? 0 : null'), 'one real source-backed action can be reviewed without inventing a second alternative');
 check(page.includes("ui('Review action')") && page.includes("ui('Open source workflow')"), 'candidate actions expose direct review and source-workflow actions');
-check(page.includes("ui('Cross-Domain score')") && page.includes("ui('Not calculated')"), 'saved source-backed options show that Cross-Domain scoring was not calculated');
-check(page.includes('isSourceBacked') && page.includes('flattenImpactFacts(projected.impact_snapshot)'), 'saved source-backed option detail renders originating structured evidence');
+check(page.includes('aggregate_score: null') && page.includes('projectedSourceEvidence(projected, locale, ui)'), 'saved source-backed options keep Cross-Domain scoring unset while presenting business evidence instead of a fake score');
+check(page.includes('isSourceBacked') && page.includes('projectedSourceEvidence(projected, locale, ui)'), 'saved source-backed option detail renders curated originating structured evidence');
 check(providers.includes("if (feedbackEvent.detail.type === 'info') return;"), 'generic informational action toasts are suppressed globally while success/error paths remain');
 check(css.includes('.cross-domain-source-card') && css.includes('.cross-domain-source-comparison-card') && css.includes('.cross-domain-human-note'), 'source-backed workflow has bounded responsive styling');
 for (const text of ['Human note — not calculation input','Source-backed actions','Cross-Domain score','Not calculated','Review action','Open source workflow']) {

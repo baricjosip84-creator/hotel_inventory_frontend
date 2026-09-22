@@ -196,7 +196,7 @@ const quantityValue = (value: string): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 const reasonRequired = (decision: Decision): boolean => ['overridden', 'rejected', 'already_handled'].includes(decision);
-const isActionablePurchase = (row: PlanItem): boolean => numberValue(row.shortage_before_transfer) > 0 || numberValue(row.recommended_purchase_quantity) > 0;
+const isActionablePurchase = (row: PlanItem): boolean => numberValue(row.recommended_purchase_quantity) > 0 || numberValue(row.final_purchase_quantity) > 0;
 
 async function listRuns(): Promise<PlanningRunListItem[]> {
   return apiRequest<PlanningRunListItem[]>('/replenishment-planning?limit=100');
@@ -369,12 +369,11 @@ export default function ReplenishmentPlanningPage() {
   const canCreateTransfers = Boolean(capabilities.canCreateStockTransfers);
   const canCreatePurchaseOrders = Boolean(capabilities.canCreatePurchaseOrders);
   const runLocked = detail?.run.status === 'materialized' || detail?.run.status === 'cancelled';
-  const pendingDecisionCount = detail?.run.materialization_guard?.pending_decision_count
-    ?? ((detail?.items.filter((row) => row.decision_status === 'pending').length ?? 0)
-      + (detail?.transfers.filter((row) => row.decision_status === 'pending').length ?? 0));
+  const actionablePurchaseRows = useMemo(() => detail?.items.filter(isActionablePurchase) ?? [], [detail]);
+  const pendingDecisionCount = actionablePurchaseRows.filter((row) => row.decision_status === 'pending').length
+    + (detail?.transfers.filter((row) => row.decision_status === 'pending').length ?? 0);
   const runAgeExpired = Boolean(detail?.run.materialization_guard?.age_expired);
   const allLinesReviewed = pendingDecisionCount === 0;
-  const actionablePurchaseRows = useMemo(() => detail?.items.filter(isActionablePurchase) ?? [], [detail]);
 
   const changedDecisions = useMemo(() => {
     if (!detail) return [];
