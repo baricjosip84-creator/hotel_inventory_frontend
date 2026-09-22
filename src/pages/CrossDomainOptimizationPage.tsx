@@ -961,7 +961,6 @@ export default function CrossDomainOptimizationPage() {
   const canOpenIntelligenceReview = hasPermission(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ) && hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ);
   const canOpenTasks = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
   const canOpenReplenishmentPlanning = hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
-  const canOpenExecutionRequests = hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW);
   const [view, setView] = useState<OptimizationView>('evidence');
   const [filters, setFilters] = useState<OptimizationFilterState>(DEFAULT_FILTERS);
   const [selectedRunId, setSelectedRunId] = useState('');
