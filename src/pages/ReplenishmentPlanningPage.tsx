@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedCurrency, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { ApiError, apiRequest } from '../lib/api';
+import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
 import { getRoleCapabilities } from '../lib/permissions';
 import { formatCurrencyAmount, getActiveTenantCurrency, normalizeCurrencyCode } from '../lib/tenantCurrency';
 import {
@@ -205,7 +206,7 @@ async function getRun(id: string): Promise<PlanningRunDetail> {
   return apiRequest<PlanningRunDetail>(`/replenishment-planning/${id}`);
 }
 async function createRun(input: { target_coverage_days: number }): Promise<PlanningRunDetail> {
-  return apiRequest<PlanningRunDetail>('/replenishment-planning', { method: 'POST', body: JSON.stringify(input) });
+  return apiRequest<PlanningRunDetail>('/replenishment-planning', { method: 'POST', body: JSON.stringify(input), skipMutationFeedback: true });
 }
 async function saveDecisions(input: DecisionMutationInput): Promise<PlanningRunDetail> {
   return apiRequest<PlanningRunDetail>(`/replenishment-planning/${input.runId}/decisions`, {
@@ -309,7 +310,9 @@ export default function ReplenishmentPlanningPage() {
   const createMutation = useMutation({
     mutationFn: createRun,
     onSuccess: async (data) => {
-      setMessage(ui('Planning run created. No stock moved and no supplier order was placed.'));
+      const successMessage = ui('Planning run created. No stock moved and no supplier order was placed.');
+      setMessage(successMessage);
+      showTenantActionSuccess(successMessage);
       setError('');
       setDrafts({});
       setSelectedRunId(data.run.id);
@@ -317,23 +320,29 @@ export default function ReplenishmentPlanningPage() {
       queryClient.setQueryData(['location-replenishment-run', data.run.id], data);
     },
     onError: (mutationError) => {
+      const failureMessage = errorMessage(mutationError);
       setMessage('');
-      setError(errorMessage(mutationError));
+      setError(failureMessage);
+      showTenantActionError(failureMessage);
     }
   });
 
   const decisionMutation = useMutation({
     mutationFn: saveDecisions,
     onSuccess: async (data) => {
-      setMessage(ui('Planning decisions saved. No draft transfer or Purchase Order was created.'));
+      const successMessage = ui('Planning decisions saved. No draft transfer or Purchase Order was created.');
+      setMessage(successMessage);
+      showTenantActionSuccess(successMessage);
       setError('');
       setDrafts({});
       queryClient.setQueryData(['location-replenishment-run', data.run.id], data);
       await queryClient.invalidateQueries({ queryKey: ['location-replenishment-runs'] });
     },
     onError: async (mutationError) => {
+      const failureMessage = errorMessage(mutationError);
       setMessage('');
-      setError(errorMessage(mutationError));
+      setError(failureMessage);
+      showTenantActionError(failureMessage);
       setDrafts({});
       if (effectiveRunId) await queryClient.invalidateQueries({ queryKey: ['location-replenishment-run', effectiveRunId] });
     }
@@ -344,9 +353,11 @@ export default function ReplenishmentPlanningPage() {
     onSuccess: async (data) => {
       const transferCount = data.created_stock_transfers.length;
       const purchaseOrderCount = data.created_purchase_orders.length;
-      setMessage(data.idempotent_replay
+      const successMessage = data.idempotent_replay
         ? ui('This run was already converted. Found {transfers} linked draft Stock Transfer(s) and {purchaseOrders} linked draft Purchase Order(s).').replace('{transfers}', formatUiNumber(transferCount, 0)).replace('{purchaseOrders}', formatUiNumber(purchaseOrderCount, 0))
-        : ui('Live evidence was checked again. Created {transfers} draft Stock Transfer(s) and {purchaseOrders} draft Purchase Order(s). Nothing was approved or executed.').replace('{transfers}', formatUiNumber(transferCount, 0)).replace('{purchaseOrders}', formatUiNumber(purchaseOrderCount, 0)));
+        : ui('Live evidence was checked again. Created {transfers} draft Stock Transfer(s) and {purchaseOrders} draft Purchase Order(s). Nothing was approved or executed.').replace('{transfers}', formatUiNumber(transferCount, 0)).replace('{purchaseOrders}', formatUiNumber(purchaseOrderCount, 0));
+      setMessage(successMessage);
+      showTenantActionSuccess(successMessage);
       setError('');
       setDrafts({});
       setConfirmation(null);
@@ -355,8 +366,10 @@ export default function ReplenishmentPlanningPage() {
       await queryClient.invalidateQueries({ queryKey: ['location-replenishment-outcomes', data.run.run.id] });
     },
     onError: async (mutationError) => {
+      const failureMessage = errorMessage(mutationError);
       setMessage('');
-      setError(errorMessage(mutationError));
+      setError(failureMessage);
+      showTenantActionError(failureMessage);
       setConfirmation(null);
       if (effectiveRunId) await queryClient.invalidateQueries({ queryKey: ['location-replenishment-run', effectiveRunId] });
     }

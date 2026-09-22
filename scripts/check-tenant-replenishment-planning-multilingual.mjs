@@ -110,7 +110,7 @@ for (const required of [
   "const DECISIONS = ['pending', 'accepted', 'overridden', 'rejected', 'deferred', 'already_handled'] as const;",
   "apiRequest<PlanningRunListItem[]>('/replenishment-planning?limit=100')",
   'apiRequest<PlanningRunDetail>(`/replenishment-planning/${id}`)',
-  "apiRequest<PlanningRunDetail>('/replenishment-planning', { method: 'POST', body: JSON.stringify(input) })",
+  "apiRequest<PlanningRunDetail>('/replenishment-planning', { method: 'POST', body: JSON.stringify(input), skipMutationFeedback: true })",
   'apiRequest<PlanningRunDetail>(`/replenishment-planning/${input.runId}/decisions`, {',
   'body: JSON.stringify({ expected_run_version: input.expectedRunVersion, decisions: input.decisions })',
   'skipMutationFeedback: true',
@@ -123,7 +123,7 @@ for (const required of [
   'expected_version: numberValue(item.version)',
   'expected_version: numberValue(transfer.version)'
 ]) if (!pageSource.includes(required)) fail(`Replenishment Planning endpoint/canonical mutation contract changed or missing: ${required}`);
-if (!process.exitCode) pass('Replenishment Planning list/detail/create/decision/materialization/outcome endpoints and canonical mutation payload values remain unchanged.');
+if (!process.exitCode) pass('Replenishment Planning list/detail/create/decision/materialization/outcome endpoints, canonical mutation payload values, and page-specific feedback suppression remain protected.');
 
 for (const required of [
   'const canGenerate = Boolean(capabilities.canCreateInventoryOptimization);',
