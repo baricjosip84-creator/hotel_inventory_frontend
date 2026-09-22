@@ -49,7 +49,15 @@ export function useOperationalAttentionItems(surface: OperationalAttentionSurfac
   const tenantAccess = getTenantAccessSnapshot();
   const permissionSnapshot = getTenantPermissionSnapshot();
   const identityKey = `${tenantAccess.tenantId || 'no-tenant'}:${tenantAccess.userId || 'no-user'}:${tenantAccess.role}`;
-  const permissionKey = permissionSnapshot?.loaded_at || 'no-permission-snapshot';
+  // Cache exact-record attention by the effective permission state, not by when
+  // that state was refreshed. AppLayout refreshes /permissions/me whenever the
+  // browser regains focus, which updates loaded_at even when permissions did not
+  // change. Using loaded_at here therefore created a brand-new query on every
+  // focus/visibility refresh and temporarily removed page/tab/row attention
+  // markers until the replacement request completed.
+  const permissionKey = permissionSnapshot
+    ? `${permissionSnapshot.custom_role_id || 'standard-role'}:${[...permissionSnapshot.permissions].sort().join(',')}`
+    : 'no-permission-snapshot';
   const query = useQuery({
     queryKey: ['tenant-sidebar', 'operational-navigation-attention', 'items', surface, identityKey, permissionKey],
     queryFn: () => apiRequest<OperationalAttentionItems>(`/navigation-attention/operational-items/${surface}`),
