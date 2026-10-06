@@ -386,7 +386,8 @@
     "check:inventory-workflow-composer-clarity-surgical-fixes-v349263": "node scripts/check-workflow-composer-clarity-surgical-fixes-v349263.mjs",
     "check:inventory-adaptive-policy-analysis-snapshot-semantics-surgical-fixes-v349264": "node scripts/check-adaptive-policy-analysis-snapshot-semantics-surgical-fixes-v349264.mjs",
     "check:inventory-low-stock-scope-clarity-surgical-fixes-v349265": "node scripts/check-low-stock-scope-clarity-surgical-fixes-v349265.mjs",
-    "check:inventory-cross-domain-governance-threshold-clarity-surgical-fixes-v349266": "node scripts/check-cross-domain-governance-threshold-clarity-surgical-fixes-v349266.mjs"
+    "check:inventory-cross-domain-governance-threshold-clarity-surgical-fixes-v349266": "node scripts/check-cross-domain-governance-threshold-clarity-surgical-fixes-v349266.mjs",
+    "check:inventory-digital-twin-focus-surgical-fix-v349267": "node scripts/check-digital-twin-focus-surgical-fix-v349267.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

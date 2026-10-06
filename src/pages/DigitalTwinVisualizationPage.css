@@ -851,6 +851,12 @@
 
 .digital-twin-focus-panel {
   margin-bottom: 16px;
+  scroll-margin-top: 96px;
+}
+
+.digital-twin-focus-panel:focus {
+  outline: 2px solid var(--io-primary, #2563eb);
+  outline-offset: 2px;
 }
 
 .digital-twin-focus-summary {

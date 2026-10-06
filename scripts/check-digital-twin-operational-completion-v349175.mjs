@@ -28,7 +28,7 @@ const productData = read('src/pages/products/useProductPageData.ts');
 
 check('Digital Twin has search with explicit submit/clear behavior', page.includes('Search connected records') && page.includes("updateFilters({ search: searchDraft.trim() })") && page.includes("updateFilters({ search: '' })"));
 check('Digital Twin has review-first callout', page.includes('Review this first') && page.includes('review_first'));
-check('Digital Twin records can open connected context', page.includes('Show connections') && page.includes('setFocusNodeKey(node.node_key)'));
+check('Digital Twin records can open connected context across public and diagnostics response shapes', page.includes('Show connections') && page.includes('digitalTwinNodeFocusKey') && page.includes('node.node_key || node.public_node_key'));
 check('Digital Twin renders a visible impact chain', page.includes('Impact chain') && page.includes('focus.impact_chain'));
 check('Digital Twin exposes exact source-record links through the permission gate', page.includes('source_record_path') && page.includes('permittedSourcePath') && page.includes('Open exact source record'));
 check('Digital Twin shows per-source data freshness', page.includes('Data freshness') && page.includes('freshness.sources'));

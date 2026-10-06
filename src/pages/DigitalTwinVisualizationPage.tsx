@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
@@ -25,6 +25,7 @@ type PaginationKind = 'nodes' | 'edges' | 'overlays';
 
 type TwinNode = {
   node_key?: string;
+  public_node_key?: string;
   node_id?: string;
   node_type?: string;
   twin_domain?: string;
@@ -39,6 +40,8 @@ type TwinNode = {
 
 type TwinEdge = {
   edge_key?: string;
+  source_public_node_key?: string | null;
+  target_public_node_key?: string | null;
   edge_id?: string;
   relationship?: string;
   source_label?: string | null;
@@ -54,6 +57,8 @@ type TwinEdge = {
 
 type TwinOverlay = {
   overlay_key?: string;
+  source_public_node_key?: string | null;
+  target_public_node_key?: string | null;
   overlay_id?: string;
   overlay_type?: string;
   twin_domain?: string;
@@ -230,6 +235,11 @@ const LIMIT_FILTERS: Array<{ value: ResultLimit; label: string }> = [
   { value: '75', label: '75 records per list' },
   { value: '100', label: '100 records per list' }
 ];
+
+const digitalTwinNodeFocusKey = (node: TwinNode) => node.node_key || node.public_node_key || null;
+const digitalTwinEdgeSourceFocusKey = (edge: TwinEdge) => edge.source_node_key || edge.source_public_node_key || null;
+const digitalTwinEdgeTargetFocusKey = (edge: TwinEdge) => edge.target_node_key || edge.target_public_node_key || null;
+const digitalTwinOverlayFocusKey = (overlay: TwinOverlay) => overlay.target_node_key || overlay.target_public_node_key || overlay.source_node_key || overlay.source_public_node_key || null;
 
 const DEFAULT_FILTERS = {
   twinDomain: 'all' as 'all' | TwinDomain,
@@ -567,6 +577,7 @@ export default function DigitalTwinVisualizationPage() {
   const [searchDraft, setSearchDraft] = useState('');
   const [offsets, setOffsets] = useState<Record<PaginationKind, number>>({ nodes: 0, edges: 0, overlays: 0 });
   const [focusNodeKey, setFocusNodeKey] = useState<string | null>(null);
+  const focusPanelRef = useRef<HTMLElement | null>(null);
 
   const queryKey = useMemo(() => [
     'digital-twin-visualization',
@@ -585,6 +596,20 @@ export default function DigitalTwinVisualizationPage() {
     queryKey,
     queryFn: () => fetchDigitalTwinSummary(filters, offsets, focusNodeKey)
   });
+
+  const response = digitalTwinQuery.data;
+  const focus = response?.focus;
+
+  useEffect(() => {
+    if (!focusNodeKey || !focus?.found || focus.node_key !== focusNodeKey) return;
+    const panel = focusPanelRef.current;
+    if (!panel) return;
+    const frame = window.requestAnimationFrame(() => {
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      panel.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusNodeKey, focus?.found, focus?.node_key]);
 
   const updateFilters = (patch: Partial<typeof DEFAULT_FILTERS>) => {
     setFilters((current) => ({ ...current, ...patch }));
@@ -623,7 +648,6 @@ export default function DigitalTwinVisualizationPage() {
     );
   }
 
-  const response = digitalTwinQuery.data;
   const summary = response?.summary || {};
   const guidance = response?.guidance || {};
   const nodes = response?.nodes || [];
@@ -631,7 +655,6 @@ export default function DigitalTwinVisualizationPage() {
   const overlays = response?.overlays || [];
   const pagination = response?.pagination || {};
   const coverage = response?.coverage;
-  const focus = response?.focus;
   const reviewFirst = response?.review_first;
   const freshness = response?.freshness;
   const appliedLimit = response?.filters?.limit || Number(filters.limit);
@@ -768,7 +791,7 @@ export default function DigitalTwinVisualizationPage() {
           </div>
 
           {focusNodeKey ? (
-            <section className="card digital-twin-focus-panel" aria-labelledby="digital-twin-focus-title">
+            <section ref={focusPanelRef} tabIndex={-1} className="card digital-twin-focus-panel" aria-labelledby="digital-twin-focus-title">
               <div className="digital-twin-section-heading">
                 <div className="digital-twin-section-title">
                   <span className="digital-twin-heading-icon"><TenantNavIcon path="/digital-twin" size={17} /></span>
@@ -829,9 +852,10 @@ export default function DigitalTwinVisualizationPage() {
                     {nodes.map((node, index) => {
                       const sourcePath = permittedSourcePath(node.source_record_path, node.source_surface);
                       const basePath = sourceSurfaceToAppPath(node.source_surface);
+                      const nodeFocusKey = digitalTwinNodeFocusKey(node);
                       return (
-                        <article className={`card digital-twin-node-card${focusNodeKey === node.node_key ? ' digital-twin-node-card--selected' : ''}`} key={node.node_key || node.node_id || `${node.label || 'point'}-${index}`}>
-                          <button className="digital-twin-select-record" type="button" onClick={() => node.node_key && setFocusNodeKey(node.node_key)} aria-label={ui('Review connected context for {record}').replace('{record}', sourceText(node.label, ui('Topology point')))}>
+                        <article className={`card digital-twin-node-card${focusNodeKey === nodeFocusKey ? ' digital-twin-node-card--selected' : ''}`} key={nodeFocusKey || node.node_id || `${node.label || 'point'}-${index}`}>
+                          <button className="digital-twin-select-record" type="button" onClick={() => nodeFocusKey && setFocusNodeKey(nodeFocusKey)} aria-label={ui('Review connected context for {record}').replace('{record}', sourceText(node.label, ui('Topology point')))}>
                             <div className="digital-twin-card-heading">
                               <span className="digital-twin-card-icon"><TenantNavIcon path={basePath || '/digital-twin'} size={18} /></span>
                               <div className="digital-twin-badges"><span className="digital-twin-badge">{domainLabel(node.twin_domain, ui)}</span><span className="digital-twin-badge digital-twin-badge--active">{statusLabel(node.status, ui)}</span></div>
@@ -841,7 +865,7 @@ export default function DigitalTwinVisualizationPage() {
                             <dl className="digital-twin-facts"><div><dt>{ui('Importance')}</dt><dd>{formatScore(node.importance_score, locale, ui)}</dd></div><div><dt>{ui('Last updated')}</dt><dd>{formatDateTime(node.updated_at || node.observed_at, locale, ui)}</dd></div></dl>
                           </button>
                           <div className="digital-twin-card-actions">
-                            <button className="button button--secondary" type="button" onClick={() => node.node_key && setFocusNodeKey(node.node_key)}>{ui('Show connections')}</button>
+                            <button className="button button--secondary" type="button" onClick={() => nodeFocusKey && setFocusNodeKey(nodeFocusKey)} disabled={!nodeFocusKey}>{ui('Show connections')}</button>
                             {sourcePath ? <Link className="button button--secondary digital-twin-link-button" to={sourcePath}><TenantNavIcon path={basePath || '/digital-twin'} size={16} /> {ui('Open {record}').replace('{record}', sourceText(node.label, ui('record')))}</Link> : null}
                           </div>
                         </article>
@@ -866,8 +890,8 @@ export default function DigitalTwinVisualizationPage() {
                           <strong>{edge.source_label && edge.target_label ? `${sourceText(edge.source_label)} → ${sourceText(edge.target_label)}` : relationshipLabel(edge.relationship, ui)}</strong>
                           <span>{relationshipLabel(edge.relationship, ui)} · {domainLabel(edge.twin_domain, ui)} · {statusLabel(edge.status, ui)}</span>
                           <div className="digital-twin-edge-actions">
-                            {edge.source_node_key ? <button type="button" onClick={() => setFocusNodeKey(edge.source_node_key || null)}>{ui('Review source')}</button> : null}
-                            {edge.target_node_key ? <button type="button" onClick={() => setFocusNodeKey(edge.target_node_key || null)}>{ui('Review affected record')}</button> : null}
+                            {digitalTwinEdgeSourceFocusKey(edge) ? <button type="button" onClick={() => setFocusNodeKey(digitalTwinEdgeSourceFocusKey(edge))}>{ui('Review source')}</button> : null}
+                            {digitalTwinEdgeTargetFocusKey(edge) ? <button type="button" onClick={() => setFocusNodeKey(digitalTwinEdgeTargetFocusKey(edge))}>{ui('Review affected record')}</button> : null}
                           </div>
                         </div>
                         <div className="digital-twin-dependency-confidence"><span>{ui('Confidence')}</span><strong>{formatPercent(edge.confidence_score, locale, ui)}</strong></div>
@@ -895,7 +919,7 @@ export default function DigitalTwinVisualizationPage() {
                           <p className="card__subtext">{overlay.summary_key ? digitalTwinSystemText(overlay.summary_key, overlay.summary, ui) : (overlay.summary || ui('No additional source summary was provided.'))}</p>
                           <dl className="digital-twin-facts digital-twin-facts--overlay"><div><dt>{ui('Priority')}</dt><dd>{formatScore(overlay.priority_score, locale, ui)}</dd></div><div><dt>{ui('Confidence')}</dt><dd>{formatPercent(overlay.confidence_score, locale, ui)}</dd></div><div><dt>{ui('Last updated')}</dt><dd>{formatDateTime(overlay.updated_at || overlay.created_at, locale, ui)}</dd></div></dl>
                           <div className="digital-twin-card-actions">
-                            {(overlay.target_node_key || overlay.source_node_key) ? <button className="button button--secondary" type="button" onClick={() => setFocusNodeKey(overlay.target_node_key || overlay.source_node_key || null)}>{ui('Review connected context')}</button> : null}
+                            {digitalTwinOverlayFocusKey(overlay) ? <button className="button button--secondary" type="button" onClick={() => setFocusNodeKey(digitalTwinOverlayFocusKey(overlay))}>{ui('Review connected context')}</button> : null}
                             {sourcePath ? <Link className="button button--secondary digital-twin-link-button" to={sourcePath}><TenantNavIcon path={basePath || '/action-center'} size={16} /> {ui('Open exact source record')}</Link> : null}
                             {basePath !== '/action-center' ? <Link className="button button--secondary digital-twin-link-button" to="/action-center"><TenantNavIcon path="/action-center" size={16} /> {ui('Open Action Center')}</Link> : null}
                           </div>
