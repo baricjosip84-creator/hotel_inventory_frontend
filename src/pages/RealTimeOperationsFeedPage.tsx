@@ -757,7 +757,7 @@ export default function RealTimeOperationsFeedPage() {
             </>
           )}
 
-          {response?.generated_at ? <p className="card__subtext operations-feed-page__updated">{ui("Feed updated")} {formatDateTime(response.generated_at, locale, ui)}. {ui("The feed refreshes automatically about every minute while this page is open.")}</p> : null}
+          {feedQuery.dataUpdatedAt ? <p className="card__subtext operations-feed-page__updated">{ui("Feed updated")} {formatDateTime(new Date(feedQuery.dataUpdatedAt).toISOString(), locale, ui)}. {ui("The feed refreshes automatically about every minute while this page is open.")}</p> : null}
         </div>
       </section>
 

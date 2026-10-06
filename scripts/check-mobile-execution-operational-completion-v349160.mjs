@@ -23,7 +23,7 @@ const check = (label, condition) => {
 check('Mobile Execution uses the execution-task mobile queue', page.includes("/execution-tasks/mobile-queue?${params.toString()}"));
 check('My/Unassigned/Team scopes are explicit', page.includes("type AssignmentScope = 'mine' | 'unassigned' | 'team'") && page.includes("label: 'My tasks'") && page.includes("label: 'Unassigned tasks'") && page.includes("label: 'Team tasks'"));
 check('responsibility scope is sent to the server', page.includes("new URLSearchParams({ assignment_scope: assignmentScope"));
-check('Mobile Execution defaults to My tasks', page.includes("useState<AssignmentScope>('mine')"));
+check('Mobile Execution defaults to My tasks', page.includes("searchParams.get('scope')?.trim() || 'mine'") && page.includes(": 'mine';"));
 check('offline take is part of the mobile action contract', page.includes("type MobileAction = 'take' | 'start' | 'complete' | 'block' | 'unblock'") && page.includes("operation.action === 'take'"));
 check('Take task is a visible action', page.includes("take: 'Take task'"));
 check('another team member task is read-only', page.includes("assignment === 'other'") && page.includes("Mobile Execution will not let you change its task state."));

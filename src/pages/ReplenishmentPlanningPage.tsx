@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedCurrency, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { ApiError, apiRequest } from '../lib/api';
@@ -47,6 +48,8 @@ type PlanningRunListItem = {
   };
   item_count?: number | string;
   transfer_count?: number | string;
+  handoff_product_id?: string | null;
+  handoff_storage_location_id?: string | null;
 };
 
 type SupplierEvidence = {
@@ -101,6 +104,9 @@ type PlanItem = {
 type PlanTransfer = {
   id: string;
   version: number | string;
+  product_id: string;
+  source_storage_location_id: string;
+  destination_storage_location_id: string;
   product_name: string;
   product_unit?: string | null;
   source_storage_location_name: string;
@@ -202,8 +208,10 @@ const quantityValue = (value: string): number | null => {
 const reasonRequired = (decision: Decision): boolean => ['overridden', 'rejected', 'already_handled'].includes(decision);
 const isActionablePurchase = (row: PlanItem): boolean => numberValue(row.recommended_purchase_quantity) > 0 || numberValue(row.final_purchase_quantity) > 0;
 
-async function listRuns(): Promise<PlanningRunListItem[]> {
-  return apiRequest<PlanningRunListItem[]>('/replenishment-planning?limit=100');
+async function listRuns(sourceParLevelId = ''): Promise<PlanningRunListItem[]> {
+  const params = new URLSearchParams({ limit: '100' });
+  if (sourceParLevelId) params.set('source_par_level_id', sourceParLevelId);
+  return apiRequest<PlanningRunListItem[]>(`/replenishment-planning?${params.toString()}`);
 }
 async function getRun(id: string): Promise<PlanningRunDetail> {
   return apiRequest<PlanningRunDetail>(`/replenishment-planning/${id}`);
@@ -244,6 +252,9 @@ function StatusBadge({ value, label }: { value?: string | null; label: string })
 export default function ReplenishmentPlanningPage() {
   const queryClient = useQueryClient();
   const { locale, ui } = useAppTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sourceParLevelId = searchParams.get('source_par_level_id')?.trim() || '';
+  const handoffActive = Boolean(sourceParLevelId);
   const capabilities = getRoleCapabilities();
   const replenishmentAttentionItemsQuery = useOperationalAttentionItems(
     'replenishment_planning',
@@ -317,8 +328,14 @@ export default function ReplenishmentPlanningPage() {
   const [confirmation, setConfirmation] = useState<ConfirmationState>(null);
   const [activeWorkspaceSection, setActiveWorkspaceSection] = useState<ReplenishmentWorkspaceSection>('overview');
 
-  const runsQuery = useQuery({ queryKey: ['location-replenishment-runs'], queryFn: listRuns });
+  const runsQuery = useQuery({
+    queryKey: ['location-replenishment-runs', sourceParLevelId || 'all'],
+    queryFn: () => listRuns(sourceParLevelId)
+  });
   const effectiveRunId = selectedRunId || runsQuery.data?.[0]?.id || '';
+  const currentHandoffRun = handoffActive ? runsQuery.data?.find((run) => run.id === effectiveRunId) || runsQuery.data?.[0] : undefined;
+  const handoffProductId = currentHandoffRun?.handoff_product_id || '';
+  const handoffStorageLocationId = currentHandoffRun?.handoff_storage_location_id || '';
   const currentRunNeedsReviewAttention = Boolean(
     effectiveRunId
     && (replenishmentAttentionItemsQuery.data?.run_ids || []).includes(effectiveRunId)
@@ -405,6 +422,16 @@ export default function ReplenishmentPlanningPage() {
   });
 
   const detail = detailQuery.data;
+
+  useEffect(() => {
+    if (!handoffActive || !detail || !handoffProductId || !handoffStorageLocationId) return;
+    setActiveWorkspaceSection('review');
+    const timer = window.setTimeout(() => {
+      const match = document.querySelector<HTMLElement>('[data-replenishment-handoff-match="true"]');
+      match?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [detail, handoffActive, handoffProductId, handoffStorageLocationId]);
   const summary = detail?.run.summary ?? {};
   const canGenerate = Boolean(capabilities.canCreateInventoryOptimization);
   const canGovern = Boolean(capabilities.canGovernInventoryOptimization);
@@ -532,6 +559,15 @@ export default function ReplenishmentPlanningPage() {
       }
       return next;
     });
+  };
+
+  const clearSourceHandoff = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('source_par_level_id');
+    next.delete('source_optimization_plan_id');
+    next.delete('source_optimization_item_id');
+    setSelectedRunId('');
+    setSearchParams(next, { replace: true });
   };
 
   const refreshPage = async () => {
@@ -730,8 +766,9 @@ export default function ReplenishmentPlanningPage() {
             </select>
           </label>
         </div>
+        {handoffActive ? runsQuery.isLoading ? <div className="replenishment-planning-note">{ui('Finding a saved planning run for the source decision…')}</div> : runsQuery.data?.length ? <div className="replenishment-planning-note"><strong>{ui('Opened from Cross-Domain Optimization.')}</strong> {ui('The newest saved planning run containing the same product and destination location is selected. The original optimization recommendation was not tied to a specific replenishment run ID, so the app will not silently open an unrelated run.')} <button type="button" className="app-button app-button--secondary" onClick={clearSourceHandoff}>{ui('Show all planning runs')}</button></div> : <div className="replenishment-planning-warning-note"><strong>{ui('No saved planning run matches this source decision.')}</strong> {ui('The original replenishment scope is unavailable in saved planning runs. Generate a fresh run for current data or show all runs; no unrelated run has been selected.')} <button type="button" className="app-button app-button--secondary" onClick={clearSourceHandoff}>{ui('Show all planning runs')}</button></div> : null}
         {!canGenerate ? <div className="replenishment-planning-note">{ui("Your role can review planning runs but cannot generate a new run.")}</div> : null}
-        {!runsQuery.isLoading && runsQuery.data?.length === 0 ? (
+        {!handoffActive && !runsQuery.isLoading && runsQuery.data?.length === 0 ? (
           <div className="replenishment-planning-empty-state">
             <strong>{ui("No planning run yet")}</strong>
             <span>{ui("Set a coverage target and generate a run after location par levels or stock minimums have been configured.")}</span>
@@ -811,8 +848,9 @@ export default function ReplenishmentPlanningPage() {
                     const draft = drafts[key] ?? { decision: row.decision_status, quantity: String(row.final_quantity), reason: row.decision_reason ?? '' };
                     const disabled = !canGovern || runLocked || Boolean(row.linked_stock_transfer_id);
                     const causesSidebarAttention = pendingTransferAttentionIds.has(row.id);
-                    return <tr key={row.id} style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined} data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}>
-                      <td><strong>{row.product_name}</strong><small>{row.product_unit || ui('Unit not recorded')}</small>{causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}</td>
+                    const handoffMatch = handoffActive && row.product_id === handoffProductId && row.destination_storage_location_id === handoffStorageLocationId;
+                    return <tr key={row.id} style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined} data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined} data-replenishment-handoff-match={handoffMatch ? "true" : undefined}>
+                      <td><strong>{row.product_name}</strong><small>{row.product_unit || ui('Unit not recorded')}</small>{handoffMatch ? <small><strong>{ui('Source decision match')}</strong></small> : null}{causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}</td>
                       <td><strong>{row.source_storage_location_name}</strong><small>{ui('to {location}').replace('{location}', row.destination_storage_location_name)}</small></td>
                       <td><strong>{formatUiNumber(row.recommended_quantity)}</strong></td>
                       <td>
@@ -854,8 +892,9 @@ export default function ReplenishmentPlanningPage() {
                     const supplierMissing = !row.supplier_id;
                     const currency = row.estimated_cost_currency || row.evidence?.supplier?.currency || null;
                     const causesSidebarAttention = pendingPurchaseAttentionIds.has(row.id);
-                    return <tr key={row.id} style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined} data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}>
-                      <td><strong>{row.product_name}</strong><small>{row.storage_location_name} · {row.product_unit || ui('Unit not recorded')}</small>{causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}</td>
+                    const handoffMatch = handoffActive && row.product_id === handoffProductId && row.storage_location_id === handoffStorageLocationId;
+                    return <tr key={row.id} style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined} data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined} data-replenishment-handoff-match={handoffMatch ? "true" : undefined}>
+                      <td><strong>{row.product_name}</strong><small>{row.storage_location_name} · {row.product_unit || ui('Unit not recorded')}</small>{handoffMatch ? <small><strong>{ui('Source decision match')}</strong></small> : null}{causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}</td>
                       <td><strong>{formatUiNumber(row.usable_inventory_position)}</strong><small>{ui('On hand {onHand} · reserved {reserved} · inbound {inbound}').replace('{onHand}', formatUiNumber(row.current_stock)).replace('{reserved}', formatUiNumber(row.reserved_quantity)).replace('{inbound}', formatUiNumber(row.reliable_inbound_quantity))}</small></td>
                       <td><strong>{formatUiNumber(row.configured_target_quantity)}</strong><small>{ui('Minimum {count}').replace('{count}', formatUiNumber(row.governed_min_quantity))}</small></td>
                       <td><strong>{formatUiNumber(row.transfer_covered_quantity)}</strong></td>

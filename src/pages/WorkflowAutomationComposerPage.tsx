@@ -373,6 +373,16 @@ function responsibilityText(blueprint: WorkflowBlueprint, ui: (englishText: stri
   return ui('Managed in source workflow');
 }
 
+function responsibilityAlreadyAssigned(blueprint: WorkflowBlueprint): boolean {
+  const responsibility = blueprint.responsibility;
+  const assignmentState = String(responsibility?.assignment_state || '').trim().toLowerCase();
+  return Boolean(
+    responsibility?.assignee_name
+    || responsibility?.responsible_role
+    || (assignmentState && assignmentState !== 'unassigned')
+  );
+}
+
 function locationText(blueprint: WorkflowBlueprint, ui: (englishText: string) => string): string | null {
   const context = blueprint.location_context;
   const from = String(context?.from_location_name || '').trim();
@@ -729,7 +739,7 @@ export default function WorkflowAutomationComposerPage() {
                 const sourceLink = blueprintSourceLink(blueprint);
                 const urgencyValue = blueprint.escalation_policy_preview?.urgency || blueprint.trigger_preview?.trigger_urgency;
                 const approvalSteps = blueprint.approval_chain_preview || [];
-                const suggestedSteps = blueprint.recommended_steps_preview || [];
+                const suggestedSteps = (blueprint.recommended_steps_preview || []).filter((step) => !(step === 'assign_human_owner' && responsibilityAlreadyAssigned(blueprint)));
                 const triggerStatus = blueprint.trigger_preview?.trigger_status || blueprint.trigger_preview?.contract_status;
 
                 return (

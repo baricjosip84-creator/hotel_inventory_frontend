@@ -80,7 +80,7 @@ for (const required of [
   'formatLocalizedNumber(numberValue(value), locale, { maximumFractionDigits })',
   'formatLocalizedDateTime(value, locale)',
   'formatLocalizedCurrency(numberValue(value), normalizeCurrencyCode(currency || getActiveTenantCurrency()), locale, { maximumFractionDigits: 4 })',
-  "const fallbackValue = typeof value === 'number' || typeof value === 'string' || value == null",
+  'const fallbackValue: number | string | null | undefined =',
   'return formatCurrencyAmount(fallbackValue, currency, 4);',
   "ui('{percent}%').replace('{percent}', formatLocalizedNumber(numberValue(ratio) * 100, locale, { maximumFractionDigits: 0 }))",
   'canonicalDisplayLabel',
@@ -108,7 +108,7 @@ if (!process.exitCode) pass('Replenishment Planning route and insights/optimizat
 
 for (const required of [
   "const DECISIONS = ['pending', 'accepted', 'overridden', 'rejected', 'deferred', 'already_handled'] as const;",
-  "apiRequest<PlanningRunListItem[]>('/replenishment-planning?limit=100')",
+  "return apiRequest<PlanningRunListItem[]>(`/replenishment-planning?${params.toString()}`);",
   'apiRequest<PlanningRunDetail>(`/replenishment-planning/${id}`)',
   "apiRequest<PlanningRunDetail>('/replenishment-planning', { method: 'POST', body: JSON.stringify(input), skipMutationFeedback: true })",
   'apiRequest<PlanningRunDetail>(`/replenishment-planning/${input.runId}/decisions`, {',

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
@@ -354,10 +354,28 @@ export default function MobileExecutionPage() {
   const storageKeys = useMemo(() => getMobileStorageKeys(), []);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const evidenceInputRef = useRef<HTMLInputElement | null>(null);
-  const [assignmentScope, setAssignmentScope] = useState<AssignmentScope>('mine');
-  const [urgency, setUrgency] = useState<'all' | ActionUrgency>('all');
-  const [sourceType, setSourceType] = useState<'all' | ExecutionTaskSourceType>('all');
-  const [page, setPage] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedScope = searchParams.get('scope')?.trim() || 'mine';
+  const requestedUrgency = searchParams.get('urgency')?.trim() || 'all';
+  const requestedSourceType = searchParams.get('source')?.trim() || 'all';
+  const requestedPage = Number(searchParams.get('page') || '0');
+  const assignmentScope: AssignmentScope = ['mine', 'unassigned', 'team'].includes(requestedScope) ? requestedScope as AssignmentScope : 'mine';
+  const urgency: 'all' | ActionUrgency = ['all', 'critical', 'high', 'medium', 'low'].includes(requestedUrgency) ? requestedUrgency as 'all' | ActionUrgency : 'all';
+  const sourceType: 'all' | ExecutionTaskSourceType = ['all', 'manual', 'reservation', 'requisition', 'purchase_order', 'shipment', 'transfer', 'cycle_count', 'replenishment', 'execution_request'].includes(requestedSourceType) ? requestedSourceType as 'all' | ExecutionTaskSourceType : 'all';
+  const page = Number.isInteger(requestedPage) && requestedPage >= 0 ? requestedPage : 0;
+  const updateQueueContext = (key: 'scope' | 'urgency' | 'source', value: string, defaultValue: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (!value || value === defaultValue) next.delete(key);
+    else next.set(key, value);
+    next.delete('page');
+    setSearchParams(next, { replace: true });
+  };
+  const updateQueuePage = (nextPage: number) => {
+    const next = new URLSearchParams(searchParams);
+    if (nextPage <= 0) next.delete('page');
+    else next.set('page', String(nextPage));
+    setSearchParams(next, { replace: true });
+  };
   const [online, setOnline] = useState(() => navigator.onLine);
   const [storageAvailable, setStorageAvailable] = useState(() => mobileStorageAvailable());
   const [pending, setPending] = useState<OfflineOperation[]>(() => readStored<OfflineOperation[]>(storageKeys?.pending || null, []));
@@ -418,7 +436,6 @@ export default function MobileExecutionPage() {
     if (cacheKey && !writeStored(cacheKey, mobileExecutionQuery.data)) setStorageAvailable(false);
   }, [mobileExecutionQuery.data, cacheKey, filterKey]);
 
-  useEffect(() => { setPage(0); }, [assignmentScope, urgency, sourceType]);
 
   const persistPending = (operations: OfflineOperation[]): boolean => {
     setPending(operations);
@@ -558,11 +575,11 @@ export default function MobileExecutionPage() {
         <div className="section__title mobile-execution-section-title"><span className="mobile-execution-section-icon"><TenantNavIcon path="/mobile-execution" size={16} /></span>{ui('Mobile execution controls')}</div>
         <div className="card mobile-execution-controls-shell">
           <div className="mobile-execution-scope-tabs" role="group" aria-label={ui('Choose task ownership view')}>
-            {SCOPE_OPTIONS.map((option) => <button key={option.value} type="button" className={`button button--secondary mobile-execution-scope-button ${assignmentScope === option.value ? 'mobile-execution-scope-button--active' : ''}`} onClick={() => setAssignmentScope(option.value)}>{ui(option.label)}</button>)}
+            {SCOPE_OPTIONS.map((option) => <button key={option.value} type="button" className={`button button--secondary mobile-execution-scope-button ${assignmentScope === option.value ? 'mobile-execution-scope-button--active' : ''}`} onClick={() => updateQueueContext('scope', option.value, 'mine')}>{ui(option.label)}</button>)}
           </div>
           <div className="mobile-execution-toolbar">
-            <select aria-label={ui('Filter mobile tasks by urgency')} className="mobile-execution-select" value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | ActionUrgency)}>{URGENCY_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}</select>
-            <select aria-label={ui('Filter mobile tasks by source')} className="mobile-execution-select" value={sourceType} onChange={(event) => setSourceType(event.target.value as 'all' | ExecutionTaskSourceType)}>{SOURCE_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}</select>
+            <select aria-label={ui('Filter mobile tasks by urgency')} className="mobile-execution-select" value={urgency} onChange={(event) => updateQueueContext('urgency', event.target.value, 'all')}>{URGENCY_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}</select>
+            <select aria-label={ui('Filter mobile tasks by source')} className="mobile-execution-select" value={sourceType} onChange={(event) => updateQueueContext('source', event.target.value, 'all')}>{SOURCE_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}</select>
             <button className="button button--secondary mobile-execution-control-button" type="button" onClick={() => mobileExecutionQuery.refetch()} disabled={mobileExecutionQuery.isFetching || !online}>{mobileExecutionQuery.isFetching ? ui('Refreshing…') : ui('Refresh mobile queue')}</button>
             <button className="button button--secondary mobile-execution-control-button" type="button" onClick={() => void replayPending()} disabled={!online || syncing || pending.length === 0 || !canRunAnyMobileAction}>{syncing ? ui('Synchronizing…') : `${ui('Sync pending')} (${formatLocalizedNumber(pending.length, locale)})`}</button>
             <Link className="button button--secondary mobile-execution-control-button" to="/execution-tasks">{ui('Open execution tasks')}</Link>
@@ -622,7 +639,7 @@ export default function MobileExecutionPage() {
           })}
         </div>}
 
-        {response && (page > 0 || total > PAGE_SIZE) ? <div className="mobile-execution-pagination"><button className="button button--secondary" type="button" disabled={page === 0} onClick={() => setPage((value) => Math.max(0, value - 1))}>{ui('Previous')}</button><span className="card__subtext">{ui('Showing {from}-{to} of {total}').replace('{from}', String(showingFrom)).replace('{to}', String(showingTo)).replace('{total}', String(total))}</span><button className="button button--secondary" type="button" disabled={!pagination.has_more} onClick={() => setPage((value) => value + 1)}>{ui('Next')}</button></div> : null}
+        {response && (page > 0 || total > PAGE_SIZE) ? <div className="mobile-execution-pagination"><button className="button button--secondary" type="button" disabled={page === 0} onClick={() => updateQueuePage(Math.max(0, page - 1))}>{ui('Previous')}</button><span className="card__subtext">{ui('Showing {from}-{to} of {total}').replace('{from}', String(showingFrom)).replace('{to}', String(showingTo)).replace('{total}', String(total))}</span><button className="button button--secondary" type="button" disabled={!pagination.has_more} onClick={() => updateQueuePage(page + 1)}>{ui('Next')}</button></div> : null}
       </section>
     </div>
   );

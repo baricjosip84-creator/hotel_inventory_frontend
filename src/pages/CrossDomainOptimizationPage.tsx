@@ -791,6 +791,9 @@ function sourceOptionProjectedOutcome(item: SourceRecommendation): Record<string
   return {
     source_plan_type: item.plan_type,
     source_item_type: item.item_type,
+    source_optimization_plan_id: item.plan_id || null,
+    source_optimization_item_id: item.id || null,
+    source_par_level_id: item.plan_type === 'replenishment_optimization' ? (item.source_id || null) : null,
     source_status: item.status,
     source_score: Number.isFinite(Number(item.score)) ? Number(item.score) : null,
     source_score_note: 'Originating planning-module score; not normalized or ranked by Cross-Domain Optimization.',
@@ -818,7 +821,16 @@ function projectedSourcePlanType(projected: Record<string, unknown>): string {
 
 function projectedSourceWorkflowPath(projected: Record<string, unknown>): string | null {
   const planType = projectedSourcePlanType(projected);
-  if (planType === 'replenishment_optimization') return '/replenishment-planning';
+  if (planType === 'replenishment_optimization') {
+    const sourceParLevelId = String(projected.source_par_level_id || projected.source_id || '').trim();
+    const sourceOptimizationPlanId = String(projected.source_optimization_plan_id || '').trim();
+    const sourceOptimizationItemId = String(projected.source_optimization_item_id || '').trim();
+    if (!sourceParLevelId) return '/replenishment-planning';
+    const params = new URLSearchParams({ source_par_level_id: sourceParLevelId });
+    if (sourceOptimizationPlanId) params.set('source_optimization_plan_id', sourceOptimizationPlanId);
+    if (sourceOptimizationItemId) params.set('source_optimization_item_id', sourceOptimizationItemId);
+    return `/replenishment-planning?${params.toString()}`;
+  }
   if (['facility_balancing', 'bottleneck_detection', 'labor_forecast', 'sla_risk'].includes(planType)) return '/execution-tasks';
   return null;
 }
