@@ -89,7 +89,8 @@ for (const required of [
   "ui('Showing')",
   "ui('Older')",
   "ui('No feedback evidence has been recorded in this category yet.')",
-  "<th>{ui('Score / Error')}</th>",
+  '<th>{learningMetricLabel(mode, ui)}</th>',
+  'learningMetricValue(mode, score, locale)',
   'learningEvidenceDisplayLabel(mode, row, index, locale, ui)',
   'ui(formatLabel(row.outcome_status ?? row.calibration_status ?? row.effectiveness_status ?? row.result_status))',
   "formatLocalizedDateTime(String(row.observed_at), locale)"

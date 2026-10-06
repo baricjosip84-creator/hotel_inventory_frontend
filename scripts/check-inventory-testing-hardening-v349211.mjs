@@ -19,8 +19,9 @@ check(page.includes('const showTenantFeedbackTechnicalFields = false;'),
   'Tenant Learning Feedback technical-field gate is explicitly off');
 check(page.includes('const showTenantLearningFeedbackReadinessChecks = false;'),
   'Tenant Learning Feedback readiness gate is explicitly off');
-check(page.includes('showTenantLearningFeedbackReadinessChecks && canViewDiagnostics ? <OperationalWorkspaceTab'),
-  'Readiness Checks tab implementation is retained but hidden from the tenant page');
+check(page.includes('{showTenantLearningFeedbackReadinessChecks && canViewDiagnostics ? (\n        <OperationalWorkspaceTabs')
+  && page.includes("<OperationalWorkspaceTab active={view === 'readiness'}"),
+  'Readiness Checks tab implementation is retained while single-tab chrome stays hidden from the tenant page');
 check(page.includes('showTenantLearningFeedbackReadinessChecks && canViewDiagnostics ? (\n        <>'),
   'Readiness Checks content implementation is retained but hidden from the tenant page');
 

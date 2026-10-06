@@ -1837,6 +1837,55 @@ function learningActionRationale(action: { rationale?: string; rationale_key?: s
   return action.rationale_key ? ui(text) : text;
 }
 
+function learningBusinessPostureLabel(value: unknown, ui: LearningUi): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '—';
+  const labels: Record<string, string> = {
+    controlled_learning_observation_posture: 'Observation only',
+    learning_review_required: 'Review required',
+    learning_evidence_controlled: 'Evidence monitored',
+    no_learning_evidence_yet: 'No learning evidence yet',
+    learning_drift_pressure_high: 'High drift pressure',
+    learning_review_pressure_present: 'Review pressure present'
+  };
+  return labels[raw] ? ui(labels[raw]) : ui(formatLabel(raw));
+}
+
+function learningNextReviewFocusLabel(value: unknown, ui: LearningUi): string {
+  const raw = String(value ?? '').trim();
+  const labels: Record<string, string> = {
+    high_priority_learning_evidence: 'Review high-priority learning evidence',
+    medium_priority_learning_evidence: 'Review learning evidence requiring attention',
+    routine_learning_monitoring: 'No urgent follow-up; continue monitoring'
+  };
+  return labels[raw] ? ui(labels[raw]) : ui(formatLabel(raw || 'routine_learning_monitoring'));
+}
+
+function formatNormalizedLearningScore(value: unknown, locale: AppLocale): string {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '—';
+  return formatLocalizedNumber(numeric, locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatLearningPercentage(value: unknown, locale: AppLocale): string {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '—';
+  return `${formatLocalizedNumber(numeric, locale, { maximumFractionDigits: 2 })}%`;
+}
+
+function learningMetricLabel(mode: FeedbackMode, ui: LearningUi): string {
+  if (mode === 'forecast-accuracy') return ui('Forecast error (%)');
+  if (mode === 'policy-effectiveness') return ui('Effectiveness score (-1 to 1)');
+  if (mode === 'optimization-results') return ui('Value score (-1 to 1)');
+  return ui('Outcome score (-1 to 1)');
+}
+
+function learningMetricValue(mode: FeedbackMode, value: unknown, locale: AppLocale): string {
+  if (value === undefined || value === null || value === '') return '—';
+  if (mode === 'forecast-accuracy') return formatLearningPercentage(value, locale);
+  return formatNormalizedLearningScore(value, locale);
+}
+
 
 function learningOwnedSystemText(value: unknown, fallback: string, ui: LearningUi, locale: AppLocale): string {
   const raw = String(value ?? '').trim();
@@ -2174,7 +2223,7 @@ function FeedbackActionPlan({ plan, canCreateFollowUp, creatingFollowUp, onCreat
         <LocalizedLearningStatCard label="Actions" value={plan?.action_count ?? 0} iconPath="/action-center" tone="blue" />
         <LocalizedLearningStatCard label="High priority" value={plan?.high_priority_action_count ?? 0} iconPath="/alerts" tone="amber" />
         <LocalizedLearningStatCard label="Medium priority" value={plan?.medium_priority_action_count ?? 0} iconPath="/workflow-composer" tone="violet" />
-        <LocalizedLearningStatCard label="Next review focus" value={plan?.next_review_focus || 'routine_learning_monitoring'} iconPath="/decision-learning-feedback" tone="green" />
+        <LocalizedLearningStatCard label="Next review focus" value={learningNextReviewFocusLabel(plan?.next_review_focus, ui)} iconPath="/decision-learning-feedback" tone="green" />
       </div>
       {!actions.length ? (
         <p className="card__subtext">{ui('No recommended learning actions available yet.')}</p>
@@ -2185,7 +2234,7 @@ function FeedbackActionPlan({ plan, canCreateFollowUp, creatingFollowUp, onCreat
               <tr>
                 <th>{ui('Action')}</th>
                 <th>{ui('Priority')}</th>
-                <th>{ui('Evidence')}</th>
+                <th>{ui('Evidence requiring this action')}</th>
                 <th>{ui('Owner')}</th>
                 <th>{ui('Mode')}</th>
                 <th>{ui('Rationale')}</th>
@@ -2217,6 +2266,9 @@ function FeedbackActionPlan({ plan, canCreateFollowUp, creatingFollowUp, onCreat
 function LearningImpactAssessment({ assessment }: { assessment: ContinuousLearningSummary['learning_impact_assessment'] }) {
   const { locale, ui } = useAppTranslation();
   const domains = assessment?.domain_impact_summary || [];
+  const totalEvidenceCount = Number(assessment?.total_evidence_count ?? 0);
+  const learningSignalValue = totalEvidenceCount > 0 ? formatLearningPercentage(assessment?.learning_signal_score, locale) : '—';
+  const driftPressureValue = totalEvidenceCount > 0 ? formatLearningPercentage(assessment?.drift_pressure_score, locale) : '—';
 
   return (
     <section className={'card learning-feedback-section learning-feedback-impact'}>
@@ -2229,17 +2281,19 @@ function LearningImpactAssessment({ assessment }: { assessment: ContinuousLearni
         </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <LocalizedLearningStatCard label="Impact posture" value={assessment?.impact_posture || 'no_learning_evidence_yet'} iconPath="/decision-learning-feedback" tone="blue" />
-        <LocalizedLearningStatCard label="Learning signal" value={assessment?.learning_signal_score ?? 100} iconPath="/insights" tone="green" />
-        <LocalizedLearningStatCard label="Drift pressure" value={assessment?.drift_pressure_score ?? 0} iconPath="/alerts" tone="amber" />
-        <LocalizedLearningStatCard label="Total evidence" value={assessment?.total_evidence_count ?? 0} iconPath="/audit" tone="violet" />
+        <LocalizedLearningStatCard label="Impact posture" value={learningBusinessPostureLabel(assessment?.impact_posture || 'no_learning_evidence_yet', ui)} iconPath="/decision-learning-feedback" tone="blue" />
+        <LocalizedLearningStatCard label="Learning signal" value={learningSignalValue} iconPath="/insights" tone="green" />
+        <LocalizedLearningStatCard label="Drift pressure" value={driftPressureValue} iconPath="/alerts" tone="amber" />
+        <LocalizedLearningStatCard label="Total evidence" value={totalEvidenceCount} iconPath="/audit" tone="violet" />
         <LocalizedLearningStatCard label="Open review" value={assessment?.open_review_evidence_count ?? 0} iconPath="/intelligence-review" tone="slate" />
       </div>
+      {totalEvidenceCount === 0 ? <p className="card__subtext">{ui('No learning signal yet — record evidence first.')}</p> : null}
+      {totalEvidenceCount === 1 ? <p className="card__subtext">{ui('Preliminary signal — based on one evidence record.')}</p> : null}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
-        <LocalizedLearningStatCard label="Avg outcome score" value={assessment?.average_outcome_score ?? '—'} />
-        <LocalizedLearningStatCard label="Avg forecast error" value={assessment?.average_forecast_percentage_error ?? '—'} />
-        <LocalizedLearningStatCard label="Avg policy score" value={assessment?.average_policy_effectiveness_score ?? '—'} />
-        <LocalizedLearningStatCard label="Avg optimization value" value={assessment?.average_optimization_value_score ?? '—'} />
+        <LocalizedLearningStatCard label="Avg outcome score (-1 to 1)" value={formatNormalizedLearningScore(assessment?.average_outcome_score, locale)} />
+        <LocalizedLearningStatCard label="Avg forecast error (%)" value={assessment?.average_forecast_percentage_error === null || assessment?.average_forecast_percentage_error === undefined ? '—' : formatLearningPercentage(assessment.average_forecast_percentage_error, locale)} />
+        <LocalizedLearningStatCard label="Avg policy score (-1 to 1)" value={formatNormalizedLearningScore(assessment?.average_policy_effectiveness_score, locale)} />
+        <LocalizedLearningStatCard label="Avg optimization value (-1 to 1)" value={formatNormalizedLearningScore(assessment?.average_optimization_value_score, locale)} />
       </div>
       {domains.length > 0 ? (
         <div style={{ overflowX: 'auto' }}>
@@ -5032,8 +5086,10 @@ function EvidenceDetailCard({ detail, canCreateFollowUp, canViewDiagnostics, cre
   const status = detail.outcome_status ?? detail.calibration_status ?? detail.effectiveness_status ?? detail.result_status;
   const expected = detail.expected_result ?? detail.predicted_value ?? detail.baseline_reference ?? detail.expected_tradeoff;
   const observed = detail.observed_result ?? detail.observed_value ?? detail.measured_result ?? detail.observed_tradeoff;
-  const metric = detail.outcome_score ?? detail.percentage_error ?? detail.effectiveness_score ?? detail.realized_value_score;
   const detailMode = feedbackModeFromEvidenceType(detail.evidence_type);
+  const metric = detailMode === 'forecast-accuracy'
+    ? detail.percentage_error
+    : detail.outcome_score ?? detail.effectiveness_score ?? detail.realized_value_score;
   const sourceDisplayLabel = learningEvidenceDisplayLabel(detailMode, detail, null, locale, ui);
   return (
     <section className="card learning-feedback-section learning-feedback-detail">
@@ -5046,7 +5102,7 @@ function EvidenceDetailCard({ detail, canCreateFollowUp, canViewDiagnostics, cre
         <div><strong>{ui('Evidence type')}</strong><div>{ui(formatLabel(detail.evidence_type))}</div></div>
         <div><strong>{ui('Status')}</strong><div>{ui(formatLabel(status))}</div></div>
         <div><strong>{ui('Observed')}</strong><div>{observedAt}</div></div>
-        <div><strong>{ui('Score / Error')}</strong><div>{typeof metric === 'number' ? formatLocalizedNumber(metric, locale, { maximumFractionDigits: 4 }) : valueText(metric)}</div></div>
+        <div><strong>{learningMetricLabel(detailMode, ui)}</strong><div>{learningMetricValue(detailMode, metric, locale)}</div></div>
         <div><strong>{ui('Created by')}</strong><div>{valueText(detail.created_by_user_name)}</div></div>
         <div><strong>{ui('Last recorded by')}</strong><div>{valueText(detail.recorded_by_user_name)}</div></div>
         <div><strong>{ui('Independent review')}</strong><div>{ui(formatLabel(detail.learning_feedback_review_status || 'unreviewed'))}</div></div>
@@ -5125,16 +5181,18 @@ function EvidenceTable({
         <>
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
-              <thead><tr><th>{ui('Record')}</th><th>{ui('Area')}</th><th>{ui('Status')}</th><th>{ui('Score / Error')}</th><th>{ui('Observed')}</th><th>{ui('Review')}</th><th>{ui('Action')}</th></tr></thead>
+              <thead><tr><th>{ui('Record')}</th><th>{ui('Area')}</th><th>{ui('Status')}</th><th>{learningMetricLabel(mode, ui)}</th><th>{ui('Observed')}</th><th>{ui('Review')}</th><th>{ui('Action')}</th></tr></thead>
               <tbody>{rows.map((row, index) => {
                 const businessKey = row.outcome_key ?? row.accuracy_key ?? row.effectiveness_key ?? row.result_key;
-                const score = row.outcome_score ?? row.absolute_error ?? row.effectiveness_score ?? row.realized_value_score;
+                const score = mode === 'forecast-accuracy'
+                  ? row.percentage_error
+                  : row.outcome_score ?? row.effectiveness_score ?? row.realized_value_score;
                 return (
                   <tr key={String(row.id ?? businessKey ?? index)}>
                     <td>{learningEvidenceDisplayLabel(mode, row, index, locale, ui)}</td>
                     <td>{learningDomainLabel(row.learning_domain ?? row.forecast_domain ?? row.policy_domain ?? row.result_domain, ui)}</td>
                     <td>{ui(formatLabel(row.outcome_status ?? row.calibration_status ?? row.effectiveness_status ?? row.result_status))}</td>
-                    <td>{typeof score === 'number' ? formatLocalizedNumber(score, locale, { maximumFractionDigits: 4 }) : formatLabel(score)}</td>
+                    <td>{learningMetricValue(mode, score, locale)}</td>
                     <td>{row.observed_at ? formatLocalizedDateTime(String(row.observed_at), locale) : '—'}</td>
                     <td>{ui(formatLabel(row.learning_feedback_review_status || 'unreviewed'))}</td>
                     <td><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><button className="button button--secondary" type="button" onClick={() => onView(mode, row)}>{ui('View details')}</button>{canEdit ? <button className="button button--secondary" type="button" onClick={() => onEdit(mode, row)}>{ui('Edit')}</button> : null}</div></td>
@@ -5706,7 +5764,7 @@ export default function DecisionLearningFeedbackPage() {
         title={ui('Learning Feedback')}
         description={ui('Record what happened after you followed or checked a recommendation, forecast, policy, or optimization result.')}
         meta={undefined /* v3.49.55: repetitive technical hero pills intentionally hidden; safety/audit behavior remains enforced. */}
-        aside={<><OperationalWorkspaceStatus value={governance?.continuous_learning_posture ? ui(formatLabel(governance.continuous_learning_posture)) : summaryQuery.isLoading ? ui('Loading') : summaryQuery.isError ? ui('Unavailable') : ui('Unknown')} label={`${ui('continuous learning posture')} · ${ui('refreshed')} ${summaryQuery.dataUpdatedAt ? formatLocalizedDateTime(summaryQuery.dataUpdatedAt, locale) : ui('not refreshed yet')}`} /><button className="button button--secondary" type="button" onClick={refreshSummary} disabled={summaryQuery.isFetching}><TenantNavIcon path="/decision-learning-feedback" size={16} />{summaryQuery.isFetching ? ui('Refreshing…') : ui('Refresh summary')}</button></>}
+        aside={<><OperationalWorkspaceStatus value={governance?.continuous_learning_posture ? learningBusinessPostureLabel(governance.continuous_learning_posture, ui) : summaryQuery.isLoading ? ui('Loading') : summaryQuery.isError ? ui('Unavailable') : ui('Unknown')} label={`${ui('Learning status')} · ${ui('refreshed')} ${summaryQuery.dataUpdatedAt ? formatLocalizedDateTime(summaryQuery.dataUpdatedAt, locale) : ui('not refreshed yet')}`} /><button className="button button--secondary" type="button" onClick={refreshSummary} disabled={summaryQuery.isFetching}><TenantNavIcon path="/decision-learning-feedback" size={16} />{summaryQuery.isFetching ? ui('Refreshing…') : ui('Refresh summary')}</button></>}
       />
 
       {summaryQuery.isError ? (
@@ -5722,22 +5780,24 @@ export default function DecisionLearningFeedbackPage() {
       ) : null}
 
       <OperationalWorkspaceStats ariaLabel={ui('Learning feedback summary')}>
-        <LocalizedLearningStatCard label="Posture" value={governance?.continuous_learning_posture || (summaryQuery.isLoading ? 'loading' : summaryQuery.isError ? 'unavailable' : 'unknown')} iconPath="/decision-learning-feedback" tone="blue" />
+        <LocalizedLearningStatCard label="Learning status" value={governance?.continuous_learning_posture ? learningBusinessPostureLabel(governance.continuous_learning_posture, ui) : (summaryQuery.isLoading ? 'loading' : summaryQuery.isError ? 'unavailable' : 'unknown')} iconPath="/decision-learning-feedback" tone="blue" />
         <LocalizedLearningStatCard label="Outcomes" value={summaryQuery.isLoading ? "loading" : summaryQuery.isError ? "unavailable" : governance?.outcome_count ?? 0} iconPath="/intelligence-review" tone="green" />
         {canReadInsights ? <LocalizedLearningStatCard label="Forecast evidence" value={summaryQuery.isLoading ? "loading" : summaryQuery.isError ? "unavailable" : governance?.forecast_accuracy_count ?? 0} iconPath="/probabilistic-forecasting" tone="violet" /> : null}
         <LocalizedLearningStatCard label="Policy evidence" value={summaryQuery.isLoading ? "loading" : summaryQuery.isError ? "unavailable" : governance?.policy_effectiveness_count ?? 0} iconPath="/adaptive-policy-engine" tone="amber" />
         <LocalizedLearningStatCard label="Optimization evidence" value={summaryQuery.isLoading ? "loading" : summaryQuery.isError ? "unavailable" : governance?.optimization_result_count ?? 0} iconPath="/cross-domain-optimization" tone="slate" />
       </OperationalWorkspaceStats>
 
-      <OperationalWorkspaceTabs ariaLabel={ui('Learning Feedback view')}>
-        <OperationalWorkspaceTab
-          active={view === 'feedback'}
-          iconPath="/decision-learning-feedback"
-          label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>{ui('Feedback records')}{canGovern && Number(summaryQuery.data?.feedback_review_board?.review_item_count || 0) > 0 ? <SidebarAttentionTabDot label={ui('Attention required')} /> : null}</span>}
-          onClick={() => setView('feedback')}
-        />
-        {showTenantLearningFeedbackReadinessChecks && canViewDiagnostics ? <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label={ui('Readiness checks')} onClick={() => setView('readiness')} /> : null}
-      </OperationalWorkspaceTabs>
+      {showTenantLearningFeedbackReadinessChecks && canViewDiagnostics ? (
+        <OperationalWorkspaceTabs ariaLabel={ui('Learning Feedback view')}>
+          <OperationalWorkspaceTab
+            active={view === 'feedback'}
+            iconPath="/decision-learning-feedback"
+            label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>{ui('Feedback records')}{canGovern && Number(summaryQuery.data?.feedback_review_board?.review_item_count || 0) > 0 ? <SidebarAttentionTabDot label={ui('Attention required')} /> : null}</span>}
+            onClick={() => setView('feedback')}
+          />
+          <OperationalWorkspaceTab active={view === 'readiness'} iconPath="/reliability-command" label={ui('Readiness checks')} onClick={() => setView('readiness')} />
+        </OperationalWorkspaceTabs>
+      ) : null}
 
       {view === 'feedback' ? (canGovern ? (
       <section ref={feedbackFormRef} tabIndex={-1} style={{ scrollMarginTop: 16 }} className={'card learning-feedback-form-card'}>
