@@ -379,7 +379,8 @@
     "check:inventory-readiness-policy-clarity-surgical-fixes-v349256": "node scripts/check-readiness-policy-clarity-surgical-fixes-v349256.mjs",
     "check:inventory-probabilistic-forecast-clarity-surgical-fixes-v349257": "node scripts/check-probabilistic-forecast-clarity-surgical-fixes-v349257.mjs",
     "check:inventory-reports-surgical-fixes-v349258": "node scripts/check-reports-surgical-fixes-v349258.mjs",
-    "check:administration-audit-permissions-surgical-fixes-v349259": "node scripts/check-administration-audit-permissions-surgical-fixes-v349259.mjs"
+    "check:administration-audit-permissions-surgical-fixes-v349259": "node scripts/check-administration-audit-permissions-surgical-fixes-v349259.mjs",
+    "check:inventory-mobile-execution-ux-surgical-fixes-v349260": "node scripts/check-mobile-execution-ux-surgical-fixes-v349260.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

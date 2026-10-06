@@ -46,11 +46,11 @@ check('task resolving state is explicit', scanner.includes("ui('Verifying barcod
 check('mobile photo capture uses the device camera hint', page.includes('accept="image/*" capture="environment"'));
 check('mobile evidence upload targets the existing Execution Task attachment store', page.includes("entity_type: 'execution_task'") && page.includes('/enterprise-inventory/attachments/upload?'));
 check('evidence upload requires attachment write and task read permission', page.includes('TENANT_PERMISSIONS.ATTACHMENTS_WRITE') && page.includes('TENANT_PERMISSIONS.EXECUTION_TASKS_READ'));
-check('photo and general evidence controls are present', page.includes("ui('Take photo')") && page.includes("ui('Add evidence')"));
+check('photo and general evidence controls are present', page.includes("ui('Add photo')") && page.includes("ui('Upload evidence')"));
 
 for (const key of [
   'My tasks', 'Unassigned tasks', 'Team tasks', 'Take task', 'Assigned to', 'Deadline',
-  'Scan/verify task item', 'Take photo', 'Add evidence', 'Execution Task Scanner',
+  'Scan/verify task item', 'Add photo', 'Upload evidence', 'Open task details', 'No pending sync', 'Execution Task Scanner',
   'Scan a product, package, or inventory label to verify that it belongs to the selected execution task.',
   'Verified execution task', 'Task item verified. Complete the real source workflow before completing the execution task.'
 ]) {

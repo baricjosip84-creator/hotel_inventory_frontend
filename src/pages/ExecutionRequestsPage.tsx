@@ -356,7 +356,7 @@ export default function ExecutionRequestsPage() {
         setSecurityAudit(null);
         setExecutionReview(null);
         openedRequestedRequestIdRef.current = requestedRequestId;
-        window.requestAnimationFrame(() => registrySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => document.getElementById('execution-request-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' })));
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof ApiError ? err.message : ui('Failed to open the linked Execution Request'));

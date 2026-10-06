@@ -45,7 +45,7 @@ const dynamic = [
   'All urgency', 'Critical', 'High', 'Medium', 'Low',
   'All task sources', 'Execution requests', 'Manual', 'Reservation', 'Requisition', 'Purchase order', 'Shipment', 'Transfer', 'Cycle count', 'Replenishment',
   'My tasks', 'Unassigned tasks', 'Team tasks', 'Work assigned to you.', 'Work that still needs an owner.', 'Assigned work across the team. Other people’s tasks are read-only here.',
-  'Take task', 'Start', 'Complete', 'Block', 'Unblock',
+  'Take task', 'Start', 'Complete', 'Block', 'Unblock', 'Open task details', 'Open source workflow',
   'Unknown', 'Ready', 'Assigned', 'In progress', 'Blocked', 'Completed', 'Cancelled', 'Overdue', 'Due soon', 'Scheduled', 'No deadline', 'Execution request',
   'Mobile work queue'
 ];

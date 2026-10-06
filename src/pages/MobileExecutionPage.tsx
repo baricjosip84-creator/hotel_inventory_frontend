@@ -305,7 +305,8 @@ function taskSourceLink(task: MobileExecutionTask): string | null {
   const route = task.source_route || '/execution-tasks';
   const params = new URLSearchParams();
 
-  if (task.source_type === 'cycle_count') params.set('tab', 'cycle-counts');
+  if (task.source_type === 'manual') params.set('task_id', task.id);
+  else if (task.source_type === 'cycle_count') params.set('tab', 'cycle-counts');
   else if (task.source_type === 'replenishment') params.set('tab', 'par-levels');
 
   if (task.source_id) {
@@ -574,15 +575,20 @@ export default function MobileExecutionPage() {
       <section className="section mobile-execution-section">
         <div className="section__title mobile-execution-section-title"><span className="mobile-execution-section-icon"><TenantNavIcon path="/mobile-execution" size={16} /></span>{ui('Mobile execution controls')}</div>
         <div className="card mobile-execution-controls-shell">
-          <div className="mobile-execution-scope-tabs" role="group" aria-label={ui('Choose task ownership view')}>
-            {SCOPE_OPTIONS.map((option) => <button key={option.value} type="button" className={`button button--secondary mobile-execution-scope-button ${assignmentScope === option.value ? 'mobile-execution-scope-button--active' : ''}`} onClick={() => updateQueueContext('scope', option.value, 'mine')}>{ui(option.label)}</button>)}
+          <div className="mobile-execution-control-group">
+            <div className="mobile-execution-control-heading">{ui('Responsibility')}</div>
+            <div className="mobile-execution-scope-tabs" role="group" aria-label={ui('Choose task ownership view')}>
+              {SCOPE_OPTIONS.map((option) => <button key={option.value} type="button" className={`button button--secondary mobile-execution-scope-button ${assignmentScope === option.value ? 'mobile-execution-scope-button--active' : ''}`} onClick={() => updateQueueContext('scope', option.value, 'mine')}>{ui(option.label)}</button>)}
+            </div>
           </div>
-          <div className="mobile-execution-toolbar">
-            <select aria-label={ui('Filter mobile tasks by urgency')} className="mobile-execution-select" value={urgency} onChange={(event) => updateQueueContext('urgency', event.target.value, 'all')}>{URGENCY_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}</select>
-            <select aria-label={ui('Filter mobile tasks by source')} className="mobile-execution-select" value={sourceType} onChange={(event) => updateQueueContext('source', event.target.value, 'all')}>{SOURCE_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}</select>
+          <div className="mobile-execution-filter-grid">
+            <label className="mobile-execution-filter-field"><span>{ui('Urgency')}</span><select aria-label={ui('Filter mobile tasks by urgency')} className="mobile-execution-select" value={urgency} onChange={(event) => updateQueueContext('urgency', event.target.value, 'all')}>{URGENCY_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}</select></label>
+            <label className="mobile-execution-filter-field"><span>{ui('Source')}</span><select aria-label={ui('Filter mobile tasks by source')} className="mobile-execution-select" value={sourceType} onChange={(event) => updateQueueContext('source', event.target.value, 'all')}>{SOURCE_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}</select></label>
+          </div>
+          <div className="mobile-execution-toolbar mobile-execution-toolbar--actions">
             <button className="button button--secondary mobile-execution-control-button" type="button" onClick={() => mobileExecutionQuery.refetch()} disabled={mobileExecutionQuery.isFetching || !online}>{mobileExecutionQuery.isFetching ? ui('Refreshing…') : ui('Refresh mobile queue')}</button>
-            <button className="button button--secondary mobile-execution-control-button" type="button" onClick={() => void replayPending()} disabled={!online || syncing || pending.length === 0 || !canRunAnyMobileAction}>{syncing ? ui('Synchronizing…') : `${ui('Sync pending')} (${formatLocalizedNumber(pending.length, locale)})`}</button>
-            <Link className="button button--secondary mobile-execution-control-button" to="/execution-tasks">{ui('Open execution tasks')}</Link>
+            {pending.length > 0 ? <button className="button button--secondary mobile-execution-control-button" type="button" onClick={() => void replayPending()} disabled={!online || syncing || !canRunAnyMobileAction}>{syncing ? ui('Synchronizing…') : `${ui('Sync pending')} (${formatLocalizedNumber(pending.length, locale)})`}</button> : <span className="mobile-execution-sync-state">{ui('No pending sync')}</span>}
+            <Link className="button mobile-execution-control-button mobile-execution-control-button--open" to="/execution-tasks">{ui('Open execution tasks')}</Link>
           </div>
           {!storageAvailable ? <p className="form-error">{ui('Offline storage is unavailable. Mobile Execution will continue, but cached queue pages and queued actions are kept only while this page remains open.')}</p> : null}
           {usingOfflineSnapshot ? <p className="card__subtext"><strong>{ui('Offline snapshot:')}</strong> {ui('showing the last successfully downloaded queue page.')}</p> : null}
@@ -630,10 +636,11 @@ export default function MobileExecutionPage() {
               <div className="mobile-execution-task-actions">
                 {actions.map((action) => <button key={action} className={actionButtonClass(action)} type="button" disabled={busyTaskId === task.id} onClick={() => { if (action === 'block') { setBlockReasonTaskId(task.id); setBlockReason(''); setActionError(null); return; } void runAction(task, action); }}>{ui(ACTION_LABELS[action])}</button>)}
                 {task.scan_supported && canUseScanner ? <Link className="button button--secondary mobile-execution-source-button" to={`/scanner?mode=task&executionTaskId=${encodeURIComponent(task.id)}`}><TenantNavIcon path="/scanner" size={14} />{ui('Scan/verify task item')}</Link> : null}
-                {sourceLink ? <Link className="button button--secondary mobile-execution-source-button" to={sourceLink}><TenantNavIcon path={task.source_route || '/execution-tasks'} size={14} />{ui('Open source workflow')}</Link> : null}
-                {canUploadEvidence ? <button className="button button--secondary mobile-execution-source-button" type="button" disabled={evidenceUploading} onClick={() => beginEvidence(task, 'photo')}><TenantNavIcon path="/mobile-execution" size={14} />{ui('Take photo')}</button> : null}
-                {canUploadEvidence ? <button className="button button--secondary mobile-execution-source-button" type="button" disabled={evidenceUploading} onClick={() => beginEvidence(task, 'file')}>{ui('Add evidence')}</button> : null}
+                {sourceLink ? <Link className="button button--secondary mobile-execution-source-button" to={sourceLink}><TenantNavIcon path={task.source_type === 'manual' ? '/execution-tasks' : task.source_route || '/execution-tasks'} size={14} />{ui(task.source_type === 'manual' ? 'Open task details' : 'Open source workflow')}</Link> : null}
+                {canUploadEvidence ? <button className="button button--secondary mobile-execution-source-button" type="button" disabled={evidenceUploading} onClick={() => beginEvidence(task, 'photo')}><TenantNavIcon path="/mobile-execution" size={14} />{ui('Add photo')}</button> : null}
+                {canUploadEvidence ? <button className="button button--secondary mobile-execution-source-button" type="button" disabled={evidenceUploading} onClick={() => beginEvidence(task, 'file')}><TenantNavIcon path="/audit" size={14} />{ui('Upload evidence')}</button> : null}
               </div>
+              {canUploadEvidence ? <p className="card__subtext mobile-execution-evidence-help">{ui('Evidence can be an image, PDF, text, CSV, Word, or Excel file.')}</p> : null}
               {assignment === 'other' ? <p className="card__subtext mobile-execution-assignment-note">{ui('This task belongs to another team member. You can review it here, but Mobile Execution will not let you change its task state.')}</p> : null}
             </article>;
           })}
