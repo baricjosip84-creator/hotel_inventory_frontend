@@ -670,3 +670,59 @@
   outline: 2px solid currentColor;
   outline-offset: -2px;
 }
+
+/* Surgical fix 011: business-readable policy evidence and recommendation timeline clarity. */
+.adaptive-policy-page--refined .adaptive-policy-evidence-guide {
+  padding: 18px;
+  border-top: 3px solid #dbeafe;
+}
+
+.adaptive-policy-page--refined .adaptive-policy-evidence-guide__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin-top: 14px;
+}
+
+.adaptive-policy-page--refined .adaptive-policy-evidence-guide__grid > div {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.adaptive-policy-page--refined .adaptive-policy-evidence-guide__grid span {
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.adaptive-policy-page--refined .adaptive-policy-table--recommendations {
+  min-width: 1020px;
+}
+
+.adaptive-policy-page--refined .adaptive-policy-table--recommendations th:nth-child(5),
+.adaptive-policy-page--refined .adaptive-policy-table--recommendations td:nth-child(5),
+.adaptive-policy-page--refined .adaptive-policy-table--recommendations th:nth-child(6),
+.adaptive-policy-page--refined .adaptive-policy-table--recommendations td:nth-child(6) {
+  min-width: 108px;
+  white-space: nowrap;
+}
+
+.adaptive-policy-page--refined .adaptive-policy-table--recommendations .adaptive-policy-badge {
+  white-space: nowrap;
+}
+
+.adaptive-policy-page--refined .adaptive-policy-table__subtext--timeline {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px dashed #dbe5f1;
+}
+
+@media (max-width: 820px) {
+  .adaptive-policy-page--refined .adaptive-policy-evidence-guide__grid {
+    grid-template-columns: 1fr;
+  }
+}

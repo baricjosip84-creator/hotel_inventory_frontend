@@ -5738,6 +5738,22 @@ export default function HumanInLoopAIReviewPage() {
       || numberValue(a.readiness_score) - numberValue(b.readiness_score)
       || a.label.localeCompare(b.label);
   });
+  const enablementClassifiedFeatureKeys = new Set(
+    [...enablementBlockedFeatures, ...enablementEligibleFeatures]
+      .map((feature) => feature.feature_key)
+      .filter((featureKey): featureKey is string => Boolean(featureKey))
+  );
+  const enablementPendingCount = numberValue(enablementManifest?.totals?.not_enabled_pending_hardening);
+  const enablementFeatureCount = numberValue(enablementManifest?.totals?.feature_count);
+  const enablementPendingCandidates = allReadinessFeatures
+    .filter((feature) => feature.key && !enablementClassifiedFeatureKeys.has(feature.key));
+  const enablementPendingFeatures = enablementFeatureCount === allReadinessFeatures.length
+    && enablementPendingCandidates.length === enablementPendingCount
+    ? enablementPendingCandidates
+    : [];
+  const enablementClassifiedCount = numberValue(enablementManifest?.totals?.eligible_for_controlled_enablement)
+    + numberValue(enablementManifest?.totals?.blocked_or_requires_governance_waiver)
+    + enablementPendingCount;
 
   const readinessCandidateCount = numberValue(readinessSummary.production_candidates);
   const readinessNotReadyCount = numberValue(readinessSummary.not_production_ready);
@@ -5860,7 +5876,7 @@ export default function HumanInLoopAIReviewPage() {
       </div>
 
 
-      {activeView === 'readiness' && !canViewDiagnostics ? (
+      {activeView === 'readiness' ? (
         <section className="section ai-review-page__business-readiness">
           <div className="section__title">{ui('Business readiness')}</div>
           <div className="card ai-review-page__readiness-note" style={{ marginBottom: 12 }}>
@@ -5906,7 +5922,9 @@ export default function HumanInLoopAIReviewPage() {
               </div>
               <div className="card" style={{ marginTop: 16 }}>
                 <div className="card__label">{ui('Technical diagnostics')}</div>
-                <p className="card__subtext">{ui('Response contracts, DOM anchors, schema/table checks, and other engineering diagnostics require Tenant Diagnostics access and are not shown in the normal business view.')}</p>
+                <p className="card__subtext">{canViewDiagnostics
+                  ? ui('Detailed production, evidence, monitoring, rollback, release, and governance diagnostics are available below. These are supporting dimensions and can overlap; they are not additional feature-level readiness states.')
+                  : ui('Response contracts, DOM anchors, schema/table checks, and other engineering diagnostics require Tenant Diagnostics access and are not shown in the normal business view.')}</p>
               </div>
             </>
           )}
@@ -5916,6 +5934,21 @@ export default function HumanInLoopAIReviewPage() {
       {activeView === 'readiness' && canViewDiagnostics ? (
       <section className="section">
         <div className="section__title">{ui("Intelligence feature readiness")}</div>
+        <div className="card ai-review-page__readiness-note" style={{ marginBottom: 12 }}>
+          <div className="card__label">{ui("Technical governance diagnostics")}</div>
+          <strong>{ui("How these statuses relate:")}</strong>
+          <ul style={{ marginBottom: 0 }}>
+            <li>{ui('Business readiness is the canonical feature-level view: each visible intelligence feature has one business readiness status, owner area, and next action.')}</li>
+            <li>{ui('The production enablement manifest is a separate deployment gate. Eligible, blocked/waiver, and pending are mutually exclusive manifest outcomes and should reconcile to the manifest feature count.')}</li>
+            <li>{ui('Monitoring, signoff, evidence, rollback, maturity, risk, and governance counts are supporting diagnostics. They may overlap and are not expected to add up to the visible feature count.')}</li>
+            <li>{ui('Tracked capabilities are lower-level controls grouped under the visible intelligence features; capability totals are not feature totals.')}</li>
+          </ul>
+          {enablementFeatureCount > 0 ? (
+            <p className="card__subtext" style={{ marginBottom: 0, marginTop: 10 }}>
+              {ui('Manifest accounting:')} {formatLocalizedNumber(enablementClassifiedCount, locale)} / {formatLocalizedNumber(enablementFeatureCount, locale)} {ui('features classified as eligible, blocked/waiver, or pending.')}
+            </p>
+          ) : null}
+        </div>
         <div className="card ai-review-page__readiness-note" style={{ marginBottom: 12 }}>
           <strong>{ui("What this means:")}</strong> {ui("These checks govern rule-based intelligence and optional AI-assisted capabilities. They measure evidence and operational safety, not whether every feature uses a machine-learning model.")}
         </div>
@@ -9906,6 +9939,23 @@ export default function HumanInLoopAIReviewPage() {
                       <li key={feature.feature_key}>{feature.feature_label ? localizedReadinessSystemText(feature.feature_label, ui) : formatLabel(feature.feature_key)}</li>
                     ))}
                   </ul>
+                </div>
+              ) : null}
+              {enablementPendingCount > 0 ? (
+                <div style={{ marginTop: 14 }}>
+                  <div className="card__label">{ui("Pending hardening features")}</div>
+                  {enablementPendingFeatures.length ? (
+                    <ul style={{ marginBottom: 0 }}>
+                      {enablementPendingFeatures.map((feature) => (
+                        <li key={feature.key}>
+                          <strong>{localizedReadinessSystemText(feature.label, ui)}</strong>
+                          {feature.completion_gaps?.length ? <span className="card__subtext"> — {localizedReadinessSystemText(feature.completion_gaps[0], ui)}</span> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="card__subtext">{ui('The manifest reports pending features, but their names are not present in the current readiness response. No feature name is inferred.')}</p>
+                  )}
                 </div>
               ) : null}
             </>

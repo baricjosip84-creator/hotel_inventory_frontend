@@ -684,7 +684,8 @@ function EvidenceSection({
   iconPath,
   rows,
   headers,
-  renderRow
+  renderRow,
+  tableClassName
 }: {
   title: string;
   description: string;
@@ -692,6 +693,7 @@ function EvidenceSection({
   rows: Array<Record<string, unknown>>;
   headers: string[];
   renderRow: (row: Record<string, unknown>, index: number) => ReactNode;
+  tableClassName?: string;
 }) {
   const { locale, ui } = useAppTranslation();
   return (
@@ -710,7 +712,7 @@ function EvidenceSection({
         <p className="adaptive-policy-muted">{ui('No matching records were returned.')}</p>
       ) : (
         <div className="table-wrap">
-          <table className="data-table adaptive-policy-table">
+          <table className={`data-table adaptive-policy-table${tableClassName ? ` ${tableClassName}` : ''}`}>
             <thead>
               <tr>{headers.map((header) => <th key={header}>{ui(header)}</th>)}</tr>
             </thead>
@@ -817,6 +819,26 @@ export default function AdaptivePolicyEnginePage() {
   const applicationCount = data?.governance?.application_count ?? data?.applications?.length ?? 0;
   const evidenceCount = policyCount + signalCount + recommendationCount + measurementCount + applicationCount;
   const hasEvidence = evidenceCount > 0;
+  const policySignalsByKey = useMemo(() => {
+    const grouped = new Map<string, PolicySignalRecord[]>();
+    for (const signal of data?.signals || []) {
+      if (!signal.policy_key) continue;
+      const bucket = grouped.get(signal.policy_key) || [];
+      bucket.push(signal);
+      grouped.set(signal.policy_key, bucket);
+    }
+    for (const bucket of grouped.values()) {
+      bucket.sort((a, b) => String(b.observed_at || '').localeCompare(String(a.observed_at || '')));
+    }
+    return grouped;
+  }, [data?.signals]);
+  const hasMeasuredEffectiveness = useMemo(
+    () => (data?.effectiveness || []).some((measurement) => measurement.baseline_score !== null
+      && measurement.baseline_score !== undefined
+      && measurement.delta_score !== null
+      && measurement.delta_score !== undefined),
+    [data?.effectiveness]
+  );
   const pageUpdated = dataUpdatedAt ? formatLocalizedDateTime(dataUpdatedAt, locale) : ui('Not refreshed yet');
   const analysisGenerated = data?.analysis?.analysis_generated_at
     ? formatLocalizedDateTime(data.analysis.analysis_generated_at, locale)
@@ -970,6 +992,21 @@ export default function AdaptivePolicyEnginePage() {
 
       {view === 'evidence' ? (
         <>
+          <section className="card adaptive-policy-readiness-note adaptive-policy-evidence-guide">
+            <div className="adaptive-policy-section-heading">
+              <span className="adaptive-policy-heading-icon"><TenantNavIcon path="/adaptive-policy-engine" size={17} /></span>
+              <div>
+                <h2>{ui('How to read this evidence')}</h2>
+                <p className="card__subtext">{ui('Policies are business rules under observation. Signals are measured changes that may justify review. Recommendations are advisory and still require a person to decide and apply any real change.')}</p>
+              </div>
+            </div>
+            <div className="adaptive-policy-evidence-guide__grid">
+              <div><strong>{ui('Variance')}</strong><span>{ui('How far the observed signal moved from its reference point; positive and negative values show direction.')}</span></div>
+              <div><strong>{ui('Weight')}</strong><span>{ui('How much this signal contributes to the policy analysis relative to other signals.')}</span></div>
+              <div><strong>{ui('Evidence confidence')}</strong><span>{ui('How strong the stored evidence is for this signal or recommendation; it is not automatic approval.')}</span></div>
+              <div><strong>{ui('Effectiveness')}</strong><span>{ui('Only determined when both a baseline and a later measured result exist. Without both, the page shows a current observation instead of claiming an effect.')}</span></div>
+            </div>
+          </section>
           <p className="adaptive-policy-limit-note"><TenantNavIcon path="/system-context" size={14} />
             {ui('Lists show up to {limit} matching records in each evidence category. Totals use all matching evidence, not only the rows shown here.').replace('{limit}', formatLocalizedNumber(Number(filters.limit), locale))}
           </p>
@@ -1021,15 +1058,27 @@ export default function AdaptivePolicyEnginePage() {
             description="Advisory policy changes that still require human review and manual application."
             rows={(data?.recommendations || []) as Array<Record<string, unknown>>}
             headers={['Policy', 'Recommendation', 'Type', 'Status', 'Risk', 'Confidence', 'Created', 'Review / action']}
+            tableClassName="adaptive-policy-table--recommendations"
             renderRow={(row, index) => {
               const recommendation = row as PolicyRecommendationRecord;
               const recommendationSummary = recommendationDisplaySummary(recommendation, ui);
               const adjustmentSummary = recommendedAdjustmentSummary(recommendation, ui);
+              const policySignalHistory = recommendation.policy_key ? (policySignalsByKey.get(recommendation.policy_key) || []) : [];
+              const latestPolicySignal = policySignalHistory[0];
               const hasActiveApplication = (data?.applications || []).some((application) => application.policy_id === recommendation.policy_id && ['applied_monitoring', 'recalibration_review', 'rollback_review'].includes(String(application.application_status)));
               return (
                 <tr id={recommendation.id ? `adaptive-policy-recommendation-${recommendation.id}` : undefined} className={requestedRecommendationId && recommendation.id === requestedRecommendationId ? 'adaptive-policy-table-row--focused' : undefined} key={`${recommendation.recommendation_key || 'recommendation'}-${index}`}>
                   <td>{policyTitleFromKey(recommendation.policy_key, data?.policies, ui)}</td>
-                  <td><strong>{recommendationDisplayLabel(recommendation.recommendation_key, ui)}</strong>{recommendationSummary ? <span className="adaptive-policy-table__subtext">{recommendationSummary}</span> : null}{adjustmentSummary ? <span className="adaptive-policy-table__subtext adaptive-policy-table__subtext--proposal">{adjustmentSummary}</span> : null}</td>
+                  <td>
+                    <strong>{recommendationDisplayLabel(recommendation.recommendation_key, ui)}</strong>
+                    {recommendationSummary ? <span className="adaptive-policy-table__subtext">{recommendationSummary}</span> : null}
+                    {adjustmentSummary ? <span className="adaptive-policy-table__subtext adaptive-policy-table__subtext--proposal">{adjustmentSummary}</span> : null}
+                    {latestPolicySignal ? (
+                      <span className="adaptive-policy-table__subtext adaptive-policy-table__subtext--timeline">
+                        {ui('Policy signal history:')} {formatLocalizedNumber(policySignalHistory.length, locale)} · {ui('Latest observed signal:')} {formatKnownSystemLabel(latestPolicySignal.signal_type, SIGNAL_TYPE_LABELS, ui)} {formatDelta(latestPolicySignal.variance_score, locale)} · {formatLocalizedDateTime(latestPolicySignal.observed_at, locale)}. {ui('This is the latest policy evidence and may be newer than the recommendation itself.')}
+                      </span>
+                    ) : null}
+                  </td>
                   <td>{formatCanonicalLabel(recommendation.recommendation_type, ui)}</td>
                   <td><StatusBadge value={recommendation.recommendation_status} /></td>
                   <td><StatusBadge value={recommendation.risk_level} tone={['high', 'critical'].includes(String(recommendation.risk_level)) ? 'danger' : 'neutral'} /></td>
@@ -1072,9 +1121,11 @@ export default function AdaptivePolicyEnginePage() {
             }}
           />
           <EvidenceSection
-            title={ui('Effectiveness measurements')}
+            title={ui(hasMeasuredEffectiveness ? 'Effectiveness measurements' : 'Current policy observations')}
             iconPath="/reports"
-            description="Baseline and observed results used to understand whether a policy helped, harmed, or had no measured change."
+            description={hasMeasuredEffectiveness
+              ? ui('Baseline and observed results used to understand whether a policy helped, harmed, or had no measured change.')
+              : ui('No before-and-after baseline is available in the returned records, so effectiveness cannot be determined yet. These rows show current policy observations only.')}
             rows={(data?.effectiveness || []) as Array<Record<string, unknown>>}
             headers={['Policy', 'Measurement', 'Type', 'Baseline', 'Observed', 'Change', 'Confidence', 'Measured']}
             renderRow={(row, index) => {
