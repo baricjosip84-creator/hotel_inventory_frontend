@@ -554,6 +554,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
             <legend>{ui("API permissions")}</legend>
             <p className="card__subtext">{ui("Select only the API permissions this connection genuinely needs. You can grant only permissions available to your current role.")}</p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>{grantableApiScopes.map((scope) => <label key={scope.value} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={apiScopes.includes(scope.value)} onChange={(event) => setApiScopes((current) => event.target.checked ? Array.from(new Set([...current, scope.value])) : current.filter((value) => value !== scope.value))} />{ui(scope.label)}</label>)}</div>
+            {!editingApiClient && apiScopes.length === 0 ? <p className="card__subtext" style={{ marginTop: 10 }}>{ui("Select at least one API permission.")}</p> : null}
           </fieldset>
           <div style={{ alignSelf: 'end', display: 'flex', gap: 8 }}><button className="button" disabled={!canWrite || !name.trim() || apiScopes.length === 0 || createClient.isPending || updateClient.isPending}>{editingApiClient ? ui("Save changes") : ui("Create API key")}</button>{editingApiClient ? <button className="button button--secondary" type="button" onClick={clearApiClientForm} disabled={updateClient.isPending}>{ui("Cancel")}</button> : null}</div>
         </form>

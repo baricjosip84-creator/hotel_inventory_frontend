@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PropsWithChildren } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PLATFORM_MUTATION_FEEDBACK_EVENT, TENANT_MUTATION_FEEDBACK_EVENT } from '../lib/actionFeedback';
@@ -423,6 +423,7 @@ function translateTenantFeedbackMessage(ui: (englishText: string) => string, mes
 function ActionFeedbackToasts() {
   const { ui } = useAppTranslation();
   const [items, setItems] = useState<ActionFeedback[]>([]);
+  const recentFeedbackRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     const enqueue = (surface: 'tenant' | 'platform', event: Event) => {
@@ -430,6 +431,19 @@ function ActionFeedbackToasts() {
       // v3.49.221: generic/global informational narration is intentionally silent.
       // Real success and error feedback remains visible.
       if (feedbackEvent.detail.type === 'info') return;
+
+      // A single user action can occasionally surface the same mutation feedback
+      // through more than one listener/path. Collapse only near-simultaneous,
+      // byte-identical feedback so one operation produces one visible toast.
+      const now = Date.now();
+      const dedupeKey = [surface, feedbackEvent.detail.type, feedbackEvent.detail.message, feedbackEvent.detail.requestId || ''].join('|');
+      const previousAt = recentFeedbackRef.current.get(dedupeKey) || 0;
+      if (now - previousAt < 1200) return;
+      recentFeedbackRef.current.set(dedupeKey, now);
+      for (const [key, seenAt] of recentFeedbackRef.current.entries()) {
+        if (now - seenAt > 10000) recentFeedbackRef.current.delete(key);
+      }
+
       const nextItem: ActionFeedback = {
         id: Date.now() + Math.random(),
         type: feedbackEvent.detail.type,

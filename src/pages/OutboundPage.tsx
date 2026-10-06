@@ -756,7 +756,7 @@ export default function OutboundPage() {
   const previewOrderDocument = async (order: Order, type: 'order_confirmation' | 'pick_list' | 'packing_slip' | 'delivery_note') => {
     try {
       setError('');
-      const preview = await apiRequest<DocumentPreview>(`/outbound/orders/${order.id}/documents/preview`, { method: 'POST', body: JSON.stringify({ type }) });
+      const preview = await apiRequest<DocumentPreview>(`/outbound/orders/${order.id}/documents/preview`, { method: 'POST', body: JSON.stringify({ type }), skipMutationFeedback: true });
       setSelectedOrderId(order.id);
       setDocumentPreview(preview);
     } catch (previewError) {
@@ -779,7 +779,7 @@ export default function OutboundPage() {
   const sendStoredDocument = async (document: OutboundDocument) => {
     try {
       setError('');
-      const preview = await apiRequest<{ recipient_email: string; subject: string; message?: string; document: { document_type: string; title: string; document_number: string; filename: string } }>(`/outbound/documents/${document.id}/email-preview`, { method: 'POST', body: JSON.stringify({}) });
+      const preview = await apiRequest<{ recipient_email: string; subject: string; message?: string; document: { document_type: string; title: string; document_number: string; filename: string } }>(`/outbound/documents/${document.id}/email-preview`, { method: 'POST', body: JSON.stringify({}), skipMutationFeedback: true });
       setEmailCompose({ document_id: document.id, document_type: preview.document.document_type, document_title: preview.document.title, document_number: preview.document.document_number, filename: preview.document.filename, recipient_email: preview.recipient_email || '', subject: preview.subject || '', message: preview.message || '' });
     } catch (sendError) {
       setError(mutationErrorMessage(sendError, ui));
@@ -835,7 +835,7 @@ export default function OutboundPage() {
   const previewReturnReceipt = async (row: CustomerReturn) => {
     try {
       setError('');
-      const preview = await apiRequest<DocumentPreview>(`/outbound/returns/${row.id}/documents/preview`, { method: 'POST', body: JSON.stringify({}) });
+      const preview = await apiRequest<DocumentPreview>(`/outbound/returns/${row.id}/documents/preview`, { method: 'POST', body: JSON.stringify({}), skipMutationFeedback: true });
       setSelectedReturnId(row.id);
       setReturnDocumentPreview(preview);
     } catch (documentError) {

@@ -148,14 +148,79 @@ function tenantMutationActionLabel(path: string, method: string): string {
 
 function tenantMutationSuccessMessage(path: string, method: string, body?: BodyInit | null): string {
   const normalizedPath = path.toLowerCase();
+  const normalizedPathOnly = normalizedPath.split('?')[0];
   const normalizedMethod = method.toUpperCase();
 
-  if (normalizedMethod === 'POST' && normalizedPath === '/system-context/snapshots/capture') {
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/system-context/snapshots/capture') {
     return 'System Context snapshot captured successfully.';
   }
 
-  if (normalizedMethod === 'POST' && normalizedPath === '/system-context/snapshots/forecast-scenarios/capture') {
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/system-context/snapshots/forecast-scenarios/capture') {
     return 'Forecast scenario set captured successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/stock/adjust') {
+    return 'Stock adjustment applied successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/stock/count') {
+    return 'Stock count applied successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/decision-intelligence/adaptive-policy-engine-refresh') {
+    return 'Policy analysis refreshed successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/decision-intelligence/probabilistic-forecasting-refresh') {
+    return 'Forecast analysis refreshed successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && /^\/inventory-requisitions\/[^/]+\/fulfill$/.test(normalizedPathOnly)) {
+    return 'Requisition fulfilled successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/inventory-requisitions/bulk-fulfill') {
+    return 'Requisitions fulfilled successfully.';
+  }
+
+  const requisitionWorkflowMatch = normalizedMethod === 'POST'
+    ? normalizedPathOnly.match(/^\/inventory-requisitions\/[^/]+\/(submit|approve|reject|cancel|reopen)$/)
+    : null;
+  if (requisitionWorkflowMatch) {
+    const action = requisitionWorkflowMatch[1];
+    if (action === 'submit') return 'Requisition submitted successfully.';
+    if (action === 'approve') return 'Requisition approved successfully.';
+    if (action === 'reject') return 'Requisition rejected successfully.';
+    if (action === 'cancel') return 'Requisition cancelled successfully.';
+    return 'Requisition reopened successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && /^\/reorder-insights\/recommendations\/[^/]+\/decision$/.test(normalizedPathOnly)) {
+    const status = readMutationStringField(body, 'status')?.toLowerCase();
+    if (status === 'approved') return 'Recommendation approved successfully.';
+    if (status === 'rejected') return 'Recommendation rejected successfully.';
+    if (status === 'deferred') return 'Recommendation deferred successfully.';
+    return 'Recommendation decision saved successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/reorder-insights/recommendations/bulk-decision') {
+    const status = readMutationStringField(body, 'status')?.toLowerCase();
+    if (status === 'approved') return 'Recommendations approved successfully.';
+    if (status === 'rejected') return 'Recommendations rejected successfully.';
+    if (status === 'deferred') return 'Recommendations deferred successfully.';
+    return 'Recommendation decisions saved successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && /^\/inventory-capabilities\/api-clients\/[^/]+\/rotate$/.test(normalizedPathOnly)) {
+    return 'API key secret rotated successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && /^\/inventory-capabilities\/api-clients\/[^/]+\/revoke$/.test(normalizedPathOnly)) {
+    return 'API key revoked successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && /^\/inventory-capabilities\/webhooks\/[^/]+\/rotate-secret$/.test(normalizedPathOnly)) {
+    return 'Webhook signing secret rotated successfully.';
   }
 
   if (normalizedPath.endsWith('/enterprise-inventory/approvals/execute') && normalizedMethod === 'POST') {

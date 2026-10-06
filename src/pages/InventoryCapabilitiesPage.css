@@ -25,15 +25,15 @@
   position: sticky;
   top: 0;
   z-index: 4;
-  overflow-x: auto;
-  flex-wrap: nowrap !important;
+  overflow-x: visible;
+  flex-wrap: wrap !important;
   width: 100%;
-  scrollbar-width: thin;
 }
 
 .io-advanced-inventory-page .capability-tabs .button {
-  flex: 0 0 auto;
-  white-space: nowrap;
+  flex: 1 1 160px;
+  white-space: normal;
+  text-align: center;
 }
 
 .io-advanced-inventory-page .card {
@@ -197,6 +197,14 @@
   .io-advanced-inventory-page .capability-tabs {
     margin-left: 0;
     margin-right: 0;
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    scrollbar-width: thin;
+  }
+
+  .io-advanced-inventory-page .capability-tabs .button {
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
 }
 
