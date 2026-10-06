@@ -75,6 +75,23 @@ const REQUISITION_STATUS_OPTIONS = [
   ['cancelled', 'Cancelled']
 ] as const;
 
+
+const DEFAULT_INVENTORY_FILTERS = { category: '', location: '' };
+const DEFAULT_STOCK_FILTERS = { category: '', location: '' };
+const DEFAULT_MOVEMENT_FILTERS = { from: '', to: '', category: '', product: '', limit: 50 };
+const DEFAULT_LEDGER_FILTERS = { from: '', to: '', product: '', location: '', movement_type: '', limit: 100 };
+const DEFAULT_VARIANCE_FILTERS = { from: '', to: '', product: '', location: '', limit: 100 };
+const DEFAULT_TRANSFER_FILTERS = { from: '', to: '', location: '', status: 'all', limit: 100 };
+const DEFAULT_REQUISITION_FILTERS = { from: '', to: '', department: '', status: 'all', limit: 100 };
+const DEFAULT_PROCUREMENT_FILTERS = { from: '', to: '', supplier: '' };
+const DEFAULT_PO_COMMITMENT_FILTERS = { from: '', to: '', supplier: '', product: '', status: 'open', limit: 100 };
+const DEFAULT_SPEND_FILTERS = { from: '', to: '', supplier: '', category: '', product: '', limit: 100 };
+const DEFAULT_LOW_STOCK_FILTERS = { category: '', supplier: '', location: '', scope: 'both' as 'product' | 'par' | 'both' };
+const DEFAULT_SLOW_FILTERS = { days: 90, category: '', product: '', limit: 100 };
+const DEFAULT_USAGE_FILTERS = { days: 30, from: '', to: '', category: '', product: '', location: '' };
+const DEFAULT_SUPPLIER_FILTERS = { from: '', to: '', supplier: '', limit: 100 };
+const DEFAULT_EXPIRY_FILTERS = { days: 90, category: '', location: '' };
+
 const MOVEMENT_TYPE_OPTIONS = [
   ['', 'All movement types'],
   ['shipment_receive', 'Shipment receipt'],
@@ -832,21 +849,21 @@ function RiskBadge({ status }: { status: string }) {
 export default function ReportsPage() {
   const { locale, ui } = useAppTranslation();
   const [activeTab, setActiveTab] = useState<ReportTab>('inventory-valuation');
-  const [inventoryFilters, setInventoryFilters] = useState({ category: '', location: '' });
-  const [stockFilters, setStockFilters] = useState({ category: '', location: '' });
-  const [movementFilters, setMovementFilters] = useState({ from: '', to: '', category: '', product: '', limit: 50 });
-  const [ledgerFilters, setLedgerFilters] = useState({ from: '', to: '', product: '', location: '', movement_type: '', limit: 100 });
-  const [varianceFilters, setVarianceFilters] = useState({ from: '', to: '', product: '', location: '', limit: 100 });
-  const [transferFilters, setTransferFilters] = useState({ from: '', to: '', location: '', status: 'all', limit: 100 });
-  const [requisitionFilters, setRequisitionFilters] = useState({ from: '', to: '', department: '', status: 'all', limit: 100 });
-  const [procurementFilters, setProcurementFilters] = useState({ from: '', to: '', supplier: '' });
-  const [poCommitmentFilters, setPoCommitmentFilters] = useState({ from: '', to: '', supplier: '', product: '', status: 'open', limit: 100 });
-  const [spendFilters, setSpendFilters] = useState({ from: '', to: '', supplier: '', category: '', product: '', limit: 100 });
-  const [lowStockFilters, setLowStockFilters] = useState({ category: '', supplier: '', location: '', scope: 'both' as 'product' | 'par' | 'both' });
-  const [slowFilters, setSlowFilters] = useState({ days: 90, category: '', product: '', limit: 100 });
-  const [usageFilters, setUsageFilters] = useState({ days: 30, from: '', to: '', category: '', product: '', location: '' });
-  const [supplierFilters, setSupplierFilters] = useState({ from: '', to: '', supplier: '', limit: 100 });
-  const [expiryFilters, setExpiryFilters] = useState({ days: 90, category: '', location: '' });
+  const [inventoryFilters, setInventoryFilters] = useState({ ...DEFAULT_INVENTORY_FILTERS });
+  const [stockFilters, setStockFilters] = useState({ ...DEFAULT_STOCK_FILTERS });
+  const [movementFilters, setMovementFilters] = useState({ ...DEFAULT_MOVEMENT_FILTERS });
+  const [ledgerFilters, setLedgerFilters] = useState({ ...DEFAULT_LEDGER_FILTERS });
+  const [varianceFilters, setVarianceFilters] = useState({ ...DEFAULT_VARIANCE_FILTERS });
+  const [transferFilters, setTransferFilters] = useState({ ...DEFAULT_TRANSFER_FILTERS });
+  const [requisitionFilters, setRequisitionFilters] = useState({ ...DEFAULT_REQUISITION_FILTERS });
+  const [procurementFilters, setProcurementFilters] = useState({ ...DEFAULT_PROCUREMENT_FILTERS });
+  const [poCommitmentFilters, setPoCommitmentFilters] = useState({ ...DEFAULT_PO_COMMITMENT_FILTERS });
+  const [spendFilters, setSpendFilters] = useState({ ...DEFAULT_SPEND_FILTERS });
+  const [lowStockFilters, setLowStockFilters] = useState({ ...DEFAULT_LOW_STOCK_FILTERS });
+  const [slowFilters, setSlowFilters] = useState({ ...DEFAULT_SLOW_FILTERS });
+  const [usageFilters, setUsageFilters] = useState({ ...DEFAULT_USAGE_FILTERS });
+  const [supplierFilters, setSupplierFilters] = useState({ ...DEFAULT_SUPPLIER_FILTERS });
+  const [expiryFilters, setExpiryFilters] = useState({ ...DEFAULT_EXPIRY_FILTERS });
   const [downloadingReport, setDownloadingReport] = useState<ReportTab | null>(null);
   const [downloadFormat, setDownloadFormat] = useState<ExportFormat | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -1122,6 +1139,9 @@ export default function ReportsPage() {
       table{border-collapse:collapse;width:100%;font-size:11px} th,td{border:1px solid #dbe4ef;padding:7px;text-align:left;vertical-align:top}
       th{background:#f8fafc}.reports-refreshed{font-size:10px;color:#64748b;margin:8px 0 12px}
       .reports-summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.reports-summary-card{border:1px solid #dbe4ef;padding:12px}
+      .reports-summary-card>div,.reports-unit-block>div{display:grid;grid-template-columns:minmax(150px,1fr) auto;gap:18px;align-items:start;padding:7px 0;border-bottom:1px solid #edf2f7}
+      .reports-summary-card strong,.reports-unit-block strong{justify-self:end;text-align:right}.reports-unit-block{margin-top:10px;padding-top:8px;border-top:1px solid #dbe4ef}
+      .reports-subtext{display:block;margin-top:4px;color:#64748b;font-size:10px;line-height:1.35}.reports-table td{overflow-wrap:anywhere}.reports-table td+td{border-left:1px solid #eef2f7}
       .reports-risk{font-weight:700}.io-workspace-section-header__icon{display:none}@page{size:landscape;margin:12mm}
     `;
     printWindow.document.head.appendChild(style);
@@ -1153,8 +1173,55 @@ export default function ReportsPage() {
     }
   };
 
+  const hasActiveReportFilters = (report: ReportTab): boolean => {
+    const changed = <T extends object>(current: T, defaults: T) => Object.keys(defaults).some((key) => current[key as keyof T] !== defaults[key as keyof T]);
+    switch (report) {
+      case 'inventory-valuation': return changed(inventoryFilters, DEFAULT_INVENTORY_FILTERS);
+      case 'stock-by-location': return changed(stockFilters, DEFAULT_STOCK_FILTERS);
+      case 'product-movements': return changed(movementFilters, DEFAULT_MOVEMENT_FILTERS);
+      case 'movement-ledger': return changed(ledgerFilters, DEFAULT_LEDGER_FILTERS);
+      case 'inventory-variance': return changed(varianceFilters, DEFAULT_VARIANCE_FILTERS);
+      case 'stock-transfer-activity': return changed(transferFilters, DEFAULT_TRANSFER_FILTERS);
+      case 'requisition-activity': return changed(requisitionFilters, DEFAULT_REQUISITION_FILTERS);
+      case 'procurement-summary': return changed(procurementFilters, DEFAULT_PROCUREMENT_FILTERS);
+      case 'purchase-order-commitments': return changed(poCommitmentFilters, DEFAULT_PO_COMMITMENT_FILTERS);
+      case 'purchasing-spend': return changed(spendFilters, DEFAULT_SPEND_FILTERS);
+      case 'low-stock': return changed(lowStockFilters, DEFAULT_LOW_STOCK_FILTERS);
+      case 'slow-moving': return changed(slowFilters, DEFAULT_SLOW_FILTERS);
+      case 'usage-summary': return changed(usageFilters, DEFAULT_USAGE_FILTERS);
+      case 'supplier-performance': return changed(supplierFilters, DEFAULT_SUPPLIER_FILTERS);
+      case 'expiry-risk': return changed(expiryFilters, DEFAULT_EXPIRY_FILTERS);
+      case 'forecast': return false;
+    }
+  };
+
+  const clearReportFilters = (report: ReportTab) => {
+    clearDownloadStatus();
+    switch (report) {
+      case 'inventory-valuation': setInventoryFilters({ ...DEFAULT_INVENTORY_FILTERS }); break;
+      case 'stock-by-location': setStockFilters({ ...DEFAULT_STOCK_FILTERS }); break;
+      case 'product-movements': setMovementFilters({ ...DEFAULT_MOVEMENT_FILTERS }); break;
+      case 'movement-ledger': setLedgerFilters({ ...DEFAULT_LEDGER_FILTERS }); break;
+      case 'inventory-variance': setVarianceFilters({ ...DEFAULT_VARIANCE_FILTERS }); break;
+      case 'stock-transfer-activity': setTransferFilters({ ...DEFAULT_TRANSFER_FILTERS }); break;
+      case 'requisition-activity': setRequisitionFilters({ ...DEFAULT_REQUISITION_FILTERS }); break;
+      case 'procurement-summary': setProcurementFilters({ ...DEFAULT_PROCUREMENT_FILTERS }); break;
+      case 'purchase-order-commitments': setPoCommitmentFilters({ ...DEFAULT_PO_COMMITMENT_FILTERS }); break;
+      case 'purchasing-spend': setSpendFilters({ ...DEFAULT_SPEND_FILTERS }); break;
+      case 'low-stock': setLowStockFilters({ ...DEFAULT_LOW_STOCK_FILTERS }); break;
+      case 'slow-moving': setSlowFilters({ ...DEFAULT_SLOW_FILTERS }); break;
+      case 'usage-summary': setUsageFilters({ ...DEFAULT_USAGE_FILTERS }); break;
+      case 'supplier-performance': setSupplierFilters({ ...DEFAULT_SUPPLIER_FILTERS }); break;
+      case 'expiry-risk': setExpiryFilters({ ...DEFAULT_EXPIRY_FILTERS }); break;
+      case 'forecast': break;
+    }
+  };
+
   const actionButtons = (report: ReportTab, isFetching: boolean, disabled = false) => (
     <>
+      {report !== 'forecast' ? <button type="button" className="reports-button reports-button--secondary" disabled={isExporting || disabled || isFetching || !hasActiveReportFilters(report)} onClick={() => clearReportFilters(report)}>
+        {ui("Clear filters")}
+      </button> : null}
       <button type="button" className="reports-button reports-button--secondary" disabled={isExporting || disabled || isFetching} onClick={() => refreshReport(report)}>
         {isFetching ? ui("Refreshing…") : ui("Refresh")}
       </button>

@@ -89,8 +89,16 @@
   border-radius: 9px;
   background: #fff;
   color: #0f172a;
+  color-scheme: light;
   font: inherit;
   font-weight: 500;
+}
+
+.reports-field select option,
+.reports-field select optgroup {
+  background: #fff;
+  color: #0f172a;
+  color-scheme: light;
 }
 
 .reports-field small {
