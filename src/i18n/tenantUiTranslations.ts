@@ -2,6 +2,18 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  ["Review damage / waste usage", "Schaden-/Abfallverbrauch prüfen", "Revisar uso por daños/desperdicio", "Examiner l’utilisation liée aux dommages/déchets", "Pregledaj potrošnju zbog oštećenja / otpada"],
+  ["Action urgency:", "Aktionsdringlichkeit:", "Urgencia de la acción:", "Urgence de l’action :", "Hitnost radnje:"],
+  ["Action state:", "Aktionsstatus:", "Estado de la acción:", "État de l’action :", "Stanje radnje:"],
+  ["Task state:", "Aufgabenstatus:", "Estado de la tarea:", "État de la tâche :", "Stanje zadatka:"],
+  ["Alert severity:", "Warnungs-Schweregrad:", "Severidad de la alerta:", "Gravité de l’alerte :", "Ozbiljnost upozorenja:"],
+  ["Ranking score:", "Rangwert:", "Puntuación de clasificación:", "Score de classement :", "Rezultat rangiranja:"],
+  ["Task priority:", "Aufgabenpriorität:", "Prioridad de la tarea:", "Priorité de la tâche :", "Prioritet zadatka:"],
+  ["SLA", "SLA", "SLA", "SLA", "SLA"],
+  ["Task source:", "Aufgabenquelle:", "Origen de la tarea:", "Source de la tâche :", "Izvor zadatka:"],
+  ["Identifiers", "Kennungen", "Identificadores", "Identifiants", "Identifikatori"],
+  ["Action ID:", "Aktions-ID:", "ID de acción:", "ID d’action :", "ID radnje:"],
+  ["Source ID:", "Quell-ID:", "ID de origen:", "ID source :", "ID izvora:"],
   ["Exact type, e.g. shipments", "Exakter Typ, z. B. shipments", "Tipo exacto, p. ej. shipments", "Type exact, p. ex. shipments", "Točna vrsta, npr. shipments"],
   ["Exact code, e.g. shipment.received", "Exakter Code, z. B. shipment.received", "Código exacto, p. ej. shipment.received", "Code exact, p. ex. shipment.received", "Točan kod, npr. shipment.received"],
   ["Review active sessions and revoke stale account access.", "Aktive Sitzungen prüfen und veralteten Kontozugriff widerrufen.", "Revise las sesiones activas y revoque accesos obsoletos a la cuenta.", "Examinez les sessions actives et révoquez les accès de compte obsolètes.", "Pregledajte aktivne sesije i ukinite zastarjeli pristup računu."],
@@ -13961,6 +13973,13 @@ const rows: readonly TranslationRow[] = [
   ["Opened from the Dashboard recommendation card. The matching recommendation is selected below.", "Von der Empfehlungskarte im Dashboard geöffnet. Die passende Empfehlung ist unten ausgewählt.", "Abierto desde la tarjeta de recomendación del panel. La recomendación correspondiente está seleccionada abajo.", "Ouvert depuis la carte de recommandation du tableau de bord. La recommandation correspondante est sélectionnée ci-dessous.", "Otvoreno s kartice preporuke na nadzornoj ploči. Odgovarajuća preporuka odabrana je ispod."],
   ["No active procurement recommendation currently matches the Dashboard product context.", "Derzeit entspricht keine aktive Beschaffungsempfehlung dem Produktkontext des Dashboards.", "Actualmente ninguna recomendación activa de compras coincide con el contexto de producto del panel.", "Aucune recommandation d’approvisionnement active ne correspond actuellement au contexte produit du tableau de bord.", "Trenutačno nijedna aktivna preporuka nabave ne odgovara kontekstu proizvoda s nadzorne ploče."],
   ["Show all recommendations", "Alle Empfehlungen anzeigen", "Mostrar todas las recomendaciones", "Afficher toutes les recommandations", "Prikaži sve preporuke"],
+  ["Tenant usage this hour:", "Mandantennutzung in dieser Stunde:", "Uso del tenant esta hora:", "Utilisation du tenant cette heure :", "Korištenje tenanta u ovom satu:"],
+  ["Saved result snapshot", "Gespeicherter Ergebnis-Snapshot", "Instantánea del resultado guardado", "Instantané du résultat enregistré", "Snimka spremljenog rezultata"],
+  ["Values reflect the evidence captured for this run and are not live operational values.", "Die Werte spiegeln die für diesen Lauf erfassten Nachweise wider und sind keine operativen Live-Werte.", "Los valores reflejan la evidencia capturada para esta ejecución y no son valores operativos en vivo.", "Les valeurs reflètent les preuves capturées pour cette exécution et ne sont pas des valeurs opérationnelles en direct.", "Vrijednosti odražavaju dokaze zabilježene za ovo izvođenje i nisu operativne vrijednosti uživo."],
+  ["Evidence confidence describes the evidence available to this run; it is not AI model confidence.", "Die Evidenzkonfidenz beschreibt die für diesen Lauf verfügbaren Nachweise; sie ist keine Konfidenz eines KI-Modells.", "La confianza de la evidencia describe la evidencia disponible para esta ejecución; no es la confianza de un modelo de IA.", "La confiance des preuves décrit les preuves disponibles pour cette exécution ; ce n’est pas la confiance d’un modèle d’IA.", "Pouzdanost dokaza opisuje dokaze dostupne ovom izvođenju; to nije pouzdanost AI modela."],
+  ["Technical / audit details", "Technische / Audit-Details", "Detalles técnicos / de auditoría", "Détails techniques / d’audit", "Tehnički / revizijski detalji"],
+  ["<1 ms", "<1 ms", "<1 ms", "<1 ms", "<1 ms"],
+  ["Current mode:", "Aktueller Modus:", "Modo actual:", "Mode actuel :", "Trenutni način:"],
 ];
 
 const indexes: Record<AppLocale, number> = { 'en-GB': 0, 'de-DE': 1, 'es-ES': 2, 'fr-FR': 3, 'hr-HR': 4 };

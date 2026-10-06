@@ -1083,6 +1083,7 @@ export default function AIOperationsCopilotPage() {
         ) : undefined}
         aside={<OperationalWorkspaceStatus value={modeDetails.label} label={ui("current analysis mode")} />}
       />
+      <div style={styles.modeHeroBanner}><strong>{ui('Current mode:')}</strong> {modeDetails.label}</div>
 
       {capabilitiesQuery.isError ? <div style={styles.error}>{readableError(capabilitiesQuery.error, ui)}</div> : null}
       {actionMessage ? <div style={styles.info}>{actionMessage}</div> : null}
@@ -1112,7 +1113,7 @@ export default function AIOperationsCopilotPage() {
         <OperationalWorkspaceStatCard
           label={ui("Runs this hour")}
           value={capabilitiesQuery.data?.run_limits ? `${formatLocalizedNumber(capabilitiesQuery.data.run_limits.user_runs_used, locale)}/${formatLocalizedNumber(capabilitiesQuery.data.run_limits.user_limit, locale)}` : ui('Loading')}
-          helper={`${ui('Tenant usage:')} ${capabilitiesQuery.data?.run_limits ? `${formatLocalizedNumber(capabilitiesQuery.data.run_limits.tenant_runs_used, locale)}/${formatLocalizedNumber(capabilitiesQuery.data.run_limits.tenant_limit, locale)}` : ui('Not reported')}`}
+          helper={`${ui('Tenant usage this hour:')} ${capabilitiesQuery.data?.run_limits ? `${formatLocalizedNumber(capabilitiesQuery.data.run_limits.tenant_runs_used, locale)}/${formatLocalizedNumber(capabilitiesQuery.data.run_limits.tenant_limit, locale)}` : ui('Not reported')}`}
           iconPath="/automation-schedules"
           tone="neutral"
         />
@@ -1449,7 +1450,13 @@ export default function AIOperationsCopilotPage() {
                 <Badge tone={selectedRun.data_shared_externally ? 'warn' : 'good'}>
                   {selectedRun.data_shared_externally ? ui('Evidence shared externally') : ui('No external data sharing')}
                 </Badge>
-                <Badge>{ui('Confidence')} {formatConfidence(selectedRun.confidence_score, locale, ui)}</Badge>
+                <Badge>{ui('Evidence confidence')} {formatConfidence(selectedRun.confidence_score, locale, ui)}</Badge>
+              </div>
+              <div style={styles.snapshotNotice}>
+                <strong>{ui('Saved result snapshot')}.</strong> {ui('Values reflect the evidence captured for this run and are not live operational values.')}
+              </div>
+              <div style={styles.confidenceNotice}>
+                {ui('Evidence confidence describes the evidence available to this run; it is not AI model confidence.')}
               </div>
 
               {selectedRun.run_status === 'failed' ? (
@@ -1478,7 +1485,7 @@ export default function AIOperationsCopilotPage() {
                           const content = (
                             <>
                               <strong>{item.label}</strong>
-                              <span style={styles.help}>{copilotEvidenceKindLabel(item.kind, ui)}{capabilities.canViewTenantDiagnostics && item.id ? ` · ${item.id}` : ''}</span>
+                              <span style={styles.help}>{copilotEvidenceKindLabel(item.kind, ui)}</span>
                               {permittedHref ? <span style={styles.evidenceOpen}>{ui('Open source record')}</span> : null}
                             </>
                           );
@@ -1597,15 +1604,18 @@ export default function AIOperationsCopilotPage() {
                 <div><span style={styles.keyLabel}>{ui("Created")}</span><strong>{formatDateTime(selectedRun.created_at, locale, ui)}</strong></div>
                 <div><span style={styles.keyLabel}>{ui("Completed")}</span><strong>{formatDateTime(selectedRun.completed_at, locale, ui)}</strong></div>
                 <div><span style={styles.keyLabel}>{ui("External data sharing")}</span><strong>{selectedRun.data_shared_externally ? ui('Yes') : ui('No')}</strong></div>
-                {capabilities.canViewTenantDiagnostics ? (
-                  <>
+              </div>
+              {capabilities.canViewTenantDiagnostics ? (
+                <details style={styles.technicalDetails}>
+                  <summary style={styles.technicalSummary}>{ui('Technical / audit details')}</summary>
+                  <div style={styles.metadataGrid}>
                     <div><span style={styles.keyLabel}>{ui("Run identifier")}</span><strong>{selectedRun.id}</strong></div>
-                    <div><span style={styles.keyLabel}>{ui("Latency")}</span><strong>{selectedRun.latency_ms == null ? ui('Not reported') : `${formatLocalizedNumber(selectedRun.latency_ms, locale)} ms`}</strong></div>
+                    <div><span style={styles.keyLabel}>{ui("Latency")}</span><strong>{selectedRun.latency_ms == null ? ui('Not reported') : selectedRun.latency_ms < 1 ? ui('<1 ms') : `${formatLocalizedNumber(selectedRun.latency_ms, locale)} ms`}</strong></div>
                     <div><span style={styles.keyLabel}>{ui("Provider response reference")}</span><strong>{selectedRun.provider_response_id ? ui('Stored as a reference') : ui('None')}</strong></div>
                     <div><span style={styles.keyLabel}>{ui("External processing confirmed")}</span><strong>{selectedRun.external_processing_confirmed ? ui('Yes') : ui('No')}</strong></div>
-                  </>
-                ) : null}
-              </div>
+                  </div>
+                </details>
+              ) : null}
             </div>
           ) : null}
         </Panel>
@@ -1799,5 +1809,10 @@ const styles: Record<string, CSSProperties> = {
   historyPagination: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-color, #dbe3ee)' },
   paginationButton: { minWidth: 90, padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#ffffff', color: '#1d4ed8', fontWeight: 800, cursor: 'pointer' },
   safetyGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 9 },
-  safetyItem: { display: 'flex', gap: 9, alignItems: 'center', padding: 9, borderRadius: 8, background: 'rgba(100, 116, 139, 0.07)', fontSize: 13 }
+  safetyItem: { display: 'flex', gap: 9, alignItems: 'center', padding: 9, borderRadius: 8, background: 'rgba(100, 116, 139, 0.07)', fontSize: 13 },
+  modeHeroBanner: { marginTop: -4, marginBottom: 12, padding: '8px 11px', borderRadius: 9, background: '#eef2ff', color: '#3730a3', fontSize: 13, lineHeight: 1.4 },
+  snapshotNotice: { padding: '11px 12px', border: '1px solid #bfdbfe', borderRadius: 10, background: '#eff6ff', color: '#1e3a8a', lineHeight: 1.45 },
+  confidenceNotice: { padding: '9px 11px', borderRadius: 9, background: '#f8fafc', color: '#475569', fontSize: 13, lineHeight: 1.45 },
+  technicalDetails: { marginTop: 4, padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 10, background: '#f8fafc' },
+  technicalSummary: { cursor: 'pointer', fontWeight: 800, color: '#334155' }
 };

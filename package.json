@@ -371,7 +371,9 @@
     "check:inventory-navigation-state-surgical-fixes-v349248": "node scripts/check-inventory-navigation-state-surgical-fixes-v349248.mjs",
     "check:inventory-i18n-build-surgical-fixes-v349249": "node scripts/check-inventory-i18n-build-surgical-fixes-v349249.mjs",
     "check:inventory-continuity-governance-surgical-fixes-v349250": "node scripts/check-inventory-continuity-governance-surgical-fixes-v349250.mjs",
-    "check:inventory-dashboard-navigation-surgical-fixes-v349251": "node scripts/check-dashboard-navigation-surgical-fixes-v349251.mjs"
+    "check:inventory-dashboard-navigation-surgical-fixes-v349251": "node scripts/check-dashboard-navigation-surgical-fixes-v349251.mjs",
+    "check:inventory-dashboard-alert-action-semantics-surgical-fixes-v349252": "node scripts/check-dashboard-alert-action-semantics-surgical-fixes-v349252.mjs",
+    "check:inventory-ai-copilot-presentation-surgical-fixes-v349253": "node scripts/check-ai-copilot-presentation-surgical-fixes-v349253.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
