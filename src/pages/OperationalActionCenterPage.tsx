@@ -34,6 +34,9 @@ type OperationalAction = {
   summary_key?: string | null;
   source_type?: string | null;
   source_id?: string | null;
+  execution_task_status?: string | null;
+  execution_task_priority?: string | null;
+  alert_severity?: string | null;
   recommended_next_step?: string | null;
   recommended_next_step_key?: string | null;
   required_permission?: string | null;
@@ -402,6 +405,23 @@ function actionSummaryLabel(action: OperationalAction, ui: (englishText: string)
   return action.summary_key ? ui(summary) : summary;
 }
 
+function actionTechnicalFactorLabel(factor: string, ui: (englishText: string) => string): string {
+  const raw = String(factor || '').trim();
+  if (!raw) return ui('Not reported');
+  if (raw === 'sla_due_at_absent') return `${ui('SLA')}: ${ui('Not scheduled')}`;
+  if (raw === 'sla_due_at_present') return `${ui('SLA')}: ${ui('Scheduled')}`;
+
+  const [key, ...rest] = raw.split(':');
+  const value = rest.join(':');
+  if (key === 'status' && value) return `${ui('Task state:')} ${canonicalLabel(value, ui)}`;
+  if (key === 'priority' && value) return `${ui('Task priority:')} ${canonicalLabel(value, ui)}`;
+  if (key === 'severity' && value) return `${ui('Alert severity:')} ${canonicalLabel(value, ui)}`;
+  if (key === 'escalation_level' && value) return `${ui('Escalation level')}: ${value}`;
+  if (key === 'task_source' && value) return `${ui('Task source:')} ${canonicalLabel(value, ui)}`;
+
+  return canonicalLabel(raw, ui);
+}
+
 function actionDomainIconPath(domain?: string | null): string {
   if (domain === 'alerts') return '/alerts';
   if (domain === 'execution') return '/execution-tasks';
@@ -486,7 +506,7 @@ async function fetchActionCenter(domain: ActionDomain, urgency: 'all' | ActionUr
 
 export default function OperationalActionCenterPage() {
   const { locale, ui } = useAppTranslation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const sourceActionId = searchParams.get('source_action_id');
   const [domain, setDomain] = useRouteQueryState<ActionDomain>({
     paramName: 'domain',
@@ -498,6 +518,38 @@ export default function OperationalActionCenterPage() {
     defaultValue: 'all',
     allowedValues: URGENCY_FILTER_VALUES
   });
+  const expandedAdvancedSections = useMemo(() => {
+    return new Set(
+      String(searchParams.get('expanded_sections') || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter((value) => value === 'governance' || value === 'diagnostics')
+    );
+  }, [searchParams]);
+  const focusedAdvancedSection = searchParams.get('action_section');
+  const governanceDetailsOpen = expandedAdvancedSections.has('governance');
+  const diagnosticsDetailsOpen = expandedAdvancedSections.has('diagnostics');
+
+  const setAdvancedSectionState = (section: 'governance' | 'diagnostics', open: boolean) => {
+    const next = new URLSearchParams(searchParams);
+    const sections = new Set(
+      String(next.get('expanded_sections') || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter((value) => value === 'governance' || value === 'diagnostics')
+    );
+
+    if (open) sections.add(section);
+    else sections.delete(section);
+
+    if (sections.size) next.set('expanded_sections', Array.from(sections).join(','));
+    else next.delete('expanded_sections');
+
+    if (open) next.set('action_section', section);
+    else if (next.get('action_section') === section) next.delete('action_section');
+
+    setSearchParams(next, { replace: true });
+  };
 
   const canViewAlerts = hasPermission(TENANT_PERMISSIONS.ALERTS_READ);
   const canViewExecutionTasks = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
@@ -541,6 +593,10 @@ export default function OperationalActionCenterPage() {
   const routeExposureAudit = response?.control_tower_route_exposure_audit || {};
   const readinessScope = response?.readiness_scope || {};
   const readinessAssessmentAvailable = readinessScope.assessment_available !== false;
+  const remediationActionCount = numberValue(remediationFeedback.remediation_action_count);
+  const reviewReadyActionCount = numberValue(effectivenessReview.review_ready_action_count);
+  const escalationCandidateCount = numberValue(escalationGovernance.escalation_candidate_count);
+  const closureCandidateCount = numberValue(closureGate.closure_candidate_count);
   const frontendPanelContractDriftCount = CONTROL_TOWER_RENDERED_PANEL_KEYS.filter((key) => {
     return !(routeExposureAudit.frontend_rendered_panels || []).includes(key);
   }).length;
@@ -555,6 +611,18 @@ export default function OperationalActionCenterPage() {
     const element = document.getElementById(`action-${selectedSourceAction.action_id}`);
     element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [selectedSourceAction]);
+
+  useEffect(() => {
+    if (actionCenterQuery.isLoading) return;
+    if (focusedAdvancedSection !== 'governance' && focusedAdvancedSection !== 'diagnostics') return;
+    const elementId = focusedAdvancedSection === 'governance'
+      ? 'action-center-governance-readiness'
+      : 'action-center-technical-diagnostics';
+    const timer = window.setTimeout(() => {
+      document.getElementById(elementId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [actionCenterQuery.dataUpdatedAt, actionCenterQuery.isLoading, focusedAdvancedSection]);
 
   if (actionCenterQuery.isLoading) {
     return (
@@ -709,9 +777,11 @@ export default function OperationalActionCenterPage() {
                         </div>
                       </div>
                       <div className="action-center-badge-row">
-                        <span style={urgencyBadgeStyle(action.urgency)}>{canonicalLabel(action.urgency, ui)}</span>
+                        <span style={urgencyBadgeStyle(action.urgency)}>{ui('Action urgency:')} {canonicalLabel(action.urgency, ui)}</span>
                         <span style={badgeStyle}>{canonicalLabel(action.action_domain, ui)}</span>
-                        <span style={badgeStyle}>{canonicalLabel(action.action_status, ui)}</span>
+                        <span style={badgeStyle}>{ui('Action state:')} {canonicalLabel(action.action_status, ui)}</span>
+                        {action.execution_task_status ? <span style={badgeStyle}>{ui('Task state:')} {canonicalLabel(action.execution_task_status, ui)}</span> : null}
+                        {action.alert_severity ? <span style={badgeStyle}>{ui('Alert severity:')} {canonicalLabel(action.alert_severity, ui)}</span> : null}
                       </div>
                     </div>
 
@@ -738,15 +808,23 @@ export default function OperationalActionCenterPage() {
                     {canViewTenantDiagnostics ? (
                       <details style={actionMetadataStyle} className="action-center-technical-details">
                         <summary style={{ cursor: 'pointer', fontWeight: 700 }}>{ui("Technical details")}</summary>
-                        <div className="card__subtext">{ui("Priority score:")} {formatLocalizedNumber(numberValue(action.priority_score), locale)}</div>
-                        <div className="card__subtext">
-                          {ui("Action:")} {action.action_id}{action.source_id ? ` · ${ui('Source:')} ${action.source_id}` : ''}
-                        </div>
+                        <div className="card__subtext">{ui("Ranking score:")} {formatLocalizedNumber(numberValue(action.priority_score), locale)}</div>
+                        {action.execution_task_priority ? <div className="card__subtext">{ui('Task priority:')} {canonicalLabel(action.execution_task_priority, ui)}</div> : null}
                         {action.explainability?.primary_factors?.length ? (
-                          <div className="card__subtext">
-                            {ui("Evidence:")} {action.explainability.primary_factors.map((factor) => canonicalLabel(factor, ui)).join(' · ')}
+                          <div className="card__subtext action-center-evidence-list">
+                            <strong>{ui("Evidence:")}</strong>
+                            <ul style={{ margin: '6px 0 0', paddingLeft: 20 }}>
+                              {action.explainability.primary_factors.map((factor, index) => (
+                                <li key={`${factor}-${index}`}>{actionTechnicalFactorLabel(factor, ui)}</li>
+                              ))}
+                            </ul>
                           </div>
                         ) : null}
+                        <details className="action-center-identifiers">
+                          <summary style={{ cursor: 'pointer' }}>{ui('Identifiers')}</summary>
+                          <div className="card__subtext">{ui('Action ID:')} {action.action_id}</div>
+                          {action.source_id ? <div className="card__subtext">{ui('Source ID:')} {action.source_id}</div> : null}
+                        </details>
                       </details>
                     ) : null}
                   </article>
@@ -759,11 +837,29 @@ export default function OperationalActionCenterPage() {
 
 
       {canViewGovernanceReadiness ? (
-      <details style={{ ...detailsStyle, marginTop: 16 }} className="action-center-details">
+      <details
+        id="action-center-governance-readiness"
+        style={{ ...detailsStyle, marginTop: 16, scrollMarginTop: 24 }}
+        className="action-center-details"
+        open={governanceDetailsOpen}
+        onToggle={(event) => setAdvancedSectionState('governance', event.currentTarget.open)}
+      >
         <summary style={detailsSummaryStyle}>{ui("Governance readiness details")}</summary>
         <p className="card__subtext">
           {ui("Advanced read-only checks showing whether related actions have enough ownership, evidence, review, escalation, and closure information. These scores describe a bounded workflow-readiness sample, not the tenant's overall operational health.")}
         </p>
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>{ui('What this means')}</div>
+          <p className="card__subtext">
+            {ui('Use these checks to see whether work has an owner, supporting evidence, required review, and a clear path to closure. Resolve any blocker in the source workflow, then return here to review readiness again.')}
+          </p>
+          <div style={{ ...toolbarStyle, marginTop: 8 }}>
+            {canViewAlerts ? <Link className="button button--secondary" to="/alerts">{ui('Open alerts')}</Link> : null}
+            {canViewExecutionTasks ? <Link className="button button--secondary" to="/execution-tasks">{ui('Open execution tasks')}</Link> : null}
+            {canViewDecisionIntelligence ? <Link className="button button--secondary" to="/intelligence-review">{ui('Open intelligence review')}</Link> : null}
+            {canViewControlTower ? <Link className="button button--secondary" to="/reliability-command">{ui('Open reliability command')}</Link> : null}
+          </div>
+        </div>
         {readinessAssessmentAvailable ? (
         <>
         <p className="card__subtext">
@@ -829,8 +925,8 @@ export default function OperationalActionCenterPage() {
           </div>
           <div className="card">
             <div className="card__label">{ui("Evidence coverage")}</div>
-            <div className="card__value">{formatPercent(remediationFeedback.source_evidence_coverage_score, locale)}</div>
-            <div className="card__subtext">{ui("Actions with source workflow traceability.")}</div>
+            <div className="card__value">{remediationActionCount > 0 ? formatPercent(remediationFeedback.source_evidence_coverage_score, locale) : ui('N/A')}</div>
+            <div className="card__subtext">{remediationActionCount > 0 ? ui("Actions with source workflow traceability.") : ui('No eligible remediation actions were available for this percentage.')}</div>
           </div>
         </div>
 
@@ -879,8 +975,8 @@ export default function OperationalActionCenterPage() {
           </div>
           <div className="card">
             <div className="card__label">{ui("Governance coverage")}</div>
-            <div className="card__value">{formatPercent(effectivenessReview.governance_coverage_score, locale)}</div>
-            <div className="card__subtext">{ui("High-risk remediation actions with governance gate context.")}</div>
+            <div className="card__value">{reviewReadyActionCount > 0 ? formatPercent(effectivenessReview.governance_coverage_score, locale) : ui('N/A')}</div>
+            <div className="card__subtext">{reviewReadyActionCount > 0 ? ui("High-risk remediation actions with governance gate context.") : ui('No review-ready actions were available for this percentage.')}</div>
           </div>
         </div>
 
@@ -930,8 +1026,8 @@ export default function OperationalActionCenterPage() {
           </div>
           <div className="card">
             <div className="card__label">{ui("Governance gate score")}</div>
-            <div className="card__value">{formatPercent(escalationGovernance.governance_gate_score, locale)}</div>
-            <div className="card__subtext">{ui("High-risk remediation actions covered by approval context.")}</div>
+            <div className="card__value">{escalationCandidateCount > 0 ? formatPercent(escalationGovernance.governance_gate_score, locale) : ui('N/A')}</div>
+            <div className="card__subtext">{escalationCandidateCount > 0 ? ui("High-risk remediation actions covered by approval context.") : ui('No escalation candidates were available for this percentage.')}</div>
           </div>
         </div>
 
@@ -980,8 +1076,8 @@ export default function OperationalActionCenterPage() {
           </div>
           <div className="card">
             <div className="card__label">{ui("Escalation clearance")}</div>
-            <div className="card__value">{formatPercent(closureGate.escalation_clearance_score, locale)}</div>
-            <div className="card__subtext">{ui("Blocked or escalated remediation must clear before closure.")}</div>
+            <div className="card__value">{closureCandidateCount > 0 ? formatPercent(closureGate.escalation_clearance_score, locale) : ui('N/A')}</div>
+            <div className="card__subtext">{closureCandidateCount > 0 ? ui("Blocked or escalated remediation must clear before closure.") : ui('No closure candidates were available for this percentage.')}</div>
           </div>
         </div>
 
@@ -1021,7 +1117,13 @@ export default function OperationalActionCenterPage() {
       ) : null}
 
       {canViewTenantDiagnostics ? (
-        <details style={{ ...detailsStyle, marginTop: 16 }} className="action-center-details">
+        <details
+          id="action-center-technical-diagnostics"
+          style={{ ...detailsStyle, marginTop: 16, scrollMarginTop: 24 }}
+          className="action-center-details"
+          open={diagnosticsDetailsOpen}
+          onToggle={(event) => setAdvancedSectionState('diagnostics', event.currentTarget.open)}
+        >
           <summary style={detailsSummaryStyle}>{ui("Technical contract diagnostics")}</summary>
           <p className="card__subtext">
             {ui("Advanced checks shown only to users with tenant diagnostics access, confirming that the page and backend still agree about the information this screen requires.")}
@@ -1097,7 +1199,7 @@ export default function OperationalActionCenterPage() {
           </div>
           <div className="card">
             <div className="card__label">{ui("Required permission")}</div>
-            <div className="card__value" style={{ fontSize: 18 }}>{routeExposureAudit.required_permission || '—'}</div>
+            <div className="card__value" style={{ fontSize: 18, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{routeExposureAudit.required_permission || '—'}</div>
             <div className="card__subtext">{ui("Backend permission gate expected for the route.")}</div>
           </div>
           <div className="card">
