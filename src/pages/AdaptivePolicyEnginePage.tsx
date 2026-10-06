@@ -897,10 +897,11 @@ export default function AdaptivePolicyEnginePage() {
         eyebrow={ui('Decision intelligence & policy review')}
         title={ui('Adaptive Policy Engine')}
         description={ui('Checks real operating results to see whether recurring inventory, reservation, supplier, or execution rules may need human review and adjustment. Nothing is changed automatically.')}
-        aside={<><OperationalWorkspaceStatus value={formatCanonicalLabel(data?.governance?.adaptive_policy_posture, ui)} label={`${ui('Policy review posture')} · ${ui('Analysis generated')} ${analysisGenerated} · ${ui('Page updated')} ${pageUpdated}`} />{canGovern ? <button className="button button--secondary" type="button" onClick={() => refreshAnalysis.mutate()} disabled={refreshAnalysis.isPending || isFetching}><TenantNavIcon path="/adaptive-policy-engine" size={14} />{ui(refreshAnalysis.isPending ? 'Refreshing analysis…' : 'Refresh policy analysis')}</button> : <button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/adaptive-policy-engine" size={14} />{ui(isFetching ? 'Refreshing…' : 'Refresh page')}</button>}</>}
+        aside={<><OperationalWorkspaceStatus value={formatCanonicalLabel(data?.governance?.adaptive_policy_posture, ui)} label={`${ui('Policy review posture')} · ${ui('Analysis generated')} ${analysisGenerated} · ${ui('Page updated')} ${pageUpdated}`} />{canGovern ? <button className="button button--secondary" type="button" onClick={() => refreshAnalysis.mutate()} disabled={refreshAnalysis.isPending || isFetching}><TenantNavIcon path="/adaptive-policy-engine" size={14} />{ui(refreshAnalysis.isPending ? 'Running analysis…' : 'Run new policy analysis')}</button> : <button className="button button--secondary" type="button" onClick={() => void refetch()} disabled={isFetching}><TenantNavIcon path="/adaptive-policy-engine" size={14} />{ui(isFetching ? 'Refreshing…' : 'Refresh page')}</button>}</>}
       />
-      {refreshAnalysis.isError ? <section className="card card--danger adaptive-policy-state-card adaptive-policy-state-card--danger"><p>{ui('Policy analysis could not be refreshed. No operating rule was changed.')}</p></section> : null}
-      {refreshAnalysis.isSuccess ? <p className="adaptive-policy-limit-note">{ui('Policy analysis refreshed from current operating data. Any recommendation still requires human review.')}</p> : null}
+      {canGovern ? <p className="adaptive-policy-limit-note">{ui('Running a new policy analysis records a new evidence snapshot from current operating data. It does not apply policy changes automatically.')}</p> : null}
+      {refreshAnalysis.isError ? <section className="card card--danger adaptive-policy-state-card adaptive-policy-state-card--danger"><p>{ui('New policy analysis could not be run. No operating rule was changed.')}</p></section> : null}
+      {refreshAnalysis.isSuccess ? <p className="adaptive-policy-limit-note">{ui('New policy analysis snapshot recorded from current operating data. No policy changes were applied; recommendations still require human review.')}</p> : null}
 
 <OperationalWorkspaceStats ariaLabel={ui('Adaptive policy evidence summary')}>
         <MetricCard label="Policies" value={policyCount} iconPath="/adaptive-policy-engine" tone="blue" />
@@ -986,7 +987,7 @@ export default function AdaptivePolicyEnginePage() {
         <section className="card adaptive-policy-empty-state">
           <div className="adaptive-policy-section-heading"><span className="adaptive-policy-heading-icon adaptive-policy-heading-icon--slate"><TenantNavIcon path="/adaptive-policy-engine" size={17} /></span><h2>{ui('No adaptive policy evidence is available for this tenant and filter set')}</h2></div>
           <p>{ui('Readiness is not assessed when there are no policy, signal, recommendation, or effectiveness records. Zero records do not mean that policies are safe, approved, or ready for promotion.')}</p>
-          <p>{ui('If you can govern Decision Intelligence, use Refresh policy analysis to rebuild this evidence from current operating data.')}</p>
+          <p>{ui('If you can govern Decision Intelligence, use Run new policy analysis to create a fresh evidence snapshot from current operating data.')}</p>
         </section>
       ) : null}
 

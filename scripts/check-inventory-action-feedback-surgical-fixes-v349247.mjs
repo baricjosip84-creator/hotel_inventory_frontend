@@ -12,7 +12,7 @@ const checks = [];
 const check = (condition, label) => checks.push({ condition: Boolean(condition), label });
 
 check(api.includes("return 'Stock adjustment applied successfully.';"), 'stock adjustment uses action-specific toast');
-check(api.includes("return 'Policy analysis refreshed successfully.';"), 'adaptive policy refresh uses action-specific toast');
+check(api.includes("return 'New policy analysis snapshot recorded. No policy changes were applied.';"), 'adaptive policy analysis toast explains snapshot creation and no policy mutation');
 check(api.includes("return 'Forecast analysis refreshed successfully.';"), 'forecast refresh uses action-specific toast');
 check(api.includes("return 'Requisition fulfilled successfully.';"), 'requisition fulfillment uses action-specific toast');
 check(api.includes("return 'Recommendation approved successfully.';"), 'recommendation approval uses action-specific toast');
@@ -31,7 +31,7 @@ check(capabilityCss.includes('flex-wrap: wrap !important;'), 'advanced inventory
 check(capabilityCss.includes('@media (max-width: 720px)') && capabilityCss.includes('overflow-x: auto;'), 'narrow-screen capability tabs retain horizontal fallback');
 
 for (const message of [
-  'Policy analysis refreshed successfully.',
+  'New policy analysis snapshot recorded. No policy changes were applied.',
   'Forecast analysis refreshed successfully.',
   'Requisition fulfilled successfully.',
   'Recommendation approved successfully.',

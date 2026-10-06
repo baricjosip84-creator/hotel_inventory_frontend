@@ -168,7 +168,7 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
   }
 
   if (normalizedMethod === 'POST' && normalizedPathOnly === '/decision-intelligence/adaptive-policy-engine-refresh') {
-    return 'Policy analysis refreshed successfully.';
+    return 'New policy analysis snapshot recorded. No policy changes were applied.';
   }
 
   if (normalizedMethod === 'POST' && normalizedPathOnly === '/decision-intelligence/probabilistic-forecasting-refresh') {
