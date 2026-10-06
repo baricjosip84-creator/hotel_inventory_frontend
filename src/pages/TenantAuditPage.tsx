@@ -518,7 +518,7 @@ export default function TenantAuditPage() {
             <input
               value={draftFilters.action}
               onChange={(event) => setDraftFilters((current) => ({ ...current, action: event.target.value }))}
-              placeholder={ui('Example: shipment.receive')}
+              placeholder={ui('Exact code, e.g. shipment.received')}
             />
           </label>
           <label className="tenant-audit-field">
@@ -526,7 +526,7 @@ export default function TenantAuditPage() {
             <input
               value={draftFilters.entityType}
               onChange={(event) => setDraftFilters((current) => ({ ...current, entityType: event.target.value }))}
-              placeholder={ui('Example: shipments')}
+              placeholder={ui('Exact type, e.g. shipments')}
             />
           </label>
           <label className="tenant-audit-checkbox">

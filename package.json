@@ -365,7 +365,8 @@
     "check:inventory-testing-hardening-v349241": "node scripts/check-inventory-testing-hardening-v349241.mjs",
     "check:inventory-testing-hardening-v349242": "node scripts/check-inventory-testing-hardening-v349242.mjs",
     "check:inventory-testing-hardening-v349243": "node scripts/check-inventory-testing-hardening-v349243.mjs",
-    "check:inventory-testing-hardening-v349244": "node scripts/check-inventory-testing-hardening-v349244.mjs"
+    "check:inventory-testing-hardening-v349244": "node scripts/check-inventory-testing-hardening-v349244.mjs",
+    "check:inventory-audit-surgical-fixes-v349246": "node scripts/check-inventory-audit-surgical-fixes-v349246.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
