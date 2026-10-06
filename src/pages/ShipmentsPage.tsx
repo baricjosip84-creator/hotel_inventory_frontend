@@ -628,6 +628,9 @@ export default function ShipmentsPage() {
   const purchaseOrderHandoffShipmentId = searchParams.get('source') === 'purchase-order'
     ? (searchParams.get('shipmentId') || '')
     : '';
+  const dashboardHandoffShipmentId = searchParams.get('source') === 'dashboard'
+    ? (searchParams.get('shipmentId') || '')
+    : '';
   const uiRef = useRef(ui);
   uiRef.current = ui;
   const isMobile = useIsMobile();
@@ -685,6 +688,7 @@ export default function ShipmentsPage() {
   const [pendingAutoReceive, setPendingAutoReceive] = useState<PendingAutoReceive | null>(null);
   const autoReceiveAttemptKeyRef = useRef<string>('');
   const purchaseOrderHandoffRef = useRef<string>('');
+  const dashboardHandoffRef = useRef<string>('');
 
   const [pageMessage, setPageMessage] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -1330,13 +1334,62 @@ export default function ShipmentsPage() {
     };
   }, [purchaseOrderHandoffShipmentId, queryClient, setSearchParams]);
 
+  useEffect(() => {
+    if (!dashboardHandoffShipmentId) return;
+    if (dashboardHandoffRef.current === dashboardHandoffShipmentId) return;
+
+    dashboardHandoffRef.current = dashboardHandoffShipmentId;
+    setWorkspaceSection('receiving');
+    setPageError(null);
+    setPageMessage(null);
+
+    let cancelled = false;
+
+    const openDashboardShipment = async () => {
+      try {
+        const shipment = await fetchShipmentById(dashboardHandoffShipmentId);
+        if (cancelled) return;
+
+        queryClient.setQueryData<ShipmentSummary[]>(['shipments'], (current) => {
+          const existing = current ?? [];
+          const withoutCurrent = existing.filter((item) => item.id !== shipment.id);
+          return [shipment, ...withoutCurrent];
+        });
+
+        setSelectedShipmentId(shipment.id);
+        setReceiveDrafts({});
+        setHighlightedItemId('');
+        setPendingAutoReceive(null);
+        setSelectedScannerLocationId('');
+        autoReceiveAttemptKeyRef.current = '';
+        setPageMessage(uiRef.current('Shipment opened from Dashboard.'));
+
+        const nextParams = new URLSearchParams(window.location.search);
+        nextParams.delete('shipmentId');
+        nextParams.delete('source');
+        setSearchParams(nextParams, { replace: true });
+
+        window.requestAnimationFrame(() => {
+          document.getElementById('shipments-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      } catch (error) {
+        if (cancelled) return;
+        dashboardHandoffRef.current = '';
+        setPageError(error instanceof ApiError ? error.message : uiRef.current('Failed to open shipment.'));
+      }
+    };
+
+    void openDashboardShipment();
+    return () => { cancelled = true; };
+  }, [dashboardHandoffShipmentId, queryClient, setSearchParams]);
+
 
   useEffect(() => {
     const shipmentIdFromQuery = searchParams.get('shipmentId');
 
-    // Purchase-order handoff has its own stable direct-open path above. This
-    // effect is reserved for scanner/barcode navigation only.
-    if (searchParams.get('source') === 'purchase-order') {
+    // Purchase-order and Dashboard handoffs have their own source-aware direct-open paths above.
+    // This effect is reserved for scanner/barcode navigation only.
+    if (searchParams.get('source') === 'purchase-order' || searchParams.get('source') === 'dashboard') {
       return;
     }
 

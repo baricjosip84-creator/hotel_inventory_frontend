@@ -421,6 +421,14 @@ export default function SuppliersPage() {
     [suppliers]
   );
 
+  const requestedSupplier = requestedSupplierId ? supplierById.get(requestedSupplierId) ?? null : null;
+
+  const clearRequestedSupplier = () => {
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete('supplier_id');
+    setSearchParams(nextSearchParams, { replace: true });
+  };
+
   const slaBreachBySupplierId = useMemo(() => {
     const map = new Map<string, SupplierSlaBreachItem>();
     slaBreaches.forEach((breach) => {
@@ -713,11 +721,30 @@ export default function SuppliersPage() {
         </div>
 
         {!suppliersQuery.isLoading && !suppliersQuery.isError ? (
-          <div style={styles.resultCount}>
-            {search.trim()
-              ? `${formatLocalizedNumber(filteredSuppliers.length, locale)} ${ui('of')} ${formatLocalizedNumber(suppliers.length, locale)} ${ui('suppliers match.')}`
-              : `${formatLocalizedNumber(suppliers.length, locale)} ${ui('suppliers shown.')}`}
-          </div>
+          <>
+            <div style={styles.resultCount}>
+              {requestedSupplierId
+                ? `${formatLocalizedNumber(filteredSuppliers.length, locale)} ${ui('of')} ${formatLocalizedNumber(suppliers.length, locale)} ${ui('suppliers shown.')}`
+                : search.trim()
+                  ? `${formatLocalizedNumber(filteredSuppliers.length, locale)} ${ui('of')} ${formatLocalizedNumber(suppliers.length, locale)} ${ui('suppliers match.')}`
+                  : `${formatLocalizedNumber(suppliers.length, locale)} ${ui('suppliers shown.')}`}
+            </div>
+            {requestedSupplierId ? (
+              <div className={requestedSupplier ? 'app-info-state' : 'app-warning-state'} style={styles.messageBox}>
+                <div>
+                  <strong>{requestedSupplier ? requestedSupplier.name : ui('Selected supplier unavailable')}</strong>
+                  <div style={styles.rowSubtle}>
+                    {requestedSupplier
+                      ? `${ui('Dashboard supplier context')} · ${formatLocalizedNumber(filteredSuppliers.length, locale)} ${ui('of')} ${formatLocalizedNumber(suppliers.length, locale)}`
+                      : ui('The linked supplier is not available in the current tenant view.')}
+                  </div>
+                </div>
+                <button type="button" style={styles.secondaryButton} onClick={clearRequestedSupplier}>
+                  {ui('Show all suppliers')}
+                </button>
+              </div>
+            ) : null}
+          </>
         ) : null}
 
         {archiveError ? <div className="app-error-state" style={styles.errorBox}>{archiveError}</div> : null}
@@ -1356,6 +1383,14 @@ const styles: Record<string, CSSProperties> = {
     marginBottom: '12px',
     color: '#64748b',
     fontSize: '13px'
+  },
+  messageBox: {
+    marginBottom: '14px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap'
   },
   tableWrapper: {
     background: '#ffffff',

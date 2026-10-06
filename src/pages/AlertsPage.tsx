@@ -305,6 +305,7 @@ export default function AlertsPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedAlertId = searchParams.get('alert_id')?.trim() || '';
+  const focusQueue = searchParams.get('focus_queue') === 'true';
   const { canManageAlerts, canOverrideAlerts } = getRoleCapabilities();
   const canReadProducts = hasPermission(TENANT_PERMISSIONS.PRODUCTS_READ);
   const accessRoleLabel = getCurrentAccessRoleLabel();
@@ -445,6 +446,13 @@ export default function AlertsPage() {
     const target = document.getElementById(`alert-${requestedAlertId}`);
     if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [focusedAlertQuery.data, requestedAlertId]);
+
+  useEffect(() => {
+    if (!focusQueue || alertsQuery.isLoading) return;
+    window.requestAnimationFrame(() => {
+      document.getElementById('alerts-queue')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [alerts.length, alertsQuery.isLoading, focusQueue]);
   const summary = useMemo(
     () => ({
       total: alerts.length,
@@ -723,7 +731,7 @@ export default function AlertsPage() {
         </form>
       </section>
 
-      <section className="app-panel app-panel--padded alerts-section alerts-queue-section" style={styles.panel}>
+      <section id="alerts-queue" className="app-panel app-panel--padded alerts-section alerts-queue-section" style={styles.panel}>
         <div style={styles.queueHeader}>
           <div>
             <div className="alerts-section-heading"><span className="alerts-heading-icon"><TenantNavIcon path="/alerts" size={18} /></span><h2 style={styles.panelTitle}>{ui('Alert queue')}</h2></div>

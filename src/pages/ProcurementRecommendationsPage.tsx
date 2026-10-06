@@ -1,8 +1,8 @@
 import { formatCurrencyAmount, getActiveTenantCurrency, normalizeCurrencyCode } from '../lib/tenantCurrency';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
-import { useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 import type { CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiRequest } from "../lib/api";
@@ -780,13 +780,14 @@ function getErrorMessage(error: unknown, ui: (englishText: string) => string): s
   return ui("Unable to load procurement recommendations.");
 }
 
-function buildRecommendationsPath(filters: RecommendationFilters): string {
+function buildRecommendationsPath(filters: RecommendationFilters, productId = ''): string {
   const params = new URLSearchParams();
   params.set("lookback_days", String(filters.lookbackDays));
   params.set("limit", String(filters.limit));
   params.set("offset", String(filters.offset));
   params.set("active_only", "true");
 
+  if (productId) params.set("product_id", productId);
   if (filters.urgency) params.set("urgency", filters.urgency);
   if (filters.supplierId) params.set("supplier_id", filters.supplierId);
   if (filters.procurementReady)
@@ -802,9 +803,10 @@ function buildRecommendationsPath(filters: RecommendationFilters): string {
 
 async function fetchRecommendations(
   filters: RecommendationFilters,
+  productId = '',
 ): Promise<ReplenishmentRecommendationsResponse> {
   return apiRequest<ReplenishmentRecommendationsResponse>(
-    buildRecommendationsPath(filters),
+    buildRecommendationsPath(filters, productId),
   );
 }
 
@@ -818,6 +820,7 @@ async function fetchProcurementRecommendationOptions(): Promise<ProcurementRecom
 
 async function fetchAllRecommendationRows(
   filters: RecommendationFilters,
+  productId = '',
 ): Promise<{ rows: ReplenishmentRecommendation[]; generatedAt?: string; total: number }> {
   const rows: ReplenishmentRecommendation[] = [];
   let offset = 0;
@@ -825,7 +828,7 @@ async function fetchAllRecommendationRows(
   let total = 0;
 
   while (rows.length < 5000) {
-    const page = await fetchRecommendations({ ...filters, limit: 500, offset });
+    const page = await fetchRecommendations({ ...filters, limit: 500, offset }, productId);
     generatedAt = page.generated_at || generatedAt;
     total = toNumber(page.pagination?.total);
     rows.push(...(page.rows || []));
@@ -1442,6 +1445,8 @@ function Badge({
 
 export default function ProcurementRecommendationsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedProductId = searchParams.get('product_id')?.trim() || '';
   const { locale, ui } = useAppTranslation();
   const formatUiNumber = (value: number | string | null | undefined, digits = 2): string => {
     if (value === null || value === undefined || value === "") return "—";
@@ -1543,12 +1548,12 @@ export default function ProcurementRecommendationsPage() {
   });
 
   const recommendationsQuery = useQuery({
-    queryKey: ["procurement-recommendations", filters],
-    queryFn: () => fetchRecommendations(filters),
+    queryKey: ["procurement-recommendations", filters, requestedProductId],
+    queryFn: () => fetchRecommendations(filters, requestedProductId),
   });
 
   const exportFilteredMutation = useMutation({
-    mutationFn: () => fetchAllRecommendationRows(filters),
+    mutationFn: () => fetchAllRecommendationRows(filters, requestedProductId),
     onSuccess: (payload) => {
       exportRecommendationRowsCsv({
         rows: payload.rows,
@@ -1780,6 +1785,30 @@ export default function ProcurementRecommendationsPage() {
 
   const data = recommendationsQuery.data;
   const rows = useMemo(() => data?.rows ?? [], [data?.rows]);
+  const requestedProductRow = requestedProductId
+    ? rows.find((row) => row.product_id === requestedProductId) ?? null
+    : null;
+
+  useEffect(() => {
+    if (!requestedProductId || recommendationsQuery.isLoading || recommendationsQuery.isError) return;
+    if (!requestedProductRow) return;
+
+    setSelectedProductId(requestedProductRow.product_id);
+    setActiveWorkspaceSection('detail');
+    window.requestAnimationFrame(() => {
+      detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [recommendationsQuery.isError, recommendationsQuery.isLoading, requestedProductId, requestedProductRow]);
+
+  const clearRequestedProduct = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('product_id');
+    setSearchParams(nextParams, { replace: true });
+    setSelectedProductId(null);
+    setActiveWorkspaceSection('queue');
+    window.requestAnimationFrame(() => queueRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+
   const summary: RecommendationSummary = data?.summary ?? {};
   const dashboard = executionDashboardQuery.data;
   const dashboardSummary = dashboard?.summary;
@@ -2031,6 +2060,19 @@ export default function ProcurementRecommendationsPage() {
       </OperationalWorkspaceTabs>
 
       <div ref={queueRef} className="procurement-recommendations-scroll-anchor">
+      {requestedProductId ? (
+        <div className={requestedProductRow ? 'app-info-state' : 'app-warning-state'} style={{ ...styles.infoBox, marginBottom: 14 }}>
+          <strong>{requestedProductRow ? requestedProductRow.product_name : ui('Requested recommendation unavailable')}</strong>
+          <div>
+            {requestedProductRow
+              ? ui('Opened from the Dashboard recommendation card. The matching recommendation is selected below.')
+              : ui('No active procurement recommendation currently matches the Dashboard product context.')}
+          </div>
+          <button type="button" style={styles.secondaryButton} onClick={clearRequestedProduct}>
+            {ui('Show all recommendations')}
+          </button>
+        </div>
+      ) : null}
       <section style={styles.panel}>
         <div style={styles.panelHeader}>
           <div>

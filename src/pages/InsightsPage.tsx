@@ -897,6 +897,11 @@ export default function InsightsPage() {
   const actionAgendaUnavailable = [healthQuery, reorderQuery, depletionRiskQuery, anomaliesQuery, supplierTrustQuery]
     .some((query) => query.isError);
 
+  const unusualAnomalyRows = useMemo(
+    () => (anomaliesQuery.data?.rows ?? []).filter((row) => String(row.anomaly_tier || '').toLowerCase() !== 'normal'),
+    [anomaliesQuery.data?.rows]
+  );
+
   async function refreshAllInsights() {
     try {
       const results = await Promise.all(allInsightQueries.map((query) => query.refetch()));
@@ -950,7 +955,7 @@ export default function InsightsPage() {
       });
     }
 
-    const anomalyTop = anomaliesQuery.data?.rows?.[0];
+    const anomalyTop = unusualAnomalyRows[0];
     if (anomalyTop && canOpenStockMovements) {
       nextActions.push({
         title: ui('Review unusual outbound activity'),
@@ -978,7 +983,7 @@ export default function InsightsPage() {
     return nextActions.slice(0, 4);
   }, [
     activeReorderRows,
-    anomaliesQuery.data?.rows,
+    unusualAnomalyRows,
     canOpenDashboard,
     canOpenProducts,
     canOpenStock,
@@ -2377,9 +2382,9 @@ export default function InsightsPage() {
       <Section title={ui("Unusual inventory movement")} subtitle={ui("Products whose recent outbound activity looks unusual compared to their own baseline.")} iconPath="/stock-movements">
         {anomaliesQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>{ui("Loading anomaly signals...")}</div> : null}
         {anomaliesQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(anomaliesQuery.error, ui('Unknown error'))}</div> : null}
-        {anomaliesQuery.data?.rows.length ? (
+        {unusualAnomalyRows.length ? (
           <div style={styles.list}>
-            {anomaliesQuery.data.rows.slice(0, 10).map((row) => (
+            {unusualAnomalyRows.slice(0, 10).map((row) => (
               <article key={row.product_id} className="insights-item-card" style={styles.itemCard}>
                 <div style={styles.itemTitle}>{row.product_name}</div>
                 <div style={styles.itemMeta}>{ui('Anomaly {score} · Tier {tier}').replace('{score}', formatNumber(row.anomaly_score, 0)).replace('{tier}', formatReadableStatus(row.anomaly_tier))}</div>

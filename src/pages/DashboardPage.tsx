@@ -331,6 +331,31 @@ function movementDisplayValue(row: RecentActivityRow): string {
   return String(row.movement_kind || specificType || 'other');
 }
 
+function dashboardReasonLabel(row: RecentActivityRow, ui: (englishText: string) => string): string {
+  const reason = String(row.reason || '').trim();
+  if (!reason) return '-';
+
+  if (row.shipment_id && (reason === 'shipment_receive' || reason.startsWith('shipment_receive:'))) {
+    return row.shipment_po_number || ui('Shipment received');
+  }
+
+  if (reason.startsWith('stock_transfer_out:') || reason.startsWith('stock_transfer_in:')) {
+    return ui('Stock transfer');
+  }
+
+  if (reason.startsWith('outbound_dispatch:')) {
+    const reference = reason.slice('outbound_dispatch:'.length).trim();
+    return reference ? `${ui('Order')} ${reference}` : ui('Outbound dispatched');
+  }
+
+  if (reason.startsWith('usage_reversal:')) return ui('Usage reversed');
+  if (reason.startsWith('usage:') || reason === 'consumption') return ui('Stock consumed');
+  if (reason === 'inventory_count') return ui('Physical count');
+  if (reason === 'manual_adjustment') return ui('Manual adjustment');
+
+  return reason;
+}
+
 
 function healthBadgeStyle(tier: string): CSSProperties {
   if (tier === 'excellent') {
@@ -668,7 +693,9 @@ export default function DashboardPage() {
   }, [reorderRecommendationsQuery.data]);
 
   const topAnomalies = useMemo(() => {
-    return (anomaliesQuery.data?.rows ?? []).slice(0, 6);
+    return (anomaliesQuery.data?.rows ?? [])
+      .filter((row) => String(row.anomaly_tier || '').toLowerCase() !== 'normal')
+      .slice(0, 6);
   }, [anomaliesQuery.data]);
 
   if (summaryQuery.isLoading) {
@@ -804,7 +831,7 @@ export default function DashboardPage() {
       <div style={styles.quickActionRow}>
         {canViewStock ? <ActionLink to="/stock" label={ui('Open Stock')} iconPath="/stock" /> : null}
         {canViewShipments ? <ActionLink to="/shipments" label={ui('Open Shipments')} iconPath="/shipments" /> : null}
-        {canViewAlerts ? <ActionLink to="/alerts?resolved=false" label={ui('Review Alerts')} iconPath="/alerts" /> : null}
+        {canViewAlerts ? <ActionLink to="/alerts?resolved=false&focus_queue=true" label={ui('Review Alerts')} iconPath="/alerts" /> : null}
         {canViewProducts ? (
           <ActionLink to="/products" label={canManageProducts ? ui('Manage Products') : ui('Open Products')} iconPath="/products" />
         ) : null}
@@ -988,6 +1015,14 @@ export default function DashboardPage() {
                       <span>{ui('Risk Score')}</span>
                       <strong>{formatNumber(row.risk_score)}</strong>
                     </div>
+
+                    {canViewStock ? (
+                      <ActionLink
+                        to={`/stock?stock_id=${encodeURIComponent(row.stock_id)}`}
+                        label={ui('Open Stock')}
+                        iconPath="/stock"
+                      />
+                    ) : null}
                   </div>
                 ))
               )}
@@ -999,7 +1034,7 @@ export default function DashboardPage() {
           title={ui('Reorder Recommendations')}
           iconPath="/insights"
           iconTone="default"
-          subtitle={ui('Explainable reorder signals based on current stock and classified consumption.')}
+          subtitle={ui('Explainable reorder signals based on current stock and classified consumption. Recommendations can exceed the configured minimum when recent demand requires additional coverage.')}
           actionHint={ui('Action queue')}
         >
           {!canViewInsights ? (
@@ -1048,7 +1083,7 @@ export default function DashboardPage() {
                     </div>
 
                     <div style={styles.metricRow}>
-                      <span>{ui('Min Stock')}</span>
+                      <span>{ui('Configured Minimum')}</span>
                       <strong>{formatNumber(row.min_stock)}</strong>
                     </div>
 
@@ -1070,6 +1105,12 @@ export default function DashboardPage() {
                       <span>{ui('Recommended Reorder')}</span>
                       <strong>{formatNumber(row.recommended_reorder_quantity)}</strong>
                     </div>
+
+                    <ActionLink
+                      to={`/procurement-recommendations?product_id=${encodeURIComponent(row.product_id)}`}
+                      label={ui('Review recommendation')}
+                      iconPath="/procurement-recommendations"
+                    />
                   </div>
                 ))
               )}
@@ -1150,7 +1191,7 @@ export default function DashboardPage() {
                     <div className="dashboard-record-card__header dashboard-record-card__header--split">
                       <div>
                         {canViewShipments ? (
-                          <Link to={`/shipments?shipmentId=${encodeURIComponent(row.id)}`} style={styles.tableRecordLink} title={ui('Open Shipment')}>
+                          <Link to={`/shipments?shipmentId=${encodeURIComponent(row.id)}&source=dashboard`} style={styles.tableRecordLink} title={ui('Open Shipment')}>
                             {row.po_number || '-'}
                           </Link>
                         ) : <strong>{row.po_number || '-'}</strong>}
@@ -1297,6 +1338,14 @@ export default function DashboardPage() {
                       <span>{ui('Anomaly Score')}</span>
                       <strong>{formatNumber(row.anomaly_score)}</strong>
                     </div>
+
+                    {canViewStockMovements ? (
+                      <ActionLink
+                        to={`/stock-movements?product_id=${encodeURIComponent(row.product_id)}`}
+                        label={ui('Open Stock Movements')}
+                        iconPath="/stock-movements"
+                      />
+                    ) : null}
                   </div>
                 ))
               )}
@@ -1344,7 +1393,7 @@ export default function DashboardPage() {
                       <div className="dashboard-activity-card__details">
                         <span><small>{ui('Location')}</small><b>{row.storage_location_name || ui('Location unavailable')}</b></span>
                         <span><small>{ui('Type')}</small><b>{enumDisplayLabel(movementDisplayValue(row), ui)}</b></span>
-                        <span><small>{ui('Reason')}</small><b>{row.reason || '-'}</b></span>
+                        <span><small>{ui('Reason')}</small><b>{dashboardReasonLabel(row, ui)}</b></span>
                         <span><small>{ui('User')}</small><b>{row.user_name || (row.user_id ? ui('User name unavailable') : ui('System'))}</b></span>
                       </div>
                     </article>
