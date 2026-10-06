@@ -516,3 +516,196 @@ BATCH 003 STATUS
 NEXT CORRECTION WORK
 - Continue through the remaining canonical audit findings, prioritizing confirmed defects still present in the corrected cumulative source.
 - I18N-DEF-001 (page subtitles/navigation descriptions bypass localization) remains open and was NOT silently claimed fixed by this batch.
+
+================================================================================
+SURGICAL CORRECTION BATCH 004 — I18N / CROSS-DOMAIN CONTEXT / BUILD BASELINE
+Date: 6 Oct 2026
+Baseline: cumulative frontend surgical-fix-003, originally derived from authoritative hotel-inventory-frontend(7).zip
+Backend baseline: authoritative hotel-inventory-backend(7).zip — unchanged in this batch
+Audit source: Inventory_Management_App_Tenant_Audit_Findings_2026-09-26_v93.txt
+================================================================================
+
+FIX 016 — I18N-DEF-001 — PAGE SUBTITLES / NAVIGATION DESCRIPTIONS BYPASSED LOCALIZATION
+Audit finding:
+- Tenant shell could show translated controls while page subtitles and navigation-description tooltips remained English.
+
+Frontend files changed:
+- src/layouts/AppLayout.tsx
+- src/i18n/tenantUiTranslations.ts
+
+Surgical correction:
+- Navigation item description tooltips now pass through the existing tenant UI translation runtime.
+- Current-page subtitles now pass through the same tenant UI translation runtime.
+- Added complete five-language catalog rows for every current tenant navigation/page description that previously had no catalog entry.
+- Also added five-language catalog rows for the exact Tenant Audit filter hints introduced in Batch 001:
+  - `Exact code, e.g. shipment.received`
+  - `Exact type, e.g. shipments`
+
+Result:
+- Current tenant navigation/page descriptions are catalog-backed across EN/DE/ES/FR/HR.
+- Existing business/runtime values remain untouched; this is display-only localization.
+
+--------------------------------------------------------------------------------
+
+FIX 017 — REPLENISHMENT PLANNING TYPECHECK BASELINE DEFECT
+Source defect discovered during Batch 003 verification:
+- src/pages/ReplenishmentPlanningPage.tsx failed TypeScript checking because an `unknown` fallback value could be passed into the currency formatter without explicit narrowing.
+
+Frontend file changed:
+- src/pages/ReplenishmentPlanningPage.tsx
+
+Surgical correction:
+- Explicitly narrowed the fallback value to `number | string | null | undefined` before passing it to `formatCurrencyAmount`.
+- No business behavior or currency calculation was changed.
+
+Result:
+- `npm run typecheck:ci` now passes.
+
+--------------------------------------------------------------------------------
+
+FIX 018 — CDO-DEF-001 — CROSS-DOMAIN REVIEW SCORE DISPLAYED 100x TOO LARGE
+Audit finding:
+- Review score was displayed with the generic fraction formatter even though the backend review score is already an integer percentage on a 0–100 scale.
+- Example risk: backend 80 could display as 8,000%.
+
+Frontend file changed:
+- src/pages/CrossDomainOptimizationPage.tsx
+
+Surgical correction:
+- Added a dedicated review-score formatter for backend 0–100 scores.
+- Review cards now render the backend score directly as a percentage.
+- Existing 0–1 ratio/score fields continue using the original percentage formatter.
+
+Result:
+- Review score scale now matches the backend contract without changing unrelated percentage fields.
+
+--------------------------------------------------------------------------------
+
+FIX 019 — CDO-DEF-003 — SELECTED CROSS-DOMAIN PLANNING RUN LOST ON BACK / F5
+Audit finding:
+- The selected Cross-Domain planning run existed only in component state and was lost on browser Back, refresh, or remount.
+
+Frontend file changed:
+- src/pages/CrossDomainOptimizationPage.tsx
+
+Surgical correction:
+- Selected run is now backed by the `review_run_id` URL query parameter.
+- Opening a run updates `review_run_id` using replace semantics.
+- Page initialization and browser URL changes restore the selected run from the query parameter.
+- Clearing/changing evidence filters also clears the selected-run URL state intentionally.
+
+Result:
+- Selected planning-run context is durable across refresh and browser navigation.
+
+--------------------------------------------------------------------------------
+
+FIX 020 — CDO-DEF-004 — LEARNING FEEDBACK HANDOFF LOST EXACT RUN / OPTION CONTEXT
+Audit finding:
+- Cross-Domain opened Learning Feedback generically, forcing the user to rediscover the exact planning run/option.
+
+Frontend files changed:
+- src/pages/CrossDomainOptimizationPage.tsx
+- src/pages/DecisionLearningFeedbackPage.tsx
+
+Surgical correction:
+- Cross-Domain now opens Learning Feedback with durable query context:
+  - mode=optimization-results
+  - source_id=<selected Cross-Domain run id>
+  - option_id=<selected option id> when available
+- Learning Feedback now consumes these query parameters.
+- After source data loads, it selects the matching optimization-results source and matching option when present, including the expected-evidence snapshot used by the existing form.
+- Existing manual navigation remains supported when no handoff query is supplied.
+
+Result:
+- The exact Cross-Domain run and selected option carry into Learning Feedback instead of landing on a generic page state.
+
+--------------------------------------------------------------------------------
+
+FIX 021 — CDO-DEF-005 — INTELLIGENCE REVIEW HANDOFF LOST EXACT REVIEW CONTEXT
+Audit finding:
+- Cross-Domain opened Intelligence Review generically instead of identifying the exact selected optimization run/review action.
+
+Frontend file changed:
+- src/pages/CrossDomainOptimizationPage.tsx
+
+Backend contract verified, no backend edit required:
+- Cross-Domain run detail already exposes an `intelligence_review` handoff with `source_action_id`.
+
+Surgical correction:
+- Run-detail handoff typing now carries `source_action_id`.
+- Cross-Domain builds `/intelligence-review?source_action_id=...` from the backend handoff.
+- A deterministic `optimization_run:<run id>` fallback is retained when the handoff does not supply the identifier.
+- Both existing Intelligence Review entry actions now use the contextual path.
+
+Result:
+- Intelligence Review receives exact source-action context for the selected Cross-Domain run.
+
+--------------------------------------------------------------------------------
+
+REGRESSION / HISTORICAL GUARD UPDATES
+Frontend files changed/added:
+- scripts/check-inventory-i18n-build-surgical-fixes-v349249.mjs (new)
+- scripts/check-cross-domain-optimization-operational-completion-v349170.mjs
+- package.json
+
+New guard registered:
+- `check:inventory-i18n-build-surgical-fixes-v349249`
+
+New guard coverage includes:
+- tenant navigation hover descriptions use localization
+- page subtitles use localization
+- all current tenant navigation/page descriptions have catalog rows
+- Batch 001 Audit exact-code/type hints remain translated
+- Replenishment formatter input is explicitly narrowed
+- Cross-Domain review scores use the backend 0–100 score directly
+- Cross-Domain selected run is URL-backed
+- Intelligence Review handoff carries source_action_id
+- Learning Feedback handoff carries run and option IDs
+- Learning Feedback consumes the durable run/option handoff
+
+Historical Cross-Domain operational guard update:
+- Updated only the guard assertions that expected obsolete generic navigation strings.
+- It now verifies the new contextual Learning Feedback and Intelligence Review paths instead of requiring generic `navigate('/...')` calls.
+- Product behavior was not weakened to satisfy the historical guard.
+
+VERIFICATION COMPLETED LOCALLY
+- npm run check:inventory-i18n-build-surgical-fixes-v349249 -> PASS (11/11)
+- npm run check:multilingual-foundation -> PASS
+- npm run check:tenant-admin-system-multilingual -> PASS
+- npm run check:tenant-dashboard-shared-multilingual -> PASS
+- npm run check:tenant-audit-multilingual -> PASS
+- npm run check:cross-domain-optimization-operational-completion-v349170 -> PASS
+- npm run check:tenant-cross-domain-optimization-multilingual -> PASS
+- npm run check:cross-domain-translation-completion-v349181 -> PASS (9/9)
+- npm run check:learning-feedback-operational-completion-v349165 -> PASS (20/20)
+- npm run check:learning-feedback-business-presentation-closure-v349184 -> PASS (14/14)
+- npm run check:tenant-decision-learning-feedback-page-completion-multilingual -> PASS
+- npm run check:tenant-replenishment-planning-multilingual -> PASS
+- npm run typecheck:ci -> PASS
+- Full `npm run build` prebuild/contract suite was run with BACKEND_ROOT pointing at the authoritative backend source. All prebuild checks reached and passed through v3.49.244 and TypeScript checking. Final Vite bundling could not execute in this extracted ZIP environment because the source-supplied node_modules lacks the Linux native optional Rolldown binding (`@rolldown/binding-linux-x64-gnu`) and the archived vite shim lacks executable permission. This is an environment/dependency artifact, not a TypeScript or regression-check failure; no dependency reinstall was performed.
+
+BACKEND CHANGES IN BATCH 004
+- None.
+- hotel-inventory-backend(7).zip remains unchanged.
+
+FILES CHANGED IN BATCH 004
+- src/layouts/AppLayout.tsx
+- src/i18n/tenantUiTranslations.ts
+- src/pages/ReplenishmentPlanningPage.tsx
+- src/pages/CrossDomainOptimizationPage.tsx
+- src/pages/DecisionLearningFeedbackPage.tsx
+- scripts/check-inventory-i18n-build-surgical-fixes-v349249.mjs (new)
+- scripts/check-cross-domain-optimization-operational-completion-v349170.mjs
+- package.json
+
+DELIBERATELY NOT CLAIMED FIXED
+- CDO-DEF-002 — Cross-Domain -> Replenishment Planning exact selected run/option handoff remains OPEN.
+- Current source recommendation linkage does not provide an obvious persisted Replenishment Planning run identifier equivalent to the exact Learning Feedback / Intelligence Review contracts. This needs a deliberate data-contract decision rather than a guessed query parameter.
+
+BATCH 004 STATUS
+- IMPLEMENTED LOCALLY
+- TARGETED REGRESSION CHECKS PASS
+- TYPESCRIPT CHECK PASS
+- FULL PREBUILD CONTRACT SUITE PASS
+- FINAL VITE BUNDLE BLOCKED ONLY BY EXTRACTED ZIP NATIVE-DEPENDENCY ENVIRONMENT
+- READY FOR SOURCE PACKAGE HANDOFF / DEPLOYMENT RETEST

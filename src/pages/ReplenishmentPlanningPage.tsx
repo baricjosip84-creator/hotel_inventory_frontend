@@ -267,9 +267,13 @@ export default function ReplenishmentPlanningPage() {
     try {
       return formatLocalizedCurrency(numberValue(value), normalizeCurrencyCode(currency || getActiveTenantCurrency()), locale, { maximumFractionDigits: 4 });
     } catch {
-      const fallbackValue = typeof value === 'number' || typeof value === 'string' || value == null
+      const fallbackValue: number | string | null | undefined = typeof value === 'number' || typeof value === 'string'
         ? value
-        : String(value);
+        : value === null
+          ? null
+          : value === undefined
+            ? undefined
+            : String(value);
       return formatCurrencyAmount(fallbackValue, currency, 4);
     }
   };

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router';
 import { apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
 import type { AppLocale } from '../i18n/config';
@@ -5173,6 +5174,13 @@ function recordKeyForMode(mode: FeedbackMode, row: Record<string, unknown>): str
 export default function DecisionLearningFeedbackPage() {
   const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const requestedModeParam = searchParams.get('mode')?.trim() || '';
+  const requestedMode: FeedbackMode = (['learning-outcomes', 'forecast-accuracy', 'policy-effectiveness', 'optimization-results'] as FeedbackMode[]).includes(requestedModeParam as FeedbackMode)
+    ? requestedModeParam as FeedbackMode
+    : 'learning-outcomes';
+  const requestedSourceId = searchParams.get('source_id')?.trim() || '';
+  const requestedOptionId = searchParams.get('option_id')?.trim() || '';
   const canGovern = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN);
   const canOverrideIndependentReview = hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_REVIEW_OVERRIDE);
   const currentUserId = getCurrentTenantUserId();
@@ -5185,10 +5193,10 @@ export default function DecisionLearningFeedbackPage() {
   // Previous tenant-facing heading retained as commented reference: {ui('Record feedback evidence')}
   // Previous tenant-facing observation label retained as commented reference: ui('Result observed on')
   const [view, setView] = useState<LearningFeedbackView>('feedback');
-  const [mode, setMode] = useState<FeedbackMode>('learning-outcomes');
+  const [mode, setMode] = useState<FeedbackMode>(requestedMode);
   const [form, setForm] = useState<FeedbackFormState>(() => ({ ...defaultForm, observedAt: nowLocalDateTimeValue(), financialImpactCurrency: getActiveTenantCurrency() }));
   const [businessEvidenceSnapshots, setBusinessEvidenceSnapshots] = useState<BusinessEvidenceSnapshots>({});
-  const [sourceId, setSourceId] = useState('');
+  const [sourceId, setSourceId] = useState(requestedSourceId);
   const [sourceSearch, setSourceSearch] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [pageOffsets, setPageOffsets] = useState<Record<EvidenceBucket, number>>({ outcomes: 0, forecast_accuracy: 0, policy_effectiveness: 0, optimization_results: 0 });
@@ -5202,6 +5210,7 @@ export default function DecisionLearningFeedbackPage() {
   const [selectedEvidenceMode, setSelectedEvidenceMode] = useState<FeedbackMode | null>(null);
   const feedbackFormRef = useRef<HTMLElement | null>(null);
   const evidenceDetailRef = useRef<HTMLDivElement | null>(null);
+  const handoffAppliedRef = useRef(false);
   const pageLimit = 25;
   const reviewLimit = 25;
 
@@ -5423,6 +5432,26 @@ export default function DecisionLearningFeedbackPage() {
     const expectedSnapshot = businessEvidenceSnapshot(optionExpected, locale, ui);
     setBusinessEvidenceSnapshots((current) => ({ ...current, expected: expectedSnapshot }));
   };
+
+  useEffect(() => {
+    if (handoffAppliedRef.current || requestedMode !== 'optimization-results' || mode !== 'optimization-results' || !requestedSourceId) return;
+    const source = (sourceQuery.data?.sources || []).find((item) => item.id === requestedSourceId);
+    if (!source) return;
+
+    handleSourceChange(requestedSourceId);
+    const requestedOption = requestedOptionId ? (source.options || []).find((item) => item.id === requestedOptionId) : null;
+    if (requestedOption) {
+      const optionExpected = requestedOption.tradeoff_summary || requestedOption.projected_outcome || { option: requestedOption.title };
+      setForm((current) => ({
+        ...current,
+        optimizationOptionId: requestedOptionId,
+        expected: formBusinessEvidence(optionExpected, locale, ui)
+      }));
+      const expectedSnapshot = businessEvidenceSnapshot(optionExpected, locale, ui);
+      setBusinessEvidenceSnapshots((current) => ({ ...current, expected: expectedSnapshot }));
+    }
+    handoffAppliedRef.current = true;
+  }, [mode, requestedMode, requestedSourceId, requestedOptionId, sourceQuery.data]);
 
   const viewEvidence = async (nextMode: FeedbackMode, row: Record<string, unknown>) => {
     if (nextMode === 'forecast-accuracy' && !canReadInsights) return;

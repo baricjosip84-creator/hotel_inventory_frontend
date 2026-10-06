@@ -1,0 +1,43 @@
+INVENTORY MANAGEMENT APP — SURGICAL FIX 004 VERIFICATION
+Date: 6 Oct 2026
+
+BASELINE
+- Frontend: cumulative surgical-fix-003, originally based on authoritative hotel-inventory-frontend(7).zip
+- Backend: authoritative hotel-inventory-backend(7).zip (unchanged)
+- Audit: Inventory_Management_App_Tenant_Audit_Findings_2026-09-26_v93.txt
+
+CHANGES VERIFIED
+1. Tenant navigation descriptions and page subtitles use the tenant UI translation runtime.
+2. All current tenant navigation/page descriptions are catalog-backed in EN/DE/ES/FR/HR.
+3. Batch 001 Tenant Audit exact-code/type hints are catalog-backed.
+4. Replenishment Planning currency fallback type narrowing closes the existing TypeScript error.
+5. Cross-Domain review score renders backend 0–100 percentage directly.
+6. Cross-Domain selected run is stored/restored through review_run_id in the URL.
+7. Cross-Domain -> Intelligence Review carries exact source_action_id context.
+8. Cross-Domain -> Learning Feedback carries exact run and selected-option context.
+9. Learning Feedback consumes those context parameters and preselects the matching source/option.
+
+CHECK RESULTS
+PASS — check:inventory-i18n-build-surgical-fixes-v349249 — 11/11
+PASS — check:multilingual-foundation
+PASS — check:tenant-admin-system-multilingual
+PASS — check:tenant-dashboard-shared-multilingual
+PASS — check:tenant-audit-multilingual
+PASS — check:cross-domain-optimization-operational-completion-v349170
+PASS — check:tenant-cross-domain-optimization-multilingual
+PASS — check:cross-domain-translation-completion-v349181 — 9/9
+PASS — check:learning-feedback-operational-completion-v349165 — 20/20
+PASS — check:learning-feedback-business-presentation-closure-v349184 — 14/14
+PASS — check:tenant-decision-learning-feedback-page-completion-multilingual
+PASS — check:tenant-replenishment-planning-multilingual
+PASS — typecheck:ci
+PASS — full prebuild contract/check sequence through v3.49.244 when BACKEND_ROOT points to the authoritative backend source
+
+FINAL BUNDLE NOTE
+`npm run build` reached the Vite bundling stage after all prebuild checks passed. Final Vite execution is blocked in this extracted-source environment because archived node_modules does not contain the Linux native optional Rolldown binding (`@rolldown/binding-linux-x64-gnu`) and the archived vite shim is not executable. Running Vite through Node confirms the missing native optional dependency. No npm dependency reinstall was performed, so this is recorded as an environment/dependency limitation rather than a source-code verification failure.
+
+BACKEND CHANGES
+None.
+
+OPEN / NOT CLAIMED FIXED
+CDO-DEF-002 — exact Cross-Domain -> Replenishment Planning selected run/option context remains open pending a deliberate persisted-context/data-contract decision.

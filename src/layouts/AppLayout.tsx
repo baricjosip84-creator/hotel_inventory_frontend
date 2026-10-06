@@ -854,7 +854,7 @@ export default function AppLayout() {
                   <NavLink
                     key={item.to}
                     to={item.to}
-                    title={item.description}
+                    title={ui(item.description)}
                     onClick={(event) => handleNavigationClick(event, item.to)}
                     style={({ isActive }) => ({
                       ...styles.navItem,
@@ -983,7 +983,7 @@ export default function AppLayout() {
                   ...(isMobile ? styles.headerTextMobile : {})
                 }}
               >
-                {pageMeta.subtitle}
+                {ui(pageMeta.subtitle)}
               </p>
             </div>
           </div>
