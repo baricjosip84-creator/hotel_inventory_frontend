@@ -493,6 +493,37 @@
   gap: 14px !important;
 }
 
+.ai-review-page__queue-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.ai-review-page__technical-details {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 10px;
+}
+
+.ai-review-page__technical-details summary {
+  cursor: pointer;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ai-review-page__technical-details code {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.ai-review-page__linked-execution {
+  margin-top: 8px;
+  padding: 9px 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 9px;
+  background: #eff6ff;
+}
+
 .ai-review-page__review-card {
   position: relative;
   overflow: hidden;
@@ -648,6 +679,12 @@
 
 .ai-review-page--refined .table td {
   border-top-color: #eef2f7;
+}
+
+@media (max-width: 1180px) {
+  .ai-review-page__queue-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {

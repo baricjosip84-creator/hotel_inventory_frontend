@@ -3747,7 +3747,7 @@ type AIReviewHistoryResponse = {
 };
 
 type ReviewDecisionDraft = {
-  decision: ReviewDecision;
+  decision: '' | ReviewDecision;
   reason_category: string;
   reviewer_notes: string;
   override_reason: string;
@@ -3866,7 +3866,7 @@ const ESCALATION_TARGET_OPTIONS: Array<{ value: EscalationTargetRole; label: str
 ];
 
 const defaultReviewDecisionDraft: ReviewDecisionDraft = {
-  decision: 'acknowledged',
+  decision: '',
   reason_category: '',
   reviewer_notes: '',
   override_reason: '',
@@ -4043,7 +4043,8 @@ const RECOMMENDATION_CANONICAL_LABELS: Record<string, string> = {
   local_rules_fallback: 'Local rules fallback',
   openai_responses: 'External AI response',
   structured_evidence: 'Structured evidence',
-  metadata_only: 'Metadata only'
+  metadata_only: 'Metadata only',
+  prepare_min_stock_proposal: 'Minimum-stock proposal'
 };
 
 function recommendationLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
@@ -4555,7 +4556,7 @@ type BusinessImpactRow = { label: string; value: string };
 function reviewSystemValueLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
   const raw = String(value || 'unknown');
   const canonical = RECOMMENDATION_CANONICAL_LABELS[raw];
-  return canonical ? ui(canonical) : raw;
+  return canonical ? ui(canonical) : formatLabel(raw);
 }
 
 function explainabilityFactorLabel(value: string, ui: (englishText: string) => string): string {
@@ -4888,7 +4889,7 @@ function reviewLifecycleMeaning(status: string | null | undefined, ui: (englishT
 
 function reviewDecisionValidationMessage(decision: ReviewDecision | undefined, draft: ReviewDecisionDraft, ui: (englishText: string) => string): string | null {
   if (!decision) {
-    return ui('No review decision is currently available for this lifecycle state.');
+    return ui('Select a review decision before recording it.');
   }
 
   const reasonRequired = !['acknowledged', 'reopened'].includes(decision);
@@ -5764,7 +5765,7 @@ export default function HumanInLoopAIReviewPage() {
     if (!sourceActionId) return;
     const draft = reviewDecisionDrafts[sourceActionId] || defaultReviewDecisionDraft;
     const allowed = review.lifecycle?.allowed_decisions || [];
-    const decision = allowed.includes(draft.decision) ? draft.decision : allowed[0];
+    const decision = draft.decision && allowed.includes(draft.decision) ? draft.decision : undefined;
     if (!decision) return;
 
     setReviewActionMessage(null);
@@ -9454,7 +9455,7 @@ export default function HumanInLoopAIReviewPage() {
         {reviews.length === 0 && !reviewQuery.isLoading && !reviewQuery.error ? (
           <div className="empty-state">{ui(requestedSourceActionId ? 'The requested review is not available to your role or is no longer available.' : 'No recommendation review items match the selected filters.')}</div>
         ) : (
-          <div style={reviewListStyle}>
+          <div className="ai-review-page__queue-list">
             {reviews.map((review) => {
               const sourcePath = sourceReviewToAppPath(review);
               const confidence = review.confidence_visualization;
@@ -9492,9 +9493,9 @@ export default function HumanInLoopAIReviewPage() {
                 if (!isEscalatedReview || currentRoleOwnsEscalation) return true;
                 return adminCanReassignEscalation && option.value === 'escalated';
               });
-              const selectedDecision = visibleDecisionOptions.some((option) => option.value === decisionDraft.decision)
-                ? decisionDraft.decision
-                : visibleDecisionOptions[0]?.value;
+              const selectedDecision: ReviewDecision | undefined = visibleDecisionOptions.some((option) => option.value === decisionDraft.decision)
+                ? decisionDraft.decision as ReviewDecision
+                : undefined;
               const decisionValidationMessage = reviewDecisionValidationMessage(selectedDecision, decisionDraft, ui);
               const historyIsSelected = selectedHistorySourceActionId === sourceActionId;
               const businessImpactRows = reviewBusinessImpactRows(review, ui, locale);
@@ -9515,7 +9516,11 @@ export default function HumanInLoopAIReviewPage() {
                     <span className="ai-review-page__badge">{recommendationLabel(review.review_state, ui)}</span>
                     {dueIndicator === 'overdue' ? <span className="ai-review-page__badge ai-review-page__badge--overdue">{ui('OVERDUE')}</span> : dueIndicator === 'due_soon' ? <span className="ai-review-page__badge ai-review-page__badge--amber">{ui('Due soon')}</span> : null}
                     <span className="ai-review-page__badge ai-review-page__badge--violet">{recommendationLabel(review.ai_operation_domain, ui)}</span>
-                    {review.governance_approval_guidance?.approval_required && reviewStateIsActive(lifecycle?.current_status || review.review_state) ? <span className="ai-review-page__badge ai-review-page__badge--amber">{ui("Approval required")}</span> : null}
+                    {review.governance_approval_guidance?.approval_required
+                      && reviewStateIsActive(lifecycle?.current_status || review.review_state)
+                      && (lifecycle?.current_status || review.review_state) !== 'approval_required'
+                      ? <span className="ai-review-page__badge ai-review-page__badge--amber">{ui("Approval required")}</span>
+                      : null}
                   </div>
                   <div className="ai-review-page__review-heading"><span className="ai-review-page__review-icon ai-review-page__icon--violet"><TenantNavIcon path="/intelligence-review" size={18} /></span><h3>{intelligenceReviewTitle(review, ui)}</h3></div>
                   <p className="card__subtext">{review.summary ? (review.summary_key ? ui(review.summary) : review.summary) : ui('No review summary was provided.')}</p>
@@ -9562,10 +9567,13 @@ export default function HumanInLoopAIReviewPage() {
                   <AdaptivePolicyEvidencePanel review={review} ui={ui} locale={locale} />
 
                   {canViewDiagnostics && review.source_reference?.source_id ? (
-                    <div style={{ marginTop: 12 }}>
-                      <div className="card__label">{ui("Source record")}</div>
-                      <p className="card__subtext">{recommendationLabel(review.source_reference.source_type, ui)} · {review.source_reference.source_id}</p>
-                    </div>
+                    <details className="ai-review-page__technical-details" style={{ marginTop: 12 }}>
+                      <summary>{ui('Technical / audit details')}</summary>
+                      <div style={{ marginTop: 8 }}>
+                        <div className="card__label">{ui("Source record")}</div>
+                        <p className="card__subtext">{recommendationLabel(review.source_reference.source_type, ui)} · <code>{review.source_reference.source_id}</code></p>
+                      </div>
+                    </details>
                   ) : null}
 
                   {review.explainability_review?.primary_factors?.length ? (
@@ -9588,7 +9596,7 @@ export default function HumanInLoopAIReviewPage() {
                   <div className="ai-review-page__lifecycle-panel">
                     <div className="card__label">{ui("Review status")}</div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-                      <span style={badgeStyle}>{ui("Status:")} {isForecastReview && (lifecycle?.current_status || review.review_state) === 'approved_for_manual_action' ? ui('Approved for advisory use') : recommendationLabel(lifecycle?.current_status || review.review_state, ui)}</span>
+                      <span style={badgeStyle}>{ui("Review outcome:")} {isForecastReview && (lifecycle?.current_status || review.review_state) === 'approved_for_manual_action' ? ui('Approved for advisory use') : recommendationLabel(lifecycle?.current_status || review.review_state, ui)}</span>
                       <span style={badgeStyle}>{lifecycle?.persisted ? `${ui('Version')} ${formatLocalizedNumber(lifecycle.version || 1, locale)}` : ui('Not yet reviewed')}</span>
                       {lifecycle?.reviewer_role ? <span style={badgeStyle}>{ui("Reviewer:")} {recommendationLabel(lifecycle.reviewer_role, ui)}</span> : null}
                     </div>
@@ -9606,9 +9614,9 @@ export default function HumanInLoopAIReviewPage() {
                     {lifecycle?.reviewer_notes ? <p className="card__subtext" style={{ marginTop: 8 }}>{ui("Latest notes:")} {lifecycle.reviewer_notes}</p> : null}
                     {lifecycle?.override_reason ? <p className="card__subtext">{ui("Override reason:")} {lifecycle.override_reason}</p> : null}
                     {lifecycle?.execution_request_id ? (
-                      <p className="card__subtext">
-                        {ui('A linked Execution Request exists.')}
-                        {lifecycle.execution_request_status ? ` · ${ui('Status:')} ${recommendationLabel(lifecycle.execution_request_status, ui)}` : ''}
+                      <p className="card__subtext ai-review-page__linked-execution">
+                        <strong>{ui('Linked Execution Request:')}</strong>
+                        {lifecycle.execution_request_status ? ` ${ui('Status:')} ${recommendationLabel(lifecycle.execution_request_status, ui)}` : ` ${ui('Linked')}`}
                         {lifecycle.execution_request_execution_status ? ` · ${ui('Execution:')} ${recommendationLabel(lifecycle.execution_request_execution_status, ui)}` : ''}
                       </p>
                     ) : null}
@@ -9622,9 +9630,10 @@ export default function HumanInLoopAIReviewPage() {
                           <span className="card__subtext">{ui("Decision")}</span>
                           <select
                             style={{ ...selectStyle, width: '100%', marginTop: 4 }}
-                            value={selectedDecision}
-                            onChange={(event) => updateReviewDecisionDraft(sourceActionId, { decision: event.target.value as ReviewDecision })}
+                            value={selectedDecision || ''}
+                            onChange={(event) => updateReviewDecisionDraft(sourceActionId, { decision: event.target.value as '' | ReviewDecision })}
                           >
+                            <option value="" disabled>{ui('Select decision')}</option>
                             {visibleDecisionOptions.map((option) => (
                               <option key={option.value} value={option.value}>
                                 {ui(option.value === 'escalated' && isEscalatedReview ? 'Update escalation' : isForecastReview && option.value === 'approved_for_manual_action' ? 'Approve for advisory use' : option.label)}
@@ -9822,7 +9831,11 @@ export default function HumanInLoopAIReviewPage() {
             })}
           </div>
         )}
-        {!isFocusedReview && !reviewQuery.isLoading && !reviewQuery.error && numberValue(reviewQuery.data?.pagination?.total) > 0 ? (
+        {!isFocusedReview
+          && !reviewQuery.isLoading
+          && !reviewQuery.error
+          && (reviewQuery.data?.pagination?.previous_offset !== null && reviewQuery.data?.pagination?.previous_offset !== undefined
+            || reviewQuery.data?.pagination?.next_offset !== null && reviewQuery.data?.pagination?.next_offset !== undefined) ? (
           <div className="ai-review-page__pagination">
             <span className="card__subtext">{ui('Showing')} {formatLocalizedNumber(numberValue(reviewQuery.data?.pagination?.from), locale)}–{formatLocalizedNumber(numberValue(reviewQuery.data?.pagination?.to), locale)} {ui('of')} {formatLocalizedNumber(numberValue(reviewQuery.data?.pagination?.total), locale)}</span>
             <div>
