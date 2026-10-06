@@ -44,6 +44,11 @@ type TenantAuditSummary = {
   last_event_at: string | null;
 };
 
+type TenantAuditFilterOptions = {
+  actions: string[];
+  entity_types: string[];
+};
+
 type AuditFilters = {
   limit: '25' | '50' | '100';
   search: string;
@@ -276,6 +281,14 @@ export default function TenantAuditPage() {
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [filterError, setFilterError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+
+  const filterOptionsQuery = useQuery({
+    queryKey: ['tenant', 'audit', 'filter-options'],
+    queryFn: () => apiRequest<TenantAuditFilterOptions>('/audit/filter-options'),
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: 1
+  });
 
   const filterParams = useMemo(() => buildAppliedFilterParams(appliedFilters), [appliedFilters]);
 
@@ -514,20 +527,48 @@ export default function TenantAuditPage() {
             </select>
           </label>
           <label className="tenant-audit-field">
-            <span>{ui('Action code')}</span>
-            <input
-              value={draftFilters.action}
-              onChange={(event) => setDraftFilters((current) => ({ ...current, action: event.target.value }))}
-              placeholder={ui('Exact code, e.g. shipment.received')}
-            />
+            <span>{ui('Action')}</span>
+            {filterOptionsQuery.error ? (
+              <input
+                value={draftFilters.action}
+                onChange={(event) => setDraftFilters((current) => ({ ...current, action: event.target.value }))}
+                placeholder={ui('Exact code, e.g. shipment.received')}
+              />
+            ) : (
+              <select
+                value={draftFilters.action}
+                onChange={(event) => setDraftFilters((current) => ({ ...current, action: event.target.value }))}
+                disabled={filterOptionsQuery.isLoading}
+              >
+                <option value="">{filterOptionsQuery.isLoading ? ui('Loading actions…') : ui('All actions')}</option>
+                {(filterOptionsQuery.data?.actions || []).map((action) => (
+                  <option key={action} value={action}>{formatLabel(action)}</option>
+                ))}
+              </select>
+            )}
+            <small>{ui('Choose the business action you recognize. Exact audit codes stay behind the selector.')}</small>
           </label>
           <label className="tenant-audit-field">
-            <span>{ui('Entity type')}</span>
-            <input
-              value={draftFilters.entityType}
-              onChange={(event) => setDraftFilters((current) => ({ ...current, entityType: event.target.value }))}
-              placeholder={ui('Exact type, e.g. shipments')}
-            />
+            <span>{ui('Entity')}</span>
+            {filterOptionsQuery.error ? (
+              <input
+                value={draftFilters.entityType}
+                onChange={(event) => setDraftFilters((current) => ({ ...current, entityType: event.target.value }))}
+                placeholder={ui('Exact type, e.g. shipments')}
+              />
+            ) : (
+              <select
+                value={draftFilters.entityType}
+                onChange={(event) => setDraftFilters((current) => ({ ...current, entityType: event.target.value }))}
+                disabled={filterOptionsQuery.isLoading}
+              >
+                <option value="">{filterOptionsQuery.isLoading ? ui('Loading entities…') : ui('All entities')}</option>
+                {(filterOptionsQuery.data?.entity_types || []).map((entityType) => (
+                  <option key={entityType} value={entityType}>{formatLabel(entityType)}</option>
+                ))}
+              </select>
+            )}
+            <small>{ui('Choose the business record type instead of guessing an internal entity name.')}</small>
           </label>
           <label className="tenant-audit-checkbox">
             <input
@@ -537,7 +578,14 @@ export default function TenantAuditPage() {
             />
             <span>{ui('Support-session actions only')}</span>
           </label>
-          <div className="tenant-audit-filter-note">{ui('CSV export uses the currently applied filters, not unfinished filter edits.')}</div>
+          <div className="tenant-audit-filter-note">
+            {ui('CSV export uses the currently applied filters, not unfinished filter edits.')}
+            {filtersChanged ? (
+              <strong className="tenant-audit-filter-pending">{ui('Pending filter changes — choose Apply filters to update the audit results.')}</strong>
+            ) : anyFilterApplied ? (
+              <strong className="tenant-audit-filter-applied">{ui('Applied filters are active.')}</strong>
+            ) : null}
+          </div>
         </div>
       </section>
 

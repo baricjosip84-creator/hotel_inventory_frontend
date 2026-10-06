@@ -48,13 +48,17 @@
 
 .tenant-permissions-role-card__topline {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
 }
 
 .tenant-permissions-role-card__topline strong {
+  min-width: 0;
   font-size: 13.5px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .tenant-permissions-role-card__topline em {
@@ -147,6 +151,14 @@
   color: #0f172a;
   font: inherit;
   font-weight: 500;
+}
+
+.tenant-permissions-character-count {
+  justify-self: end;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.2;
 }
 
 .tenant-permissions-field input:focus,

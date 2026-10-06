@@ -4,7 +4,13 @@
 }
 
 .role-permission-editor--operational .role-permission-editor__message {
+  position: fixed;
+  top: 76px;
+  right: 18px;
+  z-index: 1400;
+  width: min(430px, calc(100vw - 36px));
   margin: 0;
+  box-shadow: 0 16px 38px rgba(15, 23, 42, .18);
 }
 
 .role-permission-editor--operational .role-permission-editor__role-collections {
@@ -270,5 +276,13 @@
   .role-permission-editor--operational .role-permission-editor__badges {
     grid-column: 2;
     justify-content: flex-start !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .role-permission-editor--operational .role-permission-editor__message {
+    top: 68px;
+    right: 10px;
+    width: calc(100vw - 20px);
   }
 }

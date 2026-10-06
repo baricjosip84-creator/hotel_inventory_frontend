@@ -32,6 +32,8 @@ function customRoleId(role: TenantRolePermissionPolicy | undefined): string | nu
   return role?.role_kind === 'custom' && role.role_id ? role.role_id : null;
 }
 
+const CUSTOM_ROLE_NAME_MAX_LENGTH = 80;
+
 export default function TenantPermissionsPage() {
   const { ui } = useAppTranslation();
   const query = useQuery<TenantPermissionPolicyMatrix>({
@@ -369,7 +371,8 @@ export default function TenantPermissionsPage() {
         <div className="tenant-permissions-form-grid">
           <label className="tenant-permissions-field">
             <span>{ui("Role name")}</span>
-            <input value={createName} onChange={(event) => setCreateName(event.target.value)} maxLength={80} required placeholder={ui("Example: Receiving Clerk")} />
+            <input value={createName} onChange={(event) => setCreateName(event.target.value)} maxLength={CUSTOM_ROLE_NAME_MAX_LENGTH} required placeholder={ui("Example: Receiving Clerk")} aria-describedby="tenant-custom-role-name-count" />
+            <small id="tenant-custom-role-name-count" className="tenant-permissions-character-count">{createName.length}/{CUSTOM_ROLE_NAME_MAX_LENGTH} {ui("characters")}</small>
           </label>
           <label className="tenant-permissions-field">
             <span>{ui("Starting template")}</span>
@@ -411,7 +414,8 @@ export default function TenantPermissionsPage() {
           <div className="tenant-permissions-form-grid tenant-permissions-form-grid--manage">
             <label className="tenant-permissions-field">
               <span>{ui("Name")}</span>
-              <input value={metadataName} onChange={(event) => setMetadataName(event.target.value)} maxLength={80} />
+              <input value={metadataName} onChange={(event) => setMetadataName(event.target.value)} maxLength={CUSTOM_ROLE_NAME_MAX_LENGTH} aria-describedby="tenant-custom-role-manage-name-count" />
+              <small id="tenant-custom-role-manage-name-count" className="tenant-permissions-character-count">{metadataName.length}/{CUSTOM_ROLE_NAME_MAX_LENGTH} {ui("characters")}</small>
             </label>
             <label className="tenant-permissions-field">
               <span>{ui("Description")}</span>
