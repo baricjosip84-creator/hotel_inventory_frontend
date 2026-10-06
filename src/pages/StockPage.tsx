@@ -1498,9 +1498,9 @@ export default function StockPage() {
           subtitle={ui("Tracked product and location combinations in the current view")}
         />
         <StatCard
-          title={ui("Low Stock")}
+          title={ui("Positions Below Location Minimum")}
           value={formatLocalizedNumber(summary.lowRows, locale)}
-          subtitle={ui("Below configured minimum threshold")}
+          subtitle={ui("Product/location positions below active location par or stock minimum")}
           tone={summary.totalRows === 0 ? 'default' : summary.lowRows > 0 ? 'warn' : 'good'}
         />
         <StatCard

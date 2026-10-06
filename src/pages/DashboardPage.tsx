@@ -300,7 +300,7 @@ async function fetchDepletionRisk(): Promise<DepletionRiskResponse> {
 }
 
 async function fetchReorderRecommendations(): Promise<ReorderRecommendationsResponse> {
-  return apiRequest<ReorderRecommendationsResponse>('/reorder-insights/recommendations?lookback_days=30&sort_by=reorder_quantity_desc&limit=6');
+  return apiRequest<ReorderRecommendationsResponse>('/reorder-insights/recommendations?lookback_days=30&active_only=true&sort_by=reorder_quantity_desc&limit=6');
 }
 
 async function fetchOperationalHealth(): Promise<OperationalHealthResponse> {
@@ -786,10 +786,10 @@ export default function DashboardPage() {
         ) : null}
         {canViewStock && summary.stock ? (
           <StatCard
-            title={ui('Low Stock Rows')}
+            title={ui('Positions Below Location Minimum')}
             iconPath="/stock"
             value={formatNumber(summary.stock.low_stock_rows)}
-            subtitle={ui('Below configured minimum')}
+            subtitle={ui('Product/location positions below active location par or stock minimum')}
             tone={summary.stock.low_stock_rows > 0 ? 'danger' : 'good'}
           />
         ) : null}
@@ -894,7 +894,7 @@ export default function DashboardPage() {
                 <div style={styles.healthMetric}>
                   <DashboardIconBadge path="/stock" tone="danger" size={18} />
                   <div style={styles.healthMetricText}>
-                    <div style={styles.healthMetricLabel}>{ui('Low Stock Rate')}</div>
+                    <div style={styles.healthMetricLabel}>{ui('Location-level low stock rate')}</div>
                     <div style={styles.healthMetricValue}>
                       {formatLocalizedNumber(toNumber(health.metrics.low_stock_rate_pct) / 100, locale, { style: 'percent', maximumFractionDigits: 2 })}
                     </div>
@@ -1122,23 +1122,23 @@ export default function DashboardPage() {
       <div className="dashboard-primary-grid" style={styles.threeColumnGrid}>
         {canViewStock ? (
         <Section
-          title={ui('Low Stock')}
+          title={ui('Positions Below Location Minimum')}
           iconPath="/stock"
           iconTone="danger"
-          subtitle={ui('Most urgent low-stock rows requiring action.')}
+          subtitle={ui('Most urgent product/location positions below their active location minimum.')}
         >
           {lowStockQuery.isLoading ? (
-            <p>{ui('Loading low-stock rows...')}</p>
+            <p>{ui('Loading location-level shortages...')}</p>
           ) : lowStockQuery.isError ? (
             <SectionError
-              message={(lowStockQuery.error as Error)?.message || ui('Unable to load low-stock rows.')}
+              message={(lowStockQuery.error as Error)?.message || ui('Unable to load location-level shortages.')}
             />
           ) : (
             <div className="dashboard-vertical-list">
               {(lowStockQuery.data ?? []).length === 0 ? (
                 <PremiumEmptyState
-                  title={ui('No low-stock rows.')}
-                  message={ui('Current stock rows are at or above their configured minimums.')}
+                  title={ui('No positions below location minimum.')}
+                  message={ui('Current product/location positions are at or above their active location minimums.')}
                   tone="good"
                 />
               ) : (
@@ -1150,7 +1150,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="dashboard-record-card__metrics dashboard-record-card__metrics--three">
                       <span><small>{ui('Qty')}</small><b>{formatNumber(row.quantity)}</b></span>
-                      <span><small>{ui('Minimum')}</small><b>{formatNumber(row.min_stock)}</b></span>
+                      <span><small>{ui('Location Minimum')}</small><b>{formatNumber(row.min_stock)}</b></span>
                       <span><small>{ui('Shortage')}</small><b>{formatNumber(row.shortage)}</b></span>
                     </div>
                   </article>

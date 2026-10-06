@@ -128,7 +128,7 @@ const REPORT_TABS: Array<{ key: ReportTab; label: string }> = [
   { key: 'procurement-summary', label: 'Procurement Summary' },
   { key: 'purchase-order-commitments', label: 'PO Commitments' },
   { key: 'purchasing-spend', label: 'Purchasing & Spend' },
-  { key: 'low-stock', label: 'Low Stock' },
+  { key: 'low-stock', label: 'Product & Location Shortages' },
   { key: 'slow-moving', label: 'Slow / Non-moving' },
   { key: 'usage-summary', label: 'Usage & Consumption' },
   { key: 'supplier-performance', label: 'Supplier Performance' },
@@ -166,7 +166,7 @@ const REPORT_LABELS: Record<ReportTab, string> = {
   'procurement-summary': 'Procurement summary report',
   'purchase-order-commitments': 'Purchase order commitments report',
   'purchasing-spend': 'Purchasing and spend report',
-  'low-stock': 'Low stock and reorder report',
+  'low-stock': 'Product and location shortage report',
   'slow-moving': 'Slow and non-moving stock report',
   'usage-summary': 'Usage and consumption report',
   'supplier-performance': 'Supplier performance report',
@@ -1296,9 +1296,9 @@ export default function ReportsPage() {
           loading={inventoryOverviewQuery.isLoading}
         />
         <OperationalWorkspaceStatCard
-          label={ui("Low-stock products")}
+          label={ui("Products Below Company-wide Minimum")}
           value={lowStockOverviewQuery.data?.length ?? 0}
-          helper={ui("Products below configured minimum")}
+          helper={ui("Tenant-wide product minimum across all locations")}
           iconPath="/replenishment-planning"
           tone={(lowStockOverviewQuery.data?.length ?? 0) > 0 ? 'warn' : 'good'}
           loading={lowStockOverviewQuery.isLoading}

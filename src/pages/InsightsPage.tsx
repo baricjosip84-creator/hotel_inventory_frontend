@@ -1693,7 +1693,7 @@ export default function InsightsPage() {
                 <span style={styles.keyValue}>{healthQuery.data.metrics.overdue_shipments}</span>
               </div>
               <div style={styles.keyValueRow}>
-                <strong style={styles.keyLabel}>{ui("Low Stock Rate")}</strong>
+                <strong style={styles.keyLabel}>{ui("Location-level low stock rate")}</strong>
                 <span style={styles.keyValue}>{formatNumber(healthQuery.data.metrics.low_stock_rate_pct)}%</span>
               </div>
               <div style={styles.keyValueRow}>
