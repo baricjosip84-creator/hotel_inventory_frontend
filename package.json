@@ -382,7 +382,8 @@
     "check:administration-audit-permissions-surgical-fixes-v349259": "node scripts/check-administration-audit-permissions-surgical-fixes-v349259.mjs",
     "check:inventory-mobile-execution-ux-surgical-fixes-v349260": "node scripts/check-mobile-execution-ux-surgical-fixes-v349260.mjs",
     "check:inventory-operations-feed-clarity-surgical-fixes-v349261": "node scripts/check-operations-feed-clarity-surgical-fixes-v349261.mjs",
-    "check:inventory-learning-feedback-business-clarity-surgical-fixes-v349262": "node scripts/check-learning-feedback-business-clarity-surgical-fixes-v349262.mjs"
+    "check:inventory-learning-feedback-business-clarity-surgical-fixes-v349262": "node scripts/check-learning-feedback-business-clarity-surgical-fixes-v349262.mjs",
+    "check:inventory-workflow-composer-clarity-surgical-fixes-v349263": "node scripts/check-workflow-composer-clarity-surgical-fixes-v349263.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

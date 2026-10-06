@@ -575,3 +575,117 @@
   }
 }
 
+
+/* v3.49.263 — Workflow Composer audit clarity: compact cards, governance context, duplicate-title reference and diagnostic copy affordance. */
+.workflow-composer-page__short-reference {
+  margin-top: 4px;
+  color: #475569;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.workflow-composer-page__short-reference span {
+  color: #64748b;
+  font-weight: 800;
+}
+
+.workflow-composer-page__guidance-details {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.workflow-composer-page__guidance-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 46px;
+  padding: 9px 12px;
+  cursor: pointer;
+  color: #0f172a;
+  list-style-position: inside;
+}
+
+.workflow-composer-page__guidance-details > summary > span:last-child {
+  display: grid;
+  gap: 1px;
+}
+
+.workflow-composer-page__guidance-details > summary strong {
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+.workflow-composer-page__guidance-details > summary small {
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.workflow-composer-page__guidance-details-body {
+  display: grid;
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
+.workflow-composer-page__review-context {
+  display: grid;
+  grid-template-columns: minmax(145px, auto) minmax(0, 1fr);
+  gap: 5px 10px;
+  margin: 10px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid #e2e8f0;
+  font-size: 12px;
+}
+
+.workflow-composer-page__review-context dt {
+  color: #64748b;
+  font-weight: 800;
+}
+
+.workflow-composer-page__review-context dd {
+  margin: 0;
+  color: #0f172a;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.workflow-composer-page__details-grid > .workflow-composer-page__technical-id-row {
+  display: contents;
+}
+
+.workflow-composer-page__technical-id-row dd {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  word-break: normal;
+}
+
+.workflow-composer-page__technical-id-row code {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  color: #334155;
+  font: inherit;
+}
+
+.workflow-composer-page__copy-id {
+  flex: 0 0 auto;
+  min-height: 30px !important;
+  padding: 5px 9px !important;
+  font-size: 11px !important;
+}
+
+@media (max-width: 720px) {
+  .workflow-composer-page__review-context {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workflow-composer-page__technical-id-row dd {
+    flex-direction: column;
+  }
+}

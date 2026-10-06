@@ -217,9 +217,9 @@ const STEP_LABELS: Record<string, string> = {
   review_contract_governance_policy: 'Review the integration rules and ownership',
   verify_permission_policy: 'Confirm who is allowed to use the integration',
   coordinate_manual_source_workflow_follow_up: 'Arrange the follow-up through the existing business process',
-  source_owner_review: 'The owner of the source work reviews it',
-  governance_reviewer_approval: 'A governance reviewer gives approval',
-  manual_execution_authorization: 'An authorised person allows the work to continue',
+  source_owner_review: 'Source work owner reviews this follow-up',
+  governance_reviewer_approval: 'Governance reviewer approval is suggested',
+  manual_execution_authorization: 'An authorised person confirms the work may continue',
   integration_owner_review: 'The integration owner reviews the plan',
   workflow_governance_review: 'The workflow governance owner reviews the plan'
 };
@@ -381,6 +381,28 @@ function responsibilityAlreadyAssigned(blueprint: WorkflowBlueprint): boolean {
     || responsibility?.responsible_role
     || (assignmentState && assignmentState !== 'unassigned')
   );
+}
+
+function shortSourceReference(blueprint: WorkflowBlueprint): string | null {
+  const candidate = String(
+    blueprint.trigger_preview?.trigger_reference
+      || blueprint.source_contract_key
+      || blueprint.source_contract_id
+      || blueprint.source_action_id
+      || ''
+  ).trim();
+  if (!candidate) return null;
+
+  const parts = candidate.split(':').filter(Boolean);
+  const tail = candidate.includes(':') ? parts[parts.length - 1] || candidate : candidate;
+  const uuidPrefix = tail.match(/^([0-9a-f]{8})-/i);
+  if (uuidPrefix) return uuidPrefix[1];
+  if (tail.length <= 16) return tail;
+  return `${tail.slice(0, 8)}…${tail.slice(-4)}`;
+}
+
+function additionalReviewOrApprovalSuggested(approvalSteps: string[]): boolean {
+  return approvalSteps.length > 1;
 }
 
 function locationText(blueprint: WorkflowBlueprint, ui: (englishText: string) => string): string | null {
@@ -741,6 +763,14 @@ export default function WorkflowAutomationComposerPage() {
                 const approvalSteps = blueprint.approval_chain_preview || [];
                 const suggestedSteps = (blueprint.recommended_steps_preview || []).filter((step) => !(step === 'assign_human_owner' && responsibilityAlreadyAssigned(blueprint)));
                 const triggerStatus = blueprint.trigger_preview?.trigger_status || blueprint.trigger_preview?.contract_status;
+                const visibleTitle = sourceTitle(blueprint, ui);
+                const duplicateTitle = blueprints.filter((candidate) => sourceTitle(candidate, ui) === visibleTitle).length > 1;
+                const sourceReference = shortSourceReference(blueprint);
+                const technicalIdentifiers = [
+                  { label: 'Plan ID', value: blueprint.blueprint_id },
+                  { label: 'Source record ID', value: blueprint.trigger_preview?.trigger_reference || blueprint.source_contract_id || null },
+                  { label: 'Source action ID', value: blueprint.source_action_id || null }
+                ];
 
                 return (
                   <article key={blueprint.blueprint_id} className={`card workflow-composer-page__blueprint-card ${urgencyToneClass(urgencyValue)}`}>
@@ -762,7 +792,10 @@ export default function WorkflowAutomationComposerPage() {
                             </span>
                           ) : null}
                         </div>
-                        <h3 className="workflow-composer-page__blueprint-title">{sourceTitle(blueprint, ui)}</h3>
+                        <h3 className="workflow-composer-page__blueprint-title">{visibleTitle}</h3>
+                        {duplicateTitle && sourceReference ? (
+                          <div className="workflow-composer-page__short-reference"><span>{ui("Reference")}</span> {sourceReference}</div>
+                        ) : null}
                           </div>
                         </div>
                       </div>
@@ -814,37 +847,49 @@ export default function WorkflowAutomationComposerPage() {
                       {ui("Plan updated")} {formatDateTime(blueprint.updated_at || blueprint.created_at, locale, ui)}
                     </p>
 
-                    <div className="workflow-composer-page__plan-grid">
-                      <div className="workflow-composer-page__plan-panel">
-                        <div className="workflow-composer-page__plan-title"><span className="workflow-composer-page__plan-icon"><TenantNavIcon path="/workflow-composer" size={14} /></span>{ui("Suggested steps")}</div>
-                        {suggestedSteps.length > 0 ? (
-                          <ol className="workflow-composer-page__step-list">
-                            {suggestedSteps.map((step) => <li key={step}>{plainStep(step, ui)}</li>)}
-                          </ol>
-                        ) : (
-                          <p className="card__subtext">{ui("No suggested steps were returned.")}</p>
-                        )}
-                      </div>
-                      <div className="workflow-composer-page__plan-panel">
-                        <div className="workflow-composer-page__plan-title"><span className="workflow-composer-page__plan-icon workflow-composer-page__plan-icon--violet"><TenantNavIcon path="/permissions" size={14} /></span>{ui("Review and approval path")}</div>
-                        {approvalSteps.length > 0 ? (
-                          <ol className="workflow-composer-page__step-list">
-                            {approvalSteps.map((step) => <li key={step}>{plainStep(step, ui)}</li>)}
-                          </ol>
-                        ) : (
-                          <p className="card__subtext">{ui("No separate approval step is suggested.")}</p>
-                        )}
-                      </div>
-                    </div>
+                    <details className="workflow-composer-page__guidance-details">
+                      <summary>
+                        <span className="workflow-composer-page__plan-icon"><TenantNavIcon path="/workflow-composer" size={14} /></span>
+                        <span><strong>{ui("Plan guidance")}</strong><small>{ui("Steps, review path, and where the work happens")}</small></span>
+                      </summary>
+                      <div className="workflow-composer-page__guidance-details-body">
+                        <div className="workflow-composer-page__plan-grid">
+                          <div className="workflow-composer-page__plan-panel">
+                            <div className="workflow-composer-page__plan-title"><span className="workflow-composer-page__plan-icon"><TenantNavIcon path="/workflow-composer" size={14} /></span>{ui("Suggested steps")}</div>
+                            {suggestedSteps.length > 0 ? (
+                              <ol className="workflow-composer-page__step-list">
+                                {suggestedSteps.map((step) => <li key={step}>{plainStep(step, ui)}</li>)}
+                              </ol>
+                            ) : (
+                              <p className="card__subtext">{ui("No suggested steps were returned.")}</p>
+                            )}
+                          </div>
+                          <div className="workflow-composer-page__plan-panel">
+                            <div className="workflow-composer-page__plan-title"><span className="workflow-composer-page__plan-icon workflow-composer-page__plan-icon--violet"><TenantNavIcon path="/permissions" size={14} /></span>{ui("Review and approval path")}</div>
+                            <dl className="workflow-composer-page__review-context">
+                              <dt>{ui("Current responsibility")}</dt><dd>{responsibilityText(blueprint, ui)}</dd>
+                              <dt>{ui("Additional review or approval suggested")}</dt><dd>{ui(additionalReviewOrApprovalSuggested(approvalSteps) ? 'Yes' : 'No')}</dd>
+                            </dl>
+                            {approvalSteps.length > 0 ? (
+                              <ol className="workflow-composer-page__step-list">
+                                {approvalSteps.map((step) => <li key={step}>{plainStep(step, ui)}</li>)}
+                              </ol>
+                            ) : (
+                              <p className="card__subtext">{ui("No separate approval step is suggested.")}</p>
+                            )}
+                          </div>
+                        </div>
 
-                    <div className="workflow-composer-page__routing-note">
-                      <span className="workflow-composer-page__routing-icon"><TenantNavIcon path={blueprint.integration_routing_preview?.external_workflow_eligible ? '/system-context' : '/workspace'} size={15} /></span>
-                      <div><strong>{ui("Where the work happens:")}</strong>{' '}
-                      {blueprint.integration_routing_preview?.external_workflow_eligible
-                        ? ui('This is an external integration visibility plan. It still requires manual governance and does not run the partner workflow.')
-                        : ui('The existing source page remains responsible for the real work and its audit history.')}
+                        <div className="workflow-composer-page__routing-note">
+                          <span className="workflow-composer-page__routing-icon"><TenantNavIcon path={blueprint.integration_routing_preview?.external_workflow_eligible ? '/system-context' : '/workspace'} size={15} /></span>
+                          <div><strong>{ui("Where the work happens:")}</strong>{' '}
+                          {blueprint.integration_routing_preview?.external_workflow_eligible
+                            ? ui('This is an external integration visibility plan. It still requires manual governance and does not run the partner workflow.')
+                            : ui('The existing source page remains responsible for the real work and its audit history.')}
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    </details>
 
                     <div className="workflow-composer-page__actions">
                       {sourceLink ? <Link className="button button--secondary workflow-composer-page__source-button" to={sourceLink.to}><TenantNavIcon path={linkIconPath(sourceLink.to)} size={14} />{ui(sourceLink.label)}</Link> : null}
@@ -857,9 +902,17 @@ export default function WorkflowAutomationComposerPage() {
                       <details className="workflow-composer-page__details">
                         <summary><TenantNavIcon path="/system-context" size={14} />{ui("Technical plan details")}</summary>
                         <dl className="workflow-composer-page__details-grid">
-                          <dt>{ui("Plan ID")}</dt><dd>{blueprint.blueprint_id}</dd>
-                          <dt>{ui("Source record ID")}</dt><dd>{blueprint.trigger_preview?.trigger_reference || blueprint.source_contract_id || ui('Not reported')}</dd>
-                          <dt>{ui("Source action ID")}</dt><dd>{blueprint.source_action_id || ui('Not reported')}</dd>
+                          {technicalIdentifiers.map((identifier) => (
+                            <div className="workflow-composer-page__technical-id-row" key={identifier.label}>
+                              <dt>{ui(identifier.label)}</dt>
+                              <dd>
+                                <code>{identifier.value || ui('Not reported')}</code>
+                                {identifier.value ? (
+                                  <button type="button" className="button button--secondary workflow-composer-page__copy-id" data-skip-global-action-feedback="true" onClick={() => { void navigator.clipboard?.writeText(identifier.value || ''); }}>{ui("Copy ID")}</button>
+                                ) : null}
+                              </dd>
+                            </div>
+                          ))}
                           <dt>{ui("Trigger source")}</dt><dd>{canonicalLabel(blueprint.trigger_preview?.trigger_source, ui)}</dd>
                           <dt>{ui("Trigger preview only")}</dt><dd>{ui(blueprint.trigger_preview?.event_trigger_only_preview ? 'Yes' : 'Not reported')}</dd>
                           <dt>{ui("Suggested escalation when blocked")}</dt><dd>{ui(blueprint.escalation_policy_preview?.escalate_when_blocked ? 'Yes' : 'No')}</dd>

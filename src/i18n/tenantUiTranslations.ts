@@ -14070,6 +14070,13 @@ const rows: readonly TranslationRow[] = [
   ["Forecast error (%)", "Prognosefehler (%)", "Error de previsión (%)", "Erreur de prévision (%)", "Pogreška prognoze (%)"],
   ["Effectiveness score (-1 to 1)", "Wirksamkeitswert (-1 bis 1)", "Puntuación de eficacia (-1 a 1)", "Score d’efficacité (-1 à 1)", "Ocjena učinkovitosti (-1 do 1)"],
   ["Value score (-1 to 1)", "Wertbewertung (-1 bis 1)", "Puntuación de valor (-1 a 1)", "Score de valeur (-1 à 1)", "Ocjena vrijednosti (-1 do 1)"],
+  ["Plan guidance", "Planhinweise", "Guía del plan", "Guide du plan", "Smjernice plana"],
+  ["Steps, review path, and where the work happens", "Schritte, Prüfpfad und Ort der Arbeitsausführung", "Pasos, ruta de revisión y dónde se realiza el trabajo", "Étapes, parcours de validation et lieu d’exécution du travail", "Koraci, put pregleda i mjesto gdje se posao obavlja"],
+  ["Current responsibility", "Aktuelle Verantwortung", "Responsabilidad actual", "Responsabilité actuelle", "Trenutačna odgovornost"],
+  ["Additional review or approval suggested", "Zusätzliche Prüfung oder Genehmigung vorgeschlagen", "Revisión o aprobación adicional sugerida", "Examen ou approbation supplémentaire suggéré", "Predložen dodatni pregled ili odobrenje"],
+  ["Source work owner reviews this follow-up", "Der Verantwortliche der Quellarbeit prüft diese Folgemaßnahme", "El responsable del trabajo de origen revisa este seguimiento", "Le responsable du travail source examine ce suivi", "Vlasnik izvornog posla pregledava ovaj nastavak"],
+  ["Governance reviewer approval is suggested", "Eine Genehmigung durch einen Governance-Prüfer wird vorgeschlagen", "Se sugiere la aprobación de un revisor de gobernanza", "L’approbation d’un réviseur de gouvernance est suggérée", "Predlaže se odobrenje pregledavatelja upravljanja"],
+  ["An authorised person confirms the work may continue", "Eine autorisierte Person bestätigt, dass die Arbeit fortgesetzt werden darf", "Una persona autorizada confirma que el trabajo puede continuar", "Une personne autorisée confirme que le travail peut continuer", "Ovlaštena osoba potvrđuje da se posao može nastaviti"],
 ];
 
 const indexes: Record<AppLocale, number> = { 'en-GB': 0, 'de-DE': 1, 'es-ES': 2, 'fr-FR': 3, 'hr-HR': 4 };

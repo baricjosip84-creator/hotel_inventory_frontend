@@ -58,7 +58,7 @@ const dynamicLabels = [
   'Review the original task, alert, or contract', 'Choose the person responsible for the work', 'Record the required human approval',
   'Complete the work through its normal controlled page', 'Record the result in the original workflow', 'Review the integration rules and ownership',
   'Confirm who is allowed to use the integration', 'Arrange the follow-up through the existing business process',
-  'The owner of the source work reviews it', 'A governance reviewer gives approval', 'An authorised person allows the work to continue',
+  'Source work owner reviews this follow-up', 'Governance reviewer approval is suggested', 'An authorised person confirms the work may continue',
   'The integration owner reviews the plan', 'The workflow governance owner reviews the plan',
   'Unknown', 'Open', 'Pending', 'Ready', 'Assigned', 'In progress', 'Blocked', 'Completed', 'Cancelled', 'Active', 'Inactive',
   'Approved', 'Rejected', 'Resolved', 'Action Center item', 'Execution task', 'Alert', 'Integration contract',
