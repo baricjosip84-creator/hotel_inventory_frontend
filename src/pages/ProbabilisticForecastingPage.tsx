@@ -192,7 +192,7 @@ type LifecycleConfig = {
   scoreKey: string;
   checksKey: string;
   blockersKey: string;
-  metrics: Array<{ label: string; key: string; format?: 'number' | 'percent' | 'boolean' }>;
+  metrics: Array<{ label: string; key: string; format?: 'number' | 'percent' | 'boolean'; missingLabel?: string }>;
 };
 
 const DEFAULT_FILTERS: ForecastFilterState = {
@@ -378,7 +378,7 @@ const LIFECYCLE_SECTIONS: LifecycleConfig[] = [
       { label: 'Models', key: 'model_count' },
       { label: 'Intervals', key: 'interval_count' },
       { label: 'Outcome observations', key: 'calibration_observation_count' },
-      { label: 'Capture rate', key: 'calibration_capture_rate', format: 'percent' },
+      { label: 'Capture rate', key: 'calibration_capture_rate', format: 'percent', missingLabel: 'Insufficient validated outcomes' },
       { label: 'Average normalized error', key: 'average_normalized_error' },
       { label: 'High-risk forecasts', key: 'high_risk_forecast_count' }
     ]
@@ -549,14 +549,33 @@ function formatMetric(value: unknown, format: LifecycleConfig['metrics'][number]
   return formatNumber(value, locale, 1);
 }
 
-function formatIntervalRange(row: ForecastIntervalRecord, locale: Parameters<typeof formatLocalizedNumber>[1]): string {
-  const lower = row.lower_bound ?? row.p10_value;
-  const expected = row.expected_value ?? row.p50_value;
-  const upper = row.upper_bound ?? row.p90_value;
-  if (lower === null || lower === undefined || upper === null || upper === undefined) {
-    return expected === null || expected === undefined ? '—' : formatNumber(expected, locale);
+function intervalValue(row: ForecastIntervalRecord, kind: 'lower' | 'expected' | 'upper'): unknown {
+  if (kind === 'lower') return row.lower_bound ?? row.p10_value;
+  if (kind === 'upper') return row.upper_bound ?? row.p90_value;
+  return row.expected_value ?? row.p50_value;
+}
+
+function formatAssessmentBoolean(value: unknown, ui: (englishText: string) => string): string {
+  if (value === true) return ui('Yes');
+  if (value === false) return ui('No');
+  return ui('Not yet assessed');
+}
+
+function formatAssessmentPercentage(value: unknown, locale: Parameters<typeof formatLocalizedNumber>[1], ui: (englishText: string) => string): string {
+  if (value === null || value === undefined || value === '') return ui('Not yet assessed');
+  return formatPercentage(value, locale);
+}
+
+function riskExplanation(risk: ForecastRiskRecord, ui: (englishText: string) => string): string {
+  if (risk.explanation_summary?.trim()) return risk.explanation_summary;
+  const probability = Number(risk.probability_score);
+  if (Number.isFinite(probability) && probability >= 0.75) {
+    return ui('No explanation was stored for this high-risk estimate. Review the forecast range and current stock evidence before acting.');
   }
-  return `${formatNumber(lower, locale)} – ${formatNumber(expected, locale)} – ${formatNumber(upper, locale)}`;
+  if (Number.isFinite(probability) && probability <= 0.05) {
+    return ui('No specific risk explanation was stored because the current estimate is very low. Review the forecast range if you need the supporting evidence.');
+  }
+  return ui('No explanation was stored for this risk estimate. Review the forecast range and current evidence before acting.');
 }
 
 function badgeTone(value: unknown): 'neutral' | 'good' | 'warning' | 'danger' {
@@ -578,16 +597,21 @@ function MetricCard({
   value,
   format = 'number',
   iconPath,
-  tone = 'blue'
+  tone = 'blue',
+  missingLabel
 }: {
   label: string;
   value: unknown;
   format?: LifecycleConfig['metrics'][number]['format'];
   iconPath?: string;
   tone?: 'blue' | 'green' | 'amber' | 'violet' | 'slate';
+  missingLabel?: string;
 }) {
   const { locale, ui } = useAppTranslation();
-  return <OperationalWorkspaceStatCard label={ui(label)} value={formatMetric(value, format, locale, ui)} iconPath={iconPath} tone={tone === 'violet' ? 'blue' : tone} />;
+  const displayValue = (value === null || value === undefined || value === '') && missingLabel
+    ? ui(missingLabel)
+    : formatMetric(value, format, locale, ui);
+  return <OperationalWorkspaceStatCard label={ui(label)} value={displayValue} iconPath={iconPath} tone={tone === 'violet' ? 'blue' : tone} />;
 }
 
 function EvidenceSection({
@@ -685,42 +709,48 @@ function LifecycleCard({ config, section, diagnostics }: { config: LifecycleConf
   const available = section?.assessment_available !== false;
   const checks = (section?.[config.checksKey] || []) as Array<Record<string, unknown>>;
   const blockers = (section?.[config.blockersKey] || []) as Array<Record<string, unknown>>;
+  const needsAttention = blockers.length > 0;
 
   return (
-    <section className="card forecast-lifecycle">
-      <div className="forecast-lifecycle__header">
-        <div className="forecast-section-heading">
-          <span className="forecast-heading-icon"><TenantNavIcon path="/reliability-command" size={17} /></span>
-          <div>
-            <h2>{ui(config.title)}</h2>
-            <p className="card__subtext">{ui(config.description)}</p>
+    <details className="card forecast-lifecycle">
+      <summary className="forecast-lifecycle__summary">
+        <div className="forecast-lifecycle__header">
+          <div className="forecast-section-heading">
+            <span className={`forecast-heading-icon ${needsAttention ? 'forecast-heading-icon--warning' : ''}`}><TenantNavIcon path="/reliability-command" size={17} /></span>
+            <div>
+              <h2>{ui(config.title)}</h2>
+              <p className="card__subtext">{ui(config.description)}</p>
+              <span className="forecast-lifecycle__expand-hint">{ui('Open review details')}</span>
+            </div>
+          </div>
+          <div className="forecast-decision">
+            <span>{ui('Current result')}</span>
+            <strong>{available ? formatCanonicalLabel(section?.[config.decisionKey], ui) : ui('Not assessed — no matching evidence')}</strong>
           </div>
         </div>
-        <div className="forecast-decision">
-          <span>{ui('Current result')}</span>
-          <strong>{available ? formatCanonicalLabel(section?.[config.decisionKey], ui) : ui('Not assessed — no matching evidence')}</strong>
-        </div>
-      </div>
+      </summary>
 
-      {available ? (
-        <>
-          <div className="forecast-metrics">
-            <MetricCard label="Review score" value={section?.[config.scoreKey]} />
-            {config.metrics.map((metric) => (
-              <MetricCard key={metric.key} label={metric.label} value={section?.[metric.key]} format={metric.format} />
-            ))}
+      <div className="forecast-lifecycle__body">
+        {available ? (
+          <>
+            <div className="forecast-metrics">
+              <MetricCard label="Review score" value={section?.[config.scoreKey]} />
+              {config.metrics.map((metric) => (
+                <MetricCard key={metric.key} label={metric.label} value={section?.[metric.key]} format={metric.format} missingLabel={metric.missingLabel} />
+              ))}
+            </div>
+            <div className="forecast-check-grid">
+              <CheckColumn title={ui('Checks')} items={checks} diagnostics={diagnostics} />
+              <CheckColumn title={ui('Items needing attention')} items={blockers} diagnostics={diagnostics} attention />
+            </div>
+          </>
+        ) : (
+          <div className="forecast-not-assessed">
+            {ui('This review is not calculated until at least one matching model, interval, risk probability, or outcome observation exists.')}
           </div>
-          <div className="forecast-check-grid">
-            <CheckColumn title={ui('Checks')} items={checks} diagnostics={diagnostics} />
-            <CheckColumn title={ui('Items needing attention')} items={blockers} diagnostics={diagnostics} attention />
-          </div>
-        </>
-      ) : (
-        <div className="forecast-not-assessed">
-          {ui('This review is not calculated until at least one matching model, interval, risk probability, or outcome observation exists.')}
-        </div>
-      )}
-    </section>
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -1056,7 +1086,14 @@ export default function ProbabilisticForecastingPage() {
                   <td>{formatCanonicalLabel(model.model_domain, ui)}</td>
                   <td>{formatCanonicalLabel(model.forecast_type, ui)}</td>
                   <td><StatusBadge value={model.model_status} /></td>
-                  <td>{formatCanonicalLabel(model.uncertainty_method, ui)}</td>
+                  <td>
+                    {String(model.uncertainty_method || '').toLowerCase() === 'general' ? (
+                      <>
+                        <strong>{ui('General forecast method')}</strong>
+                        <span className="forecast-table__subtext">{ui('Default forecast method; no specialized uncertainty method is recorded for this model.')}</span>
+                      </>
+                    ) : formatCanonicalLabel(model.uncertainty_method, ui)}
+                  </td>
                   <td>{formatPercentage(model.confidence_score, locale)}</td>
                   <td>{formatDate(model.updated_at || model.created_at, locale)}</td>
                 </tr>
@@ -1070,7 +1107,7 @@ export default function ProbabilisticForecastingPage() {
             rows={evidenceIntervals as Array<Record<string, unknown>>}
             pagination={focusedEvidence ? focusedEvidence.pagination?.intervals : data?.pagination?.intervals}
             onPrevious={() => movePage('interval_offset', -1)} onNext={() => movePage('interval_offset', 1)}
-            headers={['Model', 'Range', 'Unit', 'Period starts', 'Period ends', 'Evidence confidence', 'Generated']}
+            headers={['Model', 'Lower', 'Expected', 'Upper', 'Unit', 'Period starts', 'Period ends', 'Evidence confidence', 'Generated']}
             renderRow={(row, index) => {
               const interval = row as ForecastIntervalRecord;
               return (
@@ -1079,7 +1116,9 @@ export default function ProbabilisticForecastingPage() {
                     <strong>{interval.model_title || formatLabel(interval.model_key || interval.interval_key)}</strong>
                     {interval.model_version ? <span className="forecast-table__subtext">{ui('Version')} {formatLocalizedNumber(Number(interval.model_version), locale)}</span> : null}
                   </td>
-                  <td>{formatIntervalRange(interval, locale)}</td>
+                  <td>{formatNumber(intervalValue(interval, 'lower'), locale)}</td>
+                  <td>{formatNumber(intervalValue(interval, 'expected'), locale)}</td>
+                  <td>{formatNumber(intervalValue(interval, 'upper'), locale)}</td>
                   <td>{interval.unit || '—'}</td>
                   <td>{formatDate(interval.forecast_period_start, locale)}</td>
                   <td>{formatDate(interval.forecast_period_end, locale)}</td>
@@ -1109,7 +1148,7 @@ export default function ProbabilisticForecastingPage() {
                   <td>{formatCanonicalLabel(risk.risk_type, ui)}</td>
                   <td>{formatPercentage(risk.probability_score, locale)}</td>
                   <td>{formatPercentage(risk.severity_score, locale)}</td>
-                  <td>{canViewDiagnostics ? (risk.explanation_summary || '—') : ui('Risk is calculated from the current forecast range and available evidence.')}</td>
+                  <td>{riskExplanation(risk, ui)}</td>
                   <td>{formatDate(risk.observed_at, locale)}</td>
                 </tr>
               );
@@ -1139,8 +1178,8 @@ export default function ProbabilisticForecastingPage() {
                   <td>{formatNumber(observation.predicted_value, locale)}</td>
                   <td>{formatNumber(observation.actual_value, locale)}</td>
                   <td>{formatNumber(observation.absolute_error, locale)}</td>
-                  <td>{formatBoolean(observation.interval_captured_actual, ui)}</td>
-                  <td>{formatPercentage(observation.calibration_score, locale)}</td>
+                  <td>{formatAssessmentBoolean(observation.interval_captured_actual, ui)}</td>
+                  <td>{formatAssessmentPercentage(observation.calibration_score, locale, ui)}</td>
                   <td>{formatDate(observation.measured_at, locale)}</td>
                 </tr>
               );
@@ -1158,6 +1197,15 @@ export default function ProbabilisticForecastingPage() {
                 <div>
                   <h2>{ui('These are advisory checks, not approvals or automated actions')}</h2>
                   <p className="card__subtext">{ui('A passing check only means the evidence satisfies that calculation. Models that need a human decision are reviewed in Intelligence Review; approval still does not change inventory or execute business work.')}</p>{canOpenIntelligenceReview ? <Link className="button button--secondary" to="/intelligence-review"><TenantNavIcon path="/intelligence-review" size={14} />{ui('Open Intelligence Review')}</Link> : null}
+                </div>
+              </div>
+            </section>
+            <section className="card forecast-review-summary">
+              <div className="forecast-section-heading">
+                <span className="forecast-heading-icon forecast-heading-icon--amber"><TenantNavIcon path="/alerts" size={17} /></span>
+                <div>
+                  <h2>{ui('Forecast review summary')}</h2>
+                  <p className="card__subtext">{ui('Start with sections whose current result is blocked or requires review. Each lifecycle section is collapsed by default so you can open only the evidence you need.')}</p>
                 </div>
               </div>
             </section>

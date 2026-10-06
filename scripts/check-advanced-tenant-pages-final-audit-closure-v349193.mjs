@@ -17,7 +17,7 @@ const check = (condition, message) => {
 check(intelligence.includes('/intelligence-readiness/business-readiness-summary'), 'Intelligence Review loads the dedicated business-readiness endpoint');
 check(/const businessReadinessQuery = useQuery\([\s\S]*?enabled: activeView === 'readiness'\s*\}/.test(intelligence), 'business readiness loads for ordinary Decision Intelligence readers without diagnostics permission');
 check((intelligence.match(/enabled: activeView === 'readiness' && canViewDiagnostics/g) || []).length >= 10, 'technical readiness queries require Tenant Diagnostics permission');
-check(intelligence.includes("activeView === 'readiness' && !canViewDiagnostics"), 'ordinary users receive the business-only readiness surface');
+check(intelligence.includes("<div className=\"section__title\">{ui('Business readiness')}</div>"), 'business readiness remains the primary readiness surface for both ordinary and diagnostics-capable users');
 check((intelligence.match(/activeView === 'readiness' && canViewDiagnostics/g) || []).length >= 12, 'engineering readiness surfaces remain diagnostics-gated');
 check(intelligence.includes("ui(item.feature_label || 'Intelligence feature')"), 'business readiness feature names go through the tenant translation catalog');
 

@@ -376,7 +376,8 @@
     "check:inventory-ai-copilot-presentation-surgical-fixes-v349253": "node scripts/check-ai-copilot-presentation-surgical-fixes-v349253.mjs",
     "check:inventory-action-center-readiness-presentation-surgical-fixes-v349254": "node scripts/check-action-center-readiness-presentation-surgical-fixes-v349254.mjs",
     "check:inventory-intelligence-review-queue-surgical-fixes-v349255": "node scripts/check-intelligence-review-queue-surgical-fixes-v349255.mjs",
-    "check:inventory-readiness-policy-clarity-surgical-fixes-v349256": "node scripts/check-readiness-policy-clarity-surgical-fixes-v349256.mjs"
+    "check:inventory-readiness-policy-clarity-surgical-fixes-v349256": "node scripts/check-readiness-policy-clarity-surgical-fixes-v349256.mjs",
+    "check:inventory-probabilistic-forecast-clarity-surgical-fixes-v349257": "node scripts/check-probabilistic-forecast-clarity-surgical-fixes-v349257.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

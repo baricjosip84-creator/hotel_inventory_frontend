@@ -597,3 +597,62 @@
   border-top: 3px solid #2563eb;
   background: #f8fbff;
 }
+
+
+/* Surgical clarity pass v3.49.257 — keep forecast governance readable before exposing diagnostics. */
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-review-summary {
+  border-left: 4px solid #f59e0b;
+  background: #fffdf7;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] details.forecast-lifecycle {
+  display: block;
+  padding: 0;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-lifecycle__summary {
+  display: block;
+  padding: 18px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-lifecycle__summary::-webkit-details-marker {
+  display: none;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-lifecycle__summary:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.22);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-lifecycle__summary .forecast-lifecycle__header {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-lifecycle__expand-hint {
+  display: inline-flex;
+  margin-top: 8px;
+  color: #2563eb;
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-lifecycle__expand-hint::before {
+  content: '▸';
+  margin-right: 6px;
+  transition: transform 120ms ease;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] details.forecast-lifecycle[open] .forecast-lifecycle__expand-hint::before {
+  transform: rotate(90deg);
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-lifecycle__body {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-top: 1px solid #eef2f7;
+}

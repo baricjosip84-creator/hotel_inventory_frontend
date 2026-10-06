@@ -86,8 +86,11 @@ for (const required of [
   "formatLocalizedNumber(pagination?.total || rows.length, locale)",
   'formatPercentage(model.confidence_score, locale)',
   'formatDate(model.updated_at || model.created_at, locale)',
-  'formatIntervalRange(interval, locale)',
-  'formatBoolean(observation.interval_captured_actual, ui)',
+  'formatNumber(intervalValue(interval, \'lower\'), locale)',
+  'formatNumber(intervalValue(interval, \'expected\'), locale)',
+  'formatNumber(intervalValue(interval, \'upper\'), locale)',
+  'formatAssessmentBoolean(observation.interval_captured_actual, ui)',
+  'formatAssessmentPercentage(observation.calibration_score, locale, ui)',
   "ui('Observed: {value}').replace('{value}', formatNumber(observed, locale))"
 ]) if (!pageSource.includes(required)) fail(`Probabilistic Forecasting locale-aware presentation missing: ${required}`);
 if (!process.exitCode) pass('Paged counts, confidence, ranges, booleans, evidence totals, and timestamps use the tenant locale.');
@@ -96,13 +99,13 @@ for (const required of [
   'model.title || formatLabel(model.model_key)',
   'model.summary ? <span className="forecast-table__subtext">{model.summary}</span>',
   "{interval.unit || '—'}",
-  "canViewDiagnostics ? (risk.explanation_summary || '—') : ui('Risk is calculated from the current forecast range and available evidence.')",
+  'riskExplanation(risk, ui)',
   'diagnostics && rawHeading ? String(rawHeading) : genericHeading',
   'diagnostics && rawSupporting && rawSupporting !== rawHeading ? <p>{String(rawSupporting)}</p> : <p>{genericSupporting}</p>',
   '<pre>{JSON.stringify(data, null, 2)}</pre>'
 ]) if (!pageSource.includes(required)) fail(`Probabilistic Forecasting server/technical data boundary changed unexpectedly: ${required}`);
 if (pageSource.includes('ui(formatLabel(')) fail('Probabilistic Forecasting translates arbitrary backend labels through ui(formatLabel(...)).');
-else pass('Backend titles and units remain source data, while raw risk/check diagnostics are restricted to diagnostics users.');
+else pass('Backend titles and units remain source data; stored risk explanations are shown with safe fallbacks, while raw check diagnostics remain restricted to diagnostics users.');
 
 for (const required of [
   "apiRequest<ProbabilisticForecastingSummary>(`/decision-intelligence/probabilistic-forecasting-summary?${queryString}`)",
