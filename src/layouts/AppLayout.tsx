@@ -134,7 +134,7 @@ function useIsMobile(breakpoint = 960): boolean {
 }
 
 export default function AppLayout() {
-  const { locale, setLocale, t, nav } = useAppTranslation();
+  const { locale, setLocale, t, nav, ui } = useAppTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -142,6 +142,13 @@ export default function AppLayout() {
   const [, setPermissionRevision] = useState(0);
   const role = getCurrentUserRole();
   const accessRoleLabel = getCurrentAccessRoleLabel();
+  const visibleAccessRoleLabel = accessRoleLabel.toLowerCase() === 'admin'
+    ? ui('Admin')
+    : accessRoleLabel.toLowerCase() === 'manager'
+      ? ui('Manager')
+      : accessRoleLabel.toLowerCase() === 'staff'
+        ? ui('Staff')
+        : accessRoleLabel;
   const tenantAccess = getTenantAccessSnapshot();
   const supportSession = getSupportSessionInfo();
   const hasTenantUserAttentionActor = tenantAccess.hasTenantContext
@@ -924,7 +931,7 @@ export default function AppLayout() {
 
         <div style={styles.sidebarFooter}>
           <div style={styles.sidebarLanguageSelector}><LanguageSelector scope="tenant" compact appearance="sidebar" /></div>
-          <div style={styles.sidebarIdentity}><div style={styles.sidebarAvatar}>{(accessRoleLabel || 'U').trim().charAt(0).toUpperCase()}</div><div style={styles.sidebarIdentityText}><div style={styles.sidebarIdentityName}>{tenantSubscriptionAccess?.tenant.name || t('common.tenantWorkspace')}</div><div style={styles.sidebarIdentityRole}>{accessRoleLabel || t('common.tenantUser')}</div></div></div>
+          <div style={styles.sidebarIdentity}><div style={styles.sidebarAvatar}>{(accessRoleLabel || 'U').trim().charAt(0).toUpperCase()}</div><div style={styles.sidebarIdentityText}><div style={styles.sidebarIdentityName}>{tenantSubscriptionAccess?.tenant.name || t('common.tenantWorkspace')}</div><div style={styles.sidebarIdentityRole}>{visibleAccessRoleLabel || t('common.tenantUser')}</div></div></div>
           <button type="button" data-tenant-logout="true" style={styles.logoutButton} onClick={handleLogout} disabled={isLoggingOut}><TenantNavIcon path="/logout" size={17}/><span>{isLoggingOut ? t('common.loggingOut') : supportSession.isSupportSession ? t('common.exitSupportMode') : t('common.logout')}</span></button>
         </div>
       </aside>
@@ -980,7 +987,7 @@ export default function AppLayout() {
               </p>
             </div>
           </div>
-          {!isMobile ? <div style={styles.headerContext}><div style={styles.headerContextAvatar}>{(accessRoleLabel || 'U').trim().charAt(0).toUpperCase()}</div><div style={styles.headerContextText}><div style={styles.headerContextRole}>{accessRoleLabel || t('common.tenantUser')}</div><div style={styles.headerContextTenant}>{tenantSubscriptionAccess?.tenant.name || t('common.tenantWorkspace')}</div></div></div> : null}
+          {!isMobile ? <div style={styles.headerContext}><div style={styles.headerContextAvatar}>{(accessRoleLabel || 'U').trim().charAt(0).toUpperCase()}</div><div style={styles.headerContextText}><div style={styles.headerContextRole}>{visibleAccessRoleLabel || t('common.tenantUser')}</div><div style={styles.headerContextTenant}>{tenantSubscriptionAccess?.tenant.name || t('common.tenantWorkspace')}</div></div></div> : null}
         </header>
 
 
@@ -1458,7 +1465,7 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'pointer'
   },
   content: {
-    flex: 1,
+    flex: '1 0 auto',
     minWidth: 0,
     width: '100%',
     maxWidth: '1400px',
@@ -1467,9 +1474,9 @@ const styles: Record<string, CSSProperties> = {
     boxSizing: 'border-box'
   },
   contentDesktop: {
-    padding: '20px 22px 26px'
+    padding: '20px 22px 40px'
   },
   contentMobile: {
-    padding: '14px 12px 22px'
+    padding: '14px 12px 32px'
   }
 };

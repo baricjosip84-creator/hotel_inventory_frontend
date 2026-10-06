@@ -1,0 +1,26 @@
+INVENTORY MANAGEMENT APP — SURGICAL FIX 003 VERIFICATION
+Date: 2026-10-06
+Baseline: cumulative frontend surgical-fix-002, originally based on hotel-inventory-frontend(7).zip
+Backend: unchanged hotel-inventory-backend(7).zip
+
+PASS — check:inventory-navigation-state-surgical-fixes-v349248 (24/24)
+PASS — check:operations-feed-operational-completion-v349161 (23/23)
+PASS — check:tenant-real-time-operations-feed-multilingual
+PASS — check:learning-feedback-operational-completion-v349165 (20/20)
+PASS — check:learning-feedback-business-presentation-closure-v349184 (14/14)
+PASS — check:tenant-decision-learning-feedback-page-completion-multilingual
+PASS — check:commercial-shell
+PASS — targeted TypeScript transpile/syntax checks for changed TS/TSX files
+
+TYPECHECK: NOT CLEAN ON BASELINE
+Command: npm run typecheck:ci
+Existing unrelated error:
+src/pages/ReplenishmentPlanningPage.tsx(273,35): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string | number'.
+ReplenishmentPlanningPage.tsx was not changed in batch 003.
+
+Batch 003 changed:
+- Operations Feed durable URL-backed filter/search state
+- Learning Feedback detail/edit viewport focus
+- Learning Feedback business-readable search prompts
+- Global tenant footer/content separation guard
+- Localized built-in tenant role display

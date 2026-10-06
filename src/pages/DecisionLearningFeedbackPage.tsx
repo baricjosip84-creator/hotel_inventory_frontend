@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
@@ -5200,8 +5200,28 @@ export default function DecisionLearningFeedbackPage() {
   const [evidenceSort, setEvidenceSort] = useState('newest');
   const [selectedEvidenceDetail, setSelectedEvidenceDetail] = useState<Record<string, unknown> | null>(null);
   const [selectedEvidenceMode, setSelectedEvidenceMode] = useState<FeedbackMode | null>(null);
+  const feedbackFormRef = useRef<HTMLElement | null>(null);
+  const evidenceDetailRef = useRef<HTMLDivElement | null>(null);
   const pageLimit = 25;
   const reviewLimit = 25;
+
+  useEffect(() => {
+    if (!selectedEvidenceDetail) return;
+    const frame = window.requestAnimationFrame(() => {
+      evidenceDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      evidenceDetailRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [selectedEvidenceDetail]);
+
+  useEffect(() => {
+    if (!form.recordKey) return;
+    const frame = window.requestAnimationFrame(() => {
+      feedbackFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      feedbackFormRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [form.recordKey]);
 
   const summaryQuery = useQuery({
     queryKey: ['decision-learning-summary', pageOffsets, reviewOffset, view, canViewDiagnostics, canReadInsights, evidenceSearch, evidenceReviewStatus, evidenceDateFrom, evidenceDateTo, evidenceSort],
@@ -5577,7 +5597,6 @@ export default function DecisionLearningFeedbackPage() {
         learningActionCompletedAt: toLocalDateTimeValue(full.recommendation_outcome_learning_action_completed_at),
         learningActionEvidence: formBusinessEvidence(full.recommendation_outcome_learning_action_evidence, locale, ui)
       });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
       setMessage(ui('Editing an existing feedback record. Saving will update that record instead of creating a duplicate.'));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : ui('Unable to load the feedback record.'));
@@ -5692,7 +5711,7 @@ export default function DecisionLearningFeedbackPage() {
       </OperationalWorkspaceTabs>
 
       {view === 'feedback' ? (canGovern ? (
-      <section className={'card learning-feedback-form-card'}>
+      <section ref={feedbackFormRef} tabIndex={-1} style={{ scrollMarginTop: 16 }} className={'card learning-feedback-form-card'}>
         <div className="card__header">
           <div>
             <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/decision-learning-feedback" size={18} /></span>{ui('Record what happened')}</h2>
@@ -5703,7 +5722,7 @@ export default function DecisionLearningFeedbackPage() {
         <div className="learning-feedback-source-picker">
           <label>
             <span className="form-label">{ui('Find source')}</span>
-            <input className="input" value={sourceSearch} onChange={(event) => setSourceSearch(event.target.value)} placeholder={ui('Search by name or key')} />
+            <input className="input" value={sourceSearch} onChange={(event) => setSourceSearch(event.target.value)} placeholder={ui('Search recommendations, policies, forecasts, or optimization results')} />
           </label>
           <label>
             <span className="form-label">{ui('Source record')}</span>
@@ -6249,12 +6268,12 @@ export default function DecisionLearningFeedbackPage() {
             </p>
           </section>
 
-          {selectedEvidenceDetail ? <EvidenceDetailCard detail={selectedEvidenceDetail} canCreateFollowUp={canCreateExecutionRequests} canViewDiagnostics={canViewDiagnostics} creatingFollowUp={followUpMutation.isPending} onClose={() => { setSelectedEvidenceDetail(null); setSelectedEvidenceMode(null); }} onCreateFollowUp={createEvidenceFollowUp} /> : null}
+          {selectedEvidenceDetail ? <div ref={evidenceDetailRef} tabIndex={-1} style={{ scrollMarginTop: 16 }}><EvidenceDetailCard detail={selectedEvidenceDetail} canCreateFollowUp={canCreateExecutionRequests} canViewDiagnostics={canViewDiagnostics} creatingFollowUp={followUpMutation.isPending} onClose={() => { setSelectedEvidenceDetail(null); setSelectedEvidenceMode(null); }} onCreateFollowUp={createEvidenceFollowUp} /></div> : null}
 
           <section className="card learning-feedback-section learning-feedback-history-filters">
             <div className="card__header"><div><h2>{ui('Find recorded feedback')}</h2><p className="card__subtext">{ui('Search and filter the full feedback history, not only the rows currently visible on this page.')}</p></div></div>
             <div className="learning-feedback-filter-grid">
-              <label><span className="form-label">{ui('Search')}</span><input className="input" value={evidenceSearch} onChange={(event) => { setEvidenceSearch(event.target.value); setPageOffsets({ outcomes: 0, forecast_accuracy: 0, policy_effectiveness: 0, optimization_results: 0 }); }} placeholder={ui('Source, key, area, status, expected or actual result')} /></label>
+              <label><span className="form-label">{ui('Search')}</span><input className="input" value={evidenceSearch} onChange={(event) => { setEvidenceSearch(event.target.value); setPageOffsets({ outcomes: 0, forecast_accuracy: 0, policy_effectiveness: 0, optimization_results: 0 }); }} placeholder={ui('Search source name, business area, status, or result')} /></label>
               <label><span className="form-label">{ui('Review status')}</span><select className="input" value={evidenceReviewStatus} onChange={(event) => { setEvidenceReviewStatus(event.target.value); setPageOffsets({ outcomes: 0, forecast_accuracy: 0, policy_effectiveness: 0, optimization_results: 0 }); }}><option value="">{ui('All review states')}</option>{['open','resolved','dismissed','archived','unreviewed'].map((value) => <option key={value} value={value}>{ui(formatLabel(value))}</option>)}</select></label>
               <label><span className="form-label">{ui('Observed from')}</span><input className="input" type="date" value={evidenceDateFrom} onChange={(event) => { setEvidenceDateFrom(event.target.value); setPageOffsets({ outcomes: 0, forecast_accuracy: 0, policy_effectiveness: 0, optimization_results: 0 }); }} /></label>
               <label><span className="form-label">{ui('Observed to')}</span><input className="input" type="date" value={evidenceDateTo} onChange={(event) => { setEvidenceDateTo(event.target.value); setPageOffsets({ outcomes: 0, forecast_accuracy: 0, policy_effectiveness: 0, optimization_results: 0 }); }} /></label>

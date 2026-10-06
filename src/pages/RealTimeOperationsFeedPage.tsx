@@ -508,21 +508,32 @@ async function fetchOperationsFeed(
 
 export default function RealTimeOperationsFeedPage() {
   const { locale, ui } = useAppTranslation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const requestedTimelineItemId = searchParams.get('timeline_item_id')?.trim() || '';
   const requestedDomain = searchParams.get('event_domain')?.trim() || '';
   const requestedUrgency = searchParams.get('urgency')?.trim() || '';
-  const initialDomain = EVENT_DOMAIN_FILTERS.some((option) => option.value === requestedDomain)
+  const requestedSearchText = searchParams.get('search') || '';
+  const requestedTimeWindow = searchParams.get('time')?.trim() || '';
+  const requestedViewScope = searchParams.get('view')?.trim() || '';
+  const eventDomain: 'all' | EventDomain = EVENT_DOMAIN_FILTERS.some((option) => option.value === requestedDomain)
     ? requestedDomain as 'all' | EventDomain
     : 'all';
-  const initialUrgency = ['critical', 'high', 'medium', 'low'].includes(requestedUrgency)
+  const urgency: 'all' | EventUrgency = ['critical', 'high', 'medium', 'low'].includes(requestedUrgency)
     ? requestedUrgency as EventUrgency
     : 'all';
-  const [eventDomain, setEventDomain] = useState<'all' | EventDomain>(initialDomain);
-  const [urgency, setUrgency] = useState<'all' | EventUrgency>(initialUrgency);
-  const [searchText, setSearchText] = useState('');
-  const [timeWindow, setTimeWindow] = useState<FeedTimeWindow>('all');
-  const [viewScope, setViewScope] = useState<FeedView>('all');
+  const searchText = requestedSearchText;
+  const timeWindow: FeedTimeWindow = ['today', '24h'].includes(requestedTimeWindow)
+    ? requestedTimeWindow as FeedTimeWindow
+    : 'all';
+  const viewScope: FeedView = requestedViewScope === 'new' ? 'new' : 'all';
+
+  const updateFeedControl = (key: 'event_domain' | 'urgency' | 'search' | 'time' | 'view', value: string, defaultValue = 'all') => {
+    const next = new URLSearchParams(searchParams);
+    const normalized = value.trim();
+    if (!normalized || normalized === defaultValue) next.delete(key);
+    else next.set(key, normalized);
+    setSearchParams(next, { replace: true });
+  };
   const locallyAvailableDomains = useMemo(localAvailableDomains, []);
   const lastSeenStorageKey = useMemo(buildLastSeenStorageKey, []);
   const [previousVisitAt] = useState<string | null>(() => readLastSeenTimestamp(lastSeenStorageKey));
@@ -602,8 +613,11 @@ export default function RealTimeOperationsFeedPage() {
   */
 
   useEffect(() => {
-    if (eventDomain !== 'all' && !availableDomains.has(eventDomain)) setEventDomain('all');
-  }, [availableDomains, eventDomain]);
+    if (eventDomain === 'all' || availableDomains.has(eventDomain)) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('event_domain');
+    setSearchParams(next, { replace: true });
+  }, [availableDomains, eventDomain, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!lastSeenStorageKey || !response?.generated_at || typeof window === 'undefined') return;
@@ -681,29 +695,29 @@ export default function RealTimeOperationsFeedPage() {
           <div className="operations-feed-page__toolbar">
             <label className="operations-feed-page__field">
               <span>{ui("Work area")}</span>
-              <select className="operations-feed-page__select" value={eventDomain} onChange={(event) => setEventDomain(event.target.value as 'all' | EventDomain)}>
+              <select className="operations-feed-page__select" value={eventDomain} onChange={(event) => updateFeedControl('event_domain', event.target.value)}>
                 {availableDomainFilters.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
               </select>
             </label>
             <label className="operations-feed-page__field">
               <span>{ui("Urgency")}</span>
-              <select className="operations-feed-page__select" value={urgency} onChange={(event) => setUrgency(event.target.value as 'all' | EventUrgency)}>
+              <select className="operations-feed-page__select" value={urgency} onChange={(event) => updateFeedControl('urgency', event.target.value)}>
                 {URGENCY_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
               </select>
             </label>
             <label className="operations-feed-page__field operations-feed-page__field--search">
               <span>{ui("Search current feed")}</span>
-              <input className="operations-feed-page__input" type="search" value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder={ui("Search title, summary, status, or work area")} />
+              <input className="operations-feed-page__input" type="search" value={searchText} onChange={(event) => updateFeedControl('search', event.target.value, '')} placeholder={ui("Search title, summary, status, or work area")} />
             </label>
             <label className="operations-feed-page__field">
               <span>{ui("Time")}</span>
-              <select className="operations-feed-page__select" value={timeWindow} onChange={(event) => setTimeWindow(event.target.value as FeedTimeWindow)}>
+              <select className="operations-feed-page__select" value={timeWindow} onChange={(event) => updateFeedControl('time', event.target.value)}>
                 {TIME_WINDOW_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
               </select>
             </label>
             <label className="operations-feed-page__field">
               <span>{ui("View")}</span>
-              <select className="operations-feed-page__select" value={viewScope} onChange={(event) => setViewScope(event.target.value as FeedView)}>
+              <select className="operations-feed-page__select" value={viewScope} onChange={(event) => updateFeedControl('view', event.target.value)}>
                 {VIEW_FILTERS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
               </select>
             </label>

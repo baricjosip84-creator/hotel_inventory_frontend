@@ -1,0 +1,518 @@
+INVENTORY MANAGEMENT APP — SURGICAL CORRECTION LOG
+Date started: 2026-10-06
+Status: ACTIVE
+
+AUTHORITATIVE SOURCE OF TRUTH
+- Backend source: hotel-inventory-backend(7).zip
+- Frontend source: hotel-inventory-frontend(7).zip
+- Audit findings: Inventory_Management_App_Tenant_Audit_Findings_2026-09-26_v93.txt
+
+WORKING RULES
+- Only targeted corrections tied to recorded audit findings.
+- No broad redesigns or unrelated feature changes.
+- Each completed correction records exact files changed, behavior changed, and verification performed.
+- Backend remains unchanged unless a finding specifically requires a backend correction.
+
+================================================================================
+CORRECTION BATCH 001 — 2026-10-06
+================================================================================
+
+FIX 001 — CROSS-DOMAIN ZERO-RESULT FILTER DEAD-END
+Audit finding:
+- CDO-DEF-006 — Zero-result filter state hides filters and Clear filters recovery control.
+- Severity in audit: High UX / navigation / evidence-discovery defect.
+
+Problem before correction:
+- When a legitimate Cross-Domain filter returned zero evidence, `hasEvidence` became false.
+- The page then hid the entire filter section, including Clear filters.
+- The empty state incorrectly said `No decision comparisons yet`, even though tenant evidence existed but was filtered out.
+
+Frontend file changed:
+- src/pages/CrossDomainOptimizationPage.tsx
+
+Surgical correction:
+- Added explicit `hasActiveEvidenceFilters` state derived from the business-area/status/objective/option/tradeoff/result filters.
+- Filter controls now remain visible when an active filter returns zero matching evidence.
+- Zero-result filtered state now says `No evidence matches the current filters` instead of claiming no comparisons exist.
+- Zero-result filtered state now provides a direct `Clear filters` recovery button.
+- The planning-run chooser remains shown only when matching evidence exists, avoiding an empty selector.
+- Existing true first-use/no-data behavior remains unchanged when there are no active evidence filters.
+
+Expected live retest:
+1. Open Cross-Domain Optimization with existing evidence.
+2. Apply a filter known to return zero evidence (previous reproduction used Business area = Procurement).
+3. Confirm Filter the evidence remains visible.
+4. Confirm active filter remains visible.
+5. Confirm Clear filters remains visible.
+6. Confirm empty-state text says no evidence matches current filters rather than no comparisons exist.
+7. Click Clear filters and confirm existing evidence returns.
+
+Verification completed locally:
+- New targeted regression check: PASS.
+- Existing Cross-Domain operational completion check v3.49.170: PASS.
+- TypeScript syntax transpile check for changed TSX file: PASS.
+
+--------------------------------------------------------------------------------
+
+FIX 002 — TENANT AUDIT ACTION-CODE EXAMPLE WAS WRONG / MISLEADING
+Audit findings:
+- Dedicated Action code test used `shipment.receive`, based on the UI example, and returned 0.
+- Broad Search audit history with `shipment.receive` found two Shipment Received rows because the actual stored action contains that substring.
+- Audit recorded the dedicated filter result as an inconsistency/functional failure from the tenant UI perspective.
+- Entity type testing also showed that exact technical/internal values are required (`shipments`, not visible singular `Shipment`).
+
+Root cause confirmed in source:
+- Tenant Audit dedicated Action code filter is an exact-match backend filter (`al.action = value`).
+- Actual shipment-received action code is `shipment.received`.
+- Frontend placeholder incorrectly instructed the user with `Example: shipment.receive`.
+
+Frontend file changed:
+- src/pages/TenantAuditPage.tsx
+
+Surgical correction:
+- Action code placeholder changed from `Example: shipment.receive` to `Exact code, e.g. shipment.received`.
+- Entity type placeholder changed from `Example: shipments` to `Exact type, e.g. shipments`.
+- This keeps exact-match semantics intact while no longer instructing users to enter a non-existent action code.
+
+Expected live retest:
+1. Administration -> Audit.
+2. Reset filters.
+3. Enter `shipment.received` in Action code.
+4. Apply filters.
+5. Confirm Shipment Received audit events are returned.
+6. Confirm the field now clearly states an exact code is required.
+
+Verification completed locally:
+- New targeted regression check: PASS.
+- Existing Tenant Audit page hardening check: PASS.
+- TypeScript syntax transpile check for changed TSX file: PASS.
+
+--------------------------------------------------------------------------------
+
+REGRESSION GUARD ADDED
+Frontend file added:
+- scripts/check-inventory-audit-surgical-fixes-v349246.mjs
+
+Frontend package.json changed:
+- Added script: `check:inventory-audit-surgical-fixes-v349246`
+
+Guard checks:
+- Cross-Domain active-filter detection exists.
+- Cross-Domain filter controls remain rendered for zero-result active-filter states.
+- Filtered empty-state copy is correct.
+- Direct Clear filters recovery exists.
+- Tenant Audit example uses real `shipment.received` action code.
+- Tenant Audit Entity type wording states exact-value behavior.
+
+Verification command:
+- npm run check:inventory-audit-surgical-fixes-v349246 -> PASS
+
+OTHER VERIFICATION
+- npm run check:tenant-audit-page-hardening -> PASS
+- npm run check:cross-domain-optimization-operational-completion-v349170 -> PASS
+- Targeted TypeScript syntax transpile for both changed TSX files -> PASS
+- Full `npm run typecheck` was attempted twice but did not complete within the available execution timeout. No typecheck failure/error was produced before timeout; it is therefore recorded as NOT COMPLETED, not PASS.
+
+BACKEND CHANGES IN BATCH 001
+- None.
+- hotel-inventory-backend(7).zip remains the unchanged backend source baseline for this batch.
+
+FILES CHANGED IN BATCH 001
+- src/pages/CrossDomainOptimizationPage.tsx
+- src/pages/TenantAuditPage.tsx
+- scripts/check-inventory-audit-surgical-fixes-v349246.mjs (new)
+- package.json
+
+BATCH 001 STATUS
+- IMPLEMENTED LOCALLY
+- TARGETED REGRESSION CHECKS PASS
+- READY FOR SOURCE PACKAGE HANDOFF / DEPLOYMENT RETEST
+
+NEXT CORRECTION WORK
+- Continue through confirmed audit findings from the canonical v93 ledger one surgical issue at a time, prioritizing high-severity defects with clear reproduction and code-backed cause.
+
+================================================================================
+CORRECTION BATCH 002 — 2026-10-06
+================================================================================
+
+THEME — ACTION FEEDBACK CORRECTNESS + ADVANCED-INVENTORY DISCOVERABILITY
+
+FIX 003 — MANUAL STOCK ADJUSTMENT SUCCESS TOAST WAS SEMANTICALLY WRONG
+Audit finding:
+- Stock positive/negative manual adjustment persisted correctly, but the global toast said `Stock created successfully.` while inline feedback correctly said `Stock adjustment applied successfully.`
+
+Frontend file changed:
+- src/lib/api.ts
+
+Surgical correction:
+- Exact POST `/stock/adjust` now produces `Stock adjustment applied successfully.`
+- Exact POST `/stock/count` now produces `Stock count applied successfully.`
+- Existing stock mutation behavior and backend contract are unchanged.
+
+Expected live retest:
+1. Perform one controlled manual stock adjustment.
+2. Confirm only adjustment-specific success wording is shown.
+3. Confirm quantity refresh and movement history remain unchanged.
+
+--------------------------------------------------------------------------------
+
+FIX 004 — DECISION-INTELLIGENCE REFRESH ACTIONS USED GENERIC `ITEM CREATED` TOASTS
+Audit findings:
+- Adaptive Policy Engine `Refresh policy analysis` showed `Item created successfully.`
+- Probabilistic Forecasting `Refresh forecast analysis` showed `Item created successfully.`
+- Audit explicitly classified both as misleading because these actions refresh/rebuild analysis evidence rather than create a generic tenant item.
+
+Frontend files changed:
+- src/lib/api.ts
+- src/i18n/tenantUiTranslations.ts
+
+Surgical correction:
+- `/decision-intelligence/adaptive-policy-engine-refresh` now reports `Policy analysis refreshed successfully.`
+- `/decision-intelligence/probabilistic-forecasting-refresh` now reports `Forecast analysis refreshed successfully.`
+- Added five-language tenant translation rows for both messages.
+
+--------------------------------------------------------------------------------
+
+FIX 005 — PROCUREMENT RECOMMENDATION DECISION TOAST WAS GENERIC
+Audit finding:
+- Approving a procurement recommendation succeeded but toast said `Item created successfully.` even though no generic item was created.
+
+Frontend files changed:
+- src/lib/api.ts
+- src/i18n/tenantUiTranslations.ts
+
+Surgical correction:
+- Recommendation decision POST now reads the submitted decision status and returns action-specific success copy:
+  - Recommendation approved successfully.
+  - Recommendation rejected successfully.
+  - Recommendation deferred successfully.
+- Bulk-decision equivalents are also covered.
+- Added five-language translations.
+
+--------------------------------------------------------------------------------
+
+FIX 006 — REQUISITION WORKFLOW/FULFILLMENT TOASTS WERE GENERIC; DUPLICATE TOAST NOISE SAFEGUARD
+Audit findings:
+- Requisition fulfillment succeeded but showed three identical `Item created successfully.` toasts.
+- Audit requested one workflow-specific success message such as `Requisition fulfilled successfully.`
+
+Frontend files changed:
+- src/lib/api.ts
+- src/app/AppProviders.tsx
+- src/i18n/tenantUiTranslations.ts
+
+Surgical correction:
+- Requisition fulfillment now reports `Requisition fulfilled successfully.`
+- Bulk fulfillment reports `Requisitions fulfilled successfully.`
+- Submit / approve / reject / cancel / reopen now use workflow-specific success messages.
+- Added five-language translations.
+- Added a narrow global toast dedupe guard: only near-simultaneous byte-identical feedback (same surface/type/message/request ID within 1.2 seconds) is collapsed. This prevents one operation from rendering duplicate identical success toasts while leaving different messages untouched.
+
+Expected live retest:
+1. Use a safe requisition workflow transition or controlled fulfillment.
+2. Confirm one action-specific success toast appears.
+3. Confirm no duplicate identical toast stack appears.
+
+--------------------------------------------------------------------------------
+
+FIX 007 — OUTBOUND READ-ONLY DOCUMENT PREVIEW FALSE SUCCESS TOAST
+Audit findings:
+- Order Confirmation Preview and Delivery Note Preview were read-only and created no stored document, but the global API layer displayed `Item created successfully.`
+- This directly contradicted the page state `No documents created yet`.
+
+Frontend file changed:
+- src/pages/OutboundPage.tsx
+
+Surgical correction:
+- Read-only order-document preview POST suppresses generic mutation-success feedback.
+- Read-only return-document preview POST suppresses generic mutation-success feedback.
+- Read-only stored-document email-preview POST suppresses generic mutation-success feedback.
+- Error handling remains unchanged.
+- Actual document creation and email-send actions continue to provide normal mutation feedback.
+
+Expected live retest:
+1. Open Outbound and Preview an Order Confirmation / Delivery Note.
+2. Confirm preview opens normally.
+3. Confirm no `Item created successfully.` toast appears.
+4. Confirm `No documents created yet` remains true until Create PDF is actually used.
+
+--------------------------------------------------------------------------------
+
+FIX 008 — API KEY SECRET ROTATION TOAST WAS GENERIC
+Audit finding:
+- API-key secret rotation visibly succeeded, but toast said `Item created successfully.`
+
+Frontend files changed:
+- src/lib/api.ts
+- src/i18n/tenantUiTranslations.ts
+
+Surgical correction:
+- API client rotate action now reports `API key secret rotated successfully.`
+- API client revoke action now reports `API key revoked successfully.`
+- Webhook secret rotation now reports `Webhook signing secret rotated successfully.`
+- Added five-language translations.
+
+--------------------------------------------------------------------------------
+
+FIX 009 — ADVANCED INVENTORY PRIMARY CAPABILITY NAVIGATION REQUIRED HORIZONTAL SCROLL ON DESKTOP
+Audit finding:
+- Advanced Inventory capability navigation used a horizontally scrollable single-row strip; not all primary areas were visible at once.
+- Audit recommendation: wrap into two/multiple rows on desktop, retain horizontal overflow only for narrow screens.
+
+Frontend file changed:
+- src/pages/InventoryCapabilitiesPage.css
+
+Surgical correction:
+- Desktop capability buttons now wrap and share the available width.
+- Buttons can use normal multi-line labels on desktop.
+- At <=720px the original horizontal-scroll behavior is retained as the narrow-screen fallback.
+
+Expected live retest:
+1. Open Advanced Inventory on desktop.
+2. Confirm all nine capability areas are discoverable without horizontal scrolling.
+3. Narrow the viewport and confirm horizontal fallback remains usable.
+
+--------------------------------------------------------------------------------
+
+FIX 010 — API KEY ZERO-PERMISSION STATE NEEDED EXPLICIT GUIDANCE
+Audit finding:
+- With a connection name but zero API permissions, the user had no clear plain-language explanation why the key could not be created.
+
+Current source review before correction:
+- Latest source already disables Create API key while `apiScopes.length === 0`; therefore the backend/create path itself did not require a correction.
+- The remaining gap was visible explanation.
+
+Frontend file changed:
+- src/pages/InventoryCapabilitiesPage.tsx
+
+Surgical correction:
+- When creating a key with zero selected scopes, the permission section now visibly states `Select at least one API permission.`
+- Existing button disable rule and backend validation remain unchanged.
+
+--------------------------------------------------------------------------------
+
+REGRESSION GUARD ADDED
+Frontend file added:
+- scripts/check-inventory-action-feedback-surgical-fixes-v349247.mjs
+
+Frontend package.json changed:
+- Added script: `check:inventory-action-feedback-surgical-fixes-v349247`
+
+Guard coverage:
+- Stock adjustment specific success copy.
+- Policy/forecast refresh specific success copy.
+- Requisition fulfillment specific success copy.
+- Recommendation approval specific success copy.
+- API/webhook secret rotation specific success copy.
+- Read-only Outbound preview feedback suppression.
+- Near-simultaneous identical toast dedupe.
+- API-key zero-scope helper.
+- Desktop wrapped Advanced Inventory capability navigation + narrow-screen fallback.
+- Translation rows for the new tenant feedback strings.
+
+VERIFICATION COMPLETED LOCALLY
+- npm run check:inventory-action-feedback-surgical-fixes-v349247 -> PASS (22/22)
+- npm run check:tenant-mutation-retry-safety -> PASS
+- npm run check:tenant-outbound-multilingual -> PASS
+- npm run check:tenant-advanced-inventory-multilingual -> PASS
+- npm run check:tenant-inventory-requisitions-page-completion-multilingual -> PASS
+- npm run check:tenant-procurement-recommendations-page-completion-multilingual -> PASS
+- npm run check:adaptive-policy-closed-loop-v349169 -> PASS (20/20)
+- npm run check:tenant-probabilistic-forecasting-multilingual -> PASS
+- Targeted TypeScript transpile/syntax checks for all changed TS/TSX files -> PASS
+
+BACKEND CHANGES IN BATCH 002
+- None.
+- hotel-inventory-backend(7).zip remains unchanged.
+
+FILES CHANGED IN BATCH 002
+- src/lib/api.ts
+- src/app/AppProviders.tsx
+- src/pages/OutboundPage.tsx
+- src/pages/InventoryCapabilitiesPage.tsx
+- src/pages/InventoryCapabilitiesPage.css
+- src/i18n/tenantUiTranslations.ts
+- scripts/check-inventory-action-feedback-surgical-fixes-v349247.mjs (new)
+- package.json
+
+BATCH 002 STATUS
+- IMPLEMENTED LOCALLY
+- TARGETED REGRESSION CHECKS PASS
+- READY FOR SOURCE PACKAGE HANDOFF / DEPLOYMENT RETEST
+
+NEXT CORRECTION WORK
+- Continue from the canonical audit ledger, prioritizing remaining confirmed functional/state/navigation defects that are still present in the latest source rather than re-fixing findings already corrected in source.
+
+================================================================================
+CORRECTION BATCH 003 — 2026-10-06
+================================================================================
+
+THEME — NAVIGATION STATE DURABILITY + LONG-PAGE ACTION FOCUS + GLOBAL SHELL SAFETY
+
+FIX 011 — OPERATIONS FEED FILTER/SEARCH STATE WAS TRANSIENT ACROSS BACK/F5
+Audit findings:
+- OPER-DEF-005 — Operations Feed navigation state is lost on browser Back.
+- OPER-DEF-006 — Operations Feed filters/search do not survive hard refresh.
+- Proven audit scope included Work area, Urgency, Search current feed, Time, and View.
+
+Current-source review before correction:
+- Work area and Urgency were read from URL only during first render, then copied into component state.
+- Search, Time, and View were component-only state with no URL persistence.
+- User control changes did not update the route, so Back/F5 could not reconstruct the working view.
+- The separate older OPER-DEF-004 alert deep-link finding is already corrected in the current source: alert source links include `alert_id` when the source UUID is available. No new patch was applied for OPER-DEF-004 in this batch.
+
+Frontend file changed:
+- src/pages/RealTimeOperationsFeedPage.tsx
+
+Surgical correction:
+- All five user controls are now route-backed:
+  - `event_domain`
+  - `urgency`
+  - `search`
+  - `time`
+  - `view`
+- Controls hydrate directly from URL search parameters on render/remount.
+- Control changes update URL search parameters with `replace: true`, preserving durable/shareable state without creating a browser-history entry for every keystroke/filter change.
+- Existing `timeline_item_id` deep-link context is preserved when filter parameters change.
+- Invalid/unavailable work-area values are removed from the URL instead of leaving a stale inaccessible filter.
+
+Expected live retest:
+1. Open Operations Feed.
+2. Set Work area = Execution tasks, Urgency = Medium, Search = product.
+3. Confirm the URL now contains the active filter state.
+4. Press F5 and confirm all active controls and the same result set remain.
+5. Open a source workflow and use browser Back; confirm the prior Operations Feed controls are restored.
+6. Separately set Time = Today and View = New since last visit, refresh, and confirm both survive.
+
+--------------------------------------------------------------------------------
+
+FIX 012 — LEARNING FEEDBACK VIEW DETAILS / EDIT OPENED CONTENT OUTSIDE VIEWPORT
+Audit findings:
+- LF-DEF-001 — View details opens the detail panel outside the current viewport.
+- LF-DEF-002 — Edit opens the edit form outside the current viewport.
+
+Frontend file changed:
+- src/pages/DecisionLearningFeedbackPage.tsx
+
+Surgical correction:
+- Added dedicated focus/scroll targets for the Feedback evidence details panel and the Record what happened edit form.
+- After a detail record finishes loading, the rendered detail container scrolls into view and receives programmatic focus.
+- After an existing record enters edit mode, the existing feedback form scrolls into view and receives programmatic focus.
+- Replaced the old broad `window.scrollTo({ top: 0 })` edit workaround with exact component targeting.
+- Added `scrollMarginTop` to the targets so the focused section is not jammed against surrounding shell content.
+
+Expected live retest:
+1. Learning Feedback -> Policy effectiveness -> View details.
+2. Confirm Feedback evidence details becomes visible immediately without manual scrolling.
+3. Close details.
+4. Click Edit on the same row.
+5. Confirm Record what happened/edit form becomes visible immediately with the existing record loaded.
+
+--------------------------------------------------------------------------------
+
+FIX 013 — LEARNING FEEDBACK SEARCH PROMPTS USED INTERNAL/AMBIGUOUS TERMINOLOGY
+Audit finding:
+- LF-UX-003 — user-facing search fields use unclear/internal terms such as `key` and do not tell a business user what recognizable information to enter.
+
+Frontend files changed:
+- src/pages/DecisionLearningFeedbackPage.tsx
+- src/i18n/tenantUiTranslations.ts
+
+Surgical correction:
+- Find source placeholder changed from `Search by name or key` to:
+  `Search recommendations, policies, forecasts, or optimization results`.
+- Recorded-feedback search placeholder changed from technical field enumeration to:
+  `Search source name, business area, status, or result`.
+- Added German, Spanish, French, and Croatian translations for both new strings.
+
+--------------------------------------------------------------------------------
+
+FIX 014 — GLOBAL TENANT FOOTER COULD COMPRESS/OVERLAP LONG-PAGE CONTENT
+Audit finding:
+- SHELL-DEF-001 — footer overlaps long page content / active controls.
+- Severity in audit: High UI / interaction.
+- Strongest audit proof: Storage Locations Create button was visibly cut by the footer; issue also appeared across multiple long tenant pages.
+
+Frontend file changed:
+- src/layouts/AppLayout.tsx
+
+Surgical correction:
+- Changed the tenant `<main>` content flex behavior from shrinkable `flex: 1` to `flex: 1 0 auto`, so long page content owns its required height instead of being compressed into the footer region.
+- Increased the normal bottom content safety gap before the footer:
+  - desktop bottom padding: 40px
+  - mobile bottom padding: 32px
+- Footer remains in normal document flow; no page-specific footer patches were added.
+
+Expected live retest:
+1. Open a previously affected long page such as Storage Locations.
+2. Scroll to the final form/action row.
+3. Confirm the last button/field is fully visible and clickable above the copyright footer.
+4. Repeat on one other long page such as Shipments or Reports.
+
+--------------------------------------------------------------------------------
+
+FIX 015 — RAW BUILT-IN ROLE CODE WAS SHOWN IN LOCALIZED TENANT SHELL
+Audit finding:
+- I18N-UX-002 — Croatian UI could still show raw built-in role code `admin`.
+
+Frontend file changed:
+- src/layouts/AppLayout.tsx
+
+Surgical correction:
+- Built-in access-role labels are now localized for display in the tenant shell:
+  - admin -> localized `Admin`
+  - manager -> localized `Manager`
+  - staff -> localized `Staff`
+- Custom-role names remain unchanged business data.
+- Internal permission/role codes are not altered; only visible shell presentation changes.
+
+--------------------------------------------------------------------------------
+
+REGRESSION GUARD ADDED
+Frontend file added:
+- scripts/check-inventory-navigation-state-surgical-fixes-v349248.mjs
+
+Frontend package.json changed:
+- Added script: `check:inventory-navigation-state-surgical-fixes-v349248`
+
+Guard coverage:
+- Operations Feed URL-backed state for all five controls.
+- Route updates use replace semantics.
+- Learning Feedback exact detail/edit scroll targets.
+- Removal of the old page-top edit workaround.
+- Business-readable Learning Feedback search prompts and translations.
+- Tenant-shell non-shrinking main content + footer safety gap.
+- Built-in tenant role display localization.
+
+VERIFICATION COMPLETED LOCALLY
+- npm run check:inventory-navigation-state-surgical-fixes-v349248 -> PASS (24/24)
+- npm run check:operations-feed-operational-completion-v349161 -> PASS (23/23)
+- npm run check:tenant-real-time-operations-feed-multilingual -> PASS
+- npm run check:learning-feedback-operational-completion-v349165 -> PASS (20/20)
+- npm run check:learning-feedback-business-presentation-closure-v349184 -> PASS (14/14)
+- npm run check:tenant-decision-learning-feedback-page-completion-multilingual -> PASS
+- npm run check:commercial-shell -> PASS
+- Targeted TypeScript transpile/syntax checks for all changed TS/TSX files -> PASS
+- `npm run typecheck:ci` was also run. It currently FAILS on pre-existing, unchanged source `src/pages/ReplenishmentPlanningPage.tsx:273` (`unknown` is not assignable to `string | number`). Batch 003 did not edit ReplenishmentPlanningPage.tsx, so this is recorded as an existing baseline typecheck defect, not a regression caused by this batch.
+
+BACKEND CHANGES IN BATCH 003
+- None.
+- hotel-inventory-backend(7).zip remains unchanged.
+
+FILES CHANGED IN BATCH 003
+- src/pages/RealTimeOperationsFeedPage.tsx
+- src/pages/DecisionLearningFeedbackPage.tsx
+- src/layouts/AppLayout.tsx
+- src/i18n/tenantUiTranslations.ts
+- scripts/check-inventory-navigation-state-surgical-fixes-v349248.mjs (new)
+- package.json
+
+BATCH 003 STATUS
+- IMPLEMENTED LOCALLY
+- TARGETED REGRESSION CHECKS PASS
+- EXISTING UNRELATED TYPECHECK DEFECT IDENTIFIED IN REPLENISHMENT PLANNING
+- READY FOR SOURCE PACKAGE HANDOFF / DEPLOYMENT RETEST
+
+NEXT CORRECTION WORK
+- Continue through the remaining canonical audit findings, prioritizing confirmed defects still present in the corrected cumulative source.
+- I18N-DEF-001 (page subtitles/navigation descriptions bypass localization) remains open and was NOT silently claimed fixed by this batch.
