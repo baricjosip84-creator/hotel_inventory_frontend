@@ -284,10 +284,20 @@ function ReliabilitySummaryCard({
   );
 }
 
-function ReliabilityNavLink({ path, label }: { path: string; label?: string }) {
+function reliabilitySourceHref(path: string, dimensionKey?: string | null): string {
+  if (path !== '/intelligence-review') return path;
+  const normalizedDimensionKey = String(dimensionKey || '').trim().toLowerCase();
+  if (normalizedDimensionKey === 'human_review_readiness' || normalizedDimensionKey === 'ai_governance_readiness') {
+    return '/intelligence-review?view=readiness';
+  }
+  return path;
+}
+
+function ReliabilityNavLink({ path, label, dimensionKey }: { path: string; label?: string; dimensionKey?: string | null }) {
   const { ui } = useAppTranslation();
+  const href = reliabilitySourceHref(path, dimensionKey);
   return (
-    <Link className="button button--secondary reliability-link-button" to={path}>
+    <Link className="button button--secondary reliability-link-button" to={href}>
       <TenantNavIcon path={path} size={16} />
       <span>{ui(label || SOURCE_LABELS[path] || 'Open source page')}</span>
     </Link>
@@ -510,7 +520,7 @@ export default function ReliabilityCommandPage() {
                     </ul>
                   ) : null}
                   {sourcePath && sourcePermissionAllows(sourcePath) ? (
-                    <div className="reliability-card-actions"><ReliabilityNavLink path={sourcePath} /></div>
+                    <div className="reliability-card-actions"><ReliabilityNavLink path={sourcePath} dimensionKey={dimension.key} /></div>
                   ) : null}
                 </article>
               );
@@ -554,7 +564,7 @@ export default function ReliabilityCommandPage() {
                         <div><dt>{ui('Suggested runbook')}</dt><dd>{systemIdentifier(risk.recommended_runbook, systemOwned, ui)}</dd></div>
                       </dl>
                       {sourcePath && sourcePermissionAllows(sourcePath) ? (
-                        <div className="reliability-card-actions"><ReliabilityNavLink path={sourcePath} /></div>
+                        <div className="reliability-card-actions"><ReliabilityNavLink path={sourcePath} dimensionKey={risk.dimension} /></div>
                       ) : null}
                     </article>
                   );
@@ -620,7 +630,7 @@ export default function ReliabilityCommandPage() {
                             </ol>
                           ) : null}
                           {sourcePath && sourcePermissionAllows(sourcePath) ? (
-                            <div className="reliability-card-actions"><ReliabilityNavLink path={sourcePath} /></div>
+                            <div className="reliability-card-actions"><ReliabilityNavLink path={sourcePath} dimensionKey={item.dimension} /></div>
                           ) : null}
                         </article>
                       );
