@@ -130,11 +130,11 @@ for (const required of [
   "downloadCsv(`purchase-order-${selectedDetail.po_number || selectedDetail.id}-audit-${stamp}.csv`",
   "downloadCsv(`purchase-order-${selectedDetail.po_number || selectedDetail.id}.csv`",
   "'PO Number',\n      'Supplier',\n      'Status'",
-  "['Created At', 'Action', 'Actor', 'Entity Type', 'Entity ID', 'Metadata Summary']",
+  "[ui('Created At'), ui('Event'), ui('Actor'), ui('Record'), ui('Reference'), ui('Business context')]",
   "['Product', 'Ordered Unit', 'Ordered Quantity', 'Base Unit', 'Base Quantity'",
   "['Shipment', 'Status', 'Delivery Date', 'Item Count', 'Ordered Quantity', 'Received Quantity', 'Created At']",
 ]) if (!pageSource.includes(required)) fail(`Purchase Orders technical CSV filename/header contract changed or missing: ${required}`);
-if (!process.exitCode) pass('Purchase Orders technical CSV filenames and schema headers remain canonical and untranslated.');
+if (!process.exitCode) pass('Purchase Orders CSV filenames remain canonical and tenant-facing audit headers remain business readable.');
 
 for (const required of [
   'selectedDetail.supplier_name',
@@ -142,11 +142,10 @@ for (const required of [
   'item.product_name',
   'item.notes ??',
   'selectedDetail.completion_reason',
-  'event.action',
-  'event.entity_type',
-  'auditMetadataSummary(event.metadata)',
+  'purchaseOrderAuditEventLabel(event.action, ui)',
+  'purchaseOrderAuditMetadataSummary(event.metadata, ui)',
   'shipment.po_number || shipment.qr_code || shipment.id',
 ]) if (!pageSource.includes(required)) fail(`Purchase Orders raw business/server evidence boundary changed or missing: ${required}`);
-if (!process.exitCode) pass('Purchase Orders supplier/product/note/audit/shipment business and server evidence remains raw.');
+if (!process.exitCode) pass('Purchase Orders supplier/product/note/shipment business data remains intact while audit evidence uses business-facing presentation.');
 
 if (!process.exitCode) pass('Tenant Purchase Orders multilingual whole-page completion checks passed.');

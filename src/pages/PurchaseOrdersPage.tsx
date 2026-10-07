@@ -474,15 +474,81 @@ function auditActorLabelKey(row: TenantAuditRow): string {
   return row.user_name || row.user_email || row.user_id || 'Tenant user';
 }
 
-function auditMetadataSummary(metadata: Record<string, unknown> | null): string {
-  if (!metadata) return '-';
+function humanizeAuditToken(value: string | null | undefined): string {
+  return String(value || '')
+    .split('.')
+    .pop()!
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^./, (character) => character.toUpperCase());
+}
 
-  const keys = ['previous_status', 'next_status', 'reason', 'delivery_date', 'copied_item_count', 'copied_total_quantity', 'ordered_quantity', 'received_quantity'];
-  const parts = keys
-    .filter((key) => metadata[key] != null && metadata[key] !== '')
-    .map((key) => `${key}: ${String(metadata[key])}`);
+function purchaseOrderAuditEventLabel(action: string, ui: (englishText: string) => string): string {
+  const labels: Record<string, string> = {
+    'purchase_order.created': 'Purchase order created',
+    'purchase_order.updated': 'Purchase order updated',
+    'purchase_order.submitted': 'Purchase order submitted for approval',
+    'purchase_order.approved': 'Purchase order approved',
+    'purchase_order.shipment_created': 'Receiving shipment created',
+    'purchase_order.completed': 'Purchase order completed',
+    'purchase_order.manually_closed': 'Purchase order manually closed',
+    'purchase_order.reopened': 'Purchase order reopened',
+    'purchase_order.cancelled': 'Purchase order cancelled',
+    'procurement_recommendation.po_draft_created': 'Purchase order draft created from procurement recommendation',
+    'public_api.purchase_order.created': 'Purchase order created through API',
+    'public_api.purchase_order.updated': 'Purchase order updated through API',
+    'public_api.purchase_order.submitted': 'Purchase order submitted through API',
+    'public_api.purchase_order.cancelled': 'Purchase order cancelled through API'
+  };
 
-  return parts.length ? parts.join(' | ') : '-';
+  return ui(labels[action] || humanizeAuditToken(action));
+}
+
+function purchaseOrderAuditMetadataSummary(
+  metadata: Record<string, unknown> | null,
+  ui: (englishText: string) => string
+): string {
+  if (!metadata) return ui('No additional business context recorded.');
+
+  const parts: string[] = [];
+  const previousStatus = typeof metadata.previous_status === 'string' ? metadata.previous_status : null;
+  const nextStatus = typeof metadata.next_status === 'string' ? metadata.next_status : null;
+  const reason = typeof metadata.reason === 'string' ? metadata.reason : null;
+  const deliveryDate = typeof metadata.delivery_date === 'string' ? metadata.delivery_date : null;
+  const itemCount = metadata.item_count;
+  const copiedItemCount = metadata.copied_item_count;
+  const copiedTotalQuantity = metadata.copied_total_quantity;
+  const orderedQuantity = metadata.ordered_quantity;
+  const receivedQuantity = metadata.received_quantity;
+  const remainingQuantity = metadata.remaining_quantity;
+  const cancelledRemainingQuantity = metadata.cancelled_remaining_quantity;
+  const openLinkedShipmentCount = metadata.open_linked_shipment_count;
+  const completionType = typeof metadata.completion_type === 'string' ? metadata.completion_type : null;
+  const source = typeof metadata.source === 'string' ? metadata.source : null;
+
+  if (previousStatus || nextStatus) {
+    parts.push(
+      ui('Status: {from} → {to}')
+        .replace('{from}', previousStatus ? ui(humanizeAuditToken(previousStatus)) : '—')
+        .replace('{to}', nextStatus ? ui(humanizeAuditToken(nextStatus)) : '—')
+    );
+  }
+  if (reason) parts.push(ui('Reason: {reason}').replace('{reason}', reason));
+  if (deliveryDate) parts.push(ui('Delivery date: {date}').replace('{date}', deliveryDate));
+  if (itemCount != null) parts.push(ui('Items: {count}').replace('{count}', String(itemCount)));
+  if (copiedItemCount != null) parts.push(ui('Shipment items: {count}').replace('{count}', String(copiedItemCount)));
+  if (copiedTotalQuantity != null) parts.push(ui('Shipment quantity: {quantity}').replace('{quantity}', String(copiedTotalQuantity)));
+  if (orderedQuantity != null) parts.push(ui('Ordered quantity: {quantity}').replace('{quantity}', String(orderedQuantity)));
+  if (receivedQuantity != null) parts.push(ui('Received quantity: {quantity}').replace('{quantity}', String(receivedQuantity)));
+  if (remainingQuantity != null) parts.push(ui('Remaining quantity: {quantity}').replace('{quantity}', String(remainingQuantity)));
+  if (cancelledRemainingQuantity != null) parts.push(ui('Cancelled remaining quantity: {quantity}').replace('{quantity}', String(cancelledRemainingQuantity)));
+  if (openLinkedShipmentCount != null) parts.push(ui('Open linked shipments: {count}').replace('{count}', String(openLinkedShipmentCount)));
+  if (completionType) parts.push(ui('Completion: {type}').replace('{type}', ui(humanizeAuditToken(completionType))));
+  if (source === 'approved_procurement_recommendation') parts.push(ui('Source: approved procurement recommendation'));
+  if (source === 'intelligence_review_copilot_replenishment') parts.push(ui('Source: approved intelligence review'));
+
+  return parts.length ? parts.join(' · ') : ui('No additional business context recorded.');
 }
 
 function formatNumberForLocale(value: number | string | null | undefined, locale: AppLocale): string {
@@ -1574,14 +1640,14 @@ export default function PurchaseOrdersPage() {
       const rows = await fetchAllPurchaseOrderAudit(selectedDetail.id, auditSearch);
       const stamp = new Date().toISOString().slice(0, 10);
       downloadCsv(`purchase-order-${selectedDetail.po_number || selectedDetail.id}-audit-${stamp}.csv`, [
-        ['Created At', 'Action', 'Actor', 'Entity Type', 'Entity ID', 'Metadata Summary'],
+        [ui('Created At'), ui('Event'), ui('Actor'), ui('Record'), ui('Reference'), ui('Business context')],
         ...rows.map((event) => [
           event.created_at,
-          event.action,
+          purchaseOrderAuditEventLabel(event.action, ui),
           auditActorLabel(event),
           event.entity_type,
           event.entity_id ?? '',
-          auditMetadataSummary(event.metadata)
+          purchaseOrderAuditMetadataSummary(event.metadata, ui)
         ])
       ]);
     } catch (error) {
@@ -1613,11 +1679,11 @@ export default function PurchaseOrdersPage() {
     const auditRows = rows.map((event) => `
       <tr>
         <td>${escapeHtml(formatDateTime(event.created_at))}</td>
-        <td>${escapeHtml(event.action)}</td>
+        <td>${escapeHtml(purchaseOrderAuditEventLabel(event.action, ui))}</td>
         <td>${escapeHtml(auditActorLabel(event))}</td>
-        <td>${escapeHtml(event.entity_type)}</td>
-        <td>${escapeHtml(event.entity_id || '-')}</td>
-        <td>${escapeHtml(auditMetadataSummary(event.metadata))}</td>
+        <td>${escapeHtml(ui('Purchase order'))}</td>
+        <td>${escapeHtml(selectedDetail.po_number)}</td>
+        <td>${escapeHtml(purchaseOrderAuditMetadataSummary(event.metadata, ui))}</td>
       </tr>
     `).join('');
 
@@ -1655,11 +1721,11 @@ export default function PurchaseOrdersPage() {
             <thead>
               <tr>
                 <th>${escapeHtml(ui('Created At'))}</th>
-                <th>${escapeHtml(ui('Action'))}</th>
+                <th>${escapeHtml(ui('Event'))}</th>
                 <th>${escapeHtml(ui('Actor'))}</th>
-                <th>${escapeHtml(ui('Entity Type'))}</th>
-                <th>${escapeHtml(ui('Entity ID'))}</th>
-                <th>${escapeHtml(ui('Metadata'))}</th>
+                <th>${escapeHtml(ui('Record'))}</th>
+                <th>${escapeHtml(ui('Reference'))}</th>
+                <th>${escapeHtml(ui('Business context'))}</th>
               </tr>
             </thead>
             <tbody>${auditRows}</tbody>
@@ -2845,8 +2911,8 @@ export default function PurchaseOrdersPage() {
         <section className="app-panel purchase-orders-card purchase-orders-detail-card">
           <OperationalSectionHeader
             iconPath="/audit"
-            title={selectedDetail ? selectedDetail.po_number : ui('Purchase order detail')}
-            description={selectedDetail ? ui('{supplier} · review order progress, receiving, and available actions.').replace('{supplier}', selectedDetail.supplier_name) : ui('Select an order from the registry to review its details and actions.')}
+            title={selectedDetail ? `${ui('Purchase order')} · ${selectedDetail.supplier_name}` : ui('Purchase order detail')}
+            description={selectedDetail ? ui('Reference {reference} · review order progress, receiving, and available actions.').replace('{reference}', selectedDetail.po_number) : ui('Select an order from the registry to review its details and actions.')}
             actions={selectedDetail ? (
               <div className="purchase-orders-header-actions">
                 <button type="button" className="app-button app-button--secondary" onClick={exportSelectedPurchaseOrderCsv}>{ui("Export detail")}</button>
@@ -3076,11 +3142,11 @@ export default function PurchaseOrdersPage() {
                       <>
                         <div className="purchase-orders-audit-list">
                           {selectedAuditEvents.map((event) => {
-                            const metadataSummary = auditMetadataSummary(event.metadata);
+                            const metadataSummary = purchaseOrderAuditMetadataSummary(event.metadata, ui);
                             return (
                               <div key={event.id} className="purchase-orders-audit-item">
-                                <div><strong>{event.action}</strong><span>{formatDateTime(event.created_at)} · {auditActorLabel(event)}</span></div>
-                                {metadataSummary !== '-' ? <details><summary>{ui("Event details")}</summary><p>{metadataSummary}</p></details> : null}
+                                <div><strong>{purchaseOrderAuditEventLabel(event.action, ui)}</strong><span>{formatDateTime(event.created_at)} · {auditActorLabel(event)}</span></div>
+                                <details><summary>{ui("Business context")}</summary><p>{metadataSummary}</p></details>
                               </div>
                             );
                           })}
