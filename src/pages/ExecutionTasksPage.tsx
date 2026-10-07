@@ -691,7 +691,7 @@ export default function ExecutionTasksPage() {
     };
     void loadAudit();
     return () => { cancelled = true; };
-  }, [canRead, selected?.id]);
+  }, [canRead, selected?.id, selected?.updated_at]);
 
   useEffect(() => {
     if (requestedTaskId && selected?.id === requestedTaskId) {
