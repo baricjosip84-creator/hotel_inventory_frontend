@@ -1,5 +1,5 @@
 import { getActiveTenantCurrency } from '../lib/tenantCurrency';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
@@ -1502,6 +1502,7 @@ export default function InventoryRequisitionsPage() {
   const [productCategoryFilter, setProductCategoryFilter] = useState('');
   const [queueSearch, setQueueSearch] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const selectedRequestRef = useRef<HTMLElement | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(() => requestedRequisitionId || null);
   useEffect(() => {
     if (requestedRequisitionId) setSelectedId(requestedRequisitionId);
@@ -1714,6 +1715,15 @@ export default function InventoryRequisitionsPage() {
   });
 
   const selected = detailQuery.data || queueRows.find((item) => item.id === selectedId) || null;
+
+  useEffect(() => {
+    if (!selected?.id || selected.id !== selectedId) return;
+    const frame = window.requestAnimationFrame(() => {
+      selectedRequestRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      selectedRequestRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [selected?.id, selectedId]);
   const effectiveFulfillmentLocationId = fulfillmentLocationId || selected?.source_storage_location_id || '';
 
   const readinessPreviewLines = useMemo(() => Object.entries(fulfillmentLines)
@@ -3748,7 +3758,13 @@ export default function InventoryRequisitionsPage() {
         </section>
       </section>
 
-      <section className="app-panel app-panel--padded" style={styles.card}>
+      <section
+        ref={selectedRequestRef}
+        tabIndex={-1}
+        aria-label={ui('Selected request')}
+        className="app-panel app-panel--padded"
+        style={{ ...styles.card, scrollMarginTop: 104 }}
+      >
         <div style={styles.sectionHeaderBlock}>
           <OperationalSectionHeader
             iconPath="/inventory-requisitions"

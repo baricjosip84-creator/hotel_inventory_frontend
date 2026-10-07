@@ -399,7 +399,8 @@
     "check:inventory-connection-registry-lifecycle-surgical-fix-v349275": "node scripts/check-connection-registry-lifecycle-surgical-fix-v349275.mjs",
     "check:inventory-scanner-shipment-focus-surgical-fix-v349276": "node scripts/check-scanner-shipment-focus-surgical-fix-v349276.mjs",
     "check:inventory-outbound-order-detail-context-surgical-fix-v349277": "node scripts/check-outbound-order-detail-context-surgical-fix-v349277.mjs",
-    "check:inventory-usage-reversal-state-surgical-fix-v349278": "node scripts/check-inventory-usage-reversal-state-surgical-fix-v349278.mjs"
+    "check:inventory-usage-reversal-state-surgical-fix-v349278": "node scripts/check-inventory-usage-reversal-state-surgical-fix-v349278.mjs",
+    "check:inventory-requisition-selected-request-focus-surgical-fix-v349279": "node scripts/check-requisition-selected-request-focus-surgical-fix-v349279.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
