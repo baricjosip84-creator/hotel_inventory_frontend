@@ -20,6 +20,7 @@ import type {
   AutomationRunnerRunOnceResponse,
   AutomationRunnerStatusResponse,
   AutomationSchedule,
+  AutomationScheduleAuditEvent,
   AutomationScheduleAuditPackResponse,
   AutomationScheduleDryRunResponse,
   AutomationScheduleListResponse,
@@ -237,6 +238,7 @@ export default function AutomationSchedulesPage() {
   const registryRef = useRef<HTMLDivElement | null>(null);
   const createRef = useRef<HTMLDivElement | null>(null);
   const detailRef = useRef<HTMLElement | null>(null);
+  const auditHistoryRef = useRef<HTMLDivElement | null>(null);
   const safetyRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -647,6 +649,51 @@ export default function AutomationSchedulesPage() {
     }
   };
 
+  const auditEventLabel = (action: string) => {
+    const labels: Record<string, string> = {
+      'automation_schedule.created': ui('Schedule created'),
+      'automation_schedule.updated': ui('Schedule updated'),
+      'automation_schedule.activated': ui('Schedule activated'),
+      'automation_schedule.paused': ui('Schedule paused'),
+      'automation_schedule.disabled': ui('Schedule disabled'),
+      'automation_schedule.manual_run_requested': ui('Manual request created'),
+      'automation_schedule.auto_request_created': ui('Scheduled request created'),
+      'automation_schedule.manual_run_duplicate_skipped': ui('Manual request skipped — duplicate found'),
+      'automation_schedule.auto_request_duplicate_skipped': ui('Scheduled request skipped — duplicate found')
+    };
+    return labels[action] || ui(humanize(action.split('.').pop() || action));
+  };
+
+  const auditEventContext = (event: AutomationScheduleAuditEvent) => {
+    const metadata = event.metadata || {};
+    const previousStatus = typeof metadata.previous_status === 'string' ? metadata.previous_status : null;
+    const nextStatus = typeof metadata.next_status === 'string' ? metadata.next_status : null;
+    const disabledReason = typeof metadata.disabled_reason === 'string' ? metadata.disabled_reason : null;
+    const requestType = typeof metadata.request_type === 'string' ? metadata.request_type : null;
+    const requestStatus = typeof metadata.request_status === 'string' ? metadata.request_status : null;
+    const duplicateSkipped = metadata.duplicate_guard_triggered === true;
+    const parts: string[] = [];
+
+    if (previousStatus || nextStatus) {
+      parts.push(
+        ui('Status: {from} → {to}')
+          .replace('{from}', previousStatus ? ui(humanize(previousStatus)) : '—')
+          .replace('{to}', nextStatus ? ui(humanize(nextStatus)) : '—')
+      );
+    }
+    if (disabledReason) parts.push(ui('Reason: {reason}').replace('{reason}', disabledReason));
+    if (requestType) {
+      parts.push(
+        ui('Request: {type} · {status}')
+          .replace('{type}', ui(humanize(requestType)))
+          .replace('{status}', requestStatus ? ui(humanize(requestStatus)) : '—')
+      );
+    }
+    if (duplicateSkipped) parts.push(ui('Duplicate request reused; no new request was created.'));
+
+    return parts.length ? parts.join(' · ') : ui('No additional context recorded.');
+  };
+
   const loadAuditPack = async (schedule: AutomationSchedule) => {
     if (!canViewExecutionRequests) {
       setError(ui('Your current role cannot read linked execution-request evidence.'));
@@ -664,7 +711,10 @@ export default function AutomationSchedulesPage() {
       setDryRunResult(null);
       setManualRunResult(null);
       setMessage(ui('Loaded the audit pack for “{name}”.').replace('{name}', schedule.name));
-      window.setTimeout(() => document.getElementById('automation-schedule-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+      window.setTimeout(() => {
+        auditHistoryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        auditHistoryRef.current?.focus({ preventScroll: true });
+      }, 0);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : ui('Failed to load the schedule audit pack'));
     } finally {
@@ -1096,7 +1146,13 @@ export default function AutomationSchedulesPage() {
           ) : null}
 
           {auditPack ? (
-            <div className="automation-schedules-result-panel">
+            <div
+              ref={auditHistoryRef}
+              id="automation-schedule-audit-history"
+              className="automation-schedules-result-panel automation-schedules-scroll-anchor"
+              tabIndex={-1}
+              aria-label={ui('Audit history')}
+            >
               <div className="automation-schedules-section-heading"><div><h4>{ui('Audit history')}</h4><p>{ui('Schedule activity, linked requests, and completeness checks.')}</p></div><StatusChip status={auditPack.completeness.complete ? 'pass' : 'watch'} /></div>
               <div className="automation-schedules-metrics">
                 <div><strong>{auditPack.evidence_summary.schedule_audit_event_count}</strong><span>{ui('Schedule events')}</span></div>
@@ -1105,6 +1161,33 @@ export default function AutomationSchedulesPage() {
                 <div><strong>{auditPack.completeness.complete ? ui('Complete') : ui('Review needed')}</strong><span>{ui('Audit status')}</span></div>
               </div>
               <ul className="automation-schedules-check-list">{auditPack.checks.map((check) => <li key={check.key}><StatusChip status={check.status} /><span><strong>{check.label}</strong>{check.detail}</span></li>)}</ul>
+
+              <div className="automation-schedules-audit-events">
+                <div className="automation-schedules-section-heading">
+                  <div>
+                    <h5>{ui('Schedule audit events')}</h5>
+                    <p>{ui('Chronological record of schedule lifecycle and request-preparation activity.')}</p>
+                  </div>
+                </div>
+                {auditPack.audit_trail.automation_schedule.length ? (
+                  <div className="automation-schedules-table-wrap">
+                    <table className="automation-schedules-table automation-schedules-table--compact">
+                      <thead><tr><th>{ui('Event')}</th><th>{ui('Actor')}</th><th>{ui('When')}</th><th>{ui('Context')}</th></tr></thead>
+                      <tbody>
+                        {auditPack.audit_trail.automation_schedule.map((event) => (
+                          <tr key={event.id}>
+                            <td><strong>{auditEventLabel(event.action)}</strong></td>
+                            <td>{event.user_name || ui('System')}</td>
+                            <td>{formatDateTime(event.created_at, locale)}</td>
+                            <td>{auditEventContext(event)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : <p className="automation-schedules-muted">{ui('No schedule audit events were found.')}</p>}
+              </div>
+
               {auditPack.linked_execution_requests.length ? (
                 <div className="automation-schedules-table-wrap">
                   <table className="automation-schedules-table automation-schedules-table--compact">

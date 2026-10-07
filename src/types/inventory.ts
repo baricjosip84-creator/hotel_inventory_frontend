@@ -2311,6 +2311,17 @@ export interface AutomationScheduleManualRunResponse {
 }
 
 
+export interface AutomationScheduleAuditEvent {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  user_id?: string | null;
+  user_name?: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
 export interface AutomationScheduleAuditPackResponse {
   automation_schedule_id: string;
   generated_at: string;
@@ -2320,8 +2331,8 @@ export interface AutomationScheduleAuditPackResponse {
   linked_execution_requests: ExecutionRequest[];
   run_ledger?: Array<Record<string, unknown>>;
   audit_trail: {
-    automation_schedule: Array<Record<string, unknown>>;
-    execution_requests: Array<Record<string, unknown>>;
+    automation_schedule: AutomationScheduleAuditEvent[];
+    execution_requests: AutomationScheduleAuditEvent[];
   };
   evidence_summary: {
     schedule_audit_event_count: number | string;

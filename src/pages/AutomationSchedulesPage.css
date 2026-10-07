@@ -559,6 +559,21 @@
   color: #0f172a;
 }
 
+
+.automation-schedules-audit-events {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.automation-schedules-audit-events .automation-schedules-table td:first-child {
+  min-width: 180px;
+}
+
+.automation-schedules-audit-events .automation-schedules-table td:last-child {
+  min-width: 260px;
+}
+
 .automation-schedules-technical-details,
 .automation-schedules-result-panel details,
 .automation-schedules-governance-content details {
