@@ -469,6 +469,7 @@ export default function StockTransfersPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const detailSectionRef = useRef<HTMLElement | null>(null);
+  const errorFeedbackRef = useRef<HTMLDivElement | null>(null);
   const syncingFromUrlRef = useRef(false);
   const {
     canCreateStockTransfers,
@@ -508,6 +509,13 @@ export default function StockTransfersPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+
+  const focusErrorFeedback = () => {
+    window.setTimeout(() => {
+      errorFeedbackRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      errorFeedbackRef.current?.focus({ preventScroll: true });
+    }, 60);
+  };
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 250);
@@ -679,6 +687,7 @@ export default function StockTransfersPage() {
     onError: (mutationError) => {
       setError(normalizeError(mutationError, ui('Failed to create stock transfer.'), ui));
       setMessage(null);
+      focusErrorFeedback();
     }
   });
 
@@ -701,6 +710,7 @@ export default function StockTransfersPage() {
     onError: (mutationError) => {
       setError(normalizeError(mutationError, ui('Failed to update stock transfer.'), ui));
       setMessage(null);
+      focusErrorFeedback();
     }
   });
 
@@ -851,6 +861,7 @@ export default function StockTransfersPage() {
     const validationError = validateForm();
     if (validationError) {
       setError(validationError);
+      focusErrorFeedback();
       return;
     }
 
@@ -858,6 +869,7 @@ export default function StockTransfersPage() {
       const draftVersion = selectedTransfer?.id === editingTransferId ? selectedTransfer.version : null;
       if (!draftVersion) {
         setError(ui('Refresh the selected transfer before saving draft changes.'));
+        focusErrorFeedback();
         return;
       }
       updateMutation.mutate({ id: editingTransferId, input: form, version: draftVersion });
@@ -1110,7 +1122,18 @@ export default function StockTransfersPage() {
       </div>
 
       {message ? <div className="app-success-state" style={styles.feedbackBox}>{message}</div> : null}
-      {error ? <div className="app-error-state" style={styles.feedbackBox}>{error}</div> : null}
+      {error ? (
+        <div
+          ref={errorFeedbackRef}
+          className="app-error-state"
+          style={{ ...styles.feedbackBox, scrollMarginTop: 96 }}
+          tabIndex={-1}
+          role="alert"
+          aria-live="assertive"
+        >
+          {error}
+        </div>
+      ) : null}
 
       {!canCreateStockTransfers && !editingTransferId ? (
         <div className="app-warning-state" style={styles.feedbackBox}>
