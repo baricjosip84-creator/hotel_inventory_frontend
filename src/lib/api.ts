@@ -223,6 +223,10 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Webhook signing secret rotated successfully.';
   }
 
+  if (normalizedMethod === 'POST' && /^\/inventory-capabilities\/products\/[^/]+\/variants$/.test(normalizedPathOnly)) {
+    return 'Variant created successfully.';
+  }
+
   if (normalizedMethod === 'POST' && normalizedPathOnly === '/inventory-capabilities/boms') {
     return 'BOM created successfully.';
   }
