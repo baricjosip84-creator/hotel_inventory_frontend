@@ -148,6 +148,7 @@ function tenantMutationActionLabel(path: string, method: string): string {
   if (normalizedPath.includes('/alerts')) return 'Alert';
   if (normalizedPath.includes('/automation-schedules')) return 'Automation schedule';
   if (normalizedPath.includes('/execution-requests')) return 'Execution request';
+  if (normalizedPath.includes('/execution-tasks')) return 'Execution task';
   if (normalizedPath.includes('/reports')) return 'Report action';
   if (normalizedPath.includes('/admin/alerts')) return 'Admin alert action';
 
@@ -356,6 +357,24 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     if (normalizedPath.endsWith('/execute')) return 'Execution Request executed successfully.';
     if (normalizedPath.endsWith('/prepare-retry')) return 'Execution Request retry prepared successfully.';
     if (normalizedPath.endsWith('/cancel')) return 'Execution Request cancelled successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/execution-tasks') {
+    return 'Execution task created successfully.';
+  }
+
+  const executionTaskActionMatch = normalizedMethod === 'POST'
+    ? normalizedPathOnly.match(/^\/execution-tasks\/[^/]+\/(ready|start|unblock|complete|cancel|block|assign)$/)
+    : null;
+  if (executionTaskActionMatch) {
+    const action = executionTaskActionMatch[1];
+    if (action === 'assign') return 'Task assigned successfully.';
+    if (action === 'start') return 'Task started successfully.';
+    if (action === 'ready') return 'Task marked ready successfully.';
+    if (action === 'block') return 'Task blocked successfully.';
+    if (action === 'unblock') return 'Task unblocked successfully.';
+    if (action === 'complete') return 'Task completed successfully.';
+    return 'Task cancelled successfully.';
   }
 
   if (normalizedMethod === 'POST' && normalizedPath.endsWith('/alerts')) {

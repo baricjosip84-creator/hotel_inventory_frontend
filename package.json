@@ -406,7 +406,8 @@
     "check:inventory-reservation-detail-focus-surgical-fix-v349282": "node scripts/check-reservation-detail-focus-surgical-fix-v349282.mjs",
     "check:inventory-execution-request-feedback-dedupe-surgical-fix-v349283": "node scripts/check-execution-request-feedback-dedupe-surgical-fix-v349283.mjs",
     "check:inventory-execution-request-technical-evidence-closure-v349284": "node scripts/check-execution-request-technical-evidence-closure-v349284.mjs",
-    "check:inventory-execution-task-audit-refresh-v349285": "node scripts/check-execution-task-audit-refresh-surgical-fix-v349285.mjs"
+    "check:inventory-execution-task-audit-refresh-v349285": "node scripts/check-execution-task-audit-refresh-surgical-fix-v349285.mjs",
+    "check:inventory-execution-task-action-feedback-v349286": "node scripts/check-execution-task-action-feedback-surgical-fix-v349286.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
