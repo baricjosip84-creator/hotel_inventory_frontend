@@ -219,6 +219,14 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'API key revoked successfully.';
   }
 
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/inventory-capabilities/webhooks') {
+    return 'Webhook created successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && /^\/inventory-capabilities\/webhooks\/[^/]+\/test$/.test(normalizedPathOnly)) {
+    return 'Webhook test queued successfully.';
+  }
+
   if (normalizedMethod === 'POST' && /^\/inventory-capabilities\/webhooks\/[^/]+\/rotate-secret$/.test(normalizedPathOnly)) {
     return 'Webhook signing secret rotated successfully.';
   }

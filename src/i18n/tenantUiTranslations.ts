@@ -7956,6 +7956,8 @@ const rows: readonly TranslationRow[] = [
   ["Tenant-specific permission changes", "Mandantenspezifische Berechtigungsänderungen", "Cambios de permisos específicos del tenant", "Modifications de permissions propres au tenant", "Promjene dozvola specifične za tenant"],
   ["Tenant-wave policy:", "Richtlinie für Mandantenwellen:", "Política de oleadas de tenants:", "Politique des vagues de tenants :", "Pravilo valova tenantâ:"],
   ["Test", "Testen", "Probar", "Tester", "Testiraj"],
+  ["Webhook created successfully.", "Webhook wurde erfolgreich erstellt.", "Webhook creado correctamente.", "Webhook créé avec succès.", "Webhook je uspješno izrađen."],
+  ["Webhook test queued successfully.", "Webhook-Test wurde erfolgreich in die Warteschlange gestellt.", "Prueba de webhook puesta en cola correctamente.", "Test du webhook mis en file avec succès.", "Test webhookske veze uspješno je stavljen u red."],
   ["Test webhook queued. Delivery status will appear below.", "Test-Webhook wurde in die Warteschlange gestellt. Der Zustellstatus wird unten angezeigt.", "Webhook de prueba puesto en cola. El estado de entrega aparecerá abajo.", "Webhook de test mis en file. L’état de livraison apparaîtra ci-dessous.", "Testni webhook stavljen je u red. Status isporuke prikazat će se u nastavku."],
   ["Testing…", "Test läuft…", "Probando…", "Test…", "Testiranje…"],
   ["Text", "Text", "Texto", "Texte", "Tekst"],
