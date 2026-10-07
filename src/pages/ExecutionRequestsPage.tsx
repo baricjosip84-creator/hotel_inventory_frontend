@@ -199,10 +199,6 @@ function getExpectedValue(request: ExecutionRequest): unknown {
   return null;
 }
 
-function JsonBlock({ value }: { value: unknown }) {
-  return <pre style={styles.json}>{JSON.stringify(value ?? null, null, 2)}</pre>;
-}
-
 function csvCell(value: unknown): string {
   const rawText = value === undefined || value === null ? '' : String(value);
   const safeText = /^[=+\-@\t\r]/.test(rawText) ? `'${rawText}` : rawText;
@@ -1630,10 +1626,6 @@ function ExecutionSecurityAuditPanel({ securityAudit }: { securityAudit: Executi
         ))}
       </div>
       {securityAudit.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
-      <details style={styles.technicalDetails}>
-        <summary style={styles.technicalSummary}>{ui('Technical security evidence')}</summary>
-        <JsonBlock value={securityAudit} />
-      </details>
     </div>
   );
 }
@@ -1678,10 +1670,6 @@ function ExecutionAuditPackPanel({ auditPack }: { auditPack: ExecutionRequestAud
         {!auditPack.audit_trail.length ? <div style={styles.meta}>{ui('No audit events found for this request.')}</div> : null}
       </div>
       {auditPack.notes.map((note) => <div key={note} style={styles.note}>{note}</div>)}
-      <details style={styles.technicalDetails}>
-        <summary style={styles.technicalSummary}>{ui('Technical audit evidence')}</summary>
-        <JsonBlock value={auditPack} />
-      </details>
     </div>
   );
 }
@@ -1893,8 +1881,6 @@ const styles: Record<string, CSSProperties> = {
   kvLabel: { color: '#64748b' },
   kvValue: { fontWeight: 700, color: '#0f172a', textAlign: 'right' },
   subheading: { margin: '0.65rem 0 0', fontSize: '0.95rem' },
-  json: { maxHeight: '260px', overflow: 'auto', background: '#0f172a', color: '#e2e8f0', padding: '0.75rem', borderRadius: '12px', fontSize: '0.75rem' },
-  technicalDetails: { marginTop: '0.35rem', borderTop: '1px solid rgba(148, 163, 184, 0.35)', paddingTop: '0.55rem' },
   technicalSummary: { cursor: 'pointer', fontWeight: 700, color: '#475569', fontSize: '0.84rem' },
   governanceDetails: { border: '1px solid #cbd5e1', borderRadius: '16px', background: '#fff', overflow: 'hidden', scrollMarginTop: '1rem' },
   governanceSummary: { cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', padding: '1rem', background: '#f8fafc' },

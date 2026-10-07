@@ -145,7 +145,7 @@ for (const required of [
   'event.label', 'adapter.label', 'adapter.description', 'hardeningSummary.closeout_recommendation', 'check.label', 'check.detail',
   'securityAudit.actor.role', 'check.message', 'auditPack.completeness.missing_actions', 'auditPack.notes',
   'review.retry_eligibility?.reason', 'review.failure.error_code', 'review.failure.error_message', 'review.review_notes',
-  'beforeAfter.product_name', 'beforeAfter.product_id', 'JSON.stringify(value ?? null, null, 2)',
+  'beforeAfter.product_name', 'beforeAfter.product_id',
   'err instanceof ApiError ? err.message',
 ]) if (!pageSource.includes(required)) fail(`Execution Requests business/server-data evidence missing unexpectedly: ${required}`);
 for (const forbidden of [
@@ -154,7 +154,7 @@ for (const forbidden of [
   'ui(adapter.description)', 'ui(hardeningSummary.closeout_recommendation)', 'ui(check.label)', 'ui(check.detail)', 'ui(check.message)',
   'ui(review.failure.error_code)', 'ui(review.failure.error_message)', 'ui(beforeAfter.product_name)', 'ui(beforeAfter.product_id)', 'ui(err.message)',
 ]) if (pageSource.includes(forbidden)) fail(`Execution Requests translates business/server data unexpectedly: ${forbidden}`);
-if (!process.exitCode) pass('Product/request/user data, backend labels/guidance/evidence, notes, errors, and technical JSON remain raw business/server data.');
+if (!process.exitCode) pass('Product/request/user data, backend labels/guidance/evidence, notes, and errors remain raw business/server data where they are intentionally rendered.');
 
 for (const required of [
   'Controlled execution requests', 'Create controlled product change', 'Request queue', 'Selected request', 'Workflow safeguards',
@@ -162,7 +162,7 @@ for (const required of [
   'Execute approved request: {adapter}? This is only enabled for controlled product-field updates.',
   'Complete this approved request without changing business data? This records a safe workflow completion only.',
   'Failed execution prepared for one controlled retry.', 'Security and separation-of-duties review',
-  'Workflow safeguard status', 'Built-in protections', 'Technical security evidence', 'Technical audit evidence',
+  'Workflow safeguard status', 'Built-in protections',
   'Before / after evidence', 'No execution requests match the selected filters.',
   'Find new recommendation', 'New recommendation', 'Create minimum-stock request', 'No new recommendation found.',
   'Why this recommendation', 'Evidence captured when the request was created', '30-day outbound', '90-day outbound',
@@ -175,8 +175,12 @@ for (const forbidden of [
   'description={selected.id}',
   'onClick={copySelectedId}',
   "<summary style={styles.detailsSummary}>{ui('Technical snapshots (advanced)')}</summary>",
+  "<summary style={styles.technicalSummary}>{ui('Technical security evidence')}</summary>",
+  "<summary style={styles.technicalSummary}>{ui('Technical audit evidence')}</summary>",
+  '<JsonBlock value={securityAudit} />',
+  '<JsonBlock value={auditPack} />',
 ]) if (activePageSource.includes(forbidden)) fail(`Execution Requests tenant UI still exposes intentionally hidden technical/meta presentation: ${forbidden}`);
-if (!process.exitCode) pass('Execution Requests hides hero meta pills, the raw selected-request UUID/copy control, and raw technical snapshot JSON from tenant users.');
+if (!process.exitCode) pass('Execution Requests hides hero meta pills, raw selected-request UUID/copy controls, raw technical snapshots, and raw security/audit JSON from tenant users.');
 
 for (const required of [
   "request.payload?.source !== 'execution_requests_recommendation_finder'",
