@@ -433,6 +433,11 @@ export default function AutomationSchedulesPage() {
       setSelected(created);
       setActiveWorkspaceSection('detail');
       setEditForm(null);
+      // A newly created schedule is a new detail context. Never carry preview,
+      // manual-run, or audit evidence from the previously selected schedule.
+      setDryRunResult(null);
+      setManualRunResult(null);
+      setAuditPack(null);
       setForm(createDefaultForm());
       setMessage(ui('Created draft schedule “{name}”. It will not run automatically until it is activated and runner request creation is explicitly enabled.').replace('{name}', created.name));
       await loadCore({ preserveMessage: true });
