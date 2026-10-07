@@ -105,6 +105,18 @@ function readMutationStringField(body: BodyInit | null | undefined, field: strin
   }
 }
 
+function readMutationNumberField(body: BodyInit | null | undefined, field: string): number | null {
+  if (typeof body !== 'string') return null;
+
+  try {
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    const value = parsed[field];
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 function readMutationAction(body: BodyInit | null | undefined): string | null {
   return readMutationStringField(body, 'action')?.toLowerCase() ?? null;
 }
@@ -217,6 +229,15 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
 
   if (normalizedMethod === 'POST' && /^\/inventory-capabilities\/api-clients\/[^/]+\/revoke$/.test(normalizedPathOnly)) {
     return 'API key revoked successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/inventory-capabilities/connections') {
+    const status = readMutationStringField(body, 'status')?.toLowerCase();
+    const expectedVersion = readMutationNumberField(body, 'expected_version') ?? 0;
+    if (status === 'disabled') return 'Connection disabled successfully.';
+    if (status === 'configured' && expectedVersion > 0) return 'Connection enabled successfully.';
+    if (expectedVersion > 0) return 'Connection updated successfully.';
+    return 'Connection saved successfully.';
   }
 
   if (normalizedMethod === 'POST' && normalizedPathOnly === '/inventory-capabilities/webhooks') {

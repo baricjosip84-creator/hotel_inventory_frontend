@@ -487,6 +487,27 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
     onSuccess: () => { clearConnectionForm(); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-external-connections'] }); },
     onError: (err) => setError(messageFrom(err, ui("Unable to save connection."), ui))
   });
+  const changeConnectionStatus = useMutation({
+    mutationFn: ({ row, status }: { row: Connection; status: 'configured' | 'disabled' }) => apiRequest('/inventory-capabilities/connections', {
+      method: 'POST',
+      body: JSON.stringify({
+        system_name: row.system_name,
+        system_type: row.system_type || 'custom',
+        base_url: row.base_url || null,
+        direction: row.direction || 'bidirectional',
+        credential_reference: row.credential_reference || null,
+        status,
+        expected_version: row.version
+      })
+    }),
+    onSuccess: (_data, { row }) => {
+      if (editingConnection?.id === row.id) clearConnectionForm();
+      setError(null);
+      void qc.invalidateQueries({ queryKey: ['inventory-external-connections'] });
+      void qc.invalidateQueries({ queryKey: ['inventory-capabilities-overview'] });
+    },
+    onError: (err) => setError(messageFrom(err, ui("Unable to update connection status."), ui))
+  });
   const createWebhook = useMutation({
     mutationFn: () => apiRequest<WebhookSubscription & { signing_secret: string }>('/inventory-capabilities/webhooks', {
       method: 'POST',
@@ -608,7 +629,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
           <label>{ui("Credential reference (not a password)")}<input value={credentialReference} onChange={(e) => setCredentialReference(e.target.value)} placeholder={ui("Secret-manager reference")} disabled={!canWrite} /></label>
           <div style={{ alignSelf: 'end', display: 'flex', gap: 8 }}><button className="button" disabled={!canWrite || !systemName.trim() || connections.isLoading || connections.isError || saveConnection.isPending}>{saveConnection.isPending ? ui("Saving…") : editingConnection ? ui("Save changes") : ui("Save connection")}</button>{editingConnection ? <button className="button button--secondary" type="button" disabled={saveConnection.isPending} onClick={clearConnectionForm}>{ui("Cancel")}</button> : null}</div>
         </form>
-        <div style={tableWrapStyle}><table><thead><tr><th>{ui("System")}</th><th>{ui("Type")}</th><th>{ui("Direction")}</th><th>{ui("Status")}</th><th>{ui("Action")}</th></tr></thead><tbody>{!connections.isLoading && !connections.isError && !(connections.data || []).length ? <EmptyTableRow colSpan={5} message={ui("No external systems are recorded yet.")} /> : null}{(connections.data || []).map((row) => <tr key={row.id}><td>{row.system_name}</td><td>{displayCanonicalLabel(row.system_type, ui)}</td><td>{displayCanonicalLabel(row.direction, ui)}</td><td>{displayCanonicalLabel(row.status, ui)}</td><td>{canWrite ? <button className="button button--secondary" type="button" disabled={saveConnection.isPending} onClick={() => editConnection(row)}>{ui("Edit")}</button> : '—'}</td></tr>)}</tbody></table></div>
+        <div style={tableWrapStyle}><table><thead><tr><th>{ui("System")}</th><th>{ui("Type")}</th><th>{ui("Direction")}</th><th>{ui("Status")}</th><th>{ui("Action")}</th></tr></thead><tbody>{!connections.isLoading && !connections.isError && !(connections.data || []).length ? <EmptyTableRow colSpan={5} message={ui("No external systems are recorded yet.")} /> : null}{(connections.data || []).map((row) => <tr key={row.id}><td>{row.system_name}</td><td>{displayCanonicalLabel(row.system_type, ui)}</td><td>{displayCanonicalLabel(row.direction, ui)}</td><td>{displayCanonicalLabel(row.status, ui)}</td><td>{canWrite ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><button className="button button--secondary" type="button" disabled={saveConnection.isPending || changeConnectionStatus.isPending} onClick={() => editConnection(row)}>{ui("Edit")}</button><button className="button button--secondary" type="button" disabled={saveConnection.isPending || changeConnectionStatus.isPending} onClick={() => changeConnectionStatus.mutate({ row, status: row.status === 'disabled' ? 'configured' : 'disabled' })}>{row.status === 'disabled' ? ui("Enable") : ui("Disable")}</button></div> : '—'}</td></tr>)}</tbody></table></div>
         {connections.isLoading ? <div className="muted">{ui("Loading external systems…")}</div> : null}
         {connections.isError ? <div className="form-error">{messageFrom(connections.error, ui("Unable to load external systems."), ui)}</div> : null}
       </div>
