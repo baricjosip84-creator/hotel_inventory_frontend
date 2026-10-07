@@ -720,7 +720,13 @@ export default function InventoryReservationsPage() {
   const actionMutation = useMutation({
     mutationFn: async ({ id, action }: { id: string; action: 'activate' | 'allocate' | 'release' | 'cancel' | 'expire' | 'fulfill' }) => {
       const body: Record<string, unknown> = {};
-      if (action === 'allocate') body.allow_partial = true;
+      if (action === 'allocate') {
+        body.allow_partial = true;
+        const reservation = detailQuery.data;
+        if (reservation && reservation.id === id && reservation.version != null) {
+          body.expected_version = Number(reservation.version);
+        }
+      }
       if (action === 'release') body.release_note = actionNote || 'Released from reservation workspace.';
       if (action === 'cancel') body.cancellation_reason = actionNote || 'Cancelled from reservation workspace.';
       if (action === 'expire') body.expiration_note = actionNote || 'Expired from reservation workspace.';
