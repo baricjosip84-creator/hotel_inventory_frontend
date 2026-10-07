@@ -433,7 +433,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
   const [apiExpiresAt, setApiExpiresAt] = useState('');
   const [apiAllowedIps, setApiAllowedIps] = useState('');
   const [editingApiClient, setEditingApiClient] = useState<ApiClient | null>(null);
-  const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const [revealedKey, setRevealedKey] = useState<{ value: string; clientId: string } | null>(null);
   const [systemName, setSystemName] = useState('');
   const [systemType, setSystemType] = useState('custom');
   const [baseUrl, setBaseUrl] = useState('');
@@ -460,7 +460,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
   const deliveries = useQuery({ queryKey: ['inventory-webhook-deliveries'], queryFn: () => apiRequest<WebhookDelivery[]>('/inventory-capabilities/webhook-deliveries?limit=25') });
   const createClient = useMutation({
     mutationFn: () => apiRequest<ApiClient & { api_key: string }>('/inventory-capabilities/api-clients', { method: 'POST', body: JSON.stringify({ name, description, scopes: apiScopes, expires_at: toApiExpiry(apiExpiresAt), allowed_ips: apiAllowedIps.split(',').map((value) => value.trim()).filter(Boolean) }) }),
-    onSuccess: (data) => { setRevealedKey(data.api_key); setName(''); setDescription(''); setApiScopes([]); setApiExpiresAt(''); setApiAllowedIps(''); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
+    onSuccess: (data) => { setRevealedKey({ value: data.api_key, clientId: data.id }); setName(''); setDescription(''); setApiScopes([]); setApiExpiresAt(''); setApiAllowedIps(''); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
     onError: (err) => setError(messageFrom(err, ui("Unable to create API client."), ui))
   });
   const clearApiClientForm = () => { setEditingApiClient(null); setName(''); setDescription(''); setApiScopes([]); setApiExpiresAt(''); setApiAllowedIps(''); };
@@ -472,12 +472,12 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
   });
   const rotateClient = useMutation({
     mutationFn: (client: ApiClient) => apiRequest<ApiClient & { api_key: string }>(`/inventory-capabilities/api-clients/${client.id}/rotate`, { method: 'POST', body: JSON.stringify({}), version: client.version }),
-    onSuccess: (data) => { setRevealedKey(data.api_key); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
+    onSuccess: (data) => { setRevealedKey({ value: data.api_key, clientId: data.id }); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
     onError: (err) => setError(messageFrom(err, ui("Unable to rotate API key."), ui))
   });
   const revokeClient = useMutation({
     mutationFn: (client: ApiClient) => apiRequest(`/inventory-capabilities/api-clients/${client.id}/revoke`, { method: 'POST', body: JSON.stringify({ reason: 'Revoked from tenant Integrations page' }), version: client.version }),
-    onSuccess: () => { clearApiClientForm(); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
+    onSuccess: (_data, client) => { if (revealedKey?.clientId === client.id) setRevealedKey(null); clearApiClientForm(); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
     onError: (err) => setError(messageFrom(err, ui("Unable to revoke API key."), ui))
   });
   const clearConnectionForm = () => { setEditingConnection(null); setSystemName(''); setSystemType('custom'); setBaseUrl(''); setDirection('bidirectional'); setCredentialReference(''); };
@@ -544,7 +544,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
         <h3>{ui("Let another system talk to this inventory app")}</h3>
         <p className="card__subtext">{ui("Create an API key and give it to the company or developer connecting another system. The public base path is")} <strong>/api/public/v1</strong>.</p>
         {revealedKey ? (
-          <div className="form-success"><strong>{ui("Copy this key now. It is only shown once:")}</strong><br /><code style={{ wordBreak: 'break-all' }}>{revealedKey}</code></div>
+          <div className="form-success"><strong>{ui("Copy this key now. It is only shown once:")}</strong><br /><code style={{ wordBreak: 'break-all' }}>{revealedKey.value}</code></div>
         ) : null}
         {error ? <div className="form-error">{error}</div> : null}
         <form onSubmit={(e) => { e.preventDefault(); if (editingApiClient) updateClient.mutate(); else createClient.mutate(); }} style={formGridStyle}>

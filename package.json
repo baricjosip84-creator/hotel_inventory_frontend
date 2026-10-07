@@ -393,7 +393,8 @@
     "check:inventory-storage-locations-feedback-state-surgical-fix-v349270": "node scripts/check-storage-locations-feedback-state-surgical-fix-v349270.mjs",
     "check:inventory-bom-location-readiness-surgical-fix-v349271": "node scripts/check-bom-location-readiness-surgical-fix-v349271.mjs",
     "check:inventory-location-hierarchy-parent-eligibility-surgical-fix-v349272": "node scripts/check-location-hierarchy-parent-eligibility-surgical-fix-v349272.mjs",
-    "check:inventory-variant-summary-feedback-surgical-fix-v349273": "node scripts/check-variant-summary-feedback-surgical-fix-v349273.mjs"
+    "check:inventory-variant-summary-feedback-surgical-fix-v349273": "node scripts/check-variant-summary-feedback-surgical-fix-v349273.mjs",
+    "check:inventory-api-key-secret-hygiene-surgical-fix-v349274": "node scripts/check-api-key-secret-hygiene-surgical-fix-v349274.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
