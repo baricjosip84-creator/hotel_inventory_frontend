@@ -2,7 +2,7 @@ import { getActiveTenantCurrency } from '../lib/tenantCurrency';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
@@ -1439,6 +1439,7 @@ function formFromRequisition(requisition: InventoryRequisition): RequisitionForm
 
 export default function InventoryRequisitionsPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedRequisitionId = searchParams.get('requisitionId')?.trim() || searchParams.get('requisition_id')?.trim() || '';
   const { locale, ui } = useAppTranslation();
@@ -1726,6 +1727,15 @@ export default function InventoryRequisitionsPage() {
   }, [selected?.id, selectedId]);
   const effectiveFulfillmentLocationId = fulfillmentLocationId || selected?.source_storage_location_id || '';
 
+  const linkedReservationQuery = useQuery({
+    queryKey: ['inventory-requisition-linked-reservation', selectedId],
+    enabled: Boolean(selectedId) && capabilities.canViewInventoryReservations,
+    queryFn: async () => {
+      const rows = await apiRequest<LinkedReservationResult[]>(`/inventory-reservations?source_type=requisition&source_id=${encodeURIComponent(selectedId || '')}&limit=20&offset=0`);
+      return rows.find((row) => !['fulfilled', 'released', 'expired', 'cancelled'].includes(String(row.status || '').toLowerCase())) || null;
+    }
+  });
+
   const readinessPreviewLines = useMemo(() => Object.entries(fulfillmentLines)
     .filter(([, quantity]) => quantity !== '' && Number(quantity) >= 0)
     .map(([requisition_item_id, quantity]) => ({
@@ -1814,7 +1824,17 @@ export default function InventoryRequisitionsPage() {
         allow_partial: true,
         linkage_note: 'Protect open requisition quantity'
       })
-    })
+    }),
+    onSuccess: async (_reservation, variables) => {
+      await Promise.all([
+        invalidateRequisitions(),
+        queryClient.invalidateQueries({ queryKey: ['inventory-requisition-linked-reservation', variables.id] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-reservations'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-reservations-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-reservations-source-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory-reservation-conflicts'] })
+      ]);
+    }
   });
 
   const fulfillMutation = useMutation({
@@ -2419,11 +2439,18 @@ export default function InventoryRequisitionsPage() {
       )
   );
   const canReopen = ['rejected', 'cancelled'].includes(String(selected?.status)) && canReopenSelected && (!approvalThresholdNotesRequired || workflowNotesMeetThresholdDepth);
+  const mutationLinkedReservation = createLinkedReservationMutation.data
+    && createLinkedReservationMutation.variables?.id === selected?.id
+    ? createLinkedReservationMutation.data
+    : null;
+  const linkedReservation = linkedReservationQuery.data || mutationLinkedReservation || null;
   const canCreateLinkedReservation = Boolean(
     selected
       && capabilities.canCreateInventoryReservations
       && ['submitted', 'approved', 'partially_fulfilled'].includes(String(selected.status))
       && (capabilities.canCancelAnyInventoryRequisitions || (currentUserId && selected.created_by_user_id === currentUserId))
+      && !linkedReservation
+      && !(capabilities.canViewInventoryReservations && linkedReservationQuery.isFetching)
   );
   const canFulfill = ['approved', 'partially_fulfilled'].includes(String(selected?.status)) && capabilities.canFulfillInventoryRequisitions;
   const selectedStatus = String(selected?.status || '');
@@ -2533,9 +2560,6 @@ export default function InventoryRequisitionsPage() {
 
       {queryError && <div style={styles.errorBox}>{ui("Some requisition data could not be loaded:")} {errorMessage(queryError, ui)}</div>}
       {mutationError && <div style={styles.errorBox}>{errorMessage(mutationError, ui)}</div>}
-      {createLinkedReservationMutation.data && (
-        <div style={styles.successBox}>{ui("Linked reservation")} {createLinkedReservationMutation.data.reservation_number} {ui("created with status")} {humanizeCode(createLinkedReservationMutation.data.status)}.</div>
-      )}
       {bulkFulfillmentMutation.data && (
         <div style={styles.successBox}>
           <div>
@@ -3796,6 +3820,20 @@ export default function InventoryRequisitionsPage() {
             {selected.status === 'draft' && capabilities.canCreateInventoryRequisitions && canManageSelectedDraftByOwnership && (
               <div style={styles.actionsRow}>
                 <button type="button" style={styles.secondaryButton} onClick={loadSelectedDraftForEditing}>{ui('Edit draft details')}</button>
+              </div>
+            )}
+            {linkedReservation && (
+              <div style={styles.successBox}>
+                <strong>{ui('Linked reservation')}</strong> {linkedReservation.reservation_number} · {ui('Status')}: {humanizeCode(linkedReservation.status)}
+                {capabilities.canViewInventoryReservations && (
+                  <button
+                    type="button"
+                    style={{ ...styles.secondaryButton, marginLeft: 10 }}
+                    onClick={() => navigate(`/inventory-reservations?reservationId=${encodeURIComponent(linkedReservation.id)}`)}
+                  >
+                    {ui('Open linked reservation')}
+                  </button>
+                )}
               </div>
             )}
             {canCreateLinkedReservation && (

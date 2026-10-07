@@ -195,6 +195,10 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Requisitions fulfilled successfully.';
   }
 
+  if (normalizedMethod === 'POST' && /^\/inventory-reservations\/from-requisition\/[^/]+$/.test(normalizedPathOnly)) {
+    return 'Linked reservation created successfully.';
+  }
+
   const requisitionWorkflowMatch = normalizedMethod === 'POST'
     ? normalizedPathOnly.match(/^\/inventory-requisitions\/[^/]+\/(submit|approve|reject|cancel|reopen)$/)
     : null;
