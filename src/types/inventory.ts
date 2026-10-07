@@ -2950,6 +2950,18 @@ export interface AutomationRunnerStatusResponse {
   batch_limit?: number | string;
   request_creation_enabled: boolean;
   execution_enabled: boolean;
+  production_safety_lock?: {
+    global_disable: boolean;
+    tenant_request_creation_enabled: boolean;
+    run_scheduled_jobs_enabled: boolean;
+    automation_runner_enabled: boolean;
+    auto_request_creation_enabled: boolean;
+    request_creation_allowed_for_mode: boolean;
+    execution_enabled: boolean;
+    default_safe_posture: boolean;
+    required_flags_for_manual_request_creation: string[];
+    required_flags_for_auto_request_creation: string[];
+  };
   mutates_inventory: boolean;
   mutates_products: boolean;
   mutates_shipments: boolean;

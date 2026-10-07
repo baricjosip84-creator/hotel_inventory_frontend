@@ -409,7 +409,8 @@
     "check:inventory-execution-task-audit-refresh-v349285": "node scripts/check-execution-task-audit-refresh-surgical-fix-v349285.mjs",
     "check:inventory-execution-task-action-feedback-v349286": "node scripts/check-execution-task-action-feedback-surgical-fix-v349286.mjs",
     "check:inventory-automation-schedule-detail-isolation-v349287": "node scripts/check-automation-schedule-detail-isolation-surgical-fix-v349287.mjs",
-    "check:inventory-automation-schedule-action-feedback-v349288": "node scripts/check-automation-schedule-action-feedback-surgical-fix-v349288.mjs"
+    "check:inventory-automation-schedule-action-feedback-v349288": "node scripts/check-automation-schedule-action-feedback-surgical-fix-v349288.mjs",
+    "check:inventory-automation-schedule-request-safety-gating-v349289": "node scripts/check-automation-schedule-request-safety-gating-surgical-fix-v349289.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

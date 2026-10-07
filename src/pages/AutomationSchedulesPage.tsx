@@ -265,6 +265,15 @@ export default function AutomationSchedulesPage() {
   const hasPreviousPage = offset > 0;
   const hasNextPage = offset + limit < total;
 
+  const manualRequestCreationAllowed = Boolean(
+    runnerStatus?.production_safety_lock
+      && !runnerStatus.production_safety_lock.global_disable
+      && runnerStatus.production_safety_lock.tenant_request_creation_enabled
+  );
+  const manualRequestCreationBlockedMessage = runnerStatus
+    ? ui('Request creation is turned off in Automation safety. Enable Request preparation before creating requests from schedules.')
+    : ui('Request creation safety status could not be loaded. Refresh the page before creating requests from schedules.');
+
   const activeCount = useMemo(() => {
     if (!runnerReadiness) return 0;
     const explicit = runnerReadiness.totals.active_schedules;
@@ -293,6 +302,7 @@ export default function AutomationSchedulesPage() {
         setData(null);
         setTypes(null);
         setRunnerReadiness(null);
+        setRunnerStatus(null);
         setSelected(null);
         return;
       }
@@ -300,10 +310,11 @@ export default function AutomationSchedulesPage() {
       const results = await Promise.allSettled([
         apiRequest<AutomationScheduleListResponse>(`/automation-schedules?${query}`),
         apiRequest<AutomationScheduleTypesResponse>('/automation-schedules/types'),
-        apiRequest<AutomationRunnerReadinessResponse>('/automation-schedules/runner-readiness')
+        apiRequest<AutomationRunnerReadinessResponse>('/automation-schedules/runner-readiness'),
+        apiRequest<AutomationRunnerStatusResponse>('/automation-schedules/runner-status')
       ]);
 
-      const [listResult, typesResult, readinessResult] = results;
+      const [listResult, typesResult, readinessResult, statusResult] = results;
       const secondaryWarnings: string[] = [];
 
       if (listResult.status === 'fulfilled') {
@@ -322,6 +333,12 @@ export default function AutomationSchedulesPage() {
 
       if (readinessResult.status === 'fulfilled') setRunnerReadiness(readinessResult.value);
       else secondaryWarnings.push(ui('Runner readiness summary could not be refreshed.'));
+
+      if (statusResult.status === 'fulfilled') setRunnerStatus(statusResult.value);
+      else {
+        setRunnerStatus(null);
+        secondaryWarnings.push(ui('Automation safety status could not be loaded.'));
+      }
 
       if (secondaryWarnings.length) setWarning(secondaryWarnings.join(' '));
     } catch (err) {
@@ -592,6 +609,16 @@ export default function AutomationSchedulesPage() {
     }
   };
 
+  const requestManualRunConfirmation = (schedule: AutomationSchedule) => {
+    if (!manualRequestCreationAllowed) {
+      setError(manualRequestCreationBlockedMessage);
+      setConfirmation(null);
+      return;
+    }
+    setError(null);
+    setConfirmation({ kind: 'manual_run', schedule });
+  };
+
   const runScheduleManually = async (schedule: AutomationSchedule) => {
     setSaving(true);
     setError(null);
@@ -711,7 +738,14 @@ export default function AutomationSchedulesPage() {
   const confirmAction = async () => {
     if (!confirmation) return;
     if (confirmation.kind === 'activate') return resumeSchedule(confirmation.schedule);
-    if (confirmation.kind === 'manual_run') return runScheduleManually(confirmation.schedule);
+    if (confirmation.kind === 'manual_run') {
+      if (!manualRequestCreationAllowed) {
+        setError(manualRequestCreationBlockedMessage);
+        setConfirmation(null);
+        return;
+      }
+      return runScheduleManually(confirmation.schedule);
+    }
     if (confirmation.kind === 'run_due') return runDueSchedulesOnce();
     if (confirmation.kind === 'disable') {
       if (confirmationText.trim().length < 3) {
@@ -943,7 +977,7 @@ export default function AutomationSchedulesPage() {
                       <div className="automation-schedules-row-actions">
                         <button type="button" onClick={() => void loadScheduleDetail(schedule)}>{ui('View')}</button>
                         <button type="button" disabled={saving || schedule.status === 'disabled'} onClick={() => void dryRunSchedule(schedule)}>{ui('Preview')}</button>
-                        {canCreateAutomationSchedules && canCreateExecutionRequests ? <button type="button" disabled={saving || schedule.status === 'disabled'} onClick={() => setConfirmation({ kind: 'manual_run', schedule })}>{ui('Create request')}</button> : null}
+                        {canCreateAutomationSchedules && canCreateExecutionRequests ? <button type="button" disabled={saving || schedule.status === 'disabled' || !manualRequestCreationAllowed} title={!manualRequestCreationAllowed ? manualRequestCreationBlockedMessage : undefined} onClick={() => requestManualRunConfirmation(schedule)}>{ui('Create request')}</button> : null}
                         {(schedule.status === 'draft' || schedule.status === 'paused') && canResumeAutomationSchedules ? <button type="button" disabled={saving} onClick={() => setConfirmation({ kind: 'activate', schedule })}>{ui('Activate')}</button> : null}
                         {(schedule.status === 'draft' || schedule.status === 'active') && canPauseAutomationSchedules ? <button type="button" disabled={saving} onClick={() => void pauseSchedule(schedule)}>{ui('Pause')}</button> : null}
                         {schedule.status !== 'disabled' && canDisableAutomationSchedules ? <button type="button" className="automation-schedules-danger-link" disabled={saving} onClick={() => { setConfirmation({ kind: 'disable', schedule }); setConfirmationText(''); }}>{ui('Disable')}</button> : null}
@@ -995,12 +1029,15 @@ export default function AutomationSchedulesPage() {
 
           <div className="automation-schedules-detail-actions" aria-label={ui('Selected schedule actions')}>
             <button type="button" className="btn btn-secondary" disabled={saving || selected.status === 'disabled'} onClick={() => void dryRunSchedule(selected)}>{ui('Preview')}</button>
-            {canCreateAutomationSchedules && canCreateExecutionRequests ? <button type="button" className="btn btn-secondary" disabled={saving || selected.status === 'disabled'} onClick={() => setConfirmation({ kind: 'manual_run', schedule: selected })}>{ui('Create request')}</button> : null}
+            {canCreateAutomationSchedules && canCreateExecutionRequests ? <button type="button" className="btn btn-secondary" disabled={saving || selected.status === 'disabled' || !manualRequestCreationAllowed} title={!manualRequestCreationAllowed ? manualRequestCreationBlockedMessage : undefined} onClick={() => requestManualRunConfirmation(selected)}>{ui('Create request')}</button> : null}
             {(selected.status === 'draft' || selected.status === 'paused') && canResumeAutomationSchedules ? <button type="button" className="btn btn-primary" disabled={saving} onClick={() => setConfirmation({ kind: 'activate', schedule: selected })}>{ui('Activate')}</button> : null}
             {(selected.status === 'draft' || selected.status === 'active') && canPauseAutomationSchedules ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => void pauseSchedule(selected)}>{ui('Pause')}</button> : null}
             {selected.status !== 'disabled' && canDisableAutomationSchedules ? <button type="button" className="btn btn-danger" disabled={saving} onClick={() => { setConfirmation({ kind: 'disable', schedule: selected }); setConfirmationText(''); }}>{ui('Disable')}</button> : null}
             {canViewExecutionRequests ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => void loadAuditPack(selected)}>{ui('Load audit history')}</button> : null}
           </div>
+          {canCreateAutomationSchedules && canCreateExecutionRequests && !manualRequestCreationAllowed ? (
+            <div className="automation-schedules-alert automation-schedules-alert--warning">{manualRequestCreationBlockedMessage}</div>
+          ) : null}
 
           <div className="automation-schedules-detail-grid">
             <div><span>{ui('Review type')}</span><strong>{selected.type_definition?.label || ui(humanize(selected.automation_type))}</strong></div>
@@ -1103,7 +1140,7 @@ export default function AutomationSchedulesPage() {
             {runnerStatus ? (
               <>
                 <div className="automation-schedules-metrics automation-schedules-metrics--safety">
-                  <div><strong>{runnerStatus.request_creation_enabled ? ui('Enabled') : ui('Off')}</strong><span>{ui('Request preparation')}</span></div>
+                  <div><strong>{manualRequestCreationAllowed ? ui('Enabled') : ui('Off')}</strong><span>{ui('Request preparation')}</span></div>
                   <div><strong>{runnerStatus.started ? ui('Running') : ui('Not running')}</strong><span>{ui('Background scheduler')}</span></div>
                   <div><strong>{ui('Off')}</strong><span>{ui('Automatic execution')}</span></div>
                   <div><strong>{formatLocalizedNumber(numberValue(numberValue(runnerStatus.failed_tick_count)), locale)}</strong><span>{ui('Failed runs')}</span></div>
