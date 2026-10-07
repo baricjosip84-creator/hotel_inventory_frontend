@@ -359,6 +359,30 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     if (normalizedPath.endsWith('/cancel')) return 'Execution Request cancelled successfully.';
   }
 
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/automation-schedules') {
+    return 'Automation schedule created successfully.';
+  }
+
+  const automationScheduleActionMatch = normalizedMethod === 'POST'
+    ? normalizedPathOnly.match(/^\/automation-schedules\/[^/]+\/(pause|resume|disable|dry-run|run)$/)
+    : null;
+  if (automationScheduleActionMatch) {
+    const action = automationScheduleActionMatch[1];
+    if (action === 'pause') return 'Automation schedule paused successfully.';
+    if (action === 'resume') return 'Automation schedule activated successfully.';
+    if (action === 'disable') return 'Automation schedule disabled successfully.';
+    if (action === 'dry-run') return 'Automation schedule preview completed successfully.';
+    return 'Automation schedule run completed successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/automation-schedules/runner/run-once') {
+    return 'Due schedule processing completed successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/automation-schedules/runner/unsafe-output-review/acknowledge') {
+    return 'Automation safety review acknowledged successfully.';
+  }
+
   if (normalizedMethod === 'POST' && normalizedPathOnly === '/execution-tasks') {
     return 'Execution task created successfully.';
   }
