@@ -174,7 +174,7 @@ export default function InventoryUsagePage() {
     }) => {
       return reverseInventoryUsageLog(usageLogId, reversalReason);
     },
-    onSuccess: (data, variables) => {
+    onSuccess: async (data, variables) => {
       const productName = data.product?.name || ui("Inventory item");
       const restoredQuantity = data.stock ? Number(data.stock.restored_quantity) : null;
       const previousQuantity = data.stock ? Number(data.stock.previous_quantity) : null;
@@ -191,24 +191,26 @@ export default function InventoryUsagePage() {
         detail: { type: "success", message: completionMessage },
       }));
 
-      queryClient.invalidateQueries({
-        queryKey: ["inventory-usage-summary-page"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["inventory-usage-logs-page"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["inventory-usage-exceptions-page"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["inventory-usage-anomalies-page"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["inventory-usage-impact-page"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["inventory-usage-log-detail-page", variables.usageLogId],
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["inventory-usage-summary-page"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["inventory-usage-logs-page"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["inventory-usage-exceptions-page"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["inventory-usage-anomalies-page"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["inventory-usage-impact-page"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["inventory-usage-log-detail-page", variables.usageLogId],
+        }),
+      ]);
     },
     onError: (mutationError) => {
       const message = mutationError instanceof Error
@@ -1156,7 +1158,7 @@ export default function InventoryUsagePage() {
       }
       onSelectUsageLog={setSelectedUsageLogId}
       onCloseUsageLogDetail={() => setSelectedUsageLogId("")}
-      reversingUsageId={reverseUsageMutation.variables?.usageLogId || null}
+      reversingUsageId={reverseUsageMutation.isPending ? (reverseUsageMutation.variables?.usageLogId || null) : null}
       reverseError={
         reverseUsageMutation.isError
           ? (reverseUsageMutation.error as Error)

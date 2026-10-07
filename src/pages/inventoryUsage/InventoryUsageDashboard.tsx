@@ -1632,16 +1632,13 @@ export function InventoryUsageDashboard({
                           onClick={() => onSelectUsageLog(usage.id)}
                         >
                           {ui("Details")}</button>
-                        {permissions.canReverse ? (
+                        {permissions.canReverse && !usage.reversed_at ? (
                           <button
                             type="button"
                             style={styles.dangerButton}
                             data-skip-global-action-feedback="true"
                             onClick={() => onReverseUsage(usage.id)}
-                            disabled={
-                              Boolean(usage.reversed_at) ||
-                              reversingUsageId === usage.id
-                            }
+                            disabled={reversingUsageId === usage.id}
                           >
                             {reversingUsageId === usage.id
                               ? ui("Reversing...")
