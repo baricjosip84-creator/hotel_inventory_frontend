@@ -690,6 +690,15 @@ export default function ShipmentsPage() {
   const purchaseOrderHandoffRef = useRef<string>('');
   const dashboardHandoffRef = useRef<string>('');
 
+  const focusShipmentDetail = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    window.requestAnimationFrame(() => {
+      const detail = document.getElementById('shipments-detail');
+      if (!detail) return;
+      detail.scrollIntoView({ behavior, block: 'start' });
+      detail.focus({ preventScroll: true });
+    });
+  }, []);
+
   const [pageMessage, setPageMessage] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
   const [supplierEmailPreview, setSupplierEmailPreview] = useState<SupplierEmailPreview | null>(null);
@@ -1408,6 +1417,7 @@ export default function ShipmentsPage() {
       return;
     }
 
+    setWorkspaceSection('receiving');
     setSelectedShipmentId(matchedShipment.id);
     setReceiveDrafts({});
     setPageError(null);
@@ -1529,7 +1539,8 @@ export default function ShipmentsPage() {
     nextParams.delete('requiresExpiryDate');
     nextParams.delete('requiresSerialOnReceipt');
     setSearchParams(nextParams, { replace: true });
-  }, [shipments, searchParams, setSearchParams, locale, ui]);
+    focusShipmentDetail('smooth');
+  }, [shipments, searchParams, setSearchParams, locale, ui, focusShipmentDetail]);
 
   useEffect(() => {
     if (!highlightedItemId || shipmentItems.length === 0) {
@@ -2258,6 +2269,7 @@ export default function ShipmentsPage() {
   };
 
   const selectShipment = (shipmentId: string) => {
+    setWorkspaceSection('receiving');
     setSelectedShipmentId(shipmentId);
     setReceiveDrafts({});
     setHighlightedItemId('');
@@ -2266,6 +2278,7 @@ export default function ShipmentsPage() {
     autoReceiveAttemptKeyRef.current = '';
     setPageError(null);
     setPageMessage(null);
+    focusShipmentDetail('smooth');
   };
 
   const openProductScanner = () => {
@@ -2820,7 +2833,12 @@ export default function ShipmentsPage() {
           )}
         </section>
 
-        <div id="shipments-detail" style={styles.panel}>
+        <div
+          id="shipments-detail"
+          tabIndex={-1}
+          aria-label={ui('Selected Shipment')}
+          style={{ ...styles.panel, scrollMarginTop: 104 }}
+        >
           <div style={styles.sectionHeaderWrap}>
             <OperationalSectionHeader
               iconPath="/scanner"

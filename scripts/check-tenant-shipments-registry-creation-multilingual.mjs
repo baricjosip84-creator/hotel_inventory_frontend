@@ -55,7 +55,8 @@ for (const key of ['Pending', 'Partial', 'Received']) {
 if (!process.exitCode) pass('Shipments canonical pending/partial/received status display labels are catalog-backed.');
 
 const renderStart = pageSource.indexOf('  return (\n    <div className="io-operational-page io-workspace-page io-shipments-page">');
-const stageEnd = pageSource.indexOf('        <div id="shipments-detail"', renderStart);
+const detailMarker = pageSource.indexOf('id="shipments-detail"', renderStart);
+const stageEnd = detailMarker >= 0 ? pageSource.lastIndexOf('<div', detailMarker) : -1;
 if (renderStart < 0 || stageEnd < 0) fail('Shipments registry/create staged render boundary is missing.');
 const stageSource = renderStart >= 0 && stageEnd >= 0 ? pageSource.slice(renderStart, stageEnd) : '';
 

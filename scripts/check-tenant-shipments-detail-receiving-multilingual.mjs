@@ -49,7 +49,8 @@ const missing = [...literalSet].filter((key) => !unique.has(key));
 if (missing.length) fail(`Shipments ui() literals missing translations: ${missing.join(' | ')}`);
 else pass(`Shipments staged page has ${literalSet.size} catalog-backed literal UI keys.`);
 
-const stageStart = pageSource.indexOf('        <div id="shipments-detail"');
+const stageMarker = pageSource.indexOf('id="shipments-detail"');
+const stageStart = stageMarker >= 0 ? pageSource.lastIndexOf('<div', stageMarker) : -1;
 const stageEnd = pageSource.indexOf('      {canAutoReorderShipments ?', stageStart);
 if (stageStart < 0 || stageEnd < 0) fail('Shipments detail/receiving staged render boundary is missing.');
 const stageSource = stageStart >= 0 && stageEnd >= 0 ? pageSource.slice(stageStart, stageEnd) : '';

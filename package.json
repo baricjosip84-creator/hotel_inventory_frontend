@@ -396,7 +396,8 @@
     "check:inventory-variant-summary-feedback-surgical-fix-v349273": "node scripts/check-variant-summary-feedback-surgical-fix-v349273.mjs",
     "check:inventory-api-key-secret-hygiene-surgical-fix-v349274": "node scripts/check-api-key-secret-hygiene-surgical-fix-v349274.mjs",
     "check:inventory-webhook-action-feedback-surgical-fix-v349274": "node scripts/check-webhook-action-feedback-surgical-fix-v349274.mjs",
-    "check:inventory-connection-registry-lifecycle-surgical-fix-v349275": "node scripts/check-connection-registry-lifecycle-surgical-fix-v349275.mjs"
+    "check:inventory-connection-registry-lifecycle-surgical-fix-v349275": "node scripts/check-connection-registry-lifecycle-surgical-fix-v349275.mjs",
+    "check:inventory-scanner-shipment-focus-surgical-fix-v349276": "node scripts/check-scanner-shipment-focus-surgical-fix-v349276.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
