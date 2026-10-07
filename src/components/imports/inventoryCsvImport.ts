@@ -123,7 +123,11 @@ export async function previewInventoryImport(input: {
       import_type: input.importType,
       source_filename: input.sourceFilename,
       rows: input.rows
-    })
+    }),
+    // Validation creates no tenant inventory data. The import panel owns the
+    // valid/invalid completion feedback, so a generic mutation-success toast
+    // would be both redundant and misleading for invalid previews.
+    skipMutationFeedback: true
   });
 }
 

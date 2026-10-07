@@ -152,6 +152,8 @@ export default function StorageLocationsPage() {
   const [form, setForm] = useState<StorageLocationFormState>(emptyForm());
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
 
   const locationsQuery = useQuery({
     queryKey: ['storage-locations'],
@@ -289,8 +291,7 @@ export default function StorageLocationsPage() {
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setFormError(null);
-    setFormMessage(null);
+    clearTransientFeedback();
 
     if (!canManageStorageLocations) {
       setFormError(
@@ -326,29 +327,27 @@ export default function StorageLocationsPage() {
 
   const beginEdit = (location: StorageLocationItem) => {
     if (!canManageStorageLocations) {
+      clearTransientFeedback();
       setFormError(ui("Your current role cannot edit storage locations."));
-      setFormMessage(null);
       return;
     }
 
     setEditingLocation(location);
     setForm(formFromLocation(location));
-    setFormError(null);
-    setFormMessage(null);
+    clearTransientFeedback();
     scrollToFormSection('storage-location-form-panel');
   };
 
   const cancelEdit = () => {
     setEditingLocation(null);
     setForm(emptyForm());
-    setFormError(null);
-    setFormMessage(null);
+    clearTransientFeedback();
   };
 
   const handleRetire = (location: StorageLocationItem) => {
     if (!canManageStorageLocations) {
+      clearTransientFeedback();
       setFormError(ui("Your current role cannot retire storage locations."));
-      setFormMessage(null);
       scrollToFormSection('storage-location-form-panel');
       return;
     }
@@ -359,14 +358,37 @@ export default function StorageLocationsPage() {
 
     if (!confirmed) return;
 
-    setFormError(null);
-    setFormMessage(null);
+    clearTransientFeedback();
     retireMutation.mutate({ id: location.id, version: location.version });
   };
 
   const clearFilters = () => {
     setSearch('');
     setZoneFilter('');
+  };
+
+  const clearTransientFeedback = () => {
+    setFormError(null);
+    setFormMessage(null);
+    setRefreshError(null);
+    setRefreshMessage(null);
+  };
+
+  const updateFormField = (field: keyof StorageLocationFormState, value: string) => {
+    clearTransientFeedback();
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleRefreshLocations = async () => {
+    clearTransientFeedback();
+    const result = await locationsQuery.refetch();
+
+    if (result.error) {
+      setRefreshError(ui('Unable to refresh storage locations.'));
+      return;
+    }
+
+    setRefreshMessage(ui('Storage locations refreshed.'));
   };
 
   return (
@@ -437,6 +459,7 @@ export default function StorageLocationsPage() {
         canImport={canManageStorageLocations}
         disabledReason={ui("Your current role cannot import storage locations.")}
         onCommitted={invalidateLocationConsumers}
+        onInteraction={clearTransientFeedback}
       />
 
       <section id="storage-location-form-panel" className="app-panel app-panel--padded" style={editingLocation ? styles.editPanel : styles.panel}>
@@ -462,7 +485,7 @@ export default function StorageLocationsPage() {
               id="storage-location-name"
               style={inputDisabled ? styles.disabledInput : styles.input}
               value={form.name}
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+              onChange={(event) => updateFormField('name', event.target.value)}
               placeholder={ui("Example: Main Warehouse")}
               maxLength={255}
               required
@@ -478,7 +501,7 @@ export default function StorageLocationsPage() {
               list="storage-location-temperature-zone-options"
               style={inputDisabled ? styles.disabledInput : styles.input}
               value={form.temperature_zone}
-              onChange={(event) => setForm((current) => ({ ...current, temperature_zone: event.target.value }))}
+              onChange={(event) => updateFormField('temperature_zone', event.target.value)}
               placeholder={ui("Example: Ambient, cold, chilled, frozen")}
               maxLength={100}
               disabled={inputDisabled}
@@ -528,12 +551,15 @@ export default function StorageLocationsPage() {
           <button
             type="button"
             style={locationsQuery.isFetching ? styles.disabledButton : styles.secondaryButton}
-            onClick={() => void locationsQuery.refetch()}
+            onClick={() => void handleRefreshLocations()}
             disabled={locationsQuery.isFetching}
           >
             {locationsQuery.isFetching ? ui('Refreshing...') : ui("Refresh Locations")}
           </button>
         </div>
+
+        {refreshMessage ? <div className="app-success-state" style={styles.successBox} role="status">{refreshMessage}</div> : null}
+        {refreshError ? <div className="app-error-state" style={styles.errorBox} role="alert">{refreshError}</div> : null}
 
         <div className="app-grid-toolbar" style={styles.toolbarGrid}>
           <div>

@@ -23,6 +23,7 @@ type InventoryCsvImportPanelProps = {
   canImport: boolean;
   disabledReason?: string;
   onCommitted?: (batch: InventoryImportBatch) => Promise<void> | void;
+  onInteraction?: () => void;
 };
 
 const panel: CSSProperties = { border: '1px solid var(--border-color, #d9dde5)', borderRadius: 12, padding: 16, marginTop: 16 };
@@ -31,7 +32,7 @@ const button: CSSProperties = { padding: '8px 12px', borderRadius: 8, border: '1
 const primaryButton: CSSProperties = { ...button, fontWeight: 700 };
 const disabledButton: CSSProperties = { ...button, opacity: 0.55, cursor: 'not-allowed' };
 const errorBox: CSSProperties = { marginTop: 12, padding: 10, border: '1px solid currentColor', borderRadius: 8 };
-const successBox: CSSProperties = { marginTop: 12, padding: 10, border: '1px solid currentColor', borderRadius: 8 };
+const feedbackBox: CSSProperties = { marginTop: 12, padding: 10, border: '1px solid currentColor', borderRadius: 8 };
 const tableWrapper: CSSProperties = { overflowX: 'auto', marginTop: 12 };
 const table: CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: 13 };
 const cell: CSSProperties = { padding: '7px 8px', borderBottom: '1px solid #d9dde5', textAlign: 'left', verticalAlign: 'top' };
@@ -48,7 +49,8 @@ export function InventoryCsvImportPanel({
   templateExample,
   canImport,
   disabledReason,
-  onCommitted
+  onCommitted,
+  onInteraction
 }: InventoryCsvImportPanelProps) {
   const { locale, ui } = useAppTranslation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -57,15 +59,18 @@ export function InventoryCsvImportPanel({
   const [batch, setBatch] = useState<InventoryImportBatch | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageTone, setMessageTone] = useState<'info' | 'success' | 'warning'>('info');
   const [busy, setBusy] = useState(false);
 
   const resetPreview = () => {
     setBatch(null);
     setError(null);
     setMessage(null);
+    setMessageTone('info');
   };
 
   const handleFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    onInteraction?.();
     resetPreview();
     const selected = event.target.files?.[0] || null;
     setFile(selected);
@@ -81,6 +86,7 @@ export function InventoryCsvImportPanel({
       const parsed = parseCsv(await selected.text());
       if (parsed.length > 2000) throw new Error(ui('CSV cannot contain more than 2,000 data rows.'));
       setRows(parsed);
+      setMessageTone('info');
       setMessage(`${formatLocalizedNumber(parsed.length, locale)} ${parsed.length === 1 ? ui('row loaded. Validate before committing.') : ui('rows loaded. Validate before committing.')}`);
     } catch (parseError) {
       setError(getErrorMessage(parseError, ui('Failed to read CSV.')));
@@ -89,12 +95,14 @@ export function InventoryCsvImportPanel({
 
   const validateCsv = async () => {
     if (!file || rows.length === 0 || !canImport) return;
+    onInteraction?.();
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
       const preview = await previewInventoryImport({ importType, sourceFilename: file.name, rows });
       setBatch(preview);
+      setMessageTone(preview.status === 'validated' ? 'success' : 'warning');
       setMessage(
         preview.status === 'validated'
           ? `${ui('Validation passed for all')} ${formatLocalizedNumber(preview.row_count, locale)} ${ui('rows. No inventory data has changed yet.')}`
@@ -109,6 +117,7 @@ export function InventoryCsvImportPanel({
 
   const commitCsv = async () => {
     if (!batch || batch.status !== 'validated' || !canImport) return;
+    onInteraction?.();
     if (!window.confirm(`${ui('Commit')} ${formatLocalizedNumber(batch.row_count, locale)} ${ui('validated')} ${title.toLocaleLowerCase()} ${batch.row_count === 1 ? ui('row? This will change tenant data.') : ui('rows? This will change tenant data.')}`)) return;
     setBusy(true);
     setError(null);
@@ -116,6 +125,7 @@ export function InventoryCsvImportPanel({
     try {
       const committed = await commitInventoryImport(batch);
       setBatch(committed);
+      setMessageTone('success');
       setMessage(ui("Import committed successfully."));
       await onCommitted?.(committed);
     } catch (commitError) {
@@ -126,6 +136,7 @@ export function InventoryCsvImportPanel({
   };
 
   const downloadTemplate = () => {
+    onInteraction?.();
     const blob = new Blob([buildTemplateCsv(templateColumns, templateExample)], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -160,6 +171,7 @@ export function InventoryCsvImportPanel({
   };
 
   const startOver = () => {
+    onInteraction?.();
     setFile(null);
     setRows([]);
     setBatch(null);
@@ -208,7 +220,15 @@ export function InventoryCsvImportPanel({
         {(file || batch) ? <button type="button" style={button} onClick={startOver} disabled={busy}>{ui("Start Over")}</button> : null}
       </div>
 
-      {message ? <div style={successBox}>{message}</div> : null}
+      {message ? (
+        <div
+          className={messageTone === 'success' ? 'app-success-state' : messageTone === 'warning' ? 'app-warning-state' : 'app-info-state'}
+          style={feedbackBox}
+          role="status"
+        >
+          {message}
+        </div>
+      ) : null}
       {error ? <div style={errorBox}>{error}</div> : null}
 
       {batch ? (
