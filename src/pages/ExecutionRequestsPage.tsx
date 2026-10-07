@@ -479,7 +479,8 @@ export default function ExecutionRequestsPage() {
           context_snapshot: contextSnapshot
             ? { ...contextSnapshot, recommendation_candidate: recommendation }
             : { recommendation_candidate: recommendation }
-        })
+        }),
+        skipMutationFeedback: true
       });
 
       setSelected(created);
@@ -534,7 +535,8 @@ export default function ExecutionRequestsPage() {
           },
           gate_snapshot: gateSnapshot,
           context_snapshot: contextSnapshot
-        })
+        }),
+        skipMutationFeedback: true
       });
 
       setSelected(created);
@@ -566,7 +568,8 @@ export default function ExecutionRequestsPage() {
     try {
       const updated = await apiRequest<ExecutionRequest>(`/execution-requests/${request.id}/submit`, {
         method: 'POST',
-        body: JSON.stringify({ note: 'Submitted for human review from the registry UI.' })
+        body: JSON.stringify({ note: 'Submitted for human review from the registry UI.' }),
+        skipMutationFeedback: true
       });
       applyReturnedRequest(updated);
       await loadRequests();
@@ -590,7 +593,8 @@ export default function ExecutionRequestsPage() {
     try {
       const updated = await apiRequest<ExecutionRequest>(`/execution-requests/${request.id}/approve`, {
         method: 'POST',
-        body: JSON.stringify({ review_note: reviewNote.trim() || null })
+        body: JSON.stringify({ review_note: reviewNote.trim() || null }),
+        skipMutationFeedback: true
       });
       applyReturnedRequest(updated);
       await loadRequests();
@@ -614,7 +618,8 @@ export default function ExecutionRequestsPage() {
     try {
       const updated = await apiRequest<ExecutionRequest>(`/execution-requests/${request.id}/reject`, {
         method: 'POST',
-        body: JSON.stringify({ rejection_reason: rejectionReason.trim() })
+        body: JSON.stringify({ rejection_reason: rejectionReason.trim() }),
+        skipMutationFeedback: true
       });
       applyReturnedRequest(updated);
       await loadRequests();
@@ -641,7 +646,8 @@ export default function ExecutionRequestsPage() {
     try {
       const updated = await apiRequest<ExecutionRequest>(`/execution-requests/${request.id}/execute`, {
         method: 'POST',
-        body: JSON.stringify({ note: note.trim() || null })
+        body: JSON.stringify({ note: note.trim() || null }),
+        skipMutationFeedback: true
       });
       applyReturnedRequest(updated);
       await loadRequests();
@@ -671,7 +677,8 @@ export default function ExecutionRequestsPage() {
     try {
       const updated = await apiRequest<ExecutionRequest>(`/execution-requests/${request.id}/execute-noop`, {
         method: 'POST',
-        body: JSON.stringify({ note: note.trim() || null })
+        body: JSON.stringify({ note: note.trim() || null }),
+        skipMutationFeedback: true
       });
       applyReturnedRequest(updated);
       await loadRequests();
@@ -754,7 +761,8 @@ export default function ExecutionRequestsPage() {
     try {
       const updated = await apiRequest<ExecutionRequest>(`/execution-requests/${request.id}/prepare-retry`, {
         method: 'POST',
-        body: JSON.stringify({ retry_reason: retryReason.trim(), note: note.trim() || null })
+        body: JSON.stringify({ retry_reason: retryReason.trim(), note: note.trim() || null }),
+        skipMutationFeedback: true
       });
       applyReturnedRequest(updated);
       await loadRequests();
@@ -778,7 +786,8 @@ export default function ExecutionRequestsPage() {
     try {
       const updated = await apiRequest<ExecutionRequest>(`/execution-requests/${request.id}/cancel`, {
         method: 'POST',
-        body: JSON.stringify({ cancel_reason: cancelReason.trim() })
+        body: JSON.stringify({ cancel_reason: cancelReason.trim() }),
+        skipMutationFeedback: true
       });
       applyReturnedRequest(updated);
       await loadRequests();
