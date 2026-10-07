@@ -402,7 +402,8 @@
     "check:inventory-usage-reversal-state-surgical-fix-v349278": "node scripts/check-inventory-usage-reversal-state-surgical-fix-v349278.mjs",
     "check:inventory-requisition-selected-request-focus-surgical-fix-v349279": "node scripts/check-requisition-selected-request-focus-surgical-fix-v349279.mjs",
     "check:inventory-requisition-linked-reservation-sync-surgical-fix-v349280": "node scripts/check-requisition-linked-reservation-sync-surgical-fix-v349280.mjs",
-    "check:inventory-reservation-allocation-version-surgical-fix-v349281": "node scripts/check-reservation-allocation-version-surgical-fix-v349281.mjs"
+    "check:inventory-reservation-allocation-version-surgical-fix-v349281": "node scripts/check-reservation-allocation-version-surgical-fix-v349281.mjs",
+    "check:inventory-reservation-detail-focus-surgical-fix-v349282": "node scripts/check-reservation-detail-focus-surgical-fix-v349282.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

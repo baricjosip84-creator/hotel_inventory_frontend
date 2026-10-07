@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
 import { useAppTranslation } from '../i18n/I18nContext';
@@ -554,6 +554,8 @@ export default function InventoryReservationsPage() {
   const [pageSize, setPageSize] = useState(25);
   const [offset, setOffset] = useState(0);
   const [activeWorkspaceSection, setActiveWorkspaceSection] = useState<ReservationWorkspaceSection>('overview');
+  const reservationDetailRef = useRef<HTMLElement | null>(null);
+  const lastFocusedReservationIdRef = useRef('');
 
   useEffect(() => {
     const reservationIdFromUrl = searchParams.get('reservationId') || searchParams.get('reservation_id') || '';
@@ -640,6 +642,19 @@ export default function InventoryReservationsPage() {
     queryFn: () => fetchReservationAuditTrail(selectedReservationId),
     enabled: Boolean(selectedReservationId)
   });
+
+  useEffect(() => {
+    if (!selectedReservationId || detailQuery.isLoading || !detailQuery.data || detailQuery.data.id !== selectedReservationId) return;
+    if (lastFocusedReservationIdRef.current === selectedReservationId) return;
+
+    lastFocusedReservationIdRef.current = selectedReservationId;
+    const frame = window.requestAnimationFrame(() => {
+      reservationDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      reservationDetailRef.current?.focus({ preventScroll: true });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [detailQuery.data, detailQuery.isLoading, selectedReservationId]);
 
   const refreshReservationQueries = () => {
     void queryClient.invalidateQueries({ queryKey: ['inventory-reservations-options'] });
@@ -1187,7 +1202,14 @@ export default function InventoryReservationsPage() {
         </div>
       </section>
 
-      <section className="app-panel" id="reservation-detail" style={{ ...pageStyles.card, scrollMarginTop: '1rem' }}>
+      <section
+        ref={reservationDetailRef}
+        className="app-panel"
+        id="reservation-detail"
+        tabIndex={-1}
+        aria-label={ui("Reservation detail")}
+        style={{ ...pageStyles.card, scrollMarginTop: '104px' }}
+      >
         <OperationalSectionHeader
           iconPath="/inventory-reservations"
           title={ui("Reservation detail")}
