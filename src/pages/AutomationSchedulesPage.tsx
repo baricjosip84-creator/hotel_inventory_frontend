@@ -1206,7 +1206,17 @@ export default function AutomationSchedulesPage() {
             {confirmation.kind === 'disable' ? (
               <label className="automation-schedules-field">
                 <span>{ui('Disable reason')}</span>
-                <textarea value={confirmationText} minLength={3} maxLength={1000} onChange={(event) => setConfirmationText(event.target.value)} placeholder={ui('Explain why this schedule is being disabled.')} />
+                <textarea
+                  value={confirmationText}
+                  minLength={3}
+                  maxLength={1000}
+                  required
+                  aria-required="true"
+                  aria-describedby="automation-disable-reason-help"
+                  onChange={(event) => setConfirmationText(event.target.value)}
+                  placeholder={ui('Explain why this schedule is being disabled.')}
+                />
+                <small id="automation-disable-reason-help">{ui('Enter a disable reason of at least 3 characters.')}</small>
               </label>
             ) : null}
             {confirmation.kind === 'acknowledge_anomaly' ? (
@@ -1218,7 +1228,13 @@ export default function AutomationSchedulesPage() {
             ) : null}
             <div className="automation-schedules-modal-actions">
               <button type="button" className="automation-schedules-button automation-schedules-button--secondary" disabled={saving} onClick={() => { setConfirmation(null); setConfirmationText(''); }}>{ui('Cancel')}</button>
-              <button type="button" className={`automation-schedules-button ${confirmation.kind === 'disable' ? 'automation-schedules-button--danger' : 'automation-schedules-button--primary'}`} disabled={saving} onClick={() => void confirmAction()}>{saving ? ui('Working…') : ui('Confirm')}</button>
+              <button
+                type="button"
+                className={`automation-schedules-button ${confirmation.kind === 'disable' ? 'automation-schedules-button--danger' : 'automation-schedules-button--primary'}`}
+                disabled={saving || (confirmation.kind === 'disable' && confirmationText.trim().length < 3)}
+                title={confirmation.kind === 'disable' && confirmationText.trim().length < 3 ? ui('Enter a disable reason of at least 3 characters.') : undefined}
+                onClick={() => void confirmAction()}
+              >{saving ? ui('Working…') : ui('Confirm')}</button>
             </div>
           </section>
         </div>
