@@ -390,7 +390,8 @@
     "check:inventory-digital-twin-focus-surgical-fix-v349267": "node scripts/check-digital-twin-focus-surgical-fix-v349267.mjs",
     "check:inventory-reliability-intelligence-readiness-handoff-surgical-fix-v349268": "node scripts/check-reliability-intelligence-readiness-handoff-surgical-fix-v349268.mjs",
     "check:inventory-stock-transfers-validation-focus-surgical-fix-v349269": "node scripts/check-stock-transfers-validation-focus-surgical-fix-v349269.mjs",
-    "check:inventory-storage-locations-feedback-state-surgical-fix-v349270": "node scripts/check-storage-locations-feedback-state-surgical-fix-v349270.mjs"
+    "check:inventory-storage-locations-feedback-state-surgical-fix-v349270": "node scripts/check-storage-locations-feedback-state-surgical-fix-v349270.mjs",
+    "check:inventory-bom-location-readiness-surgical-fix-v349271": "node scripts/check-bom-location-readiness-surgical-fix-v349271.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

@@ -223,6 +223,16 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Webhook signing secret rotated successfully.';
   }
 
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/inventory-capabilities/boms') {
+    return 'BOM created successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && /^\/inventory-capabilities\/boms\/[^/]+\/execute$/.test(normalizedPathOnly)) {
+    const direction = readMutationStringField(body, 'direction')?.toLowerCase();
+    if (direction === 'disassemble') return 'Disassembly completed and stock movements recorded.';
+    return 'Assembly completed and stock movements recorded.';
+  }
+
   if (normalizedPath.endsWith('/enterprise-inventory/approvals/execute') && normalizedMethod === 'POST') {
     const action = readMutationAction(body);
     if (action === 'approved') return 'Item approved successfully.';
