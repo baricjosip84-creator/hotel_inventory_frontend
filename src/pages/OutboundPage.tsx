@@ -473,6 +473,7 @@ export default function OutboundPage() {
   const [orderAuditPage, setOrderAuditPage] = useState(1);
   const [returnAuditPage, setReturnAuditPage] = useState(1);
   const [selectedOrderId, setSelectedOrderId] = useState('');
+  const orderDetailRef = useRef<HTMLElement | null>(null);
   const [selectedReturnId, setSelectedReturnId] = useState('');
   const [documentPreview, setDocumentPreview] = useState<DocumentPreview | null>(null);
   const [returnDocumentPreview, setReturnDocumentPreview] = useState<DocumentPreview | null>(null);
@@ -499,6 +500,25 @@ export default function OutboundPage() {
   const canAuditRead = hasPermission(TENANT_PERMISSIONS.AUDIT_READ);
   const canAttachmentRead = hasPermission(TENANT_PERMISSIONS.ATTACHMENTS_READ);
   const canAttachmentWrite = hasPermission(TENANT_PERMISSIONS.ATTACHMENTS_WRITE);
+
+  const clearOrderTransientState = () => {
+    setDocumentPreview(null);
+    setEmailCompose(null);
+    setAttachmentFile(null);
+  };
+
+  const toggleOrderDetails = (orderId: string) => {
+    const isClosing = selectedOrderId === orderId;
+    clearOrderTransientState();
+    setOrderAuditPage(1);
+    setSelectedOrderId(isClosing ? '' : orderId);
+  };
+
+  const closeOrderDetails = () => {
+    clearOrderTransientState();
+    setSelectedOrderId('');
+  };
+
   const outboundAttentionItemsQuery = useOperationalAttentionItems('outbound', canUpdate || canDispatch || canReturnReceive);
   const outboundOrderAttentionIds = useMemo(() => new Set(outboundAttentionItemsQuery.data?.order_attention_ids || []), [outboundAttentionItemsQuery.data?.order_attention_ids]);
   const outboundReturnAttentionIds = useMemo(() => new Set(outboundAttentionItemsQuery.data?.return_receive_ids || []), [outboundAttentionItemsQuery.data?.return_receive_ids]);
@@ -543,6 +563,16 @@ export default function OutboundPage() {
     const handle = window.setTimeout(() => pickingWorkbenchRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
     return () => window.clearTimeout(handle);
   }, [pickOrderId]);
+  useEffect(() => {
+    if (!selectedOrderId) return undefined;
+    const handle = window.setTimeout(() => {
+      const detail = orderDetailRef.current;
+      if (!detail) return;
+      detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      detail.focus({ preventScroll: true });
+    }, 50);
+    return () => window.clearTimeout(handle);
+  }, [selectedOrderId]);
   const orderActivity = useQuery({ queryKey: ['outbound-order-activity', selectedOrderId, orderAuditPage], queryFn: () => apiRequest<OrderActivity>(`/outbound/orders/${selectedOrderId}/activity?audit_page=${orderAuditPage}&audit_page_size=${AUDIT_PAGE_SIZE}`), enabled: Boolean(selectedOrderId) });
   const orderDocuments = useQuery({ queryKey: ['outbound-order-documents', selectedOrderId], queryFn: () => apiRequest<OutboundDocument[]>(`/outbound/orders/${selectedOrderId}/documents`), enabled: Boolean(selectedOrderId) });
   const orderCommunications = useQuery({ queryKey: ['outbound-order-communications', selectedOrderId], queryFn: () => apiRequest<Communication[]>(`/outbound/orders/${selectedOrderId}/communications`), enabled: Boolean(selectedOrderId) });
@@ -1181,7 +1211,7 @@ export default function OutboundPage() {
                 <div>{ui('Picked waiting')} <strong>{formatNumber(item.open_picked_quantity)}</strong> {ui('· Packed waiting')} <strong>{formatNumber(item.open_packed_quantity)}</strong> {ui('· Remaining')} <strong>{formatNumber(item.remaining_quantity)}</strong> {referenceLabel(item.product_unit)}</div>
               </div>)}</div>
               <div className="outbound-actions-row">
-                <button type="button" className="outbound-button" onClick={() => { setSelectedOrderId(selectedOrderId === order.id ? '' : order.id); setOrderAuditPage(1); setDocumentPreview(null); }}>{selectedOrderId === order.id ? ui('Close Details') : ui('Open Details')}</button>
+                <button type="button" className="outbound-button" onClick={() => toggleOrderDetails(order.id)}>{selectedOrderId === order.id ? ui('Close Details') : ui('Open Details')}</button>
                 {order.status === 'draft' && canUpdate && canEditOrderForm ? <button type="button" className="outbound-button" onClick={() => beginOrderEdit(order)} disabled={mutation.isPending}>{ui('Edit Draft')}</button> : null}
                 {order.status === 'draft' && canUpdate ? <button type="button" className="outbound-button-primary" onClick={() => mutation.mutate({ path: `/outbound/orders/${order.id}/confirm`, version: Number(order.version), successMessage: ui('{order} confirmed and stock reserved.').replace('{order}', order.order_number) })} disabled={mutation.isPending}>{ui('Confirm & Reserve Stock')}</button> : null}
                 {['confirmed', 'partially_dispatched'].includes(order.status) && canUpdate ? <button type="button" className="outbound-button-primary" onClick={() => startPicking(order)} disabled={mutation.isPending}>{order.status === 'partially_dispatched' ? ui('Pick Remaining') : ui('Start Picking')}</button> : null}
@@ -1211,8 +1241,8 @@ export default function OutboundPage() {
         if (selectedOrder.status === 'packed') availableDocumentTypes.push('packing_slip');
         if (['partially_dispatched','dispatched'].includes(selectedOrder.status) && deliveryNoteCount < dispatchWaveCount) availableDocumentTypes.push('delivery_note');
         const documentLabel: Record<string,string> = { order_confirmation: ui('Order Confirmation'), pick_list: ui('Pick List'), packing_slip: ui('Packing Slip'), delivery_note: ui('Delivery Note') };
-        return <section className="outbound-panel outbound-detail-workspace">
-          <div className="outbound-section-heading"><div><h3>{ui('Order details')} · {selectedOrder.order_number}</h3><p>{ui('See delivery information, who did what, documents, emails, and attachments for this order.')}</p></div><button type="button" className="outbound-button" onClick={() => { setSelectedOrderId(''); setDocumentPreview(null); }}>{ui('Close Details')}</button></div>
+        return <section ref={orderDetailRef} tabIndex={-1} aria-label={ui('Order details')} className="outbound-panel outbound-detail-workspace">
+          <div className="outbound-section-heading"><div><h3>{ui('Order details')} · {selectedOrder.order_number}</h3><p>{ui('See delivery information, who did what, documents, emails, and attachments for this order.')}</p></div><button type="button" className="outbound-button" onClick={closeOrderDetails}>{ui('Close Details')}</button></div>
           <div className="outbound-detail-grid">
             <div className="outbound-detail-card"><h4>{ui('Customer and delivery')}</h4><dl>
               <dt>{ui('Customer')}</dt><dd>{referenceLabel(selectedOrder.customer_name)}</dd>

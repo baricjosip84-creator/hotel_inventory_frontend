@@ -605,6 +605,12 @@
 .outbound-detail-workspace {
   display: grid;
   gap: 14px;
+  scroll-margin-top: 104px;
+}
+
+.outbound-detail-workspace:focus {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
 }
 
 .outbound-detail-grid {
