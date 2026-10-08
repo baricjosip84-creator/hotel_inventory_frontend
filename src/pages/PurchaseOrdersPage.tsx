@@ -927,7 +927,8 @@ function buildPayload(input: PurchaseOrderFormState) {
 async function createPurchaseOrder(input: PurchaseOrderFormState): Promise<PurchaseOrderDetail> {
   return apiRequest<PurchaseOrderDetail>('/purchase-orders', {
     method: 'POST',
-    body: JSON.stringify(buildPayload(input))
+    body: JSON.stringify(buildPayload(input)),
+    skipMutationFeedback: true
   });
 }
 
@@ -974,7 +975,8 @@ async function previewShipmentSupplierEmail(input: {
     body: JSON.stringify({
       recipient_email: input.recipientEmail?.trim() || null,
       message: input.message?.trim() || null
-    })
+    }),
+    skipMutationFeedback: true
   });
 }
 
@@ -989,7 +991,8 @@ async function sendShipmentToSupplier(input: {
       recipient_email: input.recipientEmail.trim(),
       message: input.message?.trim() || null,
       confirmed: true
-    })
+    }),
+    skipMutationFeedback: true
   });
 }
 

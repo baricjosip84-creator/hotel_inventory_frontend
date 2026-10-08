@@ -413,7 +413,8 @@
     "check:inventory-automation-schedule-request-safety-gating-v349289": "node scripts/check-automation-schedule-request-safety-gating-surgical-fix-v349289.mjs",
     "check:inventory-automation-schedule-disable-validation-v349290": "node scripts/check-automation-schedule-disable-validation-surgical-fix-v349290.mjs",
     "check:inventory-automation-schedule-audit-history-transparency-v349291": "node scripts/check-automation-schedule-audit-history-transparency-surgical-fix-v349291.mjs",
-    "check:inventory-purchase-order-business-audit-presentation-v349292": "node scripts/check-purchase-order-business-audit-presentation-surgical-fix-v349292.mjs"
+    "check:inventory-purchase-order-business-audit-presentation-v349292": "node scripts/check-purchase-order-business-audit-presentation-surgical-fix-v349292.mjs",
+    "check:inventory-purchase-order-action-feedback-v349293": "node scripts/check-purchase-order-action-feedback-surgical-fix-v349293.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

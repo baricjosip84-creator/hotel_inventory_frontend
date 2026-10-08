@@ -359,6 +359,27 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     if (normalizedPath.endsWith('/cancel')) return 'Execution Request cancelled successfully.';
   }
 
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/purchase-orders') {
+    return 'Purchase order created successfully.';
+  }
+
+  if (normalizedMethod === 'PATCH' && /^\/purchase-orders\/[^/]+$/.test(normalizedPathOnly)) {
+    return 'Purchase order updated successfully.';
+  }
+
+  const purchaseOrderActionMatch = normalizedMethod === 'POST'
+    ? normalizedPathOnly.match(/^\/purchase-orders\/[^/]+\/(submit|approve|cancel|close|reopen|create-shipment)$/)
+    : null;
+  if (purchaseOrderActionMatch) {
+    const action = purchaseOrderActionMatch[1];
+    if (action === 'submit') return 'Purchase order submitted successfully.';
+    if (action === 'approve') return 'Purchase order approved successfully.';
+    if (action === 'cancel') return 'Purchase order cancelled successfully.';
+    if (action === 'close') return 'Purchase order closed successfully.';
+    if (action === 'reopen') return 'Purchase order reopened successfully.';
+    return 'Shipment prepared. Review the supplier email before sending.';
+  }
+
   if (normalizedMethod === 'POST' && normalizedPathOnly === '/automation-schedules') {
     return 'Automation schedule created successfully.';
   }
