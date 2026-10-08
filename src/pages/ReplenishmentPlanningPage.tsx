@@ -357,7 +357,6 @@ export default function ReplenishmentPlanningPage() {
     mutationFn: createRun,
     onSuccess: async (data) => {
       const successMessage = ui('Planning run created. No stock moved and no supplier order was placed.');
-      setMessage(successMessage);
       showTenantActionSuccess(successMessage);
       setError('');
       setDrafts({});
