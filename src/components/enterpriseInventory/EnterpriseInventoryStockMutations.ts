@@ -1,4 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
+import { apiMutationRequest } from "../../lib/api";
 import { useAppTranslation } from "../../i18n/I18nContext";
 import { formatLocalizedNumber } from "../../i18n/formatters";
 import type { createEnterpriseInventoryBoundMutationFeedback } from "./EnterpriseInventoryMutationFeedback";
@@ -61,10 +62,13 @@ export function useEnterpriseInventoryStockMutations(
   });
 
   const evaluateParLevelsMutation = useMutation({
+    // This action already shows the exact generated-signal count in the page.
+    // Avoid the shared API's generic "Item created successfully" toast.
     mutationFn: () =>
-      postEnterpriseInventoryRequest<ParLevel[]>(
-        "/enterprise-inventory/par-levels/evaluate",
-      ),
+      apiMutationRequest<ParLevel[]>("/enterprise-inventory/par-levels/evaluate", {
+        method: "POST",
+        skipMutationFeedback: true,
+      }),
     onSuccess: mutationFeedback.result(
       (items: ParLevel[]) => items.length === 1
         ? ui("1 low-stock par level signal generated.")

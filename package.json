@@ -390,6 +390,7 @@
     "check:inventory-digital-twin-focus-surgical-fix-v349267": "node scripts/check-digital-twin-focus-surgical-fix-v349267.mjs",
     "check:inventory-reliability-intelligence-readiness-handoff-surgical-fix-v349268": "node scripts/check-reliability-intelligence-readiness-handoff-surgical-fix-v349268.mjs",
     "check:inventory-stock-transfers-validation-focus-surgical-fix-v349269": "node scripts/check-stock-transfers-validation-focus-surgical-fix-v349269.mjs",
+    "check:inventory-stock-transfers-deep-link-focus-v349301": "node scripts/check-replenishment-stock-transfer-deep-link-focus-surgical-fix-v349301.mjs",
     "check:inventory-storage-locations-feedback-state-surgical-fix-v349270": "node scripts/check-storage-locations-feedback-state-surgical-fix-v349270.mjs",
     "check:inventory-bom-location-readiness-surgical-fix-v349271": "node scripts/check-bom-location-readiness-surgical-fix-v349271.mjs",
     "check:inventory-location-hierarchy-parent-eligibility-surgical-fix-v349272": "node scripts/check-location-hierarchy-parent-eligibility-surgical-fix-v349272.mjs",
@@ -421,7 +422,8 @@
     "check:inventory-purchase-order-supplier-email-evidence-clarity-v349297": "node scripts/check-purchase-order-supplier-email-evidence-clarity-surgical-fix-v349297.mjs",
     "check:inventory-replenishment-planning-success-feedback-v349298": "node scripts/check-replenishment-planning-success-feedback-surgical-fix-v349298.mjs",
     "check:inventory-replenishment-source-stock-guidance-v349299": "node scripts/check-replenishment-source-stock-guidance-surgical-fix-v349299.mjs",
-    "check:inventory-replenishment-draft-types-meaning-v349300": "node scripts/check-replenishment-draft-types-meaning-surgical-fix-v349300.mjs"
+    "check:inventory-replenishment-draft-types-meaning-v349300": "node scripts/check-replenishment-draft-types-meaning-surgical-fix-v349300.mjs",
+    "check:inventory-par-level-evaluation-feedback-v349302": "node scripts/check-enterprise-par-level-evaluation-feedback-surgical-fix-v349302.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
