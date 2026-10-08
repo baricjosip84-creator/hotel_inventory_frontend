@@ -3064,11 +3064,11 @@ export default function PurchaseOrdersPage() {
                   ) : null}
                   {(supplierEmailEvidenceQuery.data ?? []).map((evidence) => (
                     <div key={evidence.id} className="purchase-orders-note-box">
-                      <strong>{evidence.pdf_filename}</strong>
+                      <strong>{ui('Supplier email record')}</strong>
                       <p>
                         {ui('Recipient')}: {evidence.recipient_email} · {ui('Prepared')}: {formatDateTime(evidence.prepared_at)} · {ui('Status')}: {ui(evidence.delivery_status === 'sent' ? 'Sent' : evidence.delivery_status === 'failed' ? 'Failed' : 'Prepared')}
                       </p>
-                      <p>SHA-256 {evidence.pdf_sha256}</p>
+                      <p className="purchase-orders-muted">{ui('The exact sent PDF is preserved for audit and can be downloaded below.')}</p>
                       <button
                         type="button"
                         className="app-button app-button--secondary"

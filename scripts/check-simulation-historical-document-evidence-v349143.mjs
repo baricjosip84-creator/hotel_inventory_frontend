@@ -33,7 +33,9 @@ check('purchase orders fetch shipment email evidence history', po.includes('fetc
 check('purchase order evidence combines all linked shipments', po.includes('Promise.all(selectedEmailShipmentIds.map'));
 check('purchase order evidence refreshes after send', po.includes("invalidateQueries({ queryKey: ['purchase-order', 'supplier-email-evidence', selectedId] })"));
 check('purchase order page explains immutable sent evidence', po.includes('Exact supplier-facing PDFs are preserved when an email is prepared'));
-check('purchase order page shows full sha256', po.includes('<p>SHA-256 {evidence.pdf_sha256}</p>'));
+check('purchase order evidence retains sha256 in the immutable evidence model', po.includes('pdf_sha256: string;'));
+check('purchase order operational evidence no longer exposes the full sha256 digest', !po.includes('<p>SHA-256 {evidence.pdf_sha256}</p>'));
+check('purchase order operational evidence no longer leads with the generated PDF filename', !po.includes('<strong>{evidence.pdf_filename}</strong>'));
 check('purchase order page downloads exact persisted pdf', po.includes('/supplier-email-deliveries/${evidence.id}/pdf'));
 check('purchase order page labels exact sent pdf download', po.includes("ui('Download exact sent PDF')"));
 check('new historical evidence messages are multilingual', translations.includes('Archived records remain available for historical attachment review.') && translations.includes('Supplier email evidence') && translations.includes('Download exact sent PDF'));
