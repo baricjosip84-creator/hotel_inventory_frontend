@@ -1,0 +1,42 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const root = process.cwd();
+const read = (name) => fs.readFileSync(path.join(root, name), 'utf8');
+const picker = read('src/components/enterpriseInventory/EnterpriseFilePicker.tsx');
+const catalog = read('src/components/imports/SupplierCatalogImportPanel.tsx');
+const attachment = read('src/components/enterpriseInventory/tabs/AttachmentsTab.tsx');
+const translations = read('src/i18n/tenantUiTranslations.ts');
+const styles = read('src/components/enterpriseInventory/EnterpriseInventoryStyles.ts');
+const pkg = JSON.parse(read('package.json'));
+const assertions = [];
+const verify = (label, condition) => { assertions.push(Boolean(condition)); console.log(`${condition ? 'PASS' : 'FAIL'}: ${label}`); };
+verify('Native browser file input and accept filter retained', picker.includes('type="file"') && picker.includes('accept={accept}'));
+verify('File chooser is opened synchronously only from a real button click', picker.includes('onClick={() => fileInputRef.current?.click()}'));
+verify('Keyboard accessible button with non-submitting type', picker.includes('<button') && picker.includes('type="button"'));
+verify('Disabled state preserved on chooser button and input', (picker.match(/disabled={disabled}/g) || []).length === 2);
+verify('Chooser uses application shared button styling rather than native UI', picker.includes('styles.secondaryButton') && picker.includes('styles.disabledButton'));
+verify('Native chooser is not independently tabbable or exposed as duplicate control', picker.includes('tabIndex={-1}') && picker.includes('aria-hidden="true"') && picker.includes("display: 'none'"));
+verify('Chosen file remains visible for operators and assistive technology', picker.includes('role="status"') && picker.includes('aria-live="polite"') && picker.includes('file.name'));
+verify('No-file state visibly distinguished', picker.includes("ui('No file selected')"));
+verify('Picker does not trigger global success toast from selection', picker.includes('data-skip-global-action-feedback="true"'));
+verify('Supplier Catalog onboarding uses same chooser', catalog.includes('<EnterpriseFilePicker fileInputRef={fileInputRef} file={file}') && !catalog.includes('<input ref={fileInputRef} type="file"'));
+verify('Supplier Catalog CSV-only constraints preserved', catalog.includes('accept=".csv,text/csv"') && catalog.includes('onChange={handleFile}'));
+verify('Supplier Catalog retains disabled/import/committed gating', catalog.includes("disabled={!canImport || busy || batch?.status === 'committed'}"));
+verify('Supplier Catalog reset still clears input and selected file', catalog.includes('setFile(null); setRows([])') && catalog.includes("fileInputRef.current.value = ''"));
+verify('Supplier Catalog still parses CSV and retains validate/commit separation', catalog.includes('parseCsv(await selected.text())') && catalog.includes('const validateRows = async') && catalog.includes('const commitRows = async'));
+verify('Attachments uses same picker', attachment.includes('<EnterpriseFilePicker') && !attachment.includes('<input\n            ref={fileInputRef}\n            type="file"'));
+verify('Attachments retains file-type and 8MB restriction', attachment.includes("const accept = '.pdf,.jpg,.jpeg,.png,.webp,.txt,.csv,.doc,.docx,.xls,.xlsx'") && attachment.includes('MAX_FILE_BYTES = 8 * 1024 * 1024'));
+verify('Attachments shows selected name and localized size', attachment.includes('file={selectedFile}') && attachment.includes('detail={selectedFile ? formatBytes(selectedFile.size, locale) : undefined}'));
+verify('Attachments retains tenant-write, archive, and pending-action gating', attachment.includes('disabled={!canUploadToSelectedRecord || createAttachmentMutation.isPending}'));
+verify('Attachments successful upload still resets native input and state', attachment.includes('setSelectedFile(null);') && attachment.includes("fileInputRef.current.value = ''"));
+verify('Attachments invalid file can be reselected after native input reset', (attachment.match(/fileInputRef.current.value = ''/g) || []).length >= 3);
+verify('Attachment mutation continues to transmit actual file and selected record', attachment.includes('createAttachmentMutation.mutate({') && attachment.includes('form: attachmentForm,') && attachment.includes('file: selectedFile,'));
+verify('Two new localized messages exist for all tenant locales', [
+  '["Choose file", "Datei auswählen", "Elegir archivo", "Choisir un fichier", "Odaberi datoteku"]',
+  '["No file selected", "Keine Datei ausgewählt", "Ningún archivo seleccionado", "Aucun fichier sélectionné", "Nije odabrana datoteka"]'
+].every(s => translations.includes(s)));
+verify('Both surfaces use identical app styles', picker.includes("import { styles } from './EnterpriseInventoryStyles';") && styles.includes('secondaryButton:'));
+verify('Targeted regression command is registered', pkg.scripts?.['check:inventory-enterprise-file-picker-v349303'] === 'node scripts/check-enterprise-file-picker-surgical-fix-v349303.mjs');
+const passed = assertions.filter(Boolean).length;
+console.log(`Enterprise Inventory unified file picker: ${passed}/${assertions.length} PASS`);
+if (passed !== assertions.length) process.exit(1);

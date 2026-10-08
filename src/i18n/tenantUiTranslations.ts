@@ -2,6 +2,8 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  ["Choose file", "Datei auswählen", "Elegir archivo", "Choisir un fichier", "Odaberi datoteku"],
+  ["No file selected", "Keine Datei ausgewählt", "Ningún archivo seleccionado", "Aucun fichier sélectionné", "Nije odabrana datoteka"],
   ["Review damage / waste usage", "Schaden-/Abfallverbrauch prüfen", "Revisar uso por daños/desperdicio", "Examiner l’utilisation liée aux dommages/déchets", "Pregledaj potrošnju zbog oštećenja / otpada"],
   ["Action urgency:", "Aktionsdringlichkeit:", "Urgencia de la acción:", "Urgence de l’action :", "Hitnost radnje:"],
   ["Action state:", "Aktionsstatus:", "Estado de la acción:", "État de l’action :", "Stanje radnje:"],

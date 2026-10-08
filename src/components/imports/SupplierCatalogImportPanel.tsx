@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from 
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../../lib/api';
 import { useAppTranslation } from '../../i18n/I18nContext';
+import { EnterpriseFilePicker } from '../enterpriseInventory/EnterpriseFilePicker';
 import { formatLocalizedNumber } from '../../i18n/formatters';
 import type { SupplierOption } from '../enterpriseInventory/EnterpriseInventoryTypes';
 import {
@@ -227,7 +228,7 @@ export function SupplierCatalogImportPanel({ suppliers, canImport, canCreateProd
           </select>
         </label>
         <button type="button" style={button} onClick={downloadTemplate}>{ui('Download CSV Template')}</button>
-        <input ref={fileInputRef} type="file" accept=".csv,text/csv" onChange={handleFile} disabled={!canImport || busy || batch?.status === 'committed'} />
+        <EnterpriseFilePicker fileInputRef={fileInputRef} file={file} accept=".csv,text/csv" onChange={handleFile} disabled={!canImport || busy || batch?.status === 'committed'} />
         <button type="button" style={!canImport || busy || !supplierId || rows.length === 0 ? disabledButton : primaryButton} disabled={!canImport || busy || !supplierId || rows.length === 0 || batch?.status === 'committed'} onClick={validateRows}>{busy ? ui('Working…') : ui('Validate & Match')}</button>
         <button type="button" style={!canImport || busy || batch?.status !== 'validated' ? disabledButton : primaryButton} disabled={!canImport || busy || batch?.status !== 'validated'} onClick={commitRows}>{ui('Commit Reviewed Catalog')}</button>
         {(file || batch) ? <button type="button" style={button} disabled={busy} onClick={startOver}>{ui('Start Over')}</button> : null}

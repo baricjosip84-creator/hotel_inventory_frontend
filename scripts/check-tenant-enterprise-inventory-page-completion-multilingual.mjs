@@ -15,6 +15,7 @@ const catalogSupportSource = read('src/components/enterpriseInventory/Enterprise
 const compliancePanelsSource = read('src/components/enterpriseInventory/EnterpriseInventoryCompliancePanels.tsx');
 const labelsSource = read('src/components/enterpriseInventory/tabs/LabelsTab.tsx');
 const attachmentsSource = read('src/components/enterpriseInventory/tabs/AttachmentsTab.tsx');
+const filePickerSource = read('src/components/enterpriseInventory/EnterpriseFilePicker.tsx');
 const notificationsSource = read('src/components/enterpriseInventory/tabs/NotificationsTab.tsx');
 const barcodeSource = read('src/lib/barcodeLabelSvg.ts');
 const mutationSource = read('src/components/enterpriseInventory/EnterpriseInventoryWorkflowMutations.ts');
@@ -42,6 +43,7 @@ const sharedFiles = [
   'src/components/enterpriseInventory/EnterpriseInventoryPageLayout.tsx',
   'src/components/enterpriseInventory/EnterpriseInventoryTabs.tsx',
   'src/components/enterpriseInventory/EnterpriseInventoryShared.tsx',
+  'src/components/enterpriseInventory/EnterpriseFilePicker.tsx',
   'src/components/enterpriseInventory/EnterpriseInventoryStockMutations.ts',
   'src/components/enterpriseInventory/EnterpriseInventoryWorkflowMutations.ts',
   'src/components/enterpriseInventory/EnterpriseInventorySubmitHandlers.ts',
@@ -199,9 +201,10 @@ if (!process.exitCode) pass('Labels, Attachments, and Notifications queries rema
 
 for (const required of [
   'selectedProduct.name', 'label.product_name || label.product_id', 'label.lot_number', 'label.batch_number',
-  'selectedFile.name', 'item.original_filename', 'item.mime_type', 'item.content_sha256',
+  'item.original_filename', 'item.mime_type', 'item.content_sha256',
   'item.last_error', 'item.title || displayToken(item.event_type, ui)',
 ]) if (!(labelsSource + attachmentsSource + notificationsSource).includes(required)) fail(`Business/server raw-data boundary changed or missing: ${required}`);
+if (!attachmentsSource.includes('file={selectedFile}') || !filePickerSource.includes('file.name')) fail('Attachment filename must continue to come from the actual selected file, not translation or inferred path.');
 if (!notificationsSource.includes('// Backend-generated notification titles remain raw by multilingual-project policy.')) fail('Backend-generated notification-title raw boundary is no longer explicit.');
 else pass('Product/traceability/file/server error/backend notification data remain raw while frontend-owned presentation is localized.');
 

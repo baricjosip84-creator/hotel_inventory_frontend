@@ -4,6 +4,7 @@ import { useAppTranslation } from '../../../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../../../i18n/formatters';
 import { downloadEnterpriseInventoryFile } from '../EnterpriseInventoryRequests';
 import { InputField, SelectField } from '../EnterpriseInventoryShared';
+import { EnterpriseFilePicker } from '../EnterpriseFilePicker';
 import { styles } from '../EnterpriseInventoryStyles';
 import type {
   AttachmentEntityOption,
@@ -138,11 +139,13 @@ export function AttachmentsTab({
     if (file.size <= 0) {
       setSelectedFile(null);
       setFileError(ui('The selected file is empty.'));
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
     if (file.size > MAX_FILE_BYTES) {
       setSelectedFile(null);
       setFileError(ui('Maximum attachment size is 8 MB.'));
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
     setSelectedFile(file);
@@ -211,17 +214,14 @@ export function AttachmentsTab({
             />
           )}
         </div>
-        <label style={styles.field}>
-          <span style={styles.label}>{ui('File')}</span>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={accept}
-            disabled={!canUploadToSelectedRecord || createAttachmentMutation.isPending}
-            onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
-          />
-        </label>
-        {selectedFile ? <p style={styles.helper}>{ui('Selected:')} <strong>{selectedFile.name}</strong> · {formatBytes(selectedFile.size, locale)}</p> : null}
+        <EnterpriseFilePicker
+          fileInputRef={fileInputRef}
+          file={selectedFile}
+          accept={accept}
+          detail={selectedFile ? formatBytes(selectedFile.size, locale) : undefined}
+          disabled={!canUploadToSelectedRecord || createAttachmentMutation.isPending}
+          onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
+        />
         {fileError ? <div style={styles.error}>{fileError}</div> : null}
         {!canWriteAttachments ? <p style={styles.helper}>{ui('Uploading requires {permission} permission.').replace('{permission}', TENANT_PERMISSIONS.ATTACHMENTS_WRITE)}</p> : null}
         {selectedRecordArchived ? <p style={styles.helper}>{ui('Archived records remain available for historical attachment review. New uploads and deletion are disabled.')}</p> : null}

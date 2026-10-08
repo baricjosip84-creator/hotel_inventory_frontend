@@ -423,7 +423,8 @@
     "check:inventory-replenishment-planning-success-feedback-v349298": "node scripts/check-replenishment-planning-success-feedback-surgical-fix-v349298.mjs",
     "check:inventory-replenishment-source-stock-guidance-v349299": "node scripts/check-replenishment-source-stock-guidance-surgical-fix-v349299.mjs",
     "check:inventory-replenishment-draft-types-meaning-v349300": "node scripts/check-replenishment-draft-types-meaning-surgical-fix-v349300.mjs",
-    "check:inventory-par-level-evaluation-feedback-v349302": "node scripts/check-enterprise-par-level-evaluation-feedback-surgical-fix-v349302.mjs"
+    "check:inventory-par-level-evaluation-feedback-v349302": "node scripts/check-enterprise-par-level-evaluation-feedback-surgical-fix-v349302.mjs",
+    "check:inventory-enterprise-file-picker-v349303": "node scripts/check-enterprise-file-picker-surgical-fix-v349303.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
