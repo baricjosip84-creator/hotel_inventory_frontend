@@ -419,7 +419,8 @@
     "check:inventory-purchase-order-supplier-facing-redaction-v349295": "node scripts/check-purchase-order-supplier-facing-redaction-surgical-fix-v349295.mjs",
     "check:inventory-purchase-order-duplicate-send-protection-v349296": "node scripts/check-purchase-order-duplicate-send-protection-surgical-fix-v349296.mjs",
     "check:inventory-purchase-order-supplier-email-evidence-clarity-v349297": "node scripts/check-purchase-order-supplier-email-evidence-clarity-surgical-fix-v349297.mjs",
-    "check:inventory-replenishment-planning-success-feedback-v349298": "node scripts/check-replenishment-planning-success-feedback-surgical-fix-v349298.mjs"
+    "check:inventory-replenishment-planning-success-feedback-v349298": "node scripts/check-replenishment-planning-success-feedback-surgical-fix-v349298.mjs",
+    "check:inventory-replenishment-source-stock-guidance-v349299": "node scripts/check-replenishment-source-stock-guidance-surgical-fix-v349299.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

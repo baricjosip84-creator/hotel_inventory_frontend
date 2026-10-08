@@ -854,7 +854,13 @@ export default function ReplenishmentPlanningPage() {
                       <td><strong>{formatUiNumber(row.recommended_quantity)}</strong></td>
                       <td>
                         <strong>{ui('{count} available').replace('{count}', formatUiNumber(row.source_surplus_before))}</strong>
-                        {row.evidence?.source_review_required ? <small>{ui('Review required')} · {ui('Source policy not configured')}</small> : null}
+                        {row.evidence?.source_review_required ? (
+                          <small>
+                            {ui('Review required')} · {ui(row.evidence?.source_policy_configured === false
+                              ? 'Source location has no minimum/target stock settings'
+                              : 'Review source stock settings before accepting')}
+                          </small>
+                        ) : null}
                         <small>{ui('{count} shortage').replace('{count}', formatUiNumber(row.destination_shortage_before))}</small>
                       </td>
                       <td><select value={draft.decision} disabled={disabled} onChange={(event) => setDrafts((current) => ({ ...current, [key]: { ...draft, decision: event.target.value as Decision } }))}>{DECISIONS.map((decision) => <option key={decision} value={decision} disabled={decision === 'pending' && row.decision_status !== 'pending'}>{decisionDisplayLabel(decision)}</option>)}</select></td>
