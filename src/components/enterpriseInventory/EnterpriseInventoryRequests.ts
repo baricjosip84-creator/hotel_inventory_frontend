@@ -12,12 +12,14 @@ export function postEnterpriseInventoryRequest<TResponse>(path: string, body?: u
 export function postEnterpriseInventoryVersionedRequest<TResponse>(
   path: string,
   version: string | number,
-  body?: unknown
+  body?: unknown,
+  options?: { skipMutationFeedback?: boolean }
 ): Promise<TResponse> {
   return apiMutationRequest<TResponse>(path, {
     method: 'POST',
     version,
-    ...(body === undefined ? {} : { body: JSON.stringify(body) })
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    ...(options?.skipMutationFeedback === true ? { skipMutationFeedback: true } : {})
   });
 }
 

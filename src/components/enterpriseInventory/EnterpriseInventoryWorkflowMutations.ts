@@ -223,6 +223,9 @@ export function useEnterpriseInventoryWorkflowMutations({
         `/enterprise-inventory/supplier-invoices/${invoice.id}/${action}`,
         invoice.version,
         body,
+        // This workflow already reports its precise action result after success.
+        // Do not also show the shared API's generic "Item created" toast.
+        { skipMutationFeedback: true },
       );
     },
     onSuccess: mutationFeedback.variable<SupplierInvoiceLifecycleInput>(
