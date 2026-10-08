@@ -1090,6 +1090,7 @@ export default function PurchaseOrdersPage() {
   const [cancelReason, setCancelReason] = useState('');
   const [closeReason, setCloseReason] = useState('');
   const [shipmentDeliveryDate, setShipmentDeliveryDate] = useState('');
+  const [supplierPreparationError, setSupplierPreparationError] = useState<string | null>(null);
   const [supplierEmailPreview, setSupplierEmailPreview] = useState<SupplierEmailPreview | null>(null);
   const [supplierEmailRecipient, setSupplierEmailRecipient] = useState('');
   const [supplierEmailMessage, setSupplierEmailMessage] = useState('');
@@ -1366,6 +1367,11 @@ export default function PurchaseOrdersPage() {
   }, [currentPage, totalPages]);
 
   useEffect(() => {
+    setShipmentDeliveryDate('');
+    setSupplierPreparationError(null);
+  }, [selectedId]);
+
+  useEffect(() => {
     const purchaseOrderIdFromQuery =
       searchParams.get('purchaseOrderId') || searchParams.get('purchase_order_id');
 
@@ -1457,6 +1463,7 @@ export default function PurchaseOrdersPage() {
       setSupplierEmailRecipient(preview.recipient_email || '');
       setSupplierEmailMessage(preview.message || '');
       setSupplierEmailShipmentId(shipmentId);
+      setSupplierPreparationError(null);
       setFormError(null);
 
       if (createdShipment) {
@@ -1469,7 +1476,7 @@ export default function PurchaseOrdersPage() {
     onError: (error) => {
       setSupplierEmailPreview(null);
       setSupplierEmailShipmentId(null);
-      setFormError(error instanceof ApiError ? error.message : ui('Failed to prepare supplier email preview.'));
+      setSupplierPreparationError(error instanceof ApiError ? error.message : ui('Failed to prepare supplier email preview.'));
     }
   });
 
@@ -2087,6 +2094,16 @@ export default function PurchaseOrdersPage() {
     capabilities.canManageShipments &&
     capabilities.canSendShipments
   );
+  const selectedNeedsDeliveryDate = Boolean(
+    selectedCanSendPurchaseOrder &&
+    !selectedOpenShipment &&
+    !selectedDetail?.expected_delivery_date
+  );
+  const selectedDeliveryDateReady = Boolean(
+    selectedOpenShipment ||
+    selectedDetail?.expected_delivery_date ||
+    shipmentDeliveryDate
+  );
   /*
    * v3.49.116: Do not expose inbound reservations as a normal PO workflow action.
    * const selectedCanCreateInboundReservation = Boolean(
@@ -2130,19 +2147,17 @@ export default function PurchaseOrdersPage() {
 
     if (selectedHasOpenShipment && !selectedOpenShipment) {
       const message = ui('The open receiving record could not be identified. Refresh the Purchase Order and try again.');
-      setFormError(message);
-      showTenantActionError(message);
+      setSupplierPreparationError(message);
       return;
     }
 
     const deliveryDate = shipmentDeliveryDate || selectedDetail.expected_delivery_date || null;
     if (!selectedOpenShipment && !deliveryDate) {
-      const message = ui('Delivery date is required before sending this purchase order.');
-      setFormError(message);
-      showTenantActionError(message);
+      setSupplierPreparationError(ui('Delivery date is required before sending this purchase order.'));
       return;
     }
 
+    setSupplierPreparationError(null);
     setFormError(null);
     preparePurchaseOrderSupplierEmailMutation.mutate({
       purchaseOrderId: selectedDetail.id,
@@ -2970,18 +2985,37 @@ export default function PurchaseOrdersPage() {
               {selectedCanSendPurchaseOrder ? (
                 <div className="purchase-orders-action-panel">
                   <div><strong>{ui("Send to supplier")}</strong><span>{ui("Send the approved Purchase Order. Receiving is prepared automatically.")}</span></div>
-                  {!selectedOpenShipment && !selectedDetail.expected_delivery_date ? (
-                    <label className="purchase-orders-field"><span>{ui("Delivery date")}</span><input type="date" value={shipmentDeliveryDate} onChange={(event) => setShipmentDeliveryDate(event.target.value)} /></label>
+                  {selectedNeedsDeliveryDate ? (
+                    <label className="purchase-orders-field">
+                      <span>{ui("Delivery date")}</span>
+                      <input
+                        type="date"
+                        value={shipmentDeliveryDate}
+                        required
+                        aria-describedby={!shipmentDeliveryDate ? 'purchase-order-delivery-date-guidance' : undefined}
+                        onChange={(event) => {
+                          setShipmentDeliveryDate(event.target.value);
+                          setSupplierPreparationError(null);
+                        }}
+                      />
+                      {!shipmentDeliveryDate ? (
+                        <small id="purchase-order-delivery-date-guidance" className="purchase-orders-field-help">
+                          {ui('Delivery date is required before sending this purchase order.')}
+                        </small>
+                      ) : null}
+                    </label>
                   ) : null}
                   <button
                     type="button"
                     className="app-button app-button--primary"
-                    disabled={preparePurchaseOrderSupplierEmailMutation.isPending || sendPurchaseOrderToSupplierMutation.isPending}
+                    disabled={preparePurchaseOrderSupplierEmailMutation.isPending || sendPurchaseOrderToSupplierMutation.isPending || !selectedDeliveryDateReady}
+                    aria-disabled={!selectedDeliveryDateReady}
+                    title={!selectedDeliveryDateReady ? ui('Delivery date is required before sending this purchase order.') : ui('Send to supplier')}
                     onClick={prepareSelectedPurchaseOrderEmail}
                   >
                     {preparePurchaseOrderSupplierEmailMutation.isPending ? ui('Preparing Preview...') : ui('Send to supplier')}
                   </button>
-                  {preparePurchaseOrderSupplierEmailMutation.error ? <p style={styles.error}>{normalizeError(preparePurchaseOrderSupplierEmailMutation.error, ui('Failed to prepare supplier email preview.'), ui)}</p> : null}
+                  {supplierPreparationError ? <p style={styles.error}>{supplierPreparationError}</p> : null}
                 </div>
               ) : null}
 
