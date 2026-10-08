@@ -2086,11 +2086,26 @@ export default function PurchaseOrdersPage() {
   const selectedCanReopen = selectedDetail?.status === 'completed' && selectedDetail?.completion_type === 'manual_close' && selectedRemainingQuantity > 0;
   const selectedHasOpenShipment = Number(selectedDetail?.receiving_summary?.open_linked_shipment_count || 0) > 0;
   const selectedOpenShipment = (selectedDetail?.linked_shipments || []).find((shipment) => shipment.status !== 'received') || null;
-  const selectedCanSendPurchaseOrder = Boolean(
+  const selectedOpenShipmentHasSentSupplierEmail = Boolean(
+    selectedOpenShipment &&
+    (supplierEmailEvidenceQuery.data ?? []).some((evidence) =>
+      evidence.shipment_id === selectedOpenShipment.id && evidence.delivery_status === 'sent'
+    )
+  );
+  const selectedOpenShipmentEmailSafetyReady = Boolean(
+    !selectedOpenShipment ||
+    (!supplierEmailEvidenceQuery.isLoading && !supplierEmailEvidenceQuery.isFetching && !supplierEmailEvidenceQuery.error)
+  );
+  const selectedCanSendPurchaseOrderBase = Boolean(
     selectedDetail?.status === 'approved' &&
     selectedRemainingQuantity > 0 &&
     capabilities.canManageShipments &&
     capabilities.canSendShipments
+  );
+  const selectedCanSendPurchaseOrder = Boolean(
+    selectedCanSendPurchaseOrderBase &&
+    selectedOpenShipmentEmailSafetyReady &&
+    !selectedOpenShipmentHasSentSupplierEmail
   );
   const selectedNeedsDeliveryDate = Boolean(
     selectedCanSendPurchaseOrder &&
@@ -2141,7 +2156,17 @@ export default function PurchaseOrdersPage() {
 
 
   const prepareSelectedPurchaseOrderEmail = () => {
-    if (!selectedDetail || !selectedCanSendPurchaseOrder) return;
+    if (!selectedDetail || !selectedCanSendPurchaseOrderBase) return;
+
+    if (selectedOpenShipmentHasSentSupplierEmail) {
+      setSupplierPreparationError(ui('This receiving shipment already has a sent supplier email. Use the recorded evidence below; sending it again is blocked to prevent duplicate supplier communication.'));
+      return;
+    }
+
+    if (!selectedOpenShipmentEmailSafetyReady) {
+      setSupplierPreparationError(ui('Supplier email history must be loaded before sending. Refresh the purchase order and try again.'));
+      return;
+    }
 
     if (selectedHasOpenShipment && !selectedOpenShipment) {
       const message = ui('The open receiving record could not be identified. Refresh the Purchase Order and try again.');
@@ -2979,6 +3004,15 @@ export default function PurchaseOrdersPage() {
                   </button>
                 ) : null}
               </div>
+
+              {selectedOpenShipmentHasSentSupplierEmail ? (
+                <div className="purchase-orders-action-panel">
+                  <div>
+                    <strong>{ui('Supplier email already sent')}</strong>
+                    <span>{ui('This receiving shipment already has a sent supplier email. Use the recorded evidence below; sending it again is blocked to prevent duplicate supplier communication.')}</span>
+                  </div>
+                </div>
+              ) : null}
 
               {selectedCanSendPurchaseOrder ? (
                 <div className="purchase-orders-action-panel">
