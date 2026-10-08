@@ -312,7 +312,7 @@ export function SupplierReturnsTab() {
         serial_numbers: item.serial_numbers,
         reason: item.reason.trim() || null,
       })),
-    }),
+    }, { skipMutationFeedback: true }),
     onSuccess: async (created) => {
       setDraftItems([]);
       setSelectedLotId('');
@@ -342,6 +342,7 @@ export function SupplierReturnsTab() {
             action: action === 'approve' ? 'approved' : 'rejected',
             comment: reason || null,
           },
+          { skipMutationFeedback: true },
         );
       }
       if (action === 'cancel') {
@@ -349,11 +350,14 @@ export function SupplierReturnsTab() {
           `/enterprise-inventory/supplier-returns/${item.id}/cancel`,
           item.version,
           { reason: reason?.trim() || '' },
+          { skipMutationFeedback: true },
         );
       }
       return postEnterpriseInventoryVersionedRequest<SupplierReturn>(
         `/enterprise-inventory/supplier-returns/${item.id}/${action}`,
         item.version,
+        undefined,
+        { skipMutationFeedback: true },
       );
     },
     onSuccess: async (_result, input) => {
@@ -384,6 +388,7 @@ export function SupplierReturnsTab() {
         expected_tax_amount: expectedCreditTaxNumber,
         notes: creditNotes.trim() || null,
       },
+      { skipMutationFeedback: true },
     ),
     onSuccess: async () => {
       setCreditReturnId('');
@@ -404,8 +409,8 @@ export function SupplierReturnsTab() {
   const creditLifecycleMutation = useMutation({
     mutationFn: async ({ credit, action, payload }: { credit: SupplierReturnCredit; action: 'expected' | 'credit_note' | 'settle' | 'waive'; payload: Record<string, unknown> }) => {
       const base = `/enterprise-inventory/supplier-return-credit-reconciliations/${credit.id}`;
-      if (action === 'expected') return patchEnterpriseInventoryRequest<SupplierReturnCredit>(`${base}/expected`, payload, credit.version);
-      return postEnterpriseInventoryVersionedRequest<SupplierReturnCredit>(`${base}/${action === 'credit_note' ? 'credit-note' : action}`, credit.version, payload);
+      if (action === 'expected') return patchEnterpriseInventoryRequest<SupplierReturnCredit>(`${base}/expected`, payload, credit.version, { skipMutationFeedback: true });
+      return postEnterpriseInventoryVersionedRequest<SupplierReturnCredit>(`${base}/${action === 'credit_note' ? 'credit-note' : action}`, credit.version, payload, { skipMutationFeedback: true });
     },
     onSuccess: async (_result, input) => {
       const labels = {

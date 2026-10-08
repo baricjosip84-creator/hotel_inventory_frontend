@@ -1,9 +1,14 @@
 import { apiDownloadFile, apiMutationRequest } from '../../lib/api';
 
-export function postEnterpriseInventoryRequest<TResponse>(path: string, body?: unknown): Promise<TResponse> {
+export function postEnterpriseInventoryRequest<TResponse>(
+  path: string,
+  body?: unknown,
+  options?: { skipMutationFeedback?: boolean }
+): Promise<TResponse> {
   return apiMutationRequest<TResponse>(path, {
     method: 'POST',
-    ...(body === undefined ? {} : { body: JSON.stringify(body) })
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    ...(options?.skipMutationFeedback === true ? { skipMutationFeedback: true } : {})
   });
 }
 
@@ -26,12 +31,14 @@ export function postEnterpriseInventoryVersionedRequest<TResponse>(
 export function patchEnterpriseInventoryRequest<TResponse>(
   path: string,
   body?: unknown,
-  version?: string | number
+  version?: string | number,
+  options?: { skipMutationFeedback?: boolean }
 ): Promise<TResponse> {
   return apiMutationRequest<TResponse>(path, {
     method: 'PATCH',
     ...(version === undefined ? {} : { version }),
-    ...(body === undefined ? {} : { body: JSON.stringify(body) })
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    ...(options?.skipMutationFeedback === true ? { skipMutationFeedback: true } : {})
   });
 }
 
