@@ -214,7 +214,6 @@ type SupplierEmailPreview = {
     expected_delivery_date?: string | null;
     delivery_address?: string | null;
     payment_terms?: string | null;
-    notes?: string | null;
     approved_by?: string | null;
     currency?: string | null;
     show_pricing?: boolean;
@@ -228,7 +227,6 @@ type SupplierEmailPreview = {
     items: Array<{
       product_id: string;
       product_name: string;
-      sku?: string | null;
       supplier_sku?: string | null;
       quantity: number | string;
       unit: string;
@@ -3271,15 +3269,13 @@ export default function PurchaseOrdersPage() {
                 <span><strong>{ui('Currency:')}</strong> {supplierEmailPreview.document.currency || ui('Not specified')}</span>
               </div>
 
-              {supplierEmailPreview.document.notes ? <div style={styles.documentNotes}><strong>{ui('PO notes')}:</strong> {supplierEmailPreview.document.notes}</div> : null}
-
-              <div className="purchase-orders-table-wrap">
+                            <div className="purchase-orders-table-wrap">
                 <table className="purchase-orders-table purchase-orders-table--detail">
                   <thead><tr><th>{ui('SKU')}</th><th>{ui('Product')}</th><th>{ui('Qty')}</th><th>{ui('UoM')}</th><th>{ui('Unit price')}</th><th>{ui('Line total')}</th></tr></thead>
                   <tbody>
                     {supplierEmailPreview.document.items.map((item) => (
                       <tr key={item.product_id}>
-                        <td>{item.supplier_sku || item.sku || ui('Not specified')}</td>
+                        <td>{item.supplier_sku || ui('Not specified')}</td>
                         <td>{item.product_name}</td>
                         <td>{formatNumber(item.quantity)}</td>
                         <td>{item.unit || ui('Not specified')}</td>

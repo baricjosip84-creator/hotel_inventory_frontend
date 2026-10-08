@@ -125,12 +125,12 @@ for (const required of [
   'supplierEmailPreview.document.qr_purpose',
   'supplierEmailPreview.document.buyer.name',
   'supplierEmailPreview.document.supplier.name',
-  'supplierEmailPreview.document.notes',
   'item.product_name',
   'data.message || fallbackMessage',
   'error.message'
 ]) if (!pageSource.includes(required)) fail(`Shipments server/business raw-data boundary changed or missing: ${required}`);
-if (!process.exitCode) pass('Backend-generated document title/subject/QR purpose/messages plus supplier/product/business data remain raw while frontend-owned wrappers are localized.');
+if (pageSource.includes('supplierEmailPreview.document.notes')) fail('Supplier-facing Shipment preview must not render internal Purchase Order notes.');
+if (!process.exitCode) pass('Backend-generated document title/subject/QR purpose/messages plus supplier/product/business data remain raw while internal Purchase Order notes stay outside the supplier-facing preview.');
 
 for (const legacy of [
   'title="Advanced shipment controls"',

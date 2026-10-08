@@ -239,7 +239,6 @@ type SupplierEmailPreview = {
     expected_delivery_date?: string | null;
     delivery_address?: string | null;
     payment_terms?: string | null;
-    notes?: string | null;
     approved_by?: string | null;
     currency?: string | null;
     show_pricing?: boolean;
@@ -253,7 +252,6 @@ type SupplierEmailPreview = {
     items: Array<{
       product_id: string;
       product_name: string;
-      sku?: string | null;
       supplier_sku?: string | null;
       quantity: number | string;
       unit: string;
@@ -3920,13 +3918,7 @@ export default function ShipmentsPage() {
                   </>
                 ) : null}
               </div>
-              {supplierEmailPreview.document.notes ? (
-                <div style={styles.documentNotes}>
-                  <strong>{supplierEmailPreview.document.linked_purchase_order_id ? ui('PO notes') : ui('Shipment instructions')}:</strong> {supplierEmailPreview.document.notes}
-                </div>
-              ) : null}
-
-              <div style={styles.tableWrapper}>
+                            <div style={styles.tableWrapper}>
                 <table style={styles.table}>
                   <thead>
                     <tr>
@@ -3941,7 +3933,7 @@ export default function ShipmentsPage() {
                   <tbody>
                     {supplierEmailPreview.document.items.map((item) => (
                       <tr key={item.product_id}>
-                        <td style={styles.td}>{item.supplier_sku || item.sku || ui('Not specified')}</td>
+                        <td style={styles.td}>{item.supplier_sku || ui('Not specified')}</td>
                         <td style={styles.td}>{item.product_name}</td>
                         <td style={styles.td}>{formatShipmentQuantity(item.quantity)}</td>
                         <td style={styles.td}>{item.unit || ui('Not specified')}</td>
