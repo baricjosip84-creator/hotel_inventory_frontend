@@ -45,7 +45,10 @@ const tokenLabels: Record<string, string> = {
   department_requisition_submitted: 'Department requisition submitted',
   invoice_variance_detected: 'Invoice variance detected',
   low_stock_par_level: 'Low-stock par-level signal',
+  alert_escalated: 'Alert escalated',
   supplier_return_created: 'Supplier return created',
+  supplier_return_credit_expected: 'Supplier return credit expected',
+  supplier_return_credit_note_received: 'Supplier credit note received',
   supplier_return_dispatched: 'Supplier return dispatched',
   purchase_order: 'Purchase order',
   supplier_invoice: 'Supplier invoice',
@@ -60,6 +63,14 @@ const displayToken = (value: string | null | undefined, ui: Ui) => {
   const normalized = String(value || '').trim();
   if (!normalized) return '—';
   return tokenLabels[normalized] ? ui(tokenLabels[normalized]) : normalized;
+};
+
+// Event types are persistent machine identifiers. Keep them in the API and
+// diagnostic evidence, but never expose unknown identifiers in the tenant UI.
+const notificationEventLabel = (value: string | null | undefined, ui: Ui) => {
+  const normalized = String(value || '').trim();
+  if (!normalized) return '—';
+  return tokenLabels[normalized] ? ui(tokenLabels[normalized]) : ui('Other inventory event');
 };
 
 const deliveryDestinationLabel = (channel: string, ui: Ui) => {
@@ -98,8 +109,8 @@ const tenantFacingNotificationDescription = (item: NotificationEvent, ui: Ui) =>
   }
 
   // Backend-generated notification titles remain raw by multilingual-project policy.
-  if (normalizedTitle) return normalizedTitle;
-  const eventLabel = displayToken(item.event_type, ui);
+  if (normalizedTitle && normalizedTitle !== String(item.event_type || '').trim()) return normalizedTitle;
+  const eventLabel = notificationEventLabel(item.event_type, ui);
   return eventLabel === '—' ? ui('Inventory notification recorded.') : eventLabel;
 };
 
@@ -172,7 +183,7 @@ export function NotificationsTab({
             rows={deliveries.map((item) => [
               deliveryStatusLabel(item, ui),
               displayToken(item.channel, ui),
-              item.title || displayToken(item.event_type, ui) || item.notification_event_id,
+              item.title && item.title !== item.event_type ? item.title : notificationEventLabel(item.event_type, ui),
               item.recipient || '—',
               actorLabel(item.queued_by_name, item.queued_by_email, item.queued_by_user_id ? ui('Tenant user') : ui('System / legacy')),
               actorLabel(item.last_process_triggered_by_name, item.last_process_triggered_by_email, item.last_process_triggered_by_user_id ? ui('Tenant user') : ui('System worker')),
@@ -213,7 +224,7 @@ export function NotificationsTab({
           headers={['Severity', 'Event', 'Description', 'Created'].map(ui)}
           rows={notifications.map((item) => [
             displayToken(item.severity, ui),
-            displayToken(item.event_type, ui),
+            notificationEventLabel(item.event_type, ui),
             tenantFacingNotificationDescription(item, ui),
             formatLocalizedDateTime(item.created_at, locale)
           ])}

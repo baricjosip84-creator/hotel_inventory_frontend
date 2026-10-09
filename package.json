@@ -7,6 +7,7 @@
   "type": "module",
   "scripts": {
     "check:notifications-tab-queue-feedback-surgical-fix-v349312": "node scripts/check-notifications-tab-queue-feedback-surgical-fix-v349312.mjs",
+    "check:notification-event-labels-surgical-fix-v349313": "node scripts/check-notification-event-labels-surgical-fix-v349313.mjs",
     "check:digital-twin-operational-completion-v349175": "node scripts/check-digital-twin-operational-completion-v349175.mjs",
     "check:tenant-shipments-page-completion-multilingual": "node scripts/check-tenant-shipments-page-completion-multilingual.mjs",
     "check:tenant-shipments-detail-receiving-multilingual": "node scripts/check-tenant-shipments-detail-receiving-multilingual.mjs",

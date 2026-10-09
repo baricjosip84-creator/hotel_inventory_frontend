@@ -202,7 +202,7 @@ if (!process.exitCode) pass('Labels, Attachments, and Notifications queries rema
 for (const required of [
   'selectedProduct.name', 'label.product_name || label.product_id', 'label.lot_number', 'label.batch_number',
   'item.original_filename', 'item.mime_type', 'item.content_sha256',
-  'item.last_error', 'item.title || displayToken(item.event_type, ui)',
+  'item.last_error', 'item.title && item.title !== item.event_type ? item.title : notificationEventLabel(item.event_type, ui)',
 ]) if (!(labelsSource + attachmentsSource + notificationsSource).includes(required)) fail(`Business/server raw-data boundary changed or missing: ${required}`);
 if (!attachmentsSource.includes('file={selectedFile}') || !filePickerSource.includes('file.name')) fail('Attachment filename must continue to come from the actual selected file, not translation or inferred path.');
 if (!notificationsSource.includes('// Backend-generated notification titles remain raw by multilingual-project policy.')) fail('Backend-generated notification-title raw boundary is no longer explicit.');
