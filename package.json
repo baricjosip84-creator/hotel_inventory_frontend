@@ -430,7 +430,8 @@
     "check:inventory-supplier-return-add-line-readiness-v349306": "node scripts/check-supplier-return-add-line-readiness-surgical-fix-v349306.mjs",
     "check:inventory-approval-rule-created-focus-v349307": "node scripts/check-approval-rule-created-focus-surgical-fix-v349307.mjs",
     "check:inventory-tenant-departments-v349308": "node scripts/check-tenant-departments-surgical-fix-v349308.mjs",
-    "check:inventory-approval-queue-visibility-v349309": "node scripts/check-inventory-approval-queue-visibility-surgical-fix-v349309.mjs"
+    "check:inventory-approval-queue-visibility-v349309": "node scripts/check-inventory-approval-queue-visibility-surgical-fix-v349309.mjs",
+    "check:inventory-requisition-fulfillment-closed-state-v349310": "node scripts/check-requisition-fulfillment-closed-state-surgical-fix-v349310.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

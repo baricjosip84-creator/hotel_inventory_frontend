@@ -2458,6 +2458,9 @@ export default function InventoryRequisitionsPage() {
       && !(capabilities.canViewInventoryReservations && linkedReservationQuery.isFetching)
   );
   const canFulfill = ['approved', 'partially_fulfilled'].includes(String(selected?.status)) && capabilities.canFulfillInventoryRequisitions;
+  const showFulfillmentEditor = canFulfill && Boolean(selected?.items?.some((item) =>
+    Number(item.remaining_quantity ?? (Number(item.requested_quantity) - Number(item.fulfilled_quantity))) > 0
+  ));
   const selectedStatus = String(selected?.status || '');
   const showSubmitAction = selectedStatus === 'draft' && capabilities.canSubmitInventoryRequisitions && canManageSelectedDraftByOwnership;
   const showApproveAction = selectedStatus === 'submitted' && capabilities.canApproveInventoryRequisitions;
@@ -3875,8 +3878,12 @@ export default function InventoryRequisitionsPage() {
                     <th style={styles.th}>{ui('Remaining')}</th>
                     <th style={styles.th}>{ui('Est. remaining value')}</th>
                     <th style={styles.th}>{ui('Request note depth')}</th>
-                    <th style={styles.th}>{ui('Fulfill now')}</th>
-                    <th style={styles.th}>{ui('Fulfillment note')}</th>
+                    {showFulfillmentEditor && (
+                      <>
+                        <th style={styles.th}>{ui('Fulfill now')}</th>
+                        <th style={styles.th}>{ui('Fulfillment note')}</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -3903,7 +3910,9 @@ export default function InventoryRequisitionsPage() {
                             <><br /><span style={item.approval_threshold_line_note_meets_minimum ? styles.muted : styles.warningText}>{formatApprovalThresholdLineNoteDepth(item, ui, locale)}</span></>
                           )}
                         </td>
-                        <td style={styles.td}>
+                        {showFulfillmentEditor && (
+                          <>
+                            <td style={styles.td}>
                           <input
                             style={styles.input}
                             type="number"
@@ -3942,6 +3951,8 @@ export default function InventoryRequisitionsPage() {
                             <><br /><span style={fulfillmentNoteMeetsThresholdDepth ? styles.muted : styles.warningText}>{ui('Fulfillment note depth:')} {formatNumber(fulfillmentNoteLength)}/{formatNumber(selectedApprovalThresholdNoteMinLength)}</span></>
                           )}
                         </td>
+                          </>
+                        )}
                       </tr>
                     );
                   })}
@@ -3985,7 +3996,11 @@ export default function InventoryRequisitionsPage() {
               </div>
             )}
 
-            <div style={styles.workflowPanel}>
+            {selected.status === 'fulfilled' && (
+              <p style={styles.successBox}>{ui('Fulfillment is complete. No further stock issue can be recorded for this requisition. The fulfillment history remains available below.')}</p>
+            )}
+            {showFulfillmentEditor && (
+              <div style={styles.workflowPanel}>
               <label style={styles.field}>
                 {ui('Fulfillment source location')}
                 <select
@@ -4045,9 +4060,10 @@ export default function InventoryRequisitionsPage() {
               >
                 {fulfillMutation.isPending ? ui('Fulfilling…') : ui('Record fulfillment')}
               </button>
-            </div>
+              </div>
+            )}
 
-            {canFulfill && (
+            {showFulfillmentEditor && (
               <div style={styles.readinessPanel}>
                 <div style={styles.lineHeader}>
                   <h4 style={styles.sectionTitle}>{ui('Fulfillment readiness')}</h4>
