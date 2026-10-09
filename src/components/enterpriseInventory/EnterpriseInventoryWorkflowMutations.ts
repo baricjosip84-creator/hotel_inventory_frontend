@@ -125,7 +125,7 @@ export function useEnterpriseInventoryWorkflowMutations({
       ),
     onSuccess: mutationFeedback.resetting(
       ui("Approval rule saved."),
-      ["enterprise-approval-rules"],
+      ["enterprise-approval-rules", "tenant-department-options"],
       resetApprovalRuleForm,
     ),
     onError: mutationFeedback.error(ui("Failed to save approval rule.")),

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { DataTable, InputField, SelectField } from '../EnterpriseInventoryShared';
+import TenantDepartmentField from '../../inventory/TenantDepartmentField';
 import { styles } from '../EnterpriseInventoryStyles';
 import { TENANT_PERMISSIONS, hasPermission } from '../../../lib/permissions';
 import { useAppTranslation } from '../../../i18n/I18nContext';
@@ -123,7 +124,7 @@ export function ApprovalsTab({ approvalQueue, approvalRuleForm, approvalRulesQue
           required
         />
         {entitySupportsScope ? <>
-          <InputField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label={ui('Department')} value={approvalRuleForm.department} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, department: value }))} />
+          <TenantDepartmentField allowAll disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label={ui('Department')} value={approvalRuleForm.department} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, department: value }))} />
           <SelectField disabled={!canWriteApprovalRules || createApprovalRuleMutation.isPending} label={ui('Storage location')} value={approvalRuleForm.storage_location_id} onChange={(value) => setApprovalRuleForm((current) => ({ ...current, storage_location_id: value }))} options={storageLocations.map((location) => ({ value: location.id, label: location.name }))} />
         </> : null}
         {entityUsesAmount ? <>

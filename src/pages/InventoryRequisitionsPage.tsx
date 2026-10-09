@@ -14,6 +14,8 @@ import { SidebarAttentionMarker } from '../components/ui/SidebarAttentionMarker'
 import { sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionStyles';
 import { useOperationalAttentionItems } from '../lib/sidebarAttentionItems';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
+import TenantDepartmentField from '../components/inventory/TenantDepartmentField';
+import { useTenantDepartmentOptions } from '../lib/useTenantDepartmentOptions';
 import {
   OperationalSectionHeader,
   OperationalWorkspaceHero,
@@ -1683,6 +1685,8 @@ export default function InventoryRequisitionsPage() {
     queryFn: () => apiRequest<RequisitionOptions>('/inventory-requisitions/options')
   });
 
+  const tenantDepartmentsQuery = useTenantDepartmentOptions();
+
   const createProductOptions = useMemo(() => optionsQuery.data?.products || [], [optionsQuery.data?.products]);
   const filterProductOptions = useMemo(() => optionsQuery.data?.filter_products || [], [optionsQuery.data?.filter_products]);
   const activeLocationOptions = useMemo(() => optionsQuery.data?.storage_locations || [], [optionsQuery.data?.storage_locations]);
@@ -1766,6 +1770,7 @@ export default function InventoryRequisitionsPage() {
       queryClient.invalidateQueries({ queryKey: ['inventory-requisitions'] }),
       queryClient.invalidateQueries({ queryKey: ['inventory-requisition-summary'] }),
       queryClient.invalidateQueries({ queryKey: ['inventory-requisition-options'] }),
+      queryClient.invalidateQueries({ queryKey: ['tenant-department-options'] }),
       queryClient.invalidateQueries({ queryKey: ['inventory-requisition-detail'] }),
       queryClient.invalidateQueries({ queryKey: ['inventory-requisition-fulfillments'] }),
       queryClient.invalidateQueries({ queryKey: ['inventory-requisition-readiness'] }),
@@ -3251,10 +3256,10 @@ export default function InventoryRequisitionsPage() {
       </details>
 
       <datalist id="requisition-requesting-departments">
-        {(optionsQuery.data?.requesting_departments || []).map((department) => <option key={department} value={department} />)}
+        {(tenantDepartmentsQuery.data || []).map((department) => <option key={department} value={department} />)}
       </datalist>
       <datalist id="requisition-target-departments">
-        {(optionsQuery.data?.target_departments || []).map((department) => <option key={department} value={department} />)}
+        {(tenantDepartmentsQuery.data || []).map((department) => <option key={department} value={department} />)}
       </datalist>
 
       <section style={styles.grid}>
@@ -3269,25 +3274,12 @@ export default function InventoryRequisitionsPage() {
             />
           </div>
           <div style={styles.twoColumns}>
-            <label style={styles.field}>
-              {ui('Requesting department')}
-              <input
-                style={styles.input}
-                list="requisition-requesting-departments"
-                value={form.requesting_department}
-                onChange={(event) => setForm((current) => ({ ...current, requesting_department: event.target.value }))}
-                required
-              />
-            </label>
-            <label style={styles.field}>
-              {ui('Target department')}
-              <input
-                style={styles.input}
-                list="requisition-target-departments"
-                value={form.target_department}
-                onChange={(event) => setForm((current) => ({ ...current, target_department: event.target.value }))}
-              />
-            </label>
+            <TenantDepartmentField required label={ui('Requesting department')}
+              value={form.requesting_department}
+              onChange={(value) => setForm((current) => ({ ...current, requesting_department: value }))} />
+            <TenantDepartmentField label={ui('Target department')}
+              value={form.target_department}
+              onChange={(value) => setForm((current) => ({ ...current, target_department: value }))} />
             <label style={styles.field}>
               {ui('Source location')}
               <select

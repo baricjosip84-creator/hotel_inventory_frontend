@@ -2,6 +2,14 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  ["Search departments", "Abteilungen suchen", "Buscar departamentos", "Rechercher des services", "Pretraži odjele"],
+  ["Select department", "Abteilung auswählen", "Seleccionar departamento", "Choisir un service", "Odaberi odjel"],
+  ["All departments", "Alle Abteilungen", "Todos los departamentos", "Tous les services", "Svi odjeli"],
+  ["Use a new department name…", "Neuen Abteilungsnamen verwenden…", "Usar un nombre de departamento nuevo…", "Utiliser un nouveau nom de service…", "Upotrijebi novi naziv odjela…"],
+  ["New department name", "Neuer Abteilungsname", "Nuevo nombre de departamento", "Nouveau nom de service", "Novi naziv odjela"],
+  ["The new name will be used when this record is saved.", "Der neue Name wird beim Speichern dieses Datensatzes verwendet.", "El nuevo nombre se utilizará al guardar este registro.", "Le nouveau nom sera utilisé à l’enregistrement de cette fiche.", "Novi naziv upotrijebit će se pri spremanju ovog zapisa."],
+  ["Loading departments…", "Abteilungen werden geladen…", "Cargando departamentos…", "Chargement des services…", "Učitavanje odjela…"],
+  ["Department choices unavailable. Try again.", "Abteilungsauswahl nicht verfügbar. Bitte erneut versuchen.", "Departamentos no disponibles. Inténtelo de nuevo.", "Choix des services indisponible. Réessayez.", "Popis odjela nije dostupan. Pokušajte ponovno."],
   ["Choose file", "Datei auswählen", "Elegir archivo", "Choisir un fichier", "Odaberi datoteku"],
   ["No file selected", "Keine Datei ausgewählt", "Ningún archivo seleccionado", "Aucun fichier sélectionné", "Nije odabrana datoteka"],
   ["Review damage / waste usage", "Schaden-/Abfallverbrauch prüfen", "Revisar uso por daños/desperdicio", "Examiner l’utilisation liée aux dommages/déchets", "Pregledaj potrošnju zbog oštećenja / otpada"],
