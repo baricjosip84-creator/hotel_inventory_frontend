@@ -9957,3 +9957,80 @@ LIMITATIONS / LIVE ACCEPTANCE
 CURRENT ENGINEERING BASELINE: Frontend097 + Backend071 unchanged.
 PRODUCTION ACCEPTANCE: PENDING. Batch098 NOT STARTED.
 ================================================================================
+
+================================================================================
+SURGICAL CORRECTION BATCH 098 — TENANT PERMISSIONS / DISCARD UNSAVED ROLE CHANGES
+Date: 2026-10-09
+================================================================================
+
+AUTHORITATIVE BASELINE
+- Frontend097 cumulative source ZIP SHA-256: 18bbb0937a3803e8fe32b048ed4645dc6453c3fc2eda027c6ca9ad1ad5e1a22a.
+- Backend071 unchanged ZIP SHA-256: 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f.
+- Canonical audit v93, Administration > Permissions, Manager / Reports unsaved override, 2026-10-05 17:24 and 17:27 CEST. Audit confirms Reset to defaults remained disabled while an unsaved edit existed; user had to manually re-check the original permission. The audit classifies this as a local discard/reset semantics UX issue, not a backend validation defect.
+- Prior cumulative FIX_LOG 001-097 verified identical byte-for-byte in external Batch097 bundle and embedded Frontend097 archive. No earlier entries removed.
+
+SOURCE-VERIFIED ROOT CAUSE
+- Shared RolePermissionEditor.tsx computes `dirty` from the selected draft vs persisted `effective_permissions` and disables Reset when `activeRole.is_default` is true, regardless of unsaved local edits.
+- TenantPermissionsPage.tsx already implements `discardDraftForRole` and passes it to RolePermissionEditor as `onDiscardDraft`, but that callback was only usable during switching of role/workspace; no explicit in-place discard action existed.
+- Reset invokes a persisted role-policy REST mutation and must retain its separate confirmation and validation protections; it is NOT appropriate for local cancel.
+
+FRONTEND-ONLY SURGICAL CORRECTION
+- src/components/permissions/RolePermissionEditor.tsx: add a visible `Discard changes` action only for a tenant editable role with dirty draft. It appears in the existing top toolbar and lower action bar, stays disabled while saving/resetting, confirms discarding, then calls `onDiscardDraft` (in-memory deletion of selected role draft, reverting to the persisted `effective_permissions`). Does not send any request or mutate the stored permission policy.
+- Existing Save role permissions, Reset to defaults / starting template, role switch safeguards, dirty indicator and browser unload protection remain intact. Platform role editor behavior unchanged (explicit button scoped to tenant).
+- src/i18n/tenantUiTranslations.ts: add five-language labels for `Discard changes` and confirmation `Discard unsaved permission changes for this role?` (English, German, Spanish, French, Croatian).
+- package.json: register `check:tenant-permission-discard-v349336`.
+- scripts/check-tenant-permission-discard-surgical-fix-v349336.mjs: add 34 focused assertions including simulated confirmation/cancel, dirty/non-editable/saving/resetting gating, saved-policy fallback, callback isolation, translation parity, existing Save/Reset controls, and isolated TypeScript transpilation.
+- No backend, migrations, access-policy semantics or tenant isolation changes.
+
+SOURCE VERIFICATION
+- Batch098 focused regression: 34/34 PASS.
+- Cumulative surgical regression suites v349298–v349336: 39/39 PASS.
+- Nine broader application source checks: 9/9 PASS, including tenant permissions management tests.
+- Global multilingual closure PASS: 45 routes, 264 reachable files and 14,221 unique five-language catalog rows with placeholder parity.
+- Isolated TypeScript TSX/TS syntax checks: zero diagnostics; new JS script syntax PASS.
+- Archive ZIP CRC, exact frontend delta, unchanged backend checksum, FULL and delta parity, embedded/standalone FIX_LOG consistency and bundle checksum manifest: PASS (release manifest).
+
+LIMITATIONS / LIVE ACCEPTANCE
+- Supported Node24 npm ci, full-project typecheck:ci, ESLint, Vite build, CI and deployed-browser interaction: NOT VERIFIED. Only isolated TypeScript transpilation and source-based checks were available in this environment.
+- Once deployed: Administration > Permissions > Manager > Reports; uncheck Reports Read without saving. Confirm both toolbar/footer `Discard changes` buttons appear and Reset to defaults remains disabled for hardcoded-default role; Cancel should keep draft; Confirm should restore Reports Read and remove unsaved warning, with no backend mutation/audit event. Change again then Save only in a controlled admin test if authorized. Verify other roles are unaffected, keyboard access and all five locales.
+- Existing production acceptance backlog still open. No deployment or live PASS claim.
+
+CURRENT ENGINEERING BASELINE: Frontend098 + Backend071 unchanged.
+PRODUCTION ACCEPTANCE: PENDING. Batch099 NOT STARTED.
+================================================================================
+
+
+================================================================================
+SURGICAL CORRECTION BATCH 099 — ACTION CENTER / CROATIAN PAGE-NAME CONSISTENCY
+Date: 2026-10-09
+================================================================================
+
+AUTHORITATIVE BASELINE
+- Full source Frontend098 plus unchanged Backend071; canonical audit v93.
+- Audit ACTION-I18N-002: Action Center page title and hero used different Croatian names. The current source confirms src/i18n/navigationTranslations.ts translates navigation title as "Centar aktivnosti", while src/i18n/tenantUiTranslations.ts translated the hero's ui("Action Center") as "Centar radnji".
+- Baseline cumulative FIX_LOG through 098 preserved byte-for-byte before appending this entry.
+
+FRONTEND-ONLY SURGICAL CORRECTION
+- src/i18n/tenantUiTranslations.ts: standardize the Croatian Action Center name to the existing, more natural navigation name "Centar aktivnosti" in 25 related five-language catalog rows. Preserve English/German/Spanish/French values, translation keys and other UI meanings; update grammatically inflected Croatian mentions in headings, loading/error copy, buttons, deep links, and related guidance.
+- src/i18n/navigationTranslations.ts and OperationalActionCenterPage.tsx: verified existing navigation title and hero ui() usage; no source edits required.
+- package.json: add check:action-center-croatian-name-v349337.
+- scripts/check-action-center-croatian-name-surgical-fix-v349337.mjs: focused guard for title/hero/link/translation consistency and isolated TypeScript syntax.
+- No routes, permissions, database schemas, backend APIs, action/priority logic, or tenant-isolation changes.
+
+VERIFICATION
+- New Batch099 focused guard: 17/17 PASS.
+- All 40/40 cumulative targeted surgical suites through v349337 PASS.
+- Nine broad application source checks PASS, including Action Center multilingual and global multilingual closure.
+- Global multilingual closure: 45/45 tenant routes; 264 reachable source files; 14,221 unique five-language catalog rows; placeholder parity PASS.
+- Isolated TypeScript syntax PASS in the three relevant TS/TSX files; Node regression script syntax PASS.
+- ZIP CRC, exact source byte-level delta, changed-files parity, unchanged Backend071 hash and embedded/standalone FIX_LOG parity PASS.
+
+LIMITATIONS / LIVE ACCEPTANCE
+- Supported Node24 dependency installation, full-project typecheck:ci/ESLint/Vite build, CI deployment and live production browser acceptance NOT VERIFIED. Local environment Node22 with incomplete dependencies; focused source checks are not full build tests.
+- After deploy, switch to Croatian, open Action Center and confirm left sidebar, page title, hero, loading/error states and any related action links consistently use "Centar aktivnosti" and correct inflected wording. Switch to EN/DE/ES/FR and check those translations remain unchanged.
+- SHELL-DEF-001 footer overlap audit was reviewed but not edited: current shell positions footer in normal document flow, so no current overlapping regression could be established from source alone; needs actual browser retest before a global layout change.
+- All earlier production acceptance items remain open.
+
+CURRENT ENGINEERING BASELINE: Frontend099 + Backend071 unchanged.
+PRODUCTION ACCEPTANCE: PENDING. Batch100 NOT STARTED.
+================================================================================
