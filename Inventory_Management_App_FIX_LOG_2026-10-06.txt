@@ -9220,3 +9220,66 @@ PRODUCTION STATUS: NOT DEPLOYED / NOT LIVE VERIFIED.
 Batch081 HAS NOT STARTED; select next genuine unresolved v93 item after
 reconciling this cumulative log and current source.
 ================================================================================
+
+
+================================================================================
+SURGICAL CORRECTION BATCH 081 — OUTBOUND WORKFLOW DISCLOSURE AFFORDANCE
+Date: 2026-10-09
+================================================================================
+
+SOURCE OF TRUTH
+- Frontend 080 cumulative source ZIP, SHA256 699714f81217de6b988968a86e40b1720126431454de89c411485f2f7d72ea8b.
+- Backend 071 cumulative source ZIP, SHA256 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f.
+- Canonical audit v93 (DASH-011 / OUTBOUND-UX-OBS-001).
+- Embedded cumulative FIX_LOG in Frontend 080, not the stale separate 079 snapshot.
+
+DEFECT CONFIRMED IN FRONTEND 080
+- Outbound workflow / View the five order steps is a closed native HTML
+  details/summary disclosure. The CSS explicitly hides the native details marker.
+- No replacement disclosure indicator was present, so the panel looked like
+  ordinary text rather than an expandable five-step workflow guide.
+- This is the historical OUTBOUND-UX-OBS-001, not a new workflow-state defect.
+
+SURGICAL IMPLEMENTATION — FRONTEND ONLY
+- src/pages/OutboundPage.css:
+  - Add persistent chevron marker aligned opposite the existing translated
+    summary labels; rotate downward when closed and upward when expanded.
+  - Show hover/background affordance, focus-visible outline, 44px hit target,
+    flexible label wrapping for small screens and reduced-motion support.
+  - Preserve native HTML details/summary semantics and original closed state.
+- scripts/check-outbound-workflow-disclosure-surgical-fix-v349319.mjs:
+  - Add 21 focused source/semantics/CSS regression checks.
+- package.json:
+  - Register check:outbound-workflow-disclosure-v349319.
+- No changes in OutboundPage.tsx, runtime business workflow, backend, schema,
+  authorization, stock movement, i18n keys or API contracts.
+
+SOURCE VERIFICATION PERFORMED
+- PASS Batch081 new guard: 21/21.
+- PASS 22/22 cumulative targeted surgical regressions v349298–v349319.
+- PASS global tenant multilingual closure (45 routes; 264 reachable files;
+  14,212 five-language catalog rows).
+- PASS i18n build surgical checks 11/11.
+- PASS tenant permission hardening, tenant audit hardening, role-permission contract.
+- PASS CSS syntax parse, 0 top-level errors (tinycss2).
+- PASS archive CRC, compared with FE080 complete baseline, and changed-only
+  content verification (see manifest).
+- Backend071 unchanged exactly; no backend tests run for this CSS-only change.
+
+NOT VERIFIED / ACCEPTANCE
+- Local Node v22.16.0 is below frontend's explicit required Node 24.x;
+  historical npm ci offline attempts were blocked by an unavailable dependency.
+- Full frontend npm ci, project-wide lint, full TypeScript typecheck:ci,
+  Vite prebuild, CI/CD and deployed browser acceptance have NOT been verified.
+- Run full gates with supported Node/registry; then deploy FE081 + BE071.
+- In deployed browser open Outbound, confirm chevron is visible when closed,
+  points up when opened, and keyboard Tab/Enter/Space action is clear.
+  Check narrow/mobile width, five-language labels and reduced motion.
+- Independently complete notification worker, barcode print dialog, fresh
+  submitted-requisition approval queue and previously pending live retests.
+
+CURRENT ENGINEERING SOURCE OF TRUTH: Frontend 081 + Backend 071.
+PRODUCTION STATUS: NOT LIVE VERIFIED.
+Batch 082 has NOT STARTED; select and reconcile a remaining real audit v93
+finding against current sources and this cumulative FIX_LOG first.
+================================================================================

@@ -703,11 +703,50 @@
   .outbound-detail-card dd { margin-bottom: 8px; }
 }
 
-.outbound-workflow-summary { cursor: pointer; list-style: none; display: flex; align-items: center; min-height: 44px; }
+.outbound-workflow-summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 44px;
+  border-radius: 8px;
+  padding: 2px 8px;
+}
 .outbound-workflow-summary::-webkit-details-marker { display: none; }
-.outbound-workflow-summary > span { display: flex; align-items: baseline; gap: 10px; }
+.outbound-workflow-summary > span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  min-width: 0;
+}
 .outbound-workflow-summary small { color: var(--text-muted, #667085); font-weight: 400; }
+/* The native details marker is suppressed above; replace it with a persistent
+   expand/collapse indicator while retaining native keyboard semantics. */
+.outbound-workflow-summary::after {
+  content: '';
+  display: block;
+  flex: 0 0 10px;
+  width: 10px;
+  height: 10px;
+  margin-right: 5px;
+  border-right: 2px solid var(--text-muted, #667085);
+  border-bottom: 2px solid var(--text-muted, #667085);
+  transform: rotate(45deg);
+  transition: transform 160ms ease;
+}
+.outbound-workflow-panel[open] .outbound-workflow-summary::after { transform: rotate(225deg); }
+.outbound-workflow-summary:hover { background: var(--surface-muted, #f1f5f9); }
+.outbound-workflow-summary:focus-visible {
+  outline: 2px solid var(--primary, #2563eb);
+  outline-offset: 2px;
+}
 .outbound-workflow-panel[open] .outbound-workflow-summary { margin-bottom: 12px; }
+@media (prefers-reduced-motion: reduce) {
+  .outbound-workflow-summary::after { transition: none; }
+}
 
 .outbound-email-preview { margin-top: 12px; padding: 14px; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; }
 .outbound-email-preview textarea { min-height: 92px; resize: vertical; }
