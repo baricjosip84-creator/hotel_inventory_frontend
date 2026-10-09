@@ -626,7 +626,15 @@ export function SupplierReturnsTab() {
                   .replace('{quantity}', formatQuantity(selectedLot.returnable_quantity))}
               </p>
             ) : null}
-            <button type="button" onClick={addDraftItem} disabled={!canWrite || !selectedLotId || !lineQuantity || createReturnMutation.isPending} style={!canWrite || !selectedLotId || !lineQuantity || createReturnMutation.isPending ? styles.disabledButton : styles.secondaryButton}>
+            <button
+              type="button"
+              onClick={addDraftItem}
+              disabled={!canWrite || !selectedLotId || !lineQuantity || createReturnMutation.isPending}
+              style={{
+                ...(!canWrite || !selectedLotId || !lineQuantity || createReturnMutation.isPending ? styles.disabledButton : styles.primaryButton),
+                marginTop: 8,
+              }}
+            >
               {ui('Add return line')}
             </button>
           </div>

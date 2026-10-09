@@ -426,7 +426,8 @@
     "check:inventory-par-level-evaluation-feedback-v349302": "node scripts/check-enterprise-par-level-evaluation-feedback-surgical-fix-v349302.mjs",
     "check:inventory-enterprise-file-picker-v349303": "node scripts/check-enterprise-file-picker-surgical-fix-v349303.mjs",
     "check:inventory-supplier-invoice-lifecycle-feedback-v349304": "node scripts/check-supplier-invoice-lifecycle-feedback-surgical-fix-v349304.mjs",
-    "check:inventory-supplier-return-feedback-v349305": "node scripts/check-supplier-return-feedback-surgical-fix-v349305.mjs"
+    "check:inventory-supplier-return-feedback-v349305": "node scripts/check-supplier-return-feedback-surgical-fix-v349305.mjs",
+    "check:inventory-supplier-return-add-line-readiness-v349306": "node scripts/check-supplier-return-add-line-readiness-surgical-fix-v349306.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
