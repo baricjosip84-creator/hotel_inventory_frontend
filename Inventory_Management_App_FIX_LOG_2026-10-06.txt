@@ -9838,3 +9838,43 @@ LIMITATIONS / LIVE ACCEPTANCE
 CURRENT ENGINEERING BASELINE: Frontend094 + Backend071 unchanged.
 PRODUCTION ACCEPTANCE: PENDING. Batch095 NOT STARTED.
 ================================================================================
+
+
+================================================================================
+SURGICAL CORRECTION BATCH 095 — USERS / CONTEXTUAL DESTRUCTIVE-ACTION CONFIRMATIONS
+Date: 2026-10-09
+================================================================================
+
+AUTHORITATIVE BASELINE
+- Frontend094 full source SHA-256: a6b7bd80982cd1fb8670385b7cd68defa0d265f7555c4c6905eda7d0e55c41c4.
+- Backend071 unchanged full source SHA-256: 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f.
+- Canonical audit v93, Administration / Users, 2026-10-05: clicking Delete on an inactive controlled account showed generic `Confirm action: Delete?`, omitting the account name, permanence, and retained-history implications; functional deletion was independently tested and passed.
+- Started with the matching complete embedded/standalone FE094 cumulative FIX_LOG; all previous Batches001–094 remain incorporated.
+
+SOURCE-VERIFIED ROOT CAUSE
+- UsersPage.tsx already contains a detailed, localized native confirmation in handleDelete(user): account name, irreversible deletion, and possible blocking when business history references the user. It also has account-specific deactivate/reactivate confirmations.
+- AppProviders.tsx registers a document-level capture-phase click handler. A generic `Delete`/`Deactivate`/`Reactivate` label triggers `Confirm action: {label}?` first, then sets a one-second bypass for the page's own window.confirm. Consequently the contextual page-level dialog is not shown in that ordinary click path.
+- AppProviders.tsx already offers an opt-out for actions with their own confirmation: data-skip-global-confirm="true". No global handler changes are necessary.
+
+FRONTEND-ONLY SURGICAL CORRECTION
+- src/pages/UsersPage.tsx: add data-skip-global-confirm="true" ONLY to the Users Deactivate, Reactivate and Delete buttons. Their handler-invoked page-specific confirmations now run without a preceding generic capture-phase dialog.
+- Preserve existing contextual prompts, all handlers and mutations, disabled states, self-protection, no-delete-while-active guard, role gating, native Cancel behavior, backend validation and audit history. Successful actions retain their existing action-specific notifications.
+- package.json: register check:users-contextual-confirmations-v349333.
+- scripts/check-users-contextual-confirmations-surgical-fix-v349333.mjs: 35 focused checks proving opt-out scope, global interceptor support, own handlers and prompts, cancel/mutation boundaries, backend tenant/self/active/history safeguards, existing multilingual catalog and isolated TSX syntax.
+- No backend/schema/migration or translation change.
+
+VERIFICATION
+- Batch095 focused guard: 35/35 PASS.
+- Cumulative surgical regression suites v349298–v349333: 36/36 PASS.
+- Broader application source checks: 9/9 PASS, including 45 tenant routes, 264 reachable files, 14,219 multilingual catalog rows with five-language placeholder parity.
+- Isolated UsersPage.tsx TypeScript transpilation: zero diagnostics; new Node regression script syntax PASS.
+- ZIP CRC, exact expected delta, changed-files parity, and frontend/log synchronization: PASS; see checksum manifest.
+
+LIMITATIONS / CONTROLLED LIVE ACCEPTANCE
+- Full Node24 npm ci, project ESLint/typecheck:ci/Vite build, CI/deployment and live browser acceptance: NOT VERIFIED in this environment (local Node22 and no complete application dependencies).
+- In deployed test tenant only: open Users, click Delete for an inactive disposable user and verify the first/only browser prompt names the user and explains irreversibility plus potential historical references; click Cancel and verify user still exists; repeat with OK only for an explicitly disposable account, verify deletion and audit. Check Deactivate/Reactivate also shows user-specific consequence text, Cancel preserves the record and their existing backend permissions. Verify all five languages.
+- Global dangerous-action capture remains active for other application buttons; this batch changes only three Users controls. Existing production acceptance backlog remains open.
+
+CURRENT ENGINEERING BASELINE: Frontend095 + Backend071 unchanged.
+PRODUCTION ACCEPTANCE: PENDING. Batch096 NOT STARTED.
+================================================================================

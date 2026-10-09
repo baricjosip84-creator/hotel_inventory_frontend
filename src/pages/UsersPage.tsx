@@ -669,6 +669,7 @@ export default function UsersPage() {
                           type="button"
                           className="app-button app-button--secondary users-action-button users-action-button--warn"
                           onClick={() => handleStatusChange(user)}
+                          data-skip-global-confirm="true"
                           disabled={!canWrite || statusMutation.isPending || onlyActiveAdmin}
                           title={onlyActiveAdmin ? ui("Assign another active admin before deactivating this account") : undefined}
                         >
@@ -680,6 +681,7 @@ export default function UsersPage() {
                             type="button"
                             className="app-button app-button--secondary users-action-button users-action-button--activate"
                             onClick={() => handleStatusChange(user)}
+                            data-skip-global-confirm="true"
                             disabled={!canWrite || statusMutation.isPending}
                           >
                             {statusMutation.isPending && statusMutation.variables?.id === user.id ? ui("Updating…") : ui("Reactivate")}
@@ -688,6 +690,7 @@ export default function UsersPage() {
                             type="button"
                             className="app-button app-button--danger users-action-button"
                             onClick={() => handleDelete(user)}
+                            data-skip-global-confirm="true"
                             disabled={!canWrite || deleteMutation.isPending}
                             title={ui("Permanently delete this inactive account when retention constraints allow it")}
                           >
