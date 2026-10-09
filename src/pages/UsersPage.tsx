@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ApiError, apiRequest } from '../lib/api';
+import { ApiError, apiRequest, isTenantUserEmailConflict } from '../lib/api';
 import { scrollToFormSection } from '../lib/scrollToForm';
 import { getCurrentTenantUserId } from '../lib/auth';
 import { getRoleCapabilities } from '../lib/permissions';
@@ -242,7 +242,9 @@ export default function UsersPage() {
     },
     onError: (error) => {
       setPageMessage(null);
-      setPageError(error instanceof ApiError ? error.message : ui("Failed to create user."));
+      setPageError(isTenantUserEmailConflict(error, '/users', 'POST')
+        ? ui('This email is already used by another tenant user.')
+        : error instanceof ApiError ? error.message : ui("Failed to create user."));
       setFieldErrors(getMutationFieldErrors(error, ui));
     }
   });
@@ -262,9 +264,11 @@ export default function UsersPage() {
         queryClient.invalidateQueries({ queryKey: ['tenant-user-role-options'] })
       ]);
     },
-    onError: (error) => {
+    onError: (error, input) => {
       setPageMessage(null);
-      setPageError(error instanceof ApiError ? error.message : ui("Failed to update user."));
+      setPageError(isTenantUserEmailConflict(error, `/users/${input.id}`, 'PUT')
+        ? ui('This email is already used by another tenant user.')
+        : error instanceof ApiError ? error.message : ui("Failed to update user."));
       setFieldErrors(getMutationFieldErrors(error, ui));
     }
   });

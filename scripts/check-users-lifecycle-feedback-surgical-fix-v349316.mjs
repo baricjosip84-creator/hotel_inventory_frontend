@@ -65,7 +65,7 @@ check('Status write still PATCHes /users/{id}/status with is_active boolean', us
 check('Edit write still uses PUT and expected_revision', users.includes('`/users/${input.id}`') && users.includes("method: 'PUT'") && users.includes('expected_revision: input.revision'));
 check('Page feedback retains distinct activation/deactivation and edit messages', users.includes('ui("User activated successfully.")') && users.includes('ui("User deactivated successfully.")') && users.includes('ui("User updated successfully.")'));
 check('Central API success toast still emits and translates business label', api.includes("dispatchTenantMutationFeedback({ type: 'success', message: tenantMutationSuccessMessage(path, method, requestOptions.body), translateMessage: true })"));
-check('User mutation error handling remains on the page', users.includes('getMutationFieldErrors(error, ui)') && users.includes('setPageError(error instanceof ApiError ? error.message : ui("Failed to update user."))'));
+check('User mutation error handling remains on the page', users.includes('getMutationFieldErrors(error, ui)') && (users.includes('setPageError(error instanceof ApiError ? error.message : ui("Failed to update user."))') || (users.includes("isTenantUserEmailConflict(error, `/users/${input.id}`, 'PUT')") && users.includes('error instanceof ApiError ? error.message : ui("Failed to update user.")'))));
 for (const label of ['User activated successfully.', 'User deactivated successfully.', 'User updated successfully.', 'User created successfully.', 'User deleted successfully.']) {
   const line = i18n.split('\n').find(l => l.includes(`"${label}"`));
   check(`Existing German, Spanish, French and Croatian translations: ${label}`, Boolean(line && (line.match(/"/g) || []).length >= 10));

@@ -1,0 +1,78 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const ts = require('typescript');
+const root = process.cwd();
+const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+const api = read('src/lib/api.ts');
+const users = read('src/pages/UsersPage.tsx');
+const i18n = read('src/i18n/tenantUiTranslations.ts');
+const backendError = read('../hotel-inventory-backend/src/middleware/errorHandler.js');
+const backendSchema = read('../hotel-inventory-backend/db/migrations/001_initial.sql');
+const pkg = JSON.parse(read('package.json'));
+const ast = ts.createSourceFile('api.ts', api, ts.ScriptTarget.Latest, true);
+if (ast.parseDiagnostics.length) throw new Error(`api.ts parser diagnostics: ${ast.parseDiagnostics.length}`);
+const usersAst = ts.createSourceFile('UsersPage.tsx', users, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+if (usersAst.parseDiagnostics.length) throw new Error(`UsersPage.tsx parser diagnostics: ${usersAst.parseDiagnostics.length}`);
+const needed = ['ApiError', 'isTenantUserEmailConflict', 'tenantMutationErrorMessage'];
+const declarations = new Map();
+for (const node of ast.statements) {
+  if ((ts.isClassDeclaration(node) || ts.isFunctionDeclaration(node)) && node.name && needed.includes(node.name.text)) {
+    declarations.set(node.name.text, node.getText(ast));
+  }
+}
+if (declarations.size !== needed.length) throw new Error(`Missing callable definitions: ${needed.filter(x => !declarations.has(x)).join(', ')}`);
+const isolated = needed.map((name) => declarations.get(name)).join('\n') + '\nmodule.exports = { ApiError, isTenantUserEmailConflict, tenantMutationErrorMessage };';
+const transpiled = ts.transpileModule(isolated, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }, reportDiagnostics: true });
+if (transpiled.diagnostics?.length) throw new Error(`Isolated API helper TypeScript errors: ${transpiled.diagnostics.length}`);
+const sandbox = { module: { exports: {} }, exports: {} };
+vm.runInNewContext(transpiled.outputText, sandbox, { timeout: 5000 });
+const { ApiError, isTenantUserEmailConflict: isConflict, tenantMutationErrorMessage: feedback } = sandbox.module.exports;
+const err = (status, code, constraint = 'users_email_tenant_unique') => new ApiError('A record with the same unique value already exists', status, code, 'request-123', constraint === 'absent' ? undefined : { constraint });
+const conflict = err(409, 'UNIQUE_CONSTRAINT_VIOLATION');
+const checks = [];
+function check(name, yes) {
+  const pass = Boolean(yes);
+  checks.push(pass);
+  console.log(`${pass ? 'PASS' : 'FAIL'}: ${name}`);
+}
+check('Database defines tenant-scoped unique user email constraint', backendSchema.includes('CREATE UNIQUE INDEX users_email_tenant_unique'));
+check('Backend 071 sends named unique constraint with 409 code', backendError.includes("'UNIQUE_CONSTRAINT_VIOLATION'") && backendError.includes('constraint: err.constraint'));
+check('Correct tenant user PUT conflict identified', isConflict(conflict, '/users/abc-123', 'PUT'));
+check('Correct tenant user POST conflict identified', isConflict(conflict, '/users', 'POST'));
+check('GET query and uppercasing do not confuse scope', isConflict(conflict, '/USERS/abc-123?debug=1', 'put'));
+check('Legacy uniqueness responses without constraint are recognized', isConflict(err(409, 'UNIQUE_CONSTRAINT_VIOLATION', 'absent'), '/users/id', 'PUT'));
+check('Other named constraint not misleadingly classified', !isConflict(err(409, 'UNIQUE_CONSTRAINT_VIOLATION', 'another_unique_rule'), '/users/id', 'PUT'));
+check('500 response not reported as duplicate email', !isConflict(err(500, 'UNIQUE_CONSTRAINT_VIOLATION'), '/users/id', 'PUT'));
+check('Non-unique conflict is not reported as email', !isConflict(err(409, 'REVISION_CONFLICT'), '/users/id', 'PUT'));
+check('Status update path not erroneously reported as email', !isConflict(conflict, '/users/id/status', 'PATCH'));
+check('Deletion path not erroneously reported as email', !isConflict(conflict, '/users/id', 'DELETE'));
+check('Unrelated supplier duplicate untouched', !isConflict(conflict, '/suppliers/id', 'PUT'));
+check('Platform user route untouched', !isConflict(conflict, '/platform/users/id', 'PUT'));
+check('No mutation on GET or other methods', !isConflict(conflict, '/users/id', 'GET'));
+check('Non-ApiError is not misreported', !isConflict(new Error('A record with the same unique value already exists'), '/users/id', 'PUT'));
+const businessMessage = 'This email is already used by another tenant user.';
+const mapped = feedback(conflict, '/users/id', 'PUT');
+check('Shared toast uses business duplicate email label', mapped.message === businessMessage);
+check('Shared toast applies existing tenant language translation', mapped.translateMessage === true);
+check('Known duplicate email suppresses technical request ID from toast', mapped.suppressRequestId === true);
+check('Create duplicate email also uses business label', feedback(conflict, '/users', 'POST').message === businessMessage);
+check('Unrelated technical server failure remains unchanged', feedback(new ApiError('A different error', 500, 'OTHER', 'request-321'), '/users/id', 'PUT').message === 'A different error');
+check('Other constraint preserves original generic conflict wording', feedback(err(409, 'UNIQUE_CONSTRAINT_VIOLATION', 'another_unique_rule'), '/users/id', 'PUT').message === 'A record with the same unique value already exists');
+check('Other constraint does not suppress diagnostic request ID', feedback(err(409, 'UNIQUE_CONSTRAINT_VIOLATION', 'another_unique_rule'), '/users/id', 'PUT').suppressRequestId !== true);
+check('Shared API sends path and method to mapper', api.includes('tenantMutationErrorMessage(error, path, method)'));
+check('Toast suppresses request ID only when mapper requests', api.includes('!mutationFeedback.suppressRequestId ? error.requestId : undefined'));
+check('Central API retains original errors/diagnostic capture', api.includes('captureApiFailure({') && api.includes('throw error;'));
+check('User page imports the narrowly-scoped helper', users.includes("import { ApiError, apiRequest, isTenantUserEmailConflict } from '../lib/api';"));
+check('User-create page banner translates same business message', users.includes("isTenantUserEmailConflict(error, '/users', 'POST')") && users.includes("? ui('This email is already used by another tenant user.')"));
+check('User-update page banner checks actual edited user ID', users.includes("isTenantUserEmailConflict(error, `/users/${input.id}`, 'PUT')") && users.includes('onError: (error, input) => {'));
+check('Existing inline field-level error retained', users.includes("return { email: ui('This email is already used by another tenant user.') };") && (users.match(/setFieldErrors\(getMutationFieldErrors\(error, ui\)\)/g) || []).length >= 2);
+check('All tenant-language translations already exist', (i18n.split('\n').find(line => line.includes(`"${businessMessage}"`))?.match(/"/g) || []).length >= 10);
+check('User create/update/status/delete endpoints unchanged', users.includes('`/users/${input.id}/status`') && users.includes('expected_revision: input.revision') && users.includes("method: 'DELETE'") && users.includes('method: \'POST\''));
+check('No new backend source modification implied', backendError.includes('A record with the same unique value already exists'));
+check('Package registers this regression script', pkg.scripts?.['check:users-duplicate-email-feedback-v349318'] === 'node scripts/check-users-duplicate-email-feedback-surgical-fix-v349318.mjs');
+const passCount = checks.filter(Boolean).length;
+console.log(`Users duplicate-email feedback surgical fix: ${passCount}/${checks.length} PASS`);
+if (passCount !== checks.length) process.exitCode = 1;

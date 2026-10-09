@@ -459,7 +459,14 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
   return `${label} saved successfully.`;
 }
 
-function tenantMutationErrorMessage(error: unknown): { message: string; translateMessage: boolean } {
+function tenantMutationErrorMessage(error: unknown, path: string, method: string): { message: string; translateMessage: boolean; suppressRequestId?: boolean } {
+  // Duplicate tenant-user email conflicts have a meaningful business explanation.
+  // Keep the technical request ID in the original ApiError and diagnostics,
+  // not the everyday toast for this known validation failure.
+  if (isTenantUserEmailConflict(error, path, method)) {
+    return { message: 'This email is already used by another tenant user.', translateMessage: true, suppressRequestId: true };
+  }
+
   if (error instanceof ApiError) {
     if (error.code === 'EMAIL_NOT_CONFIGURED') {
       return { message: 'Email is not configured for this server. The record was not changed. Configure backend email settings before using supplier email actions.', translateMessage: true };
@@ -509,6 +516,28 @@ export class ApiError extends Error {
     this.requestId = requestId;
     this.details = details;
   }
+}
+
+export function isTenantUserEmailConflict(error: unknown, path: string, method: string): boolean {
+  if (!(error instanceof ApiError) || error.status !== 409 || error.code !== 'UNIQUE_CONSTRAINT_VIOLATION') {
+    return false;
+  }
+
+  const normalizedPath = path.toLowerCase().split('?')[0];
+  const normalizedMethod = method.toUpperCase();
+  if (!(normalizedMethod === 'POST' && normalizedPath === '/users') &&
+      !(normalizedMethod === 'PUT' && /^\/users\/[^/]+$/.test(normalizedPath))) {
+    return false;
+  }
+
+  // Backend 071 identifies the PostgreSQL tenant/email uniqueness constraint.
+  // Older responses can omit details; never convert a *different* named
+  // constraint or a non-conflict failure into a claimed duplicate email.
+  const details = error.details;
+  const constraint = details && typeof details === 'object' && 'constraint' in details
+    ? (details as { constraint?: unknown }).constraint
+    : undefined;
+  return constraint == null || constraint === 'users_email_tenant_unique';
 }
 
 
@@ -1292,12 +1321,12 @@ export async function apiRequest<T>(
     }
 
     if (shouldShowMutationFeedback) {
-      const mutationFeedback = tenantMutationErrorMessage(error);
+      const mutationFeedback = tenantMutationErrorMessage(error, path, method);
       dispatchTenantMutationFeedback({
         type: 'error',
         message: mutationFeedback.message,
         translateMessage: mutationFeedback.translateMessage,
-        requestId: error instanceof ApiError && error.code !== 'EMAIL_NOT_CONFIGURED' ? error.requestId : undefined
+        requestId: error instanceof ApiError && error.code !== 'EMAIL_NOT_CONFIGURED' && !mutationFeedback.suppressRequestId ? error.requestId : undefined
       });
     }
 

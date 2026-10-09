@@ -9121,3 +9121,102 @@ FOLLOW-UP
 CURRENT SOURCE OF TRUTH: Frontend079 + Backend071.
 PRODUCTION STATUS: NOT DEPLOYED / NOT LIVE VERIFIED.
 ================================================================================
+
+================================================================================
+BATCH 080 — ADMINISTRATION / USERS — DUPLICATE EMAIL ERROR FEEDBACK CLOSURE
+Date: 2026-10-09
+================================================================================
+SOURCE OF TRUTH / EVIDENCE
+Frontend079: hotel-inventory-frontend_surgical-fix-079.zip
+  SHA256 8340ee09082c21c249ba868ea51a2f8b6e9dec1adaab187226d55b521a0338c0
+Backend071: hotel-inventory-backend_surgical-fix-071.zip (UNCHANGED)
+  SHA256 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f
+Audit: Inventory_Management_App_Tenant_Audit_Findings_2026-09-26_v93.txt
+  Dedicated 2026-10-05 Users edit-time duplicate-email test (16:27 CEST).
+Cumulative engineering FIX_LOG: embedded full Frontend079 copy, 515,320 bytes,
+  SHA256 429d9344f76e770ee2130646ebdcddea6167764575b5f2af51949a76fb3ca0c1.
+  WARNING: a 511,299-byte standalone copy from the previous chat lacked the 079
+  appendix. This Batch080 release advances the complete embedded 079 version.
+
+CONFIRMED HISTORICAL AUDIT FINDING / CURRENT SOURCE
+- Editing a tenant user to use another user's email was correctly rejected.
+- Existing field-level email message already said: "This email is already used
+  by another tenant user." The page-level banner and bottom-right global
+  failure toast instead displayed "A record with the same unique value already
+  exists", and the toast exposed a normal-user-facing Request ID.
+- Current Frontend079 src/pages/UsersPage.tsx still rendered the raw
+  ApiError.message in create/update page banners, even for its already-detected
+  duplicate-email field error.
+- Current src/lib/api.ts dispatched global mutation error feedback with the
+  raw ApiError.message and requestId on all failures.
+- Backend071 maps PostgreSQL 23505 to 409 UNIQUE_CONSTRAINT_VIOLATION with
+  error.details.constraint; schema defines users_email_tenant_unique for
+  (tenant_id, email). The backend's reject behavior remains correct.
+
+SURGICAL IMPLEMENTATION — FRONTEND 080 ONLY
+1. src/lib/api.ts:
+   - Added isTenantUserEmailConflict(error, path, method) scoped to exact tenant
+     /users POST creation or /users/{id} PUT update, HTTP 409 and backend
+     UNIQUE_CONSTRAINT_VIOLATION. If constraint metadata is supplied, it must
+     match users_email_tenant_unique; unknown named constraints are NOT assumed
+     to be duplicate email. Missing constraint detail is tolerated for legacy
+     error responses; other endpoints, methods, and statuses remain unchanged.
+   - Existing tenantMutationErrorMessage now maps only this confirmed case to
+     the already-translated business wording. It suppresses the request ID
+     only in the user-facing toast for this confirmed validation condition.
+     Original ApiError and runtime capture retain the technical request ID.
+2. src/pages/UsersPage.tsx:
+   - Create/update error banner now uses the same localized duplicate-email
+     explanation as the existing email field error, only for that exact case.
+   - All other failures retain the original ApiError / fallback behavior.
+   - Existing field-level errors and mutation methods, payloads and permissions
+     are unchanged; no backend or data/migration change.
+3. scripts/check-users-duplicate-email-feedback-surgical-fix-v349318.mjs:
+   - New 33-check executable API-error classification, toast/i18n, page/banner,
+     negative routing/constraint/status and unchanged-boundary regression.
+4. scripts/check-users-lifecycle-feedback-surgical-fix-v349316.mjs:
+   - Updated one pre-existing source-form assertion so it accepts the safer
+     narrow duplicate-email branch while still requiring normal update failure
+     fallback and field-level errors. Prior 27 checks remain intact.
+5. package.json: register check:users-duplicate-email-feedback-v349318.
+6. Embedded and standalone cumulative FIX_LOG updated through Batch080.
+
+VERIFICATION
+- PASS new 33/33 duplicate-email checks.
+- PASS 21/21 targeted Batch060–080 surgical regression suites after providing
+  sibling Backend071 source and temporary global TypeScript resolver in the
+  test environment. Resolver excluded from release ZIPs.
+- PASS global tenant multilingual closure: 45/45 tenant routes; 264 reachable
+  source files; 14,212 five-language catalog rows.
+- PASS i18n-build surgical checks 11/11.
+- PASS Tenant Permissions page, Tenant Audit page and role-permission contracts.
+- PASS isolated changed api.ts + UsersPage.tsx TS/TSX parse and transpilation:
+  0 diagnostics each.
+- Source ZIP CRC, cumulative-file equality, checksum and changed-only archive
+  equivalence recorded separately in Batch080 manifest/verification.
+
+FULL RELEASE GATES STILL NOT VERIFIED
+- npm ci --offline (even with --ignore-scripts) failed ENOTCACHED for
+  zod-validation-error@4.0.2, while Node v22.16.0 is below the frontend
+  package's explicit Node 24.x requirement and react-router's >=22.22.0.
+- Therefore full project lint, typecheck:ci, Vite prebuild, deployment CI and
+  live/browser production acceptance are NOT claimed PASS.
+
+REQUIRED LIVE RETEST
+- On supported Node 24.x with npm registry, execute full dependency install,
+  backend/frontend CI, lint, typecheck and build before deployment.
+- Deploy FE080 with unchanged BE071.
+- As tenant Admin and with disposable user only, try an already-used email on
+  both create and edit; assert unchanged user data and one business-readable
+  localized explanation across field, page and toast; no Request ID in that
+  specific ordinary validation toast. Confirm other errors retain diagnostic
+  evidence and status flows remain unaffected.
+- Independently finish real-world tests for Notifications worker attempts,
+  Barcode Labels OS print, centralized Approvals fresh requisition, and other
+  source-corrected features. Do not equate source tests with live acceptance.
+
+CURRENT SOURCE OF TRUTH: Frontend080 + Backend071.
+PRODUCTION STATUS: NOT DEPLOYED / NOT LIVE VERIFIED.
+Batch081 HAS NOT STARTED; select next genuine unresolved v93 item after
+reconciling this cumulative log and current source.
+================================================================================
