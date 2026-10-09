@@ -1,4 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router';
+import { apiRequest } from '../../../lib/api';
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { DataTable, InputField, SelectField } from '../EnterpriseInventoryShared';
 import TenantDepartmentField from '../../inventory/TenantDepartmentField';
@@ -20,6 +23,16 @@ type ApprovalQueueItem = {
   status: string;
   created_at: string;
 };
+
+type SubmittedInventoryRequisition = {
+  id: string;
+  requisition_number: string;
+  status: string;
+  requesting_department: string;
+  created_at: string;
+};
+
+const REQUISITION_APPROVAL_PAGE_SIZE = 20;
 
 type CreateApprovalRuleMutation = { isPending: boolean; data?: ApprovalRule; mutate: (input: ApprovalRuleForm) => void };
 type ExecuteApprovalMutation = { isPending: boolean; mutate: (input: { entity_type: string; entity_id: string; action: 'approved' | 'rejected'; comment?: string }) => void };
@@ -46,6 +59,20 @@ export function ApprovalsTab({ approvalQueue, approvalRuleForm, approvalRulesQue
   const { locale, ui } = useAppTranslation();
   const canWriteApprovalRules = hasPermission(TENANT_PERMISSIONS.APPROVAL_RULES_WRITE);
   const canExecuteApprovals = hasPermission(TENANT_PERMISSIONS.APPROVALS_EXECUTE);
+  const canReviewInventoryRequisitions = hasPermission(TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_READ)
+    && hasPermission(TENANT_PERMISSIONS.INVENTORY_REQUISITIONS_APPROVE);
+  const [requisitionPage, setRequisitionPage] = useState(0);
+  const navigate = useNavigate();
+  const submittedRequisitionsQuery = useQuery({
+    queryKey: ['inventory-requisitions', 'approval-queue-submitted', requisitionPage],
+    enabled: canReviewInventoryRequisitions,
+    queryFn: () => apiRequest<SubmittedInventoryRequisition[]>(
+      `/inventory-requisitions?status=submitted&limit=${REQUISITION_APPROVAL_PAGE_SIZE + 1}&offset=${requisitionPage * REQUISITION_APPROVAL_PAGE_SIZE}`
+    ),
+    refetchOnMount: 'always'
+  });
+  const submittedRequisitions = (submittedRequisitionsQuery.data ?? []).slice(0, REQUISITION_APPROVAL_PAGE_SIZE);
+  const hasMoreRequisitions = (submittedRequisitionsQuery.data?.length ?? 0) > REQUISITION_APPROVAL_PAGE_SIZE;
   const approvalEntityOptions = [
     { value: 'purchase_order', label: ui('Purchase order'), visible: hasPermission(TENANT_PERMISSIONS.PURCHASE_ORDERS_READ) },
     { value: 'supplier_invoice', label: ui('Supplier invoice'), visible: hasPermission(TENANT_PERMISSIONS.INVOICES_READ) },
@@ -144,6 +171,34 @@ export function ApprovalsTab({ approvalQueue, approvalRuleForm, approvalRulesQue
       <div style={styles.stack}>
         <section style={styles.card}>
           <h2 style={styles.cardTitle}>{ui('Approval queue')}</h2>
+          {canReviewInventoryRequisitions ? <div style={{ marginBottom: 18 }}>
+            <h3 style={{ ...styles.cardTitle, fontSize: 15 }}>{ui('Submitted inventory requisitions')}</h3>
+            <p style={{ ...styles.helper, marginBottom: 12 }}>{ui('Inventory requisitions use their own approval workflow. Open the request to review and approve it. The rules below govern Department requisitions, not Inventory requisitions.')}</p>
+            {submittedRequisitionsQuery.isPending ? <p style={styles.helper}>{ui('Loading submitted requisitions…')}</p> : null}
+            {submittedRequisitionsQuery.isError ? <div style={styles.error} role="alert">
+              {ui('Submitted requisitions could not be loaded. The approval queue may be incomplete.')}
+              <button type="button" style={{ ...styles.secondarySmallButton, marginLeft: 8 }} onClick={() => void submittedRequisitionsQuery.refetch()}>{ui('Retry')}</button>
+            </div> : null}
+            {submittedRequisitionsQuery.isSuccess && submittedRequisitions.length === 0 && requisitionPage === 0 ? <p style={styles.helper}>{ui('No submitted inventory requisitions waiting for review.')}</p> : null}
+            {submittedRequisitionsQuery.isSuccess && submittedRequisitions.length === 0 && requisitionPage > 0 ? <p style={styles.helper}>{ui('No further submitted requisitions. Return to the previous page.')}</p> : null}
+            {submittedRequisitions.length ? <div style={styles.tableWrap}>
+              <table style={styles.table}>
+                <thead><tr>{['Requisition', 'Department', 'Status', 'Actions'].map((header) => <th key={header} style={styles.th}>{ui(header)}</th>)}</tr></thead>
+                <tbody>{submittedRequisitions.map((item) => <tr key={item.id}>
+                  <td style={styles.td}><strong>{item.requisition_number}</strong></td>
+                  <td style={styles.td}>{item.requesting_department || '—'}</td>
+                  <td style={styles.td}>{ui('Submitted')}</td>
+                  <td style={styles.td}><button type="button" style={styles.smallButton} onClick={() => navigate(`/inventory-requisitions?requisitionId=${encodeURIComponent(item.id)}`)}>{ui('Open requisition')}</button></td>
+                </tr>)}</tbody>
+              </table>
+            </div> : null}
+            {(submittedRequisitionsQuery.isSuccess && (requisitionPage > 0 || hasMoreRequisitions)) ? <div style={{ ...styles.actions, marginTop: 10 }}>
+              <button type="button" style={requisitionPage === 0 ? styles.disabledButton : styles.secondarySmallButton} disabled={requisitionPage === 0} onClick={() => setRequisitionPage((page) => Math.max(0, page - 1))}>{ui('Previous')}</button>
+              <span style={styles.helper}>{ui('Page')} {formatLocalizedNumber(requisitionPage + 1, locale)}</span>
+              <button type="button" style={hasMoreRequisitions ? styles.secondarySmallButton : styles.disabledButton} disabled={!hasMoreRequisitions} onClick={() => setRequisitionPage((page) => page + 1)}>{ui('Next')}</button>
+            </div> : null}
+          </div> : null}
+          <h3 style={{ ...styles.cardTitle, fontSize: 15 }}>{ui('Other approval requests')}</h3>
           {approvalQueue.length ? <div style={styles.tableWrap}>
             <table style={styles.table}>
               <thead><tr>{['Entity', 'Status', 'Created', 'Actions'].map((header) => <th key={header} style={styles.th}>{ui(header)}</th>)}</tr></thead>
@@ -175,7 +230,7 @@ export function ApprovalsTab({ approvalQueue, approvalRuleForm, approvalRulesQue
                 );
               })}</tbody>
             </table>
-          </div> : <p style={styles.helper}>{ui('No items currently waiting for approval.')}</p>}
+          </div> : <p style={styles.helper}>{ui('No other approval requests are waiting.')}</p>}
         </section>
 
         <section style={styles.card}>
