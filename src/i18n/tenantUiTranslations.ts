@@ -2,6 +2,7 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  ["Alert status:", "Warnungsstatus:", "Estado de la alerta:", "Statut de l’alerte :", "Status upozorenja:"],
   ["Online", "Online", "En línea", "En ligne", "Na mreži"],
   ["Offline", "Offline", "Sin conexión", "Hors ligne", "Izvan mreže"],
   ["Discard changes", "Änderungen verwerfen", "Descartar cambios", "Abandonner les modifications", "Odbaci promjene"],

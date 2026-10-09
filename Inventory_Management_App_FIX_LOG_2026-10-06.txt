@@ -10161,3 +10161,41 @@ PRODUCTION ACCEPTANCE
 CURRENT ENGINEERING BASELINE: Frontend102 + Backend072.
 PRODUCTION ACCEPTANCE: PENDING. Batch104 NOT STARTED.
 ================================================================================
+
+================================================================================
+SURGICAL CORRECTION BATCH 104 — ACTION CENTER GENERATED ALERT EVIDENCE LOCALIZATION
+Date: 2026-10-09
+================================================================================
+AUTHORITATIVE BASELINE
+- Frontend102 full cumulative source ZIP SHA-256: eaa605612d1b7080712e1725a4e7fda29d3ca32f42d4b5b082ebd9473581986f
+- Backend072 full cumulative source ZIP SHA-256: 2036cbc149b5c319911ec8fe72418361651ebcea2caaf799b58382adb0cf3e69; unchanged.
+- Canonical audit v93: ACTION-I18N-004 (record-level alert evidence remains in English in Croatian mode); ACTION-UX-016 (machine-style evidence is difficult to read).
+- Existing complete embedded/standalone cumulative FIX_LOG through Batch103 exactly matched before this append.
+
+SOURCE-VERIFIED ROOT CAUSE
+- The backend already emits normalized primary_factors as separate entries: unresolved_alert, severity:info, escalation_level:0; they are not one long text field in the current code.
+- The current Action Center frontend already renders each factor on its own line, translates severity/escalation labels, and capitalizes severity values.
+- But unresolved_alert fell through the generic canonicalLabel humanizer, producing untranslated English 'Unresolved alert' in Croatian despite localized surrounding labels.
+
+SURGICAL FRONTEND CORRECTION
+- src/pages/OperationalActionCenterPage.tsx: recognize exactly the machine-generated unresolved_alert factor and display localized 'Alert status: Unresolved' using the existing translation helper. Preserve all unknown factors and user-authored titles/summaries untouched.
+- src/i18n/tenantUiTranslations.ts: add 'Alert status:' in en/de/es/fr/hr; reuse pre-existing localized 'Unresolved' entry.
+- package.json: register check:action-center-alert-evidence-v349342.
+- scripts/check-action-center-alert-evidence-localization-surgical-fix-v349342.mjs: add focused compiled runtime tests for all five languages, factor formatting, unknown evidence preservation, backend contract and TSX syntax.
+- Internal alert codes, database values, ordering, ranking, alert workflows, tenant access controls, backend and other diagnostic factors unchanged.
+- In Croatian, displayed factors include: 'Status upozorenja: Neriješeno', 'Ozbiljnost upozorenja: Informacija', and 'Razina eskalacije: 0'.
+
+VERIFICATION
+- Batch104 focused runtime and source contract assertions 26/26 PASS.
+- 53/53 available regression scripts PASS, including all inherited surgical checks, application checks, tenant multilingual closure audit and backend Reports checks.
+- Multilingual closure audit: 45/45 tenant routes, 264 reachable source files, 14,226 five-language catalog rows, placeholder parity PASS.
+- Isolated TypeScript transpilation and new test syntax PASS; ZIP integrity, exact modified/addition diff, unchanged backend archive and bundle manifest parity PASS.
+- Full clean npm ci, complete Node24 frontend production typecheck/build/CI, PostgreSQL integration and deployed browser tests were NOT run. Do not mark production acceptance as PASS.
+
+LIVE ACCEPTANCE STILL PENDING
+- Deploy Frontend103 with unchanged Backend072. Open Action Center in Croatian, expand an active Alert card's Technical details and verify localized status, severity and escalation lines; also check all five available languages and technical identifier toggle.
+- Existing unrelated live acceptance backlog remains open; continue the next true unresolved audit finding against the current code, not simply the historical audit record.
+
+CURRENT ENGINEERING BASELINE: Frontend103 + Backend072.
+PRODUCTION ACCEPTANCE: PENDING. Batch105 NOT STARTED.
+================================================================================

@@ -408,6 +408,7 @@ function actionSummaryLabel(action: OperationalAction, ui: (englishText: string)
 function actionTechnicalFactorLabel(factor: string, ui: (englishText: string) => string): string {
   const raw = String(factor || '').trim();
   if (!raw) return ui('Not reported');
+  if (raw === 'unresolved_alert') return `${ui('Alert status:')} ${ui('Unresolved')}`;
   if (raw === 'sla_due_at_absent') return `${ui('SLA')}: ${ui('Not scheduled')}`;
   if (raw === 'sla_due_at_present') return `${ui('SLA')}: ${ui('Scheduled')}`;
 

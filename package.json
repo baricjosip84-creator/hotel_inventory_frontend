@@ -461,7 +461,8 @@
     "check:tenant-permission-discard-v349336": "node scripts/check-tenant-permission-discard-surgical-fix-v349336.mjs",
     "check:action-center-croatian-name-v349337": "node scripts/check-action-center-croatian-name-surgical-fix-v349337.mjs",
     "check:permission-group-action-scope-v349339": "node scripts/surgical-fix-101-permissions-group-scope.test.mjs",
-    "check:toast-technical-request-id-v349338": "node scripts/check-toast-technical-request-id-surgical-fix-v349338.mjs"
+    "check:toast-technical-request-id-v349338": "node scripts/check-toast-technical-request-id-surgical-fix-v349338.mjs",
+    "check:action-center-alert-evidence-v349342": "node scripts/check-action-center-alert-evidence-localization-surgical-fix-v349342.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
