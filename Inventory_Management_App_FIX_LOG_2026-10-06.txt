@@ -9878,3 +9878,42 @@ LIMITATIONS / CONTROLLED LIVE ACCEPTANCE
 CURRENT ENGINEERING BASELINE: Frontend095 + Backend071 unchanged.
 PRODUCTION ACCEPTANCE: PENDING. Batch096 NOT STARTED.
 ================================================================================
+
+
+================================================================================
+SURGICAL CORRECTION BATCH 096 — REPORTS / MOVEMENT LEDGER LOCATION FILTER SELECTION
+Date: 2026-10-09
+================================================================================
+
+AUTHORITATIVE BASELINE
+- Frontend095 cumulative ZIP SHA256: 49fbf18498b8514067b0855aa919e78426ac650e96666f9e70d200bbd9807118.
+- Backend071 unchanged ZIP SHA256: 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f.
+- Canonical audit v93: Movement Ledger Location datalist option could be displayed, but selecting a different location did not reliably persist, blocking a controlled filter workflow. Earlier Location=Main Warehouse row checks do not prove that the control is usable. Product and date filters already passed separately.
+- Existing shared report dropdown / color-scheme adjustments were reviewed. Do not reapply Batch081 or Batch082.
+
+SOURCE-VERIFIED ROOT CAUSE
+- ReportsPage.tsx still used AutocompleteFilterField (<input list> backed by <datalist>) for ledger Location. The browser/OS suggestion popup owns the selection interaction and was recorded as unreliable in the audit.
+- ReportsPage.tsx already has ChoiceFilterField, a controlled single-select used by Count Variance and other Reports filters. The shared fetchReportFilterOptions populates tenant-scoped active storage-location names; the backend Movement Ledger location filter already accepts the name string through parameterized SQL.
+
+FRONTEND-ONLY SURGICAL CORRECTION
+- src/pages/ReportsPage.tsx: Replace only Movement Ledger Location's datalist/autocomplete input with existing ChoiceFilterField. Keep controlled ledgerFilters.location, Any location empty option, active location name values, existing updateAndClear semantics, export-disabled behavior, backend query, From/To, Product, Movement type, Result limit, actions, rows and exports.
+- When the options endpoint has no locations, ChoiceFilterField falls back to an ordinary typed TextFilterField as before. Where options exist, selection now uses whole location names; partial typed location fragments are intentionally no longer a standard selection path. Historical/deleted locations absent from options cannot be chosen from the populated dropdown: retest/consider separately, do not fabricate choices.
+- package.json: register check:reports-ledger-location-select-v349334.
+- scripts/check-reports-ledger-location-select-surgical-fix-v349334.mjs: 29 focused assertions including filter binding, clear, URL encoding, unchanged backend SQL, permissions/context and isolated TypeScript transpilation.
+- No backend, database/schema, migration, permissions, reporting calculation or translation edits.
+
+SOURCE VERIFICATION
+- Batch096 focused guard: 29/29 PASS.
+- Cumulative targeted surgical suites v349298–v349334: 37/37 PASS.
+- Broader application checks: 9/9 PASS, including 45 tenant routes, 264 reachable files and 14,219 unique five-language translation catalog rows/placeholder parity.
+- ReportsPage.tsx isolated TypeScript transpilation: zero diagnostics. New Node script syntax: PASS.
+- Full source ZIP, delta ZIP, CRC, expected byte-level delta, FIX_LOG synchronization and bundle contents: PASS (see manifest).
+
+LIMITATIONS / LIVE ACCEPTANCE
+- Full Node24 npm ci, project ESLint, complete TypeScript typecheck:ci, production Vite build, CI/deployment and live production acceptance: NOT VERIFIED. Local Node22 and incomplete dependency installation; isolated parsing is not a full build.
+- Once deployed in test tenant, open Reports > Movement Ledger; select Main Warehouse, then Kitchen Store; verify selected value remains visible, each refresh returns only expected location rows, Any location clears filter, export honors selection, keyboard access and mobile behavior. Check no matching rows, Product/date combinations, and a tenant with no location options. Historical/archived location filtering remains a potential separate UX limitation because populated options show active names.
+- Global application dropdown design remains broader work; this batch is the confirmed Ledger selection-path correction only. No production PASS claim.
+
+CURRENT ENGINEERING BASELINE: Frontend096 + Backend071 unchanged.
+PRODUCTION ACCEPTANCE: PENDING. Batch097 NOT STARTED.
+================================================================================
