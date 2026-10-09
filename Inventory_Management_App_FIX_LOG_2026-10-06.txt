@@ -10083,3 +10083,81 @@ AUDIT: Administration > Permissions; group-level Enable group sets every editabl
 FIX: Add brief localized inline explanation adjacent to bulk group controls distinguishing all editable permissions in a group from filtered shown editable permissions, and both from role defaults. Add style, five-language translations, focused regression script and npm script. Do not alter setGroup handlers, effective permission calculation, backend or database.
 SOURCE CHECK: Focused new regression guard PASS. Full cumulative regression/build and deployed-browser checks not established in this runtime; require CI/browser verification.
 FILES: src/components/permissions/RolePermissionEditor.tsx; RolePermissionEditor.css; src/i18n/tenantUiTranslations.ts; scripts/surgical-fix-101-permissions-group-scope.test.mjs; package.json.
+
+================================================================================
+SURGICAL CORRECTION BATCH 102 — REPORTS / HISTORICAL STORAGE LOCATION FILTER OPTIONS
+Date: 2026-10-09
+================================================================================
+AUTHORITATIVE BASELINE
+- Frontend101 source unchanged. Backend071 source is the backend correction baseline.
+- Canonical audit v93, Reports > Movement Ledger location-selection UX. Batch096 introduced a reliable native dropdown and explicitly deferred live verification of historical locations no longer in the current active-location list.
+- Latest FIX_LOG through Batch101 copied byte-for-byte before this new entry.
+
+SOURCE-VERIFIED PROBLEM
+- Backend getReportFilterOptions selected report locations solely from storage_locations with deleted_at IS NULL.
+- The existing Reports > Movement Ledger and Count Variance filters select from those option strings and therefore cannot choose an old name if it has disappeared from that list.
+- The existing Movement Ledger read query already searches sm.storage_location_name_snapshot as well as current sl.name. Historical recorded names are useful options, and do not require changing historical stock movements or their calculations.
+
+BACKEND-ONLY CHANGE
+- src/services/analytics/reportService.js: report location options now combine tenant-scoped, nondeleted storage location names and tenant-scoped stock_movements.storage_location_name_snapshot values via parameterized $1 queries, UNION ALL and SELECT DISTINCT. NULL/blank-only options are removed and the values are sorted.
+- Keeps existing response key locations and all other filters unchanged. No cross-tenant query, new write, migration or change to movement/cycle-count calculations.
+- package.json registers check:report-historical-location-options-v349340.
+- scripts/checkReportHistoricalLocationOptionsSurgicalFixV349340.js adds source guards and an isolated service-contract check; it does not execute PostgreSQL.
+- Frontend101 (including its embedded Batch101 FIX_LOG) is intentionally unchanged; standalone cumulative FIX_LOG is current through Batch102 and included in the bundle. Backend becomes 072.
+
+VERIFICATION
+- Batch102 backend source and isolated service-contract guard PASS: 17/17 assertions.
+- Frontend inherited targeted suites v349298–v349339 PASS: 42/42.
+- Broader frontend checks PASS: 7/7, including global 45-route multilingual audit.
+- Backend inherited Reports surgical guard PASS: 9/9.
+- Across these checks 51/51 scripts PASS. Backend changed JS files and report controller pass node --check.
+- Full backend source comparison: two modified files (reportService.js, package.json), one new regression script, no removals; frontend source ZIP unchanged.
+- ZIP CRC/integrity, backend change delta, current cumulative log and bundle checksum manifest verified separately during release creation.
+
+LIMITATIONS AND ACCEPTANCE
+- No PostgreSQL integration execution, live tenant data performance measurement, full Node24 dependency installation/build/CI or deployed browser acceptance; these remain PENDING.
+- Test in deployed system using a location renamed or archived AFTER at least one stock movement with a saved location snapshot. Confirm Reports > Movement Ledger Location offers both active and recorded historical names; selecting the historical name returns only the expected tenant movement rows. Confirm all other report filters, exports and current-location choices still work. Compare location list responsiveness on tenants with large movement history.
+- Count Variance can use historical names for manual-adjustment snapshots; archived cycle-count joins have separate existing semantics and were not modified or certified by this batch.
+- Continue the general live acceptance backlog (worker execution, barcode print, approvals, browser UX, etc.).
+
+CURRENT ENGINEERING BASELINE: Frontend101 + Backend072.
+PRODUCTION ACCEPTANCE: PENDING. Batch103 NOT STARTED.
+================================================================================
+
+================================================================================
+SURGICAL CORRECTION BATCH 103 — MOBILE EXECUTION / CONNECTIVITY STATUS LOCALIZATION AND CROATIAN QUEUE WORDING
+Date: 2026-10-09
+================================================================================
+AUTHORITATIVE BASELINE
+- Frontend101 full source ZIP SHA-256: 6c1ee670b5b177de5ca90732416437b5e70782b09f9276c55a6f368e52152f7a
+- Backend072 full source ZIP SHA-256: 2036cbc149b5c319911ec8fe72418361651ebcea2caaf799b58382adb0cf3e69; kept byte-for-byte unchanged.
+- Canonical tenant audit v93: Mobile Execution, MOBILE-I18N-003 English "Online" shown twice in Croatian mode; MOBILE-I18N-002 awkward Croatian queue and refresh wording.
+- Standalone cumulative FIX_LOG through Batch102 used as the log baseline and includes all earlier history; FE101 embedded log was intentionally older at Batch101 after backend-only Batch102.
+
+SOURCE-VERIFIED ROOT CAUSE
+- src/pages/MobileExecutionPage.tsx already passes the online/offline state through ui(...) twice (workspace hero and Connection stat card).
+- src/i18n/tenantUiTranslations.ts did not contain keyed translations for "Online" or "Offline", so the shared translator fell back to those English values even in Croatian mode.
+- The same catalog used awkward Croatian copy for Touch-first task queue and Refresh mobile queue.
+
+FRONTEND-ONLY SURGICAL CORRECTION
+- Added paired Online/Offline entries for en-GB, de-DE, es-ES, fr-FR, and hr-HR; Croatian statuses are "Na mreži" and "Izvan mreže".
+- Improved Croatian "Touch-first task queue" -> "Red mobilnih zadataka" and "Refresh mobile queue" -> "Osvježi red zadataka".
+- Existing connectivity listener, task sync/replay logic, status semantics, source API, permissions, and backend are unchanged.
+- Registered check:mobile-connection-localization-v349341 in frontend package.json and added dedicated regression script.
+- Appended this release to cumulative FIX_LOG and synchronized the updated file inside Frontend102 full ZIP.
+
+VERIFICATION
+- New focused translation/runtime test: 23/23 PASS, including actual compiled translateTenantUi function across all five languages, repeated connection display usage, and safety guards.
+- 52/52 targeted + broader + backend regression scripts PASS after arranging the unchanged Backend072 test source at the expected adjacent path. The initial run had 13 missing-path fixture failures, and the complete rerun passed 52/52.
+- Global multilingual audit: 45/45 tenant routes; 264 reachable source files; 14,225 unique five-language catalog rows, placeholder parity PASS.
+- Backend072 historical report option isolated service contract 17/17 PASS and inherited report checks 9/9 PASS.
+- Isolated TypeScript source transpilation PASS; full clean Node24 npm ci, complete Vite build/CI and deployed-browser acceptance NOT VERIFIED.
+- Byte-comparison against Frontend101, changed-files exact parity, both full source archives, CRC and checksum manifest verified on packaging.
+
+PRODUCTION ACCEPTANCE
+- Pending. In Croatian Mobile Execution, confirm hero badge and Connection stat show "Na mreži" when connected, "Izvan mreže" when offline; browser online/offline transitions still update, queued actions only replay when connected, and connectivity text is translated in other tenant languages. Test long Croatian queue labels on mobile widths.
+- Existing broader production acceptance backlog remains open. Next Batch104 should inspect another confirmed audit v93 finding against Frontend102 + Backend072, with particular attention to source-generated Action Center evidence copy if justified.
+
+CURRENT ENGINEERING BASELINE: Frontend102 + Backend072.
+PRODUCTION ACCEPTANCE: PENDING. Batch104 NOT STARTED.
+================================================================================

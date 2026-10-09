@@ -2,6 +2,8 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  ["Online", "Online", "En línea", "En ligne", "Na mreži"],
+  ["Offline", "Offline", "Sin conexión", "Hors ligne", "Izvan mreže"],
   ["Discard changes", "Änderungen verwerfen", "Descartar cambios", "Abandonner les modifications", "Odbaci promjene"],
   ["Discard unsaved permission changes for this role?", "Nicht gespeicherte Berechtigungsänderungen für diese Rolle verwerfen?", "¿Descartar los cambios de permisos no guardados de este rol?", "Abandonner les modifications de permissions non enregistrées pour ce rôle ?", "Odbaciti nespremljene promjene dozvola za ovu ulogu?"],
   ["Custom storage condition…", "Benutzerdefinierte Lagerbedingung…", "Condición de almacenamiento personalizada…", "Condition de stockage personnalisée…", "Prilagođeni uvjeti skladištenja…"],
@@ -6562,7 +6564,7 @@ const rows: readonly TranslationRow[] = [
   ["Refresh feed", "Feed aktualisieren", "Actualizar feed", "Actualiser le flux", "Osvježi tok"],
   ["Refresh history", "Verlauf aktualisieren", "Actualizar historial", "Actualiser l’historique", "Osvježi povijest"],
   ["Refresh ledger", "Journal aktualisieren", "Actualizar registro", "Actualiser le registre", "Osvježi dnevnik"],
-  ["Refresh mobile queue", "Mobile Warteschlange aktualisieren", "Actualizar cola móvil", "Actualiser la file mobile", "Osvježi mobilni red"],
+  ["Refresh mobile queue", "Mobile Warteschlange aktualisieren", "Actualizar cola móvil", "Actualiser la file mobile", "Osvježi red zadataka"],
   ["Refresh orders", "Aufträge aktualisieren", "Actualizar pedidos", "Actualiser les commandes", "Osvježi narudžbe"],
   ["Refresh outcomes", "Ergebnisse aktualisieren", "Actualizar resultados", "Actualiser les résultats", "Osvježi ishode"],
   ["Refresh page", "Seite aktualisieren", "Actualizar página", "Actualiser la page", "Osvježi stranicu"],
@@ -8291,7 +8293,7 @@ const rows: readonly TranslationRow[] = [
   ["Totals and filter breakdowns", "Summen und Filteraufschlüsselungen", "Totales y desgloses de filtros", "Totaux et ventilations des filtres", "Ukupni iznosi i raščlambe filtara"],
   ["Touch-first", "Touch-optimiert", "Táctil", "Optimisé tactile", "Prilagođeno dodiru"],
   ["Touch-first execution queue for permitted warehouse work, with safe offline queuing and audited synchronization when connectivity returns.", "Touch-optimierte Ausführungswarteschlange für zulässige Lagerarbeiten mit sicherer Offline-Warteschlange und auditierter Synchronisierung bei wiederhergestellter Verbindung.", "Cola de ejecución táctil para trabajo de almacén permitido, con cola segura sin conexión y sincronización auditada cuando vuelve la conectividad.", "File d’exécution optimisée tactile pour le travail d’entrepôt autorisé, avec mise en file hors ligne sécurisée et synchronisation auditée au retour de la connexion.", "Red izvršenja prilagođen dodiru za dopušteni skladišni rad, sa sigurnim izvanmrežnim redom i revidiranom sinkronizacijom nakon povratka veze."],
-  ["Touch-first task queue", "Touch-optimierte Aufgabenwarteschlange", "Cola de tareas táctil", "File de tâches optimisée tactile", "Red zadataka prilagođen dodiru"],
+  ["Touch-first task queue", "Touch-optimierte Aufgabenwarteschlange", "Cola de tareas táctil", "File de tâches optimisée tactile", "Red mobilnih zadataka"],
   ["Trace every recorded stock change by product, location, movement type, reference, operator, package, and cost evidence. This ledger is read-only.", "Verfolgen Sie jede erfasste Bestandsänderung nach Produkt, Lagerort, Bewegungstyp, Referenz, Bediener, Paket und Kostennachweis. Dieses Journal ist schreibgeschützt.", "Rastree cada cambio de stock registrado por producto, ubicación, tipo de movimiento, referencia, operador, paquete y evidencia de coste. Este registro es de solo lectura.", "Retracez chaque variation de stock enregistrée par produit, emplacement, type de mouvement, référence, opérateur, colis et éléments de coût. Ce registre est en lecture seule.", "Pratite svaku evidentiranu promjenu zalihe prema proizvodu, lokaciji, vrsti kretanja, referenci, operateru, paketu i dokazu troška. Ovaj dnevnik je samo za čitanje."],
   ["Trace recommendations to measured business outcomes.", "Empfehlungen bis zu gemessenen Geschäftsergebnissen nachverfolgen.", "Trazar las recomendaciones hasta resultados empresariales medidos.", "Tracer les recommandations jusqu’aux résultats métier mesurés.", "Pratite preporuke do izmjerenih poslovnih ishoda."],
   ["Trace records appear after packed stock is dispatched.", "Nachverfolgungsdatensätze erscheinen, nachdem verpackter Bestand versendet wurde.", "Los registros de trazabilidad aparecen después de despachar el stock embalado.", "Les enregistrements de traçabilité apparaissent après l’expédition du stock emballé.", "Zapisi praćenja pojavljuju se nakon otpreme zapakirane zalihe."],
