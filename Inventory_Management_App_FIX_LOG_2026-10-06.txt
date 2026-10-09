@@ -9633,3 +9633,44 @@ RELEASE GATES STILL OPEN
 CURRENT ENGINEERING BASELINE: Frontend089 + Backend071 (unchanged).
 PRODUCTION ACCEPTANCE: PENDING. Batch090 NOT STARTED.
 ================================================================================
+
+
+================================================================================
+SURGICAL CORRECTION BATCH 090 — SHIPMENTS / POST-FINALIZATION ATTENTION REFRESH
+Date: 2026-10-09
+================================================================================
+
+AUTHORITATIVE INPUT BASELINE
+- Frontend089 cumulative source archive SHA-256: bcd9f05f511b5df5e4cb53f25c8fbafb808a582aeca5b49ea46d48edacd32369.
+- Backend071 full source archive SHA-256: 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f (unchanged).
+- Canonical audit v93, 2026-09-30: after controlled 35/35 receipt and successful finalization, the shipment status became Received but its card could still display red Attention required; the audit explicitly required confirming underlying attention eligibility rather than blindly clearing the badge.
+- Cumulative FIX_LOG through Batch089, checked byte-for-byte against FE089 embedded copy; all earlier changes preserved.
+
+SOURCE-VERIFIED ROOT CAUSE
+- Backend navigationAttentionService.js calculates shipment attention only for pending or partial shipments: due_receive_ids and ready_finalize_ids each explicitly restrict sh.status IN ('pending', 'partial'), filtered by operator permissions and other real conditions. A finalized Received shipment is not eligible for a current server attention result.
+- Frontend ShipmentsPage.tsx renders red badges and styling from useOperationalAttentionItems('shipments') -> attentionIds. This hook uses a separate React Query key under ['tenant-sidebar', 'operational-navigation-attention', 'items', 'shipments', identity, permission].
+- The finalize mutation already refetched ['shipments'] and ['shipment-items', selectedShipmentId], and invalidated dashboard/alerts/PO, but never invalidated the separate operational attention query. Thus its cached attention IDs could persist after the shipment card changed to Received, leading to the observed stale red warning. The shared sidebar operational summary has the same 'tenant-sidebar','operational-navigation-attention' prefix.
+- Receiving and documenting shortage can also legitimately change due-receive/ready-finalize eligibility; their success handlers had the same refresh gap.
+
+SURGICAL IMPLEMENTATION — FRONTEND ONLY
+- src/pages/ShipmentsPage.tsx: after successful shipment list refresh in (1) save shortage reason, (2) Receive Item, and (3) Finalize Shipment, invalidate ['tenant-sidebar', 'operational-navigation-attention'] to refresh the server-derived shipment item markers and sidebar summary. This triggers active query refetches and marks inactive matching caches stale.
+- Do NOT mask badges based purely on local Received status or clear query data manually. Server-derived permission-aware attention remains authoritative, including legitimate pending/partial attention, other shipments and users.
+- package.json registers check:shipment-attention-refresh-v349328.
+- scripts/check-shipment-attention-refresh-surgical-fix-v349328.mjs: 30 assertions covering backend eligibility/permissions, query-key and sidebar-summary alignment, three success-handler invalidations, existing refetch/feedback/PO/stock paths, and preservation of server-based card markers.
+- No backend, SQL, roles, mutation payload, stock math, shipment state transition, i18n translations, or PO update logic changed.
+
+SOURCE VERIFICATION
+- New focused guard: 30/30 PASS.
+- Cumulative surgical regression guards v349298–v349328: 31/31 PASS.
+- Broader application checks: 9/9 PASS, including multilingual closure across 45 tenant routes / 264 reachable frontend files / 14,212 complete five-language translation rows.
+- Isolated TypeScript transpile of ShipmentsPage.tsx: 0 diagnostics. New guard node --check: PASS.
+- ZIP CRC, source delta parity, SHA-256: recorded in Batch090 manifest.
+
+LIMITATIONS AND LIVE ACCEPTANCE
+- Full supported Node24 npm ci, full ESLint, full project typecheck:ci, Vite production build, CI deployment, and live deployed React application acceptance: NOT VERIFIED in this environment (Node22, missing full npm dependencies).
+- After CI and controlled deployment of FE090/BE071: locate pending shipment with Attention required, receive all remaining items and finalize. Confirm Received status, remaining 0, PO completion, confirmation feedback; confirm red marker clears from shipment card and Shipment list tab/sidebar without reload. Confirm a separate truly actionable pending/partial shipment continues to show attention, and role scopes remain correct. Verify save-shortage and partial receipt recalculate actionable attention; mobile and five languages. Investigate any remaining marker by inspecting real server response rather than suppressing warnings.
+- Other unresolved audit and live-acceptance items remain independently pending; no blanket closure from static source checks.
+
+CURRENT ENGINEERING BASELINE: Frontend090 + Backend071 unchanged.
+PRODUCTION ACCEPTANCE: PENDING. Batch091 NOT STARTED.
+================================================================================

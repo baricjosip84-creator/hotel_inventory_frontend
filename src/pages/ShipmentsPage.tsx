@@ -846,6 +846,9 @@ export default function ShipmentsPage() {
       setPageMessage(ui('Shortage reason saved. This incomplete line can now be finalized as a documented discrepancy.'));
       await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
+      // Shipment lifecycle changes can affect sidebar, tab, and record attention.
+      // Refresh the server-derived signals; do not hide warnings by status alone.
+      await queryClient.invalidateQueries({ queryKey: ['tenant-sidebar', 'operational-navigation-attention'] });
     },
     onError: (error) => {
       setPageMessage(null);
@@ -895,6 +898,9 @@ export default function ShipmentsPage() {
       );
 
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
+      // Shipment lifecycle changes can affect sidebar, tab, and record attention.
+      // Refresh the server-derived signals; do not hide warnings by status alone.
+      await queryClient.invalidateQueries({ queryKey: ['tenant-sidebar', 'operational-navigation-attention'] });
       await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
 
       const linkedPurchaseOrderId = data.purchase_order_id || selectedShipment?.purchase_order_id;
@@ -929,6 +935,9 @@ export default function ShipmentsPage() {
       );
 
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
+      // Shipment lifecycle changes can affect sidebar, tab, and record attention.
+      // Refresh the server-derived signals; do not hide warnings by status alone.
+      await queryClient.invalidateQueries({ queryKey: ['tenant-sidebar', 'operational-navigation-attention'] });
       await queryClient.refetchQueries({ queryKey: ['shipment-items', selectedShipmentId] });
 
       if (selectedShipment?.purchase_order_id) {
