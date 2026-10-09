@@ -130,6 +130,13 @@ export default function RolePermissionEditor<Role extends string, Permission ext
     ? ui("The starting template remains available if you need to restore this role.")
     : ui("Hardcoded defaults remain available if you need to restore this role.");
 
+  // Discard is local-only: unlike Reset to defaults, it must not mutate saved policies.
+  const discardUnsavedDraft = () => {
+    if (!onDiscardDraft || !activeRole?.editable || !dirty || saving || resetting) return;
+    if (!window.confirm(ui("Discard unsaved permission changes for this role?"))) return;
+    onDiscardDraft();
+  };
+
   useEffect(() => {
     if (!dirty) return undefined;
     const warnBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -365,6 +372,17 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                 >
                   {resetting ? ui("Resetting…") : resetLabel}
                 </button>
+                {onDiscardDraft && !isPlatformScope && dirty ? (
+                  <button
+                    type="button"
+                    className={operationalWorkspace ? 'app-button app-button--secondary' : undefined}
+                    style={operationalWorkspace ? undefined : styles.secondaryButton}
+                    disabled={!activeRole.editable || saving || resetting}
+                    onClick={discardUnsavedDraft}
+                  >
+                    {ui("Discard changes")}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   style={operationalWorkspace ? undefined : {
@@ -450,6 +468,11 @@ export default function RolePermissionEditor<Role extends string, Permission ext
                         >
                           {filtering ? ui("Disable shown") : ui("Disable group")}
                         </button>
+                        <small className="role-permission-editor__group-action-help">
+                          {filtering
+                            ? ui("Group actions change all shown editable permissions, not the role defaults.")
+                            : ui("Group actions change all editable permissions in this group, not the role defaults.")}
+                        </small>
                       </div>
                     ) : null}
                   </div>
@@ -513,6 +536,17 @@ export default function RolePermissionEditor<Role extends string, Permission ext
               >
                 {resetting ? ui("Resetting…") : resetLabel}
               </button>
+              {onDiscardDraft && !isPlatformScope && dirty ? (
+                <button
+                  type="button"
+                  className={operationalWorkspace ? 'app-button app-button--secondary' : undefined}
+                  style={operationalWorkspace ? undefined : styles.secondaryButton}
+                  disabled={!activeRole.editable || saving || resetting}
+                  onClick={discardUnsavedDraft}
+                >
+                  {ui("Discard changes")}
+                </button>
+              ) : null}
               <button
                 type="button"
                 style={operationalWorkspace ? undefined : {

@@ -286,3 +286,12 @@
     width: calc(100vw - 20px);
   }
 }
+
+/* Batch 101: explain bulk permission action scope near the controls. */
+.role-permission-editor__group-action-help {
+  display: block;
+  flex-basis: 100%;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  opacity: 0.8;
+}

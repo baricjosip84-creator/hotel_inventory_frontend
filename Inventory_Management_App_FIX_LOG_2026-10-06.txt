@@ -10074,3 +10074,12 @@ LIMITATIONS / LIVE ACCEPTANCE
 CURRENT ENGINEERING BASELINE: Frontend100 + Backend071 unchanged.
 PRODUCTION ACCEPTANCE: PENDING. Batch101 NOT STARTED.
 ================================================================================
+
+================================================================================
+BATCH 101 — PERMISSIONS GROUP-ACTION SCOPE CLARITY — 2026-10-09
+================================================================================
+SOURCE BASELINE: Frontend 100 + Backend 071; canonical audit v93.
+AUDIT: Administration > Permissions; group-level Enable group sets every editable permission enabled and does not restore the role baseline; UI did not explain scope, particularly with filtered results.
+FIX: Add brief localized inline explanation adjacent to bulk group controls distinguishing all editable permissions in a group from filtered shown editable permissions, and both from role defaults. Add style, five-language translations, focused regression script and npm script. Do not alter setGroup handlers, effective permission calculation, backend or database.
+SOURCE CHECK: Focused new regression guard PASS. Full cumulative regression/build and deployed-browser checks not established in this runtime; require CI/browser verification.
+FILES: src/components/permissions/RolePermissionEditor.tsx; RolePermissionEditor.css; src/i18n/tenantUiTranslations.ts; scripts/surgical-fix-101-permissions-group-scope.test.mjs; package.json.
