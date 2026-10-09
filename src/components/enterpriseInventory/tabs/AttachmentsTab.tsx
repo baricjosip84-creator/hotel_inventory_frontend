@@ -239,14 +239,24 @@ export function AttachmentsTab({
         {!attachmentForm.entity_id ? <p style={styles.helper}>{ui('Select a business record above to see its attachments.')}</p> : !canReadAttachments ? <p style={styles.helper}>{ui('Requires {permission} permission.').replace('{permission}', TENANT_PERMISSIONS.ATTACHMENTS_READ)}</p> : attachmentsQuery.isLoading ? <p style={styles.helper}>{ui('Loading…')}</p> : !(attachmentsQuery.data ?? []).length ? <p style={styles.helper}>{ui('No attachments found for this record.')}</p> : (
           <div style={styles.tableWrap}>
             <table style={styles.table}>
-              <thead><tr>{['File','Type / size','Stored','Integrity','Actions'].map((header) => <th key={header} style={styles.th}>{ui(header)}</th>)}</tr></thead>
+              <thead><tr>{['File','Type / size','Stored','Actions'].map((header) => <th key={header} style={styles.th}>{ui(header)}</th>)}</tr></thead>
               <tbody>
                 {(attachmentsQuery.data ?? []).map((item) => (
                   <tr key={item.id}>
                     <td style={styles.td}><strong>{item.original_filename}</strong><br/><span style={styles.muted}>{entityTypeLabel(item.entity_type)}</span></td>
                     <td style={styles.td}>{item.mime_type || '—'}<br/><span style={styles.muted}>{formatBytes(item.file_size_bytes, locale)}</span></td>
-                    <td style={styles.td}>{formatLocalizedDateTime(item.created_at, locale)}<br/><span style={styles.muted}>{item.storage_backend === 'database' ? ui('Stored file') : ui('Legacy metadata only')}</span></td>
-                    <td style={styles.td}>{item.content_sha256 ? <span style={styles.muted} title={item.content_sha256}>SHA-256 {item.content_sha256.slice(0, 12)}…</span> : '—'}</td>
+                    <td style={styles.td}>
+                      {formatLocalizedDateTime(item.created_at, locale)}<br/>
+                      <span style={styles.muted}>{item.storage_backend === 'database' ? ui('Stored file') : ui('Legacy metadata only')}</span>
+                      {item.content_sha256 ? (
+                        <details style={{ marginTop: 6 }}>
+                          <summary style={{ cursor: 'pointer', color: '#2563eb', fontSize: 12 }}>{ui('Technical details')}</summary>
+                          <div style={{ ...styles.muted, marginTop: 6, overflowWrap: 'anywhere' }}>
+                            SHA-256: <code>{item.content_sha256}</code>
+                          </div>
+                        </details>
+                      ) : null}
+                    </td>
                     <td style={styles.td}>
                       <div style={styles.actions}>
                         <button type="button" style={item.can_download ? styles.smallButton : styles.disabledButton} disabled={!item.can_download || downloadingId === item.id} onClick={() => void downloadAttachment(item)}>{downloadingId === item.id ? ui('Downloading…') : item.can_download ? ui('Download') : ui('Metadata only')}</button>
