@@ -431,7 +431,8 @@
     "check:inventory-approval-rule-created-focus-v349307": "node scripts/check-approval-rule-created-focus-surgical-fix-v349307.mjs",
     "check:inventory-tenant-departments-v349308": "node scripts/check-tenant-departments-surgical-fix-v349308.mjs",
     "check:inventory-approval-queue-visibility-v349309": "node scripts/check-inventory-approval-queue-visibility-surgical-fix-v349309.mjs",
-    "check:inventory-requisition-fulfillment-closed-state-v349310": "node scripts/check-requisition-fulfillment-closed-state-surgical-fix-v349310.mjs"
+    "check:inventory-requisition-fulfillment-closed-state-v349310": "node scripts/check-requisition-fulfillment-closed-state-surgical-fix-v349310.mjs",
+    "check:inventory-barcode-print-preview-v349311": "node scripts/check-barcode-print-preview-surgical-fix-v349311.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

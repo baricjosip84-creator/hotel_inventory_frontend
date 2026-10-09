@@ -272,8 +272,8 @@ export function useEnterpriseInventoryWorkflowMutations({
       (result: { print_request_count: number }) => {
         const count = formatLocalizedNumber(result.print_request_count, locale);
         return result.print_request_count === 1
-          ? ui("Print dialog opened for {count} barcode label.").replace("{count}", count)
-          : ui("Print dialog opened for {count} barcode labels.").replace("{count}", count);
+          ? ui("Print view opened for {count} barcode label. Use Print in that window if needed.").replace("{count}", count)
+          : ui("Print view opened for {count} barcode labels. Use Print in that window if needed.").replace("{count}", count);
       },
       ["enterprise-barcode-labels", "enterprise-audit"],
     ),

@@ -81,6 +81,12 @@ function sanitizeFilename(value: string): string {
   return value.replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'barcode-label';
 }
 
+function escapePrintHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[character] || character);
+}
+
 function triggerSvgDownload(label: BarcodeLabel, presentation: BarcodeLabelPresentation) {
   const markup = createBarcodeLabelSvgMarkup(label, presentation);
   const blob = new Blob([markup], { type: 'image/svg+xml;charset=utf-8' });
@@ -94,7 +100,13 @@ function triggerSvgDownload(label: BarcodeLabel, presentation: BarcodeLabelPrese
   URL.revokeObjectURL(url);
 }
 
-function openPrintWindow(labels: BarcodeLabel[], presentation: BarcodeLabelPresentation, documentTitle: string): boolean {
+function openPrintWindow(
+  labels: BarcodeLabel[],
+  presentation: BarcodeLabelPresentation,
+  documentTitle: string,
+  printButtonLabel: string,
+  printHelp: string
+): boolean {
   const popup = window.open('', '_blank', 'width=1000,height=760');
   if (!popup) return false;
   try {
@@ -107,11 +119,29 @@ function openPrintWindow(labels: BarcodeLabel[], presentation: BarcodeLabelPrese
     `<article class="label label-${String(label.barcode_type || 'CODE128').toLowerCase()}">${createBarcodeLabelSvgMarkup(label, presentation)}</article>`
   )).join('');
 
+  // Register the load listener before document.write: an in-document load handler
+  // can miss its event when the new popup/document loads quickly.
+  let requestedPrint = false;
+  const requestPrint = () => {
+    if (requestedPrint || popup.closed) return;
+    requestedPrint = true;
+    popup.setTimeout(() => {
+      try {
+        popup.focus();
+        popup.print();
+      } catch {
+        // Browser printing is best-effort. The visible Print button remains available.
+      }
+    }, 150);
+  };
+  popup.addEventListener('load', requestPrint, { once: true });
+
   popup.document.open();
-  popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${documentTitle.replace(/[&<>"']/g, '')}</title><style>
-    *{box-sizing:border-box}body{margin:0;padding:18px;font-family:Arial,sans-serif;background:#fff}.sheet{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;align-items:start}.label{break-inside:avoid;page-break-inside:avoid;display:flex;justify-content:center}.label svg{width:auto;height:auto;max-width:100%;max-height:330px}.label-code128{grid-column:1/-1}.label-code128 svg{width:min(100%,760px)}@media print{body{padding:0}.sheet{gap:6mm}.label{page-break-inside:avoid}.label-code128{grid-column:1/-1}.label-code128 svg{width:105mm;max-height:none}.label-ean13 svg{width:75mm;max-height:none}.label-qr svg{width:60mm;max-height:none}@page{margin:8mm}}
-  </style></head><body><main class="sheet">${labelMarkup}</main><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),150));</script></body></html>`);
+  popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapePrintHtml(documentTitle)}</title><style>
+    *{box-sizing:border-box}body{margin:0;padding:18px;font-family:Arial,sans-serif;background:#fff}.toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px}.toolbar button{border:0;background:#2563eb;color:#fff;border-radius:8px;padding:10px 18px;font-size:15px;font-weight:600;cursor:pointer}.toolbar p{margin:0;color:#475569;font-size:13px}.sheet{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;align-items:start}.label{break-inside:avoid;page-break-inside:avoid;display:flex;justify-content:center}.label svg{width:auto;height:auto;max-width:100%;max-height:330px}.label-code128{grid-column:1/-1}.label-code128 svg{width:min(100%,760px)}@media print{body{padding:0}.toolbar{display:none!important}.sheet{gap:6mm}.label{page-break-inside:avoid}.label-code128{grid-column:1/-1}.label-code128 svg{width:105mm;max-height:none}.label-ean13 svg{width:75mm;max-height:none}.label-qr svg{width:60mm;max-height:none}@page{margin:8mm}}
+  </style></head><body><div class="toolbar"><button type="button" onclick="window.focus();window.print()">${escapePrintHtml(printButtonLabel)}</button><p>${escapePrintHtml(printHelp)}</p></div><main class="sheet">${labelMarkup}</main></body></html>`);
   popup.document.close();
+  if (popup.document.readyState === 'complete') requestPrint();
   return true;
 }
 
@@ -215,7 +245,13 @@ export function LabelsTab({
   const handlePrint = (labelsToPrint: BarcodeLabel[]) => {
     if (!labelsToPrint.length) return;
     try {
-      if (!openPrintWindow(labelsToPrint, barcodePresentation, ui('Inventory barcode labels'))) {
+      if (!openPrintWindow(
+        labelsToPrint,
+        barcodePresentation,
+        ui('Inventory barcode labels'),
+        ui('Print'),
+        ui('If no print dialog appears, select Print above.')
+      )) {
         window.alert(ui('The browser blocked the print window. Allow pop-ups for this site and try again.'));
         return;
       }
@@ -324,7 +360,7 @@ export function LabelsTab({
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
           <div>
             <h2 style={{ ...styles.cardTitle, marginBottom: 4 }}>{ui('Saved barcode labels')}</h2>
-            <p style={styles.helper}>{ui('Open browser print dialogs, download SVG files, or retire labels. Print requests count dialog openings; browsers cannot confirm physical printing.')}</p>
+            <p style={styles.helper}>{ui('Print opens a preview window with a Print button. Print requests count previews opened, not confirmed print jobs.')}</p>
           </div>
           <button
             type="button"

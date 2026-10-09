@@ -299,7 +299,7 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
   }
 
   if (normalizedPath.endsWith('/enterprise-inventory/barcode-labels/print-events') && normalizedMethod === 'POST') {
-    return 'Barcode label print dialog opened.';
+    return 'Barcode label print view opened.';
   }
 
   if (normalizedPath.endsWith('/enterprise-inventory/barcode-labels') && normalizedMethod === 'POST') {
