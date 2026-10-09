@@ -451,7 +451,8 @@
     "check:shipment-shortage-hint-v349327": "node scripts/check-shipment-shortage-hint-surgical-fix-v349327.mjs",
     "check:shipment-attention-refresh-v349328": "node scripts/check-shipment-attention-refresh-surgical-fix-v349328.mjs",
     "check:procurement-readiness-distinction-v349329": "node scripts/check-procurement-readiness-distinction-surgical-fix-v349329.mjs",
-    "check:procurement-enum-explanations-v349330": "node scripts/check-procurement-enum-explanations-surgical-fix-v349330.mjs"
+    "check:procurement-enum-explanations-v349330": "node scripts/check-procurement-enum-explanations-surgical-fix-v349330.mjs",
+    "check:stock-adjustment-audit-note-position-v349331": "node scripts/check-stock-adjustment-audit-note-position-surgical-fix-v349331.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

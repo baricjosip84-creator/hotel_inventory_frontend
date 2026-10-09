@@ -2278,6 +2278,28 @@ export default function StockPage() {
                       </div>
                     )}
 
+                    {draft.action !== 'consume' ? (
+                      <div>
+                        <label style={styles.label} htmlFor="stock-action-reason">
+                          {ui("Audit Note")}
+                        </label>
+                        <input
+                          id="stock-action-reason"
+                          style={styles.input}
+                          type="text"
+                          maxLength={1000}
+                          value={draft.reason}
+                          onChange={(event) =>
+                            updateDraft((current) => ({
+                              ...current,
+                              reason: event.target.value
+                            }))
+                          }
+                          placeholder={ui("Optional explanation for this count or adjustment")}
+                        />
+                      </div>
+                    ) : null}
+
                     {selectedRow?.serial_tracking_enabled ? (
                       <div style={{ gridColumn: '1 / -1' }}>
                         <label style={styles.label} htmlFor="stock-action-serials">{ui('Serial Numbers')}</label>
@@ -2327,28 +2349,6 @@ export default function StockPage() {
                           <input id="stock-action-manufactured" style={styles.input} type="date" value={draft.manufactured_at} onChange={(event) => updateDraft((current) => ({ ...current, manufactured_at: event.target.value }))} />
                         </div>
                       </>
-                    ) : null}
-
-                    {draft.action !== 'consume' ? (
-                      <div>
-                        <label style={styles.label} htmlFor="stock-action-reason">
-                          {ui("Audit Note")}
-                        </label>
-                        <input
-                          id="stock-action-reason"
-                          style={styles.input}
-                          type="text"
-                          maxLength={1000}
-                          value={draft.reason}
-                          onChange={(event) =>
-                            updateDraft((current) => ({
-                              ...current,
-                              reason: event.target.value
-                            }))
-                          }
-                          placeholder={ui("Optional explanation for this count or adjustment")}
-                        />
-                      </div>
                     ) : null}
 
                     {draft.action === 'consume' && (

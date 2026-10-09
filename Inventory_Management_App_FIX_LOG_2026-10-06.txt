@@ -9758,3 +9758,42 @@ LIMITATIONS / LIVE ACCEPTANCE
 CURRENT ENGINEERING BASELINE: Frontend092 + Backend071 unchanged.
 PRODUCTION ACCEPTANCE: PENDING. Batch093 NOT STARTED.
 ================================================================================
+
+
+================================================================================
+SURGICAL CORRECTION BATCH 093 — STOCK / MANUAL ADJUSTMENT AUDIT NOTE POSITION STABILITY
+Date: 2026-10-09
+================================================================================
+
+AUTHORITATIVE BASELINE
+- Frontend092 full cumulative source SHA-256: 62d82c48a2f7ca64ef9db7d71dabea0d78f1a642b463297f3a8a6796327b51ff.
+- Backend071 full source SHA-256: 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f (UNCHANGED).
+- Canonical tenant audit v93, controlled 2026-09-28 stock manual adjustment: entering positive Adjustment Change dynamically inserted tracking fields before Audit Note, pushing an already-entered audit explanation well down the screen. Later evidence confirmed that the Audit Note value was not lost, so this is a UX positioning issue only, NOT a confirmed data-loss defect.
+- FE092 embedded cumulative FIX_LOG matches standalone, preserving all correction batches 001–092.
+
+SOURCE-VERIFIED CAUSE
+- StockPage.tsx rendered the Audit Note reason input after the `actionAddsStock` conditional tracking-details section and after optional serial tracking. In a positive adjustment, Lot Number, Batch Number, Expiry Date and Manufactured Date newly appeared between the change input and Audit Note; the reason was still bound to draft.reason, but its visual position shifted.
+- Existing adjustment POST `/stock/adjust` already persisted `reason: draft.reason.trim() || 'manual_adjustment'`, so the operation's write semantics did not require a modification.
+
+FRONTEND-ONLY CORRECTION
+- src/pages/StockPage.tsx: move the existing `draft.action !== 'consume'` Audit Note JSX block directly after adjustment/count quantity controls and before optional serial and positive-stock tracking sections. This keeps the field stable when positive-adjustment tracking controls appear.
+- The note still renders for Count and Manual Adjustment, not Consumption; original label, placeholder, 1000-character length, draft.reason controlled value and update handler retained without changes.
+- Keep required/optional tracking fields and stock-add tracking gates intact; do not collapse required controls. No permissions, quantity math, backend API, stock movement, valuation, lot/serial validation, or database changes.
+- package.json registers check:stock-adjustment-audit-note-position-v349331.
+- scripts/check-stock-adjustment-audit-note-position-surgical-fix-v349331.mjs: 35 focused source checks covering DOM/source order, conditional visibility, form bindings, unchanged adjustment payload and permissions, five-language existing labels and isolated TypeScript transpilation.
+
+SOURCE VERIFICATION
+- New focused Batch093 guard: 35/35 PASS.
+- Cumulative targeted surgical regression suites v349298–v349331: 34/34 PASS.
+- Broader application checks: 9/9 PASS, including the global five-language closure audit (45 tenant routes, 264 reachable files, 14,216 translated catalog rows with placeholder parity).
+- Isolated StockPage.tsx TypeScript transpilation: 0 diagnostics; new JS test script node --check PASS.
+- ZIP integrity + exact cumulative source delta and changed-only parity: PASS (see manifest).
+
+RELEASE LIMITATIONS AND ACCEPTANCE
+- Full supported Node24 npm ci, full ESLint, project typecheck:ci, Vite build/CI, deployment and live browser/mobile acceptance: NOT VERIFIED in this environment (Node22, incomplete project dependencies); isolated transpilation is not full typechecking.
+- After supported build/deploy, use controlled stock position: prefill Audit Note; enter positive Adjustment Change and confirm the note remains directly below quantity, retains its text and tracking fields appear below. Test Count and negative adjustment, products with mandatory lot/expiry/serials, narrow viewport and localized labels. Avoid altering real stock except with controlled test data; verify stored audit reason after a permitted controlled operation.
+- Previously recorded production acceptance items for Batches001–092 remain pending independently. Canonical audit v93 unchanged; all engineering corrections recorded here.
+
+CURRENT ENGINEERING BASELINE: Frontend093 + Backend071 unchanged.
+PRODUCTION ACCEPTANCE: PENDING. Batch094 NOT STARTED.
+================================================================================
