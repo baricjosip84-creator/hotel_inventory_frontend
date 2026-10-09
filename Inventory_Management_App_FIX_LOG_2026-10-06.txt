@@ -9716,3 +9716,45 @@ PENDING ACCEPTANCE
 CURRENT ENGINEERING BASELINE: Frontend091 + Backend071 unchanged.
 PRODUCTION ACCEPTANCE: PENDING. Batch092 NOT STARTED.
 ================================================================================
+
+
+================================================================================
+SURGICAL CORRECTION BATCH 092 — PROCUREMENT RECOMMENDATION EXPLANATION ENUM CLARITY
+Date: 2026-10-09
+================================================================================
+
+AUTHORITATIVE INPUT BASELINE
+- Frontend091 cumulative source archive SHA-256: 221063d93ce0cc5e1de303e73c3e177bb92dd7bd7e7717d53d90af7ba7a41642.
+- Backend071 full source archive SHA-256: 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f, unchanged.
+- Canonical audit v93, 2026-09-30 Procurement Recommendations: explanation text exposed raw internal-style values minimum_stock, product_default_with_purchase_history and late_risk to tenant users.
+- Latest source FE091 embedded cumulative FIX_LOG matched standalone byte-for-byte; prior Batches001–091 preserved.
+
+SOURCE-VERIFIED ROOT CAUSE
+- Backend procurement/replenishmentRecommendationService.js buildDetail() sends a human-readable explanation array containing three enum-bearing server sentences: `Source signal: ${row.source_signal}.`, `Supplier selection reason: ${row.supplier_selection_reason}.`, and `Supplier performance status: ${row.supplier_performance_status}.`.
+- Frontend ProcurementRecommendationsPage.tsx previously rendered `detail.reasoning` entries directly as unprocessed text, including raw enum tokens.
+- The same frontend already contains canonicalDisplayLabel() mapping those enum identifiers to translated tenant-facing labels, including the exact observed sample codes.
+
+SURGICAL IMPLEMENTATION — FRONTEND ONLY
+- src/pages/ProcurementRecommendationsPage.tsx: add displayRecommendationReason() that recognizes only the three known enum-bearing sentence patterns. For matching rows, format the label using a localized five-language template and reuse canonicalDisplayLabel() for the embedded enum value. Unknown/new enum values get a readable title-case fallback. Unrecognized sentences, business names, quantities and original messages remain byte-for-byte unchanged. Approval blockers/warnings remain on their separate rendering paths.
+- src/i18n/tenantUiTranslations.ts: add three EN/DE/ES/FR/HR templates, preserving identical {value} placeholders.
+- package.json: add check:procurement-enum-explanations-v349330.
+- scripts/check-procurement-enum-explanations-surgical-fix-v349330.mjs: 47 focused assertions, including execution of transpiled source formatter in each tenant language and preservation of non-enum server evidence.
+- No backend or database modification; no supplier selection, approval, conversion, calculations, permissions, mutations or report semantics changed.
+
+SOURCE VERIFICATION
+- Batch092 focused regression: 47/47 PASS.
+- Cumulative targeted surgical suites v349298–v349330: 33/33 PASS.
+- Broader application source checks: 9/9 PASS.
+- Global five-language translation audit: 45 tenant routes, 264 reachable files, 14,216 five-language translation keys with placeholder parity, PASS.
+- Isolated TypeScript transpilation of modified page and translations: 0 diagnostics each; new Node regression script `node --check` PASS.
+- ZIP CRC, byte-for-byte archive equality and expected-source-only delta: PASS, documented in manifest.
+
+LIMITATIONS / LIVE ACCEPTANCE
+- Full supported Node24 npm ci, comprehensive ESLint, complete typecheck:ci, Vite build/CI, deployed live browser acceptance: NOT VERIFIED (current local Node22 and incomplete app dependencies). Isolated compilation is not a full build.
+- The correction humanizes three known enum-bearing explanation formats only. Other server-authored English explanation sentences are not automatically translated; any broader internationalization is separate follow-up work.
+- On a controlled deployment of FE092/BE071, open Procurement Recommendations and select records with minimum_stock, product_default_with_purchase_history and late_risk. Confirm business-readable localized sentence values in English, German, Spanish, French and Croatian; unrelated numerical details, blockers, approval actions and conversion gates remain unchanged. Test mobile wrapping and cases without those values.
+- Other audit v93 findings and live acceptance for prior batches remain independently pending.
+
+CURRENT ENGINEERING BASELINE: Frontend092 + Backend071 unchanged.
+PRODUCTION ACCEPTANCE: PENDING. Batch093 NOT STARTED.
+================================================================================

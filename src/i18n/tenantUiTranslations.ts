@@ -2,6 +2,9 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  ["Source signal: {value}.", "Ausgangssignal: {value}.", "Señal de origen: {value}.", "Signal source : {value}.", "Izvorni signal: {value}."],
+  ["Supplier selection reason: {value}.", "Grund für die Lieferantenauswahl: {value}.", "Motivo de selección del proveedor: {value}.", "Motif de sélection du fournisseur : {value}.", "Razlog odabira dobavljača: {value}."],
+  ["Supplier performance status: {value}.", "Lieferantenleistungsstatus: {value}.", "Estado de desempeño del proveedor: {value}.", "État de performance du fournisseur : {value}.", "Status uspješnosti dobavljača: {value}."],
   ["Alert escalated", "Warnung eskaliert", "Alerta escalada", "Alerte transmise au niveau supérieur", "Upozorenje eskalirano"],
   ["Supplier return credit expected", "Lieferantengutschrift für Rückgabe erwartet", "Abono esperado por devolución al proveedor", "Avoir fournisseur attendu pour le retour", "Očekuje se odobrenje dobavljača za povrat"],
   ["Supplier credit note received", "Lieferantengutschrift eingegangen", "Nota de abono del proveedor recibida", "Avoir fournisseur reçu", "Zaprimljeno odobrenje dobavljača"],

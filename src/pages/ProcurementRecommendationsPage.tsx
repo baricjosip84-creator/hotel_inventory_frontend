@@ -1496,6 +1496,20 @@ export default function ProcurementRecommendationsPage() {
     } as Record<string, string>)[normalized];
     return key ? ui(key) : titleCase(value);
   };
+  // Recommendation explanations are produced by the server. Humanize only the
+  // three known enum-bearing sentence shapes; leave all other evidence intact.
+  const displayRecommendationReason = (reason: string): string => {
+    const patterns: ReadonlyArray<readonly [RegExp, string]> = [
+      [/^Source signal: ([a-z0-9_]+)\.$/i, "Source signal: {value}."],
+      [/^Supplier selection reason: ([a-z0-9_]+)\.$/i, "Supplier selection reason: {value}."],
+      [/^Supplier performance status: ([a-z0-9_]+)\.$/i, "Supplier performance status: {value}."],
+    ];
+    for (const [pattern, template] of patterns) {
+      const match = reason.match(pattern);
+      if (match) return ui(template).replace("{value}", canonicalDisplayLabel(match[1]));
+    }
+    return reason;
+  };
   const queryClient = useQueryClient();
   const capabilities = getRoleCapabilities();
   const canApproveRecommendations = capabilities.canApprovePurchaseOrders;
@@ -3271,7 +3285,7 @@ export default function ProcurementRecommendationsPage() {
               <div style={styles.statLabel}>{ui("Recommendation explanation")}</div>
               <ul style={styles.reasonList}>
                 {(selectedDetail.detail?.reasoning || []).map((reason) => (
-                  <li key={reason}>{reason}</li>
+                  <li key={reason}>{displayRecommendationReason(reason)}</li>
                 ))}
                 {selectedDetail.detail?.blockers?.map((blocker) => (
                   <li
