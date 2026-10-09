@@ -1562,7 +1562,7 @@ export default function InsightsPage() {
         aside={
           <>
             <OperationalWorkspaceStatus
-              value={healthQuery.data ? formatNumber(healthQuery.data.health_score, 0) : '—'}
+              value={healthQuery.data ? formatNumber(healthQuery.data.health_score) : '—'}
               label={healthQuery.data?.generated_at ? ui('health score · refreshed {time}').replace('{time}', formatDateTime(healthQuery.data.generated_at)) : ui('tenant health score · not loaded yet')}
             />
             <button
@@ -1580,7 +1580,7 @@ export default function InsightsPage() {
       <section className="app-grid-stats insights-summary-grid io-workspace-stats" style={styles.statsGrid}>
         <StatCard
           title={ui("Operational Health")}
-          value={healthQuery.data ? formatNumber(healthQuery.data.health_score, 0) : '-'}
+          value={healthQuery.data ? formatNumber(healthQuery.data.health_score) : '-'}
           subtitle={healthQuery.data ? ui('Current tier: {tier}').replace('{tier}', formatReadableStatus(healthQuery.data.health_tier)) : ui('Tenant-level health score.')}
           tone={!healthQuery.data ? 'default' : healthQuery.data.health_tier === 'critical' ? 'bad' : healthQuery.data.health_tier === 'watch' ? 'warn' : 'good'}
           iconPath="/dashboard"
@@ -1678,7 +1678,7 @@ export default function InsightsPage() {
             <div style={styles.list}>
               <div style={styles.keyValueRow}>
                 <strong style={styles.keyLabel}>{ui("Health Score")}</strong>
-                <span style={styles.keyValue}>{formatNumber(healthQuery.data.health_score, 0)}</span>
+                <span style={styles.keyValue}>{formatNumber(healthQuery.data.health_score)}</span>
               </div>
               <div style={styles.keyValueRow}>
                 <strong style={styles.keyLabel}>{ui("Tier")}</strong>

@@ -9917,3 +9917,43 @@ LIMITATIONS / LIVE ACCEPTANCE
 CURRENT ENGINEERING BASELINE: Frontend096 + Backend071 unchanged.
 PRODUCTION ACCEPTANCE: PENDING. Batch097 NOT STARTED.
 ================================================================================
+
+
+================================================================================
+SURGICAL CORRECTION BATCH 097 — INSIGHTS / OPERATIONAL HEALTH SCORE PRECISION
+Date: 2026-10-09
+================================================================================
+
+AUTHORITATIVE BASELINE
+- Frontend096 cumulative ZIP SHA-256: 8b15505c311f96e4aebe85b0095fbeacd916adbbbd108e760e661630ba426dde.
+- Backend071 unchanged ZIP SHA-256: 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f.
+- Audit v93 DASH-013 / INSIGHTS-UX-OBS-002: Dashboard Operational Health 57.75, Insights Operational Health 58, same score but inconsistent precision.
+- Complete FIX_LOG Batches001–096 verified byte-for-byte in FE096 and standalone copy; retained.
+
+SOURCE-VERIFIED ROOT CAUSE
+- DashboardPage.tsx renders health.health_score using formatLocalizedNumber(..., maximumFractionDigits:2).
+- InsightsPage.tsx defines a shared two-decimal formatNumber helper, but overrides it with digits=0 at THREE health-score display sites (header status, Operational Health stat, and detailed Health Score).
+- Display-only inconsistency: does not demonstrate differing health calculations or backend values.
+
+FRONTEND-ONLY SURGICAL CORRECTION
+- src/pages/InsightsPage.tsx: remove the explicit zero-decimal override at all three health-score display sites; use the page's existing locale-aware maximum-two-decimal formatter.
+- Preserve other metrics' intentionally whole-number precision, health tiers, score source, refresh and error states, the Dashboard, and all calculations.
+- package.json: register check:insights-health-score-precision-v349335.
+- scripts/check-insights-health-score-precision-surgical-fix-v349335.mjs: focused source regression and isolated TSX syntax check.
+- No backend, schema, translations or database changes.
+
+VERIFICATION
+- Batch097 focused guard: 24/24 PASS.
+- Cumulative targeted surgical suites v349298–v349335: 38/38 PASS.
+- Nine broader application checks: 9/9 PASS, including multilingual closure (45 tenant routes, 264 source files, 14,219 five-language catalog rows / placeholder parity).
+- Isolated InsightsPage.tsx TS transpilation: zero diagnostics; Node regression script syntax PASS.
+- ZIP CRC, exact expected byte-level delta, FIX_LOG synchronization and bundle SHA manifest: PASS.
+
+LIMITATIONS / LIVE ACCEPTANCE
+- Full supported Node24 npm ci, full project ESLint/typecheck:ci/Vite build, CI/deployment and actual production browser testing: NOT VERIFIED in this environment (Node22 and incomplete project dependencies).
+- Once deployed to a controlled tenant with fractional health score, open Dashboard and Insights in the same tenant and near the same refresh time; both must display matching 2-decimal-maximum scores (e.g. 57.75 vs 57.75) across Insights header, stat card and detail row. Test Croatian decimal comma, browser refresh, other languages and score tier consistency. If backend scores change in between, re-refresh both before comparing; no assertion of backend equivalence is based solely on display.
+- All earlier source fixes and production acceptance backlog retained. Do not confuse source regressions with live production acceptance.
+
+CURRENT ENGINEERING BASELINE: Frontend097 + Backend071 unchanged.
+PRODUCTION ACCEPTANCE: PENDING. Batch098 NOT STARTED.
+================================================================================

@@ -455,7 +455,8 @@
     "check:stock-adjustment-audit-note-position-v349331": "node scripts/check-stock-adjustment-audit-note-position-surgical-fix-v349331.mjs",
     "check:storage-condition-selector-v349332": "node scripts/check-storage-condition-selector-surgical-fix-v349332.mjs",
     "check:users-contextual-confirmations-v349333": "node scripts/check-users-contextual-confirmations-surgical-fix-v349333.mjs",
-    "check:reports-ledger-location-select-v349334": "node scripts/check-reports-ledger-location-select-surgical-fix-v349334.mjs"
+    "check:reports-ledger-location-select-v349334": "node scripts/check-reports-ledger-location-select-surgical-fix-v349334.mjs",
+    "check:insights-health-score-precision-v349335": "node scripts/check-insights-health-score-precision-surgical-fix-v349335.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
