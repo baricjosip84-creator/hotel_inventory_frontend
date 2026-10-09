@@ -42,6 +42,8 @@ const TEMPERATURE_ZONE_SUGGESTIONS = [
   'Humidity Controlled'
 ];
 
+const CUSTOM_TEMPERATURE_ZONE_CHOICE = '__custom_condition__';
+
 const STANDARD_TEMPERATURE_ZONE_KEYS = new Set(
   TEMPERATURE_ZONE_SUGGESTIONS.map((zone) => zone.toLocaleLowerCase())
 );
@@ -150,6 +152,7 @@ export default function StorageLocationsPage() {
   const [zoneFilter, setZoneFilter] = useState(() => searchParams.get('zone')?.trim() || '');
   const [editingLocation, setEditingLocation] = useState<StorageLocationItem | null>(null);
   const [form, setForm] = useState<StorageLocationFormState>(emptyForm());
+  const [customConditionSelected, setCustomConditionSelected] = useState(false);
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
@@ -179,6 +182,7 @@ export default function StorageLocationsPage() {
     onSuccess: async () => {
       setEditingLocation(null);
       setForm(emptyForm());
+      setCustomConditionSelected(false);
       setFormError(null);
       setFormMessage(ui("Storage location created successfully."));
       await invalidateLocationConsumers();
@@ -194,6 +198,7 @@ export default function StorageLocationsPage() {
     onSuccess: async () => {
       setEditingLocation(null);
       setForm(emptyForm());
+      setCustomConditionSelected(false);
       setFormError(null);
       setFormMessage(ui("Storage location updated successfully."));
       await invalidateLocationConsumers();
@@ -209,6 +214,7 @@ export default function StorageLocationsPage() {
     onSuccess: async () => {
       setEditingLocation(null);
       setForm(emptyForm());
+      setCustomConditionSelected(false);
       setFormError(null);
       setFormMessage(ui("Storage location retired successfully. Historical records remain available."));
       await invalidateLocationConsumers();
@@ -334,6 +340,7 @@ export default function StorageLocationsPage() {
 
     setEditingLocation(location);
     setForm(formFromLocation(location));
+    setCustomConditionSelected(Boolean(location.temperature_zone?.trim()) && !isStandardTemperatureZone(location.temperature_zone));
     clearTransientFeedback();
     scrollToFormSection('storage-location-form-panel');
   };
@@ -341,6 +348,7 @@ export default function StorageLocationsPage() {
   const cancelEdit = () => {
     setEditingLocation(null);
     setForm(emptyForm());
+    setCustomConditionSelected(false);
     clearTransientFeedback();
   };
 
@@ -377,6 +385,15 @@ export default function StorageLocationsPage() {
   const updateFormField = (field: keyof StorageLocationFormState, value: string) => {
     clearTransientFeedback();
     setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const conditionChoice = customConditionSelected || (Boolean(form.temperature_zone.trim()) && !isStandardTemperatureZone(form.temperature_zone))
+    ? CUSTOM_TEMPERATURE_ZONE_CHOICE
+    : form.temperature_zone;
+
+  const handleConditionChoice = (choice: string) => {
+    setCustomConditionSelected(choice === CUSTOM_TEMPERATURE_ZONE_CHOICE);
+    updateFormField('temperature_zone', choice === CUSTOM_TEMPERATURE_ZONE_CHOICE ? '' : choice);
   };
 
   const handleRefreshLocations = async () => {
@@ -496,19 +513,32 @@ export default function StorageLocationsPage() {
 
           <div>
             <label htmlFor="storage-location-temperature-zone" style={styles.label}>{ui("Storage Condition")}</label>
-            <input
+            <select
               id="storage-location-temperature-zone"
-              list="storage-location-temperature-zone-options"
               style={inputDisabled ? styles.disabledInput : styles.input}
-              value={form.temperature_zone}
-              onChange={(event) => updateFormField('temperature_zone', event.target.value)}
-              placeholder={ui("Example: Ambient, cold, chilled, frozen")}
-              maxLength={100}
+              value={conditionChoice}
+              onChange={(event) => handleConditionChoice(event.target.value)}
               disabled={inputDisabled}
-            />
-            <datalist id="storage-location-temperature-zone-options">
-              {TEMPERATURE_ZONE_SUGGESTIONS.map((zone) => <option key={zone} value={zone} label={ui(zone)} />)}
-            </datalist>
+            >
+              <option value="">{ui("Not specified")}</option>
+              {TEMPERATURE_ZONE_SUGGESTIONS.map((zone) => <option key={zone} value={zone}>{ui(zone)}</option>)}
+              <option value={CUSTOM_TEMPERATURE_ZONE_CHOICE}>{ui("Custom storage condition…")}</option>
+            </select>
+            {conditionChoice === CUSTOM_TEMPERATURE_ZONE_CHOICE ? (
+              <div style={{ marginTop: 10 }}>
+                <label htmlFor="storage-location-custom-temperature-zone" style={styles.label}>{ui("Custom storage condition")}</label>
+                <input
+                  id="storage-location-custom-temperature-zone"
+                  style={inputDisabled ? styles.disabledInput : styles.input}
+                  value={form.temperature_zone}
+                  onChange={(event) => updateFormField('temperature_zone', event.target.value)}
+                  placeholder={ui("Enter a storage condition")}
+                  maxLength={100}
+                  required
+                  disabled={inputDisabled}
+                />
+              </div>
+            ) : null}
             <div style={styles.fieldHelp}>{ui("Optional. Choose a recommended condition label where possible. Custom values remain allowed, but the page flags them for review; do not repeat the department or location name here.")}</div>
           </div>
 

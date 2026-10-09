@@ -9797,3 +9797,44 @@ RELEASE LIMITATIONS AND ACCEPTANCE
 CURRENT ENGINEERING BASELINE: Frontend093 + Backend071 unchanged.
 PRODUCTION ACCEPTANCE: PENDING. Batch094 NOT STARTED.
 ================================================================================
+
+
+================================================================================
+SURGICAL CORRECTION BATCH 094 — STORAGE LOCATIONS / CONDITION SELECTOR CLARITY
+Date: 2026-10-09
+================================================================================
+
+AUTHORITATIVE BASELINE
+- Frontend093 full cumulative source ZIP SHA-256: 59f4491b8f00825282331dd3e019e8bd4b5f4423cffc73ea9da87d4609b61d35.
+- Backend071 full cumulative source ZIP SHA-256: 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f. Unchanged.
+- Canonical tenant audit v93, Storage Locations 2026-09-28: Storage Condition text input with datalist created competing native dropdown arrow and a floating black suggestion popup (Ambient, Dry Ambient, Controlled Ambient). The audit explicitly preferred a single clear conventional select or an integrated combobox. Operational create flow passed; the issue was visual interaction clarity.
+- IMPORTANT documentation reconciliation: standalone FIX_LOG through Batch092 was shorter than the authoritative embedded FE093 FIX_LOG. This batch restores all history by appending to the embedded FE093 copy, then synchronizes standalone and new frontend copy. Audit v93 remains unchanged.
+
+SOURCE-VERIFIED ROOT CAUSE
+- src/pages/StorageLocationsPage.tsx rendered an <input list="storage-location-temperature-zone-options"> with a native <datalist>. The suggestion popup was browser-owned, not styled as the application's standard form control.
+- The same form supports arbitrary custom temperature_zone labels and must preserve existing custom labels in edit mode; converting directly to a fixed-only select would silently lose legitimate data flexibility.
+
+FRONTEND-ONLY CORRECTION
+- StorageLocationsPage.tsx: Replace the native datalist with one native <select> of recommended storage-condition values, translated labels, an optional "Not specified" choice, and a clearly labelled "Custom storage condition…" choice.
+- The custom choice reveals a separate required max-100-character custom text field. Existing nonstandard saved values automatically enter custom mode with their text intact in edit mode. Successful create/update/retire and Cancel clear custom mode. Choosing a standard value clears the prior custom draft and stores exactly that standard value; choosing Not specified preserves the original optional/null semantics.
+- A local selection sentinel is never sent to the server. The original StorageLocationFormState, POST/PATCH /storage-locations JSON `temperature_zone`, If-Match-Version concurrency guard, permissions, classification recommendation rules, feedback and retirement safeguards remain unchanged.
+- tenantUiTranslations.ts: Three new complete EN/DE/ES/FR/HR rows for the selector's custom choice, input label and placeholder.
+- package.json: register check:storage-condition-selector-v349332.
+- scripts/check-storage-condition-selector-surgical-fix-v349332.mjs: 35 focused source assertions including translations, edit-state restoration, reset paths, original payload and permissions, and isolated TypeScript parse.
+- No backend or schema changes, no migration.
+
+SOURCE VERIFICATION
+- Batch094 focused guard: 35/35 PASS.
+- Cumulative targeted surgical suites v349298–v349332: 35/35 PASS.
+- Broader application regression checks: 9/9 PASS, including global tenant multilingual closure (45 routes, 264 reachable source files, 14,219 unique five-language translation rows, placeholder parity).
+- Isolated transpilation of modified StorageLocationsPage and translations: zero diagnostics. Node guard syntax check: PASS.
+- Full cumulative frontend ZIP + exact changed-files ZIP: CRC, byte-equality, source-delta, checksum comparisons: PASS (see manifest).
+
+LIMITATIONS / LIVE ACCEPTANCE
+- Full supported Node24 dependency installation, full ESLint, full TypeScript typecheck:ci, production Vite build, CI deployment, and real deployed desktop/mobile browser acceptance: NOT VERIFIED (only Node22 and incomplete dependencies in this working environment).
+- After proper CI/deployment, test create with Ambient; switch to Custom, enter a new label, switch back to Ambient, select Not specified; ensure no stale value leaks. Edit a saved nonstandard condition, ensure its exact spelling is prefilled and can be saved unchanged. Verify permissions, keyboard use, five tenant languages and mobile; confirm create/update still persists condition correctly. No stock mutation needed.
+- Earlier audit v93 findings and live-acceptance tasks remain separately open; no production PASS is claimed.
+
+CURRENT ENGINEERING BASELINE: Frontend094 + Backend071 unchanged.
+PRODUCTION ACCEPTANCE: PENDING. Batch095 NOT STARTED.
+================================================================================

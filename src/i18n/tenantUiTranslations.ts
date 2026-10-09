@@ -2,6 +2,9 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  ["Custom storage condition…", "Benutzerdefinierte Lagerbedingung…", "Condición de almacenamiento personalizada…", "Condition de stockage personnalisée…", "Prilagođeni uvjeti skladištenja…"],
+  ["Custom storage condition", "Benutzerdefinierte Lagerbedingung", "Condición de almacenamiento personalizada", "Condition de stockage personnalisée", "Prilagođeni uvjeti skladištenja"],
+  ["Enter a storage condition", "Lagerbedingung eingeben", "Introduzca una condición de almacenamiento", "Saisissez une condition de stockage", "Unesite uvjete skladištenja"],
   ["Source signal: {value}.", "Ausgangssignal: {value}.", "Señal de origen: {value}.", "Signal source : {value}.", "Izvorni signal: {value}."],
   ["Supplier selection reason: {value}.", "Grund für die Lieferantenauswahl: {value}.", "Motivo de selección del proveedor: {value}.", "Motif de sélection du fournisseur : {value}.", "Razlog odabira dobavljača: {value}."],
   ["Supplier performance status: {value}.", "Lieferantenleistungsstatus: {value}.", "Estado de desempeño del proveedor: {value}.", "État de performance du fournisseur : {value}.", "Status uspješnosti dobavljača: {value}."],
