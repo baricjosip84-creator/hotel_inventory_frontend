@@ -780,6 +780,58 @@ function ChoiceFilterField({ label, value, placeholder, options, onChange, disab
   );
 }
 
+// Native select for normal report locations, with an explicit typed fallback for
+// historic/renamed locations not present in the available option catalog.
+function HistoricalLocationFilterField({ label, value, placeholder, options, onChange, disabled }: {
+  label: string;
+  value: string;
+  placeholder: string;
+  options: string[];
+  onChange: (value: string) => void;
+  disabled: boolean;
+}) {
+  const { ui } = useAppTranslation();
+  const [customMode, setCustomMode] = useState(false);
+  if (!options.length) {
+    return <TextFilterField label={label} value={value} placeholder={placeholder} disabled={disabled} onChange={onChange} />;
+  }
+  const customOptionValue = '__historical_location__';
+  const manual = customMode || Boolean(value && !options.includes(value));
+  return (
+    <label className="reports-field reports-field--compact">
+      <span>{label}</span>
+      <select
+        value={manual ? customOptionValue : value}
+        disabled={disabled}
+        onChange={(event) => {
+          if (event.target.value === customOptionValue) {
+            setCustomMode(true);
+            onChange('');
+          } else {
+            setCustomMode(false);
+            onChange(event.target.value);
+          }
+        }}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+        <option value={customOptionValue}>{ui('Other or historical location…')}</option>
+      </select>
+      {manual ? (
+        <input
+          type="text"
+          value={value}
+          maxLength={MAX_REPORT_FILTER_LENGTH}
+          aria-label={ui('Enter a historical location or search term')}
+          placeholder={ui('Enter a historical location or search term')}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      ) : null}
+    </label>
+  );
+}
+
 function AutocompleteFilterField({ label, value, placeholder, options, onChange, disabled, listId }: {
   label: string;
   value: string;
@@ -1511,7 +1563,7 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={transferFilters.from} to={transferFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setTransferFilters, 'from', value)} onToChange={(value) => updateAndClear(setTransferFilters, 'to', value)} />
-              <AutocompleteFilterField label={ui("Location")} value={transferFilters.location} placeholder={ui("Any current or historical source/destination")} options={filterOptions.locations} listId="report-locations-transfers" disabled={isExporting} onChange={(value) => updateAndClear(setTransferFilters, 'location', value)} />
+              <HistoricalLocationFilterField label={ui("Location")} value={transferFilters.location} placeholder={ui("Any current or historical source/destination")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setTransferFilters, 'location', value)} />
               <label className="reports-field reports-field--compact"><span>{ui("Status")}</span><select value={transferFilters.status} onChange={(event) => updateAndClear(setTransferFilters, 'status', event.target.value)} disabled={isExporting}>{TRANSFER_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{ui(label)}</option>)}</select></label>
               <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={transferFilters.limit} onChange={(event) => updateAndClear(setTransferFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
             </>

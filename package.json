@@ -462,7 +462,8 @@
     "check:action-center-croatian-name-v349337": "node scripts/check-action-center-croatian-name-surgical-fix-v349337.mjs",
     "check:permission-group-action-scope-v349339": "node scripts/surgical-fix-101-permissions-group-scope.test.mjs",
     "check:toast-technical-request-id-v349338": "node scripts/check-toast-technical-request-id-surgical-fix-v349338.mjs",
-    "check:action-center-alert-evidence-v349342": "node scripts/check-action-center-alert-evidence-localization-surgical-fix-v349342.mjs"
+    "check:action-center-alert-evidence-v349342": "node scripts/check-action-center-alert-evidence-localization-surgical-fix-v349342.mjs",
+    "check:reports-transfer-location-dropdown-v349343": "node scripts/check-reports-transfer-location-dropdown-surgical-fix-v349343.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

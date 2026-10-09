@@ -10199,3 +10199,38 @@ LIVE ACCEPTANCE STILL PENDING
 CURRENT ENGINEERING BASELINE: Frontend103 + Backend072.
 PRODUCTION ACCEPTANCE: PENDING. Batch105 NOT STARTED.
 ================================================================================
+
+
+================================================================================
+SURGICAL CORRECTION BATCH 105 — REPORTS / STOCK TRANSFERS LOCATION DROPDOWN WITH HISTORICAL FALLBACK
+Date: 2026-10-09
+================================================================================
+AUTHORITATIVE STARTING POINT
+- Full cumulative Frontend103 and Backend072 source archives from the Batch104 continuation bundle.
+- Canonical tenant audit v93: GLOBAL-UX-003 / Reports > Stock Transfers Location dropdown differs from the standard native choice presentation. This batch addresses this one verified instance, not every remaining Product autocomplete elsewhere in Reports.
+- Complete standalone and embedded FIX_LOG through Batch104 matched exactly before appending.
+
+SOURCE FINDING
+- ReportsPage.tsx still used AutocompleteFilterField with a datalist for Stock Transfers Location. It rendered browser-specific suggestion popups unlike native Result limit dropdown.
+- The stock-transfer location search includes current and historical names, so replacing with a strict option-only select would remove the ability to search an unlisted historical location.
+
+CODE CHANGES
+- Added reusable HistoricalLocationFilterField in src/pages/ReportsPage.tsx. Listed locations use a standard native select. An explicit Other or historical location option reveals a labelled typed fallback. If options cannot be loaded, free-text input is retained. Existing historical input values outside the option set remain editable.
+- Replaced only Stock Transfers Location's datalist usage with the new component; preserved existing transfer filters, query state, tenant options, permissions and export handlers.
+- Added translations for both control labels in English, German, Spanish, French and Croatian.
+- Registered check:reports-transfer-location-dropdown-v349343 and added runtime/source regression script check-reports-transfer-location-dropdown-surgical-fix-v349343.mjs.
+- Backend072 remains byte-for-byte unchanged; no database migration.
+
+VERIFICATION
+- Focused compiled-helper runtime and source regression: 26/26 assertions PASS (native choice, historical typing, clearing, existing value, locale, TS transpilation).
+- Inherited/source checks: 50/50 available targeted test scripts PASS (49 frontend, 1 backend), including Reports, Permissions, Audit and prior surgical fixes.
+- Tenant multilingual closure audit PASS: 45/45 tenant routes, 264 reachable source files, 14,228 five-language translation rows.
+- Full Node24 project build, real PostgreSQL queries and deployed browser acceptance were NOT run or certified.
+- Package ZIP integrity, exact changed files and manifest checks independently verified during release creation.
+
+LIVE ACCEPTANCE PENDING
+- After deploying Frontend104 with Backend072, open Reports > Stock Transfers. Confirm the Location dropdown appearance matches the Result limit control. Select active locations and verify filtering, CSV/PDF/Print outputs; select Other or historical location and type a historical location name. Confirm clearing to the default restores unfiltered results. Test Croatian and other languages, mobile widths and permissions. Confirm other Reports controls remain unchanged.
+
+CURRENT ENGINEERING BASELINE: Frontend104 + Backend072.
+PRODUCTION ACCEPTANCE: PENDING. Batch106 NOT STARTED.
+================================================================================
