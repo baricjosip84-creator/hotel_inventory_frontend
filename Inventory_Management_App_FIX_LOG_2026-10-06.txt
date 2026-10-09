@@ -9283,3 +9283,53 @@ PRODUCTION STATUS: NOT LIVE VERIFIED.
 Batch 082 has NOT STARTED; select and reconcile a remaining real audit v93
 finding against current sources and this cumulative FIX_LOG first.
 ================================================================================
+
+
+================================================================================
+SURGICAL CORRECTION BATCH 082 — REPORTS / COUNT VARIANCE FILTER PRESENTATION
+Date: 2026-10-09
+================================================================================
+
+SOURCE OF TRUTH
+- Frontend 081 cumulative ZIP (SHA-256 b47f25cbafe406843fb2dde65742c39b4727a414448dce9affe3ca483b299c2a).
+- Backend 071 cumulative ZIP (SHA-256 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f).
+- Canonical audit findings v93: Reports > Count Variance, REPORT-CV-UX-001, REPORT-CV-UX-002 and REPORT-CV-UX-003.
+- Cumulative FIX_LOG through Batch 081.
+
+CONFIRMED ISSUE
+- Count Variance Product and Location used AutocompleteFilterField with native datalist popups.
+- Result limit, on the same row, used a native select. This produces inconsistent opened-filter presentation, as confirmed in Chrome and Opera testing in the original audit.
+- The functional product/location options and report query were already working.
+
+SURGICAL IMPLEMENTATION — FRONTEND ONLY
+- src/pages/ReportsPage.tsx: the two Count Variance Product/Location fields now reuse the pre-existing ChoiceFilterField (standard select presentation) used elsewhere on Reports, not a new CSS/dropdown implementation.
+- Product/location options still come from the same tenant filterOptions.products and filterOptions.locations arrays. State update and clear behavior still calls updateAndClear(setVarianceFilters, ...); existing Result limit, report rows, backend and exports are unchanged.
+- When no options are loaded, ChoiceFilterField falls back to the same TextFilterField behavior already built into that shared component.
+- scripts/check-reports-count-variance-filter-style-surgical-fix-v349320.mjs: new 24-assertion regression check.
+- package.json: added npm check:reports-count-variance-filter-style-v349320.
+- Cumulative FIX_LOG updated here and embedded identically in full frontend ZIP.
+
+IMPORTANT UX BEHAVIOR QUALIFICATION
+- With tenant options present, native select restricts Product/Location choices to complete supplied names, not arbitrary typed substrings. This is an intentional interaction change from the previous datalist. The backend's product/location query parameters and result calculations are not changed.
+- Because browser-native dropdown popup styling depends on browser/OS, a live Chrome+Opera acceptance pass must confirm visual alignment and that operators can select the intended product/location from a realistic list (including larger lists) before signoff.
+- Confirm no need for substring-only filtering; if required, add a separately designed optional search mechanism rather than silently reverting the native list.
+
+SOURCE VERIFICATION PERFORMED
+- PASS new focused 24/24 assertions.
+- PASS 23/23 cumulative targeted surgical regression suites v349298–v349320.
+- PASS Reports page hardening; Tenant Reports multilingual; global tenant multilingual closure (45 routes / 264 reachable files / 14,212 five-language rows).
+- PASS i18n-build surgical check 11/11; Tenant Permissions; Tenant Audit; role-permission contract; report-export-feature closure.
+- PASS isolated ReportsPage.tsx TypeScript/TSX transpilation diagnostics: 0.
+- Backend071 cumulative working source byte-identical to authoritative ZIP.
+- ZIP CRC and exact changed-file/archive equivalence: recorded separately in Batch082 manifest.
+
+NOT VERIFIED / RELEASE GATES
+- Node v22.16.0 is below frontend's Node24.x requirement; historical offline npm ci was blocked by missing registry/cache dependencies.
+- Full npm ci, full project ESLint/typecheck:ci/Vite prebuild, CI/CD and actual browser visual/function tests: NOT VERIFIED; do not declare production PASS.
+- Deploy FE082 + unchanged BE071 only after supported CI. Retest Count Variance filters and cross-browser popup appearance, other untouched report filters and CSV/PDF/Print.
+- Continue pending Notifications worker attempts/delivery, Barcode Labels actual print dialog, and central Approvals fresh requisition acceptance.
+
+CURRENT ENGINEERING BASELINE: Frontend 082 + Backend 071.
+PRODUCTION ACCEPTANCE: PENDING.
+Batch 083 has NOT started; select and validate next unresolved issue in audit v93.
+================================================================================

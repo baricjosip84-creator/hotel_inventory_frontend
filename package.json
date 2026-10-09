@@ -440,7 +440,8 @@
     "check:inventory-barcode-print-preview-v349311": "node scripts/check-barcode-print-preview-surgical-fix-v349311.mjs",
     "check:inventory-attachment-hash-i18n-v349317": "node scripts/check-attachment-hash-i18n-surgical-fix-v349317.mjs",
     "check:users-duplicate-email-feedback-v349318": "node scripts/check-users-duplicate-email-feedback-surgical-fix-v349318.mjs",
-    "check:outbound-workflow-disclosure-v349319": "node scripts/check-outbound-workflow-disclosure-surgical-fix-v349319.mjs"
+    "check:outbound-workflow-disclosure-v349319": "node scripts/check-outbound-workflow-disclosure-surgical-fix-v349319.mjs",
+    "check:reports-count-variance-filter-style-v349320": "node scripts/check-reports-count-variance-filter-style-surgical-fix-v349320.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

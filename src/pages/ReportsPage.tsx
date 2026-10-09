@@ -1480,8 +1480,8 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={varianceFilters.from} to={varianceFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setVarianceFilters, 'from', value)} onToChange={(value) => updateAndClear(setVarianceFilters, 'to', value)} />
-              <AutocompleteFilterField label={ui("Product")} value={varianceFilters.product} placeholder={ui("Any product name")} options={filterOptions.products} listId="report-products-variance" disabled={isExporting} onChange={(value) => updateAndClear(setVarianceFilters, 'product', value)} />
-              <AutocompleteFilterField label={ui("Location")} value={varianceFilters.location} placeholder={ui("Any location")} options={filterOptions.locations} listId="report-locations-variance" disabled={isExporting} onChange={(value) => updateAndClear(setVarianceFilters, 'location', value)} />
+              <ChoiceFilterField label={ui("Product")} value={varianceFilters.product} placeholder={ui("Any product name")} options={filterOptions.products} disabled={isExporting} onChange={(value) => updateAndClear(setVarianceFilters, 'product', value)} />
+              <ChoiceFilterField label={ui("Location")} value={varianceFilters.location} placeholder={ui("Any location")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setVarianceFilters, 'location', value)} />
               <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={varianceFilters.limit} onChange={(event) => updateAndClear(setVarianceFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
             </>
           }
