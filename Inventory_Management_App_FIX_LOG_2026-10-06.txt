@@ -10034,3 +10034,43 @@ LIMITATIONS / LIVE ACCEPTANCE
 CURRENT ENGINEERING BASELINE: Frontend099 + Backend071 unchanged.
 PRODUCTION ACCEPTANCE: PENDING. Batch100 NOT STARTED.
 ================================================================================
+
+
+================================================================================
+SURGICAL CORRECTION BATCH 100 — TENANT ACTION FEEDBACK / TECHNICAL REQUEST ID DISCLOSURE
+Date: 2026-10-09
+================================================================================
+
+AUTHORITATIVE BASELINE
+- Frontend099 cumulative source ZIP SHA-256: 38f5898b3b1cedcfd1b4be684ac1c047deefbbf9dc23c69c89d1f539c32096b8.
+- Backend071 unchanged ZIP SHA-256: 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f.
+- Canonical audit v93, Administration > Users, duplicate-email failure at 2026-10-05 16:27 CEST, recorded normal-user error toast exposing a Request ID. Batch080 separately fixed the duplicate-email business message, but the global toast view still rendered any attached ID directly.
+- Previous cumulative FIX_LOG entries 001–099 preserved byte-for-byte before appending this section. The prior source and external bundle FIX_LOG were compared before changes.
+
+SOURCE-VERIFIED ROOT CAUSE
+- src/app/AppProviders.tsx, ActionFeedbackToasts, rendered <small>Request ID: ...</small> directly in the notification whenever the shared API feedback event provided requestId, with no technical-details disclosure.
+- The shared API and actionFeedback retain useful request IDs for troubleshooting. Removing them upstream would compromise support diagnostics; a presentation-only fix is appropriate.
+
+FRONTEND-ONLY SURGICAL CORRECTION
+- src/app/AppProviders.tsx: present request ID only inside a native closed-by-default <details> element with translated “Technical details” summary and the existing full ID beneath it. Visible business error/success message remains unchanged, as do close control, existing timeout, feedback dedupe, request handling, and logging.
+- Reuse existing all-five-language translation catalog entries for Technical details and Request ID. Platform errors retain plain English, tenant errors use tenant language; long identifiers wrap within the toast.
+- package.json: register check:toast-technical-request-id-v349338.
+- scripts/check-toast-technical-request-id-surgical-fix-v349338.mjs: 26 focused source/TSX syntax guard assertions including default collapsed state, disclosure relationship, translation entries, API feedback presence and unchanged dedupe/dismiss semantics.
+- No backend, database, migration, tenant-permission, token, audit or mutation contract change.
+
+SOURCE VERIFICATION
+- Batch100 focused source checks: 26/26 PASS.
+- Cumulative targeted surgical regression suites v349298–v349338: 41/41 PASS. First local sweep had 15 missing TypeScript-resolver failures; symlinking the existing installed TypeScript compiler into this isolated workspace resolved those environment-only failures. The complete rerun passed 41/41.
+- Nine broader application source checks: 9/9 PASS (Action Center multilingual, global multilingual audit, multilingual foundation, tenant permissions, tenant audit, platform permission/audit, tenant Dashboard, Workspace and Reports multilingual).
+- Global multilingual audit: 45/45 tenant routes, 264 reachable source files, 14,221 five-language entries and placeholder parity PASS.
+- Modified TSX isolated TypeScript transpilation/parse: zero diagnostics; JS regression guard syntax PASS.
+- Source archive CRC, exact unchanged-file comparison, delta parity, unchanged backend hash, FIX_LOG parity and continuation bundle integrity PASS.
+
+LIMITATIONS / LIVE ACCEPTANCE
+- Full Node24 npm ci, complete ESLint/typecheck:ci/Vite build, CI and deployed tenant browser acceptance NOT VERIFIED (local runtime Node22/incomplete dependencies). Source checks do not establish rendered production appearance.
+- After deploying controlled frontend, produce a harmless API error carrying request ID. Confirm user sees understandable error text without technical code, expandable keyboard-operable Technical details reveals the full ID, and close/auto-dismiss behavior still works. Check Croatian/other languages and ensure platform alerts remain accessible. Test duplicate-user-email error separately; that path intentionally suppresses Request ID already through Batch080 mapping.
+- Existing live acceptance backlog (worker, barcode print, reservations, approvals, reports, UI changes) remains open.
+
+CURRENT ENGINEERING BASELINE: Frontend100 + Backend071 unchanged.
+PRODUCTION ACCEPTANCE: PENDING. Batch101 NOT STARTED.
+================================================================================

@@ -490,7 +490,12 @@ function ActionFeedbackToasts() {
           >
             <strong>{tenant ? ui(heading) : heading}</strong>
             <span>{message}</span>
-            {item.requestId ? <small>{tenant ? `${ui('Request ID')}: ${item.requestId}` : `Request ID: ${item.requestId}`}</small> : null}
+            {item.requestId ? (
+              <details style={styles.toastTechnicalDetails}>
+                <summary style={styles.toastTechnicalSummary}>{tenant ? ui('Technical details') : 'Technical details'}</summary>
+                <small style={styles.toastRequestId}>{tenant ? `${ui('Request ID')}: ${item.requestId}` : `Request ID: ${item.requestId}`}</small>
+              </details>
+            ) : null}
             <button
               type="button"
               style={styles.closeButton}
@@ -565,6 +570,20 @@ const styles: Record<string, CSSProperties> = {
     border: '1px solid #fecaca',
     background: '#fef2f2',
     color: '#991b1b'
+  },
+  toastTechnicalDetails: {
+    marginTop: '4px',
+    fontSize: '12px'
+  },
+  toastTechnicalSummary: {
+    cursor: 'pointer',
+    width: 'fit-content',
+    fontWeight: 600
+  },
+  toastRequestId: {
+    display: 'block',
+    marginTop: '6px',
+    overflowWrap: 'anywhere'
   },
   closeButton: {
     position: 'absolute',
