@@ -9674,3 +9674,45 @@ LIMITATIONS AND LIVE ACCEPTANCE
 CURRENT ENGINEERING BASELINE: Frontend090 + Backend071 unchanged.
 PRODUCTION ACCEPTANCE: PENDING. Batch091 NOT STARTED.
 ================================================================================
+
+
+================================================================================
+SURGICAL CORRECTION BATCH 091 — PROCUREMENT / APPROVAL REVIEW VS PO CONVERSION READINESS
+Date: 2026-10-09
+================================================================================
+
+AUTHORITATIVE INPUT BASELINE
+- Frontend090 cumulative source archive SHA-256: 63a1237e0c29953cf24305fb1b1647b754874559a4270563cc8c7a62431f314f.
+- Backend071 full source archive SHA-256: 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f (UNCHANGED).
+- Canonical audit v93, 2026-09-30 Procurement Recommendations / Coffee Beans Premium: detail described approval readiness as Ready but explicitly said PO-draft conversion No, with missing cost; the operator could confuse approval review eligibility with readiness for purchase order creation.
+- Baseline FE090 embedded cumulative FIX_LOG checked byte-identical with standalone log through Batch090, preserving earlier corrections.
+
+SOURCE-VERIFIED CAUSE
+- ProcurementRecommendationsPage.tsx shows approval readiness from detail.can_enter_approval_review but uses a bare translated Ready label.
+- A separate line displays PO-draft eligibility from detail.can_generate_po_draft and may correctly display No in the same review-ready detail.
+- Conversion remains separately governed by the existing backend rules and approval/PO-draft checks. The issue is wording and missing context, not a proven eligibility-calculation error.
+
+FRONTEND-ONLY CORRECTION
+- src/pages/ProcurementRecommendationsPage.tsx: display existing translated Ready for review rather than ambiguous Ready on approval-review readiness; preserve Blocked.
+- If can_enter_approval_review is true AND can_generate_po_draft is explicitly false, show concise guidance distinguishing reviewing approval from generating purchase orders and referring to separate conversion requirements.
+- Warning remains hidden when both readiness checks pass, when review is blocked, or while PO-draft readiness data is undefined; do not falsely classify a loading/unknown state as a confirmed conversion blocker.
+- src/i18n/tenantUiTranslations.ts: one new complete EN/DE/ES/FR/HR guidance row; reuse existing Ready for review catalog row.
+- package.json: register check:procurement-readiness-distinction-v349329.
+- scripts/check-procurement-readiness-distinction-surgical-fix-v349329.mjs: 30 focused checks, including explicit mismatch, both-ready, blocked, absent, and unknown cases; guard approval/conversion code and all translations.
+- No backend/schema/SQL, stock, pricing, permission, purchase-order creation, approval action, cost calculation or mutation contract changes.
+
+VERIFICATION
+- New focused source check: 30/30 PASS.
+- Cumulative targeted surgical regression suites v349298–v349329: 32/32 PASS.
+- Broader application checks: 9/9 PASS, including full tenant multilingual closure: 45 routes, 264 reachable source files and 14,213 five-language translation rows, placeholder parity.
+- Isolated TSX/translation TypeScript transpilation: 0 diagnostics in each file; new Node regression guard syntax PASS.
+- Archive CRC and exact byte-equivalent delta comparison with FE090 completed; see Batch091 verification/manifest.
+
+PENDING ACCEPTANCE
+- Full supported Node24 npm ci, full ESLint, full project typecheck:ci, production Vite build/CI, deployment and live-browser acceptance: NOT VERIFIED in current environment (Node22, incomplete app dependencies).
+- Deploy only after proper CI; open Procurement Recommendations, choose a recommendation whose approval review is permitted but PO-draft conversion is not (e.g. genuinely missing cost); verify Ready for review + No + clarification and intact decision restrictions. Verify both-ready/blocked cases, mobile and five languages, avoiding changes to real purchase orders.
+- Earlier audit v93 unresolved findings and live checks (notification worker, barcode print, approvals, reservations, reports, shipments) remain separately open.
+
+CURRENT ENGINEERING BASELINE: Frontend091 + Backend071 unchanged.
+PRODUCTION ACCEPTANCE: PENDING. Batch092 NOT STARTED.
+================================================================================

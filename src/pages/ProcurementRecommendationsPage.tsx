@@ -3332,12 +3332,17 @@ export default function ProcurementRecommendationsPage() {
               ) : null}
               <div style={styles.metricLine}>
                 <strong>{ui("Approval readiness:")}</strong>{" "}
-                {selectedDetail.detail?.can_enter_approval_review ? ui("Ready") : ui("Blocked")}
+                {selectedDetail.detail?.can_enter_approval_review ? ui("Ready for review") : ui("Blocked")}
               </div>
               <div style={styles.metricLine}>
                 <strong>{ui("Approved and eligible for PO-draft conversion:")}</strong>{" "}
                 {selectedDetail.detail?.can_generate_po_draft ? ui("Yes") : ui("No")}
               </div>
+              {selectedDetail.detail?.can_enter_approval_review && selectedDetail.detail?.can_generate_po_draft === false ? (
+                <p style={styles.warningText}>
+                  {ui("Ready for review does not mean ready to create a purchase order. Complete the separate conversion requirements first.")}
+                </p>
+              ) : null}
             </div>
           </div>
         ) : null}

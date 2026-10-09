@@ -449,7 +449,8 @@
     "check:outbound-return-record-clarity-v349325": "node scripts/check-outbound-return-record-clarity-surgical-fix-v349325.mjs",
     "check:outbound-sticky-subnavigation-v349326": "node scripts/check-outbound-sticky-subnavigation-surgical-fix-v349326.mjs",
     "check:shipment-shortage-hint-v349327": "node scripts/check-shipment-shortage-hint-surgical-fix-v349327.mjs",
-    "check:shipment-attention-refresh-v349328": "node scripts/check-shipment-attention-refresh-surgical-fix-v349328.mjs"
+    "check:shipment-attention-refresh-v349328": "node scripts/check-shipment-attention-refresh-surgical-fix-v349328.mjs",
+    "check:procurement-readiness-distinction-v349329": "node scripts/check-procurement-readiness-distinction-surgical-fix-v349329.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
