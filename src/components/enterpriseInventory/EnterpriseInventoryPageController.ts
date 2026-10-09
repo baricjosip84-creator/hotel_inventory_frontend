@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type SetStateAction } from "react";
 import { useSearchParams } from "react-router";
 import { useAppTranslation } from "../../i18n/I18nContext";
 import { hasPermission } from "../../lib/permissions";
@@ -30,17 +30,15 @@ function findFirstAccessibleEnterpriseInventoryTab(subscriptionAccess?: TenantSu
   )?.[0] ?? "";
 }
 
-function findInitialEnterpriseInventoryTab() {
-  return isEnterpriseInventoryTabAccessible("par-levels")
-    ? "par-levels"
-    : findFirstAccessibleEnterpriseInventoryTab();
-}
-
 export function useEnterpriseInventoryPageController() {
   const { ui } = useAppTranslation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab')?.trim() || '';
-  const [activeTab, setActiveTab] = useState(findInitialEnterpriseInventoryTab);
+  const [activeTab, setActiveTabState] = useState(() =>
+    enterpriseInventoryTabs.some(([key]) => key === requestedTab && isEnterpriseInventoryTabAccessible(key))
+      ? requestedTab
+      : findFirstAccessibleEnterpriseInventoryTab()
+  );
   const {
     errorMessage,
     mutationFeedback,
@@ -84,23 +82,35 @@ export function useEnterpriseInventoryPageController() {
   const { products, storageLocations, purchaseOrders, shipments } = pageData.stableData;
   const subscriptionAccess = pageData.queries.tenantSubscriptionAccessQuery.data;
 
+  // The URL is the source of truth for the selected work area. This preserves
+  // the Notifications tab (and any other permitted tab) after a browser reload,
+  // while keeping deep links and browser history synchronized with the UI.
+  const requestedTabAllowed = enterpriseInventoryTabs.some(([key]) =>
+    key === requestedTab && isEnterpriseInventoryTabAccessible(key, subscriptionAccess)
+  );
+  // Apply URL navigation changes (including browser Back and copied deep links)
+  // and fail closed when a remembered tab is no longer accessible.
   useEffect(() => {
-    if (!requestedTab) return;
-    const requestedTabAllowed = enterpriseInventoryTabs.some(([key]) =>
-      key === requestedTab && isEnterpriseInventoryTabAccessible(key, subscriptionAccess)
-    );
-    if (requestedTabAllowed && activeTab !== requestedTab) setActiveTab(requestedTab as (typeof enterpriseInventoryTabs)[number][0]);
-  }, [activeTab, requestedTab, subscriptionAccess]);
+    const resolvedTab = requestedTabAllowed
+      ? requestedTab
+      : findFirstAccessibleEnterpriseInventoryTab(subscriptionAccess);
+    if (activeTab !== resolvedTab) setActiveTabState(resolvedTab);
+  }, [activeTab, requestedTab, requestedTabAllowed, subscriptionAccess]);
 
-  useEffect(() => {
-    const activeTabAllowed = enterpriseInventoryTabs.some(([key]) =>
-      key === activeTab && isEnterpriseInventoryTabAccessible(key, subscriptionAccess)
-    );
+  const setActiveTab = useCallback((nextTab: SetStateAction<string>) => {
+    const selected = typeof nextTab === 'function' ? nextTab(activeTab) : nextTab;
+    if (!enterpriseInventoryTabs.some(([key]) =>
+      key === selected && isEnterpriseInventoryTabAccessible(key, subscriptionAccess)
+    )) return;
+    if (selected === requestedTab) return;
 
-    if (!activeTabAllowed) {
-      setActiveTab(findFirstAccessibleEnterpriseInventoryTab(subscriptionAccess));
-    }
-  }, [activeTab, subscriptionAccess]);
+    // Keep existing unrelated query parameters; avoid an extra browser history
+    // entry for each tab click. The URL will be restored on reload or sharing.
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('tab', selected);
+    setSearchParams(nextParams, { replace: true });
+    setActiveTabState(selected);
+  }, [activeTab, requestedTab, searchParams, setSearchParams, subscriptionAccess]);
 
   const queryStatusInput = pageData.queries as unknown as Parameters<typeof getEnterpriseInventoryActiveTabLastUpdatedAt>[1];
   const activeTabQueryError = getEnterpriseInventoryActiveTabQueryError(activeTab, queryStatusInput, ui);

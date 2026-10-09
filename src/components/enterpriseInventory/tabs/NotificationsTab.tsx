@@ -127,7 +127,7 @@ export function NotificationsTab({
   return (
     <section style={styles.stack}>
       <div className="inventory-controls-grid" style={styles.grid}>
-        <form onSubmit={onNotificationDeliverySubmit} style={styles.card}>
+        <form onSubmit={onNotificationDeliverySubmit} style={styles.card} data-skip-global-action-feedback="true">
           <h2 style={styles.cardTitle}>{ui('Queue notification delivery')}</h2>
           <p style={{ ...styles.helper, marginBottom: 12 }}>
             {ui('Choose an event and where it should be delivered. Email and webhook delivery use the notification settings configured for this tenant.')}

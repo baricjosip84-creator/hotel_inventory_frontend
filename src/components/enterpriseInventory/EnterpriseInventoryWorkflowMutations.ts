@@ -297,6 +297,9 @@ export function useEnterpriseInventoryWorkflowMutations({
       postEnterpriseInventoryRequest<NotificationDelivery>(
         "/enterprise-inventory/notifications/deliveries",
         buildNotificationDeliveryPayload(input),
+        // Queueing already has an exact onSuccess message; avoid the generic
+        // API-level "Item created" toast. Queued is not Delivered.
+        { skipMutationFeedback: true },
       ),
     onSuccess: mutationFeedback.resetting(
       ui("Notification delivery queued."),
