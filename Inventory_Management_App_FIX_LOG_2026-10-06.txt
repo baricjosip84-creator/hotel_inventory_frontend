@@ -10271,3 +10271,35 @@ LIVE ACCEPTANCE PENDING
 CURRENT ENGINEERING BASELINE: Frontend105 + Backend072.
 PRODUCTION ACCEPTANCE: PENDING. Batch107 NOT STARTED.
 ================================================================================
+
+================================================================================
+SURGICAL CORRECTION BATCH 107 — 2026-10-09
+================================================================================
+
+THEME — ACTION CENTER / GOVERNANCE DIAGNOSTIC EVIDENCE TRANSLATION, PHASE 1
+
+CANONICAL AUDIT
+- v93: ACTION-I18N-001. Advanced Action Center governance and diagnostic bullet lists remained in English while surrounding UI was localized; backend emitted stable snake_case keys, and the frontend displayed humanized English because the translation catalogue lacked corresponding keys.
+- Confirmed against Frontend105 + Backend072 before correction. The page already routes those keys through canonicalLabel(code, ui), so translation data rather than new rendering/rewrite logic is the surgical correction.
+
+IMPLEMENTED — FRONTEND106 ONLY
+- src/i18n/tenantUiTranslations.ts: 24 new five-language translation rows for three existing Action Center sections: Control Tower traceability blockers, remediation feedback blockers/manual evidence, and remediation effectiveness review blockers/contract. The four related narrative recommended-next-step translations were already catalogued and were left unchanged.
+- Backend emits exactly the same machine codes; the frontend retains canonicalLabel fallback for unknown codes. No changes to backend API, permissions, source text, audit evidence, or action execution.
+- package.json: new regression script check:action-center-governance-evidence-surgical-fix-v349350.
+- scripts/check-action-center-governance-evidence-surgical-fix-v349350.mjs: checks actual backend codes, canonicalLabel translation at runtime across English/German/Spanish/French/Croatian, the original rendering paths, preservation of unknown values, catalog uniqueness, and isolated TSX syntax validity.
+
+VERIFICATION
+- New Batch107 checks: 13/13 PASS, including all 24 known diagnostic codes in all five locales.
+- 50/50 selected inherited/new surgical and broader scripts PASS, including prior Action Center, Reports, Permissions and source checks.
+- Global multilingual closure PASS: 45/45 tenant routes, 264 reachable files, 14,254 unique complete five-language translation entries, placeholder parity PASS.
+- Exact source archive comparison and archive/checksum integrity checked in release package verification.
+- Backend072 is unchanged (byte-for-byte).
+- Not verified: clean Node24 dependency install/typecheck/production Vite build, live backend/PostgreSQL integration, deployed-browser acceptance. Current environment uses Node22 and does not have the complete project dependency installation.
+
+REMAINING
+- ACTION-I18N-001 is PARTIALLY RESOLVED: escalation, closure, route-audit and response-contract sections may still surface untranslated backend diagnostic codes. Verify those against current source and implement in next justified batch; do not claim that the complete Action Center localization backlog is closed.
+- Live browser: test the three corrected sections in all five tenant languages (especially Croatian), verify empty/blocker/evidence cases, confirm the read-only governance boundary, and revisit remaining sections as separate audit findings.
+
+CURRENT ENGINEERING BASELINE: Frontend106 + Backend072.
+PRODUCTION ACCEPTANCE: PENDING. Batch108 NOT STARTED.
+================================================================================

@@ -6,6 +6,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "check:action-center-governance-evidence-surgical-fix-v349350": "node scripts/check-action-center-governance-evidence-surgical-fix-v349350.mjs",
     "check:mobile-connection-localization-v349341": "node scripts/check-mobile-connection-status-localization-surgical-fix-v349341.mjs",
     "check:users-lifecycle-feedback-v349316": "node scripts/check-users-lifecycle-feedback-surgical-fix-v349316.mjs",
     "check:inventory-reservation-department-picker-v349315": "node scripts/check-reservation-department-picker-surgical-fix-v349315.mjs",
