@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { styles } from './EnterpriseInventoryStyles';
 import { useAppTranslation } from '../../i18n/I18nContext';
 // import { formatLocalizedDateTime } from '../../i18n/formatters'; // v3.49.107: only used by hidden hero meta.
@@ -111,7 +111,15 @@ export function SectionCard({ title, children }: { title: string; children: Reac
   );
 }
 
-export function DataTable({ loading, empty, headers, rows }: { loading: boolean; empty: string; headers: string[]; rows: string[][] }) {
+export function DataTable({ loading, empty, headers, rows, highlightedRowIndex, highlightedRowRef, highlightedRowMessage }: {
+  loading: boolean;
+  empty: string;
+  headers: string[];
+  rows: string[][];
+  highlightedRowIndex?: number;
+  highlightedRowRef?: Ref<HTMLTableRowElement>;
+  highlightedRowMessage?: string;
+}) {
   const { ui } = useAppTranslation();
   if (loading) return <p style={styles.helper}>{ui('Loading…')}</p>;
   if (!rows.length) return <p style={styles.helper}>{empty}</p>;
@@ -123,9 +131,23 @@ export function DataTable({ loading, empty, headers, rows }: { loading: boolean;
           <tr>{headers.map((header) => <th key={header} style={styles.th}>{header}</th>)}</tr>
         </thead>
         <tbody>
-          {rows.map((row, rowIndex) => (
-            <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={`${rowIndex}-${cellIndex}`} style={styles.td}>{cell}</td>)}</tr>
-          ))}
+          {rows.map((row, rowIndex) => {
+            const highlighted = rowIndex === highlightedRowIndex;
+            return (
+              <tr
+                key={rowIndex}
+                ref={highlighted ? highlightedRowRef : undefined}
+                tabIndex={highlighted ? -1 : undefined}
+                data-highlighted-record={highlighted ? 'true' : undefined}
+                style={highlighted ? { background: '#eff6ff', boxShadow: 'inset 4px 0 #2563eb', scrollMarginTop: 120 } : undefined}
+              >
+                {row.map((cell, cellIndex) => <td key={`${rowIndex}-${cellIndex}`} style={styles.td}>
+                  {cell}
+                  {highlighted && cellIndex === 0 && highlightedRowMessage ? <div style={{ marginTop: 5, color: '#1d4ed8', fontWeight: 700 }}>{highlightedRowMessage}</div> : null}
+                </td>)}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

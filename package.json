@@ -427,7 +427,8 @@
     "check:inventory-enterprise-file-picker-v349303": "node scripts/check-enterprise-file-picker-surgical-fix-v349303.mjs",
     "check:inventory-supplier-invoice-lifecycle-feedback-v349304": "node scripts/check-supplier-invoice-lifecycle-feedback-surgical-fix-v349304.mjs",
     "check:inventory-supplier-return-feedback-v349305": "node scripts/check-supplier-return-feedback-surgical-fix-v349305.mjs",
-    "check:inventory-supplier-return-add-line-readiness-v349306": "node scripts/check-supplier-return-add-line-readiness-surgical-fix-v349306.mjs"
+    "check:inventory-supplier-return-add-line-readiness-v349306": "node scripts/check-supplier-return-add-line-readiness-surgical-fix-v349306.mjs",
+    "check:inventory-approval-rule-created-focus-v349307": "node scripts/check-approval-rule-created-focus-surgical-fix-v349307.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

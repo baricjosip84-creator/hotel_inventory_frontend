@@ -1,0 +1,43 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import ts from 'typescript';
+
+const read = (name) => fs.readFileSync(path.join(process.cwd(), name), 'utf8');
+const approvals = read('src/components/enterpriseInventory/tabs/ApprovalsTab.tsx');
+const shared = read('src/components/enterpriseInventory/EnterpriseInventoryShared.tsx');
+const workflows = read('src/components/enterpriseInventory/EnterpriseInventoryWorkflowMutations.ts');
+const translations = read('src/i18n/tenantUiTranslations.ts');
+const pkg = JSON.parse(read('package.json'));
+let count = 0; let pass = 0;
+function check(label, condition) {
+  count += 1;
+  if (condition) pass += 1;
+  console.log(`${condition ? 'PASS' : 'FAIL'}: ${label}`);
+}
+const parse = (name, source) => ts.createSourceFile(name, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+check('Approvals component TSX parses without diagnostics', parse('ApprovalsTab.tsx', approvals).parseDiagnostics.length === 0);
+check('Shared DataTable TSX parses without diagnostics', parse('EnterpriseInventoryShared.tsx', shared).parseDiagnostics.length === 0);
+check('Created rule identity comes from successful mutation result, not guessed text', approvals.includes('createApprovalRuleMutation.data?.id'));
+check('Row position derives from exact rule ID in refreshed list', approvals.includes('.findIndex((rule) => rule.id === newestRuleId)'));
+check('Focus is delayed until matching rule is actually loaded', approvals.includes('highlightedRuleIndex < 0') && approvals.includes('!newRuleRow.current'));
+check('Each created rule auto-focuses only once', approvals.includes('focusedRuleId.current === newestRuleId') && approvals.includes('focusedRuleId.current = newestRuleId'));
+check('Selected row scrolls into readable middle of viewport', approvals.includes("scrollIntoView({ behavior: 'smooth', block: 'center' })"));
+check('Keyboard focus follows the selected row without undoing scroll', approvals.includes('newRuleRow.current.focus({ preventScroll: true })'));
+check('Focus reruns when a subsequent newly created rule appears', approvals.includes('[newestRuleId, highlightedRuleIndex]'));
+check('The selected row is linked to DataTable by row ref', approvals.includes('highlightedRowRef={newRuleRow}'));
+check('No row is highlighted until the exact new rule is found', approvals.includes('highlightedRuleIndex >= 0 ? highlightedRuleIndex : undefined'));
+check('Contextual success label appears next to the rule', approvals.includes("highlightedRowMessage={ui('Approval rule saved.')}"));
+check('Other tables remain unchanged by optional highlight props', shared.includes('highlightedRowIndex?: number;') && shared.includes('highlightedRowRef?: Ref<HTMLTableRowElement>;') && shared.includes('highlightedRowMessage?: string;'));
+check('Only the targeted row gets the reference', shared.includes('ref={highlighted ? highlightedRowRef : undefined}'));
+check('Only the targeted row can receive programmatic keyboard focus', shared.includes('tabIndex={highlighted ? -1 : undefined}'));
+check('Target row is programmatically identifiable', shared.includes("data-highlighted-record={highlighted ? 'true' : undefined}"));
+check('Target row uses clear blue highlight', shared.includes("background: '#eff6ff'") && shared.includes("boxShadow: 'inset 4px 0 #2563eb'"));
+check('Target row preserves sticky-header clearance', shared.includes('scrollMarginTop: 120'));
+check('Standard table content remains in place', shared.includes('row.map((cell, cellIndex)') && shared.includes('{cell}'));
+check('Historical list is not auto-focused without a new mutation ID', approvals.includes('const newestRuleId = createApprovalRuleMutation.data?.id;'));
+check('Approval creation still uses existing validated mutation', approvals.includes('createApprovalRuleMutation.mutate(approvalRuleForm);'));
+check('Approval save still resets form and refreshes list', workflows.includes('mutationFeedback.resetting(') && workflows.includes('"enterprise-approval-rules"') && workflows.includes('resetApprovalRuleForm'));
+check('All five language translations already exist for the inline message', translations.includes('["Approval rule saved.", "Genehmigungsregel gespeichert.", "Regla de aprobación guardada.", "Règle d’approbation enregistrée.", "Pravilo odobravanja spremljeno."]'));
+check('Registered project check command', pkg.scripts?.['check:inventory-approval-rule-created-focus-v349307'] === 'node scripts/check-approval-rule-created-focus-surgical-fix-v349307.mjs');
+console.log(`Approval rule created-record focus: ${pass}/${count} PASS`);
+if (pass !== count) process.exitCode = 1;

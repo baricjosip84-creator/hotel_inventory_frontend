@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import { DataTable, InputField, SelectField } from '../EnterpriseInventoryShared';
 import { styles } from '../EnterpriseInventoryStyles';
@@ -19,7 +20,7 @@ type ApprovalQueueItem = {
   created_at: string;
 };
 
-type CreateApprovalRuleMutation = { isPending: boolean; mutate: (input: ApprovalRuleForm) => void };
+type CreateApprovalRuleMutation = { isPending: boolean; data?: ApprovalRule; mutate: (input: ApprovalRuleForm) => void };
 type ExecuteApprovalMutation = { isPending: boolean; mutate: (input: { entity_type: string; entity_id: string; action: 'approved' | 'rejected'; comment?: string }) => void };
 type ApprovalRulesQuery = { isLoading: boolean; data?: ApprovalRule[] };
 
@@ -61,6 +62,18 @@ export function ApprovalsTab({ approvalQueue, approvalRuleForm, approvalRulesQue
   const amountRangeValid = !entityUsesAmount || (Number.isFinite(minimumAmount) && minimumAmount >= 0 && (maximumAmount === null || (Number.isFinite(maximumAmount) && maximumAmount >= minimumAmount)));
   const currencyValid = !entityUsesAmount || /^[A-Z]{3}$/.test(approvalRuleForm.currency.trim().toUpperCase());
   const canSaveRule = canWriteApprovalRules && selectedEntityVisible && Boolean(approvalRuleForm.entity_type && approvalRuleForm.required_role) && (entityUsesAmount ? approvalRuleForm.min_amount !== '' && amountRangeValid && currencyValid : true) && !createApprovalRuleMutation.isPending;
+  const newestRuleId = createApprovalRuleMutation.data?.id;
+  const newRuleRow = useRef<HTMLTableRowElement>(null);
+  const focusedRuleId = useRef<string | null>(null);
+  const highlightedRuleIndex = newestRuleId
+    ? (approvalRulesQuery.data ?? []).findIndex((rule) => rule.id === newestRuleId)
+    : -1;
+  useEffect(() => {
+    if (!newestRuleId || highlightedRuleIndex < 0 || focusedRuleId.current === newestRuleId || !newRuleRow.current) return;
+    focusedRuleId.current = newestRuleId;
+    newRuleRow.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    newRuleRow.current.focus({ preventScroll: true });
+  }, [newestRuleId, highlightedRuleIndex]);
   const storageLocationNames = new Map(storageLocations.map((location) => [location.id, location.name]));
   const displayLabel = (value: string, labels: Record<string, string>) => labels[value] ? ui(labels[value]) : value;
   const money = (value: number | string | null | undefined, currency: string) => {
@@ -170,6 +183,9 @@ export function ApprovalsTab({ approvalQueue, approvalRuleForm, approvalRulesQue
             loading={approvalRulesQuery.isLoading}
             empty={ui('No approval rules configured yet.')}
             headers={['Entity', 'Department', 'Location', 'Min amount', 'Max amount', 'Currency', 'Required role', 'Active'].map(ui)}
+            highlightedRowIndex={highlightedRuleIndex >= 0 ? highlightedRuleIndex : undefined}
+            highlightedRowRef={newRuleRow}
+            highlightedRowMessage={ui('Approval rule saved.')}
             rows={(approvalRulesQuery.data ?? []).map((item) => {
               const amountBased = usesAmountThresholds(item.entity_type);
               return [
