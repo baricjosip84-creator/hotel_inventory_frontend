@@ -383,6 +383,43 @@
   padding: 14px;
 }
 
+/* Outbound section navigation must stay reachable while long customer-return lists
+   and dispatch history are scrolled. The tenant layout scrolls .mainArea, but its
+   child <main> normally has overflow-x: hidden (which implicitly creates an
+   overflow-y scrolling ancestor that never scrolls). Scope the clip override
+   to Outbound so the tab strip sticks to the real scrolling container only. */
+main[data-route-scroll-container]:has(> .io-outbound-page) {
+  overflow-x: clip !important;
+}
+
+.io-outbound-page > .io-workspace-tabs {
+  position: sticky;
+  top: 12px;
+  z-index: 20;
+  align-self: start;
+  min-width: 0;
+  background: #fff;
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.11);
+}
+
+.io-outbound-page > .io-workspace-tabs .io-workspace-tabs__items {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Keep all four destinations keyboard-accessible at mobile widths. */
+  overflow-x: auto;
+}
+
+@media (max-width: 760px) {
+  .io-outbound-page > .io-workspace-tabs {
+    top: 6px;
+    padding: 5px;
+  }
+  .io-outbound-page > .io-workspace-tabs .io-workspace-tabs__hint {
+    display: none;
+  }
+}
+
 /* Keep the selected draft editor visible under the sticky workspace header. */
 .outbound-order-edit-heading {
   scroll-margin-top: 110px;

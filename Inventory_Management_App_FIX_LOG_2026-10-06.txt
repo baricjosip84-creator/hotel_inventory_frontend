@@ -9549,3 +9549,87 @@ CURRENT ENGINEERING BASELINE: Frontend087 + Backend071 (unchanged).
 PRODUCTION ACCEPTANCE: PENDING.
 Batch088 has NOT started. Inspect current audit and log before selecting next change.
 ================================================================================
+
+================================================================================
+SURGICAL CORRECTION BATCH 088 — OUTBOUND / PERSISTENT SUB-NAVIGATION
+Date: 2026-10-09
+================================================================================
+
+AUTHORITATIVE SOURCE
+- FE087 cumulative source archive SHA-256 82df6c6084433bf4fa569f09ccbe4d247006635bb1fbfe839430c2bc902d2ad7.
+- BE071 cumulative source archive SHA-256 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f (unchanged).
+- Canonical audit v93, [2026-09-29, Outbound / Customer Returns navigation usability finding]: after closing cancelled return details, Outbound tabs were scrolled above the viewport; user mistook in-section 'Choose dispatched stock' input for navigation while trying to switch to Dispatch trace.
+- Full cumulative FIX_LOG through Batch087 from inside verified FE087; used instead of a stale standalone snapshot that stopped at Batch086.
+
+CONFIRMED SOURCE ROOT CAUSE
+- FE087 renders the Orders, Customers, Customer returns, Dispatch trace destinations once via shared OperationalWorkspaceTabs, with no sticky positioning.
+- Tenant AppLayout scrolls .mainArea but its child main has inline overflow-x:hidden; in CSS this creates an overflow-y auto scrolling ancestor, causing a naive position:sticky rule to attach to an ancestor that does not scroll.
+- This is an Outbound navigation UX issue, NOT a return/dispatch accounting defect. Prior return workflows and Dispatch trace stock consistency passed in the audit.
+
+IMPLEMENTATION — FRONTEND CSS ONLY
+- src/pages/OutboundPage.css: scope main[data-route-scroll-container]:has(> .io-outbound-page) to overflow-x:clip!important; this retains horizontal clipping but prevents the nested non-scrolling ancestor from capturing sticky positioning. Other pages' layout is unchanged.
+- src/pages/OutboundPage.css: .io-outbound-page > .io-workspace-tabs uses position:sticky, top:12px, z-index:20, align-self:start, opaque background, distinct border/shadow. Its tablist remains horizontally scrollable. At <=760px tabs stick 6px from the top with their nonessential hint hidden to preserve space.
+- scripts/check-outbound-sticky-subnavigation-surgical-fix-v349326.mjs: 28 assertion source guard covering scroller root, scoped overflow treatment, responsive focus/accessibility, tab availability and unchanged selection handlers.
+- package.json: registers check:outbound-sticky-subnavigation-v349326.
+- No changes to OutboundPage.tsx, shared OperationalWorkspace component, AppLayout, backend APIs, SQL, permissions, tenant data, orders, returns, stock or dispatch calculations, or localization catalog.
+
+VERIFICATION — SOURCE AND SIMULATED BROWSER ONLY
+- New focused source guard 28/28 PASS.
+- Cumulative targeted regression suites v349298–v349326: 29/29 PASS.
+- Broader checks 9/9 PASS including Outbound multilingual, global five-language closure, Outbound detail/context, i18n, Permissions, Audit, Roles, Reports and Exports.
+- Global multilingual closure: 45/45 routes, 264 reachable source files, 14,212 five-language catalog rows PASS.
+- Isolated OutboundPage.tsx transpile: 0 diagnostics; CSS stylesheet parser: 0 errors; new check script node --check PASS.
+- Headless Chromium layout simulation of the actual nested tenant scrolling structure at 1280x750 and 390x740: PASS. After scrollTop 1250, sticky bar remains at y=12 and y=6 respectively, horizontal clipping computes as clip, vertical overflow as visible, and keyboard focus reaches Dispatch trace. Simulation does NOT prove the full deployed React application.
+- ZIP CRC, byte-for-byte source delta, and SHA-256 checks included in Batch088 manifest.
+
+LIVE ACCEPTANCE STILL REQUIRED
+- Full Node24 npm ci/lint/typecheck:ci/Vite build/CI and actual deployed app browser checks NOT VERIFIED here (local Node22 and absent full npm dependencies).
+- After CI deploy FE088 + unchanged BE071; in Outbound > Customer returns scroll through several return records, close expanded details and switch to Dispatch trace without scrolling back up. Confirm active section, correct data and active-tab highlighting. Test keyboard focus/Tab and horizontal tab scrolling, all five tenant languages, mobile <=760px, long return lists and order lists. Confirm no overlap with page content/header, fixed navigation, dialogs or horizontally wide forms. Do not mutate stock except with controlled acceptance data.
+- App-wide uniform sticky navigation and design-system standardization remain separately open; this batch fixes Outbound only.
+
+CURRENT ENGINEERING BASELINE: Frontend088 + Backend071 (unchanged).
+PRODUCTION ACCEPTANCE: PENDING.
+Batch089 NOT STARTED; select the next unresolved canonical-audit issue after checking current source.
+================================================================================
+
+
+================================================================================
+SURGICAL CORRECTION BATCH 089 — SHIPMENTS / FULL RECEIPT DISCREPANCY HELP
+Date: 2026-10-09
+================================================================================
+
+AUTHORITATIVE INPUT BASELINE
+- Frontend088 cumulative source archive SHA-256: d7d656c643b35d5ee7962aca326c37e9c1df6fce217784dffca5e88eec24a2cd.
+- Backend071 cumulative source archive SHA-256: 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f (UNCHANGED).
+- Canonical audit v93, 2026-09-30 Shipments default receiving location / full 35-of-35 reception: discrepancy section claimed “Enter a discrepancy reason first” although shortage quantity was zero, even as the neighboring note said the reason was required only if line remains short. Functional full receipt and subsequent finalization passed in live audit.
+- Cumulative authoritative FIX_LOG through Batch088, matching FE088 embedded log and separate TXT; earlier verification limitations retained.
+
+SOURCE-VERIFIED ROOT CAUSE
+- src/pages/ShipmentsPage.tsx initialized quantity_received from outstanding quantity (full remaining by default).
+- The inline discrepancy helper was gated only by server remaining>0 and canReceiveShipments, and selected the warning whenever draft.discrepancy_reason was blank. It did not compare the planned receipt quantity against remaining outstanding quantity.
+- The separate optional “Save shortage reason” action also used “Enter a discrepancy reason first” as its tooltip while disabled, even when the draft would fully receive the line. Actual receipt/finalization handlers already returned meaningful success messages and are NOT modified.
+
+IMPLEMENTATION — FRONTEND ONLY
+- src/pages/ShipmentsPage.tsx: derive draftLeavesShortage from the current entered usable quantity versus remaining shipment quantity, or an explicit shortage quantity. Invalid quantities are treated conservatively; full 35/35 with shortage=0 produces false, while 20/35, 0/35, or explicitly declared shortages produce true.
+- Only show the inline “Enter a discrepancy reason first” guidance if receiving permission applies, the shipment is not already finalized, server remaining>0, and this draft actually leaves a shortage.
+- Where the optional Save shortage reason button is disabled for a blank reason but the current draft is a full receipt, replace its misleading tooltip with the existing neutral translated hint “Required only if this line remains short”. Preserve all action handlers and disabled gates.
+- package.json: register check:shipment-shortage-hint-v349327.
+- scripts/check-shipment-shortage-hint-surgical-fix-v349327.mjs: 25 focused checks, including dynamically executing the actual source predicate against zero/full/partial/decimal/explicit shortage and invalid quantity scenarios; preserving receive/save/finalize handlers and permission gates.
+- Reuses existing tenant i18n keys in all five languages; no new translation strings.
+- No backend, schema, SQL, inventory valuation, stock movement, received quantity calculation, status, supplier, order, permission or mutation contract changes.
+
+SOURCE REGRESSION EVIDENCE
+- New Batch089 focused guard 25/25 PASS.
+- All 30 targeted cumulative surgical suites v349298–v349327 PASS (after exposing the installed TypeScript package to the verification scripts; initial missing-package failures were environment setup only).
+- Broader application source guards 9/9 PASS, including global i18n: 45/45 tenant routes, 264 reachable files, 14,212 five-language translation entries, placeholder parity.
+- Isolated TypeScript transpilation of modified ShipmentsPage.tsx: zero diagnostics; new JS guard node --check PASS.
+- ZIP CRC, expected exact source delta and SHA-256 checks recorded in Batch089 manifest.
+
+RELEASE GATES STILL OPEN
+- Node 24 npm ci, full ESLint, project typecheck:ci, Vite build/CI and live React deployed acceptance NOT VERIFIED in this environment (Node 22 and full project dependencies unavailable).
+- After approved Node24 CI and deployment of FE089 with unchanged BE071: use a controlled pending shipment line with 35 remaining. With Usable Quantity Received=35 and Shortage=0, confirm the discrepancy section has NO false “Enter a discrepancy reason first” prompt; Save shortage reason stays disabled without a reason; full receive and finalize still work with expected feedback and stock/PO reconciliation. Then change draft to a partial quantity (e.g. 20 of 35) or zero and verify shortage-specific guidance appears. Test explicit shortage, already-finalized line, no receive permission, translated UI and browser/mobile focus. Do not mutate production stock except controlled acceptance data.
+- Live checks for earlier batches (Outbound sticky nav/cards/returns, Reports dropdowns, users, notifications worker, barcode OS print, approvals/reservations) remain separately pending. The shipment attention badge after finalization is a separate investigation and was not changed here.
+
+CURRENT ENGINEERING BASELINE: Frontend089 + Backend071 (unchanged).
+PRODUCTION ACCEPTANCE: PENDING. Batch090 NOT STARTED.
+================================================================================

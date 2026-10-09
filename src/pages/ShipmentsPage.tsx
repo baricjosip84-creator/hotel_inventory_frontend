@@ -3484,6 +3484,12 @@ export default function ShipmentsPage() {
                       item.storage_location_id ||
                       (storageLocations.length === 1 ? storageLocations[0].id : '');
                     const parsedReceiveQuantity = Number(draft.quantity_received || 0);
+                    // A planned full receipt does not need a shortage reason. Preserve the
+                    // separate, optional zero-delivery shortage-recording action below.
+                    const draftLeavesShortage =
+                      !Number.isFinite(parsedReceiveQuantity) ||
+                      parsedReceiveQuantity < remaining ||
+                      Number(draft.shortage_quantity || 0) > 0;
                     const exceptionalReceiveQuantity =
                       Math.max(Number(draft.damaged_quantity || 0), 0) +
                       Math.max(Number(draft.rejected_quantity || 0), 0) +
@@ -3757,7 +3763,9 @@ export default function ShipmentsPage() {
                                     }
                                     title={
                                       !draft.discrepancy_reason.trim()
-                                        ? ui('Enter a discrepancy reason first.')
+                                        ? draftLeavesShortage
+                                          ? ui('Enter a discrepancy reason first.')
+                                          : ui('Required only if this line remains short')
                                         : ui('Save a shortage reason without receiving stock. Use this when the supplier delivered zero or the line will remain short.')
                                     }
                                   >
@@ -3765,7 +3773,7 @@ export default function ShipmentsPage() {
                                   </button>
                                 ) : null}
                               </div>
-                              {remaining > 0 && canReceiveShipments ? (
+                              {remaining > 0 && canReceiveShipments && selectedShipment.status !== 'received' && draftLeavesShortage ? (
                                 <div style={styles.inlineHint}>
                                   {!draft.discrepancy_reason.trim()
                                     ? ui('Enter a discrepancy reason first.')
