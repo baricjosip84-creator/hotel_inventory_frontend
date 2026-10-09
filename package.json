@@ -6,6 +6,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "check:users-lifecycle-feedback-v349316": "node scripts/check-users-lifecycle-feedback-surgical-fix-v349316.mjs",
     "check:inventory-reservation-department-picker-v349315": "node scripts/check-reservation-department-picker-surgical-fix-v349315.mjs",
     "check:notifications-tab-queue-feedback-surgical-fix-v349312": "node scripts/check-notifications-tab-queue-feedback-surgical-fix-v349312.mjs",
     "check:notification-event-labels-surgical-fix-v349313": "node scripts/check-notification-event-labels-surgical-fix-v349313.mjs",

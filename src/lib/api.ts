@@ -105,6 +105,18 @@ function readMutationStringField(body: BodyInit | null | undefined, field: strin
   }
 }
 
+function readMutationBooleanField(body: BodyInit | null | undefined, field: string): boolean | null {
+  if (typeof body !== 'string') return null;
+
+  try {
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    const value = parsed[field];
+    return typeof value === 'boolean' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 function readMutationNumberField(body: BodyInit | null | undefined, field: string): number | null {
   if (typeof body !== 'string') return null;
 
@@ -163,6 +175,20 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
   const normalizedPath = path.toLowerCase();
   const normalizedPathOnly = normalizedPath.split('?')[0];
   const normalizedMethod = method.toUpperCase();
+
+  // UsersPage already distinguishes these lifecycle operations in its page feedback.
+  // Keep the shared toast equally precise, without suppressing confirmation or
+  // changing the existing tenant user mutation requests.
+  if (normalizedMethod === 'PATCH' && /^\/users\/[^/]+\/status$/.test(normalizedPathOnly)) {
+    const isActive = readMutationBooleanField(body, 'is_active');
+    if (isActive === true) return 'User activated successfully.';
+    if (isActive === false) return 'User deactivated successfully.';
+    return 'User updated successfully.';
+  }
+
+  if ((normalizedMethod === 'PUT' || normalizedMethod === 'PATCH') && /^\/users\/[^/]+$/.test(normalizedPathOnly)) {
+    return 'User updated successfully.';
+  }
 
   if (normalizedMethod === 'POST' && normalizedPathOnly === '/system-context/snapshots/capture') {
     return 'System Context snapshot captured successfully.';

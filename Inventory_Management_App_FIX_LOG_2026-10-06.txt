@@ -8976,3 +8976,77 @@ CURRENT ENGINEERING SOURCE-OF-TRUTH AFTER THIS BATCH:
 Frontend 077 + Backend 071. Batch 078 not started.
 PRODUCTION STATUS: NOT DEPLOYED/NOT LIVE VERIFIED.
 ================================================================================
+
+
+================================================================================
+BATCH 078 — USERS / ACTION-SPECIFIC SUCCESS TOASTS
+Date: 2026-10-09
+================================================================================
+SOURCE OF TRUTH
+Frontend 077: hotel-inventory-frontend_surgical-fix-077.zip
+  SHA256 907fe1cd333ed2f0272f17f1bd9fd4df8c35999565e877e4b90ef12ff9ceaab2
+Backend 071: hotel-inventory-backend_surgical-fix-071.zip
+  SHA256 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f
+Canonical audit: Inventory_Management_App_Tenant_Audit_Findings_2026-09-26_v93.txt
+Cumulative FIX_LOG: source through Batch 077.
+
+AUDIT RECONCILIATION
+Administration -> Users historical audit (2026-10-05, page closure): updates,
+deactivation and reactivation showed a generic shared toast `User saved successfully.`
+while the page banner already showed action-specific feedback. Source Frontend 077
+confirmed: UsersPage uses PUT /users/:id, PATCH /users/:id/status with JSON
+`is_active: boolean`; shared tenantMutationSuccessMessage only had generic
+`User saved successfully.` fallback for PUT/PATCH user operations. All five
+accurate user-success labels already have five-language translations.
+
+IMPLEMENTATION — FRONTEND 078 ONLY
+- In src/lib/api.ts, add strict boolean JSON field reader, returning null for
+  missing, invalid or non-boolean values.
+- For PATCH /users/:id/status, produce `User activated successfully.` when
+  is_active===true or `User deactivated successfully.` when is_active===false.
+  Invalid/missing body falls back safely to `User updated successfully.`
+  without inventing an activation state.
+- For PUT/PATCH /users/:id, show `User updated successfully.`.
+- Keep POST /users creation and DELETE /users/:id deletion messages intact.
+- Preserve the centralized toast dispatcher, translator, API payload/paths,
+  backend validation, role/permission safety, query invalidation, and existing
+  page-level status/errors. No new i18n strings or schema changes.
+- Add executable isolated TypeScript logic regression:
+  scripts/check-users-lifecycle-feedback-surgical-fix-v349316.mjs
+- Register `npm run check:users-lifecycle-feedback-v349316` in package.json.
+No Backend change. No migration. No other source component changed.
+
+TESTS / VERIFICATION
+- New source-and-executable TypeScript message regression: 27/27 PASS.
+- Targeted Batch 060–078 regression suites: 19/19 PASS, using temporary local
+  symlink to globally installed TypeScript for tests that import it; symlink
+  excluded from all release archives.
+- Isolated src/lib/api.ts TypeScript transpile: 0 diagnostics.
+- check:inventory-i18n-build-surgical-fixes-v349249: 11/11 PASS.
+- check:role-permission-management: PASS.
+- check:tenant-permissions-page-hardening: PASS.
+- check:tenant-audit-page-hardening: PASS.
+- IMPORTANT pre-existing failure: `check:tenant-multilingual-closure-audit`
+  FAILS at src/components/enterpriseInventory/tabs/AttachmentsTab.tsx:255
+  for raw `SHA-256:` JSX. Reproduced unchanged on Frontend 077; file hash
+  identical to Frontend 078. This is NOT a Batch 078 regression.
+- Full npm ci, project ESLint, typecheck:ci, Vite prebuild and CI NOT verified:
+  prior environment missing registry dependency and Node v22.16.0 below the
+  current dependency's minimum v22.22.0. Live deployed browser NOT checked.
+
+ACCEPTANCE / FOLLOW-UP
+- Use Node >=22.22.0 and networked dependency installation to run all checks.
+- Deploy Frontend 078 with unchanged Backend 071 after CI.
+- As an authorized tenant admin, edit a disposable user and toggle deactivate
+  then reactivate, verify correct translated toasts in viewport and page text.
+  Check create/delete labels, failures, role protections, session revocation.
+- Do not repeat destructive tests on genuine users; use disposable test user.
+- Batch 079 candidate: reconcile inherited Attachments `SHA-256:` literal
+  against multilingual closure check; fix only if current source confirms.
+- Independently pending: Notifications worker real attempts/delivery, barcode
+  OS print dialog, centralized fresh submitted requisition approval acceptance,
+  broader v93 audit, live release acceptance.
+
+CURRENT SOURCE OF TRUTH: Frontend 078 + Backend 071.
+PRODUCTION STATUS: NOT DEPLOYED / NOT LIVE VERIFIED.
+================================================================================
