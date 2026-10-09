@@ -9420,3 +9420,47 @@ CURRENT ENGINEERING BASELINE: Frontend 084 + Backend 071.
 PRODUCTION ACCEPTANCE: NOT VERIFIED.
 Batch 085 NOT STARTED — choose and verify a different unresolved v93 finding before implementing.
 ================================================================================
+
+================================================================================
+SURGICAL CORRECTION BATCH 085 — OUTBOUND / ORDER-CARD ACTION ASSOCIATION
+Date: 2026-10-09
+================================================================================
+
+SOURCE OF TRUTH
+- Frontend084 full cumulative source ZIP (SHA-256 9ef678c14ed0fa584013c7b1e0f450de63dee9671a9a3a2bb75093d379d33507).
+- Backend071 full cumulative source ZIP (SHA-256 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f; unchanged).
+- Canonical audit v93, 2026-09-29 12:22 local: correction to an initially reported wrong-order details issue.
+- Cumulative FIX_LOG through Batch084, byte-identical embedded and standalone.
+
+AUDIT EVIDENCE AND SOURCE RECONCILIATION
+- Tester clarified that opening the wrong order was a MISCLICK, not a broken record-to-details binding. The intended cancelled order opened correctly when its own button was clicked. Do NOT call this a functional context-routing defect.
+- Audit retains UX/action-association defect: adjacent Outbound customer order cards and buttons are too visually similar and crowded, making which order an action belongs to easy to confuse; general design-system review remains separately open.
+- Frontend084 OutboundPage.tsx renders one article per order with order-specific click handlers. OutboundPage.css shared 10px card gap, thin neutral border, no dedicated action-panel framing, and a generic action row without an adjacent order reference.
+
+SURGICAL IMPLEMENTATION — FRONTEND ONLY
+- src/pages/OutboundPage.tsx: wrap the existing per-order action buttons in an accessible role=group with a translated Actions label and the current order number; display the same translated action label and order number above the buttons as context. Preserve all existing buttons, per-order ID bindings, visibility gates, disabled states, confirmations, and cancellation reason form.
+- src/pages/OutboundPage.css: increase spacing ONLY between Outbound order cards; add stronger order-card border and low-contrast shadow, focus-within boundary highlight, and distinct subtle bordered/shaded action area with order-specific context that wraps long references. Preserve existing picking-active highlight and mobile action flex rules; do not globally redesign cards, customer lists, return lists, or trace lists.
+- Reuse existing five-language 'Actions' key; no tenant translation catalog change.
+- scripts/check-outbound-order-actions-framing-surgical-fix-v349323.mjs: add 27 assertion source guard for visual framing, accessibility, per-record binding and unchanged workflow gating.
+- package.json: register check:outbound-order-actions-framing-v349323.
+- Cumulative FIX_LOG automatically updated through Batch085 and embedded byte-identically in FE085.
+- No backend, SQL, permissions, API endpoint, order status, lifecycle, document, email, stock, dispatch, or mutation logic changed.
+
+SOURCE-LEVEL VERIFICATION
+- PASS new focused Batch085 guard: 27/27.
+- PASS cumulative targeted surgical suites v349298–v349323: 26/26.
+- PASS broader checks: 9/9 (Outbound multilingual, global tenant multilingual closure, Outbound detail/context, i18n, Permissions, Audit, role management, Reports, export).
+- PASS global tenant multilingual audit: 45 tenant routes, 264 reachable source files, 14,212 five-language catalog rows.
+- PASS isolated TSX transpilation: 0 diagnostics; Outbound CSS stylesheet top-level parse: 0 errors.
+- Exact archive comparisons, CRC and SHA-256 captured in Batch085 manifest.
+
+NOT VERIFIED / RELEASE GATES
+- Local Node22 below frontend-required Node24 and dependency packages unavailable; full npm ci, repository lint, project-wide typecheck:ci, full Vite build, CI/CD and browser-based acceptance NOT VERIFIED.
+- After supported CI, deploy FE085 + unchanged BE071. In Outbound > Orders: inspect two adjacent draft/cancelled/packed orders with distinct numbers and customer names. Confirm card boundaries and action groups are visually distinguishable, labels refer to correct order, keyboard focus is visible, no button mis-association, responsive wraps, all five languages. Open Details and click Edit Draft on the intended card; confirm actual selected order matches clicked card. Check confirmation/cancel gates, Save Draft, reduced width and tab navigation; do not mutate stock except in controlled environment.
+- Still-open cross-app/universal design-system task: consistent framing/spacing of actions and cards beyond Outbound; this batch addresses a specific instance, not whole-app visual closure.
+- Earlier live-pending checks: Batch084 Edit Draft scroll/focus; CDO staged disclosures; Count Variance filters; barcode print dialog; Notifications worker delivery; fresh-requisition Approvals; Reservations dropdowns; Users feedback; Attachments SHA-256 disclosure.
+
+CURRENT ENGINEERING BASELINE: Frontend085 + Backend071.
+PRODUCTION ACCEPTANCE: NOT VERIFIED.
+Batch086 has NOT started. Select next actual unresolved issue from v93, reconciling current source and cumulative FIX_LOG.
+================================================================================

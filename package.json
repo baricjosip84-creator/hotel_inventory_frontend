@@ -443,7 +443,8 @@
     "check:outbound-workflow-disclosure-v349319": "node scripts/check-outbound-workflow-disclosure-surgical-fix-v349319.mjs",
     "check:reports-count-variance-filter-style-v349320": "node scripts/check-reports-count-variance-filter-style-surgical-fix-v349320.mjs",
     "check:cross-domain-readiness-details-v349321": "node scripts/check-cross-domain-readiness-details-surgical-fix-v349321.mjs",
-    "check:outbound-draft-editor-position-v349322": "node scripts/check-outbound-draft-editor-position-surgical-fix-v349322.mjs"
+    "check:outbound-draft-editor-position-v349322": "node scripts/check-outbound-draft-editor-position-surgical-fix-v349322.mjs",
+    "check:outbound-order-actions-framing-v349323": "node scripts/check-outbound-order-actions-framing-surgical-fix-v349323.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
