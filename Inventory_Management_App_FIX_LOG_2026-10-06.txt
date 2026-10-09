@@ -9333,3 +9333,48 @@ CURRENT ENGINEERING BASELINE: Frontend 082 + Backend 071.
 PRODUCTION ACCEPTANCE: PENDING.
 Batch 083 has NOT started; select and validate next unresolved issue in audit v93.
 ================================================================================
+
+================================================================================
+SURGICAL CORRECTION BATCH 083 — CROSS-DOMAIN OPTIMIZATION / COMPACT READINESS REVIEWS
+Date: 2026-10-09
+================================================================================
+
+SOURCE OF TRUTH
+- Frontend 082 cumulative ZIP (SHA-256 853f92bf45ba49830d0744a1fc075c8484cec6a94ca564be329b4aefa595afdb).
+- Backend 071 cumulative ZIP (SHA-256 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f; unchanged).
+- Canonical tenant audit v93 finding CDO-UX-001: selected-run readiness screen very long/technical due to seven expanded review cards.
+- Cumulative FIX_LOG through Batch 082, identical embedded/standalone before the change.
+
+CONFIRMED ISSUE
+- CrossDomainOptimizationPage.tsx renders all seven REVIEW_SECTIONS through ReviewCard.
+- Each ReviewCard displayed every individual review check by default; stage decision, score and blocker count were present but the longer check lists dominated the page.
+- The same audit requests a compact blocker overview first and deeper checks that can be expanded. This batch addresses the expansion/readability part without changing readiness decisions.
+
+SURGICAL IMPLEMENTATION — FRONTEND ONLY
+- src/pages/CrossDomainOptimizationPage.tsx: preserve seven-stage card header, decision badge, review score, and Items needing attention counter, plus truthful 'not assessed' message. Where checks are present, move only the detail list into native closed-by-default details/summary using the existing translated Review checks label and locale-aware check count. Zero-check stages show translated empty-state feedback.
+- src/pages/CrossDomainOptimizationPage.css: add compact visible chevron, focus-visible outline, minimum 44px summary height, hover affordance and reduced-motion support.
+- scripts/check-cross-domain-readiness-details-surgical-fix-v349321.mjs: new 24-assertion source guard.
+- package.json: register check:cross-domain-readiness-details-v349321.
+- Cumulative FIX_LOG updated and embedded byte-identically.
+- No backend, tenant-data query, optimization engine, governance write, decision gate, workflow handoff, schema or translation table changed.
+
+SOURCE VERIFICATION
+- PASS new Batch083 focused regression 24/24.
+- PASS cumulative targeted surgical suites v349298–v349321: 24/24.
+- PASS tenant multilingual closure (45/45 tenant routes, 264 source files, 14,212 five-language catalog entries) and Cross-Domain multilingual check.
+- PASS Cross-Domain operational completion, Cross-Domain translation completion (9/9), Cross-Domain governance threshold clarity (35/35), Decision Intelligence layout.
+- PASS existing i18n build guard (11/11), Reports, Permissions, Audit, role contract, report-export checks.
+- PASS isolated TypeScript transpile of changed CrossDomainOptimizationPage.tsx: zero diagnostics.
+- PASS CSS stylesheet top-level parse: zero errors.
+- ZIP CRC, exact delta/source equivalence and archive hashes in Batch083 manifest.
+
+RELEASE LIMITATIONS / ACCEPTANCE
+- Local Node v22.16.0 is below declared frontend Node 24.x, and full project dependencies are not available. Full npm ci, full ESLint, project-wide typecheck, Vite production prebuild, CI and deployed browser acceptance are NOT VERIFIED.
+- After full CI using Node 24 and registry dependencies, deploy FE083 with unchanged BE071. In actual browser select a Cross-Domain planning run > Is it ready?; verify seven concise stage summaries, visible review score/attention counts, keyboard Tab/Enter/Space and chevron operation, expanding complete checks, translations, narrow viewport and reduced motion. Confirm no business/governance changes.
+- Retest FE082 Reports Count Variance selectors and earlier outstanding Notifications worker, Barcode Labels print dialog, fresh-requisition Approvals, Users, Reservations and Attachments scenarios.
+- CDO-UX-001 is addressed in source; live UX acceptance remains pending.
+
+CURRENT ENGINEERING BASELINE: Frontend 083 + Backend 071.
+PRODUCTION ACCEPTANCE: NOT VERIFIED.
+Batch 084 NOT STARTED — reconcile next audit finding against this version and the cumulative FIX_LOG before modifying source.
+================================================================================

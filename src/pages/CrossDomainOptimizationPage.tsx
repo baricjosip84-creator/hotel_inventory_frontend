@@ -933,16 +933,19 @@ function ReviewCard({ config, section }: { config: ReviewConfig; section?: Optim
     <section className="card cross-domain-section">
       <div className="card__header"><div><h2>{ui(config.title)}</h2><p className="card__subtext">{ui(config.description)}</p></div><StatusBadge value={decision ? String(decision) : null} /></div>
       <div className="cross-domain-review-summary"><strong>{ui('Review score')}</strong><span>{formatReviewScorePercentage(score, locale)}</span><strong>{ui('Items needing attention')}</strong><span>{formatLocalizedNumber(blockers.length, locale)}</span></div>
-      {section?.assessment_available === false ? <p className="cross-domain-muted">{ui('This review is not assessed because the selected run does not yet have the required evidence.')}</p> : (
-        <div className="cross-domain-check-list">
-          {checks.map((check, index) => (
-            <article className="cross-domain-check" key={`${config.title}-${index}`}>
-              <div><strong>{check.check_label || check.label ? ui(String(check.check_label || check.label)) : ui('Review check')}</strong><p>{check.manual_resolution || check.required_next_step ? ui(String(check.manual_resolution || check.required_next_step)) : ''}</p></div>
-              <StatusBadge value={String(check.check_status || (check.passed === true ? 'ready' : 'blocked'))} />
-            </article>
-          ))}
-        </div>
-      )}
+      {section?.assessment_available === false ? <p className="cross-domain-muted">{ui('This review is not assessed because the selected run does not yet have the required evidence.')}</p> : checks.length ? (
+        <details className="cross-domain-review-details">
+          <summary><span>{ui('Review checks')}</span><span className="cross-domain-badge cross-domain-badge--neutral">{formatLocalizedNumber(checks.length, locale)}</span></summary>
+          <div className="cross-domain-check-list">
+            {checks.map((check, index) => (
+              <article className="cross-domain-check" key={`${config.title}-${index}`}>
+                <div><strong>{check.check_label || check.label ? ui(String(check.check_label || check.label)) : ui('Review check')}</strong><p>{check.manual_resolution || check.required_next_step ? ui(String(check.manual_resolution || check.required_next_step)) : ''}</p></div>
+                <StatusBadge value={String(check.check_status || (check.passed === true ? 'ready' : 'blocked'))} />
+              </article>
+            ))}
+          </div>
+        </details>
+      ) : <p className="cross-domain-muted">{ui('No matching records were returned.')}</p>}
     </section>
   );
 }
