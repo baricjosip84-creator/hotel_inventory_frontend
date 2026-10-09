@@ -252,7 +252,7 @@ export function AttachmentsTab({
                         <details style={{ marginTop: 6 }}>
                           <summary style={{ cursor: 'pointer', color: '#2563eb', fontSize: 12 }}>{ui('Technical details')}</summary>
                           <div style={{ ...styles.muted, marginTop: 6, overflowWrap: 'anywhere' }}>
-                            SHA-256: <code>{item.content_sha256}</code>
+                            {ui('SHA-256 checksum:')} <code>{item.content_sha256}</code>
                           </div>
                         </details>
                       ) : null}

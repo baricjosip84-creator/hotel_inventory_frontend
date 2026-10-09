@@ -7952,6 +7952,7 @@ const rows: readonly TranslationRow[] = [
   ["Tax/VAT:", "Steuer/USt.:", "Impuesto/IVA:", "Taxe/TVA :", "Porez/PDV:"],
   ["Technical audit evidence", "Technischer Audit-Nachweis", "Evidencia técnica de auditoría", "Éléments techniques d’audit", "Tehnički revizijski dokazi"],
   ["Technical contract diagnostics", "Technische Vertragsdiagnose", "Diagnóstico técnico de contrato", "Diagnostic technique du contrat", "Tehnička dijagnostika ugovora"],
+  ["SHA-256 checksum:", "SHA-256-Prüfsumme:", "Suma de verificación SHA-256:", "Somme de contrôle SHA-256 :", "Kontrolni zbroj SHA-256:"],
   ["Technical details", "Technische Details", "Detalles técnicos", "Détails techniques", "Tehnički detalji"],
   ["Technical event details", "Technische Ereignisdetails", "Detalles técnicos del evento", "Détails techniques de l’événement", "Tehnički detalji događaja"],
   ["Technical plan details", "Technische Plandetails", "Detalles técnicos del plan", "Détails techniques du plan", "Tehnički detalji plana"],

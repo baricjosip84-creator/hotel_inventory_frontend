@@ -9050,3 +9050,74 @@ ACCEPTANCE / FOLLOW-UP
 CURRENT SOURCE OF TRUTH: Frontend 078 + Backend 071.
 PRODUCTION STATUS: NOT DEPLOYED / NOT LIVE VERIFIED.
 ================================================================================
+
+
+================================================================================
+BATCH 079 — ATTACHMENTS / SHA-256 CHECKSUM LABEL FIVE-LANGUAGE CLOSURE
+Date: 2026-10-09
+================================================================================
+SOURCE OF TRUTH
+Frontend 078: hotel-inventory-frontend_surgical-fix-078.zip
+  SHA256 d142c693a484779137472e3e696d74aa2fe96bf2ed5402fa86e1d06689c979cf
+Backend 071: hotel-inventory-backend_surgical-fix-071.zip
+  SHA256 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f
+Canonical audit: Inventory_Management_App_Tenant_Audit_Findings_2026-09-26_v93.txt
+Cumulative FIX_LOG: source through Batch 078.
+
+RECONCILIATION / DEFECT
+After Batch076 moved the full SHA-256 into the optional Technical details
+accordion on Inventory Controls -> Attachments, a raw JSX `SHA-256:` label
+remained in AttachmentsTab.tsx. Batch078's multilingual closure audit revealed
+that literal and the defect was reproduced against unchanged baseline Frontend078.
+No attachment persistence, upload/download/delete or permissions bug was claimed.
+
+IMPLEMENTATION — FRONTEND 079 ONLY
+- src/components/enterpriseInventory/tabs/AttachmentsTab.tsx:
+  Replace raw `SHA-256:` JSX text with tenant-translated
+  `ui('SHA-256 checksum:')` inside the existing collapsed disclosure.
+- src/i18n/tenantUiTranslations.ts:
+  Add one five-language label row for EN, DE, ES, FR, HR, keeping the literal
+  SHA-256 algorithm name and language-appropriate checksum terminology.
+- scripts/check-attachment-hash-i18n-surgical-fix-v349317.mjs:
+  New 14-check AST/source/i18n regression guard for all locales, the disclosure,
+  unchanged four-column business table, full hash, and unchanged file actions.
+- package.json: register check:inventory-attachment-hash-i18n-v349317.
+- Embedded cumulative FIX_LOG updated through Batch079.
+- Backend071 unchanged byte-for-byte; no schema change or data migration.
+
+VERIFICATION
+PASS: New Batch079 checksum-label guard 14/14.
+PASS: Batch060–079 targeted surgical suites 20/20 (with Backend071 sibling
+  source folder available for six cross-code guards).
+PASS: Global tenant multilingual closure (45 tenant routes, 264 reachable
+  source files, 14,212 unique five-language catalog keys).
+PASS: Batch076 checksum disclosure guard 17/17 and Batch065 file-picker guard
+  24/24 (included within the full targeted suite).
+PASS: i18n-build 11/11, tenant permissions hardening, tenant audit hardening,
+  role-permission contract.
+PASS: Isolated TypeScript transpile AttachmentsTab.tsx + translation catalog,
+  0 errors each; no parse diagnostics on AttachmentsTab.tsx.
+PASS: Source archive ZIP CRC and changed-content equivalence checks.
+
+NOT VERIFIED / NOT CLAIMED
+Full dependency `npm ci`, project-wide ESLint, project `typecheck:ci`, full Vite
+prebuild, CI/CD and browser production acceptance are NOT verified by this
+batch. Current local Node v22.16.0 is below required 22.22.0 and prior npm
+registry availability/cache was inadequate. Networked supported CI must run.
+A source guard cannot prove visual copy, UX behavior, backend live state, or
+real-world notification worker, print dialog, and approval queue behavior.
+
+FOLLOW-UP
+1. On supported Node >=22.22.0 with registry, run npm ci, frontend/backend
+   automated guards, ESLint, typecheck:ci and full prebuild.
+2. Deploy Frontend079 with Backend071, verify in all five tenant locales that
+   Attachments -> Technical details shows localized SHA-256 checksum label,
+   original full value, and no extra business-table column.
+3. Retest changed Users toast and Reservations department picker from 078/077.
+4. Independently verify Notifications real worker delivery and retries,
+   Barcode Labels browser/OS print dialog, and submitted requisition presence
+   in centralized Approvals. Continue unresolved audit v93 findings.
+
+CURRENT SOURCE OF TRUTH: Frontend079 + Backend071.
+PRODUCTION STATUS: NOT DEPLOYED / NOT LIVE VERIFIED.
+================================================================================
