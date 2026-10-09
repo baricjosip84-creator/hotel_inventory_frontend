@@ -1370,7 +1370,11 @@ export default function OutboundPage() {
           {returnForm.items.map((line, index) => {
             const selected = selectedTraceForReturnLine(line);
             const eligibleRows = eligibleReturnRowsForLine(index);
-            return <div key={index} className="outbound-return-line-editor">
+            return <div key={index} className="outbound-return-line-editor" role="group" aria-label={ui('Item {number}').replace('{number}', String(index + 1))}>
+              <div className="outbound-return-line-heading">
+                <strong>{ui('Item {number}').replace('{number}', String(index + 1))}</strong>
+                <button type="button" className="outbound-button-danger" disabled={returnForm.items.length === 1} onClick={() => removeReturnLine(index)}>{ui('Remove')}</button>
+              </div>
               <div className="outbound-return-line-grid">
                 <label className="outbound-field">{ui('Dispatched stock')} <select value={line.allocation_id} onChange={(event) => chooseReturnAllocation(index, event.target.value)}>
                     <option value="">{ui('Choose dispatched stock')}</option>
@@ -1392,9 +1396,13 @@ export default function OutboundPage() {
                     <option value="quarantine">{ui('Quarantine')}</option>
                   </select>
                 </label>
-                <button type="button" className="outbound-button-danger" disabled={returnForm.items.length === 1} onClick={() => removeReturnLine(index)}>{ui('Remove')}</button>
               </div>
-              {selected ? <div className="outbound-card-subtitle">{selected.order_number} · {referenceLabel(selected.customer_name)} · {referenceLabel(selected.product_name)}{selected.product_archived ? ` · ${ui('Archived')}` : ''} · {formatLot(selected)} {ui('· up to')} {formatNumber(selected.returnable_quantity)} {referenceLabel(selected.product_unit)} {ui('still returnable.')}</div> : null}
+              {selected ? <div className="outbound-return-selected-stock" aria-live="polite">
+                <div><span>{ui('Order')}</span><strong>{selected.order_number}</strong></div>
+                <div><span>{ui('Customer')}</span><strong>{referenceLabel(selected.customer_name)}</strong></div>
+                <div><span>{ui('Product')}</span><strong>{referenceLabel(selected.product_name)}{selected.product_archived ? ` · ${ui('Archived')}` : ''}</strong></div>
+                <div><span>{ui('Still returnable')}</span><strong>{formatNumber(selected.returnable_quantity)} {referenceLabel(selected.product_unit)} · {formatLot(selected)}</strong></div>
+              </div> : null}
               {selected?.product_archived ? <div className="outbound-alert outbound-alert--warning">{ui('This product is archived. The historical return is still allowed, but usable-stock returns are routed to quarantine and the product stays archived.')}</div> : null}
               {selected?.returnable_serial_numbers?.length ? <div className="outbound-serial-box"><div className="outbound-muted" style={{ marginBottom: 7 }}>{ui('Select the exact serials physically returned (')}{line.serial_numbers.length}/{Number.isInteger(Number(line.quantity)) ? Number(line.quantity) : '?'})</div>{selected.returnable_serial_numbers.map((serial) => { const checked = line.serial_numbers.includes(serial); return <label key={serial}><input type="checkbox" checked={checked} onChange={(event) => updateReturnLine(index, { serial_numbers: event.target.checked ? [...line.serial_numbers, serial] : line.serial_numbers.filter((value) => value !== serial) })} /> {serial}</label>; })}</div> : null}
             </div>;

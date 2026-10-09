@@ -9464,3 +9464,44 @@ CURRENT ENGINEERING BASELINE: Frontend085 + Backend071.
 PRODUCTION ACCEPTANCE: NOT VERIFIED.
 Batch086 has NOT started. Select next actual unresolved issue from v93, reconciling current source and cumulative FIX_LOG.
 ================================================================================
+
+================================================================================
+SURGICAL CORRECTION BATCH 086 — OUTBOUND / CUSTOMER RETURNS LINE HIERARCHY
+Date: 2026-10-09
+================================================================================
+
+SOURCE OF TRUTH
+- FE085 full cumulative source SHA-256 87459697e88449bd805fa8d205482b75ce70121c3d3fbdce699dd894917b1692.
+- BE071 full cumulative source SHA-256 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f; unchanged.
+- Canonical tenant audit v93, 2026-09-29 14:07–14:12, Outbound > Customer Returns: dispatched-stock return line unclear / high-priority visual UX fail despite functional stock selection PASS.
+- Complete cumulative FIX_LOG through Batch085, standalone/embedded matched before this change.
+
+CONFIRMED IN FE085
+- Each return line had five adjacent controls including Remove and its own thin boundary, with little heading/association.
+- Selected dispatched stock was repeated as a long one-line narrative beneath the fields, making the order/customer/product/remaining quantity hard to scan.
+- Audit explicitly requires stronger return-line containment and clear field/action association, not a return API redesign.
+
+SCOPE: FRONTEND ONLY
+- src/pages/OutboundPage.tsx: each return line now has a translated Item {number} heading and accessible group label; move that same line's existing Remove button into the heading, preserving last-line disabled gate and index-specific callback; show selected order, customer, product, and remaining quantity/lot in a compact four-part summary (only after selection). Keep archived status/warning, serial selectors, actual dispatched-stock options, location, quantity, condition, create validation, mutation and permissions as before.
+- src/pages/OutboundPage.css: stronger return-line boundary and focused-line highlight, distinct heading, contained selected-stock grid, long-value wrap, responsive one-column selected-stock summary.
+- package.json + scripts/check-outbound-return-line-clarity-surgical-fix-v349324.mjs: add 30 focused source assertions.
+- Existing five-language keys Item {number}, Order, Customer, Product, Still returnable reused, no language catalog changes.
+- No backend, SQL, API, stock, customer, shipment, return lifecycle, permission, reason validation or document logic changed. General application-wide visual consistency is NOT closed.
+
+SOURCE VERIFICATION
+- Batch086 focused regression: 30/30 PASS.
+- All 27 cumulative surgical suites v349298–v349324: PASS.
+- 9 broader source checks: PASS (Outbound multilingual, global multilingual catalog, Outbound detail, i18n, Permissions, Audit, Roles, Reports and Exports).
+- Global multilingual audit: 45/45 tenant routes, 264 reachable source files, 14,212 five-language catalog rows.
+- Isolated TypeScript transpilation of OutboundPage.tsx: 0 diagnostics; CSS top-level balance: 0 errors.
+- ZIP integrity, exact previous-to-new file delta and checksum manifest prepared with package.
+
+NOT VERIFIED / REMAINING RELEASE GATES
+- Full Node24 npm ci, project ESLint, full typecheck:ci, Vite build/CI and deployed-browser acceptance still NOT VERIFIED: local runtime Node22 and incomplete project dependencies.
+- After supported CI, deploy FE086 + unchanged BE071. In Outbound > Customer Returns with at least one returnable dispatch, confirm Item 1/Item 2 grouping, clear stock summary, correct item-specific Remove, disabled last-item Remove, input/dropdown operation, long customer/product/lot names, 760px width, focus styling and all five languages. Create and receive a return ONLY with controlled test data; verify stock reconciliation and success feedback. Do not assume live PASS from source checks.
+- Separately still open: page-wide design-system consistency, sticky subnavigation, dense return record cards, Notifications worker, Barcode Labels print, Approvals fresh requisition and acceptance of Batches 076–085.
+
+CURRENT ENGINEERING BASELINE: Frontend086 + Backend071 (unchanged).
+PRODUCTION ACCEPTANCE: PENDING.
+Batch087 NOT STARTED: select next genuine unresolved audit finding against FE086/BE071 and this cumulative FIX_LOG.
+================================================================================
