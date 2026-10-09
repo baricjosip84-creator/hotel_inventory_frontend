@@ -10234,3 +10234,40 @@ LIVE ACCEPTANCE PENDING
 CURRENT ENGINEERING BASELINE: Frontend104 + Backend072.
 PRODUCTION ACCEPTANCE: PENDING. Batch106 NOT STARTED.
 ================================================================================
+
+
+================================================================================
+SURGICAL CORRECTION BATCH 106 — REPORTS PRODUCT FILTERS / SHARED NATIVE SELECT WITH MANUAL SEARCH
+Date: 2026-10-09
+================================================================================
+AUTHORITATIVE STARTING POINT
+- Frontend104 full cumulative ZIP SHA-256: 3e856afd5a3369c669b5f4bdd05ecc8cebf5e92de22465fea2cd749dfae139f5
+- Backend072 full cumulative ZIP SHA-256: 2036cbc149b5c319911ec8fe72418361651ebcea2caaf799b58382adb0cf3e69 (unchanged).
+- Audit v93: GLOBAL-UX-003, heavy/inconsistent Product autocomplete popups in Reports (Product Movements, Movement Ledger, PO Commitments, Purchasing & Spend, Slow / Non-moving, Usage & Consumption). Earlier batch 082 changed Count Variance; this is the remaining common Product autocomplete component used by the six reports listed here.
+- The standalone cumulative FIX_LOG and the version embedded in Frontend104 matched byte-for-byte.
+
+SOURCE-VERIFIED ISSUE
+- ReportsPage.tsx AutocompleteFilterField used a browser-owned input+datalist with inconsistent heavy popups compared with report native selects.
+- The server accepts typed product filters, so forcing selection only from the active product option list would regress partial-text and historical/discontinued-product search.
+
+FRONTEND CORRECTION
+- src/pages/ReportsPage.tsx: replace only the shared Product filter implementation, preserving the current report filter components and all six existing caller bindings. Render one native select for current products plus explicit 'Other product or manual search…' option with an accessible controlled text input. An existing non-catalog product value remains editable, and an empty catalog falls back to plain text entry. Selecting an ordinary product forwards its exact name; selecting Any product clears the value. API query, export, print, permissions, dates, totals, and backend are unchanged.
+- src/i18n/tenantUiTranslations.ts: add two new UI strings in English, German, Spanish, French, and Croatian.
+- package.json: register check:reports-product-selectors-v349344.
+- scripts/check-reports-product-selectors-surgical-fix-v349344.mjs: add 36 compiled-helper, selector-state, six-report-binding, translation, and isolated TypeScript source assertions.
+- The existing name AutocompleteFilterField is retained for source compatibility with six report callers and previous regression assertions; the implementation no longer uses a browser datalist.
+
+VERIFICATION
+- Focused Batch106 regression 36/36 PASS: native select, normal choice, manual search, historical/current product values, clearing, no-options fallback, five-language translation and isolated TSX parse.
+- Inherited + new selected script tests 50/50 PASS (including prior surgical fix checks, Reports, Permissions, Audit and tenant multilingual audit).
+- Multilingual closure audit PASS: 45/45 tenant routes, 264 reachable source files, 14,230 five-language catalog rows, placeholder parity PASS.
+- Exact changed-file comparison, frontend and backend ZIP CRC, and SHA-256 manifest verified at packaging.
+- Full clean Node24 npm ci / full typecheck / Vite build, backend PostgreSQL integration, and actual deployed-browser acceptance NOT VERIFIED in local Node22 environment.
+
+LIVE ACCEPTANCE PENDING
+- Deploy Frontend105 with unchanged Backend072. In Reports > Product Movements, Movement Ledger, PO Commitments, Purchasing & Spend, Slow / Non-moving, and Usage & Consumption, confirm Product uses the same ordinary dropdown presentation as Result limit.
+- Select a listed product, choose Other product or manual search and type a partial product name or discontinued/historical name, then clear to Any product; verify result rows, PDF/CSV/Print output, all five tenant languages, mobile widths and disabled-during-export states. Confirm Count Variance and Location selectors retain their separate earlier fixes.
+
+CURRENT ENGINEERING BASELINE: Frontend105 + Backend072.
+PRODUCTION ACCEPTANCE: PENDING. Batch107 NOT STARTED.
+================================================================================

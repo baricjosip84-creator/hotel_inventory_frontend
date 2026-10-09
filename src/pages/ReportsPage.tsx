@@ -832,6 +832,9 @@ function HistoricalLocationFilterField({ label, value, placeholder, options, onC
   );
 }
 
+// Shared product filter used by Reports. Keep the existing component name so all
+// report panels retain their filter wiring; native datalist popups are no longer
+// used. Manual search preserves historical names and partial-name matching.
 function AutocompleteFilterField({ label, value, placeholder, options, onChange, disabled, listId }: {
   label: string;
   value: string;
@@ -841,18 +844,45 @@ function AutocompleteFilterField({ label, value, placeholder, options, onChange,
   disabled: boolean;
   listId: string;
 }) {
+  const { ui } = useAppTranslation();
+  const [customMode, setCustomMode] = useState(false);
+  if (!options.length) {
+    return <TextFilterField label={label} value={value} placeholder={placeholder} onChange={onChange} disabled={disabled} />;
+  }
+  const manualOptionValue = '__manual_product_search__';
+  const manual = customMode || Boolean(value && !options.includes(value));
   return (
     <label className="reports-field reports-field--compact">
       <span>{label}</span>
-      <input
-        value={value}
-        maxLength={MAX_REPORT_FILTER_LENGTH}
-        placeholder={placeholder}
-        list={options.length ? listId : undefined}
-        onChange={(event) => onChange(event.target.value)}
+      <select
+        id={listId}
+        value={manual ? manualOptionValue : value}
         disabled={disabled}
-      />
-      {options.length ? <datalist id={listId}>{options.map((option) => <option key={option} value={option} />)}</datalist> : null}
+        onChange={(event) => {
+          if (event.target.value === manualOptionValue) {
+            setCustomMode(true);
+            onChange('');
+          } else {
+            setCustomMode(false);
+            onChange(event.target.value);
+          }
+        }}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+        <option value={manualOptionValue}>{ui('Other product or manual search…')}</option>
+      </select>
+      {manual ? (
+        <input
+          type="text"
+          value={value}
+          maxLength={MAX_REPORT_FILTER_LENGTH}
+          aria-label={ui('Enter a product name or search term')}
+          placeholder={ui('Enter a product name or search term')}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      ) : null}
     </label>
   );
 }
