@@ -9378,3 +9378,45 @@ CURRENT ENGINEERING BASELINE: Frontend 083 + Backend 071.
 PRODUCTION ACCEPTANCE: NOT VERIFIED.
 Batch 084 NOT STARTED — reconcile next audit finding against this version and the cumulative FIX_LOG before modifying source.
 ================================================================================
+
+================================================================================
+SURGICAL CORRECTION BATCH 084 — OUTBOUND / EDIT DRAFT AUTOMATIC POSITIONING
+Date: 2026-10-09
+================================================================================
+
+SOURCE OF TRUTH
+- Frontend083 cumulative ZIP (SHA-256 1680eedc5ab5ae569e45b131df8a05d124f3b27cc4253c4c753e88bc9cb30785).
+- Backend071 cumulative ZIP (SHA-256 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f; unchanged).
+- Canonical tenant audit v93, Outbound Page 26 Edit Draft positioning (2026-09-29 12:01 CEST).
+- Cumulative FIX_LOG through Batch083, byte-identical embedded in FE083 and standalone.
+
+CONFIRMED ISSUE
+- Audit verified that selecting Edit Draft opened the correct form but left it above the current viewport, requiring the operator to scroll manually upward.
+- FE083 beginOrderEdit(order) correctly selected the draft and populated the form but did not scroll or focus it. Order details already used a post-render scroll/focus pattern.
+
+SURGICAL IMPLEMENTATION — FRONTEND ONLY
+- src/pages/OutboundPage.tsx: add orderEditHeadingRef to the existing Edit draft heading and a post-render effect scoped to editingOrder, showOrderForm, and the Orders tab. Bring the heading into view and focus without a second browser scroll; cancel scheduled work on state change/unmount.
+- Honor reduced-motion preference by using immediate scroll when requested, otherwise smooth scroll. Preserve the existing edit form, selected customer/products/locations, Save Draft and Cancel Edit workflows.
+- src/pages/OutboundPage.css: apply a 110px sticky-header scroll offset and visible heading-focus outline only to the draft-edit form heading.
+- scripts/check-outbound-draft-editor-position-surgical-fix-v349322.mjs: new 25-assertion source-level regression guard.
+- package.json: register check:outbound-draft-editor-position-v349322.
+- Cumulative FIX_LOG updated through Batch084 and embedded byte-identically in FE084.
+- No backend, business-data mutations, queries, permissions, database schema, tenant language catalog or order lifecycle changes.
+
+SOURCE-LEVEL VERIFICATION
+- PASS new Batch084 25/25 assertion guard.
+- PASS cumulative 25/25 surgical suites v349298–v349322 (the initial 7 module-not-found errors were environment-only and resolved by locally linking existing global TypeScript, excluded from ZIP).
+- PASS 9/9 broader checks: Outbound multilingual, global tenant multilingual closure (45 routes, 264 files, 14,212 five-language entries), Outbound detail/context 18/18, i18n build 11/11, tenant permissions, tenant audit, role permission management, Reports hardening, report export.
+- PASS isolated TypeScript TSX transpilation: 0 diagnostics.
+- PASS Outbound CSS parse: 0 top-level errors.
+- Backend071 remains unchanged. Full ZIP CRC, delta equivalence and hashes are recorded in Batch084 manifest.
+
+NOT VERIFIED / RELEASE GATES
+- Node v22.16.0 below project-declared Node24.x; full npm ci, project-wide ESLint, full TypeScript typecheck:ci, Vite production build and CI/CD remain NOT VERIFIED.
+- Production browser acceptance remains PENDING. After supported CI, deploy FE084 + BE071; open Outbound Orders, scroll far down, click Edit Draft on a draft. Confirm correct order number and form appear near the top of the viewport with visible heading focus (no manual scroll), no unwanted jumps, and working Save Draft/Cancel Edit. Test keyboard navigation, reduced motion, mobile and five locales.
+- Independently perform earlier pending production checks: Cross-Domain review disclosure, Count Variance dropdowns, Notifications worker processing, actual Barcode Print dialog, fresh requisition Approvals, Reservations department choices, Users feedback, Attachments checksum details, and Outbound order-card action grouping.
+
+CURRENT ENGINEERING BASELINE: Frontend 084 + Backend 071.
+PRODUCTION ACCEPTANCE: NOT VERIFIED.
+Batch 085 NOT STARTED — choose and verify a different unresolved v93 finding before implementing.
+================================================================================

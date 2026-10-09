@@ -453,6 +453,7 @@ export default function OutboundPage() {
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [orderForm, setOrderForm] = useState<OrderForm>(emptyOrder);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const orderEditHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const [pickOrderId, setPickOrderId] = useState<string>('');
   const pickingWorkbenchRef = useRef<HTMLElement | null>(null);
   const [pickDrafts, setPickDrafts] = useState<Record<string, { quantity: string; inventory_lot_id: string; serial_numbers: string[] }>>({});
@@ -573,6 +574,17 @@ export default function OutboundPage() {
     }, 50);
     return () => window.clearTimeout(handle);
   }, [selectedOrderId]);
+  useEffect(() => {
+    if (!editingOrder || !showOrderForm || activeTab !== 'orders') return undefined;
+    const handle = window.setTimeout(() => {
+      const heading = orderEditHeadingRef.current;
+      if (!heading) return;
+      const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+      heading.scrollIntoView({ behavior, block: 'start' });
+      heading.focus({ preventScroll: true });
+    }, 50);
+    return () => window.clearTimeout(handle);
+  }, [editingOrder, showOrderForm, activeTab]);
   const orderActivity = useQuery({ queryKey: ['outbound-order-activity', selectedOrderId, orderAuditPage], queryFn: () => apiRequest<OrderActivity>(`/outbound/orders/${selectedOrderId}/activity?audit_page=${orderAuditPage}&audit_page_size=${AUDIT_PAGE_SIZE}`), enabled: Boolean(selectedOrderId) });
   const orderDocuments = useQuery({ queryKey: ['outbound-order-documents', selectedOrderId], queryFn: () => apiRequest<OutboundDocument[]>(`/outbound/orders/${selectedOrderId}/documents`), enabled: Boolean(selectedOrderId) });
   const orderCommunications = useQuery({ queryKey: ['outbound-order-communications', selectedOrderId], queryFn: () => apiRequest<Communication[]>(`/outbound/orders/${selectedOrderId}/communications`), enabled: Boolean(selectedOrderId) });
@@ -1095,7 +1107,7 @@ export default function OutboundPage() {
     {activeTab === 'orders' ? <>
       {(showOrderForm || editingOrder) ? <section className="outbound-panel">
         <div className="outbound-section-heading">
-          <div className="io-section-heading-with-icon"><span className="io-section-heading-icon"><TenantNavIcon path="/outbound" size={18} /></span><div className="io-section-heading-copy"><h3>{editingOrder ? ui('Edit draft {order}').replace('{order}', editingOrder.order_number) : ui('Create customer order')}</h3><p>{ui('Create a draft first. Stock is not reserved until the draft is confirmed.')}</p></div></div>
+          <div className="io-section-heading-with-icon"><span className="io-section-heading-icon"><TenantNavIcon path="/outbound" size={18} /></span><div className="io-section-heading-copy"><h3 ref={orderEditHeadingRef} tabIndex={-1} className="outbound-order-edit-heading">{editingOrder ? ui('Edit draft {order}').replace('{order}', editingOrder.order_number) : ui('Create customer order')}</h3><p>{ui('Create a draft first. Stock is not reserved until the draft is confirmed.')}</p></div></div>
           <button type="button" className="outbound-button" onClick={cancelOrderEdit}>{ui('Close form')}</button>
         </div>
         {!canUseOrderForm && !editingOrder ? <div className="outbound-alert outbound-alert--warning">{ui('Creating an order also requires read access to customers, products, storage locations, and stock so only currently fulfillable selections are offered.')}</div> : null}

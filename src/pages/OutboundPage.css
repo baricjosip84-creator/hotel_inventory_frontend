@@ -383,6 +383,17 @@
   padding: 14px;
 }
 
+/* Keep the selected draft editor visible under the sticky workspace header. */
+.outbound-order-edit-heading {
+  scroll-margin-top: 110px;
+}
+
+.outbound-order-edit-heading:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+
 .outbound-order-card--active {
   border-color: #bfdbfe;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.05);
