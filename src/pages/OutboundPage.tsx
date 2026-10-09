@@ -1428,19 +1428,31 @@ export default function OutboundPage() {
             const causesSidebarAttention = outboundReturnAttentionIds.has(row.id);
             return <article
               key={row.id}
-              className="outbound-return-card"
+              className={`outbound-return-card${selectedReturnId === row.id ? ' outbound-return-card--expanded' : ''}`}
               style={causesSidebarAttention ? sidebarAttentionItemStyle : undefined}
               data-sidebar-attention-item={causesSidebarAttention ? "true" : undefined}
             >
             <div className="outbound-card-topline"><div><div className="outbound-card-title">{row.return_number} · {referenceLabel(row.customer_name)}</div>{causesSidebarAttention ? <div style={{ marginTop: 6 }}><SidebarAttentionMarker label={ui('Attention required')} /></div> : null}<div className="outbound-card-subtitle">{ui('Order')} {referenceLabel(row.order_number)} {ui('· Created')} {formatDate(row.created_at)}</div></div><StatusBadge status={row.status} /></div>
-            <div className="outbound-notes"><strong>{ui('Reason:')}</strong> {row.reason}{row.notes ? <> · {row.notes}</> : null}</div>
+            <div className="outbound-return-reason"><strong>{ui('Reason:')}</strong><span>{row.reason}</span>{row.notes ? <span className="outbound-return-reason-note">{row.notes}</span> : null}</div>
             {row.status === 'cancelled' && row.cancellation_reason ? <div className="outbound-alert outbound-alert--error" style={{ marginTop: 8 }}><strong>{ui('Cancellation:')}</strong> {row.cancellation_reason}</div> : null}
-            <div className="outbound-return-items">{row.items.map((item) => <div key={item.id}><strong>{referenceLabel(item.product_name)}</strong> · {ui('SKU:')} {referenceLabel(item.product_sku)} · {formatNumber(item.quantity)} {referenceLabel(item.product_unit)} → {formatStatus(item.condition)} @ {referenceLabel(item.storage_location_name)}{item.lot_number || item.batch_number ? ` · ${[item.lot_number ? `${ui('Lot')} ${item.lot_number}` : '', item.batch_number ? `${ui('Batch')} ${item.batch_number}` : ''].filter(Boolean).join(' · ')}` : ''}{item.serial_numbers?.length ? <> · <strong>{ui('Serials:')}</strong> {item.serial_numbers.join(', ')}</> : null}{item.notes ? <> · <strong>{ui('Item note:')}</strong> {item.notes}</> : null}</div>)}</div>
-            <div className="outbound-actions-row">
+            <div className="outbound-return-items">{row.items.map((item) => <div key={item.id} className="outbound-return-item-summary">
+              <div className="outbound-return-item-identity"><strong>{referenceLabel(item.product_name)}</strong><span>{ui('SKU:')} {referenceLabel(item.product_sku)}</span></div>
+              <div className="outbound-return-item-metrics">
+                <div><span>{ui('Quantity')}</span><strong>{formatNumber(item.quantity)} {referenceLabel(item.product_unit)}</strong></div>
+                <div><span>{ui('Condition')}</span><strong>{formatStatus(item.condition)}</strong></div>
+                <div><span>{ui('Return to location')}</span><strong>{referenceLabel(item.storage_location_name)}</strong></div>
+              </div>
+              {item.lot_number || item.batch_number ? <div className="outbound-return-item-extra">{item.lot_number ? <span><strong>{ui('Lot')}</strong> {item.lot_number}</span> : null}{item.batch_number ? <span><strong>{ui('Batch')}</strong> {item.batch_number}</span> : null}</div> : null}
+              {item.serial_numbers?.length ? <div className="outbound-return-item-extra"><strong>{ui('Serials:')}</strong> {item.serial_numbers.join(', ')}</div> : null}
+              {item.notes ? <div className="outbound-return-item-extra"><strong>{ui('Item note:')}</strong> {item.notes}</div> : null}
+            </div>)}</div>
+            <div className="outbound-return-action-area">
+              <div className="outbound-return-action-context"><span>{ui('Customer returns')}</span><strong>{row.return_number}</strong></div>
+              <div className="outbound-actions-row outbound-return-action-buttons">
               <button type="button" className="outbound-button" onClick={() => { setSelectedReturnId(selectedReturnId === row.id ? '' : row.id); setReturnAuditPage(1); setReturnDocumentPreview(null); setAttachmentFile(null); }}>{selectedReturnId === row.id ? ui('Close Details') : ui('Open Details')}</button>
               {row.status === 'draft' && canReturnReceive ? <button type="button" className="outbound-button-primary" disabled={mutation.isPending} onClick={() => { if (window.confirm(ui('Receive this customer return into inventory now?'))) mutation.mutate({ path: `/outbound/returns/${row.id}/receive`, version: Number(row.version), successMessage: ui('{return} received into inventory.').replace('{return}', row.return_number) }); }}>{ui('Receive Return')}</button> : null}
               {row.status === 'draft' && canReturnCancel ? <button type="button" className="outbound-button-danger" disabled={mutation.isPending} onClick={() => { setCancelReturnId(cancelReturnId === row.id ? '' : row.id); setCancelReturnReason(''); }}>{ui('Cancel Return')}</button> : null}
-              
+              </div>
             </div>
             {cancelReturnId === row.id ? <div className="outbound-inline-action-form"><label className="outbound-field">{ui('Return cancellation reason')}<textarea value={cancelReturnReason} onChange={(event) => setCancelReturnReason(event.target.value)} autoFocus /></label><div className="outbound-actions-row"><button type="button" className="outbound-button-danger" disabled={mutation.isPending || cancelReturnReason.trim().length < 3} onClick={() => mutation.mutate({ path: `/outbound/returns/${row.id}/cancel`, version: Number(row.version), body: { reason: cancelReturnReason.trim() }, successMessage: ui('{return} cancelled.').replace('{return}', row.return_number) }, { onSuccess: () => { setCancelReturnId(''); setCancelReturnReason(''); } })}>{ui('Confirm')}</button><button type="button" className="outbound-button" onClick={() => { setCancelReturnId(''); setCancelReturnReason(''); }}>{ui('Close')}</button></div></div> : null}
             {selectedReturnId === row.id ? <div className="outbound-detail-grid" style={{ marginTop: 12 }}>

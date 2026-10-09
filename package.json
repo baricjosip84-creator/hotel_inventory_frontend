@@ -445,7 +445,8 @@
     "check:cross-domain-readiness-details-v349321": "node scripts/check-cross-domain-readiness-details-surgical-fix-v349321.mjs",
     "check:outbound-draft-editor-position-v349322": "node scripts/check-outbound-draft-editor-position-surgical-fix-v349322.mjs",
     "check:outbound-order-actions-framing-v349323": "node scripts/check-outbound-order-actions-framing-surgical-fix-v349323.mjs",
-    "check:outbound-return-line-clarity-v349324": "node scripts/check-outbound-return-line-clarity-surgical-fix-v349324.mjs"
+    "check:outbound-return-line-clarity-v349324": "node scripts/check-outbound-return-line-clarity-surgical-fix-v349324.mjs",
+    "check:outbound-return-record-clarity-v349325": "node scripts/check-outbound-return-record-clarity-surgical-fix-v349325.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

@@ -9505,3 +9505,47 @@ CURRENT ENGINEERING BASELINE: Frontend086 + Backend071 (unchanged).
 PRODUCTION ACCEPTANCE: PENDING.
 Batch087 NOT STARTED: select next genuine unresolved audit finding against FE086/BE071 and this cumulative FIX_LOG.
 ================================================================================
+
+
+================================================================================
+SURGICAL CORRECTION BATCH 087 — OUTBOUND / CUSTOMER RETURNS SAVED-RECORD HIERARCHY
+Date: 2026-10-09
+================================================================================
+
+AUTHORITATIVE INPUT BASELINE
+- Frontend086 cumulative archive SHA-256: 4c59aad5f4e3c099a8ce5421697e90143eb3e5d6c0a12d26875e4ef3dbc24233.
+- Backend071 cumulative archive SHA-256: 301bf71e61de7fd446382faf62fd98f2fa42b90a1a2e92e89e0b3ac1b126825f (UNCHANGED).
+- Inventory_Management_App_Tenant_Audit_Findings_2026-09-26_v93.txt; audited Outbound > Customer Returns (2026-09-29 14:24) Open Details functional PASS / VISUAL-UX FAIL for crowded/flat summary and details; high-priority form clarity finding; user requested coherent cross-page styling.
+- Cumulative FIX_LOG through Batch086, including earlier return-form item grouping, which must not be redone.
+
+CONFIRMED IN FRONTEND086
+- Each saved return showed all fields for every return item in one long dense line with inline punctuation: product, SKU, quantity, condition, destination, lot, batch, serials and notes.
+- The return record's action buttons used an unframed generic actions row without an explicit return-reference context.
+- Opened details were not visually enclosed as one record's subordinate workspace. All functional controls existed and work should not be disturbed.
+
+IMPLEMENTATION (FRONTEND ONLY)
+- src/pages/OutboundPage.tsx: keep original return number/customer/status and reason; render each original row.items record as a self-contained item summary with separate product/SKU and labeled Quantity/Condition/Return to location values. Preserve conditional lot/batch, serials and item notes. Use existing five-language ui keys; no new translation catalog entries.
+- src/pages/OutboundPage.tsx: add return-reference action area so Details, Receive Return, and Cancel Return clearly belong to their record; selected return gets an expanded card class. Existing permission, draft status, confirmation, optimistic version/concurrency and mutate endpoints untouched. Existing activity/audit/documents/email/attachments stay visible when selected.
+- src/pages/OutboundPage.css: card boundaries and focus state, contained return item summaries, a separate action area, expanded-detail workspace border, 3-column information at wider widths and single-column on narrow viewports; long values wrap.
+- package.json: new script check:outbound-return-record-clarity-v349325.
+- scripts/check-outbound-return-record-clarity-surgical-fix-v349325.mjs: 31 checks of structure, data provenance, action scoping, cancellation/receive protections, responsive classes and unchanged details.
+- Frontend-only; no database, API, backend, permissions, inventory movement, lifecycle state, or email/document handling altered.
+
+SOURCE REGRESSION EVIDENCE
+- Batch087 focused guard: 31/31 PASS.
+- All 28 targeted surgical suites v349298–v349325: PASS.
+- 9 broader checks: PASS, including Outbound multilingual, five-language tenant catalog closure, details/context, i18n, permissions, audit, roles, reports and exports.
+- Tenant multilingual audit: 45/45 routes, 264 reachable source files, 14,212 five-language rows; PASS.
+- Isolated TypeScript transpilation of OutboundPage.tsx: 0 diagnostics.
+- CSS structural brace balance: PASS (not a browser visual test).
+- Byte-for-byte archive equivalence and source delta recorded in Batch087 manifest.
+
+RELEASE LIMITATIONS / LIVE ACCEPTANCE
+- Full npm ci, full lint, full typecheck:ci, Vite production build, CI deployment and live acceptance remain PENDING. The available Node 22.16.0 does not meet frontend engines Node 24.x, and project dependencies are not fully installed.
+- On supported Node24 CI: deploy FE087+BE071, verify Customer Returns records with multiple line items, long SKU/location/serial/lot fields, multilingual and responsive layouts (at/under 760px), keyboard focus, exact-row action ownership, Details activity/audit/docs/email/attachment access; receive/cancel only on controlled test data and verify inventory invariants. Do not claim real browser PASS from static checks.
+- Existing source correction history 001–086 remains cumulative. Remaining distinct UI work: sticky Outbound subnavigation (audited 2026-09-29), wider app design-system consistency, and previous live checks for printing, notifications, approvals, reservations, users, attachments, reports and outbound.
+
+CURRENT ENGINEERING BASELINE: Frontend087 + Backend071 (unchanged).
+PRODUCTION ACCEPTANCE: PENDING.
+Batch088 has NOT started. Inspect current audit and log before selecting next change.
+================================================================================
