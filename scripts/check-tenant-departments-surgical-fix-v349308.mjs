@@ -25,7 +25,7 @@ check('requesting and target included', () => {assert.match(service,/SELECT requ
 check('reservations, par levels, cycle counts, usage included', () => {for(const table of ['inventory_reservations','inventory_par_levels','cycle_counts','inventory_usage_logs'])assert.ok(service.includes(`${table} WHERE tenant_id = $1`));});
 check('no unscoped department query', () => {const clauses=service.match(/FROM (approval_rules|department_requisitions|cycle_counts|inventory_par_levels|inventory_requisitions|inventory_reservations|inventory_usage_logs) WHERE tenant_id = \$1/g)||[];assert.equal(clauses.length,9);});
 check('blanks discarded and case-insensitive deduplication', () => {assert.match(service,/NULLIF\(BTRIM\(name\), ''\) IS NOT NULL/);assert.match(service,/GROUP BY LOWER\(name\)/);});
-check('read endpoint guarded by either read permission', () => assert.match(route,/\/department-options'.*requirePermission\.any\(\[TENANT_PERMISSIONS\.APPROVAL_RULES_READ, TENANT_PERMISSIONS\.REQUISITIONS_READ\]\)/));
+check('read endpoint guarded by appropriate read permissions', () => assert.match(route,/\/department-options'.*requirePermission\.any\(\[TENANT_PERMISSIONS\.APPROVAL_RULES_READ, TENANT_PERMISSIONS\.REQUISITIONS_READ, TENANT_PERMISSIONS\.INVENTORY_RESERVATIONS_READ\]\)/));
 check('controller enforces trusted tenant context', () => assert.match(controller,/listTenantDepartmentOptions\(\{ tenantId: assertTenantContext\(req\), db: getDb\(req\) \}\)/));
 check('frontend shares stable query key', () => assert.match(hook,/queryKey: \['tenant-department-options'\]/));
 check('frontend uses protected endpoint', () => assert.match(hook,/apiRequest<string\[]>\('\/enterprise-inventory\/department-options'\)/));

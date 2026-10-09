@@ -9,6 +9,7 @@ import { getCurrentTenantUserId } from '../lib/auth';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { ProductItem } from '../types/inventory';
 import ProductUomSelect from '../components/inventory/ProductUomSelect';
+import TenantDepartmentField from '../components/inventory/TenantDepartmentField';
 import { SidebarAttentionMarker, SidebarAttentionTabDot } from '../components/ui/SidebarAttentionMarker';
 import { sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionStyles';
 import { useOperationalAttentionItems } from '../lib/sidebarAttentionItems';
@@ -658,6 +659,7 @@ export default function InventoryReservationsPage() {
 
   const refreshReservationQueries = () => {
     void queryClient.invalidateQueries({ queryKey: ['inventory-reservations-options'] });
+    void queryClient.invalidateQueries({ queryKey: ['tenant-department-options'] });
     void queryClient.invalidateQueries({ queryKey: ['inventory-reservations'] });
     void queryClient.invalidateQueries({ queryKey: ['inventory-reservations-summary'] });
     void queryClient.invalidateQueries({ queryKey: ['inventory-reservations-source-summary'] });
@@ -999,10 +1001,10 @@ export default function InventoryReservationsPage() {
               <label style={pageStyles.label}>{ui("Linked source ID (UUID)")} <input style={pageStyles.input} value={draft.source_id} onChange={(event) => setDraft({ ...draft, source_id: event.target.value })} placeholder={ui("Required UUID for linked source")} />
               </label>
             ) : null}
-            <label style={pageStyles.label}>{ui("Requesting department")} <input list="reservation-departments" style={pageStyles.input} value={draft.requesting_department} onChange={(event) => setDraft({ ...draft, requesting_department: event.target.value })} />
-            </label>
-            <label style={pageStyles.label}>{ui("Target department")} <input list="reservation-departments" style={pageStyles.input} value={draft.target_department} onChange={(event) => setDraft({ ...draft, target_department: event.target.value })} />
-            </label>
+            <TenantDepartmentField label={ui("Requesting department")} value={draft.requesting_department}
+              onChange={(value) => setDraft((current) => ({ ...current, requesting_department: value }))} />
+            <TenantDepartmentField label={ui("Target department")} value={draft.target_department}
+              onChange={(value) => setDraft((current) => ({ ...current, target_department: value }))} />
             <label style={pageStyles.label}>{ui("Priority")} <select style={pageStyles.input} value={draft.priority} onChange={(event) => setDraft({ ...draft, priority: event.target.value })}>
                 <option value="low">{ui("Low")}</option>
                 <option value="normal">{ui("Normal")}</option>
@@ -1017,9 +1019,6 @@ export default function InventoryReservationsPage() {
             <label style={pageStyles.label}>{ui("Notes")} <input style={pageStyles.input} value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} />
             </label>
           </div>
-          <datalist id="reservation-departments">
-            {(optionsQuery.data?.departments || []).map((department) => <option key={department} value={department} />)}
-          </datalist>
 
           <h3 style={{ ...pageStyles.sectionTitle, marginTop: '1rem' }}>{ui("Lines")}</h3>
           <div style={pageStyles.tableWrap}>
@@ -1287,10 +1286,10 @@ export default function InventoryReservationsPage() {
                     <label style={pageStyles.label}>{ui("Linked source ID (UUID)")} <input style={pageStyles.input} value={editDraft.source_id} onChange={(event) => setEditDraft({ ...editDraft, source_id: event.target.value })} placeholder={ui("Required UUID for linked source")} />
                     </label>
                   ) : null}
-                  <label style={pageStyles.label}>{ui("Requesting department")} <input list="reservation-departments" style={pageStyles.input} value={editDraft.requesting_department} onChange={(event) => setEditDraft({ ...editDraft, requesting_department: event.target.value })} />
-                  </label>
-                  <label style={pageStyles.label}>{ui("Target department")} <input list="reservation-departments" style={pageStyles.input} value={editDraft.target_department} onChange={(event) => setEditDraft({ ...editDraft, target_department: event.target.value })} />
-                  </label>
+                  <TenantDepartmentField label={ui("Requesting department")} value={editDraft.requesting_department}
+                    onChange={(value) => setEditDraft((current) => current ? ({ ...current, requesting_department: value }) : current)} />
+                  <TenantDepartmentField label={ui("Target department")} value={editDraft.target_department}
+                    onChange={(value) => setEditDraft((current) => current ? ({ ...current, target_department: value }) : current)} />
                   <label style={pageStyles.label}>{ui("Priority")} <select style={pageStyles.input} value={editDraft.priority} onChange={(event) => setEditDraft({ ...editDraft, priority: event.target.value })}>
                       <option value="low">{ui("Low")}</option>
                       <option value="normal">{ui("Normal")}</option>

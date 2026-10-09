@@ -8886,3 +8886,93 @@ keep separate live follow-ups for Notifications worker/attempts, Barcode print d
 Approval queue fresh requisition, remaining department selectors and deployment.
 PRODUCTION STATUS: SOURCE CORRECTION READY FOR COMPLETE CI + BROWSER ACCEPTANCE; NOT VERIFIED LIVE.
 ================================================================================
+
+================================================================================
+BATCH 077 — RESERVATIONS SHARED TENANT DEPARTMENT PICKER / READ ACCESS
+Date: 2026-10-09
+================================================================================
+SOURCE OF TRUTH
+Frontend 076: hotel-inventory-frontend_surgical-fix-076.zip
+  SHA256 2fa3c607a5fd371b70909e57e7bb6591db51765c9cc907b5aad80f5d70c7d34e
+Backend 070: hotel-inventory-backend_surgical-fix-070.zip
+  SHA256 518ec873cb1887a39aa2b0834e28dc9a820c5e6a5c709e35edf9dda1a579dc93
+Canonical audit: Inventory_Management_App_Tenant_Audit_Findings_2026-09-26_v93.txt
+Cumulative FIX_LOG: through completed source Batch 076.
+
+CONFIRMED HISTORICAL AUDIT DEFECT / CURRENT SOURCE RECONCILIATION
+Audit 2026-09-30 18:55: Reservations create draft Requesting department and Target
+ department were plain free-text fields. Current Frontend 076 still used two datalist
+ text inputs in CREATE and another two in EDIT. The datalist drew only from the
+ Reservations options response, not the tenant-wide vocabulary introduced in Batch 070.
+Meanwhile, Backend 070 GET /enterprise-inventory/department-options admitted only
+ approval-rules.read or requisitions.read. A user holding reservation-read access
+ without those privileges would be denied the shared picker. Batch 070 explicitly
+ deferred the Reservations follow-up; Batch 077 closes this specific UI/access gap.
+
+SURGICAL IMPLEMENTATION — FRONTEND 077 + BACKEND 071
+Frontend Reservations page:
+- Use existing TenantDepartmentField for requesting + target departments in both
+  Create draft and Edit draft, a total of four controlled picker placements.
+- Reuse tenant-wide searchable department dropdown. Existing names select directly;
+  new department names remain a clear deliberate secondary action (not implicit typing).
+- Preserve old/custom selected department names on already-existing drafts.
+- Remove the obsolete reservation-departments datalist. Reservation filters remain
+  plain search text, deliberately, as filters rather than record-editing inputs.
+- Refresh shared tenant department options cache after successful reservation create
+  or update, using the established refreshReservationQueries path.
+- Preserve reservation payload fields, form validations, source ownership, version
+  gating, create/update endpoints, products, storage, allocation and lifecycle flows.
+- Use existing five-language picker labels; no new translations or schema changes.
+Backend department-options route:
+- Add inventory_reservations.read as a third qualifying permission; retain existing
+  approval_rules.read and requisitions.read grants.
+- Keep GET read-only, tenant context asserted server-side, and the same tenant-scoped
+  SQL using existing operational records. No new writable department master/API.
+- Update prior frontend/backend Batch 070 permission-guard assertions for the
+  explicitly enlarged permission union; add a dedicated Batch 077 regression guard
+  in each repo and register package commands.
+
+SOURCE CHANGE LIST (excluding mirrored embedded FIX_LOG)
+Frontend MODIFIED: package.json; scripts/check-tenant-departments-surgical-fix-v349308.mjs;
+  src/pages/InventoryReservationsPage.tsx.
+Frontend ADDED: scripts/check-reservation-department-picker-surgical-fix-v349315.mjs.
+Frontend documentation: embedded root Inventory_Management_App_FIX_LOG_2026-10-06.txt synchronized.
+Backend MODIFIED: package.json; scripts/checkTenantDepartmentOptionsSurgicalFixV349308.js;
+  src/routes/enterpriseInventory.js.
+Backend ADDED: scripts/checkReservationDepartmentAccessSurgicalFixV349315.js.
+No files removed. No database or migration change.
+
+TESTS / VERIFICATION
+- Dedicated new frontend guard: 20/20 PASS.
+- Dedicated new backend route/auth guard: 10/10 PASS.
+- Inherited frontend tenant-department guard: 31/31 PASS.
+- Inherited backend tenant-department guard: 13/13 PASS.
+- Eighteen Batch 060–077 targeted regression suites: 18/18 PASS.
+- Reservation multilingual full-page check: PASS.
+- All three Enterprise Inventory multilingual suites: PASS.
+- Requisition-linked-reservation sync: 20/20 PASS with correct BACKEND_ROOT.
+- Prior Attachments technical-detail regression: 17/17 PASS.
+- Prior Notification event labels regression: 28/28 PASS.
+- Reservations TSX parser and isolated transpile: 0 diagnostics.
+- Archive byte-equivalence and checksum verification captured separately.
+
+REMAINING GATES (NOT CLAIMED PASS)
+- `npm ci --offline` failed ENOTCACHED (zod-validation-error@4.0.2 archive absent).
+  Environment Node v22.16.0 is below react-router v8.3.0 >=22.22.0 minimum.
+- Therefore do NOT claim project TypeScript typecheck:ci, full npm prebuild, targeted
+  project ESLint, CI or live deployed browser acceptance passed here.
+- Re-run npm ci, frontend + backend guards, targeted ESLint, typecheck:ci and prebuild
+  on suitable networked Node environment before deployment.
+- Deploy FE077 with BE071 together (backend permission extension is needed for
+  reservation-only permitted readers). Validate tenant access, four department
+  controls, known/new/legacy names, save and refresh without changing data semantics.
+
+OUTSTANDING OTHER FINDINGS
+Notifications worker delivery attempt evidence; barcode OS/browser print dialog;
+central Approvals fresh submitted requisition acceptance; broader unresolved audit
+v93 and end-to-end production release acceptance remain independently open.
+
+CURRENT ENGINEERING SOURCE-OF-TRUTH AFTER THIS BATCH:
+Frontend 077 + Backend 071. Batch 078 not started.
+PRODUCTION STATUS: NOT DEPLOYED/NOT LIVE VERIFIED.
+================================================================================
