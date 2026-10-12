@@ -10437,3 +10437,42 @@ LIVE ACCEPTANCE
 CURRENT ENGINEERING SOURCE OF TRUTH: Frontend110 + Backend072.
 PRODUCTION ACCEPTANCE: PENDING. Batch112 NOT STARTED.
 ================================================================================
+
+================================================================================
+BATCH 112 — MOBILE EXECUTION / SYSTEM-GENERATED CLOSURE TASK LOCALIZATION
+DATE: 2026-10-12
+BASELINE: Frontend110 + Backend072
+RESULT: Frontend111 + Backend072 (backend unchanged)
+
+CANONICAL AUDIT FINDING
+- MOBILE-I18N-001 — system-generated task title/description remain English in Croatian mode, while the surrounding Mobile Execution interface is localized. Audit specifically warned not to translate arbitrary user-created or edited titles.
+- Confirmed in Frontend110: src/pages/MobileExecutionPage.tsx displayed task.title and task.description directly. Backend072 executionTaskService.js creates a stable `Close approved execution request: ${adapterLabel}` title and an exact two-sentence human-closure description for approved execution requests.
+
+IMPLEMENTED — FRONTEND111 ONLY
+- src/pages/mobileExecutionSystemText.ts (new): use an exact provenance guard (source_type === execution_request, exact backend-generated closure description, recognized title prefix, nonempty adapter label) to translate the known stable system template at display time. Keep the adapter label exactly as supplied and leave all unknown, manually edited or user-authored text untouched.
+- src/pages/MobileExecutionPage.tsx: display the safe localized title/description for this verified system template; existing API calls, task storage, offline action queue, permission checks, labels and scanner/source links remain unchanged. No writeback or stored-data mutation.
+- src/i18n/tenantUiTranslations.ts: add two five-language translation rows (EN/DE/ES/FR/HR) for the closure title prefix and full system-generated description. Adapter names are not translated.
+- scripts/check-mobile-closure-task-localization-surgical-fix-v349355.mjs (new): execute formatter with real translation catalog in five languages; verify backend-template provenance, unchanged user-authored/custom tasks, no mutation, task rendering and package registration.
+- scripts/check-tenant-mobile-execution-multilingual.mjs: update old source contract assertions to recognize the narrow system-owned template exception. It still rejects blind ui(task.title)/ui(task.description) translation and enforces source/permission/offline safeguards.
+- package.json: register focused Batch112 regression script.
+
+SOURCE VERIFICATION
+- New focused Batch112 check: 37/37 assertions PASS (actual translated formatter execution, five languages and user-data protection).
+- Broader regression run: 102/103 selected scripts PASS with BACKEND_ROOT set to the unchanged Backend072 directory. The sole failure is INHERITED check-tenant-custom-role-management.mjs, whose outdated deactivation wording assertion was independently reproduced on untouched earlier Frontend108 in Batch110. Do not claim it passes or classify it as a new regression.
+- Existing tenant Mobile Execution multilingual/operational contract check: PASS after legitimate contract update.
+- Global multilingual closure: PASS; 45/45 tenant routes; 265 reachable source files; 14,308 complete five-language entries with placeholder parity.
+- Modified/new TypeScript isolated transpilation: PASS, zero syntax diagnostics.
+- Full-archive member comparison, changed-files parity, backend SHA-256 unchanged, ZIP CRC and continuation manifest verified at packaging.
+
+NOT VERIFIED
+- Full clean Node24 dependency installation, project-wide TypeScript/Vite build, live PostgreSQL integrations, or deployed browser acceptance. Environment uses Node22 and does not contain the full frontend dependencies.
+
+LIVE ACCEPTANCE
+- In Mobile Execution Croatian mode, open a server-generated task with source_type=execution_request and the approved-closure template, e.g. Standard Cost Update. Confirm the title prefix and instruction are Croatian, while adapter name stays verbatim.
+- Switch among EN/DE/ES/FR/HR and verify the same task is displayed in the chosen locale without updating task data.
+- Open an ordinary manually authored execution task and confirm its free-text title and description remain unchanged.
+- Verify task action, offline sync, task detail navigation and source workflow permissions continue to work; no Task API fields have changed.
+
+CURRENT ENGINEERING SOURCE OF TRUTH: Frontend111 + Backend072.
+PRODUCTION ACCEPTANCE: PENDING. Batch113 NOT STARTED.
+================================================================================

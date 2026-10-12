@@ -88,8 +88,9 @@ for (const pattern of [
 ]) if (pageSource.includes(pattern)) fail(`Canonical Mobile Execution technical value must remain language-independent: ${pattern}`);
 
 for (const contract of [
-  "{task.title || ui('Untitled mobile task')}",
-  "{task.description || localizedSystemText(task.step_label_key, task.step_label, 'No task summary was provided.', ui)}",
+  "{displayedSystemTask.title || ui('Untitled mobile task')}",
+  "{displayedSystemTask.description || localizedSystemText(task.step_label_key, task.step_label, 'No task summary was provided.', ui)}",
+  'displayMobileExecutionSystemTask(task, ui)', 
   'task.step_label_key', 'task.assigned_to_name', 'task.storage_location_name', 'task.source_route', 'task.source_id',
   'mobileExecutionQuery.error instanceof ApiError ? mobileExecutionQuery.error.message'
 ]) if (!pageSource.includes(contract)) fail(`Mobile Execution backend/business display contract changed: ${contract}`);
@@ -97,7 +98,7 @@ for (const forbidden of ['ui(task.title)', 'ui(task.description)', 'ui(task.assi
   if (pageSource.includes(forbidden)) fail(`Backend-returned business/error content must not be blindly translated: ${forbidden}`);
 }
 if (!pageSource.includes("return text ? (key ? ui(text) : text) : ui(fallback);")) fail('Mobile Execution must translate backend text only when the backend marks it as stable system-owned text.');
-if (!process.exitCode) pass('Mobile Execution keeps user/business task text raw while localizing keyed backend-owned step guidance.');
+if (!process.exitCode) pass('Mobile Execution preserves user/business text while allowing the verified system-generated closure task template to be localized.');
 
 if (!pageSource.includes('LEGACY_KEYS.forEach((key) => localStorage.removeItem(key))')) fail('Mobile Execution legacy unscoped cache cleanup must remain intact.');
 if (!pageSource.includes('getTenantObservabilityIdentity(getAccessToken())') || !pageSource.includes("const scope = `${identity.tenantId}:${actorType}:${actorId}`")) fail('Mobile Execution cached/offline data must remain tenant-and-user scoped.');

@@ -2,6 +2,9 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // Batch 112: only the verified backend-generated Mobile Execution closure template.
+  ["Close approved execution request:", "Genehmigte Ausführungsanforderung abschließen:", "Cerrar solicitud de ejecución aprobada:", "Clore la demande d’exécution approuvée :", "Zatvori odobreni zahtjev za izvršenje:"],
+  ["Review and close the approved execution request through the operational task queue. This task is a human closure record only; it does not execute adapters or mutate inventory.", "Die genehmigte Ausführungsanforderung in der operativen Aufgabenliste prüfen und abschließen. Diese Aufgabe dokumentiert nur den manuellen Abschluss; sie führt keine Adapter aus und verändert keine Bestände.", "Revise y cierre la solicitud de ejecución aprobada desde la cola de tareas operativas. Esta tarea solo documenta el cierre manual; no ejecuta adaptadores ni modifica el inventario.", "Vérifiez et clôturez la demande d’exécution approuvée dans la file des tâches opérationnelles. Cette tâche documente uniquement la clôture manuelle ; elle n’exécute aucun adaptateur et ne modifie pas le stock.", "Pregledajte i zatvorite odobreni zahtjev za izvršenje u operativnom redu zadataka. Ovaj zadatak samo evidentira ručno zatvaranje; ne pokreće adaptere niti mijenja zalihe."],
   // Batch 111: readable labels for policy-effectiveness Expected evidence.
   ["Planning basis", "Planungsgrundlage", "Base de planificación", "Base de planification", "Osnova planiranja"],
   ["Consumption-only demand considered", "Nur verbrauchsbasierter Bedarf berücksichtigt", "Se considera únicamente la demanda por consumo", "Demande fondée uniquement sur la consommation prise en compte", "Uvažena je potražnja temeljena samo na potrošnji"],

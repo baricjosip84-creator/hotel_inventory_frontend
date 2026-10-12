@@ -8,6 +8,7 @@ import type { AppLocale } from '../i18n/config';
 import { getAccessToken, getSupportSessionInfo, getTenantObservabilityIdentity } from '../lib/auth';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
+import { displayMobileExecutionSystemTask } from './mobileExecutionSystemText';
 import {
   OperationalWorkspaceHero,
   OperationalWorkspaceStatCard,
@@ -610,11 +611,12 @@ export default function MobileExecutionPage() {
             const urgencyClass = urgencyToneClass(task.urgency);
             const queuedCount = pending.filter((operation) => operation.task_id === task.id).length;
             const sourceLink = taskSourceLink(task);
+            const displayedSystemTask = displayMobileExecutionSystemTask(task, ui);
             const locationFrom = task.compact_payload?.from_location;
             const locationTo = task.compact_payload?.to_location;
             return <article className={`card mobile-execution-task-card mobile-execution-task-card--${urgencyClass}`} key={task.id}>
-              <div className="mobile-execution-task-header"><div className="mobile-execution-task-lead"><span className={`mobile-execution-icon mobile-execution-icon--${urgencyClass}`}><TenantNavIcon path={task.source_route || '/execution-tasks'} size={17} /></span><div className="mobile-execution-task-heading"><div className="card__label">{canonicalLabel(task.status, ui)} · {task.task_code || ui('Execution task')}</div><h3>{task.title || ui('Untitled mobile task')}</h3></div></div><span className={`mobile-execution-urgency-pill mobile-execution-urgency-pill--${urgencyClass}`}>{canonicalLabel(task.urgency, ui)}</span></div>
-              <p className="card__subtext mobile-execution-task-summary">{task.description || localizedSystemText(task.step_label_key, task.step_label, 'No task summary was provided.', ui)}</p>
+              <div className="mobile-execution-task-header"><div className="mobile-execution-task-lead"><span className={`mobile-execution-icon mobile-execution-icon--${urgencyClass}`}><TenantNavIcon path={task.source_route || '/execution-tasks'} size={17} /></span><div className="mobile-execution-task-heading"><div className="card__label">{canonicalLabel(task.status, ui)} · {task.task_code || ui('Execution task')}</div><h3>{displayedSystemTask.title || ui('Untitled mobile task')}</h3></div></div><span className={`mobile-execution-urgency-pill mobile-execution-urgency-pill--${urgencyClass}`}>{canonicalLabel(task.urgency, ui)}</span></div>
+              <p className="card__subtext mobile-execution-task-summary">{displayedSystemTask.description || localizedSystemText(task.step_label_key, task.step_label, 'No task summary was provided.', ui)}</p>
 
               <div className="mobile-execution-task-facts">
                 <div className="mobile-execution-task-fact"><span className="card__label">{ui('Assigned to')}</span><strong>{assignment === 'mine' ? ui('You') : assignment === 'unassigned' ? ui('Unassigned') : task.assigned_to_name || ui('Another team member')}</strong></div>
