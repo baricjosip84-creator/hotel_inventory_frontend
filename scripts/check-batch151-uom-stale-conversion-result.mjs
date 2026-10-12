@@ -44,10 +44,10 @@ function scenario() {
   const setConverted = value => converted.push(value);
   const setError = value => errors.push(value);
   const pendingRequests = [];
-  const apiRequest = (url, options) => { requests.push({ url, body: JSON.parse(options.body), method: options.method }); return new Promise((resolve, reject) => pendingRequests.push({ resolve, reject })); };
-  const qc = { invalidateQueries: ({ queryKey }) => cleared.push(queryKey) };
-  const f = new Function('apiRequest', 'productId', 'fromUom', 'toUom', 'convertQty', 'setConverted', 'setError', 'messageFrom', 'ui', 'conversionRequestSeqRef', 'activeUomProductRef', 'qc', 'clearUomForm', 'editingUom', 'setProductId', 'setFromUom', 'setToUom', 'setConvertQty', js + '\nreturn { convertOptions, saveOptions, removeOptions, changeProduct, editQuantity, editFrom, editTo };');
-  const cb = f(apiRequest, 'p-A', 'CASE', 'pcs', '2', setConverted, setError, e => String(e?.message ?? e), x => x, ref, { current: 'p-A' }, qc, () => cleared.push('form'), null, value => productChanges.push(value), value => unitsChanged.push(['from', value]), value => unitsChanged.push(['to', value]), value => unitsChanged.push(['qty', value]));
+  const apiRequest = (url, options) => { if (!options) return Promise.resolve({base_uom:'pcs',conversions:[{uom_code:'CASE',factor_to_base:24,purchase_uom:false,issue_uom:false}]}); requests.push({ url, body: JSON.parse(options.body), method: options.method }); return new Promise((resolve, reject) => pendingRequests.push({ resolve, reject })); };
+  const qc = { invalidateQueries: ({ queryKey }) => cleared.push(queryKey), setQueryData: (key) => cleared.push(key) };
+  const f = new Function('apiRequest', 'productId', 'fromUom', 'toUom', 'convertQty', 'setConverted', 'setError', 'messageFrom', 'ui', 'conversionRequestSeqRef', 'activeUomProductRef', 'qc', 'clearUomForm', 'editingUom', 'setProductId', 'setFromUom', 'setToUom', 'setConvertQty', 'showTenantActionSuccess', 'showTenantActionError', js + '\nreturn { convertOptions, saveOptions, removeOptions, changeProduct, editQuantity, editFrom, editTo };');
+  const cb = f(apiRequest, 'p-A', 'CASE', 'pcs', '2', setConverted, setError, e => String(e?.message ?? e), x => x, ref, { current: 'p-A' }, qc, () => cleared.push('form'), null, value => productChanges.push(value), value => unitsChanged.push(['from', value]), value => unitsChanged.push(['to', value]), value => unitsChanged.push(['qty', value]), ()=>{}, ()=>{});
   return { ...cb, ref, requests, pendingRequests, converted, errors, productChanges, unitsChanged, cleared };
 }
 {
@@ -91,9 +91,9 @@ for (const [key, value] of [['editQuantity', '3'], ['editFrom', 'pcs'], ['editTo
   const context = s.convertOptions.onMutate();
   s.convertOptions.onError(new Error('service offline'), undefined, context);
   check('current conversion errors remain visible', () => assert.deepEqual(s.errors, ['service offline']));
-  s.saveOptions.onSuccess({}, { targetProductId: 'p-A' });
+  await s.saveOptions.onSuccess({}, { targetProductId: 'p-A', payload: {uom_code:'CASE',factor_to_base:24,purchase_uom:false,issue_uom:false} });
   check('successful UoM save invalidates in-flight conversion', () => assert.equal(s.ref.current, 2));
-  check('successful save still invalidates UoM query', () => assert(s.cleared.some(value => Array.isArray(value) && value[0] === 'uom' && value[1] === 'p-A')));
+  check('successful save still refreshes verified UoM query cache', () => assert(s.cleared.some(value => Array.isArray(value) && value[0] === 'uom' && value[1] === 'p-A')));
   s.removeOptions.onSuccess({}, { targetProductId: 'p-A' });
   check('successful deletion also invalidates in-flight conversion', () => assert.equal(s.ref.current, 3));
   check('successful deletion still invalidates UoM query', () => assert(s.cleared.some(value => Array.isArray(value) && value[0] === 'uom' && value[1] === 'p-A')));

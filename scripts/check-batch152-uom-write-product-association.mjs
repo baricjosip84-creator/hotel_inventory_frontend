@@ -32,11 +32,11 @@ check('save captures UoM business values at submission',()=>assert.match(saveCli
 check('save retains version-based optimistic concurrency',()=>assert.match(saveClick, /expected_version: editingUom\?\.version \?\? 0/));
 check('delete captures same record and selected product',()=>assert.match(deleteClick,/remove\.mutate\(\{ targetProductId: productId, row \}\)/));
 check('synchronous product ref assigned before state setter',()=>assert.match(declarations.changeProduct.getText(ast), /activeUomProductRef\.current = id;[\s\S]*?setProductId\(id\)/));
-check('save calls versioned backend with saved request product',()=>assert.match(declarations.save.getText(ast), /apiRequest\(`\/inventory-capabilities\/products\/\$\{targetProductId\}\/uom`, \{ method: 'POST', body: JSON\.stringify\(payload\) \}\)/));
+check('save calls versioned backend with saved request product',()=>assert.match(declarations.save.getText(ast), /apiRequest\(`\/inventory-capabilities\/products\/\$\{targetProductId\}\/uom`, \{ method: 'POST', body: JSON\.stringify\(payload\), skipMutationFeedback: true \}\)/));
 check('save success invalidates the originally submitted product',()=>assert.match(declarations.save.getText(ast), /onSuccess:[\s\S]*?invalidateQueries\(\{ queryKey: \['uom', targetProductId\] \}\)/));
 check('save stale completion never resets another product form',()=>assert.match(declarations.save.getText(ast), /if \(activeUomProductRef\.current !== targetProductId\) return;[\s\S]*?clearUomForm\(\)/));
 check('delete stale completion never resets another product form',()=>assert.match(declarations.remove.getText(ast), /if \(activeUomProductRef\.current !== targetProductId\) return;[\s\S]*?clearUomForm\(\)/));
-check('save error is scoped to current product',()=>assert.match(declarations.save.getText(ast), /onError:[\s\S]*?if \(activeUomProductRef\.current === targetProductId\) setError/));
+check('save error is scoped to current product',()=>assert.match(declarations.save.getText(ast), /onError:[\s\S]*?if \(activeUomProductRef\.current === targetProductId\) \{[\s\S]*?setError\(message\)/));
 check('delete error is scoped to current product',()=>assert.match(declarations.remove.getText(ast), /onError:[\s\S]*?if \(activeUomProductRef\.current === targetProductId\) setError/));
 check('delete preserves versioned route',()=>assert.match(declarations.remove.getText(ast), /apiRequest\(`\/inventory-capabilities\/uom\/\$\{row\.id\}`, \{ method: 'DELETE', version: row\.version \}\)/));
 const script = `const saveOptions = ${declarations.save.initializer.arguments[0].getText(ast)};\n` +
@@ -46,9 +46,9 @@ const js = ts.transpileModule(script, {fileName:'batch152-run.ts',compilerOption
 function scenario() {
   const activeUomProductRef = {current:'p-A'};
   const conversionRequestSeqRef = {current:0};
-  const observed = { requests:[], invalidations:[], formClears:0, conversions:[], errors:[], selected:[], units:[] };
-  const qc = { invalidateQueries: ({queryKey}) => observed.invalidations.push(queryKey) };
-  const apiRequest = (url, opts) => { observed.requests.push({url,opts}); return Promise.resolve({id:'ok'}); };
+  const observed = { requests:[], invalidations:[], readbackCache:[], formClears:0, conversions:[], errors:[], selected:[], units:[] };
+  const qc = { invalidateQueries: ({queryKey}) => observed.invalidations.push(queryKey), setQueryData: (queryKey,data) => observed.readbackCache.push({queryKey,data}) };
+  const apiRequest = (url, opts) => { observed.requests.push({url,opts}); return Promise.resolve(opts ? {id:'ok'} : {base_uom:'pcs',conversions:[{id:'u-1',uom_code:'CASE',factor_to_base:24,purchase_uom:true,issue_uom:false}]}); };
   const clearUomForm = () => { observed.formClears++; };
   const setConverted = val => observed.conversions.push(val);
   const setError = val => observed.errors.push(val);
@@ -58,8 +58,8 @@ function scenario() {
   const ui = x => x;
   const messageFrom = e => e.message;
   const editingUom = {id:'u-1'};
-  const build = new Function('apiRequest','qc','activeUomProductRef','conversionRequestSeqRef','clearUomForm','setConverted','setError','setProductId','setFromUom','setToUom','messageFrom','ui','editingUom', js+'\nreturn {saveOptions,removeOptions,changeProduct};');
-  return {...build(apiRequest,qc,activeUomProductRef,conversionRequestSeqRef,clearUomForm,setConverted,setError,setProductId,setFromUom,setToUom,messageFrom,ui,editingUom), observed,activeUomProductRef,conversionRequestSeqRef};
+  const build = new Function('apiRequest','qc','activeUomProductRef','conversionRequestSeqRef','clearUomForm','setConverted','setError','setProductId','setFromUom','setToUom','messageFrom','ui','editingUom','showTenantActionSuccess','showTenantActionError', js+'\nreturn {saveOptions,removeOptions,changeProduct};');
+  return {...build(apiRequest,qc,activeUomProductRef,conversionRequestSeqRef,clearUomForm,setConverted,setError,setProductId,setFromUom,setToUom,messageFrom,ui,editingUom,()=>{},()=>{}), observed,activeUomProductRef,conversionRequestSeqRef};
 }
 const payload = {uom_code:'CASE',uom_name:'Case',factor_to_base:24,purchase_uom:true,issue_uom:false,expected_version:0};
 const vars = {targetProductId:'p-A',payload};
@@ -72,8 +72,8 @@ const vars = {targetProductId:'p-A',payload};
  check('switch updates current product synchronously',()=>assert.equal(s.activeUomProductRef.current,'p-B'));
  const previousClears=s.observed.formClears;
  const previousSeq=s.conversionRequestSeqRef.current;
- s.saveOptions.onSuccess({id:'ok'},vars);
- check('late save refreshes product A, not B',()=>assert.deepEqual(s.observed.invalidations,[['uom','p-A']]));
+ await s.saveOptions.onSuccess({id:'ok'},vars);
+ check('late verified save refreshes cached product A, not B',()=>assert.deepEqual(s.observed.readbackCache.map(x=>x.queryKey),[['uom','p-A']]));
  check('late save does not clear product B form',()=>assert.equal(s.observed.formClears,previousClears));
  check('late save does not erase product B result',()=>assert.equal(s.observed.conversions.length,1));
  check('late save does not invalidate product B conversion generation',()=>assert.equal(s.conversionRequestSeqRef.current,previousSeq));
@@ -81,11 +81,11 @@ const vars = {targetProductId:'p-A',payload};
  check('late save error cannot appear on product B',()=>assert.deepEqual(s.observed.errors,[null]));
 }
 {
- const s=scenario(); s.saveOptions.onSuccess({id:'ok'},vars);
+ const s=scenario(); await s.saveOptions.onSuccess({id:'ok'},vars);
  check('normal same-product save still clears form',()=>assert.equal(s.observed.formClears,1));
  check('normal same-product save resets conversion',()=>assert.deepEqual(s.observed.conversions,[null]));
  check('normal same-product save increments generation',()=>assert.equal(s.conversionRequestSeqRef.current,1));
- check('normal same-product save invalidates the correct product',()=>assert.deepEqual(s.observed.invalidations,[['uom','p-A']]));
+ check('normal verified save refreshes correct product cache',()=>assert.deepEqual(s.observed.readbackCache.map(x=>x.queryKey),[['uom','p-A']]));
  s.saveOptions.onError(new Error('Save failed'),vars);
  check('current-product save error remains visible',()=>assert.equal(s.observed.errors.at(-1),'Save failed'));
 }

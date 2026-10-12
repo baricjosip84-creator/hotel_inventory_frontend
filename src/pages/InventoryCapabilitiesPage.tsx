@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { showTenantActionSuccess, showTenantActionError } from '../lib/actionFeedback';
 import { suggestCustomFieldKey, isValidCustomFieldKey } from '../lib/customFieldKey';
 import { getStorageLocationMutationErrorMessage } from '../lib/storageLocationMutationError';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
@@ -790,14 +791,43 @@ function UomPanel({ products, canWrite }: { products: Product[]; canWrite: boole
   const activeUomProductRef = useRef(productId);
   const save = useMutation({
     mutationFn: ({ targetProductId, payload }: { targetProductId: string; payload: { uom_code: string; uom_name: string | null; factor_to_base: number; purchase_uom: boolean; issue_uom: boolean; rounding_scale?: number; barcode?: string | null; expected_version: number } }) =>
-      apiRequest(`/inventory-capabilities/products/${targetProductId}/uom`, { method: 'POST', body: JSON.stringify(payload) }),
-    onSuccess: (_data, { targetProductId }) => {
-      void qc.invalidateQueries({ queryKey: ['uom', targetProductId] });
-      if (activeUomProductRef.current !== targetProductId) return;
-      clearUomForm(); setConverted(null); conversionRequestSeqRef.current += 1; setError(null);
+      apiRequest(`/inventory-capabilities/products/${targetProductId}/uom`, { method: 'POST', body: JSON.stringify(payload), skipMutationFeedback: true }),
+    onSuccess: async (_data, { targetProductId, payload }) => {
+      // The original tenant audit recorded CASE=24 appearing to save but never
+      // appearing in the product's saved-unit list, even after a full reload.
+      // Do not discard the user's form merely because the POST returned 2xx:
+      // read the saved conversion back from the authoritative GET endpoint.
+      try {
+        const verified = await apiRequest<UomResponse>(`/inventory-capabilities/products/${targetProductId}/uom`);
+        const savedRow = verified.conversions.find((row) => row.uom_code.toUpperCase() === payload.uom_code.trim().toUpperCase());
+        const savedFactor = Number(savedRow?.factor_to_base);
+        const factorMatches = savedRow && Number.isFinite(savedFactor) &&
+          Math.abs(savedFactor - payload.factor_to_base) <= Math.max(1e-8, Math.abs(payload.factor_to_base) * 1e-9);
+        if (!factorMatches || Boolean(savedRow.purchase_uom) !== payload.purchase_uom || Boolean(savedRow.issue_uom) !== payload.issue_uom) {
+          void qc.invalidateQueries({ queryKey: ['uom', targetProductId] });
+          if (activeUomProductRef.current === targetProductId) {
+            const warning = ui("The save was acknowledged, but the conversion was not found on reload. Check the saved list before trying again.");
+            setError(warning); showTenantActionError(warning);
+          }
+          return;
+        }
+        qc.setQueryData(['uom', targetProductId], verified);
+        if (activeUomProductRef.current !== targetProductId) return;
+        clearUomForm(); setConverted(null); conversionRequestSeqRef.current += 1; setError(null);
+        showTenantActionSuccess(ui(payload.expected_version > 0 ? "Unit conversion updated successfully." : "Unit conversion saved successfully."));
+      } catch (_readbackError) {
+        void qc.invalidateQueries({ queryKey: ['uom', targetProductId] });
+        if (activeUomProductRef.current === targetProductId) {
+          const warning = ui("The save was acknowledged, but the conversion could not be checked. Refresh the saved list before trying again.");
+          setError(warning); showTenantActionError(warning);
+        }
+      }
     },
     onError: (e, { targetProductId }) => {
-      if (activeUomProductRef.current === targetProductId) setError(messageFrom(e, ui("Unable to save UoM."), ui));
+      if (activeUomProductRef.current === targetProductId) {
+        const message = messageFrom(e, ui("Unable to save UoM."), ui);
+        setError(message); showTenantActionError(message);
+      }
     }
   });
   const remove = useMutation({
@@ -869,6 +899,8 @@ function CustomFieldsPanel({
   const [required, setRequired] = useState(false);
   const [editingDefinition, setEditingDefinition] = useState<CustomDefinition | null>(null);
   const [entityId, setEntityId] = useState('');
+  // Track the selected custom-field target synchronously across pending value writes.
+  const activeCustomValueTargetRef = useRef<{ entityType: EntityType; entityId: string }>({ entityType: 'product', entityId: '' });
   const [values, setValues] = useState<Record<string, string | boolean>>({});
   const [valueVersions, setValueVersions] = useState<Record<string, number>>({});
   const [definitionVersions, setDefinitionVersions] = useState<Record<string, number>>({});
@@ -915,9 +947,12 @@ function CustomFieldsPanel({
 
   useEffect(() => {
     if (!canRead) {
-      setEntityType(readableEntityTypes[0] || 'product');
+      const nextType = readableEntityTypes[0] || 'product';
+      activeCustomValueTargetRef.current = { entityType: nextType, entityId: '' };
+      setEntityType(nextType);
       return;
     }
+    activeCustomValueTargetRef.current = { entityType, entityId: '' };
     setEntityId('');
     setValues({});
     setValueVersions({});
@@ -950,7 +985,13 @@ function CustomFieldsPanel({
   const clearDefinitionForm = () => { setEditingDefinition(null); setCustomizeFieldKey(false); setFieldKey(''); setLabel(''); setDataType('text'); setOptions(''); setRequired(false); };
   const editDefinition = (row: CustomDefinition) => { setEditingDefinition(row); setCustomizeFieldKey(false); setFieldKey(row.field_key); setLabel(row.label); setDataType(row.data_type); setOptions((row.options || []).join(', ')); setRequired(Boolean(row.is_required)); setError(null); };
 
+  const changeEntityType = (nextEntityType: EntityType) => {
+    activeCustomValueTargetRef.current = { entityType: nextEntityType, entityId: '' };
+    setEntityType(nextEntityType);
+  };
+
   const changeEntityId = (nextEntityId: string) => {
+    activeCustomValueTargetRef.current = { entityType, entityId: nextEntityId };
     setEntityId(nextEntityId);
     setValues({});
     setValueVersions({});
@@ -1007,15 +1048,18 @@ function CustomFieldsPanel({
   });
 
   const saveValues = useMutation({
-    mutationFn: () => apiRequest(`/inventory-capabilities/custom-fields/${entityType}/${entityId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ values, value_versions: valueVersions, definition_versions: definitionVersions })
-    }),
-    onSuccess: () => {
-      setError(null);
-      void qc.invalidateQueries({ queryKey: ['custom-field-values', entityType, entityId] });
+    mutationFn: ({ targetEntityType, targetEntityId, payload }: { targetEntityType: EntityType; targetEntityId: string; payload: { values: typeof values; value_versions: typeof valueVersions; definition_versions: typeof definitionVersions } }) =>
+      apiRequest(`/inventory-capabilities/custom-fields/${targetEntityType}/${targetEntityId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      }),
+    onSuccess: (_data, { targetEntityType, targetEntityId }) => {
+      void qc.invalidateQueries({ queryKey: ['custom-field-values', targetEntityType, targetEntityId] });
+      if (activeCustomValueTargetRef.current.entityType === targetEntityType && activeCustomValueTargetRef.current.entityId === targetEntityId) setError(null);
     },
-    onError: (errorValue) => setError(messageFrom(errorValue, ui("Unable to save custom values."), ui))
+    onError: (errorValue, { targetEntityType, targetEntityId }) => {
+      if (activeCustomValueTargetRef.current.entityType === targetEntityType && activeCustomValueTargetRef.current.entityId === targetEntityId) setError(messageFrom(errorValue, ui("Unable to save custom values."), ui));
+    }
   });
 
   return (
@@ -1024,7 +1068,7 @@ function CustomFieldsPanel({
       <div className="card">
         <label>
           {ui("Entity type")}
-          <select value={entityType} onChange={(event) => setEntityType(event.target.value as EntityType)}>
+          <select value={entityType} onChange={(event) => changeEntityType(event.target.value as EntityType)}>
             {readableEntityTypes.map((key) => <option key={key} value={key}>{entityConfigs[key].label}</option>)}
           </select>
         </label>
@@ -1075,7 +1119,7 @@ function CustomFieldsPanel({
                 : <input type={row.data_type === 'number' ? 'number' : row.data_type === 'date' ? 'date' : 'text'} value={String(values[row.field_key] || '')} onChange={(event) => setValues({ ...values, [row.field_key]: event.target.value })} />}
           </label>
         ))}
-        <button className="button" style={{ marginTop: 14 }} type="button" disabled={!canWrite || !entityId || entityValues.isLoading || entityValues.isError || !entityValues.data || saveValues.isPending} onClick={() => saveValues.mutate()}>{saveValues.isPending ? ui("Saving…") : ui("Save custom fields")}</button>
+        <button className="button" style={{ marginTop: 14 }} type="button" disabled={!canWrite || !entityId || entityValues.isLoading || entityValues.isError || !entityValues.data || saveValues.isPending} onClick={() => saveValues.mutate({ targetEntityType: entityType, targetEntityId: entityId, payload: { values: { ...values }, value_versions: { ...valueVersions }, definition_versions: { ...definitionVersions } } })}>{saveValues.isPending ? ui("Saving…") : ui("Save custom fields")}</button>
       </div>
       <div className="card" style={tableWrapStyle}>
         {definitions.isLoading ? <div className="muted">{ui("Loading custom field definitions…")}</div> : null}{definitions.isError ? <div className="form-error">{messageFrom(definitions.error, ui("Unable to load custom field definitions."), ui)}</div> : null}<table><thead><tr><th>{ui("Key")}</th><th>{ui("Label")}</th><th>{ui("Type")}</th><th>{ui("Required")}</th><th>{ui("Status")}</th><th>{ui("Action")}</th></tr></thead><tbody>{!definitions.isLoading && !definitions.isError && !(definitions.data || []).length ? <EmptyTableRow colSpan={6} message={ui("No custom fields are configured for this entity type.")} /> : null}{(definitions.data || []).map((definition) => <tr key={definition.id}><td>{definition.field_key}</td><td>{definition.label}</td><td>{displayCanonicalLabel(definition.data_type, ui)}</td><td>{definition.is_required ? ui("Yes") : ui("No")}</td><td>{definition.is_active ? ui("Active") : ui("Inactive")}</td><td>{canWrite ? <div className="capability-action-row"><button className="button button--secondary" type="button" disabled={saveDefinition.isPending || toggleDefinition.isPending} onClick={() => editDefinition(definition)}>{ui("Edit")}</button><button className="button button--secondary" type="button" disabled={saveDefinition.isPending || toggleDefinition.isPending} onClick={() => toggleDefinition.mutate(definition)}>{definition.is_active ? ui("Deactivate") : ui("Activate")}</button></div> : '—'}</td></tr>)}</tbody></table>
