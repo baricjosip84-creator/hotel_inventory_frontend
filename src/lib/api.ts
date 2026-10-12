@@ -283,6 +283,14 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Webhook signing secret rotated successfully.';
   }
 
+  // Batch126: a saved alternate UoM is not a newly created product.
+  // This endpoint creates and edits unit conversions using expected_version;
+  // keep the message scoped to the exact UoM resource (not /uom/convert).
+  if (normalizedMethod === 'POST' && /^\/inventory-capabilities\/products\/[^/]+\/uom$/.test(normalizedPathOnly)) {
+    const expectedVersion = readMutationNumberField(body, 'expected_version') ?? 0;
+    return expectedVersion > 0 ? 'Unit conversion updated successfully.' : 'Unit conversion saved successfully.';
+  }
+
   if (normalizedMethod === 'POST' && /^\/inventory-capabilities\/products\/[^/]+\/variants$/.test(normalizedPathOnly)) {
     return 'Variant created successfully.';
   }

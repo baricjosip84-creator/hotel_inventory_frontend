@@ -11004,3 +11004,45 @@ TARGETED LIVE ACCEPTANCE
 NEW AUTHORITATIVE SOURCE OF TRUTH: Full Frontend124 + full Backend072.
 NEXT: Batch126 NOT STARTED; continue verifying genuinely open audit defects or perform production acceptance.
 ================================================================================
+
+
+================================================================================
+BATCH 126 — ADVANCED INVENTORY / UNIT CONVERSION ACTION-SPECIFIC SUCCESS FEEDBACK
+DATE: 2026-10-12
+BASELINE: Full Frontend124 + full unchanged Backend072 (Batch125 completed)
+RESULT: Full Frontend125 + full unchanged Backend072
+
+AUDIT EVIDENCE AND CURRENT-SOURCE REPRODUCTION
+- Canonical audit v93, Advanced Inventory > Units of measure, 2026-09-28 around 13:05-13:16 CEST (lines 13774-13802): after Save conversion (CASE / Case / 24) the shared success toast incorrectly read 'Product created successfully.' That message describes an unrelated business entity. The separate historical read-back/persistence failure remains unverified in current production and is NOT asserted fixed here.
+- Confirmed in unmodified full Frontend124: the POST /inventory-capabilities/products/:productId/uom page mutation has no special entry in tenantMutationSuccessMessage, so the shared helper's generic products mutation fallback yields 'Product created successfully.'
+- The same new executable Batch126 guard fails against the untouched Frontend124 API at exactly 'Product created successfully.' versus expected 'Unit conversion saved successfully.'
+
+SURGICAL FRONTEND125 CHANGES (NO BACKEND MODIFICATIONS)
+1. src/lib/api.ts: add an exact POST /inventory-capabilities/products/:productId/uom-only mutation success mapping, using the existing body expected_version numeric field (zero or omitted: 'Unit conversion saved successfully.'; positive edit version: 'Unit conversion updated successfully.'). Lower/uppercase input and optional URL query are normalized by the existing helper. Deliberately do NOT capture /uom/convert or other product mutations.
+2. src/i18n/tenantUiTranslations.ts: add precisely two five-language EN/DE/ES/FR/HR translation rows for these specific success messages.
+3. scripts/check-batch126-uom-success-feedback.mjs (NEW): 41 focused executable assertions including real TypeScript API success-label function extraction and execution, create/edit/invalid-body branches, non-UoM route isolation, existing UoM page write/read/invalidation/error contract, and complete unique translations.
+4. package.json: register check:batch126-uom-success-feedback.
+5. Append this Batch126 entry to the SAME cumulative FIX_LOG and ensure the file inside the new full frontend is byte-identical to the standalone TXT.
+
+SAFE NON-CHANGES
+- No UoM POST/GET/convert route, HTTP method, request body, expected-version rules, React Query cache key/invalidation, tenant permissions, backend validation/service, PostgreSQL schema, on-hand stock, lot/serial state, purchase order units, monetary data, or pricing logic changed.
+- The shared feedback dispatcher still translates the returned message via the existing `translateMessage: true` workflow. This is success copy only; backend errors and failure handling are unchanged.
+- Do NOT claim the 2026-09-28 historical CASE persistence issue is repaired. Backend UoM read/write behavior requires separate real database/browser acceptance before concluding it is still defective or already fixed.
+
+VERIFICATION PERFORMED
+- Baseline reproduction: new guard FAILS on pristine Frontend124 API with 'Product created successfully.'; PASS on edited Frontend125.
+- Focused new test: 41/41 PASS, including execution of actual extracted tenantMutationSuccessMessage and translation-source checks.
+- Selected regression sweep: 50/50 PASS = all 49 selected Batch125 scripts plus new Batch126 script. No scripts omitted from inherited selection; used identical unchanged Backend072 source and preinstalled TypeScript via test-only environment link.
+- Global multilingual audit: PASS; 45/45 tenant routes, 265 reachable source files and 14,320 five-language catalog entries, including placeholder parity.
+- Isolated TypeScript API/catalog TS syntax/transpile PASS. This is NOT the same as full project typecheck or Vite production build.
+- Complete frontend ZIP member parity, supplemental delta exact match, ZIP CRC integrity, embedded/standalone log identity and unchanged Backend072 SHA-256 are checked in final release script.
+
+PRODUCTION ACCEPTANCE / TARGETED MANUAL RETEST
+- After compatible deployment, navigate to Advanced Inventory > Units of measure with appropriate product-write rights. Save a valid alternate unit on a safe test product; see a clear 'Unit conversion saved successfully.' toast instead of 'Product created successfully.' Edit the same conversion using its current version; see 'Unit conversion updated successfully.' without a phantom product creation.
+- Verify read-back and persistent conversion after switching products and full browser refresh, including a CASE=24 conversion test, via deployed browser backed by real PostgreSQL. This historical functional issue remains DEFERRED until tested; do not infer persistence from a successful toast.
+- Confirm no special UoM toast appears for Convert (read-only quantity test), for Variants, or for normal Products create. Repeat in EN/DE/ES/FR/HR.
+- Full Node24 clean install, whole-project TS/Vite build, real database integration and browser/mobile acceptance remain NOT VERIFIED.
+
+NEW AUTHORITATIVE CODE SOURCE: Full Frontend125 + unchanged full Backend072.
+NEXT: Batch127 NOT STARTED. Continue surgical audit/source reconciliation before any new mutation.
+================================================================================
