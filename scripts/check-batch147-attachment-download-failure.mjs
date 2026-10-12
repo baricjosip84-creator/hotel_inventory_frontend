@@ -71,8 +71,11 @@ function setup({allowed=true,pending=false,reject=null,downloadResult=undefined}
 check('error rendered with accessible alert role',()=>assert.match(page,/<div role="alert" style=\{styles\.error\}>\{downloadError\}<\/div>/));
 check('error stays by attachment list, not upload form',()=>assert(page.indexOf('{downloadError &&')>page.indexOf("ui('Entity attachments')")));
 check('error gated by attachment read permission',()=>assert(page.includes('downloadError && canReadAttachments && attachmentForm.entity_id')));
-check('changing attachment entity type clears stale error',()=>assert(page.includes("setDownloadError(null); setAttachmentForm((current) => ({ ...current, entity_type: value, entity_id: '' }))")));
-check('changing record clears stale error on both selectors',()=>assert.equal(page.split('setDownloadError(null); setAttachmentForm((current) => ({ ...current, entity_id: value }))').length-1,2));
+// Batch149 also clears the pending upload file when the attachment target changes.
+// Preserve the original download-error invariant without asserting an obsolete
+// byte-for-byte callback, and allow the new upload-safety step in between.
+check('changing attachment entity type clears stale error',()=>assert(/setDownloadError\(null\);\s*(?:clearPendingAttachmentFile\(\);\s*)?setAttachmentForm\(\(current\) => \(\{ \.\.\.current, entity_type: value, entity_id: '' \}\)\)/.test(page)));
+check('changing record clears stale error on both selectors',()=>assert.equal((page.match(/setDownloadError\(null\);\s*(?:clearPendingAttachmentFile\(\);\s*)?setAttachmentForm\(\(current\) => \(\{ \.\.\.current, entity_id: value \}\)\)/g)||[]).length,2));
 check('existing styled file picker retained',()=>assert(page.includes('<EnterpriseFilePicker')));
 check('file upload MIME and size restriction unchanged',()=>assert(page.includes('MAX_FILE_BYTES = 8 * 1024 * 1024')));
 check('upload endpoint remains in workflow mutation',()=>assert(readFileSync(path.join(front,'src/components/enterpriseInventory/EnterpriseInventoryWorkflowMutations.ts'),'utf8').includes('/enterprise-inventory/attachments/upload?')));

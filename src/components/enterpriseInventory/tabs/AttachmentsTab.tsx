@@ -152,6 +152,14 @@ export function AttachmentsTab({
     setSelectedFile(file);
   };
 
+  // A chosen attachment belongs to its selected business record. A target
+  // change must not leave the previous file armed for upload to another record.
+  const clearPendingAttachmentFile = () => {
+    setSelectedFile(null);
+    setFileError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleUpload = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFileError(null);
@@ -198,7 +206,7 @@ export function AttachmentsTab({
             disabled={(!canReadAttachments && !canWriteAttachments) || createAttachmentMutation.isPending}
             label={ui('Attach to')}
             value={attachmentForm.entity_type}
-            onChange={(value) => { setDownloadError(null); setAttachmentForm((current) => ({ ...current, entity_type: value, entity_id: '' })); }}
+            onChange={(value) => { setDownloadError(null); clearPendingAttachmentFile(); setAttachmentForm((current) => ({ ...current, entity_type: value, entity_id: '' })); }}
             options={entityTypes.map(([value, label]) => ({ value, label: ui(label) }))}
             required
           />
@@ -207,7 +215,7 @@ export function AttachmentsTab({
               disabled={(!canReadAttachments && !canWriteAttachments) || createAttachmentMutation.isPending || attachmentEntityOptionsQuery.isLoading}
               label={ui('Business record')}
               value={attachmentForm.entity_id}
-              onChange={(value) => { setDownloadError(null); setAttachmentForm((current) => ({ ...current, entity_id: value })); }}
+              onChange={(value) => { setDownloadError(null); clearPendingAttachmentFile(); setAttachmentForm((current) => ({ ...current, entity_id: value })); }}
               options={entityOptions}
               required
             />
@@ -216,7 +224,7 @@ export function AttachmentsTab({
               disabled={(!canReadAttachments && !canWriteAttachments) || createAttachmentMutation.isPending}
               label={ui('Business record ID')}
               value={attachmentForm.entity_id}
-              onChange={(value) => { setDownloadError(null); setAttachmentForm((current) => ({ ...current, entity_id: value })); }}
+              onChange={(value) => { setDownloadError(null); clearPendingAttachmentFile(); setAttachmentForm((current) => ({ ...current, entity_id: value })); }}
               required
             />
           )}

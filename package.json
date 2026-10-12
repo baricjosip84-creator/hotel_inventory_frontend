@@ -506,7 +506,8 @@
     "check:batch145-supplier-catalog-deactivate-feedback": "node scripts/check-batch145-supplier-catalog-deactivate-feedback.mjs",
     "check:batch146-outbound-email-provider-feedback": "node scripts/check-batch146-outbound-email-provider-feedback.mjs",
     "check:batch147-attachment-download-failure": "node scripts/check-batch147-attachment-download-failure.mjs",
-    "check:batch148-attachment-download-busy-state": "node scripts/check-batch148-attachment-download-busy-state.mjs"
+    "check:batch148-attachment-download-busy-state": "node scripts/check-batch148-attachment-download-busy-state.mjs",
+    "check:batch149-attachment-target-file-reset": "node scripts/check-batch149-attachment-target-file-reset.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
