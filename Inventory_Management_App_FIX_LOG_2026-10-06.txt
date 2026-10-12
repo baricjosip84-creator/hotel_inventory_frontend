@@ -11509,3 +11509,33 @@ PENDING PRODUCTION ACCEPTANCE
 SOURCE OF TRUTH AFTER THIS BATCH: Complete Frontend136 + complete byte-identical Backend072; full cumulative FIX_LOG through Batch137 (both locations identical), historical Audit v93 unchanged.
 NEXT: Batch138 NOT STARTED; inspect genuinely unresolved findings before editing. Continue returning full apps, changed-files ZIP, complete updated documents, manifest, and all-in-one ZIP.
 ================================================================================
+
+================================================================================
+BATCH 138 — ADVANCED INVENTORY / UNITS OF MEASURE: WORKED BUSINESS GUIDANCE AND LEGIBLE CONVERT ACTION
+Date: 2026-10-12
+================================================================================
+SOURCE AND CONFIRMED ISSUE
+- Source: FULL Frontend surgical-fix-136 + byte-identical Backend surgical-fix-072, canonical audit v93, full cumulative FIX_LOG through Batch137.
+- Audit v93 2026-09-28, Units of measure: ordinary users do not understand base unit, UoM code, units in base unit, purchasing vs issue/selling flags, or conversion test without guidance. The enabled Convert button appeared too much like a disabled action. The current Frontend136 still included only one abstract sentence above the form and used button--secondary for Convert.
+- Distinct unresolved issue, not the Batch126 UoM success-toast correction, and NOT a fix for the separately observed missing CASE=24 conversion after reloading. That functional persistence issue stays open for DB/network-backed investigation.
+
+SINGLE SURGICAL FRONTEND CHANGE
+1. src/pages/InventoryCapabilitiesPage.tsx / UomPanel ONLY: replace abstract line with concise plain-language base unit and pack explanation; worked CASE / Case / 24 example (1 CASE = 24 pcs); explain Purchasing unit vs Issue/selling unit. Clarify conversion test does NOT change stock and show both directions 2 CASE = 48 pcs and 48 pcs = 2 CASE. Accessible aria-label on help container.
+2. Same UomPanel Convert button: change from secondary pale styling to existing standard button styling. Preserve precisely its enabled/disabled expression, real mutation, payload and resulting quantity display.
+3. src/i18n/tenantUiTranslations.ts: add five distinct five-language rows (English, German, Spanish, French, Croatian) for every new user-facing help phrase.
+4. scripts/check-batch138-uom-guidance.mjs: 37 focused source/behavior contract assertions including TSX transpile, translation coverage, save/convert path/payload unchanged, stock mutation excluded, value/version/write guards and deletion unchanged. Registered under check:batch138-uom-guidance in package.json.
+5. Append this block to FULL cumulative FIX_LOG through Batch137. The same bytes are stored in the new full frontend, standalone TXT and complete handoff ZIP.
+
+VERIFICATION
+- Untouched original Frontend136: new guard expected FAIL at absent guidance after preliminary TSX/registration checks.
+- Corrected Frontend137: new guard 37/37 PASS.
+- All 61 inherited selected regression scripts + new Batch138 = 62/62 PASS, including global five-language closure.
+- Full archive CRC, exact changed member set, changed-files ZIP parity, embedded/standalone FIX_LOG equality and backend sha256 identity verified before delivery.
+- Runtime: Node22 tests with global test-only TypeScript link. Production Node24 npm ci/full TypeScript/Vite build NOT VERIFIED. PostgreSQL persistence and deployed desktop/mobile visual/a11y acceptance NOT VERIFIED.
+
+SAFETY/ACCEPTANCE
+- No backend, schema, inventory stock, unit factor, conversion calculation, authority rule, write permission, mutation path, optimistic-version, persistence/cache logic or stored records altered. This is guidance and action contrast only.
+- After deployment check UoM labels/examples in all five locales and contrast of enabled/disabled Convert on desktop/mobile. Separately reproduce the CASE/24 persisted-readback issue with request/response and DB evidence, not inferred from these source checks.
+
+AUTHORITATIVE SOURCE AFTER THIS RELEASE: FULL Frontend surgical-fix-137 + FULL unchanged Backend surgical-fix-072. NEXT Batch139 NOT STARTED.
+================================================================================
