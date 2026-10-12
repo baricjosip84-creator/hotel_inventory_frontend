@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { suggestCustomFieldKey, isValidCustomFieldKey } from '../lib/customFieldKey';
 import { getStorageLocationMutationErrorMessage } from '../lib/storageLocationMutationError';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { OperationalWorkspaceHero, /* OperationalWorkspaceMetaPill, */ OperationalWorkspaceStatCard, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
@@ -817,6 +818,7 @@ function CustomFieldsPanel({
   const qc = useQueryClient();
   const [entityType, setEntityType] = useState<EntityType>('product');
   const [fieldKey, setFieldKey] = useState('');
+  const [customizeFieldKey, setCustomizeFieldKey] = useState(false);
   const [label, setLabel] = useState('');
   const [dataType, setDataType] = useState('text');
   const [options, setOptions] = useState('');
@@ -861,6 +863,10 @@ function CustomFieldsPanel({
     enabled: Boolean(canRead && entityId),
     queryFn: () => apiRequest<CustomValueRow[]>(`/inventory-capabilities/custom-fields/${entityType}/${entityId}`)
   });
+  const suggestedFieldKey = suggestCustomFieldKey(label, (definitions.data || []).map((row) => row.field_key));
+  const effectiveFieldKey = editingDefinition ? editingDefinition.field_key : customizeFieldKey ? fieldKey.trim() : suggestedFieldKey;
+  const fieldKeyReady = isValidCustomFieldKey(effectiveFieldKey);
+
 
   useEffect(() => {
     if (!canRead) {
@@ -872,6 +878,7 @@ function CustomFieldsPanel({
     setValueVersions({});
     setDefinitionVersions({});
     setEditingDefinition(null);
+    setCustomizeFieldKey(false);
     setFieldKey(''); setLabel(''); setDataType('text'); setOptions(''); setRequired(false);
     setError(null);
   }, [canRead, entityType, readableEntityTypes]);
@@ -895,8 +902,8 @@ function CustomFieldsPanel({
     setDefinitionVersions(nextDefinitionVersions);
   }, [entityValues.data]);
 
-  const clearDefinitionForm = () => { setEditingDefinition(null); setFieldKey(''); setLabel(''); setDataType('text'); setOptions(''); setRequired(false); };
-  const editDefinition = (row: CustomDefinition) => { setEditingDefinition(row); setFieldKey(row.field_key); setLabel(row.label); setDataType(row.data_type); setOptions((row.options || []).join(', ')); setRequired(Boolean(row.is_required)); setError(null); };
+  const clearDefinitionForm = () => { setEditingDefinition(null); setCustomizeFieldKey(false); setFieldKey(''); setLabel(''); setDataType('text'); setOptions(''); setRequired(false); };
+  const editDefinition = (row: CustomDefinition) => { setEditingDefinition(row); setCustomizeFieldKey(false); setFieldKey(row.field_key); setLabel(row.label); setDataType(row.data_type); setOptions((row.options || []).join(', ')); setRequired(Boolean(row.is_required)); setError(null); };
 
   const changeEntityId = (nextEntityId: string) => {
     setEntityId(nextEntityId);
@@ -911,7 +918,7 @@ function CustomFieldsPanel({
       method: 'POST',
       body: JSON.stringify({
         entity_type: entityType,
-        field_key: fieldKey,
+        field_key: effectiveFieldKey,
         label,
         data_type: dataType,
         is_required: required,
@@ -980,12 +987,22 @@ function CustomFieldsPanel({
       <div className="card">
         <h3>{editingDefinition ? ui("Edit custom field") : ui("Create custom field")}</h3>
         <div style={formGridStyle}>
-          <label>{ui("Field key")}<input value={fieldKey} onChange={(event) => setFieldKey(event.target.value)} placeholder="country_of_origin" disabled={Boolean(editingDefinition)} /></label>
-          <label>{ui("Label")}<input value={label} onChange={(event) => setLabel(event.target.value)} placeholder={ui("Country of origin")} /></label>
+          <label>{ui("Field name")}<input value={label} onChange={(event) => setLabel(event.target.value)} placeholder={ui("Country of origin")} /></label>
+          <div className="capability-note" style={{ alignSelf: 'center' }}>
+            {ui("Internal key (generated automatically):")} <code>{effectiveFieldKey || '—'}</code>
+            {!editingDefinition ? <button className="button button--secondary" type="button" style={{ marginLeft: 8 }} onClick={() => {
+              if (customizeFieldKey) { setCustomizeFieldKey(false); setFieldKey(''); }
+              else { setFieldKey(suggestedFieldKey); setCustomizeFieldKey(true); }
+            }}>{customizeFieldKey ? ui("Use generated key") : ui("Edit technical key")}</button> : null}
+          </div>
+          {customizeFieldKey && !editingDefinition ? <label>{ui("Technical field key")}<input value={fieldKey} onChange={(event) => setFieldKey(event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 80))} maxLength={80} placeholder="country_of_origin" />
+            <span className="card__subtext">{ui("Advanced: letters, numbers and underscores only. Existing keys cannot be renamed.")}</span>
+          </label> : null}
+          {!editingDefinition && label.trim() && !fieldKeyReady ? <div className="capability-note">{ui("Enter a technical key to save this field.")}</div> : null}
           <label>{ui("Type")}<select value={dataType} onChange={(event) => setDataType(event.target.value)}><option value="text">{ui("Text")}</option><option value="number">{ui("Number")}</option><option value="boolean">{ui("Yes/No")}</option><option value="date">{ui("Date")}</option><option value="select">{ui("Select list")}</option></select></label>
           {dataType === 'select' ? <label>{ui("Options")}<input value={options} onChange={(event) => setOptions(event.target.value)} placeholder={ui("Croatia, Italy, Germany")} /></label> : null}
           <label><input type="checkbox" checked={required} onChange={(event) => setRequired(event.target.checked)} /> {ui("Required")}</label>
-          <div style={{ display: 'flex', gap: 8 }}><button className="button" type="button" disabled={!canWrite || definitions.isLoading || definitions.isError || !fieldKey.trim() || !label.trim() || (dataType === 'select' && !options.split(',').some((value) => value.trim())) || saveDefinition.isPending} onClick={() => saveDefinition.mutate()}>{saveDefinition.isPending ? ui("Saving…") : editingDefinition ? ui("Save changes") : ui("Save field")}</button>{editingDefinition ? <button className="button button--secondary" type="button" disabled={saveDefinition.isPending} onClick={clearDefinitionForm}>{ui("Cancel")}</button> : null}</div>
+          <div style={{ display: 'flex', gap: 8 }}><button className="button" type="button" disabled={!canWrite || definitions.isLoading || definitions.isError || !fieldKeyReady || !label.trim() || (dataType === 'select' && !options.split(',').some((value) => value.trim())) || saveDefinition.isPending} onClick={() => saveDefinition.mutate()}>{saveDefinition.isPending ? ui("Saving…") : editingDefinition ? ui("Save changes") : ui("Save field")}</button>{editingDefinition ? <button className="button button--secondary" type="button" disabled={saveDefinition.isPending} onClick={clearDefinitionForm}>{ui("Cancel")}</button> : null}</div>
         </div>
         {dataType === 'select' && !options.split(',').some((value) => value.trim()) ? <div className="capability-note">{ui("A select-list field needs at least one option.")}</div> : null}
         {!canWrite ? <div className="card__subtext">{ui("You have read access to these fields but not permission to change this entity type.")}</div> : null}

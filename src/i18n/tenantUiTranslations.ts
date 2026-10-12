@@ -2,6 +2,14 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // Batch 133: business-first Custom Fields creation with a suggested system key.
+  ["Field name", "Feldname", "Nombre del campo", "Nom du champ", "Naziv polja"],
+  ["Internal key (generated automatically):", "Interner Schlüssel (automatisch erstellt):", "Clave interna (generada automáticamente):", "Clé interne (générée automatiquement) :", "Interni ključ (automatski generiran):"],
+  ["Edit technical key", "Technischen Schlüssel bearbeiten", "Editar clave técnica", "Modifier la clé technique", "Uredi tehnički ključ"],
+  ["Use generated key", "Generierten Schlüssel verwenden", "Usar clave generada", "Utiliser la clé générée", "Koristi generirani ključ"],
+  ["Technical field key", "Technischer Feldschlüssel", "Clave técnica del campo", "Clé technique du champ", "Tehnički ključ polja"],
+  ["Advanced: letters, numbers and underscores only. Existing keys cannot be renamed.", "Erweitert: nur Buchstaben, Ziffern und Unterstriche. Vorhandene Schlüssel können nicht umbenannt werden.", "Avanzado: solo letras, números y guiones bajos. No se pueden cambiar las claves existentes.", "Avancé : uniquement lettres, chiffres et traits de soulignement. Les clés existantes ne peuvent pas être renommées.", "Napredno: dopuštena su samo slova, brojevi i podvlake. Postojeći ključevi ne mogu se preimenovati."],
+  ["Enter a technical key to save this field.", "Geben Sie einen technischen Schlüssel ein, um dieses Feld zu speichern.", "Introduzca una clave técnica para guardar este campo.", "Saisissez une clé technique pour enregistrer ce champ.", "Unesite tehnički ključ da biste spremili ovo polje."],
   // Batch 132: identity registration against existing on-hand stock.
   ["Serial registered successfully.", "Seriennummer erfolgreich registriert.", "Número de serie registrado correctamente.", "Numéro de série enregistré avec succès.", "Serijski broj uspješno je registriran."],
   // Batch 131: a finalized landed-cost allocation is not a newly created item.

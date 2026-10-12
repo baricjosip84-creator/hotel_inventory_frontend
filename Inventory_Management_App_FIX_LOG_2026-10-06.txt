@@ -11304,3 +11304,46 @@ TARGETED LIVE RETEST PENDING
 SOURCE OF TRUTH: Complete Frontend131 + complete unchanged Backend072.
 NEXT: Batch133 NOT STARTED. Reconcile audit with latest source and FIX_LOG before another surgical correction. Always return all complete ZIPs, changes, verification, audit, cumulative FIX_LOG, regression evidence, full handoffs and complete bundle.
 ================================================================================
+
+================================================================================
+BATCH 133 — ADVANCED INVENTORY / CUSTOM FIELDS: BUSINESS-FIRST FIELD NAME AND GENERATED TECHNICAL KEY
+Date: 2026-10-12
+Engineering baseline: FULL Frontend131 + FULL Backend072
+New authoritative code: FULL Frontend132 + unchanged FULL Backend072
+Audit source: Inventory_Management_App_Tenant_Audit_Findings_2026-09-26_v93.txt
+
+CONFIRMED AUDIT DEFECT
+- Audit 2026-09-28, Advanced Inventory > Custom fields: ordinary users had to understand and manually invent a field_key such as test_country before saving a field, while the business label was a separate input.
+- In authoritative Frontend131 InventoryCapabilitiesPage.tsx, the Create custom field form still required raw Field key and Label values. Save disabled when fieldKey.trim() empty.
+- Not recorded as corrected in cumulative fixes 001–132.
+
+SURGICAL CORRECTION
+- The first input is now Field name (business label), e.g. Country of origin.
+- A deterministic system key is suggested from the label by a separate pure helper. Spaces/punctuation become underscores; Latin diacritics are normalized; known existing keys get numeric suffixes (_2, _3). Max length 80 consistent with backend Joi validation.
+- The derived internal key is displayed for transparency without requiring manual entry. A user can choose Edit technical key for an optional sanitized manual override; Use generated key restores automatic suggestion.
+- Existing definitions retain their saved immutable field_key when edited. Form reset and changing entity type clear the optional override. Non-Latin-only names with no valid transliteration require explicit advanced key entry.
+- The save mutation still posts the original entity_type, data_type, options, required/status/sort order and optimistic expected_version to POST /inventory-capabilities/custom-fields. Backend validations and version/uniqueness conflict guards remain authoritative and unchanged.
+- Seven full EN/DE/ES/FR/HR translation rows added. No migrations or backend changes.
+
+EXACT FRONTEND CHANGED / ADDED PATHS
+- src/pages/InventoryCapabilitiesPage.tsx
+- src/lib/customFieldKey.ts (new)
+- src/i18n/tenantUiTranslations.ts
+- scripts/check-batch133-custom-field-auto-key.mjs (new)
+- package.json (adds Batch133 test command)
+- Inventory_Management_App_FIX_LOG_2026-10-06.txt (this cumulative log, embedded verbatim)
+
+VERIFICATION
+- Focused Batch133 guard: 49/49 assertions PASS, including compiled helper execution, collision suffix, transliteration, max-length, optional override, immutable existing key, five-language translations, existing backend validation and mutation permission/version guards.
+- Baseline reproduction: New guard FAILS against untouched Frontend131 InventoryCapabilitiesPage.tsx at missing effectiveFieldKey generation; PASS against Frontend132.
+- Selected inherited + new regression scripts: 57/57 PASS using Node22 and test-only locally linked TypeScript + Backend072 fixture.
+- Global multilingual catalog audit included in 57/57 PASS.
+- Full frontend/archive CRC + exact changed-file parity and unchanged Backend072 SHA-256 PASS.
+
+NOT VERIFIED / PRODUCTION ACCEPTANCE
+- Clean npm ci / full TypeScript/Vite build on Node24; database-backed PostgreSQL integration; real browser or mobile acceptance; concurrent conflicting-field writes in deployed tenant.
+- Source-based regression evidence does NOT establish live production acceptance. Test in browser using a new custom field with label Country of origin, verify generated country_of_origin, duplicate name suffix, edit existing unchanged key, and insufficient-permission state; avoid changing production master data without review.
+
+SOURCE OF TRUTH AFTER THIS BATCH: Full Frontend132 + FULL unchanged Backend072; canonical audit v93 and cumulative FIX_LOG through Batch133.
+NEXT: Batch134 NOT STARTED; inspect the current source against remaining audit issues before editing. Provide full applications + changed-files ZIP + complete docs for every release.
+================================================================================
