@@ -10874,3 +10874,44 @@ NEW SOURCE OF TRUTH: Frontend121 + Backend072.
 NEXT: Batch123 NOT STARTED. Reconcile another distinct remaining audit issue with current source and cumulative log before changing code.
 PRODUCTION ACCEPTANCE: PENDING.
 ================================================================================
+
+
+================================================================================
+BATCH 123 — USERS EDITOR SINGLE CANCELLATION / STICKY FORM ACTIONS
+DATE: 2026-10-12
+BASELINE: Complete Frontend121 + Backend072 (Batch122 completed)
+RESULT: Complete Frontend122 + unchanged Backend072
+
+AUDIT EVIDENCE AND CURRENT SOURCE TRIAGE
+- Canonical tenant audit v93, 2026-10-05 15:54 CEST, Administration > Users > Edit user: the edit form exposes redundant 'Cancel edit' at the section header and 'Cancel' next to 'Save user' at the bottom. The audit called this a minor UX observation, not a functional failure; the edit form prefills correctly and save works. The user preference is for simpler, consistent actions with minimal scrolling.
+- Direct inspection of complete untouched Frontend121 confirmed both cancellation buttons invoke exactly the same handleCancelEdit handler. There is no corresponding correction in prior cumulative FIX_LOG entries. The long form should retain immediate access to its primary controls without having two separate cancel buttons.
+- Focused Batch123 regression guard fails on untouched Frontend121 (2 cancel action triggers) before edits and passes afterward. This is a genuine existing presentation redundancy rather than a backend or mutation failure.
+
+SURGICAL FRONTEND122 CHANGE
+1. src/pages/UsersPage.tsx: remove the redundant action from the form section header. Keep the form-footer Cancel as the SINGLE cancellation action in edit mode, and give it the existing precise translated label 'Cancel edit'. Preserve the identical handleCancelEdit clearing edit target, data, page feedback, validation errors and returning to user directory.
+2. src/pages/UsersPage.css: make existing form-footer action bar position:sticky at bottom:0 so Save user / Cancel edit remain available when a lengthy edit/create form is scrolled. Preserve responsive wrapping; use a readable white background, top border, and moderate stacking context. No JavaScript scrolling changes.
+3. scripts/check-batch123-users-single-cancel.mjs (NEW): 23 focused checks for exactly one edit cancellation trigger, edit-only visible semantics, proper button type, existing handler and mutation/permission behaviors, sticky footer presentation, TSX parse/transpile, and existing five-language 'Cancel edit' translation row.
+4. package.json: add check:batch123-users-single-cancel script.
+5. Append THIS entry to the existing cumulative FIX_LOG and deliver it byte-identically as standalone TXT and embedded in complete Frontend122.
+
+EXPLICIT SAFE BOUNDARIES
+- No backend, PostgreSQL, network requests, tenant permissions, account creation/deletion/activation, password security, concurrency/version guards or mutation payload changed.
+- The user form retains the existing Create user / Save user primary action, a visible Cancel edit during edit mode, and the existing route/tab navigation. Form-reset behavior is unchanged.
+- No translation catalog changes: the label 'Cancel edit' already has complete EN/DE/ES/FR/HR translations.
+- Sticky layout is a targeted CSS improvement, not evidence of live-browser or mobile display success.
+
+ACTUAL VERIFICATION
+- Untouched Frontend121 fails new focused regression as expected on two edit cancellation triggers.
+- New focused 23/23 PASS after fix; TSX isolated parse/transpile PASS.
+- Selected regression suite: 47/47 PASS (all 46 selected prior scripts plus the new test). Initial invocation had four ENOENT failures due to absent local backend source sibling in the test workspace; creating a read-only symlink to identical Backend072 source then rerunning ALL scripts produced 47/47 PASS. No scripts excluded.
+- Global multilingual closure PASS as part of selected regression; tenant route/translation catalog unchanged at 45 routes and 14,310 five-language entries.
+- Full ZIP source member parity, changed-file ZIP exact delta, embedded/standalone log equality, SHA-256, archive CRC and unchanged Backend072 verified in release packaging.
+- NOT VERIFIED: clean Node24 npm ci, whole-project TypeScript/Vite production build, real PostgreSQL integration, live deployed browser/mobile/sticky behavior. Source checks are not production acceptance.
+
+TARGETED LIVE RETEST
+- After normal CI/deployment, with tenant admin permissions select an existing disposable user and click Edit. Only one Cancel edit should be present at the form action bar (none in the section title). Scroll mid-form and confirm Save user / Cancel edit stay available near bottom of viewport without overlapping or hiding input fields and validation text. Cancel should return to directory without saving. Repeat Create user form and confirm submit remains visible and properly disabled until valid. Check narrow/mobile views and the five supported languages.
+
+NEW AUTHORITATIVE CODE SOURCE: Full Frontend122 + unchanged Backend072.
+NEXT: Batch124 NOT STARTED. Continue reconciling outstanding audit evidence against these exact sources; prioritize real unresolved issues over historic already-corrected findings.
+PRODUCTION ACCEPTANCE: PENDING.
+================================================================================

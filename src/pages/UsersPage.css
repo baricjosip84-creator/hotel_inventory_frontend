@@ -319,11 +319,17 @@
 }
 
 .users-form-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+  padding: 12px 0;
+  border-top: 1px solid #e2e8f0;
+  background: #fff;
 }
 
 @media (max-width: 1180px) {

@@ -720,7 +720,6 @@ export default function UsersPage() {
               ? ui("Update profile details, access assignment, or credentials. Role and password changes are security-sensitive actions.")
               : ui("Create a tenant account and assign the access model the employee needs for their job.")
             : ui("You can review tenant users, but only tenant admins can change accounts or access.")}
-          actions={editingUser ? <button type="button" className="app-button app-button--secondary" onClick={handleCancelEdit}>{ui("Cancel edit")}</button> : undefined}
         />
 
         {!canWrite ? <div className="app-warning-state users-form-banner">{ui("Only tenant admins can create or edit user accounts.")}</div> : null}
@@ -852,7 +851,7 @@ export default function UsersPage() {
                 ? updateMutation.isPending ? ui("Saving…") : ui("Save user")
                 : createMutation.isPending ? ui("Creating…") : ui("Create user")}
             </button>
-            {editingUser ? <button type="button" className="app-button app-button--secondary" onClick={handleCancelEdit}>{ui("Cancel")}</button> : null}
+            {editingUser ? <button type="button" className="app-button app-button--secondary" onClick={handleCancelEdit}>{ui("Cancel edit")}</button> : null}
           </div>
         </form>
       </section>
