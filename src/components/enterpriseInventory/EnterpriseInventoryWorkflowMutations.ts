@@ -313,6 +313,10 @@ export function useEnterpriseInventoryWorkflowMutations({
     mutationFn: () =>
       postEnterpriseInventoryRequest<{ processed: number }>(
         "/enterprise-inventory/notifications/deliveries/process",
+        undefined,
+        // The result handler already reports the processed count; do not
+        // additionally announce that an unrelated item was created.
+        { skipMutationFeedback: true },
       ),
     onSuccess: mutationFeedback.result(
       (result: { processed: number }) => {

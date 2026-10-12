@@ -11598,3 +11598,32 @@ SCOPE, RISK AND MANUAL ACCEPTANCE
 
 SOURCE OF TRUTH AFTER THIS RELEASE: FULL Frontend surgical-fix-139 + byte-identical FULL Backend surgical-fix-072. NEXT: Batch141 NOT STARTED.
 ================================================================================
+
+================================================================================
+BATCH 141 — NOTIFICATION DELIVERY PROCESSING: SINGLE ACCURATE FEEDBACK
+Date: 2026-10-12
+================================================================================
+SOURCE AND VERIFIED GAP
+- Source of truth used: full Frontend surgical-fix-139 / full unchanged Backend surgical-fix-072, canonical tenant audit v93, and complete FIX_LOG through Batch 140. Avoided previously corrected Notifications > Queue delivery duplicate toast (earlier batch); that queue action already sets skipMutationFeedback true.
+- Audit v93 records that notification workflow previously emitted generic 'Item created successfully' even when merely queueing delivery, and explicitly distinguishes Queued from Delivered. This earlier queue path is already fixed in current code. The separate processNotificationDeliveriesMutation in src/components/enterpriseInventory/EnterpriseInventoryWorkflowMutations.ts still POSTed to /enterprise-inventory/notifications/deliveries/process without skipMutationFeedback, so shared apiMutationRequest would also report the generic success 'Item created successfully'. Its mutation onSuccess already displays the correct count of processed deliveries (singular/plural), which is redundant/misleading when paired with the global generic toast.
+- The processing mutation is defined and returned from the hook; it is not currently rendered as a direct action in the NotificationsTab component in this source. Treat this as source-level feedback hardening, not as a verified currently exposed tenant-button defect. No claim of live browser reproduction.
+
+SURGICAL CHANGE
+1. src/components/enterpriseInventory/EnterpriseInventoryWorkflowMutations.ts: explicitly pass undefined body and { skipMutationFeedback: true } ONLY for successful POST /enterprise-inventory/notifications/deliveries/process; preserve the existing local success handler that reports actual processed count and existing translated failure message, result query invalidation, and API route. The existing queue path continues to suppress generic duplicates as before.
+2. package.json: register check:batch141-notification-processing-feedback.
+3. scripts/check-batch141-notification-processing-feedback.mjs: 38 source/TS compile/executable forwarding checks; confirms exact skip flag, correct endpoint/method, no payload, unchanged processed count singular/plural locale feedback, query invalidations/error handling, permission check in tab, independent queue behavior, global HTTP-wrapper suppression forwarding. Baseline unmodified workflow intentionally FAILS the new check; corrected source 38/38 PASS.
+4. Append to entire cumulative FIX_LOG without discarding earlier batches. Standalone, frontend-embedded, and release-bundle copies are byte-identical.
+
+VERIFICATION
+- Focused guard: baseline FAIL expected at missing processing suppression option; corrected 38/38 PASS.
+- All 64 inherited selected regression scripts plus new guard = 65/65 PASS (Node 22.16, test-only symlink to global TypeScript; symlink excluded from release archive). Multilingual closure passed.
+- Exact 4 changed/new paths verified against baseline, full frontend archive CRC, changed-files ZIP parity, complete 11-file package CRC, byte-identical Backend072 SHA256, cumulative FIX_LOG and manifest checked.
+- Backend route /enterprise-inventory/notifications/deliveries/process remains protected by NOTIFICATIONS_WRITE permission. No auth, scheduler, provider, DB, stock, request, result, mutation status, or navigation behavior changed.
+
+OPEN WORK / LIMITATIONS
+- Clean Node24 npm ci + TS typecheck + production Vite build NOT VERIFIED; PostgreSQL integration NOT VERIFIED; deployed tenant desktop/mobile/screen-reader or delivery worker behavior NOT VERIFIED.
+- UoM CASE=24 persistence after refresh and Custom Fields Text-value saving are separate recorded production defects requiring DB/request-response evidence; not fixed by this batch.
+- Backend scheduling/notification delivery progression beyond queueing remains production-acceptance work, not fixed here.
+
+SOURCE OF TRUTH AFTER BATCH 141: FULL Frontend surgical-fix-140 + FULL Backend surgical-fix-072 (byte-identical). NEXT: Batch142 NOT STARTED. Always deliver both complete applications plus changed-files and cumulative TXT documentation.
+================================================================================
