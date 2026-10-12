@@ -486,7 +486,8 @@
     "check:batch124-supplier-refresh-feedback": "node scripts/check-batch124-supplier-refresh-feedback.mjs",
     "check:batch125-return-credit-invoice-lineage": "node scripts/check-batch125-return-credit-invoice-lineage.mjs",
     "check:batch127-supplier-return-line-readiness": "node scripts/check-batch127-supplier-return-line-readiness.mjs",
-    "check:batch128-variant-auto-sku": "node scripts/check-batch128-variant-auto-sku.mjs"
+    "check:batch128-variant-auto-sku": "node scripts/check-batch128-variant-auto-sku.mjs",
+    "check:batch129-variant-attribute-rows": "node scripts/check-batch129-variant-attribute-rows.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

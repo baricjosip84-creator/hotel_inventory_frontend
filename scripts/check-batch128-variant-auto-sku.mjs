@@ -44,8 +44,8 @@ check('suggestion checks existing products and variants',()=>{assert.match(sourc
 check('optional manual override controls effective SKU',()=>assert.match(source,/const effectiveSku = editSku \? sku\.trim\(\) : suggestedSku;/));
 check('override has explicit switch for edit and suggested',()=>{assert.match(source,/ui\('Use suggested SKU'\)/);assert.match(source,/ui\('Edit SKU'\)/);assert.match(source,/type="button"/)});
 check('edit input only shown by optional editing',()=>assert.match(source,/editSku\s*\? <label>\{ui\('Custom variant SKU'\)\}<input value=\{sku\}/));
-check('SKU payload remains required backend contract',()=>assert.match(source,/body: JSON\.stringify\(\{ sku: effectiveSku, name, barcode: barcode \|\| null, attributes: parseAttributes\(attributes\) \}\)/));
-check('auto mode gate protects empty input and permissions',()=>assert.match(source,/disabled=\{!canWrite \|\| !parentId \|\| !effectiveSku \|\| !name\.trim\(\) \|\| create\.isPending\}/));
+check('SKU payload remains required backend contract',()=>assert.match(source,/body: JSON\.stringify\(\{ sku: effectiveSku, name, barcode: barcode \|\| null, attributes: structuredVariantAttributes\(attributeRows\) \}\)/));
+check('auto mode gate protects empty input and permissions',()=>assert.match(source,/disabled=\{!canWrite \|\| !parentId \|\| !effectiveSku \|\| !name\.trim\(\) \|\| Boolean\(attributeIssue\) \|\| create\.isPending\}/));
 check('mutation callback retains success invalidation',()=>{for (const key of ['product-variants','inventory-capabilities-overview'])assert(source.includes(`queryKey: ['${key}']`));assert.match(source,/onChanged\(\);/)});
 check('successful creation resets manual SKU option',()=>assert.match(source,/setSku\(''\); setEditSku\(false\); setName\(''\)/));
 check('parent change clears stale override',()=>assert.match(source,/const changeParent = \(id: string\) => \{ setParentId\(id\); setEditSku\(false\); setSku\(''\)/));

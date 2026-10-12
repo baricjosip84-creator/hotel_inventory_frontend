@@ -217,15 +217,30 @@ function displayCanonicalLabel(value: string | null | undefined, ui: (text: stri
   return ui(CANONICAL_DISPLAY_LABELS[value] ?? formatReadableText(value));
 }
 
-function parseAttributes(value: string): Record<string, string> {
-  const result: Record<string, string> = {};
-  value.split(',').map((part) => part.trim()).filter(Boolean).forEach((part) => {
-    const [rawKey, ...rawValue] = part.split('=');
-    const key = rawKey?.trim();
-    const val = rawValue.join('=').trim();
-    if (key && val) result[key] = val;
-  });
-  return result;
+type VariantAttributeRow = { id: number; key: string; value: string };
+
+// Validate before sending a structured JSONB attributes object. Silent omission of
+// incomplete rows or overwriting duplicate names would lose user-entered data.
+function variantAttributeIssue(rows: readonly VariantAttributeRow[]): string | null {
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const key = row.key.trim();
+    if (!key) return 'Enter a name for each attribute.';
+    if (!row.value.trim()) return 'Enter a value for each attribute.';
+    const normalized = key.toLowerCase();
+    if (normalized === '__proto__' || normalized === 'constructor' || normalized === 'prototype') {
+      return 'Use a different attribute name.';
+    }
+    if (seen.has(normalized)) return 'Attribute names must be unique.';
+    seen.add(normalized);
+  }
+  return null;
+}
+
+function structuredVariantAttributes(rows: readonly VariantAttributeRow[]): Record<string, string> {
+  const attributes: Record<string, string> = Object.create(null);
+  for (const row of rows) attributes[row.key.trim()] = row.value.trim();
+  return attributes;
 }
 
 function asNumber(value: string): number {
@@ -1055,7 +1070,7 @@ function VariantsPanel({ products, canWrite, canReadStock, canWriteProducts, can
   const [editSku, setEditSku] = useState(false);
   const [name, setName] = useState('');
   const [barcode, setBarcode] = useState('');
-  const [attributes, setAttributes] = useState('');
+  const [attributeRows, setAttributeRows] = useState<VariantAttributeRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const variants = useQuery({ queryKey: ['product-variants'], queryFn: () => apiRequest<Variant[]>('/inventory-capabilities/variants') });
   const parents = products.filter((p) => !p.parent_product_id);
@@ -1065,10 +1080,11 @@ function VariantsPanel({ products, canWrite, canReadStock, canWriteProducts, can
     ...(variants.data ?? []).map((variant) => variant.sku),
   ]);
   const effectiveSku = editSku ? sku.trim() : suggestedSku;
+  const attributeIssue = variantAttributeIssue(attributeRows);
   const create = useMutation({
-    mutationFn: () => apiRequest(`/inventory-capabilities/products/${parentId}/variants`, { method: 'POST', body: JSON.stringify({ sku: effectiveSku, name, barcode: barcode || null, attributes: parseAttributes(attributes) }) }),
+    mutationFn: () => apiRequest(`/inventory-capabilities/products/${parentId}/variants`, { method: 'POST', body: JSON.stringify({ sku: effectiveSku, name, barcode: barcode || null, attributes: structuredVariantAttributes(attributeRows) }) }),
     onSuccess: () => {
-      setSku(''); setEditSku(false); setName(''); setBarcode(''); setAttributes(''); setError(null);
+      setSku(''); setEditSku(false); setName(''); setBarcode(''); setAttributeRows([]); setError(null);
       void qc.invalidateQueries({ queryKey: ['product-variants'] });
       void qc.invalidateQueries({ queryKey: ['inventory-capabilities-overview'] });
       onChanged();
@@ -1076,12 +1092,19 @@ function VariantsPanel({ products, canWrite, canReadStock, canWriteProducts, can
     onError: (e) => setError(messageFrom(e, ui('Unable to create variant.'), ui)),
   });
   const changeParent = (id: string) => { setParentId(id); setEditSku(false); setSku(''); setError(null); };
+  const addAttribute = () => setAttributeRows((rows) => [
+    ...rows, { id: Math.max(0, ...rows.map((row) => row.id)) + 1, key: '', value: '' },
+  ]);
+  const updateAttribute = (id: number, field: 'key' | 'value', value: string) => {
+    setAttributeRows((rows) => rows.map((row) => row.id === id ? { ...row, [field]: value } : row));
+  };
+  const removeAttribute = (id: number) => setAttributeRows((rows) => rows.filter((row) => row.id !== id));
   return <section className="section" style={panelStyle}>
     <div className="section__title">{ui('Product variants')}</div>
     <div className="card">
       <p className="card__subtext">{ui('A variant is created as a real product underneath a parent. That means existing stock, barcodes, shipments and movements can use it immediately.')}</p>
       {canWriteProducts && !canReadSuppliers ? <div className="form-error">{ui('Supplier read access is required to create a variant because supplier settings can be inherited from its parent product.')}</div> : null}
-      <form onSubmit={(e) => { e.preventDefault(); if (canWrite && parentId && name.trim() && effectiveSku && !create.isPending) create.mutate(); }} style={formGridStyle}>
+      <form onSubmit={(e) => { e.preventDefault(); if (canWrite && parentId && name.trim() && effectiveSku && !attributeIssue && !create.isPending) create.mutate(); }} style={formGridStyle}>
         <ProductSelect products={parents} value={parentId} onChange={changeParent} label={ui('Parent product')} />
         <label>{ui('Variant name')}<input value={name} onChange={(e) => setName(e.target.value)} placeholder={ui('T-shirt / Red / M')} /></label>
         <div style={{ display: 'grid', gap: 6 }}>
@@ -1095,8 +1118,20 @@ function VariantsPanel({ products, canWrite, canReadStock, canWriteProducts, can
           <small className="muted">{ui('The SKU is suggested from the parent and variant name. You can edit it if needed; duplicates are checked when saving.')}</small>
         </div>
         <label>{ui('Barcode')}<input value={barcode} onChange={(e) => setBarcode(e.target.value)} /></label>
-        <label>{ui('Attributes')}<input value={attributes} onChange={(e) => setAttributes(e.target.value)} placeholder={ui('Color=Red, Size=M')} /></label>
-        <button className="button" disabled={!canWrite || !parentId || !effectiveSku || !name.trim() || create.isPending}>{create.isPending ? ui('Creating…') : ui('Create variant')}</button>
+        <div style={{ gridColumn: '1 / -1', display: 'grid', gap: 10 }}>
+          <div>
+            <strong>{ui('Variant attributes (optional)')}</strong>
+            <p className="card__subtext">{ui('Add details such as Color = Red or Size = Large. You can leave attributes empty.')}</p>
+          </div>
+          {attributeRows.map((row, index) => <div key={row.id} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, alignItems: 'end' }}>
+            <label>{ui('Attribute name')}<input value={row.key} onChange={(e) => updateAttribute(row.id, 'key', e.target.value)} placeholder={ui('Color')} disabled={!canWrite || create.isPending} /></label>
+            <label>{ui('Attribute value')}<input value={row.value} onChange={(e) => updateAttribute(row.id, 'value', e.target.value)} placeholder={ui('Red')} disabled={!canWrite || create.isPending} /></label>
+            <button type="button" className="button button--secondary" disabled={!canWrite || create.isPending} aria-label={`${ui('Remove attribute')} ${index + 1}`} onClick={() => removeAttribute(row.id)}>{ui('Remove attribute')}</button>
+          </div>)}
+          <div><button type="button" className="button button--secondary" disabled={!canWrite || create.isPending} onClick={addAttribute}>{ui('Add attribute')}</button></div>
+          {attributeIssue ? <div className="form-error" role="alert">{ui(attributeIssue)}</div> : null}
+        </div>
+        <button className="button" disabled={!canWrite || !parentId || !effectiveSku || !name.trim() || Boolean(attributeIssue) || create.isPending}>{create.isPending ? ui('Creating…') : ui('Create variant')}</button>
       </form>
       {error ? <div className="form-error">{error}</div> : null}
     </div>

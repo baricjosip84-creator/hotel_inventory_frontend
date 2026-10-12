@@ -11134,3 +11134,50 @@ TARGETED LIVE ACCEPTANCE REQUIRED
 NEW AUTHORITATIVE SOURCE: FULL Frontend127 + FULL unchanged Backend072.
 NEXT: Batch129 NOT STARTED; verify historical audit candidate against current code and cumulative FIX_LOG.
 ================================================================================
+
+
+================================================================================
+BATCH 129 — ADVANCED INVENTORY / VARIANTS: STRUCTURED ATTRIBUTE NAME/VALUE ROWS
+DATE: 2026-10-12
+BASELINE: Full Frontend127 + unchanged Backend072 (Batch128 completed)
+RESULT: Full Frontend128 + unchanged Backend072
+
+ORIGINAL AUDIT AND CURRENT SOURCE EVIDENCE
+- Canonical audit v93 2026-09-28, Advanced Inventory > Variants, original lines around 13946–13962: developer-centric free-form Attributes "Color=Red, Size=M" entry; auditor requested human-readable labeled attribute rows with Add/Remove support.
+- Verified Frontend127 still contained one free text field and parseAttributes() splitting comma-separated key=value pairs; malformed and incomplete entries were silently omitted. Backend072 already accepts the object as "attributes" and persists JSONB; no backend edit required.
+- New focused Batch129 test fails on pristine Frontend127 at missing variantAttributeIssue helper, and passes after the correction. Batch128 name-first/auto-generated SKU feature is preserved.
+
+EXACT CHANGES — COMPLETE FRONTEND128
+1. src/pages/InventoryCapabilitiesPage.tsx:
+   - Replace free-text Attributes input with optional labeled Attribute name + Attribute value rows. Add attribute and Remove attribute buttons are explicit type=button, permission-gated and disabled while create is in flight. Mobile-friendly wrapping row layout and translated usage explanation.
+   - Add pure variantAttributeIssue helper. Reject incomplete name/value, duplicate names case-insensitively and special prototype-related names; show localized, accessible role=alert feedback and prevent submission until corrected. Empty list is valid/optional.
+   - Add pure structuredVariantAttributes helper. Trim keys/values, preserve commas and equals in values and JSON-serialize a null-prototype key/value map into SAME existing POST field "attributes".
+   - Clear attribute rows only on successful create. Preserve selected parent/role restrictions, auto SKU or manual override, barcode field, mutation endpoint and success/error invalidation.
+2. src/i18n/tenantUiTranslations.ts: 12 full five-language rows for structured controls, validation, guidance and Color/Red example placeholders (EN/DE/ES/FR/HR).
+3. scripts/check-batch129-variant-attribute-rows.mjs (NEW): 52 focused assertions including actual extraction/execution of TypeScript validation + serialization, duplicate and security boundaries, UI gating, permissions, backend JSONB contract, and all language rows.
+4. scripts/check-batch128-variant-auto-sku.mjs: update TWO now-obsolete source expectations to retain SKU auto-generation/permission guards against the CURRENT attributes object and attributes-validity gate. Existing 37 Batch128 assertions still pass.
+5. package.json: register check:batch129-variant-attribute-rows.
+6. Inventory_Management_App_FIX_LOG_2026-10-06.txt: append this full batch record; standalone copy and complete frontend embedded copy are byte-identical.
+
+NON-CHANGES / SAFETY
+- Backend072 is unchanged byte-for-byte. No migrations, permissions, product/variant stock, parent eligibility, SKU uniqueness, barcode, shipment, audit, cost, API endpoint, tenant enforcement, PostgreSQL query, or lifecycle changes.
+- Attributes remain optional and travel in the same POST payload as a JSON object. Server remains authoritative for any backend constraints and concurrency.
+- Existing saved variants and their attributes rendering are unchanged; creation only. The old free text syntax is no longer required.
+
+VERIFICATION ACTUALLY PERFORMED
+- New focused guard: FAIL on untouched Frontend127 (helper absent); 52/52 PASS on Frontend128. Actual compiled helper functions exercised for empty, valid, missing name/value, case-insensitive duplicate, reserved names, whitespace trimming and punctuation values.
+- Inherited selected scripts: 52/52 PASS after updating the older Batch128 contract for current structured attrs; Batch129 new focused test 1/1 PASS; total selected scripts 53/53 PASS. Early run identified two untranslated Color/Red placeholders; added translations and full suite re-run clean.
+- Global multilingual closure: PASS, 45/45 tenant routes, 265 reachable files, 14,339 complete five-language catalog rows, placeholder parity.
+- Isolated source TSX parse/transpilation performed. Full clean Node24 npm ci, whole-project TS/Vite build, real DB integration, deployed/browser/mobile acceptance were NOT run.
+- ZIP integrity, exact delta and count, file checksums, standalone/embedded FIX_LOG equality, and byte-identical backend are verified by the packaging process.
+
+MANUAL DEPLOYED RETEST — STILL PENDING
+- Advanced Inventory > Variants: choose a normal parent, enter variant name, see suggested SKU. Leave attributes empty; create remains available for eligible role.
+- Add Color / Red and Size / M via two rows. Confirm clear labels, Remove attribute, keyboard and narrow-screen readability; create a controlled variant and verify the saved attributes table after reload.
+- Attempt incomplete name/value, duplicate Color/color, and reserved names; Create variant should be disabled with translated explanation. Remove invalid row to re-enable.
+- Confirm the value "Cotton, 100% = premium" persists literally rather than being split; readonly role cannot edit/add/remove or create; barcode and manual SKU features remain intact.
+- Validate EN/DE/ES/FR/HR and server-side uniqueness error when a proposed SKU conflicts concurrently. No production acceptance claimed until tested.
+
+NEW SOURCE OF TRUTH: FULL Frontend128 + FULL Backend072.
+NEXT: Batch130 NOT STARTED. Reconcile remaining audit candidates against this source and cumulative FIX_LOG before editing. Every future batch must deliver ALL complete ZIPs, supplemental changed files, audit, cumulative FIX_LOG, regression evidence, verification, handoffs, START HERE, SHA-256 and one complete release bundle.
+================================================================================
