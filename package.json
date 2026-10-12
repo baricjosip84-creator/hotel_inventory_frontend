@@ -509,7 +509,8 @@
     "check:batch148-attachment-download-busy-state": "node scripts/check-batch148-attachment-download-busy-state.mjs",
     "check:batch149-attachment-target-file-reset": "node scripts/check-batch149-attachment-target-file-reset.mjs",
     "check:batch150-attachment-synchronous-download-lock": "node scripts/check-batch150-attachment-synchronous-download-lock.mjs",
-    "check:batch151-uom-stale-conversion-result": "node scripts/check-batch151-uom-stale-conversion-result.mjs"
+    "check:batch151-uom-stale-conversion-result": "node scripts/check-batch151-uom-stale-conversion-result.mjs",
+    "check:batch152-uom-write-product-association": "node scripts/check-batch152-uom-write-product-association.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

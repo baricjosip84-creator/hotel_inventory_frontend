@@ -11868,3 +11868,26 @@ LIMITATIONS / NEXT WORK
 - Historical UoM CASE=24 write/readback persistence failure and Custom Fields `Croatia` plain-text value save (database returned invalid-format) remain UNRESOLVED and must be traced through actual deployed request/response and DB evidence. This fix does not claim to resolve either.
 - Continue from full cumulative Frontend150 and complete unchanged Backend072. Next Batch152 NOT started. For every batch deliver full frontend, full backend, changed-files, cumulative FIX_LOG, audit, verification, regression results, handoff, complete detailed handoff, START HERE, SHA manifest, plus 11-file release ZIP.
 ================================================================================
+
+================================================================================
+BATCH 152 — UNITS OF MEASURE: SAVE/DELETE MUST STAY LINKED TO SUBMITTED PRODUCT
+Date: 2026-10-12
+================================================================================
+AUTHORITATIVE BASELINE AND PROVEN SOURCE BUG
+- Used complete Frontend 150 ZIP SHA-256 5e84867cc24bcb8e5c57f030c163bf49b4fd0ecf07be1c55e8017dcf4855aef2 and complete unchanged Backend 072 ZIP SHA-256 2036cbc149b5c319911ec8fe72418361651ebcea2caaf799b58382adb0cf3e69. Preserved Audit v93, full cumulative FIX_LOG through 151 and handoffs.
+- Frontend150 UomPanel `save` / `remove` mutation callbacks used active component productId rather than the target product of the submitted write. If the user saves CASE=24 on product A and switches to product B while it is in flight, the successful response can invalidate the new product list instead of A; can clear B's form, conversion result and error. Similar wrong-product invalidation/form resets and errors occur for delayed UoM deletion.
+- New focused regression fails as expected against the untouched Frontend150 page (missing activeUomProductRef); passes against corrected Frontend151. Source-level reproduction only. This bug can cause misleading stale cache readback; it does NOT prove the historical DB-backed CASE=24 persistence complaint is resolved.
+SURGICAL FRONTEND-ONLY CORRECTION
+1. `src/pages/InventoryCapabilitiesPage.tsx`: capture `targetProductId` plus an immutable save payload at button click, or `targetProductId` plus target UomRow for delete. Use these mutation variables for HTTP target and its per-product React Query invalidation. A synchronous activeUomProductRef changes immediately on product selection. Mutation success/error may clear the form, conversion and local error only if the submitted product is still selected; late other-product results cannot interfere. Preserve original version optimistic locking, write permissions, conversions and controls.
+2. `scripts/check-batch152-uom-write-product-association.mjs`: new focused executable 44/44 checks. Evaluates actual extracted TSX mutation handlers; confirms endpoint/payload/version; switching A→B before save/delete response still invalidates only A; no B form/result/error corruption; original A normal success/error behavior remains.
+3. Narrow inherited guard updates: `scripts/check-batch126-uom-success-feedback.mjs`, `scripts/check-batch138-uom-guidance.mjs`, `scripts/check-batch151-uom-stale-conversion-result.mjs` adapt assumptions about API path and mutation signatures while preserving all 41, 37 and 52 previous check counts and operational behavior.
+4. `package.json`: register Batch152 regression. 5. Unabridged cumulative FIX_LOG: append Batch152, never replace earlier entries.
+VERIFICATION
+- Untouched Frontend150: focused regression expected FAIL; corrected Frontend151: 44/44 focused PASS.
+- Batch126: 41/41 PASS; Batch138: 37/37 PASS; Batch151: 52/52 PASS; selected entire suite 76/76 PASS (75 inherited + one new). No new strings/translations; prior multilingual closure passed.
+- Backend072 unchanged byte-for-byte. No SQL migration, API endpoint or inventory quantity changes. Full source archive + changed-file archive parity and all-11 bundle verified with hashes/CRC.
+LIMITATIONS / NEXT TASK
+- Tests are Node22 TypeScript-backed source tests and executable isolated mutation mocks; TS symlink and legacy backend path symlink created locally solely for test dependencies, not shipped. No clean Node24 `npm ci`, complete `tsc -b` or Vite build, PostgreSQL-backed test, production browser, live deployment or real supplier email acceptance.
+- Historical CASE=24 conversion disappearance after reload/reselection and Custom Fields `Croatia` text value save PostgreSQL 22P02 remain UNRESOLVED pending live API/SQL traces. Do not claim Batch152 fixed database persistence.
+- Next Batch153 starts only from complete cumulative Frontend151 + full Backend072; keep every past batch/audit record and deliver all 11 supporting artifacts + all-in-one ZIP.
+================================================================================

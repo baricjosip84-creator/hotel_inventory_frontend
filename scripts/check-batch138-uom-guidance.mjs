@@ -30,7 +30,7 @@ check('Reverse conversion example given',()=>assert.match(uom,/48 pcs = 2 CASE/)
 check('Convert button now uses enabled primary styling',()=>assert.match(uom,/<button className="button" type="button" disabled=\{!productId \|\| !fromUom \|\| !toUom \|\| convert\.isPending\} onClick=\{\(\) => convert\.mutate\(\)\}/));
 check('Convert still disabled until product and both units exist',()=>assert.match(uom,/disabled=\{!productId \|\| !fromUom \|\| !toUom \|\| convert\.isPending\}/));
 check('Convert action still calls backend mutation',()=>assert.match(uom,/onClick=\{\(\) => convert\.mutate\(\)\}/));
-check('Save uses same API path',()=>assert.match(uom,/`\/inventory-capabilities\/products\/\$\{productId\}\/uom`, \{ method: 'POST'/));
+check('Save uses same API path scoped to submitted product',()=>assert.match(uom,/`\/inventory-capabilities\/products\/\$\{targetProductId\}\/uom`, \{ method: 'POST'/));
 check('Save version check preserved',()=>assert.match(uom,/expected_version: editingUom\?\.version \?\? 0/));
 check('Save checkbox values preserved',()=>assert.match(uom,/purchase_uom: purchase, issue_uom: issue/));
 check('Save requires write permission',()=>assert.match(uom,/disabled=\{!canWrite \|\| !productId/));
@@ -38,7 +38,7 @@ check('Conversion API route unchanged',()=>assert.match(uom,/`\/inventory-capabi
 check('Conversion payload unchanged',()=>assert.match(uom,/from_uom: fromUom, to_uom: toUom, quantity: Number\(convertQty\)/));
 check('Conversion result remains visible',()=>assert.match(uom,/converted !== null \? <strong className="capability-result">/));
 check('Product change still resets test state',()=>assert.match(uom,/setFromUom\(''\); setToUom\(''\); setConverted\(null\)/));
-check('Save still invalidates current product UoM query',()=>assert.match(uom,/invalidateQueries\(\{ queryKey: \['uom', productId\] \}\)/));
+check('Save invalidates submitted product UoM query',()=>assert.match(uom,/invalidateQueries\(\{ queryKey: \['uom', targetProductId\] \}\)/));
 check('Stock quantity mutation not introduced',()=>assert.doesNotMatch(uom,/\/stock\/adjust|\/stock\/count|\/stock-transfers/));
 const strings=[
 'How units of measure work',
