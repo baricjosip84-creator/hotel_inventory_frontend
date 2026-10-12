@@ -1653,12 +1653,30 @@ const BUSINESS_EVIDENCE_FIELD_LABELS: Record<string, string> = {
   action: 'Action',
   outcome: 'Outcome',
   observed_at: 'Observed at',
-  due_at: 'Due at'
+  due_at: 'Due at',
+  // Human-readable names for the stored procurement/replenishment policy evidence.
+  // The source keys remain immutable for audit and subsequent editing.
+  basis: 'Planning basis',
+  consumption_only_demand: 'Consumption-only demand considered',
+  reliable_inbound_counted: 'Reliable inbound counted',
+  at_risk_inbound_separated: 'At-risk inbound separated',
+  location_par_and_minimum_rules: 'Location par and minimum rules considered',
+  active_reservations_reduce_available_stock: 'Active reservations reduce available stock',
+  approved_po_unshipped_counted_without_double_counting_shipments: 'Approved but unshipped purchase orders counted without double-counting shipments'
 };
 
 function businessEvidenceFieldLabel(key: string, ui: LearningUi): string {
   const systemLabel = BUSINESS_EVIDENCE_FIELD_LABELS[key];
   return systemLabel ? ui(systemLabel) : key;
+}
+
+function businessEvidenceFieldScalar(key: string, value: unknown, locale: AppLocale, ui: LearningUi): string {
+  // Translate only the known system-generated policy basis code; preserve all other
+  // strings, including user-authored evidence, exactly as received.
+  if (key === 'basis' && value === 'shared_procurement_replenishment_position_and_location_policy') {
+    return ui('Shared procurement, replenishment position and location policy');
+  }
+  return businessEvidenceScalar(value, locale, ui);
 }
 
 function businessEvidenceEntries(value: unknown, locale: AppLocale, ui: LearningUi, prefix = '', depth = 0): Array<{ label: string; value: string }> {
@@ -1701,7 +1719,7 @@ function businessEvidenceEntries(value: unknown, locale: AppLocale, ui: Learning
     if (item && typeof item === 'object') {
       rows.push(...businessEvidenceEntries(item, locale, ui, nextLabel, depth + 1).slice(0, 12 - rows.length));
     } else {
-      const text = businessEvidenceScalar(item, locale, ui);
+      const text = businessEvidenceFieldScalar(key, item, locale, ui);
       if (text) rows.push({ label: nextLabel, value: text });
     }
   }

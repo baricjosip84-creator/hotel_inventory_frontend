@@ -10402,3 +10402,38 @@ LIVE ACCEPTANCE
 CURRENT ENGINEERING SOURCE OF TRUTH: Frontend109 + Backend072.
 PRODUCTION ACCEPTANCE: PENDING. Batch111 NOT STARTED.
 ================================================================================
+
+
+================================================================================
+BATCH 111 — LEARNING FEEDBACK / EXPECTED POLICY EVIDENCE READABILITY
+DATE: 2026-10-12
+BASELINE: Frontend109 + Backend072
+RESULT: Frontend110 + Backend072 (backend unchanged)
+
+CANONICAL AUDIT FINDING
+- LF-UX-008, Learning Feedback > Feedback evidence details: Expected policy evidence exposed raw machine keys like `consumption_only_demand`, `at_risk_inbound_separated`, and basis value `shared_procurement_replenishment_position_and_location_policy` directly to business users.
+- Confirmed in Frontend109: the generic businessEvidenceFieldLabel formatter fell back to the raw field key for these policy flags and businessEvidenceScalar printed the system-generated policy basis as an unmodified code.
+
+IMPLEMENTED — FRONTEND110 ONLY
+- src/pages/DecisionLearningFeedbackPage.tsx: add readable semantic display labels for the seven known policy evidence fields (basis, consumption-only demand, reliable inbound, at-risk inbound, location par/minimum, active reservations, approved-but-unshipped POs without double-counting shipments). Translate only the exact known system-generated planning-basis code. Leave other raw evidence values, unknown fields and free-form user text intact.
+- src/i18n/tenantUiTranslations.ts: add eight complete EN/DE/ES/FR/HR translations for the seven field labels and the known planning-basis text.
+- package.json and new scripts/check-learning-feedback-expected-evidence-labels-surgical-fix-v349354.mjs: regression checking real formatter execution across all five locales, immutable evidence values, nested context and fallback behavior.
+- Original evidence JSON and edit snapshots remain unchanged: the existing businessEvidenceSnapshot / businessEvidenceObject round trip returns the exact original object when a structured value is viewed but not edited. Backend and schema are unchanged.
+
+SOURCE VERIFICATION
+- New Batch111 targeted behavior check: 58/58 PASS.
+- Selected inherited and new surgical / Learning Feedback / Permissions / Reports checks: 57/58 PASS. The one failure is the known inherited check-tenant-custom-role-management.mjs obsolete-confirmation-text assertion, reproduced on untouched Frontend108 in Batch110. Do not claim this legacy test passes; it is outside this correction.
+- Global multilingual closure: PASS (45/45 tenant routes, 264 reachable source files, 14,306 complete five-language translation keys; placeholder parity).
+- Existing Learning Feedback business presentation, localization and completion checks: PASS.
+- Modified TSX and translation catalog transpile without isolated TypeScript syntax diagnostics.
+- Archive member and changed-file comparison, unchanged backend SHA-256 and ZIP integrity: PASS during packaging.
+
+NOT VERIFIED
+- Full clean Node24 dependency installation, project-wide TypeScript/Vite build, live PostgreSQL integration and deployed browser acceptance.
+
+LIVE ACCEPTANCE
+- In Learning Feedback > Policy effectiveness, open a feedback evidence details panel whose Expected evidence contains procurement-policy flags and verify readable labels/values in Croatian, English and other supported locales. Compare the technical structured evidence (where permissioned) and verify original stored keys/data remain unchanged. Edit/view unrelated free-text evidence and verify it is not rewritten. Confirm review controls and records still behave as before.
+
+CURRENT ENGINEERING SOURCE OF TRUTH: Frontend110 + Backend072.
+PRODUCTION ACCEPTANCE: PENDING. Batch112 NOT STARTED.
+================================================================================
