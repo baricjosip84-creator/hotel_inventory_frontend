@@ -213,6 +213,21 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Customer order cancelled successfully.';
   }
 
+  // Batch142: customer-return lifecycle actions are not generic item creation.
+  // Match only exact successful POST routes, keeping creation, stock receipt,
+  // and cancellation feedback distinct from orders and document actions.
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/outbound/returns') {
+    return 'Customer return created successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && /^\/outbound\/returns\/[^/]+\/receive$/.test(normalizedPathOnly)) {
+    return 'Customer return received successfully.';
+  }
+
+  if (normalizedMethod === 'POST' && /^\/outbound\/returns\/[^/]+\/cancel$/.test(normalizedPathOnly)) {
+    return 'Customer return cancelled successfully.';
+  }
+
   if (normalizedMethod === 'POST' && normalizedPathOnly === '/decision-intelligence/adaptive-policy-engine-refresh') {
     return 'New policy analysis snapshot recorded. No policy changes were applied.';
   }

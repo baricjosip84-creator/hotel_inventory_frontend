@@ -11627,3 +11627,32 @@ OPEN WORK / LIMITATIONS
 
 SOURCE OF TRUTH AFTER BATCH 141: FULL Frontend surgical-fix-140 + FULL Backend surgical-fix-072 (byte-identical). NEXT: Batch142 NOT STARTED. Always deliver both complete applications plus changed-files and cumulative TXT documentation.
 ================================================================================
+
+================================================================================
+BATCH 142 — OUTBOUND CUSTOMER RETURNS: ACCURATE LIFECYCLE SUCCESS FEEDBACK
+Date: 2026-10-12
+================================================================================
+BASELINE AND EVIDENCE
+- Authoritative full source: hotel-inventory-frontend_surgical-fix-140.zip + unchanged hotel-inventory-backend_surgical-fix-072.zip; canonical tenant Audit v93; cumulative FIX_LOG through Batch141. Verified all input byte parity against previous full ZIP and SHA256 of unchanged Backend072.
+- Audit v93 around the Outbound Customer Returns screens (notably the create/cancel steps) reports that the global mutation-success toast displays generic 'Item created successfully' after return creation or cancellation, despite existing accurate local outcome text. In Frontend140 src/lib/api.ts tenantMutationSuccessMessage contains an exact customer ORDER cancellation mapping (Batch140), but none for customer RETURN creation, receipt or cancellation. All three UI POST actions in src/pages/OutboundPage.tsx use the global shared mutation request, and therefore use the generic item-created fallback. Receive is also a stock-affecting transition, not an item-create action.
+- This batch addresses feedback content only, not DB-backed acceptance of return operations. No duplicate suppression, frontend navigation, stock calculation, or lifecycle state changes.
+
+SURGICAL IMPLEMENTATION
+1. src/lib/api.ts: Add three isolated successful-POST mappings: exact /outbound/returns => 'Customer return created successfully.'; exact /outbound/returns/:id/receive => 'Customer return received successfully.'; exact /outbound/returns/:id/cancel => 'Customer return cancelled successfully.' Routes are matched after lowercasing and stripping querystring, avoiding unrelated order, supplier-return, document, GET and PUT actions.
+2. src/i18n/tenantUiTranslations.ts: Add three five-language rows (English, German, Spanish, French, Croatian) for those exact feedback strings. No fallback translations necessary.
+3. package.json: Register check:batch142-customer-return-lifecycle-feedback.
+4. scripts/check-batch142-customer-return-lifecycle-feedback.mjs: New runnable guard with 82 source/TS parse/transpile/actual message resolver execution/route isolation/backend permission/version safeguards/inline feedback/translations assertions. The untouched Frontend140 resolver reproduces the generic 'Item created successfully' message and intentionally FAILS the new test; corrected code passes 82/82.
+5. Cumulative FIX_LOG extended without altering or losing prior batch entries. Standalone, frontend-embedded and all-in-one copies are verified byte-identical.
+
+VERIFICATION
+- Baseline reproduction: FAIL as expected, actual 'Item created successfully.', expected 'Customer return created successfully.'
+- Edited focused 82/82 PASS.
+- Regression sweep: 65 inherited scripts plus new Batch142 guard = 66/66 PASS, including global multilingual closure (Node 22.16 using test-only symlink to globally installed TypeScript; symlink excluded from release). These are selected source-level regression tests, NOT a clean production build or browser acceptance.
+- Full frontend archive CRC and exact changed/new file diff; five paths in changed-files ZIP; full 11-member all-in-one package CRC/readback; unchanged backend SHA256; cumulative FIX_LOG and handoff records consistency verified.
+- OutboundPage.tsx, backend routes/controllers and validation remain byte-identical. Customer return creation reason and item validation, receive permission and stock movements, cancel reason+optimistic version checks, user permissions, error handling, query refresh, and local success messages unchanged.
+
+UNRESOLVED / ACCEPTANCE
+- Historical UoM CASE=24 persistence after refresh and Custom Fields text-value readback require DB/request-response verification; not fixed.
+- Clean Node24 npm ci, TS typecheck/Vite production build, PostgreSQL integration, and deployed browser/mobile acceptance NOT VERIFIED. Likewise actual customer return lifecycle transitions not live-tested in this batch.
+- Continue next on FULL hotel-inventory-frontend_surgical-fix-141.zip and byte-identical FULL hotel-inventory-backend_surgical-fix-072.zip. Batch143 NOT STARTED. Deliver both FULL application ZIPs, changed-files supplement, all audit/log/testing/handoff TXT files and bundled complete release for every batch.
+================================================================================
