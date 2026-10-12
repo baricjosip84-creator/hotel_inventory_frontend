@@ -340,6 +340,22 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Storage location retired successfully.';
   }
 
+  // Cycle Counts already provide precise localized inline confirmation. Mirror those
+  // existing translation keys in the viewport toast instead of the generic Item
+  // created fallback; never report reconciliation for another cycle-count action.
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/enterprise-inventory/cycle-counts') {
+    return 'Cycle count created.';
+  }
+
+  const cycleCountActionMatch = normalizedMethod === 'POST'
+    ? normalizedPathOnly.match(/^\/enterprise-inventory\/cycle-counts\/[^/]+\/(submit|reconcile)$/)
+    : null;
+  if (cycleCountActionMatch) {
+    return cycleCountActionMatch[1] === 'submit'
+      ? 'Cycle count submitted successfully.'
+      : 'Cycle count reconciled and stock movements posted.';
+  }
+
   if (normalizedPath.includes('/enterprise-inventory/department-requisitions')) {
     if (normalizedMethod === 'POST') return 'Requisition created successfully.';
     if (normalizedMethod === 'DELETE') return 'Requisition deleted successfully.';

@@ -10541,3 +10541,49 @@ NOT VERIFIED
 CURRENT ENGINEERING SOURCE OF TRUTH: Frontend113 + Backend072.
 PRODUCTION ACCEPTANCE: PENDING. Batch115 not started.
 ================================================================================
+
+
+================================================================================
+BATCH 115 — INVENTORY CONTROLS / CYCLE COUNTS ACTION-SPECIFIC VIEWPORT TOASTS
+DATE: 2026-10-12
+BASELINE: Frontend113 + Backend072 (Batch114 complete)
+RESULT: Frontend114 + Backend072 (Backend unchanged)
+
+CANONICAL AUDIT FINDING
+- Audit v93, Inventory Controls > Cycle Counts (30 September 2026): After creating a cycle count, submitting it for approval and reconciling an approved count, a generic viewport success toast reported "Item created successfully." The operational action was not creation of a generic item; the messages were inaccurate. Source evidence from Frontend113 confirms the problem remains for these three endpoints.
+
+CURRENT-SOURCE ROOT CAUSE / BASELINE REPRODUCTION
+- Frontend113 src/components/enterpriseInventory/EnterpriseInventoryStockMutations.ts already set action-specific inline statuses on successful create, submit and reconcile; but its postEnterpriseInventoryRequest wrapper uses the shared apiMutationRequest, which separately dispatches a viewport toast via tenantMutationSuccessMessage in src/lib/api.ts.
+- For POST /enterprise-inventory/cycle-counts, POST /enterprise-inventory/cycle-counts/:id/submit and POST /enterprise-inventory/cycle-counts/:id/reconcile, the shared toast routine had no exact route mappings. The final generic POST fallback consequently returned "Item created successfully." for all three.
+- The newly written focused executable test was run BEFORE the code change against Frontend113 behavior: all seven create/submit/reconcile route assertions failed, showing the incorrect generic message, while unrelated route controls passed. The test registration assertion also failed before registration (18/26 baseline PASS).
+
+IMPLEMENTED — FRONTEND114 ONLY
+1. src/lib/api.ts: route-exact, POST-only mapping for the Cycle Count creation action and ID-scoped submit/reconcile actions, checking pathname independent of query parameters. Use EXACT existing translation keys "Cycle count created.", "Cycle count submitted successfully.", and "Cycle count reconciled and stock movements posted.". Do not claim reconcile for any unrelated or unknown action.
+2. scripts/check-cycle-count-workflow-feedback-surgical-fix-v349357.mjs: new behavior-level test extracting and executing the real TypeScript toast formatter through the existing TypeScript compiler; covers 3 workflows, query strings, HTTP method specificity, action isolation, unrelated business operations, existing endpoint wiring, central feedback event dispatch and unique EN/DE/ES/FR/HR translations.
+3. package.json: register check:cycle-count-workflow-feedback-v349357.
+4. Inventory_Management_App_FIX_LOG_2026-10-06.txt: this cumulative entry, synchronized with the standalone TXT and embedded full frontend archive.
+- NO modification to backend code, API requests, database schema, SQL, tenant role/permission logic, actual stock adjustments, reconciliation transaction, workflow eligibility or persisted records. The existing three complete five-language translation rows required no modification.
+
+VERIFICATION — ACTUAL RUNS, NOT INFERRED
+- Pre-change baseline test: 18/26 PASS; seven expected feedback tests + new registration failed, confirming fix necessity.
+- After correction, new focused behavior test: 26/26 PASS.
+- Selected regression run after supplying local TypeScript CLI and backend fixture: 25/26 scripts PASS.
+- The one failing script is INHERITED check-enterprise-inventory-cleanup.mjs: hard-coded old Par-level source-label expectation. Identical failure reproduced from untouched Frontend113 ZIP independently, before any Batch115 change. Do not count it as PASS. Not modified because unrelated to Cycle Count toast logic.
+- Global tenant multilingual closure: PASS (45/45 routes; 265 reachable files; 14,308 five-language translation keys and placeholder parity).
+- src/lib/api.ts isolated TypeScript transpilation: zero diagnostics.
+- Complete full frontend and changed-files ZIP member/delta comparison and ZIP CRC, plus unchanged backend SHA-256: verified at packaging.
+
+LIMITATIONS / DEPLOYMENT STATUS
+- Node22.16 is installed locally; clean Node24 npm ci and full Vite/TypeScript production build NOT VERIFIED. Previous offline npm ci failed ENOTCACHED for zod-validation-error; this batch did not represent a successful full build.
+- Real PostgreSQL transactional acceptance and deployed browser confirmation remain PENDING, as does full production acceptance for cumulative changes. Source regression checks do not guarantee live UI behavior.
+
+TARGETED LIVE ACCEPTANCE WHEN DEPLOYED
+1. In Inventory Controls > Cycle Counts, create a safe disposable count and verify the viewport toast identifies Cycle Count creation (not an Item), with one associated inline status; no extra count should be created.
+2. Submit an eligible draft; toast should identify submission, and the resulting workflow status must match the backend.
+3. With an APPROVED disposable count and controlled stock test data only, reconcile and check that toast identifies the reconciliation and stock movement posting; verify stock movement and audit once, not duplicate postings.
+4. Switch language among Croatian/English (and other supported EN/DE/ES/FR/HR locales): all three toasts use pre-existing localized translations.
+5. Verify unrelated supplier invoice / requisition / stock-adjustment messages remain unchanged; no false success toast on errors or blocked actions.
+
+CURRENT ENGINEERING SOURCE OF TRUTH: Frontend114 + Backend072.
+PRODUCTION ACCEPTANCE: PENDING. Batch116 NOT STARTED.
+================================================================================
