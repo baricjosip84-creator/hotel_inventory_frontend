@@ -10476,3 +10476,35 @@ LIVE ACCEPTANCE
 CURRENT ENGINEERING SOURCE OF TRUTH: Frontend111 + Backend072.
 PRODUCTION ACCEPTANCE: PENDING. Batch113 NOT STARTED.
 ================================================================================
+
+================================================================================
+BATCH 113 — ACTION CENTER / CROATIAN BUSINESS WORDING
+DATE: 2026-10-12
+BASELINE: Frontend111 + Backend072
+RESULT: Frontend112 + Backend072 (backend unchanged)
+
+CANONICAL AUDIT FINDING
+- ACTION-I18N-003: audit v93 confirmed awkward Croatian operational terms in Action Center, explicitly citing "Ulazni spremnik radnji" and "Samo za čitanje, upravljaju ljudi".
+- Confirmed against Frontend111: both literals were still present as the Croatian member of exactly one existing translation row, and both English keys were used by OperationalActionCenterPage.tsx.
+
+IMPLEMENTED — FRONTEND112 ONLY
+- src/i18n/tenantUiTranslations.ts: Croatian "Action inbox" changed to "Popis radnji"; Croatian "Read-only, human-operated" changed to "Samo za čitanje; radnje obavljaju korisnici". English keys and EN/DE/ES/FR translations remain unchanged.
+- package.json: added focused source/runtime check script registration.
+- scripts/check-action-center-croatian-copy-surgical-fix-v349356.mjs: new runtime coverage for two labels across five languages, Croatian canonical reverse lookup, preservation of Action Center localization calls and untouched technical permission identifiers.
+- No modifications to Action Center records, filters, approvals, read-only governance behavior, APIs, database, tenant permissions or backend.
+
+SOURCE VERIFICATION
+- Focused Batch113 runtime assertions: 41/41 PASS.
+- 110 selected regression scripts: 108/110 PASS with available TypeScript and unchanged Backend072 fixtures. The two failures were inherited source-contract checks: check-dashboard-surgical-closure-v34969.mjs expects an older raw Dashboard movement-reason string; check-tenant-custom-role-management.mjs expects obsolete deactivation wording already documented as inherited in Batch110. Neither page/logic nor its tests changed in this batch; do not count these as PASS.
+- Global five-language closure: PASS, 45/45 tenant routes, 265 reachable source files, 14,308 complete translation rows, placeholder parity.
+- Isolated translation-catalog TypeScript transpilation in focused test: PASS. Full Node24 project build and deployed-browser acceptance NOT VERIFIED.
+- Source-archive member comparison, exact changed-files parity and unchanged backend checksum to be verified at packaging.
+
+LIVE ACCEPTANCE
+- Open Action Center with Croatian selected; confirm section title "Popis radnji" and execution mode "Samo za čitanje; radnje obavljaju korisnici".
+- Switch to EN/DE/ES/FR; verify existing translations and read-only action behavior.
+- Verify filters and technical permission keys remain unchanged.
+
+CURRENT ENGINEERING SOURCE OF TRUTH: Frontend112 + Backend072.
+PRODUCTION ACCEPTANCE: PENDING. Batch114 NOT STARTED.
+================================================================================
