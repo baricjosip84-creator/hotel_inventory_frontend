@@ -492,7 +492,8 @@
     "check:batch130-variant-parent-readable-label": "node scripts/check-batch130-variant-parent-readable-label.mjs",
     "check:batch132-serial-registration-feedback": "node scripts/check-batch132-serial-registration-feedback.mjs",
     "check:batch133-custom-field-auto-key": "node scripts/check-batch133-custom-field-auto-key.mjs",
-    "check:batch134-custom-field-feedback": "node scripts/check-batch134-custom-field-feedback.mjs"
+    "check:batch134-custom-field-feedback": "node scripts/check-batch134-custom-field-feedback.mjs",
+    "check:batch135-csv-file-picker": "node scripts/check-batch135-csv-file-picker.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

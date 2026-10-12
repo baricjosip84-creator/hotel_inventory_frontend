@@ -193,13 +193,29 @@ export function InventoryCsvImportPanel({
 
       <div style={row}>
         <button type="button" style={button} onClick={downloadTemplate}>{ui("Download CSV Template")}</button>
+        {/* Keep the native CSV chooser and File object; replace only its inconsistent visual chrome. */}
         <input
           ref={fileInputRef}
           type="file"
           accept=".csv,text/csv"
           onChange={handleFile}
           disabled={!canImport || busy || batch?.status === 'committed'}
+          tabIndex={-1}
+          aria-hidden="true"
+          style={{ display: 'none' }}
         />
+        <button
+          type="button"
+          data-skip-global-action-feedback="true"
+          style={!canImport || busy || batch?.status === 'committed' ? disabledButton : button}
+          disabled={!canImport || busy || batch?.status === 'committed'}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          {ui('Choose file')}
+        </button>
+        <span role="status" aria-live="polite" title={file?.name || undefined} style={{ maxWidth: 300, overflowWrap: 'anywhere' }}>
+          {file ? file.name : ui('No file selected')}
+        </span>
         <button
           type="button"
           style={!canImport || busy || rows.length === 0 ? disabledButton : primaryButton}

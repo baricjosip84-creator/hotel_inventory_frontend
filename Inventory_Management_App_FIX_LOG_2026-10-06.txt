@@ -11387,3 +11387,42 @@ PRODUCTION RETEST PENDING
 SOURCE OF TRUTH: Full Frontend133 + unchanged full Backend072; audit v93; cumulative FIX_LOG through Batch134.
 NEXT: Batch135 NOT STARTED. Verify a genuinely unresolved audit issue against current source before editing. Continue returning both full applications, changed-files ZIP and all updated release documents every batch.
 ================================================================================
+
+================================================================================
+BATCH 135 — SHARED CSV IMPORT / ACCESSIBLE BUSINESS-STYLED FILE PICKER
+Date: 2026-10-12
+Baseline: FULL Frontend133 + FULL Backend072
+New authoritative code: FULL Frontend134 + identical FULL Backend072
+
+AUDIT FINDING AND CONFIRMED ROOT CAUSE
+- Canonical tenant audit v93, 2026-09-28 11:35 CEST Storage Locations CSV import: native browser Choose File / No file chosen control clashes with the application visual controls; user asked for a consistent app-styled file picker while preserving real file selection and accessibility.
+- Batch065 already introduced EnterpriseFilePicker for Inventory Controls Supplier Catalogs/Attachments only; other native file-input surfaces explicitly remained untouched.
+- Unmodified Frontend133 src/components/imports/InventoryCsvImportPanel.tsx still exposes a raw visible input type=file for CSV import. The shared panel is rendered by StorageLocationsPage and SuppliersPage, so the issue affects both audited import surfaces.
+- The Batch135 focused test fails against untouched Frontend133 on missing hidden-native-control keyboard handling, confirming that this particular UX gap was not previously corrected.
+
+SURGICAL IMPLEMENTATION
+1. src/components/imports/InventoryCsvImportPanel.tsx: retain the same native File input, ref, accept=.csv,text/csv, onChange=handleFile, and permission/loading/committed disabled boundary, but hide native visual chrome and remove its duplicate tab/assistive representation. Add one ordinary application-styled, keyboard-accessible Choose file button which calls the native input's click exactly once; one adjacent aria-live status reports the actual selected filename or localized No file selected, with long-name wrapping. Opening the file dialog skips the global action-feedback toast because no import has occurred.
+2. scripts/check-batch135-csv-file-picker.mjs (new): 38 focused AST+executable assertions checking the actual click handler against a mock input ref, input and trigger disabled equivalence, accessibility/translation, file change, parser, CSV cap, invalid preview semantics, commit guard, shared page callers and existing enterprise picker pattern.
+3. package.json: add npm script check:batch135-csv-file-picker.
+4. Inventory_Management_App_FIX_LOG_2026-10-06.txt: append this cumulative entry and embed exactly the standalone contents in full frontend.
+No translations changed: Choose file / No file selected already have EN/DE/ES/FR/HR catalog rows.
+
+UNCHANGED SAFETY BOUNDARIES
+- Uses browser's original File object, same extension and MIME accept restrictions, parseCsv and 2,000 row limit, preview/validate commit distinction, validation errors/export, Start Over value reset, parent stale-feedback cleanup, and explicit tenant import permissions.
+- No new API calls, request payloads, backend changes, SQL migrations or inventory mutations. Invalid preview stays WARNING; opening a file dialog never implies a successful import.
+- Native chooser is still invoked by a real user click and supports normal OS/browser file selection; only the displayed control changes.
+
+VALIDATION
+- Focused Batch135 guard against new frontend: 38/38 PASS; against untouched Frontend133: expected FAIL at legacy visible input.
+- 58 inherited regression scripts + Batch135 script: 59/59 PASS using Node22.16 test-only global TypeScript and unchanged Backend072 fixture. Includes multilingual tenant audits.
+- File TSX parse and isolated TypeScript transpilation PASS.
+- Frontend complete ZIP CRC, exact four-path delta parity, unchanged Backend072 SHA-256 and embedded/standalone cumulative FIX_LOG equality verified when packaging.
+- Not verified: full Node24 npm ci and production Vite build, real PostgreSQL integration, deployed desktop/mobile browser, actual OS file dialog or screen-reader acceptance. Regression tests do not establish production acceptance.
+
+CONTROLLED LIVE RETEST PENDING
+- Deploy compatible Frontend134 + Backend072. In Storage Locations and Suppliers CSV import, test mouse/keyboard activation of Choose file, empty/long filename display in each of five languages, reselect after Start Over, permission-denied state, invalid duplicate-name CSV preview (no success/commit), valid preview without mutation, and commit only with explicit authorization. Confirm browser/OS picker works on desktop and mobile.
+- Do not import tenant records merely to test picker visuals; preserve validation-only safety when possible.
+
+SOURCE OF TRUTH: complete Frontend134 + complete unchanged Backend072; original audit v93; cumulative FIX_LOG through Batch135.
+NEXT: Batch136 not started. Verify an actual current-source defect before editing, continue delivering full source ZIPs, changed files, docs, checksums, and all-in-one handoff package each batch.
+================================================================================
