@@ -2619,6 +2619,7 @@ export default function ProcurementRecommendationsPage() {
             {ui("Preview approval readiness")}
           </button>
           <button
+            data-skip-global-confirm="true"
             className="app-button app-button--primary"
             type="button"
             disabled={
@@ -2645,6 +2646,7 @@ export default function ProcurementRecommendationsPage() {
             {ui("Bulk approve")}
           </button>
           <button
+            data-skip-global-confirm="true"
             className="app-button app-button--primary"
             type="button"
             disabled={
@@ -2686,6 +2688,7 @@ export default function ProcurementRecommendationsPage() {
             {ui("Bulk defer")}
           </button>
           <button
+            data-skip-global-confirm="true"
             className="app-button app-button--danger"
             type="button"
             disabled={
@@ -3214,6 +3217,7 @@ export default function ProcurementRecommendationsPage() {
               ) : null}
               <div style={styles.actionRow}>
                 <button
+                  data-skip-global-confirm="true"
                   style={styles.primaryButton}
                   type="button"
                   disabled={
@@ -3253,6 +3257,7 @@ export default function ProcurementRecommendationsPage() {
                   {ui("Defer")}
                 </button>
                 <button
+                  data-skip-global-confirm="true"
                   style={styles.dangerButton}
                   type="button"
                   disabled={!canApproveRecommendations || Boolean(selectedDetail.detail?.current_conversion_open) || decisionMutation.isPending}
@@ -3725,6 +3730,7 @@ export default function ProcurementRecommendationsPage() {
               {ui("Preview scheduled run")}
             </button>
             <button
+              data-skip-global-confirm="true"
               style={styles.primaryButton}
               type="button"
               onClick={() =>
@@ -4223,6 +4229,7 @@ export default function ProcurementRecommendationsPage() {
                         <div style={styles.exceptionActionRow}>
                           {exception.code === "MISSING_SUPPLIER" && canViewSuppliers ? (
                             <button
+                              data-skip-global-confirm="true"
                               style={styles.secondaryButton}
                               type="button"
                               disabled={!canApproveRecommendations || !canManageProducts || !canViewSuppliers || !exceptionSupplierIds[exception.exception_key] || exceptionResolutionMutation.isPending}
@@ -4259,6 +4266,7 @@ export default function ProcurementRecommendationsPage() {
                               </button>
                               {exception.row?.detail?.can_enter_approval_review ? (
                                 <button
+                                  data-skip-global-confirm="true"
                                   style={styles.primaryButton}
                                   type="button"
                                   disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
@@ -4276,6 +4284,7 @@ export default function ProcurementRecommendationsPage() {
                                 </button>
                               ) : null}
                               <button
+                                data-skip-global-confirm="true"
                                 style={styles.dangerButton}
                                 type="button"
                                 disabled={!canApproveRecommendations || exceptionResolutionMutation.isPending}
@@ -4335,6 +4344,7 @@ export default function ProcurementRecommendationsPage() {
                 {ui("Cancel")}
               </button>
               <button
+                data-skip-global-confirm="true"
                 type="button"
                 style={confirmation.tone === "danger" ? styles.dangerButton : styles.primaryButton}
                 onClick={() => {

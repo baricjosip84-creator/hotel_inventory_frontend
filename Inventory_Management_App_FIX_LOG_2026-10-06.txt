@@ -10665,3 +10665,44 @@ PENDING / TARGETED LIVE TEST
 NEW AUTHORITATIVE CODE: Frontend116 + Backend072.
 NEXT BATCH: 118 NOT STARTED.
 ================================================================================
+
+
+================================================================================
+BATCH 118 — PROCUREMENT RECOMMENDATIONS SINGLE CUSTOM CONFIRMATION
+DATE: 2026-10-12
+BASELINE: Frontend116 + Backend072 (Batch117 complete)
+RESULT: Frontend117 + Backend072 (backend unchanged)
+
+AUDIT FINDING / CURRENT SOURCE REPRODUCTION
+- Tenant audit v93 (30 Sep 2026, Red Test Variant in Procurement Recommendations): Reject produced two confirmations in sequence: native browser "Confirm action: Reject?" then custom "Reject recommendation?"; user had to confirm twice. The second custom dialog already explains the actual action and is the appropriate sole confirmation. Approval/related review actions can be similarly double-prompted.
+- Frontend116 src/app/AppProviders.tsx installs a capturing global button handler that intercepts dangerous button labels such as Reject and Approve and opens an originalConfirm browser prompt. ProcurementRecommendationsPage.tsx opens a separate local requestConfirmation(...) modal for these buttons and its final modal confirmation. None of the nine local-confirm triggers or the final modal confirm was marked with the already-supported data-skip-global-confirm="true" opt-out.
+- The existing global opt-out is used elsewhere (e.g., Users page), so no global safety changes are needed. The targeted new focused guard FAILS on the untouched Frontend116 before editing because the ten local-confirm opt-out attributes are absent.
+
+SURGICAL CORRECTION — FRONTEND117 ONLY
+1. src/pages/ProcurementRecommendationsPage.tsx: add data-skip-global-confirm="true" to the nine buttons already invoking requestConfirmation for single approval, single rejection, bulk approval, bulk rejection, PO draft conversion, scheduled execution, supplier assignment, exception approval and exception rejection. Add the same attribute to the custom dialog's FINAL Confirm button. All ten retain their original actions, disabled gates, labels and styles.
+2. scripts/check-batch118-procurement-single-confirmation.mjs: new 55-assertion TSX AST/source guard verifying all nine triggers plus final custom confirm are protected, that only intended buttons receive the exemption, shared global guard still applies to other dangerous actions, original custom confirmation/cancel and protected mutation paths remain, and translated dialog titles remain.
+3. package.json: register check:batch118-procurement-single-confirmation.
+4. Full cumulative Inventory_Management_App_FIX_LOG_2026-10-06.txt: this appended Batch118 entry. The embedded frontend copy and separately delivered copy match byte-for-byte.
+
+NON-CHANGES / SECURITY AND DATA SAFETY
+- No change to existing decision API, server authorization, tenant isolation, audit, supplier PO conversion, scheduler, database schema, stock, stock movements, role permissions, statuses, translations or global action safety handler.
+- Dangerous buttons without local dialogs still receive the global browser confirmation. Each Procurement Recommendations operation using a custom dialog still requires positive confirmation within that dialog before its mutation callback can execute; Cancel/backdrop dismiss without mutation.
+- This fixes one source-verified double-confirmation flow. Browser behavior remains pending deployment acceptance.
+
+VERIFICATION — EXACT RESULTS
+- New focused guard before source edit: FAILED as expected on the missing opt-out (baseline reproduction).
+- New focused guard after edit: 55/55 assertions PASS.
+- Selected inherited + new + Procurement-specific scripts: 41/42 PASS. One FAILED: check-tenant-procurement-guided-workflow.mjs, expecting a retired Purchase Order supplier-send delivery-date source pattern. The exact same failure was reproduced independently on UNMODIFIED Frontend116. It is inherited and outside this procurement dialog patch; do NOT claim clean sweep, and do not reinterpret that single stale assertion as a new Batch118 regression.
+- Global tenant multilingual closure audit: PASS, 45/45 routes, 265 reachable source files, 14,308 five-language translation rows. Procurement Recommendations full-page multilingual check PASS.
+- Changed TSX isolated TypeScript transpilation diagnostic check: PASS.
+- Full frontend archive member/byte-difference and supplemental changed-files ZIP verified: 3 modified source/log/package files + 1 new guard (four paths). Complete ZIP CRC verified. Backend072 byte identical.
+
+PENDING / LIVE ACCEPTANCE
+- Clean Node24 npm ci, full project TypeScript and Vite production build, real PostgreSQL integration and deployed browser/mobile acceptance were NOT run. Current local Node22 and incomplete project dependencies cannot establish production readiness.
+- In a disposable controlled tenant, open Procurement Recommendations, select a recommendation safe to reject, click Reject and verify ONE application custom dialog (not a browser prompt); cancel it and confirm NO mutation, then explicitly confirm another disposable rejection and verify persisted rejection, audit/feedback and queue. Also test Approve, Bulk reject, bulk approval, exception Reject, supplier assignment, Create PO drafts and Execute run with dry-run/safe data only; these must retain original business eligibility and positive-confirmation gates. Verify EN/DE/ES/FR/HR UI and keyboard/mobile modal behavior.
+- Old check-tenant-procurement-guided-workflow.mjs needs a separate targeted review of its Purchase Order delivery-date guard and may need regression-contract repair after comparing with live contract.
+
+NEW AUTHORITATIVE SOURCE: Frontend117 + Backend072.
+NEXT: Batch119 NOT STARTED.
+PRODUCTION ACCEPTANCE: PENDING.
+================================================================================
