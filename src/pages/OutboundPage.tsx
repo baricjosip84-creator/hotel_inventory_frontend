@@ -835,7 +835,9 @@ export default function OutboundPage() {
     if (!emailCompose?.recipient_email.trim() || !emailCompose.subject.trim()) return;
     try {
       setError('');
-      const result = await apiRequest<{ message?: string }>(`/outbound/documents/${emailCompose.document_id}/send-email`, { method: 'POST', body: JSON.stringify({ recipient_email: emailCompose.recipient_email.trim(), subject: emailCompose.subject.trim(), message: emailCompose.message.trim(), confirmed: true }) });
+      // Preserve the backend's provider-aware result (sent versus Sandbox capture).
+      // A generic mutation toast here incorrectly says an inventory item was created.
+      const result = await apiRequest<{ message?: string }>(`/outbound/documents/${emailCompose.document_id}/send-email`, { method: 'POST', body: JSON.stringify({ recipient_email: emailCompose.recipient_email.trim(), subject: emailCompose.subject.trim(), message: emailCompose.message.trim(), confirmed: true }), skipMutationFeedback: true });
       setMessage(result.message || ui('Customer email sent.'));
       setEmailCompose(null);
       await Promise.all([

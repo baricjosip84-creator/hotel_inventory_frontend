@@ -11733,3 +11733,26 @@ REMAINING ACCEPTANCE
 - Historical UoM CASE=24 persistence and Custom Fields text-value persistence remain open for database-backed investigation. Clean Node24 dependency installation/production build, PostgreSQL integration, and mobile/desktop deployed acceptance remain unverified.
 NEXT: Batch146 NOT STARTED; continue from FULL FE144 + unchanged FULL BE072 and preserve all 11 individual release artifacts plus all-in-one package.
 ================================================================================
+
+================================================================================
+BATCH 146 — OUTBOUND DOCUMENT EMAIL: PROVIDER-ACCURATE FEEDBACK WITHOUT GENERIC ITEM TOAST
+Date: 2026-10-12
+================================================================================
+SOURCE / CONFIRMED DEFECT
+- Full cumulative Frontend surgical-fix-144 + unchanged full Backend surgical-fix-072, canonical Audit v93, entire cumulative FIX_LOG through Batch145.
+- Earlier Batch144 explicitly left Outbound document send-email toast outside scope. Unchanged FE144 OutboundPage.tsx sendPreviewedEmail uses apiRequest POST /outbound/documents/:id/send-email WITHOUT skipMutationFeedback, triggering unrelated shared generic `Item created successfully.` toast even though the page displays the backend's specific `result.message`.
+- Critically, real backend src/services/outbound/outboundDocumentService.js may return `Customer email captured in Mailtrap Sandbox`, NOT a customer-delivered email. Thus an unconditional 'Customer email sent successfully' toast would be false for Sandbox. The backend distinguishes provider-confirmed sent, Sandbox capture, failed delivery, ambiguous pending attempts and failed finalization.
+SURGICAL CHANGE (FRONTEND ONLY)
+1. src/pages/OutboundPage.tsx: Add `skipMutationFeedback: true` ONLY to the existing successful POST send-email request. Keep the exact URL, POST, confirmed:true body, recipient/subject/message validation and trim, and `setMessage(result.message || ui('Customer email sent.'))` unchanged. This retains the provider-aware backend response as the single visible success confirmation; no generic item-creation toast and no false sent claim for Sandbox capture.
+2. scripts/check-batch146-outbound-email-provider-feedback.mjs: 51 executable focused checks. Extract the actual TypeScript sendPreviewedEmail function, transpile and invoke with mocked API and state. Exercise successful sent, Mailtrap Sandbox capture, missing message fallback, rejected provider, missing recipient/subject, missing composer; verify response truth, exact request and skip flag, composer behavior and six cache refreshes; verify backend resend/authorization and distinct provider statuses.
+3. package.json: Register the focused guard without removing earlier scripts. Append this full engineering record to cumulative FIX_LOG; standalone/embedded/delta/bundle log bytes must match.
+VERIFICATION
+- Baseline FE144 reproduction: focused assertion `provider-aware call suppresses generic mutation toast` fails as expected: options.skipMutationFeedback undefined, expected true. Corrected source: 51/51 focused PASS.
+- Selected regression: all 69 inherited scripts plus new guard = 70/70 PASS, one combined local test run. Global multilingual closure PASS: 45/45 tenant routes, 266 reachable source files, 14,368 existing complete five-language catalog rows, placeholder parity and feedback boundaries. No new translation messages necessary.
+- Exactly four frontend changed/new files: OutboundPage.tsx, package.json, new focused script and the full cumulative FIX_LOG. Shared API resolver, other Outbound requests, backend routing, email provider, stock calculations, permissions and SQL remain untouched.
+- Full FE145, full unchanged BE072, delta ZIP, standalone documents, 11-member complete package, SHA256 and CRC checks verified; backend SHA256 2036cbc149b5c319911ec8fe72418361651ebcea2caaf799b58382adb0cf3e69.
+KNOWN LIMITS / OPEN WORK
+- The source-level checks mock the frontend send function and verify backend source invariants; no real email was sent, no backend database or browser workflow executed, and provider behavior is not asserted in live deployment.
+- Historical UoM CASE=24 persistence and Custom Fields text-value readback still require DB-backed inspection. Clean Node24 install/typecheck/Vite build, PostgreSQL integration, and deployed browser/mobile acceptance remain pending. The source-level tests ran with Node22 and a test-only TypeScript dependency symlink, excluded from ZIP.
+NEXT: Batch147 not started. Continue from FULL FE145 + full unchanged BE072, preserving cumulative fix history and returning full 11 individual artifacts and all-in-one bundle.
+================================================================================
