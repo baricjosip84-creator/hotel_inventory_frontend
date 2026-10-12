@@ -11473,3 +11473,39 @@ SAFE LIVE RETEST (ONLY AUTHORIZED TEST DATA)
 STATUS: SOURCE-CORRECTED; SELECTED REGRESSION-VERIFIED; PRODUCTION ACCEPTANCE PENDING.
 NEXT: Batch 137 not started. Reconcile remaining audit v93 issues against full Frontend135 + Backend072; do not repeat previous fixes.
 ================================================================================
+
+================================================================================
+BATCH 137 — ADVANCED INVENTORY / CUSTOM FIELDS: PRODUCT NAME-FIRST ASSIGNMENT PICKER
+Date: 2026-10-12
+================================================================================
+AUTHORITY AND CURRENT-SOURCE REPRODUCTION
+- Baseline complete full Frontend135 + unchanged complete full Backend072, directly from previous cumulative source archives; historical tenant audit v93; most recent embedded cumulative FIX_LOG through Batch136.
+- Historical audit v93, 2026-09-28 14:02 CEST, Custom fields > Use fields on products: selected product dropdown showed long LEGACY identifiers first, obscuring the normal product name. It asked for name-first readability in that product assignment picker.
+- Current Frontend135 InventoryCapabilitiesPage.tsx still had products.map(row => ({ id: row.id, label: `${row.sku} — ${row.name}` })) in CustomFieldsPanel.entityConfigs.product. Batch130 had improved a different Variants parent selector but left Custom Fields unchanged. The cumulative log had no Custom Fields product-option fix.
+- The new source-based executable guard fails on untouched Frontend135 at the old SKU-first mapping (14 prior checks PASS, then expected FAIL). It passes after this single-purpose correction.
+
+SURGICAL FRONTEND CODE CHANGE
+1. src/pages/InventoryCapabilitiesPage.tsx: in CustomFieldsPanel.entityConfigs.product ONLY, replace SKU-first manual interpolation with the existing Batch130-tested productOptionLabel(row, true) helper, resulting in readable 'Test Product EI — LEGACY-...' instead of 'LEGACY-... — Test Product EI'. Preserve row.id for the option and all queries, PUT/GET entity IDs, permission and optimistic-version safeguards. Existing supplier/location/shipment/purchase-order option wording is untouched; no new translation strings.
+2. scripts/check-batch137-custom-field-product-picker.mjs: new executable focused regression with 36/36 assertions, including helper execution, real current-source mapping and guards, long SKU and UTF-8 cases, stable UUID selection, value save versions, permission gates, unchanged other selectors, and backend route enforcement.
+3. package.json: register check:batch137-custom-field-product-picker.
+4. Inventory_Management_App_FIX_LOG_2026-10-06.txt: restore most recent previous EMBEDDED log through Batch136 (rather than the separately materialized stale Batch135 log), append Batch137, and make embedded/standalone/complete release copies identical.
+
+BUSINESS SAFETY AND NON-CHANGES
+- No frontend mutation, backend route, PostgreSQL schema, inventory stock/price, custom-field definition or value, optimistic concurrency, tenant permission or query-key change. The change is display-label order only, with actual product ID and full SKU preserved.
+- Other selectors remain unchanged. No new translation keys or changes to the five-language catalog. It does not claim resolution of the separate historical plain-text custom-field value-save failure, which requires DB/browser investigation.
+- The mismatch discovered while preparing the bundle (standalone FIX_LOG through Batch135 vs FULL Frontend135 embedded FIX_LOG through Batch136) is corrected in the Batch137 outputs by choosing the latest cumulative content and synchronizing both copies. No Batch136 content dropped.
+
+TESTS
+- New guard on untouched Frontend135: expected FAIL after 14/36 successful preliminary checks at source-mapping assertion.
+- New guard on corrected Frontend136: 36/36 PASS.
+- 60 selected inherited regression scripts + new Batch137 = 61/61 PASS. Includes five-language global tenant closure, Backend072 fixture checks, Custom Fields Batch133/134, Variants Batch128/129/130, and previous Batch135/136 file-picker regression checks.
+- TSX isolated transpilation: zero diagnostics (part of guard). Node 22.16 test runtime with test-only TypeScript symlink, which is not packaged.
+- Final release builder verifies full ZIP CRC, byte-wise exact changed-file set/parity, standalone and embedded cumulative FIX_LOG, Backend072 byte identity, and 11-file all-in-one package checksum manifest.
+
+PENDING PRODUCTION ACCEPTANCE
+- Clean supported Node24 npm ci / full typecheck/Vite build, actual PostgreSQL integration, deployed browser/mobile/screen-reader acceptance remain NOT VERIFIED.
+- After CI/deployment, Custom Fields > Use fields on Products, choose Test Product EI; verify name appears first and SKU remains visible, correct actual product custom-field values load/save (only with authorized test data), and other entity types remain correct. Test at least one very long LEGACY SKU, Croatian and another locale, read-only role, narrow viewport. Verify this change does not falsely imply correction of the separately recorded value persistence failure.
+
+SOURCE OF TRUTH AFTER THIS BATCH: Complete Frontend136 + complete byte-identical Backend072; full cumulative FIX_LOG through Batch137 (both locations identical), historical Audit v93 unchanged.
+NEXT: Batch138 NOT STARTED; inspect genuinely unresolved findings before editing. Continue returning full apps, changed-files ZIP, complete updated documents, manifest, and all-in-one ZIP.
+================================================================================

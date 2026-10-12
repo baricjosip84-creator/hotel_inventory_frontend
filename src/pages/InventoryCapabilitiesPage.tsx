@@ -831,7 +831,8 @@ function CustomFieldsPanel({
   const [error, setError] = useState<string | null>(null);
 
   const entityConfigs: Record<EntityType, { label: string; plural: string; rows: Array<{ id: string; label: string }> }> = {
-    product: { label: ui("Product"), plural: 'products', rows: products.map((row) => ({ id: row.id, label: `${row.sku} — ${row.name}` })) },
+    // Keep the product name legible before long legacy SKUs in the Custom Fields assignment picker.
+    product: { label: ui("Product"), plural: 'products', rows: products.map((row) => ({ id: row.id, label: productOptionLabel(row, true) })) },
     supplier: { label: ui("Supplier"), plural: 'suppliers', rows: suppliers.map((row) => ({ id: row.id, label: row.name })) },
     storage_location: { label: ui("Storage location"), plural: 'storage locations', rows: locations.map((row) => ({ id: row.id, label: row.path || row.name })) },
     shipment: { label: ui("Shipment"), plural: 'shipments', rows: shipments.map((row) => ({ id: row.id, label: row.po_number || row.qr_code || ui("Reference unavailable") })) },
