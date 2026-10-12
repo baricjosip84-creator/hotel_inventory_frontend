@@ -213,6 +213,22 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Customer order cancelled successfully.';
   }
 
+  // Batch143: outbound order lifecycle operations are not generic item creation.
+  // Keep each successful POST exact to one order action and preserve the
+  // existing page-specific inline confirmation and stock/permission guards.
+  const outboundOrderAction = normalizedMethod === 'POST'
+    ? normalizedPathOnly.match(/^\/outbound\/orders\/[^/]+\/(confirm|start-picking|pick|mark-packed|reset-picks|dispatch)$/)
+    : null;
+  if (outboundOrderAction) {
+    const action = outboundOrderAction[1];
+    if (action === 'confirm') return 'Customer order confirmed and stock reserved.';
+    if (action === 'start-picking') return 'Customer order is ready for picking.';
+    if (action === 'pick') return 'Customer order pick recorded successfully.';
+    if (action === 'mark-packed') return 'Customer order marked packed successfully.';
+    if (action === 'reset-picks') return 'Customer order picks cleared successfully.';
+    return 'Customer order packed stock dispatched successfully.';
+  }
+
   // Batch142: customer-return lifecycle actions are not generic item creation.
   // Match only exact successful POST routes, keeping creation, stock receipt,
   // and cancellation feedback distinct from orders and document actions.

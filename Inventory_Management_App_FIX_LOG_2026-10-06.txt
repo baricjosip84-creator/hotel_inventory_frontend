@@ -11656,3 +11656,29 @@ UNRESOLVED / ACCEPTANCE
 - Clean Node24 npm ci, TS typecheck/Vite production build, PostgreSQL integration, and deployed browser/mobile acceptance NOT VERIFIED. Likewise actual customer return lifecycle transitions not live-tested in this batch.
 - Continue next on FULL hotel-inventory-frontend_surgical-fix-141.zip and byte-identical FULL hotel-inventory-backend_surgical-fix-072.zip. Batch143 NOT STARTED. Deliver both FULL application ZIPs, changed-files supplement, all audit/log/testing/handoff TXT files and bundled complete release for every batch.
 ================================================================================
+
+================================================================================
+BATCH 143 — OUTBOUND CUSTOMER ORDERS: ACCURATE SIX-STEP WORKFLOW SUCCESS FEEDBACK
+Date: 2026-10-12
+================================================================================
+BASELINE AND EVIDENCE
+- Authoritative full source: hotel-inventory-frontend_surgical-fix-141.zip + unchanged hotel-inventory-backend_surgical-fix-072.zip; canonical tenant Audit v93; cumulative FIX_LOG through Batch142. Full previous source ZIP and unchanged backend checksum verified.
+- Audit v93 Outbound Customer Orders documents Confirm & Reserve Stock and related customer order lifecycle controls (around line 15868) and recurring generic 'Item created successfully' workflow toast defects elsewhere. The exact latest Frontend141 API success resolver had the order /cancel exception from Batch140, but no mappings for POST /outbound/orders/:id/{confirm,start-picking,pick,mark-packed,reset-picks,dispatch}. Those six OutboundPage.tsx mutation calls use the global request helper, leading to incorrect item-creation success feedback even when the page's inline text is correct. The untouched resolver was executed against the new focused guard and failed as expected: generic Item created rather than order confirmed and stock reserved. This is a SOURCE-CONFIRMED remaining defect, not a claim of live deployment testing.
+- All six action routes and their POST permissions, validation and version checks are present in the unchanged backend outbound.js routes. Dispatch is stock-affecting, not generic item creation.
+SURGICAL IMPLEMENTATION
+1. src/lib/api.ts: Add exact action-scoped successful POST resolver match for /outbound/orders/:id/confirm, start-picking, pick, mark-packed, reset-picks and dispatch. Return separate, accurate success labels for each; do not match GET/PUT, nested documents, other resources or order cancellation.
+2. src/i18n/tenantUiTranslations.ts: Add six unique five-language translation entries (English, German, Spanish, French, Croatian) for the exact success labels.
+3. package.json: Register check:batch143-customer-order-workflow-feedback.
+4. scripts/check-batch143-customer-order-workflow-feedback.mjs: Add runnable focused guard. It parses and transpiles TS/TSX, executes the actual API success-message resolver for all six action routes, checks route/method/query isolation, restores previous toast outcomes, verifies six five-language translation rows and UI/backend safeguarding conditions. Focused assertions 133/133 PASS. Untouched baseline with original api.ts intentionally FAILS at generic 'Item created successfully'.
+5. Cumulative FIX_LOG appended through Batch143, preserving every previous entry. Standalone, frontend-embedded, changed-files and all-in-one copies byte-identical.
+VERIFICATION
+- Untouched baseline: FAIL as expected. Actual 'Item created successfully.', expected 'Customer order confirmed and stock reserved.'
+- Edited focused: 133/133 PASS.
+- Selected regression sweep: 66 inherited scripts plus Batch143 = 67/67 PASS, including global five-language closure audit. Node v22.16 and test-only TypeScript dependency/symlink; not a clean production build.
+- Exact delta: src/lib/api.ts, src/i18n/tenantUiTranslations.ts, package.json, new scripts/check-batch143-customer-order-workflow-feedback.mjs, cumulative FIX_LOG. Full frontend cumulative release and five-path changed ZIP parity verified. Backend072 unchanged with identical SHA256. Complete 11-file ZIP integrity verified.
+- OutboundPage.tsx and backend routes/controllers untouched. Existing order stock reservation, picking/serial/lot validation, mark-packed, reset-picks and dispatch logic, permissions, errors, optimistic concurrency, inline feedback and cache invalidation unaffected.
+LIMITATIONS / OPEN ITEMS
+- The historical UoM CASE=24 persistence and Custom Fields text-value readback require DB/request-response verification; not fixed. No stock or backend functional issues are claimed resolved here.
+- Clean Node24 npm ci/TS typecheck/Vite build, PostgreSQL integration, and deployed desktop/mobile browser workflow acceptance NOT VERIFIED. All checks here are local source-level selected regression tests.
+- Next authoritative complete cumulative source: hotel-inventory-frontend_surgical-fix-142.zip + full unchanged hotel-inventory-backend_surgical-fix-072.zip. Batch144 NOT STARTED.
+================================================================================
