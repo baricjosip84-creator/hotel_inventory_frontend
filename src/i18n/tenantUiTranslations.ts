@@ -2,6 +2,12 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // Batch 128: human-first variant creation and optional SKU override.
+  ["Custom variant SKU", "Benutzerdefinierte Varianten-SKU", "SKU de variante personalizado", "SKU de variante personnalisé", "Prilagođena SKU oznaka varijante"],
+  ["Enter a variant name to generate a SKU.", "Geben Sie einen Variantennamen ein, um eine SKU vorzuschlagen.", "Introduzca un nombre de variante para generar una SKU.", "Saisissez un nom de variante pour générer un SKU.", "Unesite naziv varijante za izradu SKU oznake."],
+  ["Use suggested SKU", "Vorgeschlagene SKU verwenden", "Usar SKU sugerido", "Utiliser le SKU suggéré", "Koristi predloženu SKU oznaku"],
+  ["Edit SKU", "SKU bearbeiten", "Editar SKU", "Modifier le SKU", "Uredi SKU oznaku"],
+  ["The SKU is suggested from the parent and variant name. You can edit it if needed; duplicates are checked when saving.", "Die SKU wird aus dem übergeordneten Produkt und dem Variantennamen vorgeschlagen. Sie können sie bei Bedarf ändern; doppelte SKU werden beim Speichern geprüft.", "La SKU se propone según el producto principal y el nombre de la variante. Puede editarla si es necesario; los duplicados se comprueban al guardar.", "Le SKU est proposé à partir du produit parent et du nom de la variante. Vous pouvez le modifier au besoin ; les doublons sont vérifiés lors de l’enregistrement.", "SKU oznaka predlaže se prema nadređenom proizvodu i nazivu varijante. Po potrebi je možete urediti; duplikati se provjeravaju pri spremanju."],
   // Batch 126: business-readable success feedback for product unit conversion saves/updates.
   ["Unit conversion saved successfully.", "Einheitenumrechnung erfolgreich gespeichert.", "Conversión de unidad guardada correctamente.", "Conversion d’unité enregistrée avec succès.", "Pretvorba mjerne jedinice uspješno je spremljena."],
   ["Unit conversion updated successfully.", "Einheitenumrechnung erfolgreich aktualisiert.", "Conversión de unidad actualizada correctamente.", "Conversion d’unité mise à jour avec succès.", "Pretvorba mjerne jedinice uspješno je ažurirana."],

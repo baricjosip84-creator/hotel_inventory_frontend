@@ -11092,3 +11092,45 @@ REQUIRED TARGETED LIVE BROWSER ACCEPTANCE
 AUTHORITATIVE SOURCE AFTER THIS BATCH: FULL Frontend126 + FULL unchanged Backend072.
 NEXT: Batch128 NOT STARTED; verify any further historical audit candidate against this newest cumulative source and FIX_LOG.
 ================================================================================
+
+
+================================================================================
+BATCH 128 — ADVANCED INVENTORY / VARIANTS: NAME-FIRST SUGGESTED SKU
+DATE: 2026-10-12
+BASELINE: Complete Frontend126 + unchanged complete Backend072 (Batch127 completed)
+RESULT: Complete Frontend127 + unchanged complete Backend072
+
+ORIGINAL AUDIT FINDING / CURRENT-SOURCE VALIDATION
+- Audit v93, 2026-09-28 ~16:30 CEST: Variant SKU was mandatory and manually invented, with a technical form that is confusing to ordinary inventory users. Auditor requested Variant name as the main field and automatic SKU generation by default with an optional administrator-friendly edit control.
+- Verified unmodified Frontend126 InventoryCapabilitiesPage.tsx still required !sku.trim() to enable Create variant and presented a manual SKU input before Variant name. No automatic suggestion existed. Frontend and Backend correctly already exclude variant children from parent eligibility (previously fixed); that safeguard is retained.
+- New focused Batch128 guard fails on unmodified Frontend126 at missing suggestVariantSku function; passes after the fix. Not reimplementing previously closed parent eligibility or refresh fixes.
+
+EXACT SURGICAL CHANGES — COMPLETE FRONTEND127
+1. src/pages/InventoryCapabilitiesPage.tsx: add a pure bounded suggestVariantSku(parentSku, variantName, usedSkus) function, making a readable uppercase alphanumeric/hyphen suggestion from the selected top-level parent SKU and variant name, with accent normalization and fallback for names without Latin characters. Consult the current products and variants datasets for case-insensitive collisions and append -2/-3 etc to avoid known duplicate suggestions. Backend tenant uniqueness remains authoritative (including concurrent changes).
+2. Move Variant name ahead of the technical SKU field. Default to showing the generated SKU as an accessible output. A clearly optional Edit SKU button reveals a custom SKU input and a Use suggested SKU button restores automatic mode. A parent switch or successful create clears stale manual override. Empty name/parent and missing permission still disable Create variant; submission passes the selected effective SKU into the SAME POST endpoint and payload structure.
+3. src/i18n/tenantUiTranslations.ts: add five all-language EN/DE/ES/FR/HR rows for the new help and manual-mode controls; no existing translations removed.
+4. scripts/check-batch128-variant-auto-sku.mjs (NEW): executable extracted TypeScript SKU generator test, collision/boundary/unicode cases, UI/permission/endpoint/parent-eligibility guards and five-language catalog checks.
+5. package.json: register check:batch128-variant-auto-sku.
+6. Update the same CUMULATIVE FIX_LOG through Batch128 and ensure standalone TXT is byte-identical to the embedded file in complete Frontend127.
+
+SAFE NON-CHANGES
+- Backend072, migrations, tenant and product access controls, source parent exclusions, server VARIANT_PARENT_INVALID and required-field/tenant SKU uniqueness, product/variant storage, stock, barcodes, attributes serialization and product cost inheritance are unchanged.
+- Attributes are still free-form and the historical request for structured attribute rows is NOT completed by Batch128. No claimed production acceptance. Suggested SKUs are suggestions, NOT reservations; live concurrent duplicates are still rejected by the backend.
+
+VERIFICATION ACTUALLY RUN
+- Baseline reproduction: new focused check FAILS on unmodified Frontend126 at missing SKU suggestion helper.
+- Batch128 focused: 37/37 PASS including execution of actual transpiled source helper on blank, simple, accented, unicode, punctuation, duplicate-collision and long-input cases; TypeScript parser/transpiler checks, existing API and permission guard assertions and five-language UI checks.
+- 51/51 inherited selected scripts PASS; new Batch128 focused script separately PASS = 52/52 selected checks collectively. The inherited sweep was logged through the final inherited script; a bulk command time limit interrupted the runner before appending its final summary, so each result is reported from its actual completed output, and the Batch128 focused script was rerun separately. No tests excluded.
+- Global tenant multilingual closure: PASS (45/45 routes, 265 reachable files, 14,327 unique complete five-language translation rows; placeholder parity).
+- Release ZIP CRC, exact full frontend delta, changed-files parity, standalone and embedded FIX_LOG identity, unchanged backend full-source SHA-256 checked during packaging.
+- NOT PERFORMED: clean Node24 npm ci, full project TypeScript typecheck/Vite build, real PostgreSQL integration, deployed-browser/mobile acceptance.
+
+TARGETED LIVE ACCEPTANCE REQUIRED
+- Deploy compatible Frontend127 with unchanged Backend072. Advanced Inventory > Variants: select a normal parent, enter a variant name, confirm suggested SKU appears and Create variant activates without typing an SKU. Create on controlled test product, verify stock/product/variant list, persistence and KPI refresh.
+- Create a second variant with the same name under the same parent and confirm suggested suffix, or use Edit SKU and verify custom override. Check backend rejects concurrent duplicate SKU with a meaningful message.
+- Switch parents after editing SKU and verify stale manual override resets to new suggested SKU. Test empty parent/name and readonly/no-write role; barcode and existing Attributes still optional; cannot choose a variant as its own parent.
+- Verify all five tenant languages, keyboard focus, mobile layouts, and that unrelated product create and existing variants remain unchanged.
+
+NEW AUTHORITATIVE SOURCE: FULL Frontend127 + FULL unchanged Backend072.
+NEXT: Batch129 NOT STARTED; verify historical audit candidate against current code and cumulative FIX_LOG.
+================================================================================

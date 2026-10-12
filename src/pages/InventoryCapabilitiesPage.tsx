@@ -1024,19 +1024,91 @@ function LandedCostPanel({ shipments, canWrite }: { shipments: Shipment[]; canWr
   </section>;
 }
 
+// A human-readable variant name can propose a SKU without requiring staff to
+// invent a technical identifier. The backend still enforces tenant-wide SKU uniqueness.
+function suggestVariantSku(parentSku: string, variantName: string, usedSkus: readonly string[]): string {
+  const slug = (value: string, maxLength: number) => value.normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, maxLength)
+    .replace(/-+$/g, '');
+  if (!variantName.trim()) return '';
+  const parentPart = slug(parentSku, 28) || 'PRODUCT';
+  const variantPart = slug(variantName, 22) || 'VARIANT';
+  const base = `${parentPart}-${variantPart}`;
+  const taken = new Set(usedSkus.map((value) => value.trim().toUpperCase()));
+  if (!taken.has(base)) return base;
+  for (let suffix = 2; suffix <= 9999; suffix += 1) {
+    const suggestion = `${base}-${suffix}`;
+    if (!taken.has(suggestion)) return suggestion;
+  }
+  return '';
+}
+
 function VariantsPanel({ products, canWrite, canReadStock, canWriteProducts, canReadSuppliers, onChanged }: { products: Product[]; canWrite: boolean; canReadStock: boolean; canWriteProducts: boolean; canReadSuppliers: boolean; onChanged: () => void }) {
   const { locale, ui } = useAppTranslation();
   const qc = useQueryClient();
   const [parentId, setParentId] = useState('');
   const [sku, setSku] = useState('');
+  const [editSku, setEditSku] = useState(false);
   const [name, setName] = useState('');
   const [barcode, setBarcode] = useState('');
   const [attributes, setAttributes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const variants = useQuery({ queryKey: ['product-variants'], queryFn: () => apiRequest<Variant[]>('/inventory-capabilities/variants') });
-  const create = useMutation({ mutationFn: () => apiRequest(`/inventory-capabilities/products/${parentId}/variants`, { method: 'POST', body: JSON.stringify({ sku, name, barcode: barcode || null, attributes: parseAttributes(attributes) }) }), onSuccess: () => { setSku(''); setName(''); setBarcode(''); setAttributes(''); setError(null); void qc.invalidateQueries({ queryKey: ['product-variants'] }); void qc.invalidateQueries({ queryKey: ['inventory-capabilities-overview'] }); onChanged(); }, onError: (e) => setError(messageFrom(e, ui("Unable to create variant."), ui)) });
   const parents = products.filter((p) => !p.parent_product_id);
-  return <section className="section" style={panelStyle}><div className="section__title">{ui("Product variants")}</div><div className="card"><p className="card__subtext">{ui("A variant is created as a real product underneath a parent. That means existing stock, barcodes, shipments and movements can use it immediately.")}</p>{canWriteProducts && !canReadSuppliers ? <div className="form-error">{ui("Supplier read access is required to create a variant because supplier settings can be inherited from its parent product.")}</div> : null}<form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} style={formGridStyle}><ProductSelect products={parents} value={parentId} onChange={setParentId} label={ui("Parent product")} /><label>{ui("Variant SKU")}<input value={sku} onChange={(e) => setSku(e.target.value)} /></label><label>{ui("Variant name")}<input value={name} onChange={(e) => setName(e.target.value)} placeholder={ui("T-shirt / Red / M")} /></label><label>{ui("Barcode")}<input value={barcode} onChange={(e) => setBarcode(e.target.value)} /></label><label>{ui("Attributes")}<input value={attributes} onChange={(e) => setAttributes(e.target.value)} placeholder={ui("Color=Red, Size=M")} /></label><button className="button" disabled={!canWrite || !parentId || !sku.trim() || !name.trim() || create.isPending}>{create.isPending ? ui("Creating…") : ui("Create variant")}</button></form>{error ? <div className="form-error">{error}</div> : null}</div><div className="card" style={tableWrapStyle}>{variants.isLoading ? <div className="muted">{ui("Loading product variants…")}</div> : null}{variants.isError ? <div className="form-error">{messageFrom(variants.error, ui("Unable to load product variants."), ui)}</div> : null}<table><thead><tr><th>{ui("Parent")}</th><th>{ui("SKU")}</th><th>{ui("Variant")}</th><th>{ui("Attributes")}</th><th>{ui("Stock")}</th></tr></thead><tbody>{!variants.isLoading && !variants.isError && !(variants.data || []).length ? <EmptyTableRow colSpan={5} message={ui("No product variants have been created yet.")} /> : null}{(variants.data || []).map((v) => <tr key={v.id}><td>{v.parent_product_name}</td><td>{v.sku}</td><td>{v.name}</td><td>{Object.entries(v.variant_attributes || {}).map(([k,val]) => `${k}: ${String(val)}`).join(', ') || '-'}</td><td>{canReadStock && v.current_stock_quantity !== null && v.current_stock_quantity !== undefined ? formatLocalizedNumber(Number(v.current_stock_quantity), locale) : ui("Unavailable")}</td></tr>)}</tbody></table></div></section>;
+  const parent = parents.find((p) => p.id === parentId);
+  const suggestedSku = suggestVariantSku(parent?.sku || '', name, [
+    ...products.map((product) => product.sku),
+    ...(variants.data ?? []).map((variant) => variant.sku),
+  ]);
+  const effectiveSku = editSku ? sku.trim() : suggestedSku;
+  const create = useMutation({
+    mutationFn: () => apiRequest(`/inventory-capabilities/products/${parentId}/variants`, { method: 'POST', body: JSON.stringify({ sku: effectiveSku, name, barcode: barcode || null, attributes: parseAttributes(attributes) }) }),
+    onSuccess: () => {
+      setSku(''); setEditSku(false); setName(''); setBarcode(''); setAttributes(''); setError(null);
+      void qc.invalidateQueries({ queryKey: ['product-variants'] });
+      void qc.invalidateQueries({ queryKey: ['inventory-capabilities-overview'] });
+      onChanged();
+    },
+    onError: (e) => setError(messageFrom(e, ui('Unable to create variant.'), ui)),
+  });
+  const changeParent = (id: string) => { setParentId(id); setEditSku(false); setSku(''); setError(null); };
+  return <section className="section" style={panelStyle}>
+    <div className="section__title">{ui('Product variants')}</div>
+    <div className="card">
+      <p className="card__subtext">{ui('A variant is created as a real product underneath a parent. That means existing stock, barcodes, shipments and movements can use it immediately.')}</p>
+      {canWriteProducts && !canReadSuppliers ? <div className="form-error">{ui('Supplier read access is required to create a variant because supplier settings can be inherited from its parent product.')}</div> : null}
+      <form onSubmit={(e) => { e.preventDefault(); if (canWrite && parentId && name.trim() && effectiveSku && !create.isPending) create.mutate(); }} style={formGridStyle}>
+        <ProductSelect products={parents} value={parentId} onChange={changeParent} label={ui('Parent product')} />
+        <label>{ui('Variant name')}<input value={name} onChange={(e) => setName(e.target.value)} placeholder={ui('T-shirt / Red / M')} /></label>
+        <div style={{ display: 'grid', gap: 6 }}>
+          <span style={{ fontWeight: 700 }}>{ui('Variant SKU')}</span>
+          {editSku
+            ? <label>{ui('Custom variant SKU')}<input value={sku} onChange={(e) => setSku(e.target.value)} autoComplete="off" /></label>
+            : <output aria-live="polite" style={{ overflowWrap: 'anywhere', fontWeight: 700 }}>{suggestedSku || ui('Enter a variant name to generate a SKU.')}</output>}
+          <button type="button" className="button button--secondary" disabled={!canWrite || create.isPending} onClick={() => { if (editSku) { setEditSku(false); setSku(''); } else { setSku(suggestedSku); setEditSku(true); } }}>
+            {editSku ? ui('Use suggested SKU') : ui('Edit SKU')}
+          </button>
+          <small className="muted">{ui('The SKU is suggested from the parent and variant name. You can edit it if needed; duplicates are checked when saving.')}</small>
+        </div>
+        <label>{ui('Barcode')}<input value={barcode} onChange={(e) => setBarcode(e.target.value)} /></label>
+        <label>{ui('Attributes')}<input value={attributes} onChange={(e) => setAttributes(e.target.value)} placeholder={ui('Color=Red, Size=M')} /></label>
+        <button className="button" disabled={!canWrite || !parentId || !effectiveSku || !name.trim() || create.isPending}>{create.isPending ? ui('Creating…') : ui('Create variant')}</button>
+      </form>
+      {error ? <div className="form-error">{error}</div> : null}
+    </div>
+    <div className="card" style={tableWrapStyle}>
+      {variants.isLoading ? <div className="muted">{ui('Loading product variants…')}</div> : null}
+      {variants.isError ? <div className="form-error">{messageFrom(variants.error, ui('Unable to load product variants.'), ui)}</div> : null}
+      <table><thead><tr><th>{ui('Parent')}</th><th>{ui('SKU')}</th><th>{ui('Variant')}</th><th>{ui('Attributes')}</th><th>{ui('Stock')}</th></tr></thead><tbody>
+        {!variants.isLoading && !variants.isError && !(variants.data || []).length ? <EmptyTableRow colSpan={5} message={ui('No product variants have been created yet.')} /> : null}
+        {(variants.data || []).map((v) => <tr key={v.id}><td>{v.parent_product_name}</td><td>{v.sku}</td><td>{v.name}</td><td>{Object.entries(v.variant_attributes || {}).map(([k,val]) => `${k}: ${String(val)}`).join(', ') || '-'}</td><td>{canReadStock && v.current_stock_quantity !== null && v.current_stock_quantity !== undefined ? formatLocalizedNumber(Number(v.current_stock_quantity), locale) : ui('Unavailable')}</td></tr>)}
+      </tbody></table>
+    </div>
+  </section>;
 }
 
 const HIERARCHY_TYPE_RANK: Record<string, number> = { warehouse: 0, zone: 1, aisle: 2, rack: 3, shelf: 4, bin: 5 };
