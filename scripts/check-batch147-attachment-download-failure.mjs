@@ -28,7 +28,7 @@ function setup({allowed=true,pending=false,reject=null,downloadResult=undefined}
   function setDownloadError(value){errors.push(value);}
   async function downloadEnterpriseInventoryFile(url,filename){calls.push([url,filename]);if(reject)throw reject;return downloadResult;}
   const ui=(value)=>`translated:${value}`;
-  const fn=new Function('_setDownloadingId','setDownloadError','downloadEnterpriseInventoryFile','ui','getDownloadingId','let downloadingId = getDownloadingId(); const setDownloadingId = (value) => { downloadingId=value; _setDownloadingId(value); };\n'+compiled+'\nreturn downloadAttachment;')(setDownloadingId,setDownloadError,downloadEnterpriseInventoryFile,ui,()=>downloadingId);
+  const fn=new Function('_setDownloadingId','setDownloadError','downloadEnterpriseInventoryFile','ui','getDownloadingId','let downloadingId = getDownloadingId(); const activeDownloadRef = { current: null }; const setDownloadingId = (value) => { downloadingId=value; _setDownloadingId(value); };\n'+compiled+'\nreturn downloadAttachment;')(setDownloadingId,setDownloadError,downloadEnterpriseInventoryFile,ui,()=>downloadingId);
   return {fn,calls,ids,errors,item:{id:'id/one',original_filename:'invoice 2026.pdf',can_download:allowed}};
 }
 {

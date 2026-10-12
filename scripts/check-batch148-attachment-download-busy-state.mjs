@@ -56,7 +56,7 @@ check('metadata-only row still labeled accurately',()=>assert(source.includes("i
 check('download click still invokes original handler',()=>assert(source.includes('onClick={() => void downloadAttachment(item)}')));
 check('single-flight guard remains',()=>assert(source.includes('if (!attachment.can_download || downloadingId) return;')));
 check('pending set before async transport',()=>assert(source.indexOf('setDownloadingId(attachment.id)')<source.indexOf('await downloadEnterpriseInventoryFile(')));
-check('pending always reset after transport',()=>assert(source.includes('finally {\n      setDownloadingId(null);')));
+check('pending always reset after transport',()=>assert(/finally\s*\{\s*(?:activeDownloadRef\.current = null;\s*)?setDownloadingId\(null\);/.test(source)));
 check('failed download still displays inline error',()=>assert(source.includes("setDownloadError(ui('Failed to download attachment.'))")));
 check('success/failure downloads use same transport',()=>assert(source.includes('await downloadEnterpriseInventoryFile(')));
 check('download endpoint unchanged',()=>assert(source.includes('`/enterprise-inventory/attachments/${encodeURIComponent(attachment.id)}/download`')));

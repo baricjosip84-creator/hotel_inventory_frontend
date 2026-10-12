@@ -11821,3 +11821,24 @@ IMPORTANT LIMITATIONS / NEXT WORK
 - This is frontend isolated callback/runtime verification, not proof of a browser-level file selection or live upload. Clean Node24 npm ci/full TypeScript check/Vite build, real PostgreSQL integration, and deployed desktop/mobile browser testing remain pending. Local regression environment is Node22 and a test-only TypeScript symlink, excluded from release ZIP.
 - Historical UoM CASE=24 conversion persistence and Custom Fields text-value save/readback still need database-backed investigation. Avoid claiming those are solved. Continue only from full FE148 + unchanged full BE072, preserve unabridged FIX_LOG and deliver all 11 individual files plus complete bundle each release. Next Batch150 NOT STARTED.
 ================================================================================
+
+================================================================================
+BATCH 150 — ATTACHMENTS: SYNCHRONOUS SINGLE-DOWNLOAD LOCK CLOSES DOUBLE-CLICK RACE
+Date: 2026-10-12
+================================================================================
+AUTHORITATIVE SOURCE / CONFIRMED ISSUE
+- Complete cumulative Frontend surgical-fix-148 + complete Backend surgical-fix-072; canonical Tenant Audit v93 and unabridged FIX_LOG through Batch149.
+- Attachment download handler only checked React `downloadingId` before starting the async download. React state is not synchronously visible to a second click until React commits a rerender. Two rapid clicks invoking the same handler with unchanged render state can both enter the request, despite Batch148 disabling controls upon render. Source-level race reproduced in untouched FE148 using a deferred transport and two same-render calls. This was not a claim of duplicate downloads observed in deployed browser logs.
+SURGICAL CORRECTION — FRONTEND ONLY
+1. src/components/enterpriseInventory/tabs/AttachmentsTab.tsx: add `activeDownloadRef` initialized to null. The handler checks both the existing React busy state and the synchronous ref; it claims the ref BEFORE starting the asynchronous transport, releases it in finally after success/failure, and retains the existing UI loading state, translated local error feedback, download URL and filename, download buttons, permissions, record-switch handling and 8 MB upload restrictions.
+2. scripts/check-batch150-attachment-synchronous-download-lock.mjs: executable 46-assertion guard exercising the real transpiled handler with deliberately frozen React state and deferred promises. Verify rapid second click on same/different attachment issues no second GET; no spinner state theft; eventual success and error cleanup; subsequent retry; denied/no-download and already-busy gating; exact URL and original filename; all prior UI/backend permission invariants.
+3. scripts/check-batch147-attachment-download-failure.mjs: narrowly update inherited isolated-runtime harness with a fake ref, keeping all original download failure and cleanup assertions and expected test count.
+4. scripts/check-batch148-attachment-download-busy-state.mjs: narrowly update inherited finally-block source matcher to permit synchronous-ref cleanup before existing setDownloadingId(null). All 46 existing checks still pass.
+5. package.json: register check:batch150-attachment-synchronous-download-lock; append entire engineering record to unabridged cumulative FIX_LOG. No new translations, backend source changes, business rules, file transport or database migrations.
+EVIDENCE / LIMITATIONS
+- Untouched FE148 baseline: Batch150 focused test FAIL expected at missing immediate `activeDownloadRef.current` claim (actual null, expected attachment ID). Corrected FE149 focused assertions 46/46 PASS.
+- Full selected regression suite 73 inherited + new Batch150 = 74/74 PASS, including prior Batch147 and Batch148 guards. Multilingual closure 45/45 tenant routes PASS; existing messages retained. Node22 and a test-only TypeScript symlink were used; symlink is excluded from the shipped ZIP.
+- Exactly SIX changed/new frontend paths including full cumulative FIX_LOG. Full FE149 ZIP, complete unchanged BE072 ZIP, delta ZIP, 11-member full package, and continuation package verified for CRC and exact source delta, standalone/embedded FIX_LOG byte parity and SHA256.
+- No live simultaneous browser click, PostgreSQL or server test was performed. Clean Node24 install/typecheck/Vite build and deployed desktop/mobile acceptance remain pending. Historical UoM CASE=24 persistence and Custom Fields text-value save/readback still need DB-backed investigation.
+NEXT: Batch151 not started. Continue from FULL FE149 + unchanged FULL BE072; preserve unabridged FIX_LOG and provide all 11 individual release files plus complete bundle every batch.
+================================================================================

@@ -92,6 +92,8 @@ export function AttachmentsTab({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  // A ref closes the gap between a click and React committing the busy state.
+  const activeDownloadRef = useRef<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const canReadAttachments = hasPermission(TENANT_PERMISSIONS.ATTACHMENTS_READ);
@@ -179,6 +181,8 @@ export function AttachmentsTab({
 
   const downloadAttachment = async (attachment: EntityAttachment) => {
     if (!attachment.can_download || downloadingId) return;
+    if (activeDownloadRef.current !== null) return;
+    activeDownloadRef.current = attachment.id;
     setDownloadError(null);
     setDownloadingId(attachment.id);
     try {
@@ -192,6 +196,7 @@ export function AttachmentsTab({
       // consume the rejection so a click cannot become an unhandled promise.
       setDownloadError(ui('Failed to download attachment.'));
     } finally {
+      activeDownloadRef.current = null;
       setDownloadingId(null);
     }
   };
