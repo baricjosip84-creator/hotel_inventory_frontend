@@ -11224,3 +11224,41 @@ TARGETED LIVE RETEST PENDING
 NEW AUTHORITATIVE FULL SOURCE: Frontend129 + Backend072.
 NEXT: Batch131 NOT STARTED. Always compare historical audit vs current source and FIX_LOG before a new surgical correction; return all complete source ZIPs, changed-files ZIP, canonical audit, cumulative FIX_LOG, verification, regression results, handoffs, START HERE, SHA manifest, and the complete bundle.
 ================================================================================
+
+
+================================================================================
+BATCH 131 — ADVANCED INVENTORY / LANDED COST: FINALIZATION SUCCESS FEEDBACK
+DATE: 2026-10-12
+BASELINE: Full Frontend129 + unchanged Backend072 (Batch130 complete)
+RESULT: Full Frontend130 + unchanged Backend072
+
+AUDIT EVIDENCE / CURRENT SOURCE CONFIRMATION
+- Canonical audit v93, 2026-09-28 15:55, Advanced Inventory > Landed cost: production finalization for a received shipment succeeded, but showed the generic success toast "Item created successfully." rather than indicating landed cost was finalized.
+- Verified full Frontend129 src/pages/InventoryCapabilitiesPage.tsx calls POST /inventory-capabilities/landed-costs/finalize after preview, but src/lib/api.ts tenantMutationSuccessMessage lacks an exact match for that endpoint and falls back to "Item created successfully.".
+- Cumulative FIX_LOG through Batch130 contains no resolution of this specific finalization toast. The focused Batch131 test reproduces this incorrect fallback against the baseline before patching.
+
+CHANGES (five cumulative frontend paths; no backend changes)
+1. src/lib/api.ts: add narrowly scoped exact POST /inventory-capabilities/landed-costs/finalize mapping to "Landed cost finalized successfully." before the generic fallback; normalize method/case/query string in the existing helper. GET, preview POST, unrelated resources, UoM and variant actions cannot claim a landed-cost finalization.
+2. src/i18n/tenantUiTranslations.ts: add the finalization success message for EN/DE/ES/FR/HR; reuse the shared tenant toast translation pipeline, no new UI component or API contract.
+3. scripts/check-batch131-landed-cost-finalization-feedback.mjs (new): 35 focused source, executable success-message-function, route isolation, permission/preview-fingerprint, error-path and translation checks. Test fails on unmodified Frontend129, passes on new Frontend130.
+4. package.json: register check:batch131-landed-cost-finalization-feedback script.
+5. Inventory_Management_App_FIX_LOG_2026-10-06.txt: append this Batch131 record; the standalone and embedded copies must be byte-identical.
+
+NON-CHANGES / SAFETY
+- Backend072 unchanged byte-for-byte. No SQL, migrations, stock valuation/allocation arithmetic, API body, concurrency, permission enforcement, preview fingerprint, shipment received status, irreversible finalization, history requery, error behavior or existing business data affected.
+- A success toast is emitted only after an HTTP-successful mutation through existing shared API feedback. Error handling remains unchanged. Preview uses a different POST path and does not claim finalization.
+
+TESTS / LIMITATIONS
+- Focused guard: baseline FAIL (generic "Item created successfully."); corrected frontend 35/35 PASS.
+- Selected inherited regressions: 54/54 PASS; new Batch131 guard included for total 55/55 PASS. Global multilingual closure among selected scripts PASS.
+- Source TS/TSX parse and API isolated transpilation PASS. Node22.16 + globally installed TypeScript used for source regression tests.
+- Full clean Node24 npm ci/typecheck/Vite production build, real PostgreSQL service tests and deployed-browser/mobile acceptance are NOT VERIFIED.
+- Archive CRC, complete cumulative frontend delta, supplemental changed-files parity, standalone vs embedded FIX_LOG equality, unchanged Backend072 SHA-256 verified during packaging.
+
+LIVE RETEST REQUIRED
+- Deploy Frontend130 with unchanged Backend072. Select fully received shipment with no prior finalized landed cost and enter a controlled, authorized freight amount. Run Preview, inspect allocation, then only after business authorization finalize; confirm a translated "Landed cost finalized successfully." toast, visible finalized record and correct persistence on reload.
+- Ensure preview alone does not claim finalization. Test blocked finalization for pending/partial shipments and stale preview. Confirm failed finalization yields an error, never the success toast. Exercise five locales; avoid repeat finalization of historical shipment.
+
+NEW SOURCE OF TRUTH: Full Frontend130 + Full unchanged Backend072.
+NEXT: Batch132 not started; compare audit findings with updated FIX_LOG and exact source before another correction. ALWAYS provide both complete source ZIPs, changed-files ZIP, audit, cumulative FIX_LOG, verification, regression, short and detailed handoffs, START HERE, SHA manifest, and full release bundle.
+================================================================================

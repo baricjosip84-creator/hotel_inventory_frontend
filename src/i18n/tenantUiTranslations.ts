@@ -2,6 +2,8 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // Batch 131: a finalized landed-cost allocation is not a newly created item.
+  ["Landed cost finalized successfully.", "Einstandskosten erfolgreich finalisiert.", "Coste en destino finalizado correctamente.", "Coût rendu finalisé avec succès.", "Zavisni trošak uspješno je finaliziran."],
   // Batch 128: human-first variant creation and optional SKU override.
   ["Custom variant SKU", "Benutzerdefinierte Varianten-SKU", "SKU de variante personalizado", "SKU de variante personnalisé", "Prilagođena SKU oznaka varijante"],
   ["Enter a variant name to generate a SKU.", "Geben Sie einen Variantennamen ein, um eine SKU vorzuschlagen.", "Introduzca un nombre de variante para generar una SKU.", "Saisissez un nom de variante pour générer un SKU.", "Unesite naziv varijante za izradu SKU oznake."],

@@ -295,6 +295,12 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Variant created successfully.';
   }
 
+  // Batch131: finalizing allocated landed cost is not creating a generic item.
+  // The response is already committed when the shared mutation toast is emitted.
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/inventory-capabilities/landed-costs/finalize') {
+    return 'Landed cost finalized successfully.';
+  }
+
   if (normalizedMethod === 'POST' && normalizedPathOnly === '/inventory-capabilities/boms') {
     return 'BOM created successfully.';
   }
