@@ -10366,3 +10366,39 @@ LIVE ACCEPTANCE STILL REQUIRED
 CURRENT AUTHORITATIVE ENGINEERING BASELINE: Frontend108 + Backend072.
 PRODUCTION ACCEPTANCE: PENDING. Batch110 NOT STARTED.
 ================================================================================
+
+
+================================================================================
+BATCH 110 — ADMINISTRATION / PERMISSIONS: VIEWPORT-VISIBLE ACTION FEEDBACK
+DATE: 2026-10-12
+BASELINE: Frontend108 + Backend072
+RESULT: Frontend109 + Backend072 (backend unchanged)
+
+CANONICAL AUDIT FINDING
+- Audit v93, Administration > Permissions custom-role lifecycle, recorded successful save/reset/duplicate/edit/activate/deactivate actions whose success messages appeared in banners above the user's working scroll position. Users had to scroll upward to learn whether the operation completed.
+- Confirmed against Frontend108: RolePermissionEditor still renders successMessage/errorMessage directly underneath its header, above the long role editor. TenantPermissionsPage owns the business-specific results, and permission policy API mutations intentionally set skipMutationFeedback: true, so no generic viewport toast appears.
+
+IMPLEMENTED — FRONTEND109 ONLY
+- src/pages/TenantPermissionsPage.tsx: mirror changes to existing successMessage and errorMessage state to showTenantActionSuccess/showTenantActionError via useEffect. The shared AppProviders ActionFeedbackToasts surface displays the same specific feedback at a fixed viewport position, with automatic dismissal and an explicit close button. The existing inline status/error banners remain for in-page history.
+- React effects run only for nonempty messages and upon a state change; confirmation cancellation never sets a completion message. The existing tenant policy API suppression of generic mutation feedback remains intact, avoiding generic duplicate notices.
+- No changes to the policy API, permission calculation, role assignment, lifecycle guards, backend, database, translations or shared toast component.
+- package.json: new check:permissions-visible-action-feedback-v349353 command.
+- scripts/check-permissions-visible-action-feedback-surgical-fix-v349353.mjs: verifies integrated event wiring, status/errors, unchanged guards, preservation of inline feedback, TSX parsing, and executes the existing event helpers against a simulated window.
+
+VERIFICATION
+- New Batch110 focused regression: 34/34 PASS.
+- 52 selected surgical/Permissions/Audit checks executed: 51 PASS and 1 existing BASELINE FAILURE in check-tenant-custom-role-management.mjs. The test expects obsolete text `Reassign all users before deactivating this custom role.`; Frontend108 already uses the more accurate `Reassign or deactivate active users before deactivating this custom role.`. The same failure was reproduced on the untouched Frontend108 baseline. Do not count this stale-test failure as a new product regression or claim it passes.
+- Global five-language tenant audit: PASS; 45/45 routes, 264 reachable source files, 14,298 complete translation rows, placeholder parity.
+- Isolated TypeScript transpilation of modified TSX and existing actionFeedback module: zero diagnostics.
+- Full archive-member comparison, changed-files equivalence, backend checksum invariance, ZIP CRC and continuation manifest checked during packaging.
+
+NOT VERIFIED
+- Full clean Node24 dependency installation, project-wide typecheck/production Vite build, PostgreSQL integration or actual deployed-browser interactions. Current runtime has Node22 and no complete project dependencies.
+
+LIVE ACCEPTANCE
+- Under Administration > Permissions, scroll far down; save/reset a role; verify the specific success or error toast remains visible without scrolling. Repeat custom role creation, rename, duplicate, activate/deactivate, and delete on safe test roles.
+- Verify Cancel does not show a false success, invalid operations display a useful error, the toast disappears automatically/is dismissible, and the inline banner remains. Test Croatian and another locale. Preserve all role permission and assignment protections.
+
+CURRENT ENGINEERING SOURCE OF TRUTH: Frontend109 + Backend072.
+PRODUCTION ACCEPTANCE: PENDING. Batch111 NOT STARTED.
+================================================================================

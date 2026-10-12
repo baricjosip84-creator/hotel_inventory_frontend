@@ -467,7 +467,8 @@
     "check:toast-technical-request-id-v349338": "node scripts/check-toast-technical-request-id-surgical-fix-v349338.mjs",
     "check:action-center-alert-evidence-v349342": "node scripts/check-action-center-alert-evidence-localization-surgical-fix-v349342.mjs",
     "check:reports-product-selectors-v349344": "node scripts/check-reports-product-selectors-surgical-fix-v349344.mjs",
-    "check:reports-transfer-location-dropdown-v349343": "node scripts/check-reports-transfer-location-dropdown-surgical-fix-v349343.mjs"
+    "check:reports-transfer-location-dropdown-v349343": "node scripts/check-reports-transfer-location-dropdown-surgical-fix-v349343.mjs",
+    "check:permissions-visible-action-feedback-v349353": "node scripts/check-permissions-visible-action-feedback-surgical-fix-v349353.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

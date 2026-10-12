@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import RolePermissionEditor from '../components/permissions/RolePermissionEditor';
@@ -21,6 +21,7 @@ import {
   type TenantRolePolicyKey
 } from '../lib/permissionPolicies';
 import type { TenantPermission } from '../lib/permissions';
+import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
 import { useAppTranslation } from '../i18n/I18nContext';
 import './TenantPermissionsPage.css';
 
@@ -71,6 +72,18 @@ export default function TenantPermissionsPage() {
     metadataDescriptionValue !== (activeRole.description || null)
   );
   const selectedTemplate = query.data?.custom_role_templates.find((template) => template.key === createTemplateKey);
+
+  // The inline banner lives above the long permission editor. Mirror only
+  // completed, action-specific outcomes to the existing viewport-fixed toast
+  // system so the result remains visible at the user's current scroll position.
+  // All policy writes already use skipMutationFeedback, avoiding generic duplicates.
+  useEffect(() => {
+    if (successMessage) showTenantActionSuccess(successMessage);
+  }, [successMessage]);
+
+  useEffect(() => {
+    if (errorMessage) showTenantActionError(errorMessage);
+  }, [errorMessage]);
 
   const updateDraft = (permissions: TenantPermission[]) => {
     setDraftByRole((current) => ({ ...current, [selectedRole]: permissions }));
