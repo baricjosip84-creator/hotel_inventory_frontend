@@ -60,6 +60,7 @@ function scenario(mode='good') {
  const events={requests:[],errors:[],cached:[],invalidated:[],success:[],failure:[]};
  const state={current:{entityType:'product',entityId:'p-A'}};
  const customFieldDraftDirtyRef={current:true};
+ const customFieldSelectionEpochRef={current:0};
  const apiRequest=async (url,opts) => {
   events.requests.push({url,opts});
   if(opts){if(mode==='putFail')throw new Error('invalid value format'); return {ok:true};}
@@ -71,9 +72,9 @@ function scenario(mode='good') {
  const qc={setQueryData:(k,v)=>events.cached.push({k,v}),invalidateQueries:({queryKey})=>events.invalidated.push(queryKey)};
  const setError=v=>events.errors.push(v), ui=v=>v, messageFrom=e=>e.message;
  const showTenantActionSuccess=v=>events.success.push(v), showTenantActionError=v=>events.failure.push(v);
- const factory=new Function('apiRequest','qc','activeCustomValueTargetRef','customFieldDraftDirtyRef','setError','ui','messageFrom','showTenantActionSuccess','showTenantActionError','verifyCustomFieldReadback',js+'; return options;');
- const options=factory(apiRequest,qc,state,customFieldDraftDirtyRef,setError,ui,messageFrom,showTenantActionSuccess,showTenantActionError,verify);
- const vars={targetEntityType:'product',targetEntityId:'p-A',payload:{values:{test_country:'Croatia'},value_versions:{test_country:0},definition_versions:{test_country:1}}};
+ const factory=new Function('apiRequest','qc','activeCustomValueTargetRef','customFieldSelectionEpochRef','customFieldDraftDirtyRef','setError','ui','messageFrom','showTenantActionSuccess','showTenantActionError','verifyCustomFieldReadback',js+'; return options;');
+ const options=factory(apiRequest,qc,state,customFieldSelectionEpochRef,customFieldDraftDirtyRef,setError,ui,messageFrom,showTenantActionSuccess,showTenantActionError,verify);
+ const vars={targetEntityType:'product',targetEntityId:'p-A',targetSelectionEpoch:0,payload:{values:{test_country:'Croatia'},value_versions:{test_country:0},definition_versions:{test_country:1}}};
  return {events,state,options,vars,customFieldDraftDirtyRef};
 }
 {

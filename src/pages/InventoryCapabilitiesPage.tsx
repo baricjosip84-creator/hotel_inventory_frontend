@@ -904,6 +904,9 @@ function CustomFieldsPanel({
   const activeCustomValueTargetRef = useRef<{ entityType: EntityType; entityId: string }>({ entityType: 'product', entityId: '' });
   // An automatic React Query refresh must not silently replace user edits.
   const customFieldDraftDirtyRef = useRef(false);
+  // Re-selecting the same record starts a new editing session. A late write from
+  // a previous session may update its cache but must not clear the current draft.
+  const customFieldSelectionEpochRef = useRef(0);
   const [values, setValues] = useState<Record<string, string | boolean>>({});
   const [valueVersions, setValueVersions] = useState<Record<string, number>>({});
   const [definitionVersions, setDefinitionVersions] = useState<Record<string, number>>({});
@@ -950,11 +953,13 @@ function CustomFieldsPanel({
 
   useEffect(() => {
     if (!canRead) {
+      customFieldSelectionEpochRef.current += 1;
       const nextType = readableEntityTypes[0] || 'product';
       activeCustomValueTargetRef.current = { entityType: nextType, entityId: '' };
       setEntityType(nextType);
       return;
     }
+    customFieldSelectionEpochRef.current += 1;
     activeCustomValueTargetRef.current = { entityType, entityId: '' };
     customFieldDraftDirtyRef.current = false;
     setEntityId('');
@@ -992,12 +997,14 @@ function CustomFieldsPanel({
   const editDefinition = (row: CustomDefinition) => { setEditingDefinition(row); setCustomizeFieldKey(false); setFieldKey(row.field_key); setLabel(row.label); setDataType(row.data_type); setOptions((row.options || []).join(', ')); setRequired(Boolean(row.is_required)); setError(null); };
 
   const changeEntityType = (nextEntityType: EntityType) => {
+    customFieldSelectionEpochRef.current += 1;
     activeCustomValueTargetRef.current = { entityType: nextEntityType, entityId: '' };
     customFieldDraftDirtyRef.current = false;
     setEntityType(nextEntityType);
   };
 
   const changeEntityId = (nextEntityId: string) => {
+    customFieldSelectionEpochRef.current += 1;
     activeCustomValueTargetRef.current = { entityType, entityId: nextEntityId };
     customFieldDraftDirtyRef.current = false;
     setEntityId(nextEntityId);
@@ -1056,7 +1063,7 @@ function CustomFieldsPanel({
   });
 
   const saveValues = useMutation({
-    mutationFn: async ({ targetEntityType, targetEntityId, payload }: { targetEntityType: EntityType; targetEntityId: string; payload: { values: typeof values; value_versions: typeof valueVersions; definition_versions: typeof definitionVersions } }) => {
+    mutationFn: async ({ targetEntityType, targetEntityId, payload }: { targetEntityType: EntityType; targetEntityId: string; targetSelectionEpoch: number; payload: { values: typeof values; value_versions: typeof valueVersions; definition_versions: typeof definitionVersions } }) => {
       const endpoint = `/inventory-capabilities/custom-fields/${targetEntityType}/${targetEntityId}`;
       await apiRequest(endpoint, {
         method: 'PUT',
@@ -1075,22 +1082,22 @@ function CustomFieldsPanel({
         throw new Error('CUSTOM_FIELD_READBACK_UNVERIFIED');
       }
     },
-    onSuccess: ({ verifiedRows }, { targetEntityType, targetEntityId }) => {
-      if (activeCustomValueTargetRef.current.entityType === targetEntityType && activeCustomValueTargetRef.current.entityId === targetEntityId) {
+    onSuccess: ({ verifiedRows }, { targetEntityType, targetEntityId, targetSelectionEpoch }) => {
+      if (activeCustomValueTargetRef.current.entityType === targetEntityType && activeCustomValueTargetRef.current.entityId === targetEntityId && customFieldSelectionEpochRef.current === targetSelectionEpoch) {
         // Fields stay disabled during this write. Once the server values are verified,
         // allow the cached readback to refresh value/definition versions for the next save.
         customFieldDraftDirtyRef.current = false;
       }
       qc.setQueryData(['custom-field-values', targetEntityType, targetEntityId], verifiedRows);
-      if (activeCustomValueTargetRef.current.entityType === targetEntityType && activeCustomValueTargetRef.current.entityId === targetEntityId) {
+      if (activeCustomValueTargetRef.current.entityType === targetEntityType && activeCustomValueTargetRef.current.entityId === targetEntityId && customFieldSelectionEpochRef.current === targetSelectionEpoch) {
         setError(null);
         showTenantActionSuccess(ui('Custom field values saved and verified.'));
       }
     },
-    onError: (errorValue, { targetEntityType, targetEntityId }) => {
+    onError: (errorValue, { targetEntityType, targetEntityId, targetSelectionEpoch }) => {
       // Preserve the operator's unsaved input on uncertain write/readback failures.
       // Automatic query invalidation here could overwrite the form with old data.
-      if (activeCustomValueTargetRef.current.entityType === targetEntityType && activeCustomValueTargetRef.current.entityId === targetEntityId) {
+      if (activeCustomValueTargetRef.current.entityType === targetEntityType && activeCustomValueTargetRef.current.entityId === targetEntityId && customFieldSelectionEpochRef.current === targetSelectionEpoch) {
         const verificationUnknown = errorValue instanceof Error && errorValue.message === 'CUSTOM_FIELD_READBACK_UNVERIFIED';
         const message = verificationUnknown
           ? ui('The save was accepted, but its values could not be verified. Refresh before retrying.')
@@ -1158,7 +1165,7 @@ function CustomFieldsPanel({
                 : <input disabled={saveValues.isPending} type={row.data_type === 'number' ? 'number' : row.data_type === 'date' ? 'date' : 'text'} value={String(values[row.field_key] || '')} onChange={(event) => { customFieldDraftDirtyRef.current = true; setValues({ ...values, [row.field_key]: event.target.value }); }} />}
           </label>
         ))}
-        <button className="button" style={{ marginTop: 14 }} type="button" disabled={!canWrite || !entityId || entityValues.isLoading || entityValues.isError || !entityValues.data || saveValues.isPending} onClick={() => saveValues.mutate({ targetEntityType: entityType, targetEntityId: entityId, payload: { values: { ...values }, value_versions: { ...valueVersions }, definition_versions: { ...definitionVersions } } })}>{saveValues.isPending ? ui("Saving…") : ui("Save custom fields")}</button>
+        <button className="button" style={{ marginTop: 14 }} type="button" disabled={!canWrite || !entityId || entityValues.isLoading || entityValues.isError || !entityValues.data || saveValues.isPending} onClick={() => saveValues.mutate({ targetEntityType: entityType, targetEntityId: entityId, targetSelectionEpoch: customFieldSelectionEpochRef.current, payload: { values: { ...values }, value_versions: { ...valueVersions }, definition_versions: { ...definitionVersions } } })}>{saveValues.isPending ? ui("Saving…") : ui("Save custom fields")}</button>
       </div>
       <div className="card" style={tableWrapStyle}>
         {definitions.isLoading ? <div className="muted">{ui("Loading custom field definitions…")}</div> : null}{definitions.isError ? <div className="form-error">{messageFrom(definitions.error, ui("Unable to load custom field definitions."), ui)}</div> : null}<table><thead><tr><th>{ui("Key")}</th><th>{ui("Label")}</th><th>{ui("Type")}</th><th>{ui("Required")}</th><th>{ui("Status")}</th><th>{ui("Action")}</th></tr></thead><tbody>{!definitions.isLoading && !definitions.isError && !(definitions.data || []).length ? <EmptyTableRow colSpan={6} message={ui("No custom fields are configured for this entity type.")} /> : null}{(definitions.data || []).map((definition) => <tr key={definition.id}><td>{definition.field_key}</td><td>{definition.label}</td><td>{displayCanonicalLabel(definition.data_type, ui)}</td><td>{definition.is_required ? ui("Yes") : ui("No")}</td><td>{definition.is_active ? ui("Active") : ui("Inactive")}</td><td>{canWrite ? <div className="capability-action-row"><button className="button button--secondary" type="button" disabled={saveDefinition.isPending || toggleDefinition.isPending} onClick={() => editDefinition(definition)}>{ui("Edit")}</button><button className="button button--secondary" type="button" disabled={saveDefinition.isPending || toggleDefinition.isPending} onClick={() => toggleDefinition.mutate(definition)}>{definition.is_active ? ui("Deactivate") : ui("Activate")}</button></div> : '—'}</td></tr>)}</tbody></table>

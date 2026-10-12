@@ -75,7 +75,7 @@ check('save mutation retained',()=>assert(save));
 const saveSrc=save.initializer.getText(ast);
 check('save still uses original target association',()=>assert.match(saveSrc,/targetEntityType, targetEntityId/));
 check('save still reads back written values',()=>assert.match(saveSrc,/verifyCustomFieldReadback\(payload\.values, readback\)/));
-check('save success clears dirty only when same target',()=>assert.match(saveSrc,/if \(activeCustomValueTargetRef\.current\.entityType === targetEntityType && activeCustomValueTargetRef\.current\.entityId === targetEntityId\) \{\s*\/\/[\s\S]*?customFieldDraftDirtyRef\.current = false/));
+check('save success clears dirty only when same target',()=>assert.match(saveSrc,/if \(activeCustomValueTargetRef\.current\.entityType === targetEntityType && activeCustomValueTargetRef\.current\.entityId === targetEntityId && customFieldSelectionEpochRef\.current === targetSelectionEpoch\) \{\s*\/\/[\s\S]*?customFieldDraftDirtyRef\.current = false/));
 check('save caches fresh verified rows after allowing rehydration',()=>assert.match(saveSrc,/customFieldDraftDirtyRef\.current = false;[\s\S]*?qc\.setQueryData\(\['custom-field-values', targetEntityType, targetEntityId\], verifiedRows\)/));
 check('server verification failure still preserves input',()=>assert.match(saveSrc,/CUSTOM_FIELD_READBACK_UNVERIFIED/));
 check('failed save does not clear dirty flag',()=>{const from=saveSrc.indexOf('onError:');assert(from>=0);assert(!saveSrc.slice(from).includes('customFieldDraftDirtyRef.current = false'));});

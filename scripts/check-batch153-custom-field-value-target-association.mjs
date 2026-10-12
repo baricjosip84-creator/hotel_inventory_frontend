@@ -43,8 +43,8 @@ check('click copies definition versions',()=>assert.match(click,/definition_vers
 check('write route uses captured entity type and ID',()=>assert.match(defs.saveValues.getText(ast),/custom-fields\/\$\{targetEntityType\}\/\$\{targetEntityId\}/));
 check('write retains PUT with immutable submitted payload',()=>assert.match(defs.saveValues.getText(ast),/method: 'PUT',[\s\S]*?body: JSON\.stringify\(payload\)/));
 check('write updates original record cache after readback',()=>assert.match(defs.saveValues.getText(ast),/setQueryData\(\['custom-field-values', targetEntityType, targetEntityId\], verifiedRows\)/));
-check('save success guards new selection error',()=>assert.match(defs.saveValues.getText(ast),/activeCustomValueTargetRef\.current\.entityType === targetEntityType && activeCustomValueTargetRef\.current\.entityId === targetEntityId\) \{[\s\S]*?setError\(null\)/));
-check('save failure guards new selection error',()=>assert.match(defs.saveValues.getText(ast),/onError:[\s\S]*?activeCustomValueTargetRef\.current\.entityType === targetEntityType && activeCustomValueTargetRef\.current\.entityId === targetEntityId\) \{/));
+check('save success guards new selection error',()=>assert.match(defs.saveValues.getText(ast),/activeCustomValueTargetRef\.current\.entityType === targetEntityType && activeCustomValueTargetRef\.current\.entityId === targetEntityId && customFieldSelectionEpochRef\.current === targetSelectionEpoch\) \{[\s\S]*?setError\(null\)/));
+check('save failure guards new selection error',()=>assert.match(defs.saveValues.getText(ast),/onError:[\s\S]*?activeCustomValueTargetRef\.current\.entityType === targetEntityType && activeCustomValueTargetRef\.current\.entityId === targetEntityId && customFieldSelectionEpochRef\.current === targetSelectionEpoch\) \{/));
 check('save permission gate retained',()=>assert.match(panel.getText(ast),/disabled=\{!canWrite \|\| !entityId \|\| entityValues\.isLoading \|\| entityValues\.isError \|\| !entityValues\.data \|\| saveValues\.isPending\}/));
 check('backend write permission retained',()=>assert.match(backend,/router\.put\('\/custom-fields\/:entityType\/:entityId', requireCustomFieldEntityPermission\('write'\)/));
 check('backend validation retained',()=>assert.match(backend,/validate\(validation\.customFieldValuesSave\)/));
@@ -55,6 +55,7 @@ const exprJs = ts.transpileModule(exprSource,{fileName:'custom-target-test.ts', 
 function make() {
  const activeCustomValueTargetRef = {current:{entityType:'product',entityId:'p-A'}};
  const customFieldDraftDirtyRef = {current:true};
+ const customFieldSelectionEpochRef = {current:0};
  const observed = {requests:[],invalidations:[],cache:[],errors:[],selectedIds:[],selectedTypes:[],values:[],versions:[],definitionVersions:[]};
  const apiRequest = (url, opts) => {observed.requests.push({url,opts});return Promise.resolve(opts ? {ok:true} : url.includes('/supplier/') ? [{field_key:'region',data_type:'text',value:'Rijeka'}] : [{field_key:'test_country',data_type:'text',value:'Croatia'}]);};
  const qc = {invalidateQueries: ({queryKey})=>observed.invalidations.push(queryKey), setQueryData:(key,data)=>observed.cache.push({key,data})};
@@ -66,12 +67,12 @@ function make() {
  const setDefinitionVersions = value=>observed.definitionVersions.push(value);
  const messageFrom = error => error.message;
  const ui = value=>value;
- const maker = new Function('apiRequest','qc','activeCustomValueTargetRef','customFieldDraftDirtyRef','setError','setEntityId','setEntityType','setValues','setValueVersions','setDefinitionVersions','messageFrom','ui','entityType','verifyCustomFieldReadback','showTenantActionSuccess','showTenantActionError',exprJs+'\nreturn {saveOptions,changeEntityId,changeEntityType};');
- const handlers=maker(apiRequest,qc,activeCustomValueTargetRef,customFieldDraftDirtyRef,setError,setEntityId,setEntityType,setValues,setValueVersions,setDefinitionVersions,messageFrom,ui,'product',(values,rows)=>Object.entries(values).every(([key,value])=>rows.some(row=>row.field_key===key && row.value===value)),()=>{},()=>{});
+ const maker = new Function('apiRequest','qc','activeCustomValueTargetRef','customFieldSelectionEpochRef','customFieldDraftDirtyRef','setError','setEntityId','setEntityType','setValues','setValueVersions','setDefinitionVersions','messageFrom','ui','entityType','verifyCustomFieldReadback','showTenantActionSuccess','showTenantActionError',exprJs+'\nreturn {saveOptions,changeEntityId,changeEntityType};');
+ const handlers=maker(apiRequest,qc,activeCustomValueTargetRef,customFieldSelectionEpochRef,customFieldDraftDirtyRef,setError,setEntityId,setEntityType,setValues,setValueVersions,setDefinitionVersions,messageFrom,ui,'product',(values,rows)=>Object.entries(values).every(([key,value])=>rows.some(row=>row.field_key===key && row.value===value)),()=>{},()=>{});
  return {...handlers,observed,activeCustomValueTargetRef,customFieldDraftDirtyRef};
 }
 const payload = {values:{test_country:'Croatia'},value_versions:{test_country:0},definition_versions:{test_country:1}};
-const vars = {targetEntityType:'product',targetEntityId:'p-A',payload};
+const vars = {targetEntityType:'product',targetEntityId:'p-A',targetSelectionEpoch:0,payload};
 {
  const h=make(); const savedResult=await h.saveOptions.mutationFn(vars);
  check('PUT targets submitted product A',()=>assert.equal(h.observed.requests[0].url,'/inventory-capabilities/custom-fields/product/p-A'));
@@ -108,7 +109,7 @@ const vars = {targetEntityType:'product',targetEntityId:'p-A',payload};
  check('normal save failure remains visible',()=>assert.equal(h.observed.errors.at(-1),'invalid value format'));
 }
 {
- const h=make(); const supplier={targetEntityType:'supplier',targetEntityId:'s-1',payload:{values:{region:'Rijeka'},value_versions:{region:2},definition_versions:{region:4}}};
+ const h=make(); const supplier={targetEntityType:'supplier',targetEntityId:'s-1',targetSelectionEpoch:0,payload:{values:{region:'Rijeka'},value_versions:{region:2},definition_versions:{region:4}}};
  await h.saveOptions.mutationFn(supplier);
  check('supplier request uses submitted type and identifier',()=>assert.equal(h.observed.requests[0].url,'/inventory-capabilities/custom-fields/supplier/s-1'));
  check('supplier version map preserved',()=>assert.deepEqual(JSON.parse(h.observed.requests[0].opts.body),supplier.payload));

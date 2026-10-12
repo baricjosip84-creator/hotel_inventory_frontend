@@ -11978,3 +11978,25 @@ CHANGED FULL FRONTEND MEMBERS: src/pages/InventoryCapabilitiesPage.tsx, scripts/
 BASELINE FAIL: Untouched Frontend154 fails new regression due to missing draft guard. CORRECTED: new Batch156 focused 31/31 PASS; inherited 79/79 selected scripts PASS; combined selected 80/80 PASS (Node22, TypeScript test-only symlink, legacy backend alias used during checks and NOT SHIPPED). Batch153 revised guard 46/46, Batch155 revised readback guard 62/62.
 LIMITS: Source / isolated transpiled hook behavior tests, not browser or PostgreSQL integration. The original Croatia SQL/request failure and CASE24 persistence remain OPEN. No clean Node24 npm ci, full typecheck/Vite build, deployed browser, permissions E2E, or real database acceptance. Next priority is actual server traces and a clean production build, not claiming another code-level success proves DB.
 ================================================================================
+
+================================================================================
+BATCH157 — CUSTOM FIELDS RESELECTION-GENERATION GUARD — 2026-10-13
+================================================================================
+AUTHORITATIVE BASELINE
+- Complete cumulative Frontend155 ZIP (Batch156) SHA256 2512d1d7f7392491afa0847999548195a099f0fae97681a9eb053bcd16fcc847; full unchanged Backend072 ZIP SHA256 2036cbc149b5c319911ec8fe72418361651ebcea2caaf799b58382adb0cf3e69. Original September tenant audit v93 and the entire correction log Batches001-156 preserved.
+- Original audit observations for required test_country='Croatia' failure and CASE=24 missing persistence remain OPEN. No live database HTTP trace was obtained in this batch, and neither historical failure is claimed fixed.
+REPRODUCED CODE-LEVEL DEFECT
+- Existing record-ID/type guard on CustomFieldsPanel save completion does not distinguish two separate selections of the SAME record: choose A, start save, switch A->B->A, edit A again, then receive old A save response. Old onSuccess can clear the new A draft-dirty flag, reset its error state, and show a success toast for a previous session; an old error can likewise overwrite current errors.
+- New executable focused test FAILS against the untouched complete Frontend155; passes against corrected Frontend156. This is a controlled, transpiled mutation-handler reproduction, NOT an observed deployed-browser issue.
+SURGICAL CORRECTION — FULL FRONTEND156, BACKEND072 UNCHANGED
+1. src/pages/InventoryCapabilitiesPage.tsx: CustomFieldsPanel uses a synchronous customFieldSelectionEpochRef, increments it on every record/entity selection and permission/reactive entity reset, captures the epoch together with immutable target and value/version payload when clicking Save. Verified late save GET results still populate only the originally submitted record's React Query cache, but only the same target AND same selection epoch may clear dirty drafts, change the current page error or emit success/error feedback. The server PUT/GET routes, required validation, optimistic versions and tenant permissions are unchanged.
+2. scripts/check-batch157-custom-field-reselection-epoch.mjs: new focused 41/41 assertions, including A->B->A, same-ID reselection, cross-entity switching, normal current-session success/error, PUT/GET readback and versions.
+3. Narrow updates to inherited Batch153, Batch155, Batch156 tests: include the selection generation in transpiled callback mocks and adjust target guard assertions. Original 46, 62, 31 checks remain and pass.
+4. package.json: add selected Batch157 regression. This cumulative FIX_LOG: full previous content preserved and Batch157 appended.
+VERIFICATION
+- Baseline Frontend155: focused regression EXPECTED FAIL (missing epoch guard).
+- Corrected Frontend156: new focused 41/41 PASS; 80 inherited regression scripts PASS; full selected suite 81/81 PASS on Node22.16 with local test-only TypeScript symlink and legacy backend path alias (not shipped).
+- No Node24 clean npm ci, complete frontend typecheck/build, PostgreSQL tenant integration, live deployed browser, or production acceptance was performed. Do not represent selected source tests as those checks.
+- Changed full-frontend members: 7; Backend072 byte-for-byte preserved. The release packaging verifies full archive contents, unchanged source parity, changed-files parity, ZIP CRC and manifest.
+NEXT: Batch158 should prioritize clean production build and actual network/PostgreSQL traces for the remaining original audit failures; do not endlessly repeat source-only safeguards.
+================================================================================
