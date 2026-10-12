@@ -229,6 +229,16 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Customer order packed stock dispatched successfully.';
   }
 
+  // Batch144: creating an Outbound PDF is not creating an inventory item.
+  // Preview and email actions are separate endpoints; match only the two
+  // persisted-document POST routes after a successful response.
+  if (normalizedMethod === 'POST' && /^\/outbound\/orders\/[^/]+\/documents$/.test(normalizedPathOnly)) {
+    return 'Customer order PDF created successfully.';
+  }
+  if (normalizedMethod === 'POST' && /^\/outbound\/returns\/[^/]+\/documents$/.test(normalizedPathOnly)) {
+    return 'Customer return receipt created successfully.';
+  }
+
   // Batch142: customer-return lifecycle actions are not generic item creation.
   // Match only exact successful POST routes, keeping creation, stock receipt,
   // and cancellation feedback distinct from orders and document actions.

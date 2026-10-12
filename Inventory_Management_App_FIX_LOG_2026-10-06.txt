@@ -11682,3 +11682,28 @@ LIMITATIONS / OPEN ITEMS
 - Clean Node24 npm ci/TS typecheck/Vite build, PostgreSQL integration, and deployed desktop/mobile browser workflow acceptance NOT VERIFIED. All checks here are local source-level selected regression tests.
 - Next authoritative complete cumulative source: hotel-inventory-frontend_surgical-fix-142.zip + full unchanged hotel-inventory-backend_surgical-fix-072.zip. Batch144 NOT STARTED.
 ================================================================================
+
+================================================================================
+BATCH 144 — OUTBOUND STORED PDF AND RETURN RECEIPT: SPECIFIC SUCCESS TOASTS
+Date: 2026-10-12
+================================================================================
+SOURCE AND VERIFIED DEFECT
+- Authoritative full cumulative source: hotel-inventory-frontend_surgical-fix-142.zip and unchanged full hotel-inventory-backend_surgical-fix-072.zip; canonical tenant Audit v93; complete cumulative FIX_LOG through Batch143. Baseline archive byte integrity verified.
+- Audit v93 Outbound document-generation checkpoint at around lines 15211–15213 and 15249 reports generic 'Item created successfully.' when creating stored Order Confirmation and Delivery Note PDFs; elsewhere Outbound Customer Return receipt creation recorded the same generic toast. In actual Frontend142, successful POST /outbound/orders/:id/documents and POST /outbound/returns/:id/documents still reach the generic Item fallback in tenantMutationSuccessMessage, although the UI already displays accurate stored-document inline feedback.
+- The specific separate *preview-only* historical generic toast is already guarded by skipMutationFeedback:true in both current Outbound preview callers. This batch does not re-open or alter that previously corrected preview path. It also does not change actual send-email behavior.
+SURGICAL CORRECTION (FRONTEND ONLY)
+1. src/lib/api.ts: add two narrowly-scoped successful POST cases for /outbound/orders/:id/documents -> 'Customer order PDF created successfully.' and /outbound/returns/:id/documents -> 'Customer return receipt created successfully.' Match exact routes after stripping query strings and normalize method/path case; exclude GET, PUT, DELETE, preview, email, and unrelated endpoints.
+2. src/i18n/tenantUiTranslations.ts: add two five-language message translations, English/German/Spanish/French/Croatian.
+3. package.json: register check:batch144-outbound-pdf-feedback without removing any inherited scripts.
+4. scripts/check-batch144-outbound-pdf-feedback.mjs: new executable 72-assertion focused guard, actual compiled API resolver execution, exact route/method isolation, locale rows, frontend call semantics, preview suppression, backend permission/confirmation and document-list checks. Untouched FE142 baseline fails as expected with actual 'Item created successfully.', corrected FE143 passes 72/72.
+5. Preserve and append the full prior FIX_LOG. The standalone, frontend-embedded, changed-files and all-in-one copies are byte-identical.
+TESTING AND SAFETY
+- Focused: 72/72 PASS; baseline FAIL expected and reproduced. Source-level selected regression suite: 67 inherited + Batch144 = 68/68 PASS. The large parallel run completed 67 scripts before its execution window expired; remaining check-tenant-multilingual-closure-audit.mjs was executed separately and passed (45 tenant routes, 266 reachable files, 14,368 five-language rows). Recorded per-script outcomes are based on both runs, not a claim the first combined execution completed.
+- Node v22.16 and a test-only symlink to global TypeScript. The test-only node_modules symlink is NOT included in the release ZIP.
+- All OutboundPage.tsx callers, backend permissions, stock, stored-document generation, email preview/send and external-provider safety, return receipt downloading, cache invalidations and inline feedback remain byte-identical. No backend changes.
+- Full cumulative frontend changed exactly 5 paths, including new guard and cumulative FIX_LOG. Full backend archive byte-identical (SHA256 2036cbc149b5c319911ec8fe72418361651ebcea2caaf799b58382adb0cf3e69). Both full ZIPs, changed-files ZIP, 11-file bundle integrity/readback and exact delta parity verified.
+LIMITATIONS / OPEN ITEMS
+- UoM CASE=24 persistence after refresh; Custom Fields Text-value save/readback; clean Node24 npm ci + typecheck/Vite build, live PostgreSQL and deployed browser/mobile acceptance remain unresolved/unverified.
+- Outbound stored PDF/return receipt successful result messages are locally source-tested, NOT browser/deployment verified; send-email action may still show generic shared success toast and is outside this batch.
+NEW COMPLETE SOURCE: full hotel-inventory-frontend_surgical-fix-143.zip + byte-identical full hotel-inventory-backend_surgical-fix-072.zip. NEXT: Batch145 NOT STARTED. Continue only against these newest FULL application ZIPs and return all individual release files plus all-in-one bundle.
+================================================================================

@@ -500,6 +500,7 @@
     "check:batch139-invoice-validation": "node scripts/check-batch139-invoice-validation.mjs",
     "check:batch140-outbound-cancel-feedback": "node scripts/check-batch140-outbound-cancel-feedback.mjs",
     "check:batch141-notification-processing-feedback": "node scripts/check-batch141-notification-processing-feedback.mjs",
+    "check:batch144-outbound-pdf-feedback": "node scripts/check-batch144-outbound-pdf-feedback.mjs",
     "check:batch143-customer-order-workflow-feedback": "node scripts/check-batch143-customer-order-workflow-feedback.mjs",
     "check:batch142-customer-return-lifecycle-feedback": "node scripts/check-batch142-customer-return-lifecycle-feedback.mjs"
   },
