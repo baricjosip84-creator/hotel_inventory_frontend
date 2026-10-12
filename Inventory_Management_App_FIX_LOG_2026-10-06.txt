@@ -11778,3 +11778,25 @@ LIMITATIONS / OPEN ACCEPTANCE
 - UoM CASE=24 persistence after refresh; Custom Fields text-value save/readback; clean Node24 npm ci, TypeScript whole-project typecheck, Vite production build, live database and deployed browser/mobile acceptance remain unresolved. Existing API download-error toast may appear in addition to this local error note; no new duplicate success toast was created.
 CURRENT AUTHORITATIVE CUMULATIVE CODE: full Frontend surgical-fix-146 + unchanged full Backend surgical-fix-072. NEXT: Batch148 not started. Use the COMPLETE ZIPs and return all 11 files + complete bundle for the next correction.
 ================================================================================
+
+================================================================================
+BATCH 148 — ATTACHMENTS: CONSISTENT SINGLE-DOWNLOAD BUSY STATE
+Date: 2026-10-12
+================================================================================
+AUTHORITATIVE SOURCE / AUDIT CONTEXT
+- Complete cumulative Frontend surgical-fix-146 + full Backend surgical-fix-072; Audit v93 and full FIX_LOG through Batch147. ZIP CRC and standalone/embedded FIX_LOG parity checked.
+- Audit v93 describes inconsistent enabled/disabled action presentation, especially in Inventory Controls. In current FE146 AttachmentsTab, downloadAttachment guard `if (!attachment.can_download || downloadingId) return;` already blocks simultaneous requests. However per-row Download button is disabled only when `downloadingId === item.id`, and its smallButton appearance is retained even on the active row. Consequently, while file A downloads, row B remains visibly enabled but clicking it silently does nothing; the active row remains styled as an actionable control despite disabled=true. This is a local source-confirmed UI/behavior mismatch; it does not establish a backend bug.
+FOCUSED FRONTEND CORRECTION
+1. src/components/enterpriseInventory/tabs/AttachmentsTab.tsx: download button is now disabled whenever *any* attachment download is active, or the attachment cannot be downloaded; disabled controls also use styles.disabledButton while active controls use styles.smallButton. The active row retains its 'Downloading…' label; metadata-only rows retain 'Metadata only'. Add a brief localized role=status hint above the attachment list while a download runs, gated by read permission and selected record. No new network calls or changed state transitions.
+2. src/i18n/tenantUiTranslations.ts: add complete EN/DE/ES/FR/HR row for `Download in progress. Other downloads are temporarily unavailable.`.
+3. scripts/check-batch148-attachment-download-busy-state.mjs: new executable 46-assertion guard transpiles and executes the actual JSX disabled/style expressions across seven active/idle/unavailable cases. Checks role=status and five locale values, original download action, single-flight guard, error handling, filename transport, upload/delete gates and backend permissions.
+4. package.json: register new check:batch148-attachment-download-busy-state script. Append complete record to unabridged cumulative FIX_LOG. Exactly five frontend paths changed/new including this cumulative log, 1,049 complete cumulative frontend archive files. No backend changes.
+EVIDENCE / VERIFICATION
+- Untouched FE146 source test intentionally fails: actively downloading row A has style.kind 'actionable', expected 'disabled'. Corrected FE147: 46/46 focused assertions PASS.
+- All 71 inherited selected scripts plus new Batch148 guard = 72/72 PASS. Global tenant multilingual closure PASS (45/45 routes and complete five-language rows), no new missing keys.
+- CRC/readback for full FE147, full BE072, changed-files ZIP, 11-file bundle and alternative continuation ZIP; exact five-path change parity; standalone/embedded/delta/bundle FIX_LOG byte identity; BE072 SHA256 unchanged.
+LIMITATIONS / REMAINING WORK
+- Source-level expression/runtime test, not an actual browser download. No live network/DB test. Existing download error and success handling unchanged.
+- Historical UoM CASE=24 persistence after refresh and Custom Fields text-value save/readback still require database-backed inspection. Clean Node24 npm ci/typecheck/Vite build, live PostgreSQL integration and deployed desktop/mobile browser acceptance remain unverified; Node22 and test-only TypeScript symlink used (not shipped).
+NEXT SOURCE: FULL hotel-inventory-frontend_surgical-fix-147.zip + unchanged FULL hotel-inventory-backend_surgical-fix-072.zip. Next Batch149 NOT STARTED. Return all 11 individual files and complete bundle for every next batch.
+================================================================================

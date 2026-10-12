@@ -243,6 +243,7 @@ export function AttachmentsTab({
 
       <div style={styles.card}>
         <h2 style={styles.cardTitle}>{ui('Entity attachments')}</h2>
+        {downloadingId && canReadAttachments && attachmentForm.entity_id ? <p role="status" style={styles.helper}>{ui('Download in progress. Other downloads are temporarily unavailable.')}</p> : null}
         {downloadError && canReadAttachments && attachmentForm.entity_id ? <div role="alert" style={styles.error}>{downloadError}</div> : null}
         {!attachmentForm.entity_id ? <p style={styles.helper}>{ui('Select a business record above to see its attachments.')}</p> : !canReadAttachments ? <p style={styles.helper}>{ui('Requires {permission} permission.').replace('{permission}', TENANT_PERMISSIONS.ATTACHMENTS_READ)}</p> : attachmentsQuery.isLoading ? <p style={styles.helper}>{ui('Loading…')}</p> : !(attachmentsQuery.data ?? []).length ? <p style={styles.helper}>{ui('No attachments found for this record.')}</p> : (
           <div style={styles.tableWrap}>
@@ -267,7 +268,7 @@ export function AttachmentsTab({
                     </td>
                     <td style={styles.td}>
                       <div style={styles.actions}>
-                        <button type="button" style={item.can_download ? styles.smallButton : styles.disabledButton} disabled={!item.can_download || downloadingId === item.id} onClick={() => void downloadAttachment(item)}>{downloadingId === item.id ? ui('Downloading…') : item.can_download ? ui('Download') : ui('Metadata only')}</button>
+                        <button type="button" style={item.can_download && downloadingId === null ? styles.smallButton : styles.disabledButton} disabled={!item.can_download || downloadingId !== null} onClick={() => void downloadAttachment(item)}>{downloadingId === item.id ? ui('Downloading…') : item.can_download ? ui('Download') : ui('Metadata only')}</button>
                         <button type="button" style={canWriteAttachments && !selectedRecordArchived ? styles.dangerButton : styles.disabledButton} disabled={!canWriteAttachments || selectedRecordArchived || deleteAttachmentMutation.isPending} onClick={() => { if (window.confirm(ui('Delete attachment "{filename}"?').replace('{filename}', item.original_filename))) deleteAttachmentMutation.mutate(item.id); }}>{ui('Delete')}</button>
                       </div>
                     </td>
