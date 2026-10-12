@@ -11181,3 +11181,46 @@ MANUAL DEPLOYED RETEST — STILL PENDING
 NEW SOURCE OF TRUTH: FULL Frontend128 + FULL Backend072.
 NEXT: Batch130 NOT STARTED. Reconcile remaining audit candidates against this source and cumulative FIX_LOG before editing. Every future batch must deliver ALL complete ZIPs, supplemental changed files, audit, cumulative FIX_LOG, regression evidence, verification, handoffs, START HERE, SHA-256 and one complete release bundle.
 ================================================================================
+
+
+================================================================================
+BATCH 130 — VARIANTS / HUMAN-READABLE PARENT PRODUCT SELECTION
+DATE: 2026-10-12
+BASELINE: Full Frontend128 + unchanged Backend072 (Batch129 complete)
+RESULT: Full Frontend129 + unchanged Backend072
+
+CANONICAL AUDIT EVIDENCE AND SOURCE CONFIRMATION
+- Audit v93 lines 13935 and 13945: Advanced Inventory > Variants parent product dropdown and its selected value showed long LEGACY-* SKU identifiers ahead of the human-readable product name, making the correct selection hard to verify.
+- Confirmed on unchanged complete Frontend128, src/pages/InventoryCapabilitiesPage.tsx: the shared ProductSelect rendered `${p.sku} — ${p.name}` for ALL use cases, including the Variants parent field. The cumulative FIX_LOG through Batch129 did not record this name-first selector correction. Existing variant parent-type restrictions were already correct and were not reworked.
+- Batch130 regression guard FAILS on untouched Frontend128 due to the missing productOptionLabel helper; passes against Frontend129.
+
+SURGICAL CHANGE / FULL FRONTEND129
+1. src/pages/InventoryCapabilitiesPage.tsx:
+   - Introduce pure productOptionLabel(product, nameFirst) returning `Human product name — SKU` for name-first selection, retaining `SKU — name` as the default shared behavior. Trim surrounding whitespace; gracefully handle a missing name or SKU without an orphan separator.
+   - Add optional nameFirst prop (default false) to the EXISTING ProductSelect; options retain original product UUID values and change handlers.
+   - Set nameFirst ONLY on the Product Variants parent selector. The long identifier remains available after the readable name for disambiguation. Other existing ProductSelect call sites retain SKU-first order.
+   - No translation keys are added; displayed names/SKUs are tenant data and the existing translated `Parent product` label is preserved.
+2. scripts/check-batch130-variant-parent-readable-label.mjs (NEW): 28 source+executable assertions for long LEGACY SKU readability, default selector compatibility, missing names/SKUs, unicode, UUID selection stability, SKU suggestion, parent eligibility, submit permissions, and unchanged attributes/API payload.
+3. package.json: register check:batch130-variant-parent-readable-label.
+4. Update the single cumulative FIX_LOG through Batch130; standalone TXT is byte-identical to the embedded Frontend129 copy.
+
+SAFETY BOUNDARIES
+- Backend072 byte-identical; no database migrations, API requests, option values, tenant permissions, stock, supplier, variants product creation, parent eligibility, SKU uniqueness, manual SKU, variant attributes, barcode, or product data changes.
+- Pure presentation/selection-label improvement. No new translations necessary. Native select behavior remains intact.
+
+VERIFICATION ACTUALLY PERFORMED
+- Baseline reproduction: Batch130 focused guard fails on untouched Frontend128 at absent label helper.
+- Batch130 focused: 28/28 PASS; helper transpiled and executed; entire TSX parse and isolated transpilation PASS.
+- Selected regression suite from Batch129 (53 scripts) plus new Batch130 script: 54/54 PASS on repeat with properly linked Backend072 source fixture and globally installed TypeScript CLI. First attempt: 48/54 due to six missing backend test fixture path errors; not app defects; fixture-only repair and complete rerun 54/54 PASS.
+- Global multilingual closure regression included; no translation rows added.
+- Release ZIP CRC, source delta, full frontend / changed-files parity, standalone vs frontend embedded FIX_LOG, unchanged backend hash: checked in release packaging.
+- NOT PERFORMED: clean Node24 npm ci, whole-project TypeScript typecheck/Vite production build, real PostgreSQL integration or deployed-browser/mobile acceptance.
+
+TARGETED LIVE RETEST PENDING
+- Deploy Frontend129 with Backend072. Advanced Inventory > Product variants: open Parent product, inspect legacy-coded options and the selected product, confirm human-readable name appears BEFORE LEGACY-* SKU.
+- Confirm parent variants are excluded, Create variant still uses actual selected product, automatically suggested SKU follows that parent, structured attributes and barcode remain working; verify mouse, keyboard and narrow/mobile select displays.
+- Confirm unrelated UoM, serial and BOM selectors retain their existing SKU-first order. No production acceptance has been claimed without browser retest.
+
+NEW AUTHORITATIVE FULL SOURCE: Frontend129 + Backend072.
+NEXT: Batch131 NOT STARTED. Always compare historical audit vs current source and FIX_LOG before a new surgical correction; return all complete source ZIPs, changed-files ZIP, canonical audit, cumulative FIX_LOG, verification, regression results, handoffs, START HERE, SHA manifest, and the complete bundle.
+================================================================================

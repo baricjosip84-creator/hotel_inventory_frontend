@@ -652,9 +652,18 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
   );
 }
 
-function ProductSelect({ products, value, onChange, label = 'Product' }: { products: Product[]; value: string; onChange: (id: string) => void; label?: string }) {
+// Use a readable product name first in workflows where legacy, long SKUs
+// would otherwise hide the selected product. Other selectors retain their order.
+function productOptionLabel(product: Product, nameFirst: boolean): string {
+  const name = (product.name || '').trim();
+  const sku = (product.sku || '').trim();
+  if (!name || !sku) return name || sku;
+  return nameFirst ? `${name} — ${sku}` : `${sku} — ${name}`;
+}
+
+function ProductSelect({ products, value, onChange, label = 'Product', nameFirst = false }: { products: Product[]; value: string; onChange: (id: string) => void; label?: string; nameFirst?: boolean }) {
   const { ui } = useAppTranslation();
-  return <label>{ui(label)}<select value={value} onChange={(e) => onChange(e.target.value)}><option value="">{ui("Select…")}</option>{products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}</select></label>;
+  return <label>{ui(label)}<select value={value} onChange={(e) => onChange(e.target.value)}><option value="">{ui("Select…")}</option>{products.map((p) => <option key={p.id} value={p.id}>{productOptionLabel(p, nameFirst)}</option>)}</select></label>;
 }
 
 function SerialsPanel({ products, locations, canWriteTracking, canReadStock, canRegisterSerial }: { products: Product[]; locations: Location[]; canWriteTracking: boolean; canReadStock: boolean; canRegisterSerial: boolean }) {
@@ -1105,7 +1114,7 @@ function VariantsPanel({ products, canWrite, canReadStock, canWriteProducts, can
       <p className="card__subtext">{ui('A variant is created as a real product underneath a parent. That means existing stock, barcodes, shipments and movements can use it immediately.')}</p>
       {canWriteProducts && !canReadSuppliers ? <div className="form-error">{ui('Supplier read access is required to create a variant because supplier settings can be inherited from its parent product.')}</div> : null}
       <form onSubmit={(e) => { e.preventDefault(); if (canWrite && parentId && name.trim() && effectiveSku && !attributeIssue && !create.isPending) create.mutate(); }} style={formGridStyle}>
-        <ProductSelect products={parents} value={parentId} onChange={changeParent} label={ui('Parent product')} />
+        <ProductSelect products={parents} value={parentId} onChange={changeParent} label={ui('Parent product')} nameFirst />
         <label>{ui('Variant name')}<input value={name} onChange={(e) => setName(e.target.value)} placeholder={ui('T-shirt / Red / M')} /></label>
         <div style={{ display: 'grid', gap: 6 }}>
           <span style={{ fontWeight: 700 }}>{ui('Variant SKU')}</span>
