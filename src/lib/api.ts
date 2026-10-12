@@ -386,6 +386,14 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Supplier catalog item saved successfully.';
   }
 
+  // Batch145: deactivating a supplier catalog entry is a lifecycle change,
+  // not a generic inventory-item creation. Match the exact successful POST
+  // route and retain the existing page-owned confirmation and permission checks.
+  if (normalizedMethod === 'POST' && /^\/enterprise-inventory\/supplier-catalog\/[^/]+\/deactivate$/.test(normalizedPathOnly)) {
+    return 'Supplier catalog item deactivated successfully.';
+  }
+
+
   if (normalizedPath.endsWith('/enterprise-inventory/supplier-invoices') && normalizedMethod === 'POST') {
     return 'Supplier invoice created successfully.';
   }

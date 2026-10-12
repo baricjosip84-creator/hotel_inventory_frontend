@@ -11707,3 +11707,29 @@ LIMITATIONS / OPEN ITEMS
 - Outbound stored PDF/return receipt successful result messages are locally source-tested, NOT browser/deployment verified; send-email action may still show generic shared success toast and is outside this batch.
 NEW COMPLETE SOURCE: full hotel-inventory-frontend_surgical-fix-143.zip + byte-identical full hotel-inventory-backend_surgical-fix-072.zip. NEXT: Batch145 NOT STARTED. Continue only against these newest FULL application ZIPs and return all individual release files plus all-in-one bundle.
 ================================================================================
+
+================================================================================
+BATCH 145 — SUPPLIER CATALOG ITEM DEACTIVATION: SPECIFIC LOCALIZED SUCCESS TOAST
+Date: 2026-10-12
+================================================================================
+AUTHORITATIVE BASELINE
+- Full cumulative Frontend surgical-fix-143 and full Backend surgical-fix-072, exact previous standalone/embedded FIX_LOG through Batch144, canonical Audit v93.
+- New full cumulative frontend: surgical-fix-144. Backend072 unchanged and SHA256 identical.
+SOURCE-VERIFIED DEFECT / AUDIT CONTEXT
+- Inventory Controls audit identifies app-wide misleading green `Item created successfully.` mutation toasts and includes Supplier Catalog Edit / Deactivate actions in the recorded workflow. Previous fixes addressed the Catalog create/save feedback and supplier-return/invoice lifecycle feedback, but not the independent Catalog deactivate POST.
+- In unchanged FE143, postEnterpriseInventoryVersionedRequest(`/enterprise-inventory/supplier-catalog/${item.id}/deactivate`, item.version ?? 1) triggers global API success feedback; tenantMutationSuccessMessage has no exact deactivate mapping and falls through to `Item created successfully.`. The page already has precise feedback `Supplier catalog item deactivated successfully.` with translations in English, German, Spanish, French, Croatian.
+IMPLEMENTATION
+1. src/lib/api.ts: add exact successful POST matcher for /enterprise-inventory/supplier-catalog/:id/deactivate (ignores query suffix and case), returning the existing translated success message. Other routes and GET/PATCH/DELETE never claim deactivation.
+2. scripts/check-batch145-supplier-catalog-deactivate-feedback.mjs: new executable 55-assertion guard, runs isolated TypeScript resolver, exact route/method isolation, translations, backend authorization/version, caller request, cache invalidations, permissions, previous workflows.
+3. package.json: register the guard script. Append complete cumulative FIX_LOG including this record.
+TESTING / VERIFICATION
+- Unchanged baseline: expected failure, actual `Item created successfully.` versus expected `Supplier catalog item deactivated successfully.`.
+- Corrected source: 55/55 focused PASS. 68 inherited + new = 69/69 selected regression scripts PASS. Initial large concurrent run ended after 55 passes because of execution window; all 14 remaining were executed in smaller separately tracked batches and passed. No unresolved selected script failures.
+- Global tenant multilingual closure: PASS, 45/45 routes, 266 reachable source files, 14,368 five-language catalog rows and placeholder parity. Existing translation row reused; no translation catalog file change.
+- Exactly 4 frontend diff paths: src/lib/api.ts, package.json, new scripts/check-batch145-supplier-catalog-deactivate-feedback.mjs, cumulative Inventory_Management_App_FIX_LOG_2026-10-06.txt. No changes to SupplierCatalogsTab, actual mutation caller, backend, SQL, stock, permissions, version checks, provider processing, list/reorder invalidation or other feedback.
+- CRC, complete-frontend delta parity, complete backend byte-identity, cumulative FIX_LOG identity, and 11-item all-in-one bundle integrity/readback verified.
+REMAINING ACCEPTANCE
+- Supplier Catalog deactivation feedback is source-level regression-verified, not deployed-browser verified. Live backend/database/browser acceptance required.
+- Historical UoM CASE=24 persistence and Custom Fields text-value persistence remain open for database-backed investigation. Clean Node24 dependency installation/production build, PostgreSQL integration, and mobile/desktop deployed acceptance remain unverified.
+NEXT: Batch146 NOT STARTED; continue from FULL FE144 + unchanged FULL BE072 and preserve all 11 individual release artifacts plus all-in-one package.
+================================================================================
