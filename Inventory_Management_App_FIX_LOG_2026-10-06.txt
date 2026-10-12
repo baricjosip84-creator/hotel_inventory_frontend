@@ -11842,3 +11842,29 @@ EVIDENCE / LIMITATIONS
 - No live simultaneous browser click, PostgreSQL or server test was performed. Clean Node24 install/typecheck/Vite build and deployed desktop/mobile acceptance remain pending. Historical UoM CASE=24 persistence and Custom Fields text-value save/readback still need DB-backed investigation.
 NEXT: Batch151 not started. Continue from FULL FE149 + unchanged FULL BE072; preserve unabridged FIX_LOG and provide all 11 individual release files plus complete bundle every batch.
 ================================================================================
+
+================================================================================
+BATCH 151 — UNITS OF MEASURE: STALE ASYNC CONVERSION RESULTS CANNOT CROSS SELECTIONS
+Date: 2026-10-12
+================================================================================
+AUTHORITATIVE BASELINE AND PROVEN SOURCE DEFECT
+- Started from the full unchanged Frontend 149 and Backend 072 SHA-256-confirmed code, unabridged FIX_LOG through 150 and canonical Tenant Audit v93.
+- In Frontend149, the Units of measure conversion mutation unconditionally wrote `converted_quantity` or a conversion error after its HTTP request resolved. If the user selected another product, changed the quantity, changed a unit, saved/deleted a conversion, or initiated a newer Convert request while the previous one was pending, a late response could display an old result or obsolete error against the newly selected product/inputs.
+- Batch151 focused guard FAILS on the untouched Frontend149 source at the missing request-generation ref; it PASSES on the corrected Frontend150 source. This reproduces the source-level race and is NOT evidence the user already observed it in deployed production.
+SURGICAL CORRECTION — FRONTEND ONLY
+1. src/pages/InventoryCapabilitiesPage.tsx: synchronous `conversionRequestSeqRef` generation guard. Each convert onMutate receives its own sequence. onSuccess and onError apply only if that sequence still matches. Product changes, quantity/from/to edits and successful UoM save/delete invalidate any pending conversion result. UI, API path/payload, read permissions, write permissions, inventory quantity behavior, help text, localized labels, unit form and existing visual controls remain intact.
+2. scripts/check-batch151-uom-stale-conversion-result.mjs: focused executable 52-assertion guard. Extracts actual TypeScript/JSX callbacks and React Query mutation options and runs them with deferred network requests; checks stale results and stale errors on product and three-input changes; rapid overlapping requests; ordinary successful/error responses; save/delete invalidation; GET permissions; unchanged conversion payload.
+3. scripts/check-batch126-uom-success-feedback.mjs: narrowly extend inherited source-text expectation for additional sequence invalidation after save. Preserve all original 41 assertions and API mutation feedback behaviors.
+4. package.json: register focused regression command.
+5. Inventory_Management_App_FIX_LOG_2026-10-06.txt: append this record to the ENTIRE historical log. The standalone and embedded copies are byte-identical.
+EVIDENCE AND RELEASE VALIDATION
+- Untouched Frontend149 baseline focused guard: FAIL (expected; missing synchronous generation lock).
+- Corrected Frontend150 focused guard: 52/52 PASS. Batch126 inherited guard 41/41 PASS; Batch138 inherited guidance guard 37/37 PASS.
+- Selected inherited regressions: 74/74 PASS. Batch151 new + inherited: 75/75 PASS.
+- Multilingual closure (inherited check-tenant-multilingual-closure-audit) passes; no new translated UI strings required.
+- Complete full Frontend150 and unchanged full Backend072 archive, changed-files archive, 11-file bundle and checksums verified after packaging.
+LIMITATIONS / NEXT WORK
+- Tests are isolated source/runtime mocks and inherited source-level regressions on Node22 + test-only TypeScript symlink, not deployed browser, PostgreSQL, or production Node24 npm-ci/build acceptance. No new backend write or migration.
+- Historical UoM CASE=24 write/readback persistence failure and Custom Fields `Croatia` plain-text value save (database returned invalid-format) remain UNRESOLVED and must be traced through actual deployed request/response and DB evidence. This fix does not claim to resolve either.
+- Continue from full cumulative Frontend150 and complete unchanged Backend072. Next Batch152 NOT started. For every batch deliver full frontend, full backend, changed-files, cumulative FIX_LOG, audit, verification, regression results, handoff, complete detailed handoff, START HERE, SHA manifest, plus 11-file release ZIP.
+================================================================================
