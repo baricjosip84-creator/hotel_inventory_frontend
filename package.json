@@ -6,6 +6,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "check:batch119-po-guided-delivery-contract": "node scripts/check-batch119-po-guided-delivery-contract.mjs",
     "check:batch118-procurement-single-confirmation": "node scripts/check-batch118-procurement-single-confirmation.mjs",
     "check:batch117-purchase-order-single-add-item": "node scripts/check-batch117-purchase-order-single-add-item.mjs",
     "check:cycle-count-workflow-feedback-v349357": "node scripts/check-cycle-count-workflow-feedback-surgical-fix-v349357.mjs",

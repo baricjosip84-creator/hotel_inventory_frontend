@@ -10706,3 +10706,43 @@ NEW AUTHORITATIVE SOURCE: Frontend117 + Backend072.
 NEXT: Batch119 NOT STARTED.
 PRODUCTION ACCEPTANCE: PENDING.
 ================================================================================
+
+
+================================================================================
+BATCH 119 — PURCHASE ORDER GUIDED DELIVERY REGRESSION CONTRACT CLOSURE
+DATE: 2026-10-12
+BASELINE: Frontend117 + Backend072 (Batch118 completed)
+RESULT: Frontend118 + Backend072 (backend unchanged)
+
+SOURCE / ROOT CAUSE (INHERITED TEST FAILURE, NOT A PRODUCT RUNTIME BUG)
+- Batch118 selected regression sweep found one inherited failure in scripts/check-tenant-procurement-guided-workflow.mjs. The test expected the retired literal !selectedOpenShipment && !selectedDetail.expected_delivery_date. This expression was legitimately replaced by the existing named selectedNeedsDeliveryDate and selectedDeliveryDateReady safeguards introduced long before Batch119.
+- Re-ran the unchanged Frontend117 test and independently reproduced FAIL at the exact Purchase Order supplier-send delivery-date assertion. Inspected current PurchaseOrdersPage.tsx and the separate check-purchase-order-delivery-date-gating-surgical-fix-v349294.mjs: actual runtime safeguards and localized missing-date messages already exist and remain intact.
+- This was an outdated automated source assertion, NOT evidence of a delivery-date runtime defect. No audit UX finding is claimed fixed by Batch119.
+
+SURGICAL IMPLEMENTATION — FRONTEND118 ONLY
+1. scripts/check-tenant-procurement-guided-workflow.mjs: replace its single stale source-text expectation with three guards for selectedNeedsDeliveryDate eligibility/no-open-shipment/no-expected-date, selectedDeliveryDateReady (existing shipment OR persisted PO date OR user-entered date), and the explicit no-shipment/no-date local refusal. The remainder of the inherited test remains intact. It now passes 35/35 checks.
+2. scripts/check-batch119-po-guided-delivery-contract.mjs (NEW): 33 executable assertions verifying current Purchase Order availability/capabilities, supplier-email history and double-send protection, missing-date UI and local validation, preview gating, legacy guard update and execution of both guided workflow and separate delivery-date tests.
+3. package.json: register check:batch119-po-guided-delivery-contract. Existing check:ci references to the guided workflow test remain active.
+4. Update THIS full cumulative FIX_LOG, also embedded in the complete frontend ZIP. Audit v93 remains unchanged.
+
+PRE/POST AND REGRESSION EVIDENCE
+- Untouched Frontend117 guided-workflow script FAILS at the inherited stale expression (reproduced again during Batch119).
+- Corrected guided-workflow script PASSES: 35/35.
+- Focused Batch119 guard PASSES: 33/33, including subprocess execution of the inherited guided workflow (35/35) and delivery-date gating (20/20).
+- Selected scripts from Batch118 plus Batch119 guard: 43/43 PASS. No exclusions from this selected set.
+- Global multilingual closure audit: PASS (45/45 tenant routes, 265 reachable source files, 14,308 complete five-language catalog rows).
+- Node --check of both changed/new MJS scripts: PASS.
+- ZIP CRC/member/diff and unchanged Backend072 SHA-256 to be verified during publication; exact 4 frontend ZIP paths changed from Frontend117.
+
+UNCHANGED / SAFETY
+- No runtime application TS/TSX/CSS, API requests, server code, SQL, schema, translations, roles, tenant permissions, stock, purchase-order lifecycle, shipment creation, supplier email, audit events, or database behavior changed in Batch119.
+- This test-only correction cannot establish that supplier send/receiving works in a deployed tenant. Real browser acceptance still required.
+
+REMAINING / DEPLOYMENT
+- Node24 clean npm ci and full TypeScript/Vite production build still NOT VERIFIED (only Node22 and partial modules available locally).
+- PostgreSQL/database-backed integration and deployed browser/mobile acceptance NOT VERIFIED.
+- When testing live, verify supplier-send eligibility, open-shipment reuse, required delivery date when missing, email preview, no duplicate sends, and original role/tenant authorization.
+
+NEW AUTHORITATIVE CODE: Frontend118 + Backend072.
+NEXT: Batch120 NOT STARTED; verify a genuinely unresolved audit issue against current source before making an application correction.
+================================================================================
