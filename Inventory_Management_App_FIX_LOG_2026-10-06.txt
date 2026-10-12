@@ -10303,3 +10303,66 @@ REMAINING
 CURRENT ENGINEERING BASELINE: Frontend106 + Backend072.
 PRODUCTION ACCEPTANCE: PENDING. Batch108 NOT STARTED.
 ================================================================================
+
+================================================================================
+BATCH 108 — ACTION-I18N-001 PHASE 2: ACTION CENTER GOVERNANCE / CONTRACT EVIDENCE LOCALIZATION
+DATE: 2026-10-09
+BASELINE: Frontend106 + Backend072
+RESULT: Frontend107 + Backend072 (backend unchanged)
+
+AUDIT/FINDING
+- Action Center advanced read-only governance sections continued to display humanized English backend machine keys in escalation, closure, response-contract and route-exposure review panels when no direct tenant translation existed.
+- Existing canonicalLabel(ui) formatting already separates display text from immutable backend identifiers. This correction adds the missing translations rather than changing API codes.
+
+IMPLEMENTED — FRONTEND107
+- src/i18n/tenantUiTranslations.ts: 44 new complete EN/DE/ES/FR/HR translation rows covering 37 escalation, closure, contract and route blocker/contract values plus 7 displayed response/panel contract keys. Already-translated governance posture states were verified and not duplicated.
+- package.json: added check:action-center-governance-audit-v349351.
+- scripts/check-action-center-governance-audit-localization-surgical-fix-v349351.mjs and scripts/batch108_action_codes.json: targeted backend-code/formatter/locale coverage regression.
+- src/pages/OperationalActionCenterPage.tsx, backend services, database schema, API contract, action safety and approval rules: UNCHANGED.
+
+VERIFICATION — SOURCE LEVEL
+- New Batch108 regression: 13/13 PASS; translated 44 backend codes across all five languages, checking uniqueness, actual formatter, four panel usage and preservation of unknown/free-form text.
+- 48/48 selected inherited and broader scripts PASS, including Batch107 regression and Action Center multilingual coverage.
+- Global multilingual closure: 45/45 routes, 264 reachable source files, 14,298 complete five-language translation rows, placeholder parity PASS.
+- ZIP integrity, backend archive identity, frontend exact changed-member comparison and SHA-256 manifest PASS.
+- NOT VERIFIED: clean Node24 npm ci/TypeScript full project typecheck/Vite production build, live PostgreSQL integration, deployed browser acceptance.
+
+FOLLOW-UP
+- Inspect other Action Center diagnostic categories if untranslated codes are observed in live data; do not assume unknown or user-authored evidence must be localized.
+- Live-acceptance check in HR/DE/ES/FR/EN with empty and populated escalation, closure, contract-audit and route-audit panels; verify messages and source evidence have not been mutated.
+- Broader audit v93 defects and full production acceptance remain open. Batch109 has not started.
+
+AUTHORITATIVE ENGINEERING BASELINE: Frontend107 + Backend072.
+================================================================================
+
+
+================================================================================
+BATCH 109 — REPORTS / CLEAR FILTERS RESTORES MANUAL SEARCH CONTROL MODE
+DATE: 2026-10-12
+BASELINE: Frontend107 + Backend072
+RESULT: Frontend108 + Backend072 (backend unchanged)
+
+CANONICAL AUDIT / FOLLOW-ON SOURCE DEFECT
+- Audit v93, Reports section: the user explicitly requested a visible Clear filters action on every filtered report, restoring the default/unfiltered state (later corrected in earlier code). Batches105/106 subsequently introduced Product and historical-Location dropdowns with optional manual-search modes.
+- Source verification against Frontend107 showed the parent Clear filters restored the query values, but the two selector components independently retained local `customMode`. After clearing a typed noncatalog product or historical location, the dropdown still displayed "Other ... / manual search" and the manual text box although the actual filter value was empty. This produced a misleading visual reset.
+
+IMPLEMENTED — FRONTEND108
+- src/pages/ReportsPage.tsx: add a reset revision owned by ReportsPage, incremented only in the existing Clear filters handler.
+- Wrap seven affected manual-mode filter controls in keyed React Fragments. The key changes only after an explicit Clear filters action, remounting the local selector state with `customMode=false`. Includes Product Movements, Movement Ledger, PO Commitments, Purchasing & Spend, Slow/Non-moving, Usage & Consumption and Stock Transfers historical Location.
+- Preserve the existing Product/Location selector element markup and bindings, native selects, historical/manual fallback, default filter values, backend queries, data refresh, export, print, disabled states and existing feedback clearing. No new translations or database changes.
+- Add scripts/check-reports-clear-filters-manual-mode-surgical-fix-v349352.mjs and the corresponding package.json command.
+
+SOURCE REGRESSION RESULTS
+- New Batch109 check: 17/17 PASS, covering reset-only revision, all seven keyed Fragment bindings, preservation of onChange/disabled/defaults, original manual selectors, and isolated TSX parser.
+- Inherited Batch106 Product selector test: 36/36 PASS.
+- 50/50 available direct regression scripts PASS, including inherited Reports, audit, permissions and tenant five-language closure. Two older listed scripts lack the referenced JS source in the supplied baseline ZIP and were therefore not runnable; they were not counted as passes or product failures.
+- TypeScript isolated transpile PASS. Full clean Node24 install/typecheck/Vite build and browser acceptance remain PENDING.
+- ZIP archive CRC, exact changed-member equivalence, unchanged Backend072 SHA-256, and continuation bundle manifest are verified at packaging.
+
+LIVE ACCEPTANCE STILL REQUIRED
+- Under Reports > Product Movements, Movement Ledger, PO Commitments, Purchasing & Spend, Slow / Non-moving, Usage & Consumption: select Other product or manual search; enter a noncatalog term, click Clear filters, check dropdown returns to Any product and manual box disappears; re-enter manual mode and confirm search/export still works.
+- Repeat Stock Transfers Location with Other or historical location; confirm clearing closes custom input and restores default options. Check Reset disabled state, five-language labels and report query results. Verify production build and browser separately.
+
+CURRENT AUTHORITATIVE ENGINEERING BASELINE: Frontend108 + Backend072.
+PRODUCTION ACCEPTANCE: PENDING. Batch110 NOT STARTED.
+================================================================================
