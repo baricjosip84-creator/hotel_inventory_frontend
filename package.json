@@ -6,6 +6,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "check:batch117-purchase-order-single-add-item": "node scripts/check-batch117-purchase-order-single-add-item.mjs",
     "check:cycle-count-workflow-feedback-v349357": "node scripts/check-cycle-count-workflow-feedback-surgical-fix-v349357.mjs",
     "check:reports-clear-filters-manual-mode-v349352": "node scripts/check-reports-clear-filters-manual-mode-surgical-fix-v349352.mjs",
     "check:action-center-governance-evidence-surgical-fix-v349350": "node scripts/check-action-center-governance-evidence-surgical-fix-v349350.mjs",

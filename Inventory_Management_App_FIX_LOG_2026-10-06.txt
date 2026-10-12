@@ -10626,3 +10626,42 @@ NEXT
 AUTHORITATIVE CODE SOURCE: Frontend115 + Backend072.
 PRODUCTION ACCEPTANCE: PENDING.
 ================================================================================
+
+
+================================================================================
+BATCH 117 — PURCHASE ORDERS / SINGLE ADD ITEM ACTION IN CREATE & EDIT FORM
+DATE: 2026-10-12
+BASELINE: Frontend115 + Backend072 (Batch116 completed)
+RESULT: Frontend116 + Backend072 (backend unchanged)
+
+SOURCE-VERIFIED AUDIT FINDING
+- Canonical tenant audit v93, 2026-09-30, Purchase Orders registry/create-form review: "Create form contains both `Add item` and `Add another item` controls for the same core action within one section. This is redundant and should be simplified to one consistent add-line action."
+- Checked the current Frontend115 source, not an older package: src/pages/PurchaseOrdersPage.tsx still has two onClick={addItem} controls, one in the order-items heading and one after the line cards. Both share the exact same addItem handler and both are within the same fieldset; current FIX_LOG did not include a prior correction to this duplication.
+- A new focused test run against untouched Frontend115 reproduced FAIL on "Only ONE user-facing add-item button is permitted", before edits.
+
+IMPLEMENTATION — FRONTEND116 ONLY
+1. src/pages/PurchaseOrdersPage.tsx: remove redundant header-level Add item button; preserve heading and instructions. Keep sole add-line action immediately following the existing item list, using the consistent localized label "Add item" rather than "Add another item". The button keeps type=button, existing secondary style, onClick={addItem}, and the existing disabled fieldset guard. It is reachable at the natural continuation point after the current purchase-order items.
+2. scripts/check-batch117-purchase-order-single-add-item.mjs (NEW): 31 focused structural, TSX-parse and safety assertions for sole Add item control, precise placement, existing add/remove handlers, purchase price/supplier currency/permission constraints, draft/edit submit, disabled state, localized text, and existing CSS.
+3. package.json: register check:batch117-purchase-order-single-add-item.
+4. Inventory_Management_App_FIX_LOG_2026-10-06.txt: append Batch117 to the entire existing log; standalone and embedded copies identical.
+
+SAFEGUARDS / NON-CHANGES
+- No purchase-order creation, edit, submit, approval, quantity, supplier-product pricing, stock receiving, backend route, database, tenant isolation, role permission, or API contract changes. No schema migration. No translation table additions; reuse the existing five-language "Add item" label.
+- Existing Remove button is still disabled on the final line; addItem still appends an empty draft item only. The create-form fieldset still disables inputs once a new draft has been created, unless editing.
+
+ACTUAL VERIFICATION
+- Untouched Frontend115 baseline: focused new test FAIL due to the two addItem buttons, exactly the audit issue.
+- After correction: focused 31/31 assertions PASS.
+- 35/35 selected regression scripts PASS, including all 27 from Batch116, six PO-focused regressions, tenant Purchase Orders multilingual, and new Batch117 guard.
+- Global five-language closure PASS (45 routes, 265 files, 14,308 five-language translation rows).
+- Isolated changed PurchaseOrdersPage TSX compilation/transpilation diagnostic check PASS on local TypeScript.
+- Full frontend ZIP compared byte-for-byte to Frontend115: only PurchaseOrdersPage.tsx, package.json, full cumulative log modified and the new test script added. Delta parity and ZIP CRC checked; backend archive unchanged.
+
+PENDING / TARGETED LIVE TEST
+- Deploy compatible cumulative Frontend116 and Backend072 after CI. In Purchase Orders, open Create draft and Edit draft: one clearly labelled Add item appears directly below the existing item rows. Add second and third lines; verify new rows are appended, supplier-specific products and pricing still work, one Remove cannot delete the last row, and draft submission/approval/stock lifecycle is unchanged.
+- Check the Add item remains keyboard-operable, uses correct labels EN/DE/ES/FR/HR, stays visibly enabled/disabled in the same cases as before, and does not cause unintended PO creation. Check responsive/mobile form layout and long-item lists.
+- Full Node24 clean npm ci, project-wide TS/Vite build, PostgreSQL integration, and deployed browser tests NOT VERIFIED. Do not claim production acceptance.
+
+NEW AUTHORITATIVE CODE: Frontend116 + Backend072.
+NEXT BATCH: 118 NOT STARTED.
+================================================================================
