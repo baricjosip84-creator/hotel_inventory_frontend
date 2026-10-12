@@ -59,6 +59,7 @@ const js=ts.transpileModule(`const options=${mutationSrc};`,{fileName:'callbacks
 function scenario(mode='good') {
  const events={requests:[],errors:[],cached:[],invalidated:[],success:[],failure:[]};
  const state={current:{entityType:'product',entityId:'p-A'}};
+ const customFieldDraftDirtyRef={current:true};
  const apiRequest=async (url,opts) => {
   events.requests.push({url,opts});
   if(opts){if(mode==='putFail')throw new Error('invalid value format'); return {ok:true};}
@@ -70,10 +71,10 @@ function scenario(mode='good') {
  const qc={setQueryData:(k,v)=>events.cached.push({k,v}),invalidateQueries:({queryKey})=>events.invalidated.push(queryKey)};
  const setError=v=>events.errors.push(v), ui=v=>v, messageFrom=e=>e.message;
  const showTenantActionSuccess=v=>events.success.push(v), showTenantActionError=v=>events.failure.push(v);
- const factory=new Function('apiRequest','qc','activeCustomValueTargetRef','setError','ui','messageFrom','showTenantActionSuccess','showTenantActionError','verifyCustomFieldReadback',js+'; return options;');
- const options=factory(apiRequest,qc,state,setError,ui,messageFrom,showTenantActionSuccess,showTenantActionError,verify);
+ const factory=new Function('apiRequest','qc','activeCustomValueTargetRef','customFieldDraftDirtyRef','setError','ui','messageFrom','showTenantActionSuccess','showTenantActionError','verifyCustomFieldReadback',js+'; return options;');
+ const options=factory(apiRequest,qc,state,customFieldDraftDirtyRef,setError,ui,messageFrom,showTenantActionSuccess,showTenantActionError,verify);
  const vars={targetEntityType:'product',targetEntityId:'p-A',payload:{values:{test_country:'Croatia'},value_versions:{test_country:0},definition_versions:{test_country:1}}};
- return {events,state,options,vars};
+ return {events,state,options,vars,customFieldDraftDirtyRef};
 }
 {
  const s=scenario();const result=await s.options.mutationFn(s.vars);
@@ -86,6 +87,7 @@ function scenario(mode='good') {
  s.options.onSuccess(result,s.vars);
  check('verified result cached under original record',()=>assert.deepEqual(s.events.cached[0],{k:['custom-field-values','product','p-A'],v:rows}));
  check('confirmed success notification',()=>assert.deepEqual(s.events.success,['Custom field values saved and verified.']));
+ check('verified save permits version refresh',()=>assert.equal(s.customFieldDraftDirtyRef.current,false));
  check('confirmed form error cleared',()=>assert.deepEqual(s.events.errors,[null]));
 }
 for (const mode of ['mismatch','missing','getFail']) {
@@ -109,6 +111,7 @@ for (const mode of ['mismatch','missing','getFail']) {
  const s=scenario();const result=await s.options.mutationFn(s.vars);s.state.current={entityType:'product',entityId:'p-B'};s.options.onSuccess(result,s.vars);
  check('record switch still caches original record only',()=>assert.deepEqual(s.events.cached[0].k,['custom-field-values','product','p-A']));
  check('record switch emits no misleading current-record toast',()=>assert.deepEqual(s.events.success,[]));
+ check('record switch does not reset current unsaved-draft flag',()=>assert.equal(s.customFieldDraftDirtyRef.current,true));
  check('record switch does not clear new record error',()=>assert.deepEqual(s.events.errors,[]));
 }
 console.log(`Batch155 custom fields verified readback: ${checks}/${checks} PASS`);

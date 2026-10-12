@@ -35,7 +35,7 @@ check('entity-type selector uses synchronous change handler',()=>assert.match(ty
 check('entity change resets active record immediately',()=>assert.match(defs.changeEntityType.getText(ast),/activeCustomValueTargetRef\.current = \{ entityType: nextEntityType, entityId: '' \};[\s\S]*?setEntityType\(nextEntityType\)/));
 check('record change updates active target immediately',()=>assert.match(defs.changeEntityId.getText(ast),/activeCustomValueTargetRef\.current = \{ entityType, entityId: nextEntityId \};[\s\S]*?setEntityId\(nextEntityId\)/));
 check('read-permission forced entity change also updates reference',()=>assert.match(panel.getText(ast),/if \(!canRead\) \{[\s\S]*?activeCustomValueTargetRef\.current = \{ entityType: nextType, entityId: '' \}/));
-check('reactive entity reset also updates reference',()=>assert.match(panel.getText(ast),/activeCustomValueTargetRef\.current = \{ entityType, entityId: '' \};\s*setEntityId\(''\)/));
+check('reactive entity reset also updates reference',()=>assert.match(panel.getText(ast),/activeCustomValueTargetRef\.current = \{ entityType, entityId: '' \};\s*(?:customFieldDraftDirtyRef\.current = false;\s*)?setEntityId\(''\)/));
 check('click captures entity and record IDs',()=>assert.match(click,/targetEntityType: entityType, targetEntityId: entityId/));
 check('click copies submitted values',()=>assert.match(click,/values: \{ \.\.\.values \}/));
 check('click copies value versions',()=>assert.match(click,/value_versions: \{ \.\.\.valueVersions \}/));
@@ -43,7 +43,7 @@ check('click copies definition versions',()=>assert.match(click,/definition_vers
 check('write route uses captured entity type and ID',()=>assert.match(defs.saveValues.getText(ast),/custom-fields\/\$\{targetEntityType\}\/\$\{targetEntityId\}/));
 check('write retains PUT with immutable submitted payload',()=>assert.match(defs.saveValues.getText(ast),/method: 'PUT',[\s\S]*?body: JSON\.stringify\(payload\)/));
 check('write updates original record cache after readback',()=>assert.match(defs.saveValues.getText(ast),/setQueryData\(\['custom-field-values', targetEntityType, targetEntityId\], verifiedRows\)/));
-check('save success guards new selection error',()=>assert.match(defs.saveValues.getText(ast),/activeCustomValueTargetRef\.current\.entityType === targetEntityType && activeCustomValueTargetRef\.current\.entityId === targetEntityId\) \{\s*setError\(null\)/));
+check('save success guards new selection error',()=>assert.match(defs.saveValues.getText(ast),/activeCustomValueTargetRef\.current\.entityType === targetEntityType && activeCustomValueTargetRef\.current\.entityId === targetEntityId\) \{[\s\S]*?setError\(null\)/));
 check('save failure guards new selection error',()=>assert.match(defs.saveValues.getText(ast),/onError:[\s\S]*?activeCustomValueTargetRef\.current\.entityType === targetEntityType && activeCustomValueTargetRef\.current\.entityId === targetEntityId\) \{/));
 check('save permission gate retained',()=>assert.match(panel.getText(ast),/disabled=\{!canWrite \|\| !entityId \|\| entityValues\.isLoading \|\| entityValues\.isError \|\| !entityValues\.data \|\| saveValues\.isPending\}/));
 check('backend write permission retained',()=>assert.match(backend,/router\.put\('\/custom-fields\/:entityType\/:entityId', requireCustomFieldEntityPermission\('write'\)/));
@@ -54,6 +54,7 @@ const exprSource = `const saveOptions = ${defs.saveValues.initializer.arguments[
 const exprJs = ts.transpileModule(exprSource,{fileName:'custom-target-test.ts', compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
 function make() {
  const activeCustomValueTargetRef = {current:{entityType:'product',entityId:'p-A'}};
+ const customFieldDraftDirtyRef = {current:true};
  const observed = {requests:[],invalidations:[],cache:[],errors:[],selectedIds:[],selectedTypes:[],values:[],versions:[],definitionVersions:[]};
  const apiRequest = (url, opts) => {observed.requests.push({url,opts});return Promise.resolve(opts ? {ok:true} : url.includes('/supplier/') ? [{field_key:'region',data_type:'text',value:'Rijeka'}] : [{field_key:'test_country',data_type:'text',value:'Croatia'}]);};
  const qc = {invalidateQueries: ({queryKey})=>observed.invalidations.push(queryKey), setQueryData:(key,data)=>observed.cache.push({key,data})};
@@ -65,9 +66,9 @@ function make() {
  const setDefinitionVersions = value=>observed.definitionVersions.push(value);
  const messageFrom = error => error.message;
  const ui = value=>value;
- const maker = new Function('apiRequest','qc','activeCustomValueTargetRef','setError','setEntityId','setEntityType','setValues','setValueVersions','setDefinitionVersions','messageFrom','ui','entityType','verifyCustomFieldReadback','showTenantActionSuccess','showTenantActionError',exprJs+'\nreturn {saveOptions,changeEntityId,changeEntityType};');
- const handlers=maker(apiRequest,qc,activeCustomValueTargetRef,setError,setEntityId,setEntityType,setValues,setValueVersions,setDefinitionVersions,messageFrom,ui,'product',(values,rows)=>Object.entries(values).every(([key,value])=>rows.some(row=>row.field_key===key && row.value===value)),()=>{},()=>{});
- return {...handlers,observed,activeCustomValueTargetRef};
+ const maker = new Function('apiRequest','qc','activeCustomValueTargetRef','customFieldDraftDirtyRef','setError','setEntityId','setEntityType','setValues','setValueVersions','setDefinitionVersions','messageFrom','ui','entityType','verifyCustomFieldReadback','showTenantActionSuccess','showTenantActionError',exprJs+'\nreturn {saveOptions,changeEntityId,changeEntityType};');
+ const handlers=maker(apiRequest,qc,activeCustomValueTargetRef,customFieldDraftDirtyRef,setError,setEntityId,setEntityType,setValues,setValueVersions,setDefinitionVersions,messageFrom,ui,'product',(values,rows)=>Object.entries(values).every(([key,value])=>rows.some(row=>row.field_key===key && row.value===value)),()=>{},()=>{});
+ return {...handlers,observed,activeCustomValueTargetRef,customFieldDraftDirtyRef};
 }
 const payload = {values:{test_country:'Croatia'},value_versions:{test_country:0},definition_versions:{test_country:1}};
 const vars = {targetEntityType:'product',targetEntityId:'p-A',payload};
@@ -78,6 +79,7 @@ const vars = {targetEntityType:'product',targetEntityId:'p-A',payload};
  check('submitted Croatia value/version payload preserved',()=>assert.deepEqual(JSON.parse(h.observed.requests[0].opts.body),payload));
  h.changeEntityId('p-B');
  check('selection ref changed synchronously to product B',()=>assert.deepEqual(h.activeCustomValueTargetRef.current,{entityType:'product',entityId:'p-B'}));
+ check('selection resets previous dirty draft',()=>assert.equal(h.customFieldDraftDirtyRef.current,false));
  check('new product field values reset',()=>assert.deepEqual(h.observed.values,[{}]));
  check('new product versions reset',()=>assert.deepEqual(h.observed.versions,[{}]));
  check('new product definition versions reset',()=>assert.deepEqual(h.observed.definitionVersions,[{}]));
@@ -101,6 +103,7 @@ const vars = {targetEntityType:'product',targetEntityId:'p-A',payload};
  const h=make(); h.saveOptions.onSuccess({verifiedRows:[{field_key:'test_country',data_type:'text',value:'Croatia'}]},vars);
  check('normal save caches verified current record',()=>assert.deepEqual(h.observed.cache[0].key,['custom-field-values','product','p-A']));
  check('normal success clears prior page error',()=>assert.deepEqual(h.observed.errors,[null]));
+ check('verified same-record save resets draft dirty flag',()=>assert.equal(h.customFieldDraftDirtyRef.current,false));
  h.saveOptions.onError(new Error('invalid value format'),vars);
  check('normal save failure remains visible',()=>assert.equal(h.observed.errors.at(-1),'invalid value format'));
 }

@@ -513,7 +513,8 @@
     "check:batch152-uom-write-product-association": "node scripts/check-batch152-uom-write-product-association.mjs",
     "check:batch153-custom-field-value-target-association": "node scripts/check-batch153-custom-field-value-target-association.mjs",
     "check:batch154-uom-save-readback": "node scripts/check-batch154-uom-save-readback.mjs",
-    "check:batch155-custom-field-value-readback": "node scripts/check-batch155-custom-field-value-readback.mjs"
+    "check:batch155-custom-field-value-readback": "node scripts/check-batch155-custom-field-value-readback.mjs",
+    "check:batch156-custom-field-draft-refresh": "node scripts/check-batch156-custom-field-draft-refresh.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

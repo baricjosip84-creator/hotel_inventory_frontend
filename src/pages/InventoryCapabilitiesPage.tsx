@@ -902,6 +902,8 @@ function CustomFieldsPanel({
   const [entityId, setEntityId] = useState('');
   // Track the selected custom-field target synchronously across pending value writes.
   const activeCustomValueTargetRef = useRef<{ entityType: EntityType; entityId: string }>({ entityType: 'product', entityId: '' });
+  // An automatic React Query refresh must not silently replace user edits.
+  const customFieldDraftDirtyRef = useRef(false);
   const [values, setValues] = useState<Record<string, string | boolean>>({});
   const [valueVersions, setValueVersions] = useState<Record<string, number>>({});
   const [definitionVersions, setDefinitionVersions] = useState<Record<string, number>>({});
@@ -954,6 +956,7 @@ function CustomFieldsPanel({
       return;
     }
     activeCustomValueTargetRef.current = { entityType, entityId: '' };
+    customFieldDraftDirtyRef.current = false;
     setEntityId('');
     setValues({});
     setValueVersions({});
@@ -965,7 +968,9 @@ function CustomFieldsPanel({
   }, [canRead, entityType, readableEntityTypes]);
 
   useEffect(() => {
-    if (!entityValues.data) return;
+    // Focus/reconnect/revalidation can refetch this record while its fields are being edited.
+    // Keep the operator's unsaved text until an explicit record change or verified save.
+    if (!entityValues.data || customFieldDraftDirtyRef.current) return;
     const next: Record<string, string | boolean> = {};
     const nextValueVersions: Record<string, number> = {};
     const nextDefinitionVersions: Record<string, number> = {};
@@ -988,11 +993,13 @@ function CustomFieldsPanel({
 
   const changeEntityType = (nextEntityType: EntityType) => {
     activeCustomValueTargetRef.current = { entityType: nextEntityType, entityId: '' };
+    customFieldDraftDirtyRef.current = false;
     setEntityType(nextEntityType);
   };
 
   const changeEntityId = (nextEntityId: string) => {
     activeCustomValueTargetRef.current = { entityType, entityId: nextEntityId };
+    customFieldDraftDirtyRef.current = false;
     setEntityId(nextEntityId);
     setValues({});
     setValueVersions({});
@@ -1069,6 +1076,11 @@ function CustomFieldsPanel({
       }
     },
     onSuccess: ({ verifiedRows }, { targetEntityType, targetEntityId }) => {
+      if (activeCustomValueTargetRef.current.entityType === targetEntityType && activeCustomValueTargetRef.current.entityId === targetEntityId) {
+        // Fields stay disabled during this write. Once the server values are verified,
+        // allow the cached readback to refresh value/definition versions for the next save.
+        customFieldDraftDirtyRef.current = false;
+      }
       qc.setQueryData(['custom-field-values', targetEntityType, targetEntityId], verifiedRows);
       if (activeCustomValueTargetRef.current.entityType === targetEntityType && activeCustomValueTargetRef.current.entityId === targetEntityId) {
         setError(null);
@@ -1140,10 +1152,10 @@ function CustomFieldsPanel({
           <label key={row.definition_id} style={{ display: 'block', marginTop: 12 }}>
             {row.label}{row.is_required ? ' *' : ''}
             {row.data_type === 'boolean'
-              ? <input type="checkbox" disabled={saveValues.isPending} checked={values[row.field_key] === true} onChange={(event) => setValues({ ...values, [row.field_key]: event.target.checked })} />
+              ? <input type="checkbox" disabled={saveValues.isPending} checked={values[row.field_key] === true} onChange={(event) => { customFieldDraftDirtyRef.current = true; setValues({ ...values, [row.field_key]: event.target.checked }); }} />
               : row.data_type === 'select'
-                ? <select disabled={saveValues.isPending} value={String(values[row.field_key] || '')} onChange={(event) => setValues({ ...values, [row.field_key]: event.target.value })}><option value="">{ui("Select…")}</option>{(row.options || []).map((option) => <option key={option}>{option}</option>)}</select>
-                : <input disabled={saveValues.isPending} type={row.data_type === 'number' ? 'number' : row.data_type === 'date' ? 'date' : 'text'} value={String(values[row.field_key] || '')} onChange={(event) => setValues({ ...values, [row.field_key]: event.target.value })} />}
+                ? <select disabled={saveValues.isPending} value={String(values[row.field_key] || '')} onChange={(event) => { customFieldDraftDirtyRef.current = true; setValues({ ...values, [row.field_key]: event.target.value }); }}><option value="">{ui("Select…")}</option>{(row.options || []).map((option) => <option key={option}>{option}</option>)}</select>
+                : <input disabled={saveValues.isPending} type={row.data_type === 'number' ? 'number' : row.data_type === 'date' ? 'date' : 'text'} value={String(values[row.field_key] || '')} onChange={(event) => { customFieldDraftDirtyRef.current = true; setValues({ ...values, [row.field_key]: event.target.value }); }} />}
           </label>
         ))}
         <button className="button" style={{ marginTop: 14 }} type="button" disabled={!canWrite || !entityId || entityValues.isLoading || entityValues.isError || !entityValues.data || saveValues.isPending} onClick={() => saveValues.mutate({ targetEntityType: entityType, targetEntityId: entityId, payload: { values: { ...values }, value_versions: { ...valueVersions }, definition_versions: { ...definitionVersions } } })}>{saveValues.isPending ? ui("Saving…") : ui("Save custom fields")}</button>
