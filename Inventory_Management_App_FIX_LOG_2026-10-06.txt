@@ -11756,3 +11756,25 @@ KNOWN LIMITS / OPEN WORK
 - Historical UoM CASE=24 persistence and Custom Fields text-value readback still require DB-backed inspection. Clean Node24 install/typecheck/Vite build, PostgreSQL integration, and deployed browser/mobile acceptance remain pending. The source-level tests ran with Node22 and a test-only TypeScript dependency symlink, excluded from ZIP.
 NEXT: Batch147 not started. Continue from FULL FE145 + full unchanged BE072, preserving cumulative fix history and returning full 11 individual artifacts and all-in-one bundle.
 ================================================================================
+
+================================================================================
+BATCH 147 — ATTACHMENTS: LOCALIZED DOWNLOAD-FAILURE FEEDBACK AND HANDLED REJECTION
+Date: 2026-10-12
+================================================================================
+SOURCE OF TRUTH AND CONFIRMED GAP
+- Complete cumulative Frontend surgical-fix-145 + byte-identical full Backend surgical-fix-072. Canonical audit v93 and cumulative engineering FIX_LOG through Batch146.
+- Audit v93 confirms actual attachment upload/listing/download/sha256 workflow; the successful download was tested, but download failure behavior was not. The actual FE145 AttachmentsTab downloadAttachment async function used `try { await downloadEnterpriseInventoryFile(...) } finally { setDownloadingId(null); }`, invoked from `onClick={() => void downloadAttachment(item)}`. When the downloader throws (server/network/permission/browser save error), the rejection propagates without page-specific inline feedback, and the ignored promise can become unhandled. The central API downloader may send an error toast, but there is no error next to the attachment table for operators to diagnose the failed action. This is a source-confirmed error-path defect; no live error was triggered against user data.
+SURGICAL CORRECTION — FRONTEND ONLY
+1. src/components/enterpriseInventory/tabs/AttachmentsTab.tsx: Add local `downloadError` state. Reset it before eligible download, consume a failed download in `catch`, show the translated `Failed to download attachment.` near the attachment table as an accessible role=alert, and ALWAYS reset downloadingId in `finally`. Clear stale download errors when business record/entity selection changes. Retain the same encoded attachment identifier, filename, GET download endpoint, can_download guard, loading lock, permission gate, 8-MB upload rule, styled chooser, deletion, and collapsed SHA-256 technical details. No success feedback is claimed if the download fails.
+2. src/i18n/tenantUiTranslations.ts: one complete five-language message (EN/DE/ES/FR/HR).
+3. scripts/check-batch147-attachment-download-failure.mjs: 48 executable source and isolated-runtime assertions for successful download, network/server rejection, non-Error rejection, read gating, parallel-download guard, repeat attempts, inline translated alert, record-switch cleanup, backend permissions and download transport. Registered in package.json as check:batch147-attachment-download-failure.
+4. Append this record to the unabridged cumulative FIX_LOG and keep all standalone, full-frontend-embedded, delta and bundle copies byte-identical.
+REGRESSION AND VERIFICATION
+- Actual untouched FE145 regression reproduced: expected clear-error-state assertion fails (actual undefined, expected null); the original handler has no local error feedback. Corrected FE146: 48/48 focused PASS.
+- Selected suite: all 70 inherited scripts + Batch147 = 71/71 PASS. Global multilingual closure 45/45 routes PASS. Frontend TSX isolated TypeScript parsing/transpilation PASS. Node22 and test-only globally linked TypeScript; test-only symlink excluded from full released archive.
+- Exactly 5 changed/new frontend paths including cumulative FIX_LOG; Backend072 byte-identical (SHA256 2036cbc149b5c319911ec8fe72418361651ebcea2caaf799b58382adb0cf3e69). Validate CRC, parity, complete archive readback and 11-item bundle.
+LIMITATIONS / OPEN ACCEPTANCE
+- No real backend failure simulated over HTTP, no PostgreSQL live test, no browser file-save dialog / screenreader test. The source guard mocks the download transport and exercises the actual handler.
+- UoM CASE=24 persistence after refresh; Custom Fields text-value save/readback; clean Node24 npm ci, TypeScript whole-project typecheck, Vite production build, live database and deployed browser/mobile acceptance remain unresolved. Existing API download-error toast may appear in addition to this local error note; no new duplicate success toast was created.
+CURRENT AUTHORITATIVE CUMULATIVE CODE: full Frontend surgical-fix-146 + unchanged full Backend surgical-fix-072. NEXT: Batch148 not started. Use the COMPLETE ZIPs and return all 11 files + complete bundle for the next correction.
+================================================================================

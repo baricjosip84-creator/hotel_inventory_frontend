@@ -504,7 +504,8 @@
     "check:batch143-customer-order-workflow-feedback": "node scripts/check-batch143-customer-order-workflow-feedback.mjs",
     "check:batch142-customer-return-lifecycle-feedback": "node scripts/check-batch142-customer-return-lifecycle-feedback.mjs",
     "check:batch145-supplier-catalog-deactivate-feedback": "node scripts/check-batch145-supplier-catalog-deactivate-feedback.mjs",
-    "check:batch146-outbound-email-provider-feedback": "node scripts/check-batch146-outbound-email-provider-feedback.mjs"
+    "check:batch146-outbound-email-provider-feedback": "node scripts/check-batch146-outbound-email-provider-feedback.mjs",
+    "check:batch147-attachment-download-failure": "node scripts/check-batch147-attachment-download-failure.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

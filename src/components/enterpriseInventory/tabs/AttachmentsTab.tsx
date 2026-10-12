@@ -92,6 +92,7 @@ export function AttachmentsTab({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const canReadAttachments = hasPermission(TENANT_PERMISSIONS.ATTACHMENTS_READ);
   const canWriteAttachments = hasPermission(TENANT_PERMISSIONS.ATTACHMENTS_WRITE);
@@ -170,12 +171,18 @@ export function AttachmentsTab({
 
   const downloadAttachment = async (attachment: EntityAttachment) => {
     if (!attachment.can_download || downloadingId) return;
+    setDownloadError(null);
     setDownloadingId(attachment.id);
     try {
       await downloadEnterpriseInventoryFile(
         `/enterprise-inventory/attachments/${encodeURIComponent(attachment.id)}/download`,
         attachment.original_filename
       );
+    } catch {
+      // The shared downloader reports the technical error in a toast. Keep a
+      // short, localized message next to the attachment table as well, and
+      // consume the rejection so a click cannot become an unhandled promise.
+      setDownloadError(ui('Failed to download attachment.'));
     } finally {
       setDownloadingId(null);
     }
@@ -191,7 +198,7 @@ export function AttachmentsTab({
             disabled={(!canReadAttachments && !canWriteAttachments) || createAttachmentMutation.isPending}
             label={ui('Attach to')}
             value={attachmentForm.entity_type}
-            onChange={(value) => setAttachmentForm((current) => ({ ...current, entity_type: value, entity_id: '' }))}
+            onChange={(value) => { setDownloadError(null); setAttachmentForm((current) => ({ ...current, entity_type: value, entity_id: '' })); }}
             options={entityTypes.map(([value, label]) => ({ value, label: ui(label) }))}
             required
           />
@@ -200,7 +207,7 @@ export function AttachmentsTab({
               disabled={(!canReadAttachments && !canWriteAttachments) || createAttachmentMutation.isPending || attachmentEntityOptionsQuery.isLoading}
               label={ui('Business record')}
               value={attachmentForm.entity_id}
-              onChange={(value) => setAttachmentForm((current) => ({ ...current, entity_id: value }))}
+              onChange={(value) => { setDownloadError(null); setAttachmentForm((current) => ({ ...current, entity_id: value })); }}
               options={entityOptions}
               required
             />
@@ -209,7 +216,7 @@ export function AttachmentsTab({
               disabled={(!canReadAttachments && !canWriteAttachments) || createAttachmentMutation.isPending}
               label={ui('Business record ID')}
               value={attachmentForm.entity_id}
-              onChange={(value) => setAttachmentForm((current) => ({ ...current, entity_id: value }))}
+              onChange={(value) => { setDownloadError(null); setAttachmentForm((current) => ({ ...current, entity_id: value })); }}
               required
             />
           )}
@@ -236,6 +243,7 @@ export function AttachmentsTab({
 
       <div style={styles.card}>
         <h2 style={styles.cardTitle}>{ui('Entity attachments')}</h2>
+        {downloadError && canReadAttachments && attachmentForm.entity_id ? <div role="alert" style={styles.error}>{downloadError}</div> : null}
         {!attachmentForm.entity_id ? <p style={styles.helper}>{ui('Select a business record above to see its attachments.')}</p> : !canReadAttachments ? <p style={styles.helper}>{ui('Requires {permission} permission.').replace('{permission}', TENANT_PERMISSIONS.ATTACHMENTS_READ)}</p> : attachmentsQuery.isLoading ? <p style={styles.helper}>{ui('Loading…')}</p> : !(attachmentsQuery.data ?? []).length ? <p style={styles.helper}>{ui('No attachments found for this record.')}</p> : (
           <div style={styles.tableWrap}>
             <table style={styles.table}>

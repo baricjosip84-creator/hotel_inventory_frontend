@@ -9954,6 +9954,7 @@ const rows: readonly TranslationRow[] = [
   ["Expected quantity (optional)", "Erwartete Menge (optional)", "Cantidad esperada (opcional)", "Quantité attendue (facultatif)", "Očekivana količina (neobavezno)"],
   ["Expected unit cost (optional)", "Erwartete Stückkosten (optional)", "Coste unitario esperado (opcional)", "Coût unitaire attendu (facultatif)", "Očekivani jedinični trošak (neobavezno)"],
   ["Expiry {date}", "Ablauf {date}", "Caducidad {date}", "Expiration {date}", "Rok valjanosti {date}"],
+  ["Failed to download attachment.", "Anhang konnte nicht heruntergeladen werden.", "No se pudo descargar el archivo adjunto.", "Échec du téléchargement de la pièce jointe.", "Preuzimanje privitka nije uspjelo."],
   ["Failed to create supplier invoice.", "Lieferantenrechnung konnte nicht erstellt werden.", "No se pudo crear la factura de proveedor.", "Échec de la création de la facture fournisseur.", "Nije moguće stvoriti račun dobavljača."],
   ["Failed to create supplier return.", "Lieferantenrückgabe konnte nicht erstellt werden.", "No se pudo crear la devolución al proveedor.", "Échec de la création du retour fournisseur.", "Nije moguće stvoriti povrat dobavljaču."],
   ["Failed to deactivate supplier catalog item.", "Lieferantenkatalogeintrag konnte nicht deaktiviert werden.", "No se pudo desactivar el elemento del catálogo de proveedor.", "Échec de la désactivation de l’élément du catalogue fournisseur.", "Nije moguće deaktivirati stavku kataloga dobavljača."],
