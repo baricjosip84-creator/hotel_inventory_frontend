@@ -10915,3 +10915,48 @@ NEW AUTHORITATIVE CODE SOURCE: Full Frontend122 + unchanged Backend072.
 NEXT: Batch124 NOT STARTED. Continue reconciling outstanding audit evidence against these exact sources; prioritize real unresolved issues over historic already-corrected findings.
 PRODUCTION ACCEPTANCE: PENDING.
 ================================================================================
+
+================================================================================
+BATCH 124 — SUPPLIERS / EXPLICIT REFRESH COMPLETION AND FAILURE FEEDBACK
+DATE: 2026-10-12
+BASELINE: Full Frontend122 + unchanged full Backend072 (Batch123 completed)
+RESULT: Full Frontend123 + unchanged full Backend072
+
+CANONICAL AUDIT EVIDENCE AND CURRENT-SOURCE CONFIRMATION
+- Audit v93, Suppliers page 2026-09-27: Refresh delivery status completed without visible feedback even when delivery metrics stayed unchanged (audit records two repeat observations). Refresh Performance similarly showed no completion message when Supplier D values were unchanged. The supplier list Refresh Suppliers control shares the same silent-refetch pattern.
+- Untouched complete Frontend122 SuppliersPage.tsx contains three buttons that invoke their respective React Query refetch() promises directly and never surface the returned outcome to the operator. Each button already has a loading/disabled state. No previous cumulative FIX_LOG entry was found correcting this particular Suppliers refresh feedback gap.
+- Treat this as a usability/confirmation problem, not a supplier shipment or backend data-integrity defect. No evidence of failed backend fetching was inferred from unchanged values.
+
+SURGICAL FRONTEND123 CORRECTION
+1. src/pages/SuppliersPage.tsx:
+   - Add one guarded, explicit manual-refresh dispatcher with three strictly separated scopes: supplier list, selected supplier performance, and delivery follow-up.
+   - Clear stale scope-specific result at button press; invoke the EXISTING React Query refetch() once; inspect result.isError; then show a translated completion or failure message immediately below that section's action bar. Accessible status/alert semantics are supplied.
+   - Preserve existing loading state, disable-while-fetching, selected-supplier gate, original query keys/endpoints and data rendering. A supplier switch clears prior selected-performance result. Background refetches do not create spontaneous manual-refresh success banners.
+2. src/i18n/tenantUiTranslations.ts: add six complete five-language EN/DE/ES/FR/HR messages: action-specific success and failure for each refresh scope.
+3. scripts/check-batch124-supplier-refresh-feedback.mjs (NEW): 33 assertions including actual execution of the TypeScript refresh handler under success, failure, duplicate/loading, missing selected supplier and stale-message scenarios; source endpoint/query/permission preservation; translated messages and TSX parsing.
+4. package.json: register check:batch124-supplier-refresh-feedback.
+5. Append this Batch124 entry to the ONE cumulative FIX_LOG; standalone log and embedded frontend copy are byte-identical.
+
+NON-CHANGES
+- No backend ZIP, PostgreSQL schema, supplier create/update/archive mutation, supplier lookup/search, role/permission, tenant-scope, stock, shipment, SLA calculation, query cache key or API contract altered.
+- Do not claim the values changed merely because refresh succeeded. No new business writes occur.
+
+VERIFICATION
+- Pristine baseline: all three direct refetch button handlers were confirmed in Frontend122; the new action-scoped completion state and messages were absent.
+- New Batch124 focused executable test: 33/33 PASS.
+- Selected inherited regression sweep: 48/48 PASS (all 47 previous Batch123 selected scripts plus new Batch124 test). Initial local run 39/48 due to nine missing local TypeScript module links; after making available the identical existing global TypeScript runtime as a test-only symlink, ALL 48 scripts reran successfully. No test was excluded.
+- Tenant multilingual closure PASS: 45/45 routes, 265 reachable source files, 14,316 full five-language catalog entries and placeholder parity.
+- Isolated SupplersPage.tsx and translation module transpilation PASS; new focused test executes the actual dispatcher with deterministic React Query stubs.
+- Exact changed-file/delta parity, embedded and standalone log equality, ZIP CRC, backend SHA-256 verified in release packaging.
+- NOT VERIFIED: clean Node24 npm ci, project-wide TypeScript/Vite production build, real PostgreSQL integration and deployed-browser/mobile acceptance. Source-only checks are not end-to-end acceptance.
+
+TARGETED LIVE TENANT ACCEPTANCE (AFTER CI / DEPLOYMENT)
+- Open Suppliers, click Refresh Suppliers with an unchanged list: observe a clear 'Supplier list refreshed successfully.' message near the button; no phantom creation/saving toast.
+- Open a safe existing supplier's View performance; click Refresh Performance with unchanged numbers; observe specific success result near its button. Switch suppliers and ensure stale performance result does not remain.
+- Click Refresh delivery status with unchanged late counts; see 'Delivery status refreshed successfully.' directly under Delivery Follow-up action area.
+- Test controlled network/403 failure for each action where permitted: do NOT show a success; show a specific failure result while preserving last successful data where query semantics allow. Verify repeat/disabled state and five-language labels, narrow viewport visibility, supplier selection, and read permissions. Do not alter suppliers or shipments merely to test refresh.
+
+CURRENT AUTHORITATIVE SOURCE: Full Frontend123 + unchanged full Backend072.
+NEXT: Batch125 NOT STARTED; check new audit candidate and cumulative log before editing.
+PRODUCTION ACCEPTANCE: PENDING.
+================================================================================

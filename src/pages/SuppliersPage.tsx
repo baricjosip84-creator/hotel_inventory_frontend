@@ -12,6 +12,9 @@ import { OperationalWorkspaceHero, /* OperationalWorkspaceMetaPill, */ Operation
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDate, formatLocalizedNumber } from '../i18n/formatters';
 
+type SupplierRefreshTarget = 'suppliers' | 'performance' | 'delivery';
+type SupplierRefreshFeedback = { state: 'success' | 'error'; text: string };
+
 type SupplierFormState = {
   name: string;
   email: string;
@@ -267,6 +270,7 @@ export default function SuppliersPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [archiveMessage, setArchiveMessage] = useState<string | null>(null);
   const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [refreshFeedback, setRefreshFeedback] = useState<Partial<Record<SupplierRefreshTarget, SupplierRefreshFeedback>>>({});
 
   const suppliersQuery = useQuery({
     queryKey: ['suppliers'],
@@ -284,6 +288,49 @@ export default function SuppliersPage() {
     queryFn: () => fetchSupplierPerformance(selectedPerformanceSupplier?.id || ''),
     enabled: canViewShipmentPerformance && Boolean(selectedPerformanceSupplier?.id)
   });
+
+  // Explicit button-triggered refresh feedback; background query polling is silent.
+  const refreshSupplierSection = async (target: SupplierRefreshTarget): Promise<void> => {
+    if ((target === 'suppliers' && suppliersQuery.isFetching)
+      || (target === 'performance' && (supplierPerformanceQuery.isFetching || !selectedPerformanceSupplier))
+      || (target === 'delivery' && slaBreachesQuery.isFetching)) return;
+
+    setRefreshFeedback((current) => ({ ...current, [target]: undefined }));
+    const result = target === 'suppliers'
+      ? await suppliersQuery.refetch()
+      : target === 'performance'
+        ? await supplierPerformanceQuery.refetch()
+        : await slaBreachesQuery.refetch();
+
+    const success = {
+      suppliers: 'Supplier list refreshed successfully.',
+      performance: 'Supplier performance refreshed successfully.',
+      delivery: 'Delivery status refreshed successfully.'
+    } as const;
+    const failure = {
+      suppliers: 'Could not refresh supplier list.',
+      performance: 'Could not refresh supplier performance.',
+      delivery: 'Could not refresh delivery status.'
+    } as const;
+    setRefreshFeedback((current) => ({
+      ...current,
+      [target]: { state: result.isError ? 'error' : 'success', text: ui(result.isError ? failure[target] : success[target]) }
+    }));
+  };
+
+  const renderRefreshFeedback = (target: SupplierRefreshTarget) => {
+    const feedback = refreshFeedback[target];
+    return feedback ? (
+      <div
+        role={feedback.state === 'error' ? 'alert' : 'status'}
+        aria-live={feedback.state === 'error' ? 'assertive' : 'polite'}
+        className={feedback.state === 'error' ? 'app-error-state' : 'app-success-state'}
+        style={styles.refreshFeedback}
+      >
+        {feedback.text}
+      </div>
+    ) : null;
+  };
 
   const createMutation = useMutation({
     mutationFn: createSupplier,
@@ -372,6 +419,10 @@ export default function SuppliersPage() {
       setArchiveMessage(null);
     }
   });
+
+  useEffect(() => {
+    setRefreshFeedback((current) => ({ ...current, performance: undefined }));
+  }, [selectedPerformanceSupplier?.id]);
 
   const suppliers = useMemo(() => suppliersQuery.data ?? [], [suppliersQuery.data]);
   const slaBreaches = useMemo(() => normalizeBreaches(slaBreachesQuery.data), [slaBreachesQuery.data]);
@@ -688,12 +739,13 @@ export default function SuppliersPage() {
           <button
             type="button"
             style={suppliersQuery.isFetching ? styles.disabledButton : styles.secondaryButton}
-            onClick={() => void suppliersQuery.refetch()}
+            onClick={() => void refreshSupplierSection('suppliers')}
             disabled={suppliersQuery.isFetching}
           >
             {suppliersQuery.isFetching ? ui('Refreshing...') : ui("Refresh Suppliers")}
           </button>
         </div>
+        {renderRefreshFeedback('suppliers')}
 
         <div className="app-grid-toolbar" style={styles.toolbarGrid}>
           <div style={styles.searchField}>
@@ -1003,7 +1055,7 @@ export default function SuppliersPage() {
               <button
                 type="button"
                 style={supplierPerformanceQuery.isFetching ? styles.disabledButton : styles.secondaryButton}
-                onClick={() => void supplierPerformanceQuery.refetch()}
+                onClick={() => void refreshSupplierSection('performance')}
                 disabled={supplierPerformanceQuery.isFetching}
               >
                 {supplierPerformanceQuery.isFetching ? ui('Refreshing...') : ui("Refresh Performance")}
@@ -1013,6 +1065,7 @@ export default function SuppliersPage() {
               </button>
             </div>
           </div>
+          {renderRefreshFeedback('performance')}
 
           <div style={styles.supplierIdentityGrid}>
             <div style={styles.identityItem}>
@@ -1112,12 +1165,13 @@ export default function SuppliersPage() {
           <button
             type="button"
             style={slaBreachesQuery.isFetching ? styles.disabledButton : styles.secondaryButton}
-            onClick={() => void slaBreachesQuery.refetch()}
+            onClick={() => void refreshSupplierSection('delivery')}
             disabled={slaBreachesQuery.isFetching}
           >
             {slaBreachesQuery.isFetching ? ui('Refreshing...') : ui("Refresh delivery status")}
           </button>
         </div>
+        {renderRefreshFeedback('delivery')}
 
         {slaBreachesQuery.isLoading ? (
           <div className="app-empty-state">{ui("Loading supplier SLA breaches...")}</div>
@@ -1514,6 +1568,11 @@ const styles: Record<string, CSSProperties> = {
     color: '#475569',
     fontWeight: 700,
     fontSize: '12px'
+  },
+  refreshFeedback: {
+    marginTop: '8px',
+    marginBottom: '12px',
+    fontSize: '13px'
   },
   warningBox: {
     marginBottom: '16px'

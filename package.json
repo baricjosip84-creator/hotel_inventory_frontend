@@ -481,7 +481,8 @@
     "check:batch120-procurement-draft-refresh-feedback": "node scripts/check-batch120-procurement-draft-refresh-feedback.mjs",
     "check:batch121-par-level-save-feedback": "node scripts/check-batch121-par-level-save-feedback.mjs",
     "check:batch122-approval-empty-rule-guidance": "node scripts/check-batch122-approval-empty-rule-guidance.mjs",
-    "check:batch123-users-single-cancel": "node scripts/check-batch123-users-single-cancel.mjs"
+    "check:batch123-users-single-cancel": "node scripts/check-batch123-users-single-cancel.mjs",
+    "check:batch124-supplier-refresh-feedback": "node scripts/check-batch124-supplier-refresh-feedback.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

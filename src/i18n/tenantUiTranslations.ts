@@ -14338,6 +14338,12 @@ const rows: readonly TranslationRow[] = [
   ["Enter a product name or search term", "Produktname oder Suchbegriff eingeben", "Introduzca un nombre de producto o término de búsqueda", "Saisissez un nom de produit ou un terme de recherche", "Unesite naziv proizvoda ili pojam za pretraživanje"],
   ["Other or historical location…", "Anderer oder früherer Lagerort…", "Otra ubicación o ubicación histórica…", "Autre emplacement ou emplacement historique…", "Druga ili povijesna lokacija…"],
   ["Enter a historical location or search term", "Früheren Lagerort oder Suchbegriff eingeben", "Introduzca una ubicación histórica o un término de búsqueda", "Saisissez un emplacement historique ou un terme de recherche", "Unesite povijesnu lokaciju ili pojam za pretraživanje"],
+  ["Supplier list refreshed successfully.", "Lieferantenliste erfolgreich aktualisiert.", "Lista de proveedores actualizada correctamente.", "Liste des fournisseurs actualisée avec succès.", "Popis dobavljača uspješno je osvježen."],
+  ["Supplier performance refreshed successfully.", "Lieferantenleistung erfolgreich aktualisiert.", "Rendimiento del proveedor actualizado correctamente.", "Performance du fournisseur actualisée avec succès.", "Uspješnost dobavljača uspješno je osvježena."],
+  ["Delivery status refreshed successfully.", "Lieferstatus erfolgreich aktualisiert.", "Estado de entrega actualizado correctamente.", "Statut de livraison actualisé avec succès.", "Status isporuke uspješno je osvježen."],
+  ["Could not refresh supplier list.", "Lieferantenliste konnte nicht aktualisiert werden.", "No se pudo actualizar la lista de proveedores.", "Impossible d’actualiser la liste des fournisseurs.", "Popis dobavljača nije moguće osvježiti."],
+  ["Could not refresh supplier performance.", "Lieferantenleistung konnte nicht aktualisiert werden.", "No se pudo actualizar el rendimiento del proveedor.", "Impossible d’actualiser la performance du fournisseur.", "Uspješnost dobavljača nije moguće osvježiti."],
+  ["Could not refresh delivery status.", "Lieferstatus konnte nicht aktualisiert werden.", "No se pudo actualizar el estado de entrega.", "Impossible d’actualiser le statut de livraison.", "Status isporuke nije moguće osvježiti."],
 ];
 
 const indexes: Record<AppLocale, number> = { 'en-GB': 0, 'de-DE': 1, 'es-ES': 2, 'fr-FR': 3, 'hr-HR': 4 };
