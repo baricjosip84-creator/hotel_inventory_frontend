@@ -11262,3 +11262,45 @@ LIVE RETEST REQUIRED
 NEW SOURCE OF TRUTH: Full Frontend130 + Full unchanged Backend072.
 NEXT: Batch132 not started; compare audit findings with updated FIX_LOG and exact source before another correction. ALWAYS provide both complete source ZIPs, changed-files ZIP, audit, cumulative FIX_LOG, verification, regression, short and detailed handoffs, START HERE, SHA manifest, and full release bundle.
 ================================================================================
+
+
+================================================================================
+BATCH 132 — ADVANCED INVENTORY / SERIAL TRACKING: REGISTRATION FEEDBACK
+DATE: 2026-10-12
+BASELINE: Complete Frontend130 + unchanged Backend072 (Batch131 complete)
+RESULT: Complete Frontend131 + unchanged Backend072
+
+AUDIT EVIDENCE / REPRODUCTION IN LATEST SOURCE
+- Historical canonical audit v93, 2026-09-28 12:44 CEST, Serial tracking: manually registering existing stock serial TEST-SERIAL-EI-001 succeeded, displayed Available and preserved stock quantity, but generic success toast incorrectly read "Item created successfully.". Audit requested specific "Serial registered successfully." feedback.
+- Inspected complete Frontend130 src/pages/InventoryCapabilitiesPage.tsx. Existing addSerial mutation uses POST /inventory-capabilities/serials with product, serial number, location and inventory lot. The existing src/lib/api.ts tenantMutationSuccessMessage lacked exact route handling, falling back to generic item creation copy.
+- No prior FIX_LOG entry fixed the serial POST toast. New focused guard run against UNMODIFIED Frontend130 API FAILED as expected: actual "Item created successfully." vs expected "Serial registered successfully.".
+
+SURGICAL CHANGES — FIVE PATHS IN FULL FRONTEND131
+1. src/lib/api.ts: add exact POST /inventory-capabilities/serials mapping to "Serial registered successfully." after path/method normalization. Restrict by endpoint and method; no success claim on listing GET, serial PATCH, unrelated nested routes or tracking settings PUT.
+2. src/i18n/tenantUiTranslations.ts: one translated message row, EN/DE/ES/FR/HR; existing shared translated-toast pipeline reused.
+3. scripts/check-batch132-serial-registration-feedback.mjs: 44 focused checks, compiling and executing the actual success-message resolver; covers route isolation, translations, existing endpoint and payload, frontend permissions, lot selection, invalidations, backend validation/permission guards. Baseline API fails guard, corrected source 44/44 PASS.
+4. package.json: register the test as check:batch132-serial-registration-feedback.
+5. Inventory_Management_App_FIX_LOG_2026-10-06.txt: append this cumulative batch entry, identical in standalone file and complete frontend.
+
+GUARDS / UNCHANGED BEHAVIOR
+- Backend072 unchanged byte-for-byte, no SQL or migrations.
+- Product tracking settings, unique serial scope, existing lot capacity, on-hand quantities, product/stock/location permission requirements, API validation, server-side collision/race guards, inventory serial status, and request body are unchanged.
+- POST success feedback follows existing successful network response; errors keep existing API/page error handling; new toast cannot indicate success for failed registration.
+- No duplicate serial, inventory quantity, location, lot, transaction, cost, audit, or stock-movement behavior changed.
+
+TEST RESULTS AND SCOPE
+- Baseline FAIL reproduced on untouched Frontend130 API (generic wrong toast).
+- Batch132 44/44 executable/source assertions PASS on corrected Frontend131.
+- Selected inherited regressions: 55 PASS; new Batch132 script: PASS; 56/56 total selected scripts PASS. First run had environment-only missing ESM TypeScript module links, repaired by temporary test workspace node_modules symlink. Second run executed 46 scripts PASS before execution window ended; remaining 10 scripts each run with same sources and configuration and PASS; cumulative 56/56. Global multilingual closure script PASS.
+- TypeScript API isolated transpilation and capabilities TSX parse PASS, Node22.16 + globally installed TypeScript.
+- Complete frontend, unchanged backend, changed-files ZIP CRC, exact delta parity, embedded/standalone cumulative FIX_LOG equality and unchanged backend checksum verified during release.
+- NOT VERIFIED: clean Node24 npm ci, project-wide typecheck/full Vite production build, PostgreSQL integration, live deployed/browser/mobile behavior. Source-level tests are not deployed acceptance.
+
+TARGETED LIVE RETEST PENDING
+- Deploy compatible Frontend131 + Backend072. As an authorized tenant user, select a serial-enabled product with known eligible on-hand lot and unassigned quantity; register ONE distinct test serial, confirming "Serial registered successfully." localized toast and registry row persistence after refresh.
+- Repeat with existing serial in an eligible separate lot (when safe) or with full lot capacity to confirm server rejection and ERROR, never false success; respect stock/lot and tenant permissions. Confirm tracking settings Save has no false registration message, listing GET has no mutation message, and EN/DE/ES/FR/HR translations.
+- Avoid creating test serials without controlled reversible cleanup and recording business audit impact.
+
+SOURCE OF TRUTH: Complete Frontend131 + complete unchanged Backend072.
+NEXT: Batch133 NOT STARTED. Reconcile audit with latest source and FIX_LOG before another surgical correction. Always return all complete ZIPs, changes, verification, audit, cumulative FIX_LOG, regression evidence, full handoffs and complete bundle.
+================================================================================

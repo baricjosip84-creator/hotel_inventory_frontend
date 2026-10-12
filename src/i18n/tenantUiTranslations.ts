@@ -2,6 +2,8 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // Batch 132: identity registration against existing on-hand stock.
+  ["Serial registered successfully.", "Seriennummer erfolgreich registriert.", "Número de serie registrado correctamente.", "Numéro de série enregistré avec succès.", "Serijski broj uspješno je registriran."],
   // Batch 131: a finalized landed-cost allocation is not a newly created item.
   ["Landed cost finalized successfully.", "Einstandskosten erfolgreich finalisiert.", "Coste en destino finalizado correctamente.", "Coût rendu finalisé avec succès.", "Zavisni trošak uspješno je finaliziran."],
   // Batch 128: human-first variant creation and optional SKU override.

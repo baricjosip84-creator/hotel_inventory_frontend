@@ -489,7 +489,8 @@
     "check:batch127-supplier-return-line-readiness": "node scripts/check-batch127-supplier-return-line-readiness.mjs",
     "check:batch128-variant-auto-sku": "node scripts/check-batch128-variant-auto-sku.mjs",
     "check:batch129-variant-attribute-rows": "node scripts/check-batch129-variant-attribute-rows.mjs",
-    "check:batch130-variant-parent-readable-label": "node scripts/check-batch130-variant-parent-readable-label.mjs"
+    "check:batch130-variant-parent-readable-label": "node scripts/check-batch130-variant-parent-readable-label.mjs",
+    "check:batch132-serial-registration-feedback": "node scripts/check-batch132-serial-registration-feedback.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

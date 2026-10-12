@@ -291,6 +291,13 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return expectedVersion > 0 ? 'Unit conversion updated successfully.' : 'Unit conversion saved successfully.';
   }
 
+  // Batch132: recording a serial identity on existing stock is not creating a
+  // generic inventory item. Keep this scoped to successful manual registration;
+  // read-only listing and serial lifecycle edits retain their existing messages.
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/inventory-capabilities/serials') {
+    return 'Serial registered successfully.';
+  }
+
   if (normalizedMethod === 'POST' && /^\/inventory-capabilities\/products\/[^/]+\/variants$/.test(normalizedPathOnly)) {
     return 'Variant created successfully.';
   }
