@@ -11939,3 +11939,31 @@ STRICT LIMITATIONS / REMAINING ACCEPTANCE
 - The original production Custom Fields required text field `test_country` / value `Croatia` save failure (generic format error, PostgreSQL 22P02 in historical audit) remains open; no database-backed correction or verification in Batch154. Full Node24 npm ci/typecheck/build and deployment/browser/mobile tests remain open.
 NEXT CODE SOURCE: FULL hotel-inventory-frontend_surgical-fix-153.zip + byte-identical FULL hotel-inventory-backend_surgical-fix-072.zip. Batch155 not started. Preserve original audit and unabridged FIX_LOG. Deliver all 11 individual files plus all-in-one bundle for each implementation batch.
 ================================================================================
+
+
+================================================================================
+BATCH 155 — CUSTOM FIELD VALUE SAVES MUST BE VERIFIED BY POST-WRITE GET
+Date: 2026-10-12
+================================================================================
+CANONICAL ORIGINAL AUDIT EVIDENCE
+- September 28, 2026 14:27 CEST: Advanced Inventory → Custom fields → Product Test Product EI, required Text field test_country, submitting "Croatia" failed and showed generic "The request contains an invalid value format". Original audit remains intact and unresolved; it does NOT establish which actual backend parameter or SQL statement failed.
+- Different Location hierarchy audit entries later identify PostgreSQL SQLSTATE 22P02 for the hierarchy pick_sequence omission; do not attribute that diagnosis to Custom Fields without a real Custom Fields request/SQL trace.
+- Backend072 currently calls validateCustomFieldValue() and JSON.stringify(value) for $5::jsonb in insert/update. Source inspection alone did NOT reproduce the historic Croatia failure or prove its production resolution. No database migration or backend modification is introduced.
+REPRODUCIBLE FRONTEND-SIDE GAP
+- Original complete Frontend153 CustomFieldsPanel treated HTTP PUT success as completion and invalidated the selected record cache, but had no required actual GET readback match of submitted fields. An acknowledged write without matching data could appear successful. Baseline Batch155 focused test intentionally FAILS on untouched Frontend153 missing the verification helper/handler.
+IMPLEMENTATION
+1. src/lib/customFieldValueReadback.ts NEW: typed strict comparison against independently fetched stored field rows; supports text (including Croatia), select, date, number, boolean, null/empty; rejects missing, wrong, unexpectedly coerced values.
+2. src/pages/InventoryCapabilitiesPage.tsx: immutable target association from Batch153 retained. Custom field PUT suppresses premature success, then GET reads back the exact submitted entity and compares all submitted values. Only verified GET updates that record's cache and emits a success message. Missing/mismatched readback or GET failure marks persistence UNKNOWN, gives explicit refresh-before-retry guidance, avoids re-fetch overwriting unsaved input; original PUT errors remain original errors. Field inputs are disabled during the pending write to avoid typing during verification. Switching to another record still does not receive the previous record's toast/error.
+3. src/i18n/tenantUiTranslations.ts: complete EN, DE, ES, FR, HR translations for verified success and uncertain outcome.
+4. scripts/check-batch155-custom-field-value-readback.mjs NEW: focused guard 60/60; source TSX compile, helper behavior, actual extracted mutation callbacks, immutable target and version maps, POST/GET order, Croatia accepted only after readback, mismatches/missing rows/readback errors, PUT failure, cache association, no false success, five-language translations and permissions.
+5. Narrowly updated inherited scripts/check-batch134-custom-field-feedback.mjs and scripts/check-batch153-custom-field-value-target-association.mjs to recognize the new endpoint variable and verified cache behavior. Prior check counts retained: Batch134 54/54, Batch153 44/44; original route/auth/version/record-switch contracts still asserted.
+6. package.json: registered the new Batch155 selected test. This is the only source/CI script registration change.
+VERIFICATION
+- Untouched complete Frontend153 against new Batch155 test: EXPECTED FAIL (missing verification readback).
+- Updated full Frontend154: focused 60/60 assertions PASS; inherited selected 78/78 scripts PASS; combined 79/79 PASS. Tests ran on Node22 with local test-only TypeScript symlink and backend compatibility path alias; those test dependencies are not shipped.
+- Backend072 unchanged byte-for-byte. No API path, tenant isolation, stock, inventory math or database schema change. Eight changed/new full-frontend members including appended FIX_LOG. Full zip member CRC and changed-files parity checked at release packaging.
+STRICT SCOPE AND OPEN DEFECTS
+- This is frontend readback reliability, NOT proven root-cause repair of the original Croatia save failure. Real deployed request/response, server SQLSTATE detail, tenant DB commit, correct GET and browser refresh must be checked to close it.
+- Historical CASE=24 conversion missing after reload similarly needs live PostgreSQL-based confirmation. Full Node24 clean npm ci, TypeScript/Vite build, deployed desktop/mobile acceptance and wider integration remain open.
+NEXT CODE SOURCE: full hotel-inventory-frontend_surgical-fix-154.zip + complete unchanged hotel-inventory-backend_surgical-fix-072.zip. BATCH156 not started. Preserve this original audit and entire prior FIX_LOG on next continuation. Deliver all 11 individual release files and all-in-one bundle.
+================================================================================

@@ -52,7 +52,7 @@ check('exact custom field definition route retained',()=>assert.match(page,/apiR
 check('definition is submitted by POST',()=>assert.match(page,/apiRequest\('\/inventory-capabilities\/custom-fields', \{\s*method: 'POST'/));
 check('definition save passes expected_version',()=>assert.match(page,/expected_version: editingDefinition\?\.version \?\? 0/));
 check('toggle reuses expected_version from row',()=>assert.match(page,/expected_version: row\.version/));
-check('values save remains a distinct PUT route',()=>assert.match(page,/apiRequest\(`\/inventory-capabilities\/custom-fields\/\$\{entityType\}\/\$\{entityId\}`, \{\s*method: 'PUT'/));
+check('values save remains a distinct PUT route',()=>{assert.match(page,/const endpoint = `\/inventory-capabilities\/custom-fields\/\$\{targetEntityType\}\/\$\{targetEntityId\}`/);assert.match(page,/await apiRequest\(endpoint, \{\s*method: 'PUT'/);});
 check('definition label is sent',()=>assert.match(page,/field_key: effectiveFieldKey,\s*label,/));
 check('definition options are retained',()=>assert.match(page,/options: options\.split\(','\)\.map/));
 check('definition save still invalidates definition query',()=>assert.match(page,/queryKey: \['custom-field-definitions', entityType\]/));

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { showTenantActionSuccess, showTenantActionError } from '../lib/actionFeedback';
 import { suggestCustomFieldKey, isValidCustomFieldKey } from '../lib/customFieldKey';
+import { verifyCustomFieldReadback } from '../lib/customFieldValueReadback';
 import { getStorageLocationMutationErrorMessage } from '../lib/storageLocationMutationError';
 import { hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { OperationalWorkspaceHero, /* OperationalWorkspaceMetaPill, */ OperationalWorkspaceStatCard, OperationalWorkspaceStatus, OperationalWorkspaceTab, OperationalWorkspaceTabs } from '../components/ui/OperationalWorkspace';
@@ -1048,17 +1049,43 @@ function CustomFieldsPanel({
   });
 
   const saveValues = useMutation({
-    mutationFn: ({ targetEntityType, targetEntityId, payload }: { targetEntityType: EntityType; targetEntityId: string; payload: { values: typeof values; value_versions: typeof valueVersions; definition_versions: typeof definitionVersions } }) =>
-      apiRequest(`/inventory-capabilities/custom-fields/${targetEntityType}/${targetEntityId}`, {
+    mutationFn: async ({ targetEntityType, targetEntityId, payload }: { targetEntityType: EntityType; targetEntityId: string; payload: { values: typeof values; value_versions: typeof valueVersions; definition_versions: typeof definitionVersions } }) => {
+      const endpoint = `/inventory-capabilities/custom-fields/${targetEntityType}/${targetEntityId}`;
+      await apiRequest(endpoint, {
         method: 'PUT',
-        body: JSON.stringify(payload)
-      }),
-    onSuccess: (_data, { targetEntityType, targetEntityId }) => {
-      void qc.invalidateQueries({ queryKey: ['custom-field-values', targetEntityType, targetEntityId] });
-      if (activeCustomValueTargetRef.current.entityType === targetEntityType && activeCustomValueTargetRef.current.entityId === targetEntityId) setError(null);
+        body: JSON.stringify(payload),
+        // The write is not yet confirmed to be readable; do not show a green PUT toast.
+        skipMutationFeedback: true
+      });
+      try {
+        const readback = await apiRequest<CustomValueRow[]>(endpoint);
+        if (!verifyCustomFieldReadback(payload.values, readback)) throw new Error('CUSTOM_FIELD_READBACK_MISMATCH');
+        return { verifiedRows: readback };
+      } catch {
+        // A successful PUT followed by failed readback has an UNKNOWN persistence
+        // outcome. Never tell the operator to resubmit blindly: duplicates/versions
+        // may have changed already.
+        throw new Error('CUSTOM_FIELD_READBACK_UNVERIFIED');
+      }
+    },
+    onSuccess: ({ verifiedRows }, { targetEntityType, targetEntityId }) => {
+      qc.setQueryData(['custom-field-values', targetEntityType, targetEntityId], verifiedRows);
+      if (activeCustomValueTargetRef.current.entityType === targetEntityType && activeCustomValueTargetRef.current.entityId === targetEntityId) {
+        setError(null);
+        showTenantActionSuccess(ui('Custom field values saved and verified.'));
+      }
     },
     onError: (errorValue, { targetEntityType, targetEntityId }) => {
-      if (activeCustomValueTargetRef.current.entityType === targetEntityType && activeCustomValueTargetRef.current.entityId === targetEntityId) setError(messageFrom(errorValue, ui("Unable to save custom values."), ui));
+      // Preserve the operator's unsaved input on uncertain write/readback failures.
+      // Automatic query invalidation here could overwrite the form with old data.
+      if (activeCustomValueTargetRef.current.entityType === targetEntityType && activeCustomValueTargetRef.current.entityId === targetEntityId) {
+        const verificationUnknown = errorValue instanceof Error && errorValue.message === 'CUSTOM_FIELD_READBACK_UNVERIFIED';
+        const message = verificationUnknown
+          ? ui('The save was accepted, but its values could not be verified. Refresh before retrying.')
+          : messageFrom(errorValue, ui('Unable to save custom values.'), ui);
+        setError(message);
+        if (verificationUnknown) showTenantActionError(message);
+      }
     }
   });
 
@@ -1113,10 +1140,10 @@ function CustomFieldsPanel({
           <label key={row.definition_id} style={{ display: 'block', marginTop: 12 }}>
             {row.label}{row.is_required ? ' *' : ''}
             {row.data_type === 'boolean'
-              ? <input type="checkbox" checked={values[row.field_key] === true} onChange={(event) => setValues({ ...values, [row.field_key]: event.target.checked })} />
+              ? <input type="checkbox" disabled={saveValues.isPending} checked={values[row.field_key] === true} onChange={(event) => setValues({ ...values, [row.field_key]: event.target.checked })} />
               : row.data_type === 'select'
-                ? <select value={String(values[row.field_key] || '')} onChange={(event) => setValues({ ...values, [row.field_key]: event.target.value })}><option value="">{ui("Select…")}</option>{(row.options || []).map((option) => <option key={option}>{option}</option>)}</select>
-                : <input type={row.data_type === 'number' ? 'number' : row.data_type === 'date' ? 'date' : 'text'} value={String(values[row.field_key] || '')} onChange={(event) => setValues({ ...values, [row.field_key]: event.target.value })} />}
+                ? <select disabled={saveValues.isPending} value={String(values[row.field_key] || '')} onChange={(event) => setValues({ ...values, [row.field_key]: event.target.value })}><option value="">{ui("Select…")}</option>{(row.options || []).map((option) => <option key={option}>{option}</option>)}</select>
+                : <input disabled={saveValues.isPending} type={row.data_type === 'number' ? 'number' : row.data_type === 'date' ? 'date' : 'text'} value={String(values[row.field_key] || '')} onChange={(event) => setValues({ ...values, [row.field_key]: event.target.value })} />}
           </label>
         ))}
         <button className="button" style={{ marginTop: 14 }} type="button" disabled={!canWrite || !entityId || entityValues.isLoading || entityValues.isError || !entityValues.data || saveValues.isPending} onClick={() => saveValues.mutate({ targetEntityType: entityType, targetEntityId: entityId, payload: { values: { ...values }, value_versions: { ...valueVersions }, definition_versions: { ...definitionVersions } } })}>{saveValues.isPending ? ui("Saving…") : ui("Save custom fields")}</button>
