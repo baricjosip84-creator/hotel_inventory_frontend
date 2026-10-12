@@ -23,7 +23,12 @@ requireText(page, 'formatAvailableNumber(summary.master_data.total_suppliers)', 
 requireText(page, 'formatAvailableNumber(summary.master_data.total_storage_locations)', 'locations null is not rendered as zero');
 requireText(page, "specificType !== 'other'", 'legacy generic movement type fallback');
 requireText(page, 'row.movement_kind || specificType || \'other\'', 'semantic movement kind fallback');
-requireText(page, '<td style={styles.td}>{row.reason}</td>', 'raw user-entered movement reason');
+// Batch114: Dashboard now translates known system reasons while preserving user-entered reasons.
+requireText(page, 'function dashboardReasonLabel(row: RecentActivityRow, ui:', 'readable system reason formatter');
+requireText(page, "const reason = String(row.reason || '').trim();", 'original reason is read without rewriting');
+requireText(page, 'return reason;', 'unknown/user-authored reason preserved verbatim');
+requireText(page, 'dashboardReasonLabel(row, ui)', 'recent-activity card calls reason formatter');
+requireText(page, "if (reason === 'manual_adjustment') return ui('Manual adjustment');", 'known system reason localized');
 rejectText(page, 'formatActivityReason(', 'reason rewriting helper');
 requireText(page, "ui('Demand history incomplete')", 'demand data-quality warning');
 requireText(page, "ui('Some demand movements are missing storage location context.')", 'missing-location demand-quality explanation');

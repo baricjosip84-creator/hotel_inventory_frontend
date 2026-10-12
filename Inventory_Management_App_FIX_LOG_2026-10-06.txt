@@ -10508,3 +10508,36 @@ LIVE ACCEPTANCE
 CURRENT ENGINEERING SOURCE OF TRUTH: Frontend112 + Backend072.
 PRODUCTION ACCEPTANCE: PENDING. Batch114 NOT STARTED.
 ================================================================================
+
+================================================================================
+BATCH 114 — INHERITED REGRESSION CONTRACT ALIGNMENT (DASHBOARD + CUSTOM ROLES)
+DATE: 2026-10-12
+BASELINE: Frontend112 + Backend072
+RESULT: Frontend113 + Backend072 (backend unchanged)
+
+SOURCE OF VERIFIED ENGINEERING FINDING
+- Batch113 verification recorded two inherited failures in the selected 110-script regression sweep: historical Dashboard row.reason markup and outdated custom-role deactivation copy.
+- Both failures reproduced on the untouched Frontend112 baseline before changes. Further execution of the custom-role contract uncovered two more historical source-text expectations hidden behind the first assertion (shell role label and Products write feedback).
+- Canonical audit v93 remains the original live-testing ledger. This batch is a REGRESSION TEST REPAIR, not a newly verified product or browser defect.
+
+IMPLEMENTED — FRONTEND113 TEST HARNESS ONLY
+- scripts/check-dashboard-surgical-closure-v34969.mjs: replace obsolete expectation of raw row.reason in a retired table with the present dashboardReasonLabel system-code formatting and unchanged fallback for user-authored reasons.
+- scripts/check-tenant-custom-role-management.mjs: align the expected active-user deactivation warning with the existing guarded message; verify the shell's current visibleAccessRoleLabel usage and the current Products write-permission explanation. Keep backend isolation, user-role assignment, template, delete confirmation, cannot-deactivate, and role-permission tests.
+- scripts/check-batch114-regression-contract-closure.mjs (new): verify that historical guards reflect the current source and that core movement-reason and custom-role safeguards were not removed.
+- package.json: register dedicated Batch114 check.
+- No React page, shared component, business logic, API, backend, database, translations or live tenant behavior changed.
+
+VERIFICATION
+- Baseline reproduction: Dashboard and custom-role regression scripts FAILED on unmodified Frontend112 due to inherited obsolete source-text expectations.
+- Updated Dashboard regression: PASS; updated tenant custom-role regression: PASS with Backend072.
+- New focused Batch114 regression: 20/20 assertions PASS.
+- 111/111 selected scripts PASS after providing the unchanged Backend072 in its expected local fixtures path and the installed local TypeScript compiler. This includes the 110 scripts from the Batch113 selection plus the new Batch114 contract check. Script-based source verification only, not production acceptance.
+- Global tenant multilingual closure: PASS (45 tenant routes; 265 reachable source files; 14,308 five-language rows, placeholder parity).
+- Full source-archive member integrity and exact changed-files parity: checked during release packaging. Backend archive checksum unchanged.
+
+NOT VERIFIED
+- Full clean Node24 dependency installation, full TypeScript/Vite production build, live database-backed integration, or deployed-browser acceptance. No live testing was performed.
+
+CURRENT ENGINEERING SOURCE OF TRUTH: Frontend113 + Backend072.
+PRODUCTION ACCEPTANCE: PENDING. Batch115 not started.
+================================================================================

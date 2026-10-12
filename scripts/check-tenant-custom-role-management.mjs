@@ -154,7 +154,7 @@ const customRolePermissionSurfaces = [
   ['Stock transfers', read('src/pages/StockTransfersPage.tsx'), 'cannot create stock transfer drafts'],
   ['Storage locations', read('src/pages/StorageLocationsPage.tsx'), 'cannot create, edit, or retire them.'],
   ['Suppliers', read('src/pages/SuppliersPage.tsx'), 'suppliers.write'],
-  ['Products', read('src/pages/products/ProductManagementSectionsPanel.tsx'), 'products.write']
+  ['Products', read('src/pages/products/ProductManagementSectionsPanel.tsx'), 'Products write permission is required for bulk product import.']
 ];
 
 assertIncludes(policyClient, [
@@ -172,9 +172,10 @@ assertIncludes(tenantPage, [
   'Starting template',
   'Custom role library',
   'title={`${ui("Manage")} ${roleName(activeRole)}`}',
-  'setErrorMessage(ui("Reassign all users before deactivating this custom role."))',
+  'setErrorMessage(ui("Reassign or deactivate active users before deactivating this custom role."))',
   'setErrorMessage(ui("Reassign all users before deleting this custom role."))',
   'Reassign all users before deleting this role.',
+  'activeRole.can_deactivate === false',
   'activeRole.can_deactivate === false',
   'activeRole.can_delete === false',
   'Required Read permissions are added automatically',
@@ -200,7 +201,7 @@ assertIncludes(permissionSnapshot, [
   'export function getCurrentAccessRoleLabel()'
 ], 'frontend effective permission snapshot');
 assertIncludes(editor, ['Custom roles', 'Reset to starting template', 'role.display_name'], 'shared role editor');
-assertIncludes(appLayout, ['getCurrentAccessRoleLabel', "accessRoleLabel || t('common.tenantUser')"], 'custom role shell label');
+assertIncludes(appLayout, ['getCurrentAccessRoleLabel', "visibleAccessRoleLabel || t('common.tenantUser')", "accessRoleLabel.toLowerCase() === 'admin'"], 'custom role shell label');
 assertIncludes(roleAwareWorkspace, ['getCurrentAccessRoleDisplay', 'getTenantPermissionSnapshot', 'custom_role_name', 'ui("Prepared for the current access role:")'], 'custom role workspace label');
 for (const [label, source, feedbackMarker] of customRolePermissionSurfaces) {
   assertIncludes(source, ['Current access role:', feedbackMarker], `${label} custom role feedback`);

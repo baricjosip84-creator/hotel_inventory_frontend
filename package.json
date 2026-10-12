@@ -471,7 +471,8 @@
     "check:permissions-visible-action-feedback-v349353": "node scripts/check-permissions-visible-action-feedback-surgical-fix-v349353.mjs",
     "check:learning-feedback-expected-evidence-labels-v349354": "node scripts/check-learning-feedback-expected-evidence-labels-surgical-fix-v349354.mjs",
     "check:mobile-closure-task-localization-v349355": "node scripts/check-mobile-closure-task-localization-surgical-fix-v349355.mjs",
-    "check:action-center-croatian-copy-surgical-fix-v349356": "node scripts/check-action-center-croatian-copy-surgical-fix-v349356.mjs"
+    "check:action-center-croatian-copy-surgical-fix-v349356": "node scripts/check-action-center-croatian-copy-surgical-fix-v349356.mjs",
+    "check:batch114-regression-contract-closure": "node scripts/check-batch114-regression-contract-closure.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
