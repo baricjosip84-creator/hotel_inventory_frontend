@@ -141,6 +141,21 @@ type ReturnLifecycleInput = {
   reason?: string;
 };
 
+// The button's enabled state follows the same existing returnable-quantity
+// checks as addDraftItem; serial and supplier validation still run on click.
+function getSupplierReturnLineQuantityState(
+  lot: Pick<EligibleReturnLot, 'returnable_quantity'> | null,
+  quantityInput: string,
+): 'lot' | 'required' | 'invalid' | 'exceeds' | 'ready' {
+  if (!lot) return 'lot';
+  if (!quantityInput.trim()) return 'required';
+  const quantity = Number(quantityInput);
+  if (!Number.isFinite(quantity) || quantity <= 0) return 'invalid';
+  const returnable = Number(lot.returnable_quantity);
+  if (!Number.isFinite(returnable) || quantity > returnable + 0.0000001) return 'exceeds';
+  return 'ready';
+}
+
 export function SupplierReturnsTab() {
   const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
@@ -240,6 +255,8 @@ export function SupplierReturnsTab() {
   );
 
   const selectedLot = eligibleLots.find((lot) => lot.inventory_lot_id === selectedLotId) ?? null;
+  const lineQuantityState = getSupplierReturnLineQuantityState(selectedLot, lineQuantity);
+  const addReturnLineDisabled = !canWrite || createReturnMutation.isPending || lineQuantityState !== 'ready';
   const draftTotal = draftItems.reduce((total, item) => {
     const unitCost = Number(item.lot.unit_cost ?? 0);
     return total + (Number.isFinite(unitCost) ? unitCost * item.quantity : 0);
@@ -637,14 +654,24 @@ export function SupplierReturnsTab() {
             <button
               type="button"
               onClick={addDraftItem}
-              disabled={!canWrite || !selectedLotId || !lineQuantity || createReturnMutation.isPending}
+              disabled={addReturnLineDisabled}
+              aria-describedby="supplier-return-line-readiness"
               style={{
-                ...(!canWrite || !selectedLotId || !lineQuantity || createReturnMutation.isPending ? styles.disabledButton : styles.primaryButton),
+                ...(addReturnLineDisabled ? styles.disabledButton : styles.primaryButton),
                 marginTop: 8,
               }}
             >
               {ui('Add return line')}
             </button>
+            <p id="supplier-return-line-readiness" role="status" aria-live="polite" style={{ ...styles.helper, marginTop: 8 }}>
+              {!canWrite ? ui('Requires {permission} permission.').replace('{permission}', TENANT_PERMISSIONS.SUPPLIER_RETURNS_WRITE)
+                : createReturnMutation.isPending ? ui('Saving…')
+                : lineQuantityState === 'lot' ? ui('Select a received inventory lot to return.')
+                : lineQuantityState === 'required' ? ui('Enter a return quantity to enable Add return line.')
+                : lineQuantityState === 'invalid' ? ui('Return quantity must be greater than zero.')
+                : lineQuantityState === 'exceeds' ? ui('Return quantity cannot exceed {quantity} for this lot.').replace('{quantity}', formatQuantity(selectedLot?.returnable_quantity))
+                : ui('Return quantity is valid. You can add the return line.')}
+            </p>
           </div>
         </div>
 

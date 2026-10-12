@@ -484,7 +484,8 @@
     "check:batch122-approval-empty-rule-guidance": "node scripts/check-batch122-approval-empty-rule-guidance.mjs",
     "check:batch123-users-single-cancel": "node scripts/check-batch123-users-single-cancel.mjs",
     "check:batch124-supplier-refresh-feedback": "node scripts/check-batch124-supplier-refresh-feedback.mjs",
-    "check:batch125-return-credit-invoice-lineage": "node scripts/check-batch125-return-credit-invoice-lineage.mjs"
+    "check:batch125-return-credit-invoice-lineage": "node scripts/check-batch125-return-credit-invoice-lineage.mjs",
+    "check:batch127-supplier-return-line-readiness": "node scripts/check-batch127-supplier-return-line-readiness.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

@@ -11046,3 +11046,49 @@ PRODUCTION ACCEPTANCE / TARGETED MANUAL RETEST
 NEW AUTHORITATIVE CODE SOURCE: Full Frontend125 + unchanged full Backend072.
 NEXT: Batch127 NOT STARTED. Continue surgical audit/source reconciliation before any new mutation.
 ================================================================================
+
+
+================================================================================
+BATCH 127 — SUPPLIER RETURNS: ACTION READINESS / VALID QUANTITY FEEDBACK
+DATE: 2026-10-12
+BASELINE: Complete Frontend125 + unchanged Backend072 (Batch126 complete)
+RESULT: Complete Frontend126 + unchanged Backend072
+
+ORIGINAL AUDIT / CURRENT SOURCE EVIDENCE
+- Audit v93, Supplier Returns, 30 September 2026 ~16:57-17:06 CEST (lines ~18430-18450): Add return line enabled-state transitions were subtle and it was difficult to tell when entry became actionable. Page's existing quantity-validation errors also mean known-invalid values should not present an enabled action.
+- Verified unchanged Frontend125 SupplierReturnsTab.tsx used only nonempty lineQuantity to enable Add return line, so '0', negative values and values greater than selected lot's returnable quantity could enable the action even though addDraftItem immediately rejected them.
+- The new Batch127 test FAILS on the untouched baseline because the readiness helper and accessible contextual status are absent. It PASSES after the surgical correction.
+
+EXACT SURGICAL CHANGES — FRONTEND126
+1. src/components/enterpriseInventory/tabs/SupplierReturnsTab.tsx:
+   - Add pure getSupplierReturnLineQuantityState for missing lot, missing quantity, invalid/nonpositive quantity, exceeding current returnable quantity, and ready state.
+   - Make Add return line disabled/primary style derive from valid selected lot quantity, existing supplier-return write permission and mutation pending state.
+   - Add accessible inline role=status / aria-live polite message tied to the button via aria-describedby. Explain how to activate the button, why zero/too-large quantities cannot be added and when the entered quantity is ready.
+   - Reuse existing translated error / permission / pending strings. Preserve the existing addDraftItem validation for serial numbers, returnable maximum, supplier-specific lots, and stock integrity, rather than bypassing it.
+2. src/i18n/tenantUiTranslations.ts: add two unique translation rows for action readiness prompts in EN/DE/ES/FR/HR; existing translation rows retained.
+3. scripts/check-batch127-supplier-return-line-readiness.mjs: focused executable test (46/46 checks) loads actual helper from TypeScript AST and executes valid/invalid/boundary numeric scenarios. Guards frontend button binding, accessibility, permission, pending state, existing mutation endpoint, serial validation and multilingual text.
+4. package.json: register check:batch127-supplier-return-line-readiness.
+5. Inventory_Management_App_FIX_LOG_2026-10-06.txt: append this record cumulatively, keep byte-identical inside the FULL Frontend126 ZIP and standalone.
+
+NON-CHANGES / SAFETY
+- No backend, DB migration, REST API, draft submission, Return quantity valuation, return lifecycle, invoice credit, warehouse stock, audit records, permissions or serial-number validation changed.
+- A valid positive quantity no greater than the selected lot's returnable stock stays enabled. Unknown or invalid values disable the button with a localized explanation.
+- This is UI source-level behavior, not an assertion that the production app has been deployed or manually retested.
+
+VERIFICATION ACTUALLY PERFORMED
+- New guard fails on unchanged Frontend125 (missing readiness helper), passes 46/46 on edited Frontend126.
+- Selected inherited+new regression set: 51/51 PASS (all 50 previous Batch126 scripts plus Batch127; no exclusions). Initial run had four environment-only missing-backend-path failures; correcting the test workspace's unchanged backend source link and rerunning yielded 51/51 PASS.
+- Multilingual closure audit: 45/45 tenant routes PASS, 265 reachable source files, 14,322 unique complete five-language catalog rows, placeholder parity.
+- Source TSX parse and isolated transpilation checked in focused suite. Actual exported readiness helper executed with boundary cases; complete application TypeScript build not claimed.
+- Release checks: complete ZIP CRC, exact five-file delta, cumulative FIX_LOG parity, unchanged Backend072 checksum.
+- NOT VERIFIED: clean npm ci on Node24, full project TypeScript/Vite build, PostgreSQL integration, deploy/live browser/mobile acceptance.
+
+REQUIRED TARGETED LIVE BROWSER ACCEPTANCE
+- After deploying compatible Frontend126 + Backend072, open Inventory Controls -> Supplier returns -> Create supplier return. Confirm no lot and empty quantity keep Add return line disabled with specific explanation.
+- Select a received lot, enter 0, negative value, nonnumeric value (where browser allows), and more than returnable quantity; confirm button disabled and reason shown. Enter a valid positive quantity within lot's returnable stock; confirm active style and ready feedback; add line and verify draft has the expected quantity.
+- For serial-tracked products, existing serial-number checks must still reject mismatched serials. Verify a safe role without supplier-return write permission never gets an enabled control. No creation, dispatch, stock movement, supplier credit or accounting mutations merely from entering quantities.
+- Confirm EN/DE/ES/FR/HR text and small-screen readability. This does NOT replace real DB or end-to-end acceptance.
+
+AUTHORITATIVE SOURCE AFTER THIS BATCH: FULL Frontend126 + FULL unchanged Backend072.
+NEXT: Batch128 NOT STARTED; verify any further historical audit candidate against this newest cumulative source and FIX_LOG.
+================================================================================
