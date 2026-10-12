@@ -10960,3 +10960,47 @@ CURRENT AUTHORITATIVE SOURCE: Full Frontend123 + unchanged full Backend072.
 NEXT: Batch125 NOT STARTED; check new audit candidate and cumulative log before editing.
 PRODUCTION ACCEPTANCE: PENDING.
 ================================================================================
+
+
+================================================================================
+BATCH 125 — SUPPLIER RETURN CREDIT ORIGINAL-INVOICE SELECTION / PROVENANCE GUIDANCE
+DATE: 2026-10-12
+BASELINE: Full Frontend123 + full Backend072 (Batch124 complete)
+RESULT: Full Frontend124 + unchanged full Backend072
+
+CANONICAL AUDIT FINDING / UNCHANGED SOURCE REPRODUCTION
+- Audit v93, 2026-09-30 19:32, Inventory Controls > Supplier Returns > Financial reconciliation: the selector included matched/paid invoices from the same supplier even when ZERO unreconciled returned lines could safely be matched to that invoice. An unrelated standalone invoice was selectable, only to show "No unreconciled return lines can be safely matched to this invoice" and zero expected credit. The audit correctly required original receiving/purchase-order lineage, not permissive matching by product/price alone.
+- Complete Frontend123 SupplierReturnsTab.tsx still filtered available invoice options only by supplier ID and status matched/paid, while its existing findCreditInvoiceLine helper already guarded actual line matching using exact shipment_item_id OR a matching shipment/purchase-order header with exactly one product invoice line. This mismatch between SELECTOR and MATCHING caused the remaining UX confusion. No prior FIX_LOG entry resolved the selector eligibility itself.
+- New focused Batch125 test fails on untouched Frontend123 at missing eligibleCreditInvoices, passes after patch. Original matching helper and backend were NOT changed.
+
+IMPLEMENTATION — FULL FRONTEND124
+1. src/components/enterpriseInventory/tabs/SupplierReturnsTab.tsx:
+   - Derive eligibleCreditInvoices from the same original supplier/status candidate list, keeping ONLY invoices for which at least one completed-return line is not already actively reconciled AND findCreditInvoiceLine(item, invoice) is true.
+   - Bind invoice choice dropdown and change handler to eligibleCreditInvoices; prevent a stale/invalid selected invoice from being used and disable the dropdown when no compatible invoice exists.
+   - Add role=status nearby instructions: if compatible choices exist, explain only original receipt-linked invoices are offered; if none, explain that a matched/paid invoice linked to the same received shipment or original purchase order is required. This is specific, actionable and honest when the invoice is standalone/unrelated.
+   - Preserve original matching algorithm, original invoice unit-cost basis, existing user-selected line subset, expected credit totals, currency, tenant/role permissions, settlement/credit mutations, all API request endpoints and business guards.
+2. src/i18n/tenantUiTranslations.ts: provide the two new explanatory messages in EN/DE/ES/FR/HR (no changes to the existing catalog rows).
+3. scripts/check-batch125-return-credit-invoice-lineage.mjs: new runnable guard with 42 checks, including transpiled EXECUTION of the actual frontend match and invoice-list filters against direct shipment-item, purchase-order, shipment, status, supplier, wrong-product, ambiguous lines, already-reconciled, stale selection and mixed candidate scenarios.
+4. package.json: register check:batch125-return-credit-invoice-lineage.
+5. Append this entry to canonical cumulative FIX_LOG; deliver exact same bytes as standalone TXT and complete frontend embedded copy.
+
+SAFETY / NON-CHANGES
+- Backend072 is unchanged and byte-identical. No SQL migrations, authorization, tenant isolation, stock quantities, supplier return lifecycle, invoice creation/payment, actual credit reconciliation mutation, procurement lineage matching policy or financial calculations changed.
+- The guard does NOT attempt loose same-product/same-supplier/same-price matching. Only the invoice SELECTION presentation and guidance changed. The previously verified matching rejection still protects financial traceability.
+- A valid original linked matched/paid invoice continues to be eligible. A standalone invoice with no original matching receipt/PO lineage no longer appears as a misleading selectable choice.
+
+VERIFICATION ACTUALLY PERFORMED
+- Baseline pre-edit source reproduction: focused guard fails on original Frontend123 due to absent eligibleCreditInvoices.
+- New focused runnable guard: 42/42 PASS on edited Frontend124, including live execution of source-level filtering via transpiled TypeScript.
+- Selected inherited + new regression sweep: 49/49 PASS (48 exact scripts recorded for Batch124 plus Batch125 guard). No scripts skipped.
+- Multilingual closure audit: PASS, 45 tenant routes, 265 reachable source files, 14,318 unique five-language catalog rows and placeholder parity.
+- Supplier Returns TSX and translation catalog isolated parse/transpile PASS. Package script registered PASS.
+- Archive CRC, member/delta parity, embedded/standalone FIX_LOG identity and unchanged backend checksum to be checked in final packaging.
+- NOT VERIFIED: clean Node24 npm ci, whole-project TypeScript/Vite production build, real PostgreSQL-backed integration, deployed live browser/mobile acceptance. Source simulation is NOT production acceptance.
+
+TARGETED LIVE ACCEPTANCE
+- Deploy compatible Frontend124 and Backend072. As permitted user, open Inventory Controls > Supplier Returns > Financial reconciliation and select a completed return. With a same-supplier standalone matched/paid invoice that lacks original lineage, verify it is NOT a selectable original invoice; a nearby message explains how to obtain a linked original invoice. When an invoice from the same received shipment or purchase order exists (or a shared shipment-item line), verify it is offered, its eligible unreconciled lines can be selected and the expected credit uses the INVOICE unit cost. Verify already credited lines cannot be selected, no incompatible invoices, role restrictions and all five languages. Check no financial/counter/stock mutation occurs merely from choosing an invoice.
+
+NEW AUTHORITATIVE SOURCE OF TRUTH: Full Frontend124 + full Backend072.
+NEXT: Batch126 NOT STARTED; continue verifying genuinely open audit defects or perform production acceptance.
+================================================================================

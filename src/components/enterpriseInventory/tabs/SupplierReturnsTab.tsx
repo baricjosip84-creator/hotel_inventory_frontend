@@ -270,7 +270,15 @@ export function SupplierReturnsTab() {
     && invoice.supplier_id === selectedCreditReturn.supplier_id
     && ['matched', 'paid'].includes(invoice.status)
   ));
-  const selectedCreditInvoice = candidateInvoices.find((invoice) => invoice.id === creditInvoiceId) ?? null;
+  // Only offer invoice choices that share the original receiving/procurement
+  // lineage with at least one still-unreconciled returned item. Same supplier
+  // and product alone are not sufficient evidence for a supplier credit.
+  const eligibleCreditInvoices = candidateInvoices.filter((invoice) => (
+    (selectedCreditReturn?.items ?? []).some((item) => (
+      !activeCreditReturnItemIds.has(item.id) && Boolean(findCreditInvoiceLine(item, invoice))
+    ))
+  ));
+  const selectedCreditInvoice = eligibleCreditInvoices.find((invoice) => invoice.id === creditInvoiceId) ?? null;
   const creditEligibleItems = (selectedCreditReturn?.items ?? []).filter((item) => (
     !activeCreditReturnItemIds.has(item.id) && Boolean(findCreditInvoiceLine(item, selectedCreditInvoice))
   ));
@@ -439,7 +447,7 @@ export function SupplierReturnsTab() {
 
   const handleCreditInvoiceChange = (invoiceId: string) => {
     setCreditInvoiceId(invoiceId);
-    const invoice = candidateInvoices.find((item) => item.id === invoiceId) ?? null;
+    const invoice = eligibleCreditInvoices.find((item) => item.id === invoiceId) ?? null;
     const compatibleIds = (selectedCreditReturn?.items ?? [])
       .filter((item) => !activeCreditReturnItemIds.has(item.id) && Boolean(findCreditInvoiceLine(item, invoice)))
       .map((item) => item.id);
@@ -687,13 +695,20 @@ export function SupplierReturnsTab() {
             />
             <SelectField
               label={ui('Original matched / paid invoice')}
-              value={creditInvoiceId}
+              value={selectedCreditInvoice?.id ?? ''}
               onChange={handleCreditInvoiceChange}
-              disabled={!canManageCredits || !selectedCreditReturn || createCreditMutation.isPending || creditLifecycleMutation.isPending}
-              options={candidateInvoices.map((invoice) => ({ value: invoice.id, label: `${invoice.invoice_number} · ${statusLabel(invoice.status)} · ${formatMoney(invoice.total_amount, invoice.currency)}` }))}
+              disabled={!canManageCredits || !selectedCreditReturn || !eligibleCreditInvoices.length || createCreditMutation.isPending || creditLifecycleMutation.isPending}
+              options={eligibleCreditInvoices.map((invoice) => ({ value: invoice.id, label: `${invoice.invoice_number} · ${statusLabel(invoice.status)} · ${formatMoney(invoice.total_amount, invoice.currency)}` }))}
             />
             <InputField label={ui('Expected credit tax')} type="number" min="0" step="0.0001" value={expectedCreditTax} onChange={setExpectedCreditTax} disabled={!canManageCredits || !selectedCreditInvoice || createCreditMutation.isPending || creditLifecycleMutation.isPending} />
           </div>
+          {selectedCreditReturn && !invoicesQuery.isLoading ? (
+            <p style={{ ...styles.helper, marginTop: 10 }} role="status">
+              {eligibleCreditInvoices.length
+                ? ui('Only original invoices linked to an unreconciled returned receipt are available for credit reconciliation.')
+                : ui('No eligible original invoice is linked to this return. Match or pay an invoice from the same received shipment or purchase order first; unrelated supplier invoices cannot be credited.')}
+            </p>
+          ) : null}
           {selectedCreditReturn && selectedCreditInvoice ? (
             <div style={{ marginTop: 12 }}>
               <p style={styles.helper}>{ui('Select the returned invoice lines covered by this supplier credit. The expected subtotal is calculated from the original invoice unit price, not the inventory lot cost.')}</p>
