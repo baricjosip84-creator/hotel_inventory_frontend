@@ -10746,3 +10746,48 @@ REMAINING / DEPLOYMENT
 NEW AUTHORITATIVE CODE: Frontend118 + Backend072.
 NEXT: Batch120 NOT STARTED; verify a genuinely unresolved audit issue against current source before making an application correction.
 ================================================================================
+
+
+================================================================================
+BATCH 120 — PROCUREMENT RECOMMENDATIONS PO DRAFT MANUAL REFRESH FEEDBACK
+DATE: 2026-10-12
+BASELINE: Complete Frontend118 + complete Backend072 (Batch119 completed)
+RESULT: Complete Frontend119 + unchanged complete Backend072
+
+AUDIT EVIDENCE / CURRENT SOURCE CONFIRMATION
+- Canonical audit v93, 30 Sep 2026 PROC-REC-002: On Procurement Recommendations > Purchase order drafts, clicking "Refresh drafts" provided no visible progress or completion acknowledgement. This was observed even when draft rows and totals remained the same; audit classified UX FAIL for feedback. Separate ambiguity about "Loaded spend" accounting semantics remains UNRESOLVED and is NOT described as repaired by this batch.
+- Current Frontend118 src/pages/ProcurementRecommendationsPage.tsx still had a manual <button> wired solely to onClick={() => void poDraftReviewQuery.refetch()}, with static "Refresh drafts" caption and without any manual success/failure state. The current cumulative FIX_LOG had no correction for this precise finding.
+- New focused test checked the UNMODIFIED Frontend118 page and failed at the missing refresh-feedback state before editing. This is a confirmed outstanding source-level UX defect.
+
+SURGICAL CORRECTION — FRONTEND119 ONLY
+1. src/pages/ProcurementRecommendationsPage.tsx:
+   - Add a page-local poDraftRefreshFeedback state for success/error text.
+   - Manual Refresh drafts now awaits the SAME existing paginated react-query refetch. Successful completion explicitly shows "Purchase order drafts refreshed." beside the controls. A failed React Query result or rejected refresh promise shows a translated "Refresh failed: {error}" with the real request error. Clear stale outcome when another manual refresh begins.
+   - Disable manual refresh if user lacks Purchase Order read capability OR a draft refetch is already running, and change button label to already translated "Refreshing…" while fetching.
+   - Render manual feedback with role=status for success or role=alert for error and suppress duplicate background-query failure display on a manual failure.
+   - Preserve query key, endpoint, pagination, all business mutation handlers, CSV export and permissions.
+2. src/i18n/tenantUiTranslations.ts: add exact success text in all existing five language columns (EN/DE/ES/FR/HR); reuse pre-existing localized error/loading labels.
+3. scripts/check-batch120-procurement-draft-refresh-feedback.mjs (NEW): 44 executable assertions, including actual execution of extracted TypeScript handler on simulated resolved success, resolved failure, thrown failure, permission denied and already-running refetch; accessibility and query/export contract checks.
+4. package.json: register check:batch120-procurement-draft-refresh-feedback.
+5. Append THIS Batch120 entry to the cumulative FIX_LOG, delivered standalone AND byte-identically embedded in the complete frontend.
+
+SAFETY / NON-CHANGES
+- No modifications to backend, PostgreSQL migrations, API contracts, authorization checks, tenant isolation, purchase order create/approval/status/receiving, procurement decision mutations, stock adjustments, draft data calculations, CSV exports or supplier/email processing.
+- The historic two-PO Loaded spend discrepancy is NOT fixed or asserted to be a calculation bug; investigate separately by comparing backend summary semantics against visible rows.
+
+ACTUAL VERIFICATION
+- Untouched Frontend118 fails new focused test on the missing manual feedback state (baseline reproduced).
+- Edited Frontend119 focused test: 44/44 PASS, including runnable manual async handler behavior and permission/deduplication gates.
+- 43 inherited Batch119 scripts PLUS new Batch120 guard: selected regression 44/44 PASS; none excluded from this set.
+- Global tenant multilingual audit: PASS (45/45 tenant routes, 265 reachable source files, 14,309 unique five-language catalog rows, placeholder parity).
+- Isolated TypeScript transpilation of changed page and translation catalog: PASS. New MJS syntax: PASS.
+- Byte-accurate complete ZIP, changed paths, CRC and Backend072 SHA-256 integrity verified during packaging.
+- Node24 clean npm ci, whole-project TypeScript/Vite build, PostgreSQL integration and deployed browser/mobile acceptance NOT run. Source tests and simulated handler behavior are not production acceptance.
+
+TARGETED LIVE RETEST
+- Deploy compatible Frontend119 and Backend072 after normal CI. With a role permitted to view Purchase Order drafts, click Refresh drafts: button briefly indicates Refreshing; on success show a clear nearby completion notice even if rows are unchanged. Confirm repeated clicks during fetch cannot duplicate a request. Fail the request deliberately in a safe test environment: report the error, never show success; retry should clear stale feedback and report new outcome. Verify EN/DE/ES/FR/HR and screen-reader alert/status.
+- For an unauthorized role: Refresh drafts remains disabled and existing query remains permission-gated. Existing draft CSV export/PO lifecycle should continue to operate.
+
+NEW AUTHORITATIVE SOURCE: Frontend119 + Backend072.
+NEXT: Batch121 NOT STARTED. Validate another outstanding historical audit finding against current code and log.
+================================================================================

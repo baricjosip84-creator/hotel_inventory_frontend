@@ -1547,6 +1547,7 @@ export default function ProcurementRecommendationsPage() {
   const governanceHistoryPageSize = 50;
   const [confirmation, setConfirmation] = useState<ConfirmationState | null>(null);
   const [poDraftOffset, setPoDraftOffset] = useState(0);
+  const [poDraftRefreshFeedback, setPoDraftRefreshFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const poDraftLimit = 25;
   const [activeWorkspaceSection, setActiveWorkspaceSection] = useState<ProcurementWorkspaceSection>("overview");
   const queueRef = useRef<HTMLDivElement>(null);
@@ -1672,6 +1673,27 @@ export default function ProcurementRecommendationsPage() {
     queryFn: () => fetchRecommendationPoDraftReview(poDraftOffset, poDraftLimit),
     enabled: canViewGeneratedPurchaseOrderDrafts,
   });
+
+  async function refreshPoDraftReview(): Promise<void> {
+    if (!canViewGeneratedPurchaseOrderDrafts || poDraftReviewQuery.isFetching) return;
+    setPoDraftRefreshFeedback(null);
+    try {
+      const result = await poDraftReviewQuery.refetch();
+      if (result.isError) {
+        setPoDraftRefreshFeedback({
+          tone: "error",
+          message: ui("Refresh failed: {error}").replace("{error}", getErrorMessage(result.error, ui)),
+        });
+        return;
+      }
+      setPoDraftRefreshFeedback({ tone: "success", message: ui("Purchase order drafts refreshed.") });
+    } catch (error) {
+      setPoDraftRefreshFeedback({
+        tone: "error",
+        message: ui("Refresh failed: {error}").replace("{error}", getErrorMessage(error, ui)),
+      });
+    }
+  }
 
   const exportPoDraftReviewMutation = useMutation({
     mutationFn: fetchAllRecommendationPoDraftReview,
@@ -2738,20 +2760,28 @@ export default function ProcurementRecommendationsPage() {
             <button
               style={styles.secondaryButton}
               type="button"
-              disabled={!canViewGeneratedPurchaseOrderDrafts}
-              onClick={() => void poDraftReviewQuery.refetch()}
+              disabled={!canViewGeneratedPurchaseOrderDrafts || poDraftReviewQuery.isFetching}
+              onClick={() => void refreshPoDraftReview()}
             >
-              {ui("Refresh drafts")}
+              {poDraftReviewQuery.isFetching ? ui("Refreshing…") : ui("Refresh drafts")}
             </button>
           </div>
         </div>
+        {poDraftRefreshFeedback ? (
+          <div
+            role={poDraftRefreshFeedback.tone === "error" ? "alert" : "status"}
+            style={{ ...(poDraftRefreshFeedback.tone === "error" ? styles.errorBox : styles.infoBox), marginTop: 12 }}
+          >
+            {poDraftRefreshFeedback.message}
+          </div>
+        ) : null}
         {!canViewGeneratedPurchaseOrderDrafts ? (
           <div style={styles.infoBox}>{ui("Purchase order read permission is required to load recommendation-generated PO draft review data.")}</div>
         ) : null}
         {poDraftReviewQuery.isLoading ? (
           <div style={styles.infoBox}>{ui("Loading generated PO drafts...")}</div>
         ) : null}
-        {poDraftReviewQuery.isError ? (
+        {poDraftReviewQuery.isError && poDraftRefreshFeedback?.tone !== "error" ? (
           <div style={styles.errorBox}>
             {getErrorMessage(poDraftReviewQuery.error, ui)}
           </div>

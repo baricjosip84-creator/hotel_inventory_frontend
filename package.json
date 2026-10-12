@@ -477,7 +477,8 @@
     "check:mobile-closure-task-localization-v349355": "node scripts/check-mobile-closure-task-localization-surgical-fix-v349355.mjs",
     "check:action-center-croatian-copy-surgical-fix-v349356": "node scripts/check-action-center-croatian-copy-surgical-fix-v349356.mjs",
     "check:batch114-regression-contract-closure": "node scripts/check-batch114-regression-contract-closure.mjs",
-    "check:batch116-enterprise-inventory-guard-alignment": "node scripts/check-batch116-enterprise-inventory-guard-alignment.mjs"
+    "check:batch116-enterprise-inventory-guard-alignment": "node scripts/check-batch116-enterprise-inventory-guard-alignment.mjs",
+    "check:batch120-procurement-draft-refresh-feedback": "node scripts/check-batch120-procurement-draft-refresh-feedback.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
