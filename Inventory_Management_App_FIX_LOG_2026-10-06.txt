@@ -11347,3 +11347,43 @@ NOT VERIFIED / PRODUCTION ACCEPTANCE
 SOURCE OF TRUTH AFTER THIS BATCH: Full Frontend132 + FULL unchanged Backend072; canonical audit v93 and cumulative FIX_LOG through Batch133.
 NEXT: Batch134 NOT STARTED; inspect the current source against remaining audit issues before editing. Provide full applications + changed-files ZIP + complete docs for every release.
 ================================================================================
+
+================================================================================
+BATCH 134 — ADVANCED INVENTORY / CUSTOM FIELD DEFINITION SAVE FEEDBACK
+Date: 2026-10-12
+Baseline: complete Frontend132 + complete unchanged Backend072 (Batch133 finished)
+Result: complete Frontend133 + complete unchanged Backend072
+
+AUDIT EVIDENCE / SOURCE CONFIRMATION
+- Canonical audit v93, 2026-09-28 13:58 CEST, Advanced Inventory > Custom fields: a Product custom field test_country was created correctly but the mutation toast incorrectly said "Item created successfully." rather than identifying the custom-field definition.
+- Current Frontend132 still sends POST /inventory-capabilities/custom-fields in both create and edit/status mutations, using expected_version (0 for create, positive for an existing definition). Shared src/lib/api.ts tenantMutationSuccessMessage lacked this endpoint and fell back to a generic Item create toast. No earlier cumulative correction fixed this endpoint's toast.
+- Focused Batch134 regression executed the actual extracted shared success-message resolver against unmodified Frontend132 and failed as expected: actual "Item created successfully." vs expected "Custom field created successfully.".
+
+SURGICAL CODE CHANGES — 5 CHANGED/ADDED FRONTEND PATHS
+1. src/lib/api.ts: exact POST /inventory-capabilities/custom-fields mapping: expected_version > 0 reports "Custom field updated successfully."; otherwise reports "Custom field created successfully.". Path and method case normalization/query suffix are preserved; field-values PUT, reads and neighboring routes remain independent.
+2. src/i18n/tenantUiTranslations.ts: add translated EN/DE/ES/FR/HR rows for the two new shared success messages.
+3. scripts/check-batch134-custom-field-feedback.mjs: executable focused regression guard for real resolver behavior, route/method isolation, create/update versions, related mutations, translation integrity, page/backend contracts, permission validation, and preservation of earlier contextual feedback.
+4. package.json: register check:batch134-custom-field-feedback.
+5. Inventory_Management_App_FIX_LOG_2026-10-06.txt: append this Batch134 record; the embedded and standalone copies are identical.
+
+NON-CHANGES / BUSINESS SAFETY
+- Backend072 byte-identical; no SQL or migrations, database changes, API contract, write payload, entity permission check, version conflict guard, product data, field definition names/keys/attributes, or value write behavior changed.
+- The existing shared mutation toast emits only after successful API responses; server rejection remains an error, never falsely reported as saved.
+- The new wording does not claim entity field values are saved when only a definition is created/updated; it applies solely to exact POST definition route.
+- Existing Batch133 automatic field-key behavior remains intact and separately guarded.
+
+TESTS AND ENVIRONMENT
+- New guard on unchanged Frontend132: FAIL at generic Item-created feedback, expected.
+- New guard on corrected Frontend133: 54/54 focused assertions PASS.
+- 57 selected inherited scripts plus new Batch134 guard: 58/58 PASS. Global 45-route multilingual audit PASS, 14,350 five-language catalog rows.
+- API TS parse/transpile, capabilities TSX and catalog parse PASS, using Node22.16 + test-only TypeScript link. ZIP CRC/full source difference/changed-files parity/checksum verification PASS at release packaging.
+- NOT VERIFIED: clean Node24 npm ci, whole-project TypeScript typecheck and Vite build, PostgreSQL integration, or deployed browser/mobile tenant acceptance.
+
+PRODUCTION RETEST PENDING
+- Deploy compatible Frontend133 + Backend072. On a test tenant with a permitted operator, create one controlled non-production custom-field definition, verify the localized "Custom field created successfully." and that the field appears/persists after reload.
+- Edit the same field; verify the localized update message. Toggle Active/Inactive as business-authorized; this also uses expected_version > 0 and must not claim new field creation. Confirm failed saves show errors, not success; verify custom-field *values* save does not claim a definition was created.
+- Test permission denial and version conflict without changing valuable existing tenant metadata. Clean up controlled test field only after verifying safe no-data-use state.
+
+SOURCE OF TRUTH: Full Frontend133 + unchanged full Backend072; audit v93; cumulative FIX_LOG through Batch134.
+NEXT: Batch135 NOT STARTED. Verify a genuinely unresolved audit issue against current source before editing. Continue returning both full applications, changed-files ZIP and all updated release documents every batch.
+================================================================================

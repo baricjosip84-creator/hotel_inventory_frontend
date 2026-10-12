@@ -291,6 +291,15 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return expectedVersion > 0 ? 'Unit conversion updated successfully.' : 'Unit conversion saved successfully.';
   }
 
+  // Batch134: a custom-field definition is not a generic inventory item.
+  // This endpoint uses expected_version for both creation and editing (including
+  // changing an existing field's active state). Keep the message scoped to the
+  // exact definition POST; saving an entity's field values uses a separate PUT.
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/inventory-capabilities/custom-fields') {
+    const expectedVersion = readMutationNumberField(body, 'expected_version') ?? 0;
+    return expectedVersion > 0 ? 'Custom field updated successfully.' : 'Custom field created successfully.';
+  }
+
   // Batch132: recording a serial identity on existing stock is not creating a
   // generic inventory item. Keep this scoped to successful manual registration;
   // read-only listing and serial lifecycle edits retain their existing messages.

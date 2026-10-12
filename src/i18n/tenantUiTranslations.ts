@@ -2,6 +2,9 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // Batch 134: custom-field definition create/update feedback, not generic item creation.
+  ["Custom field created successfully.", "Benutzerdefiniertes Feld erfolgreich erstellt.", "Campo personalizado creado correctamente.", "Champ personnalisé créé avec succès.", "Prilagođeno polje uspješno je izrađeno."],
+  ["Custom field updated successfully.", "Benutzerdefiniertes Feld erfolgreich aktualisiert.", "Campo personalizado actualizado correctamente.", "Champ personnalisé mis à jour avec succès.", "Prilagođeno polje uspješno je ažurirano."],
   // Batch 133: business-first Custom Fields creation with a suggested system key.
   ["Field name", "Feldname", "Nombre del campo", "Nom du champ", "Naziv polja"],
   ["Internal key (generated automatically):", "Interner Schlüssel (automatisch erstellt):", "Clave interna (generada automáticamente):", "Clé interne (générée automatiquement) :", "Interni ključ (automatski generiran):"],
