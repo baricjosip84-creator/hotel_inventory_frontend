@@ -11539,3 +11539,33 @@ SAFETY/ACCEPTANCE
 
 AUTHORITATIVE SOURCE AFTER THIS RELEASE: FULL Frontend surgical-fix-137 + FULL unchanged Backend surgical-fix-072. NEXT Batch139 NOT STARTED.
 ================================================================================
+
+================================================================================
+BATCH 139 — INVENTORY CONTROLS / SUPPLIER INVOICES: LOCALIZED FORM VALIDATION FEEDBACK
+Date: 2026-10-12
+================================================================================
+SOURCE AND CONFIRMED ISSUE
+- Source of truth: FULL Frontend surgical-fix-137 and unchanged FULL Backend surgical-fix-072. Canonical tenant audit findings v93 and cumulative FIX_LOG through Batch138 were inspected to exclude previous fixes.
+- Historical v93 Inventory Controls -> Invoices structural audit records browser-native required-field popup "Please fill out this field." as visually inconsistent with the application's own guidance and validation feedback. In current Frontend137 the Supplier Invoices form still had native constraint validation without a form-level invalid-event override; invalid invoice-header fields had no separate contextual guidance (line-level guidance existed).
+- This batch addresses specifically the *presentation of native validation errors* and missing header guidance, NOT server-side invoice accounting/matching or lifecycle operations.
+
+ONE SURGICAL FRONTEND CHANGE
+1. src/components/enterpriseInventory/tabs/InvoicesTab.tsx / exact Supplier Invoice form: React onInvalidCapture intercepts each native invalid event and prevents the OS/browser validation tooltip. HTML required/min/step semantics and blocking behavior are PRESERVED (do NOT use noValidate). The existing disabled Create draft/Save draft changes button and handleSupplierInvoiceSubmit canSaveInvoice guard remain unchanged. This avoids losing browser-supported numerical constraint checks in non-standard entry paths.
+2. Same form: add visible aria-live status guidance only while the invoice header is invalid and the user has write permission. Explain supplier, number, date, three-letter currency and non-negative tax in plain language. Existing line-level guidance remains.
+3. src/i18n/tenantUiTranslations.ts: add one exact five-language EN/DE/ES/FR/HR row for this guidance; no unrelated translation keys touched.
+4. scripts/check-batch139-invoice-validation.mjs plus package.json script: 51 focused assertions cover TSX parsing/transpilation, native popup suppression, retained native validity gating and required constraints, authorization and payload guards, explanatory text visibility/translation, real submit permission and create/edit paths, executable header validity examples.
+5. Append this entry to FULL cumulative FIX_LOG through Batch138, preserving every earlier batch. Embedded, standalone, and complete bundle copies match exactly.
+
+VERIFICATION
+- Untouched source Frontend137 fails new guard on missing onInvalidCapture; corrected source passes 51/51 checks.
+- All 62 inherited selected regression scripts + new Batch139 = 63/63 PASS, including global tenant multilingual closure.
+- Original full frontend archive compared member-by-member with newly generated complete Frontend138, supplemental changed-files ZIP exact matching five changed/new paths, archive CRC, full release bundle 11/11 members, FIX_LOG parity and unchanged backend SHA-256 verified.
+- Node22 selected source/runtime scripts and TypeScript isolated transpile tested with test-only symlink; full clean Node24 npm ci + TypeScript/Vite production build, PostgreSQL integration and deployed-browser/desktop/mobile/a11y acceptance NOT VERIFIED.
+
+ACCEPTANCE AND SAFETY
+- No backend, schema, invoice mutation, authorization, tax amount calculation, invoice lines, versioning, lifecycle, payable settlement or inventory quantity change. Native HTML required/number/step constraints remain active; noValidate was NOT used.
+- Manual verification: with Manager, try missing supplier, invoice number, date, invalid currency, negative tax and invalid lines in EN/DE/ES/FR/HR; the form shows in-context guidance rather than the raw native tooltip, Create draft remains disabled until ready, and valid draft creation/edit/submit behave unchanged. Verify keyboard Enter and desktop/mobile browsers because visual UA behavior may vary.
+- Separately outstanding: Custom Fields plain Text value save and UoM CASE=24 missing-after-reload require DB/network-backed reproduction. Other existing live acceptance backlog remains.
+
+AUTHORITATIVE SOURCE AFTER THIS RELEASE: FULL Frontend surgical-fix-138 + FULL unchanged Backend surgical-fix-072. NEXT Batch140 NOT STARTED.
+================================================================================

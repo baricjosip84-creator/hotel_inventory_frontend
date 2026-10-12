@@ -165,7 +165,12 @@ export function InvoicesTab({ createSupplierInvoiceMutation, updateSupplierInvoi
 
   return (
     <section style={styles.stack}>
-      <form onSubmit={handleSupplierInvoiceSubmit} style={styles.card} data-skip-global-action-feedback="true">
+      <form
+        onSubmit={handleSupplierInvoiceSubmit}
+        onInvalidCapture={(event) => event.preventDefault()}
+        style={styles.card}
+        data-skip-global-action-feedback="true"
+      >
         <h2 style={styles.cardTitle}>{editingInvoiceId ? ui('Edit supplier invoice draft') : ui('Create supplier invoice draft')}</h2>
         <div style={styles.formGrid}>
           <SelectField disabled={!canWriteInvoices || invoiceBusy || Boolean(editingInvoiceId)} label={ui('Supplier')} value={supplierInvoiceForm.supplier_id} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, supplier_id: value, purchase_order_id: '', shipment_id: '' }))} options={suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name }))} required />
@@ -177,6 +182,9 @@ export function InvoicesTab({ createSupplierInvoiceMutation, updateSupplierInvoi
           <InputField disabled={!canWriteInvoices || invoiceBusy} label={ui('Currency')} value={supplierInvoiceForm.currency} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, currency: value.toUpperCase().slice(0, 3) }))} required />
           <InputField disabled={!canWriteInvoices || invoiceBusy} label={ui('Tax amount')} type="number" min="0" value={supplierInvoiceForm.tax_amount} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, tax_amount: value }))} />
         </div>
+        {!invoiceHeaderValid && canWriteInvoices ? (
+          <p role="status" aria-live="polite" style={styles.helper}>{ui('Enter a supplier, invoice number, invoice date, three-letter currency code, and a tax amount of zero or more.')}</p>
+        ) : null}
         <TextareaField disabled={!canWriteInvoices || invoiceBusy} label={ui('Notes')} value={supplierInvoiceForm.notes} onChange={(value) => setSupplierInvoiceForm((current) => ({ ...current, notes: value }))} />
 
         <h3 style={{ marginBottom: 8 }}>{ui('Invoice lines')}</h3>
