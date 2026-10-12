@@ -66,8 +66,10 @@ if (tabUi.includes('hint=')) throw new Error('Inventory Controls tabs still rese
 if (!pageCss.includes('.inventory-controls-page .io-workspace-tabs__hint')) throw new Error('Inventory Controls tab hint is not defensively hidden.');
 if (!pageCss.includes('flex: 1 1 auto')) throw new Error('Inventory Controls tab list does not use the available width.');
 
-if (parLevels.includes('Legacy reorder quantity') || !parLevels.includes("label={ui('Reorder quantity')}")) {
-  throw new Error('Par-level form still exposes legacy implementation terminology.');
+if (parLevels.includes('Legacy reorder quantity')
+    || !parLevels.includes("label={ui('Fixed reorder quantity (optional)')}")
+    || !parLevels.includes("helper={ui('0 = automatically calculate the quantity needed to reach the target.')}")) {
+  throw new Error('Par-level fixed/automatic reorder quantity explanation is missing or legacy terminology has returned.');
 }
 
 if (cycleCounts.includes('Manual inventory adjustment') || cycleCounts.includes('StockAdjustmentForm')) {
@@ -109,8 +111,9 @@ if (invoices.includes('className="inventory-controls-grid" style={styles.grid}')
 if (notifications.includes('Process due deliveries now') || notifications.includes('onProcessNotificationDeliveries')) {
   throw new Error('Background delivery processing is still exposed as a normal tenant action.');
 }
-if (!notifications.includes('displayToken') || !notifications.includes('displayToken(item.event_type, ui)')) {
-  throw new Error('Known notification event codes are not mapped to tenant-facing display labels.');
+if (!notifications.includes('notificationEventLabel') || !notifications.includes('notificationEventLabel(item.event_type, ui)')
+    || !notifications.includes("ui('Other inventory event')")) {
+  throw new Error('Notification event codes must map known values to localized labels and hide unknown machine tokens.');
 }
 
 if (!notifications.includes('tenantFacingNotificationDescription') || !notifications.includes("headers={['Severity', 'Event', 'Description', 'Created'].map(ui)}")) {

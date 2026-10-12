@@ -10587,3 +10587,42 @@ TARGETED LIVE ACCEPTANCE WHEN DEPLOYED
 CURRENT ENGINEERING SOURCE OF TRUTH: Frontend114 + Backend072.
 PRODUCTION ACCEPTANCE: PENDING. Batch116 NOT STARTED.
 ================================================================================
+
+
+================================================================================
+BATCH 116 — ENTERPRISE INVENTORY REGRESSION GUARD ALIGNMENT
+DATE: 2026-10-12
+BASELINE: Frontend114 + Backend072 (Batch115 completed)
+RESULT: Frontend115 + Backend072 (backend unchanged)
+
+WHAT TRIGGERED THIS BATCH
+- Batch115 regression verification exposed inherited failure in scripts/check-enterprise-inventory-cleanup.mjs. The unchanged Frontend114 baseline reproduces the failure: the old source guard requires the retired Par-level label "Reorder quantity" even though the current form correctly presents "Fixed reorder quantity (optional)" with a helper explaining that 0 automatically replenishes to the target.
+- After repairing the first obsolete guard in a working copy, the same script revealed a second inherited source assertion: it demands displayToken(item.event_type, ui) instead of the current safer notificationEventLabel(item.event_type, ui). This intentional current helper translates known event codes and displays "Other inventory event" for unknown internal codes; raw machine tokens are not shown to users.
+- This is a REGRESSION TEST MAINTENANCE BATCH, not a new runtime product defect or a verified live audit issue. No business behavior, UI, API or database implementation is changed.
+
+CHANGES — FRONTEND115
+1. scripts/check-enterprise-inventory-cleanup.mjs: update two stale source-text checks while preserving all remaining safeguards. Require the accurate optional fixed reorder label AND zero/automatic-mode helper; require the notificationEventLabel formatter and unknown-code safety fallback, rather than the earlier displayToken call.
+2. scripts/check-batch116-enterprise-inventory-guard-alignment.mjs (NEW): 30 focused assertions, including behavioral execution of the existing TS notification event formatter, known-event translation, unknown event code concealment, blank/whitespace handling, Par-level field intent, five-language translation presence/uniqueness, and execution of the inherited cleanup guard.
+3. package.json: register a dedicated check:batch116-enterprise-inventory-guard-alignment script.
+4. Inventory_Management_App_FIX_LOG_2026-10-06.txt: append this batch without removing the cumulative history, keeping the embedded frontend copy identical to the standalone log.
+
+NON-CHANGES / DATA SAFETY
+- No src/ React or API source changed, no CSS, backend, SQL, tenant role/permission, stock movement, reorder transaction, notification delivery worker, API contract or translation catalog modified. No schema migration.
+
+ACTUAL VERIFICATION
+- Reproduced inherited cleanup failure on pristine extracted Frontend114 before edits.
+- First obsolete assertion patched -> exposed second obsolete notification formatter assertion; after both updated the inherited script passes.
+- New focused script: 30/30 assertions PASS, including executing actual transpiled notification-event formatter.
+- Selected inherited+new regression scripts: 27/27 PASS (see standalone exact script listing).
+- Global multilingual closure: PASS (45/45 tenant routes, 265 reachable source files, 14,308 five-language translation rows and placeholder parity).
+- Full frontend ZIP compared member-by-member to Frontend114: ONLY the 3 modified existing files and 1 added test script. Changed-files ZIP byte-identical with these 4 paths, all ZIP CRC checks PASS, Backend072 exact SHA-256 unchanged.
+
+LIMITATIONS
+- Test scripts were run with local Node22.16 and a globally installed TypeScript CLI symlink in the throwaway test environment. Node24 clean npm ci, full TS/Vite production build, database-backed integration and deployed-browser acceptance NOT VERIFIED. Treat this as a source-level regression test fix, not production approval.
+
+NEXT
+- Batch117 NOT STARTED. Select a *real still-present* audit defect only after checking audit v93 + current full Frontend115/Backend072 + cumulative FIX_LOG. Run focused, inherited and feasible build/browser tests, record exact results. Every release includes full FE/BE ZIPs, changed-files ZIP, updated cumulative FIX_LOG, audit, verification, regression listing, complete handoff, SHA256 manifest, all-in-one bundle.
+
+AUTHORITATIVE CODE SOURCE: Frontend115 + Backend072.
+PRODUCTION ACCEPTANCE: PENDING.
+================================================================================
