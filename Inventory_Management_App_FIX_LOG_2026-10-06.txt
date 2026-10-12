@@ -11426,3 +11426,50 @@ CONTROLLED LIVE RETEST PENDING
 SOURCE OF TRUTH: complete Frontend134 + complete unchanged Backend072; original audit v93; cumulative FIX_LOG through Batch135.
 NEXT: Batch136 not started. Verify an actual current-source defect before editing, continue delivering full source ZIPs, changed files, docs, checksums, and all-in-one handoff package each batch.
 ================================================================================
+
+================================================================================
+BATCH 136 — OUTBOUND ORDER / CUSTOMER RETURN ATTACHMENTS: CONSISTENT FILE PICKER
+Date: 2026-10-12
+================================================================================
+SOURCE OF TRUTH
+- Baseline: FULL hotel-inventory-frontend_surgical-fix-134.zip and unchanged FULL hotel-inventory-backend_surgical-fix-072.zip.
+- Canonical audit: Inventory_Management_App_Tenant_Audit_Findings_2026-09-26_v93.txt (historical, not rewritten).
+- Result: FULL Frontend surgical-fix-135 + unchanged FULL Backend surgical-fix-072.
+
+AUDIT / CURRENT SOURCE EVIDENCE
+- Tenant audit confirms multiple native Choose File / No file chosen controls visually inconsistent with the app; Inventory Controls -> Attachments and Supplier Catalogs already received reusable styled EnterpriseFilePicker in historic Batch 065, and Storage Locations/Suppliers CSV import in Batch 135.
+- The current OutboundPage.tsx still rendered two unstyled native <input type="file"> controls for outbound order attachments and customer return attachments. These surfaces were NOT changed by Batch 135 and remain part of the global file-picker visual-consistency backlog.
+- Both Outbound upload panels were independently permission gated by ATTACHMENTS_READ/ATTACHMENTS_WRITE and enabled their real upload actions only when attachmentFile was selected.
+
+SURGICAL CHANGE
+- Reused the existing translated, keyboard-accessible EnterpriseFilePicker component for both Outbound attachment panels, retaining the actual hidden native input and real File object for browser file selection/upload.
+- Added distinct useRef<HTMLInputElement> refs for outbound order and customer return chooser controls; kept unrestricted file-type selection (accept="") as before.
+- On successful attachment upload, clear selected File state and both native input values so selecting the same file again triggers onChange reliably.
+- Preserved original /enterprise-inventory/attachments/upload transport payload, entity_type/entity_id linkage, original filename, MIME fallback, binary file body, skipMutationFeedback, page-owned translated success/error results and correct query refetch per entity type.
+- No changes to record selection, access policy, order/return lifecycle, backend endpoints, database, or existing translation catalog.
+
+EXACT FRONTEND DIFF vs FULL Frontend134
+Modified: src/pages/OutboundPage.tsx; package.json; Inventory_Management_App_FIX_LOG_2026-10-06.txt.
+Added: scripts/check-batch136-outbound-attachment-picker.mjs.
+Backend changed paths: none.
+
+REGRESSION / VERIFICATION
+- Baseline source reproduction: new guard on untouched Frontend134 FAIL (20/30 pass), specifically missing Outbound unified picker and target guard registration.
+- Corrected source: new guard 30/30 PASS (permission gates, choose-button keyboard behavior, status text, upload and refresh contracts, both records, five-language existing translations).
+- 59 selected inherited regression scripts plus new Batch136 guard: 60/60 PASS. Global tenant multilingual audit included and PASS.
+- Changed OutboundPage.tsx isolated TypeScript transpile: zero diagnostics.
+- Full Node24 clean npm ci / project-wide typecheck / Vite production build NOT PERFORMED in this Node22 environment; source guards are not equivalent to a production build.
+- PostgreSQL integration, deployed desktop/mobile browser and OS/screen reader file-picker acceptance remain PENDING.
+- ZIP integrity, exact full-source vs baseline delta parity, changed-files ZIP parity, unchanged Backend072 checksum and embedded/standalone FIX_LOG equality verified during release build.
+
+SAFE LIVE RETEST (ONLY AUTHORIZED TEST DATA)
+1. Deploy compatible Frontend135 with Backend072 and log into a role with attachment read+write rights.
+2. Outbound -> Orders -> Open Details -> Attachments: select a test file through Choose file; verify the translated filename display and Upload attachment enabled state.
+3. Upload to that test order and confirm success message, correct attachment list, download and reset of selected filename; repeat selection of same file without uploading it a second time if unnecessary.
+4. Outbound -> Customer Returns -> Open Details -> Attachments: repeat choose/upload/list/download on an appropriate test return.
+5. Verify users without ATTACHMENTS_WRITE cannot see upload controls and existing failure/no-file actions remain safe.
+6. Inspect keyboard navigation/mobile layout. Do not mark the whole feature production accepted until these pass.
+
+STATUS: SOURCE-CORRECTED; SELECTED REGRESSION-VERIFIED; PRODUCTION ACCEPTANCE PENDING.
+NEXT: Batch 137 not started. Reconcile remaining audit v93 issues against full Frontend135 + Backend072; do not repeat previous fixes.
+================================================================================
