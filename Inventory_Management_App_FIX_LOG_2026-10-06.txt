@@ -10791,3 +10791,86 @@ TARGETED LIVE RETEST
 NEW AUTHORITATIVE SOURCE: Frontend119 + Backend072.
 NEXT: Batch121 NOT STARTED. Validate another outstanding historical audit finding against current code and log.
 ================================================================================
+
+
+================================================================================
+BATCH 121 — INVENTORY CONTROLS PAR LEVEL SAVE GENERIC TOAST DEDUPLICATION
+DATE: 2026-10-12
+BASELINE: Full Frontend119 + full Backend072 (Batch120 completed)
+RESULT: Full Frontend120 + unchanged full Backend072
+
+CANONICAL AUDIT EVIDENCE / CONFIRMED REMAINING DEFECT
+- Canonical tenant audit v93, 2026-09-30 16:18, Inventory Controls > Par Levels: editing an existing Par Level then saving persisted the new minimum, but the browser's success toast claimed "Item created successfully." This was misleading because a par-level configuration was UPDATED, not an inventory item created. Expected feedback is action-specific.
+- In latest untouched Frontend119, src/components/enterpriseInventory/EnterpriseInventoryStockMutations.ts createParLevelMutation used postEnterpriseInventoryRequest('/enterprise-inventory/par-levels', buildParLevelPayload(input)) without skipMutationFeedback. That wrapper defaults to generic global API success feedback. The same mutation already had precise translated inline feedback ui('Par level saved.') on success and distinct local failure handling, so the global fallback was duplicative and inaccurate. No prior cumulative FIX_LOG entry was found correcting THIS par-level-save route; Batch064 suppressed the separate Par-level EVALUATE toast only.
+- Focused Batch121 executable test FAILED on untouched Frontend119 at missing save-specific skipMutationFeedback, establishing a source-reproduced gap before editing.
+
+SURGICAL CORRECTION — FRONTEND120 ONLY
+1. src/components/enterpriseInventory/EnterpriseInventoryStockMutations.ts:
+   - Pass { skipMutationFeedback: true } as the third postEnterpriseInventoryRequest argument for CREATE/UPDATE Par level save only. This retains the ORIGINAL POST endpoint, buildParLevelPayload business data, mutation result, reset, query invalidation and specific translated inline 'Par level saved.' status.
+   - Existing local failure/error handling remains; the redundant shared generic API success/error toast for only this operation is opted out, preventing conflicting duplicate messages.
+   - Par-level Evaluate already had its own skipMutationFeedback and is not modified; replenishment-task action, cycle counts, stock movements and other inventory controls untouched.
+2. scripts/check-batch121-par-level-save-feedback.mjs: NEW executable regression guard with 32 assertions. Parses real mutation TS, transpiles and executes the ACTUAL mutation config with a stubbed request; verifies original payload builder invocation, endpoint, POST helper, single network call, skipMutationFeedback, inline status, original reset/error/invalidation and separation from Evaluate/task routes.
+3. package.json: register 'check:batch121-par-level-save-feedback'.
+4. Append this entry to cumulative FIX_LOG; separately delivered log and embedded log inside complete frontend ZIP match byte-for-byte.
+
+NON-CHANGES AND SAFE BOUNDARIES
+- No backend/SQL/permission/tenant-isolation/API-contract/migration changes. No changes to par-level effective dates, minimum/target/reorder quantities, conflict handling, request body, result parsing, inventory stock, task creation, alerts, audit or worker jobs. No translation rows added: existing 'Par level saved.' already translates to EN/DE/ES/FR/HR.
+- No claim that a real browser toast was observed after deploying Frontend120. Code-level guard ensures the specific shared request feedback is disabled; browser acceptance remains required.
+
+TESTS PERFORMED
+- Untouched Frontend119 focused Batch121 check FAILS as expected on the missing request-level opt-out.
+- Corrected Frontend120 Batch121 check PASS 32/32 assertions including executable mutation call and local feedback preservation.
+- Selected inherited regression sweep: 45/45 PASS = 44 inherited Batch120 scripts + 1 new focused guard; no tests omitted from this selected set.
+- Global tenant multilingual closure PASS (included in the selected sweep); existing five-language Par-level save text verified; unchanged translation catalog.
+- Node22/available local TS isolated source transpilation and new script syntax PASS. Full archive integrity, changed-file parity, unchanged backend SHA and embedded log equality verified.
+- NOT RUN: clean Node24 npm ci, full-project TypeScript/Vite build, real PostgreSQL integration, deployed browser/mobile acceptance. Source-level tests do not establish production readiness.
+
+TARGETED TENANT LIVE RETEST
+- After verified deployment of Frontend120 + Backend072, go to Inventory Controls > Par levels; edit a disposable existing par-level minimum, Save par level and verify the row updates, form resets and one precise 'Par level saved.' inline result is shown. Do not expect 'Item created successfully.' or double success feedback. Repeat a safe new-rule create. Use an intentionally invalid edit in a test tenant to ensure local failure feedback still appears and no success is claimed. Test localization EN/DE/ES/FR/HR and mobile view. Recheck Evaluate par levels separately; do not create a replenishment execution task unless intentionally authorized.
+
+RECONCILIATION NOTE
+- The older audit's 2026-09-30 Generated PO 'Loaded spend' mismatch was already corrected in historic Batch058 according to this same cumulative FIX_LOG. It is a historical finding, NOT an unfixed Batch121 candidate. The earlier Batch120 handoff incorrectly called its semantics unresolved; verify real production if needed but do not re-implement Batch058.
+
+NEW SOURCE OF TRUTH: Frontend120 + Backend072.
+NEXT: Batch122 NOT STARTED. Check another unresolved issue against this exact code and cumulative log.
+PRODUCTION ACCEPTANCE: PENDING.
+================================================================================
+
+
+================================================================================
+BATCH 122 — INVENTORY CONTROLS APPROVALS / EMPTY QUEUE RULE-CREATION GUIDANCE
+DATE: 2026-10-12
+BASELINE: Complete Frontend120 + Backend072 (Batch121 completed)
+RESULT: Complete Frontend121 + unchanged Backend072
+
+AUDIT EVIDENCE AND CURRENT SOURCE DEFECT
+- Canonical audit v93, 2026-09-30 18:10, Inventory Controls > Approvals initial state: approval queue empty and approval rules unconfigured. Audit explicitly observed that the empty queue gives no direct next-step guidance linking rule creation to how an eligible approval enters the queue.
+- The current Frontend120 ApprovalsTab.tsx displays 'No other approval requests are waiting.' and a separate 'No approval rules configured yet.' table empty state but provides NO contextual explanation that a permitted user should configure a rule then submit a matching business record. This is distinct from the historic Manager inventory-requisition queue defect fixed in Batch070 and from the department picker fixed in Batch069.
+- Before any edit, the new focused Batch122 executable guard FAILS on unchanged Frontend120 as expected. Not claimed to be an approval-routing backend defect.
+
+SURGICAL CORRECTION — FRONTEND121
+1. src/components/enterpriseInventory/tabs/ApprovalsTab.tsx: preserve the exact existing empty-queue description and append a short guidance line ONLY when all three conditions are met: other-approval queue has no items, the approval-rule query is not loading and has definitively returned an empty rules array, and the viewer holds APPROVAL_RULES_WRITE. Message: 'Create an approval rule above, then submit a matching record to add it to this queue.' Suppressed for read-only users, loading/unavailable rules, or when rules exist. Existing separate Submitted inventory requisitions list and warning about its independent workflow remain unchanged.
+2. src/i18n/tenantUiTranslations.ts: Add precisely one complete five-language EN/DE/ES/FR/HR translation row; the rest of the existing catalog remains unchanged.
+3. scripts/check-batch122-approval-empty-rule-guidance.mjs (NEW): 21 focused executable checks, including expression execution for empty/no-rules, read-only, rules-present, loading, missing/failed data; preservation of queue separation, permission gates, rule-save/approval mutations and existing requisition list; TS/TSX parsing/transpilation and translation row.
+4. package.json: Register check:batch122-approval-empty-rule-guidance.
+5. Reconcile the previous Batch121 standalone cumulative FIX_LOG inconsistency and append this Batch122 entry. Frontend120 embedded cumulative FIX_LOG already contained Batch121 (10,837 lines); the separately exposed /mnt/data standalone TXT was an older Batch120 10,793-line copy. Use the embedded authoritative Batch121 ledger, not the stale standalone TXT, as the source for this Batch122 log. Deliver a single byte-identical standalone and full-frontend embedded FIX_LOG now updated through Batch122.
+
+EXPLICIT NON-CHANGES
+- No backend or PostgreSQL code, approval-rule eligibility, tenant permissions, department selector, queue membership, query endpoints, requisition lifecycle, approval mutations, audit, stock or inventory business workflow changes.
+- Guidance does not promise that creating a rule alone inserts an item. It correctly requires a matching record to be submitted. Existing inventory requisitions remain a distinct queue.
+- The historical Manager REQ-000003 visibility defect was corrected in Batch070; no reimplementation or speculative new routing change is included.
+
+VERIFICATION
+- Baseline reproduction: focused guard fails on original unchanged Frontend120; 21/21 checks PASS after patch.
+- Selected inherited + new tests: 46/46 PASS (all 45 Batch121 selected scripts plus the new Batch122 script; no omitted script in this selected set).
+- Multilingual closure: PASS (45/45 tenant routes, 265 reachable sources, 14,310 five-language translation rows and placeholder parity).
+- TS and TSX isolated parsing/transpilation PASS; package script syntax PASS; full source ZIP and supplemental changed-file parity/integrity verified at publication; Backend072 hash unchanged.
+- Full clean Node24 npm ci, TypeScript/Vite production build, real backend/PostgreSQL integration, deployed browser/mobile acceptance NOT RUN; code/simulation-based guards do not replace live acceptance.
+
+TARGETED LIVE RETEST
+- With a role allowed to create approval rules, open Inventory Controls > Approvals in a tenant with no other approval requests and NO approval rules: guidance should appear directly under the empty other-approval queue message. Once one rule is loaded, guidance should disappear. When queue has approval items, show the existing rows, not the guidance. For read-only Manager role, do NOT show a create-rule instruction that cannot be acted on. On network failure/loading, avoid falsely implying there are no rules. Verify separate Submitted inventory requisitions list, creation form and five languages.
+
+NEW SOURCE OF TRUTH: Frontend121 + Backend072.
+NEXT: Batch123 NOT STARTED. Reconcile another distinct remaining audit issue with current source and cumulative log before changing code.
+PRODUCTION ACCEPTANCE: PENDING.
+================================================================================

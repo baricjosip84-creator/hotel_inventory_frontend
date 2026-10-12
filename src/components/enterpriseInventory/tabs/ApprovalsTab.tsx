@@ -230,7 +230,12 @@ export function ApprovalsTab({ approvalQueue, approvalRuleForm, approvalRulesQue
                 );
               })}</tbody>
             </table>
-          </div> : <p style={styles.helper}>{ui('No other approval requests are waiting.')}</p>}
+          </div> : <div>
+            <p style={styles.helper}>{ui('No other approval requests are waiting.')}</p>
+            {!approvalRulesQuery.isLoading && approvalRulesQuery.data?.length === 0 && canWriteApprovalRules ? (
+              <p style={styles.helper}>{ui('Create an approval rule above, then submit a matching record to add it to this queue.')}</p>
+            ) : null}
+          </div>}
         </section>
 
         <section style={styles.card}>

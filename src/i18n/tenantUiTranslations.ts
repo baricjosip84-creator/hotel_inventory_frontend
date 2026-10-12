@@ -2,6 +2,8 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // Batch 122: actionable and permission-safe guidance for an empty approvals queue with no configured rule.
+  ["Create an approval rule above, then submit a matching record to add it to this queue.", "Erstellen Sie oben eine Genehmigungsregel und reichen Sie anschließend einen passenden Vorgang ein, damit er in dieser Warteliste erscheint.", "Cree arriba una regla de aprobación y después envíe un registro que cumpla sus condiciones para que aparezca en esta cola.", "Créez une règle d’approbation ci-dessus, puis soumettez un dossier correspondant pour qu’il apparaisse dans cette file.", "Izradite pravilo odobravanja iznad, a zatim pošaljite odgovarajući zapis kako bi se pojavio u ovom redu čekanja."],
   // Batch 120: explicit completed manual refresh feedback in procurement PO drafts.
   ["Purchase order drafts refreshed.", "Bestellentwürfe wurden aktualisiert.", "Se han actualizado los borradores de órdenes de compra.", "Les brouillons de bons de commande ont été actualisés.", "Nacrti narudžbenica su osvježeni."],
   // Batch 112: only the verified backend-generated Mobile Execution closure template.
