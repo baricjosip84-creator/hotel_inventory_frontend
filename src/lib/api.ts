@@ -206,6 +206,13 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Stock count applied successfully.';
   }
 
+  // Batch140: cancelling an outbound customer order does not create an item.
+  // Keep this scoped to the successful POST action only; an unsuccessful
+  // cancellation never reaches the shared mutation-success feedback handler.
+  if (normalizedMethod === 'POST' && /^\/outbound\/orders\/[^/]+\/cancel$/.test(normalizedPathOnly)) {
+    return 'Customer order cancelled successfully.';
+  }
+
   if (normalizedMethod === 'POST' && normalizedPathOnly === '/decision-intelligence/adaptive-policy-engine-refresh') {
     return 'New policy analysis snapshot recorded. No policy changes were applied.';
   }

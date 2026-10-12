@@ -497,7 +497,8 @@
     "check:batch136-outbound-attachment-picker": "node scripts/check-batch136-outbound-attachment-picker.mjs",
     "check:batch137-custom-field-product-picker": "node scripts/check-batch137-custom-field-product-picker.mjs",
     "check:batch138-uom-guidance": "node scripts/check-batch138-uom-guidance.mjs",
-    "check:batch139-invoice-validation": "node scripts/check-batch139-invoice-validation.mjs"
+    "check:batch139-invoice-validation": "node scripts/check-batch139-invoice-validation.mjs",
+    "check:batch140-outbound-cancel-feedback": "node scripts/check-batch140-outbound-cancel-feedback.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

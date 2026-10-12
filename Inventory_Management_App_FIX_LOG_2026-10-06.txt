@@ -11569,3 +11569,32 @@ ACCEPTANCE AND SAFETY
 
 AUTHORITATIVE SOURCE AFTER THIS RELEASE: FULL Frontend surgical-fix-138 + FULL unchanged Backend surgical-fix-072. NEXT Batch140 NOT STARTED.
 ================================================================================
+
+================================================================================
+BATCH 140 — OUTBOUND / CUSTOMER ORDER CANCELLATION: ACCURATE LOCALIZED TOAST
+Date: 2026-10-12
+================================================================================
+BASELINE AND VERIFIED DEFECT
+- Authoritative full frontend: hotel-inventory-frontend_surgical-fix-138.zip; full unchanged backend hotel-inventory-backend_surgical-fix-072.zip; canonical tenant audit v93 and full cumulative FIX_LOG through Batch139 checked to avoid repeated corrections.
+- Audit v93 Outbound customer-order cancellation (2026-09-29) successfully cancelled draft order OUT-20260902-6F0ED989 with a reason and persisted status, but displayed the semantically false green success toast "Item created successfully." after cancellation. The page already displayed the correct order-specific inline business confirmation.
+- Current src/lib/api.ts Frontend138 tenantMutationSuccessMessage has no POST /outbound/orders/:id/cancel route mapping and falls through to generic Item creation success feedback. This exact production-audit defect remains in source; no previous cumulative entry corrected this exact route.
+
+ONE FOCUSED FRONTEND CORRECTION
+1. src/lib/api.ts: Add method POST and exact case-normalized path /outbound/orders/:id/cancel (querystring removed) to tenantMutationSuccessMessage; return "Customer order cancelled successfully." only after successful network mutation. Regex excludes unrelated actions, other outbound types and read methods. The existing global toast pipeline translates returned messages and never dispatches success on API failure.
+2. src/i18n/tenantUiTranslations.ts: Add the one new phrase across EN/DE/ES/FR/HR with exact translation keys. No user data or secrets in messages.
+3. scripts/check-batch140-outbound-cancel-feedback.mjs plus package.json: 55 executable focused assertions check TypeScript TS/TSX parsing and isolated transpile; actually execute extracted TypeScript success resolver against create/edit/confirm/pick/dispatch/cancel/return/stock/purchase-order routes, case normalization, method isolation, querystrings, retained legacy accurate toasts, exact five-language catalog coverage, original Outbound cancellation reason (minimum three characters), optimistic version, permission gate, inline confirmation, mutations and error handlers, and global success-only toast pipeline.
+4. Append this block to the ENTIRE cumulative FIX_LOG, preserving all previous content unchanged. Standalone, frontend-embedded, and release bundle copies are byte-identical.
+
+TEST RESULTS
+- Baseline reproduction: new guard run against unmodified Frontend138 api.ts intentionally FAILS: actual "Item created successfully." versus expected "Customer order cancelled successfully.". Corrected source passes 55/55 focused assertions.
+- All 63 inherited selected regression scripts plus new Batch140 guard = 64/64 PASS. Includes global five-language closure and all previous Batch126–139 relevant guard scripts.
+- Byte-for-byte full frontend baseline archive comparison, exact five changed/new paths, changed-files ZIP parity, new full frontend ZIP CRC, byte-identical backend SHA256, all 11 complete bundle members, and all documentation SHA checks verified.
+- Test environment Node22.16, global TypeScript symlink only for tests and excluded from release packages. Full clean Node24 npm ci, TypeScript/Vite production build, PostgreSQL integration and deployed browser/mobile/a11y acceptance NOT VERIFIED.
+
+SCOPE, RISK AND MANUAL ACCEPTANCE
+- NO backend, database, schema, mutation URL/body/method, stock reservation/dispatch, cancellation validation, authorized permissions, optimistic version, or order state changed. This is an exact success-only message mapping.
+- After deployment, cancel an eligible disposable outbound draft with a reason and authorized tenant role; expect both inline order-specific message and bottom-right "Customer order cancelled successfully." toast in EN/DE/ES/FR/HR; check cancelled status and reason persisted after refresh. Test failed cancellation/permission denial displays ONLY an error, no success. Test customer-return cancellation and purchase-order cancellation independently to ensure no mapping leakage; do not perform destructive actions on real orders.
+- Separate unresolved source/live issues: UoM CASE=24 persistence after reload, Custom Fields plain Text value save, clean production Node24 build and deployed desktop/mobile/browser acceptance require DB/network/live verification; not addressed in this batch.
+
+SOURCE OF TRUTH AFTER THIS RELEASE: FULL Frontend surgical-fix-139 + byte-identical FULL Backend surgical-fix-072. NEXT: Batch141 NOT STARTED.
+================================================================================

@@ -2,6 +2,8 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // Batch 140: a cancelled customer order is not a newly created item.
+  ["Customer order cancelled successfully.", "Kundenauftrag erfolgreich storniert.", "Pedido de cliente cancelado correctamente.", "Commande client annulée avec succès.", "Narudžba kupca uspješno je otkazana."],
   // Batch 138: practical UoM instructions and two-way conversion examples.
   ["How units of measure work", "So funktionieren Maßeinheiten", "Cómo funcionan las unidades de medida", "Comprendre les unités de mesure", "Kako funkcioniraju mjerne jedinice"],
   ["Inventory is counted in the base unit (for example, pcs). Add a different unit only when the same product is bought or issued in packs.", "Der Bestand wird in der Basiseinheit gezählt (z. B. Stück). Fügen Sie eine weitere Einheit nur hinzu, wenn das Produkt in Packungen eingekauft oder ausgegeben wird.", "El inventario se cuenta en la unidad base (por ejemplo, unidades). Añada otra unidad solo si el mismo producto se compra o se entrega en paquetes.", "Le stock est compté dans l’unité de base (par exemple, pièces). Ajoutez une autre unité seulement si le produit est acheté ou sorti en lots.", "Zalihe se vode u osnovnoj jedinici (npr. kom). Dodajte drugu jedinicu samo ako se isti proizvod nabavlja ili izdaje u pakiranjima."],
