@@ -532,7 +532,8 @@
     "check:batch174-country-uncertain-write-contract": "node scripts/check-batch174-country-uncertain-write-contract.mjs",
     "check:batch175-case-lost-post-contract": "node scripts/check-batch175-case-lost-post-contract.mjs",
     "check:batch176-custom-field-decimal-contract": "node scripts/check-batch176-custom-field-decimal-contract.mjs",
-    "check:batch179-staging-identity-contract": "node scripts/check-batch179-staging-identity-contract.mjs"
+    "check:batch179-staging-identity-contract": "node scripts/check-batch179-staging-identity-contract.mjs",
+    "check:batch180-case-cleanup-ownership": "node scripts/check-batch180-case-cleanup-ownership-contract.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

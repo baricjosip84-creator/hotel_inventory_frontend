@@ -12284,3 +12284,52 @@ HISTORICAL ORIGINAL AUDIT FINDINGS STILL OPEN: CASE/Case/24 conversion not visib
 NEXT REQUIRED ACTION: Deploy/push the specific paired full source archives and confirm the backend's Render deployed SHA; configure the protected GitHub Environment exact expected backend commit; run read-only staging schema/API checks; run approved disposable CASE=24 and Croatia write/readback only after reviewing the safeguards and obtaining user/environment approval. Capture HTTP, SQLSTATE, readback, cleanup outcomes, Node24 frontend CI and deployed-browser evidence before marking historical failures closed. Avoid unrelated microfixes as a substitute for the acceptance gates.
 RELEASE CONTENTS: Complete FE174, complete BE091, surgical-fix-179 changed ZIP, appended original FIX_LOG and audit, verification, regression results, handoff, complete detailed handoff, START HERE and SHA256 manifest; all-in-one 11 members.
 ================================================================================
+
+
+================================================================================
+BATCH 180 — STAGING CASE=24 SUCCESSFUL-RECEIPT CLEANUP OWNERSHIP GUARD
+Date: 2026-10-13
+Baseline: FULL Frontend surgical-fix-174 + FULL Backend surgical-fix-091 (Batch 179).
+Result: FULL Frontend surgical-fix-175 + FULL Backend surgical-fix-092.
+SCOPE: Original September tenant audit CASE=24 persistence diagnosis; diagnostic
+safety only, not normal tenant save, conversion calculations, or database schema.
+
+REPRODUCED SOURCE DEFECT:
+The Batch160 staging smoke probe used the POST receipt's id/version to decide
+what temporary CASE row to DELETE, even when subsequent GET showed the same id
+but a different owner marker, or a different version. The lost-POST recovery
+path had a marker check, but the successful-receipt path did not. A mock API
+reproduction against unmodified Backend 091 fails the new Batch180 negative
+regression because an altered-marker CASE is accepted and deleted.
+
+IMPLEMENTATION:
+- POST receipt kept separately from cleanup ownership state.
+- Fresh GET must confirm the exact per-run random barcode marker, CASE code,
+  factor 24, version 1, both false usage flags, and same id as POST receipt.
+- Only a proven GET row becomes eligible for version-protected DELETE.
+- Unacknowledged POST recovery uses the same ownership predicate and refuses
+  a mismatched receipt id. Unknown/mismatched results stop for manual review.
+- Inherited Batch160, Batch161, Batch174 and Batch175 fixtures/contracts updated
+  narrowly to preserve their original checks under the stronger marker rule.
+- Manual staging workflow runs the new offline guard before staging I/O.
+- Added FE cross-repository safety contract, new focused BE executable mock,
+  and package script registration. No normal runtime endpoint was changed.
+
+ACTUALLY EXECUTED:
+- New backend ownership assertion guard: 31/31 PASS.
+- New frontend/backend contract assertions: 16/16 PASS.
+- Untouched BE091 repro: expected FAIL (unsafe successful-receipt case).
+- All selected inherited/new: 118/118 scripts PASS (FE 98, BE 20), including
+  proper --self-test invocation for the three intentionally network-capable
+  diagnostic tools. Node v22.16.0; test-only TypeScript/legacy path symlinks.
+- Source syntax, archive integrity, changed-file parity, and SHA-256 manifest
+  verified. Test-only dependency symlinks are excluded from full project ZIPs.
+
+NOT ESTABLISHED: Live staging or PostgreSQL persistence, clean frontend Node24
+build, browser E2E or tenant production acceptance. Do NOT mark original
+CASE=24 or test_country=Croatia FAIL as resolved. No tenant requests were made.
+
+NEXT: Configure/approve staging workflow on the expected backend deployment,
+run read-only schema/API check, then opt-in disposable test writes. Confirm
+Node24 CI build and deployed-browser acceptance on the exact same revision.
+================================================================================
