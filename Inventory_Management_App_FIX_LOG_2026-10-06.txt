@@ -12019,3 +12019,24 @@ CHANGED FULL FRONTEND MEMBERS: 8 (including appended cumulative FIX_LOG); Backen
 LIMITS: Neither historical CASE=24 database persistence nor Croatia Custom Fields database failure is proven resolved. No deployed browser or real tenant PostgreSQL acceptance. Full Node24 npm ci/typecheck/Vite production build remains pending due to runtime/registry access constraints.
 NEXT: Obtain true Node24 install/CI + deployed tenant POST/GET/database evidence before any assertion of production closure. Preserve original audit and FIX_LOG Batches001–158.
 ================================================================================
+
+================================================================================
+BATCH159 — CUSTOM FIELD CALENDAR-DAY VALIDATION — 2026-10-13
+================================================================================
+BASELINE:
+- Complete cumulative Frontend157 SHA256 d432d34667e7b268ea5fa83d44aedbb0380f8fc467cfaf8f0fef33026567931a and Backend072 SHA256 2036cbc149b5c319911ec8fe72418361651ebcea2caaf799b58382adb0cf3e69. Canonical September v93 tenant audit and all cumulative FIX_LOG records through Batch158 were preserved without alteration.
+- Original live audit failures remain OPEN: UoM CASE=24 not visible after success/reload; Custom Fields required plain-text test_country='Croatia' rejected with generic invalid-format error. The first original audit observation for `Croatia` does NOT establish a verified Postgres 22P02 for that precise request; a separate Location hierarchy 22P02 finding exists. Do not conflate them.
+SOURCE DEFECT / ROOT CAUSE REPRODUCED LOCALLY:
+- Backend inventoryCapabilitiesService.validateCustomFieldValue accepted any date input for which JavaScript `new Date(value)` returned a finite timestamp, then returned `String(value).slice(0,10)`. JavaScript rolls impossible ISO calendar days forward; e.g. `2026-02-30` normalizes to March 2 but saved the impossible literal `2026-02-30`. This violates Custom Fields' date integrity. The frontend uses an ISO day-only date input; no preexisting persisted data or schema was migrated.
+CORRECTION:
+- New Backend073 implements isValidCustomFieldCalendarDate: requires canonical YYYY-MM-DD input and strict UTC round-trip match to reject impossible calendar days, invalid months, leap-day errors, noncalendar strings and datetime values. The Custom Fields date branch returns the canonical date if valid; otherwise preserves the existing 400 CUSTOM_FIELD_VALUE_INVALID code and translated field guidance. Required-field handling, text=String(value) (including 'Croatia'), number, Boolean and select semantics remain unchanged.
+- New dependency-free scripts/check-batch159-custom-field-calendar-date.cjs executes the REAL backend service validation function extracted into a restricted VM context. 42/42 focused assertions PASS for leap-day validity, impossible dates, ISO format and unchanged text/number/boolean/optional behavior. Untouched Backend072 fails the new focused test as EXPECTED (no calendar-day validator). Registered npm check:batch159-custom-field-calendar-date.
+- Modified backend source paths: src/services/inventory/inventoryCapabilitiesService.js, scripts/check-batch159-custom-field-calendar-date.cjs (new), package.json. Full Frontend158 is functionally identical to Frontend157 except appended embedded cumulative FIX_LOG. All previous frontend behavior preserved; no frontend React source changed.
+TESTING:
+- Backend corrected source `node --check` PASS; backend focused guard 42/42 PASS (Node22.16). Inherited 82/82 selected frontend regression scripts PASS on Frontend157 source against Backend073 source, using only test-local TypeScript symlink and explicit BACKEND_ROOT (not shipped). These are source-level checks; full Jest backend suite and clean npm installation were not performed.
+- Node24 clean frontend install/typecheck/Vite build remains BLOCKED in this execution environment (only Node22.16 installed and required dependencies not available offline); actual PostgreSQL tenant, API and deployed-browser acceptance NOT performed.
+- Original CASE=24 and Croatia plain-text production audit findings remain OPEN. This batch fixes only valid date handling, does NOT claim to correct or validate their production failure.
+RELEASE:
+- Full cumulative Frontend158, full Backend073, changed-files ZIP, unabridged cumulative FIX_LOG through Batch159, original audit v93 with append, verification, 82-script results, handoff, full detailed handoff, START HERE and SHA256 manifest; eleven-file combined package. Full archive contents and delta member parity validated.
+NEXT: Obtain real Node24 CI build and authorized tenant POST/GET/PostgreSQL evidence for two historic failures before production acceptance. Avoid unnecessary unrelated micro-fixes.
+================================================================================
