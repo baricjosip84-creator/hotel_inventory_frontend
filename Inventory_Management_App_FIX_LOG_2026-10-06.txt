@@ -12236,3 +12236,13 @@ ACTUAL TESTS: New test FAILS as expected against unchanged Backend087 (temporary
 RELEASE: Complete cumulative Frontend170 and Backend088 ZIPs, changed ZIP, cumulative FIX_LOG, original audit, verification, 109-script regression TXT, compact handoff, cumulative detailed handoff, START HERE, SHA256 manifest, all-in-one 11-file ZIP. Check ZIP CRC, unchanged-member byte parity, changed-member parity, historical document exact prefixes and checksums.
 LIMITS/REMAINING: Real staging GET/POST/PUT, PostgreSQL migration/schema verification, original CASE=24 save readback, original Croatia text saving SQLSTATE, clean Node24 build, and deployed-browser acceptance are OPEN. No new source-level diagnostic outcome should be represented as an original production-failure closure. Next action: run existing manually dispatched protected staging workflow with real authorized credentials and disposable product; use results to guide an application fix if required.
 ================================================================================
+
+
+=== BATCH 176 — 2026-10-13 — CUSTOM FIELD DECIMAL NUMERIC CONTRACT ===
+Baseline complete application source: Frontend170 + Backend088, inherited from Batch175 release.
+Released complete application source: Frontend171 + Backend089.
+New backend change: src/services/inventory/inventoryCapabilitiesService.js — Custom Field numeric validator explicitly checks decimal notation before Number() conversion, retaining finite-number check. Rejects hexadecimal, binary, octal, booleans, structured values, malformed exponents, underscores. Accepts valid decimal fractions and finite scientific notation.
+New backend regression: scripts/check-batch176-custom-field-decimal-input.cjs (60/60 assertions PASS; actual save function exercised with mocked SQL). New frontend cross-repo contract: scripts/check-batch176-custom-field-decimal-contract.mjs (8/8 PASS); package.json check scripts registered.
+Reproduction on unchanged Backend088: baseline regression FAILS expected at number '0x18'. Correction Backend089 PASS.
+Regression: 94/94 selected frontend scripts +17/17 selected backend scripts PASS (111/111 total). ZIP integrity/changed-file byte parity/source preservation verified.
+Unverified: Node24 clean production build and PostgreSQL/staging/browser. No tenant requests. Original CASE=24 persistence and Croatia text-save defects remain OPEN, separate from this validation guard.
