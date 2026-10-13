@@ -1506,7 +1506,7 @@ export default function ReportsPage() {
             <>
               <DateRangeFields from={movementFilters.from} to={movementFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setMovementFilters, 'from', value)} onToChange={(value) => updateAndClear(setMovementFilters, 'to', value)} />
               <ChoiceFilterField label={ui("Category")} value={movementFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setMovementFilters, 'category', value)} />
-              <Fragment key={filterResetRevision}><AutocompleteFilterField label={ui("Product")} value={movementFilters.product} placeholder={ui("Any product name")} options={filterOptions.products} listId="report-products-movements" disabled={isExporting} onChange={(value) => updateAndClear(setMovementFilters, 'product', value)} /></Fragment>
+              <Fragment key={filterResetRevision}><AutocompleteFilterField label={ui("Product")} value={movementFilters.product} placeholder={ui("Any product name")} options={filterOptions.historical_products ?? filterOptions.products} listId="report-products-movements" disabled={isExporting} onChange={(value) => updateAndClear(setMovementFilters, 'product', value)} /></Fragment>
               <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={movementFilters.limit} onChange={(event) => updateAndClear(setMovementFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{PRODUCT_MOVEMENT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
             </>
           }
