@@ -574,6 +574,9 @@ type ReportFilterOptions = {
   suppliers: string[];
   historical_suppliers?: string[];
   historical_operational_suppliers?: string[];
+  usage_products?: string[];
+  usage_categories?: string[];
+  performance_suppliers?: string[];
   historical_categories?: string[];
   departments: string[];
 };
@@ -1779,8 +1782,8 @@ export default function ReportsPage() {
             <>
               <label className="reports-field reports-field--compact"><span>{ui("Quick period")}</span><select value={usageFilters.days} onChange={(event) => updateAndClear(setUsageFilters, 'days', Number(event.target.value))} disabled={isExporting}>{USAGE_PERIOD_OPTIONS.map((days) => <option key={days} value={days}>{ui('Last {days} days').replace('{days}', formatNumber(days, locale, 0))}</option>)}</select></label>
               <DateRangeFields from={usageFilters.from} to={usageFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setUsageFilters, 'from', value)} onToChange={(value) => updateAndClear(setUsageFilters, 'to', value)} />
-              <ChoiceFilterField label={ui("Category")} value={usageFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setUsageFilters, 'category', value)} />
-              <Fragment key={filterResetRevision}><AutocompleteFilterField label={ui("Product")} value={usageFilters.product} placeholder={ui("Any product name")} options={filterOptions.products} listId="report-products-usage" disabled={isExporting} onChange={(value) => updateAndClear(setUsageFilters, 'product', value)} /></Fragment>
+              <ChoiceFilterField label={ui("Category")} value={usageFilters.category} placeholder={ui("All categories")} options={filterOptions.usage_categories ?? filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setUsageFilters, 'category', value)} />
+              <Fragment key={filterResetRevision}><AutocompleteFilterField label={ui("Product")} value={usageFilters.product} placeholder={ui("Any product name")} options={filterOptions.usage_products ?? filterOptions.products} listId="report-products-usage" disabled={isExporting} onChange={(value) => updateAndClear(setUsageFilters, 'product', value)} /></Fragment>
               <ChoiceFilterField label={ui("Location")} value={usageFilters.location} placeholder={ui("Any location")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setUsageFilters, 'location', value)} />
               <div className="reports-filter-note">{ui("A From/To date range overrides the quick-period window. Reversed usage entries are excluded.")}</div>
             </>
@@ -1803,7 +1806,7 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={supplierFilters.from} to={supplierFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setSupplierFilters, 'from', value)} onToChange={(value) => updateAndClear(setSupplierFilters, 'to', value)} />
-              <ChoiceFilterField label={ui("Supplier")} value={supplierFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setSupplierFilters, 'supplier', value)} />
+              <ChoiceFilterField label={ui("Supplier")} value={supplierFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.performance_suppliers ?? filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setSupplierFilters, 'supplier', value)} />
               <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={supplierFilters.limit} onChange={(event) => updateAndClear(setSupplierFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
               <div className="reports-filter-note">{ui("Date range filters shipment and supplier-return activity by creation date.")}</div>
             </>
