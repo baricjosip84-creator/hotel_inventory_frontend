@@ -521,6 +521,7 @@
     "check:batch161-exact-case-persistence-smoke-contract": "node scripts/check-batch161-exact-case-persistence-smoke-contract.mjs",
     "check:batch167-uom-selector-cache-coherence": "node scripts/check-batch167-uom-selector-cache-coherence.mjs",
     "check:batch168-custom-field-value-integrity-contract": "node scripts/check-batch168-custom-field-value-integrity-contract.mjs",
+    "check:batch169-persistence-schema-readiness-contract": "node scripts/check-batch169-persistence-schema-readiness-contract.mjs",
     "check:batch162-staging-origin-contract": "node scripts/check-batch162-staging-origin-contract.mjs"
   },
   "dependencies": {

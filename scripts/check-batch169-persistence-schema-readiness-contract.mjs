@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+const frontend = process.cwd();
+const backend = process.env.BACKEND_ROOT || path.resolve(frontend, '../hotel-inventory-backend');
+const script = fs.readFileSync(path.join(backend,'scripts/check-batch169-persistence-schema-readiness.cjs'),'utf8');
+const workflow = fs.readFileSync(path.join(backend,'.github/workflows/original-audit-persistence-staging.yml'),'utf8');
+let assertions=0;
+const check=(flag,label)=>{assert.ok(flag,label);assertions++;};
+check(script.includes('BEGIN TRANSACTION READ ONLY'),'actual read-only DB transaction');
+check(script.includes("client.query('ROLLBACK')"),'transaction always rolled back');
+check(script.includes('INVENTORY_STAGING_DATABASE_URL'),'dedicated staging credential');
+check(script.includes('product_uom_conversions'),'UoM table checked');
+check(script.includes('tenant_custom_field_values'),'Custom Field values table checked');
+check(script.includes("version: 'integer'"),'v538 concurrency version columns checked');
+check(script.includes("value: 'jsonb'"),'v512 JSONB value column checked');
+check(script.includes("'tenant_id', 'product_id', 'uom_code'"),'unique CASE conversion guard checked');
+check(script.includes("'tenant_id', 'definition_id', 'entity_id'"),'custom values unique key checked');
+check(!/client\.query\(\s*['"`]\s*(?:INSERT|UPDATE|DELETE|ALTER|DROP|CREATE)\b/i.test(script),'no SQL mutation statements');
+check(workflow.includes("INVENTORY_STAGING_READONLY_DATABASE_URL"),'workflow uses dedicated read-only credential');
+check(workflow.includes("REQUESTED_MODE"),'write mode aware schema gate');
+check(workflow.includes("Write check BLOCKED"),'write mode fails closed without schema credential');
+check(workflow.indexOf('Inspect staging persistence schema') < workflow.indexOf('Approved disposable staging API POST/PUT'),'schema preflight before writes');
+check(workflow.includes('node scripts/check-batch169-persistence-schema-readiness.cjs --self-test'),'offline test in workflow');
+check(workflow.includes('npm ci --omit=dev --ignore-scripts'),'driver installed only in configured staging job');
+console.log(`Batch169 staging persistence schema contract: ${assertions}/${assertions} PASS`);
