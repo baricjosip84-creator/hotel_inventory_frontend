@@ -573,6 +573,7 @@ type ReportFilterOptions = {
   current_locations?: string[];
   suppliers: string[];
   historical_suppliers?: string[];
+  historical_operational_suppliers?: string[];
   historical_categories?: string[];
   departments: string[];
 };
@@ -1646,7 +1647,7 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={procurementFilters.from} to={procurementFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setProcurementFilters, 'from', value)} onToChange={(value) => updateAndClear(setProcurementFilters, 'to', value)} />
-              <ChoiceFilterField label={ui("Supplier")} value={procurementFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setProcurementFilters, 'supplier', value)} />
+              <ChoiceFilterField label={ui("Supplier")} value={procurementFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.historical_operational_suppliers ?? filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setProcurementFilters, 'supplier', value)} />
               <div className="reports-filter-note">{ui("Date range filters shipments by creation date.")}</div>
             </>
           }
@@ -1678,8 +1679,8 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={poCommitmentFilters.from} to={poCommitmentFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setPoCommitmentFilters, 'from', value)} onToChange={(value) => updateAndClear(setPoCommitmentFilters, 'to', value)} />
-              <ChoiceFilterField label={ui("Supplier")} value={poCommitmentFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setPoCommitmentFilters, 'supplier', value)} />
-              <Fragment key={filterResetRevision}><AutocompleteFilterField label={ui("Product")} value={poCommitmentFilters.product} placeholder={ui("Any product name")} options={filterOptions.products} listId="report-products-po-commitments" disabled={isExporting} onChange={(value) => updateAndClear(setPoCommitmentFilters, 'product', value)} /></Fragment>
+              <ChoiceFilterField label={ui("Supplier")} value={poCommitmentFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.historical_operational_suppliers ?? filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setPoCommitmentFilters, 'supplier', value)} />
+              <Fragment key={filterResetRevision}><AutocompleteFilterField label={ui("Product")} value={poCommitmentFilters.product} placeholder={ui("Any product name")} options={filterOptions.historical_products ?? filterOptions.products} listId="report-products-po-commitments" disabled={isExporting} onChange={(value) => updateAndClear(setPoCommitmentFilters, 'product', value)} /></Fragment>
               <label className="reports-field reports-field--compact"><span>{ui("Status")}</span><select value={poCommitmentFilters.status} onChange={(event) => updateAndClear(setPoCommitmentFilters, 'status', event.target.value)} disabled={isExporting}>{PURCHASE_ORDER_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{ui(label)}</option>)}</select></label>
               <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={poCommitmentFilters.limit} onChange={(event) => updateAndClear(setPoCommitmentFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
               <div className="reports-filter-note">{ui("Date range uses expected delivery date. “Open commitments” means submitted or approved purchase orders.")}</div>
