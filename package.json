@@ -526,7 +526,8 @@
     "check:batch170-staging-unique-index-readiness-contract": "node scripts/check-batch170-staging-unique-index-readiness-contract.mjs",
     "check:batch171-uom-usage-flag-contract": "node scripts/check-batch171-uom-usage-flag-contract.mjs",
     "check:batch172-uom-numeric-save-contract": "node scripts/check-batch172-uom-numeric-save-contract.mjs",
-    "check:batch173-uom-stored-conversion-contract": "node scripts/check-batch173-uom-stored-conversion-contract.mjs"
+    "check:batch173-uom-stored-conversion-contract": "node scripts/check-batch173-uom-stored-conversion-contract.mjs",
+    "check:batch174-country-uncertain-write-contract": "node scripts/check-batch174-country-uncertain-write-contract.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
