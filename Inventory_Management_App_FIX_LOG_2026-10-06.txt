@@ -12000,3 +12000,22 @@ VERIFICATION
 - Changed full-frontend members: 7; Backend072 byte-for-byte preserved. The release packaging verifies full archive contents, unchanged source parity, changed-files parity, ZIP CRC and manifest.
 NEXT: Batch158 should prioritize clean production build and actual network/PostgreSQL traces for the remaining original audit failures; do not endlessly repeat source-only safeguards.
 ================================================================================
+
+================================================================================
+BATCH158 — UoM SELECTION-SESSION GUARD + PRODUCTION BUILD CHECK — 2026-10-13
+================================================================================
+AUTHORITATIVE INPUTS:
+- Full cumulative Frontend156 ZIP SHA256 dabc220ebe1ee2dbe4b05bc306b4a84e82c0c6d075d63d7e747010811f339ba5, unchanged Backend072 SHA256 2036cbc149b5c319911ec8fe72418361651ebcea2caaf799b58382adb0cf3e69, original Tenant Audit v93 and preserved FIX_LOG through Batch157.
+- Historical audit: Test Product EI CASE=24 conversion missing after successful save/reload, and required plain-text test_country='Croatia' save error. Both original real-DB observations remain OPEN; no production database cause inferred.
+PRODUCTION BUILD VERIFICATION ATTEMPT (not a PASS):
+- This container has Node v22.16.0 and npm 10.9.2; frontend package.json requires Node 24.x and npm >=10 <12; React Router requires at least Node 22.22.0.
+- `npm ci --ignore-scripts --no-audit --no-fund --offline --engine-strict` stopped with EBADENGINE. A repeat allowing engine warnings failed with ENOTCACHED for zod-validation-error-4.0.2.tgz. Host nodejs.org was unreachable (DNS lookup failed). A clean Node24 dependency install, full TypeScript typecheck, and Vite production build remain BLOCKED and UNVERIFIED; do not treat this as a production build pass.
+CONFIRMED FRONTEND SOURCE DEFECT AND CORRECTION:
+- UomPanel used current product ID to filter completion callbacks. If an in-flight UoM save or versioned delete was initiated for Product A, then the user navigated A -> B -> A before the response, its original callback could clear the NEW A edit form or show stale success/error, despite the same string ID. Unlike the Custom Fields protection from Batch157, UoM had no selection-session generation.
+- Frontend157 increments synchronous `uomSelectionEpochRef` on every product selection and snapshots it with the product ID for Save and Delete. It still writes, reads back, and caches only the original product; only the exact original product AND selection epoch can clear the current form or emit success/errors. The existing readback factor/flags verification and optimistic versions are preserved.
+- Name, UoM code, factor, purchase and issue controls are disabled while the conversion save/readback is pending, avoiding a newly edited draft being cleared by that same save. Product switching remains available; its new session is protected by the epoch guard.
+- Source-level failure demonstration: new Batch158 executable test expected FAIL on unchanged complete Frontend156 due to missing session generation. Updated Frontend157 focused 41/41 assertions PASS. The selected inherited regression suite 81/81 PASS; full selected 82/82 PASS on Node22.16 isolated transpiled tests. Inherited UoM scripts Batch126,151,152,154 were narrowly adjusted for the stronger session guard without deleting their original checks.
+CHANGED FULL FRONTEND MEMBERS: 8 (including appended cumulative FIX_LOG); Backend072 unchanged byte-for-byte; archive CRC, unchanged-file parity, changed-files parity, manifest checked.
+LIMITS: Neither historical CASE=24 database persistence nor Croatia Custom Fields database failure is proven resolved. No deployed browser or real tenant PostgreSQL acceptance. Full Node24 npm ci/typecheck/Vite production build remains pending due to runtime/registry access constraints.
+NEXT: Obtain true Node24 install/CI + deployed tenant POST/GET/database evidence before any assertion of production closure. Preserve original audit and FIX_LOG Batches001–158.
+================================================================================

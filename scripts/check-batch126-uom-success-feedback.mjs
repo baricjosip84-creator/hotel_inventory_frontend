@@ -43,7 +43,7 @@ check('Webhook save retains existing label',()=>assert.equal(message('/inventory
 check('UoM save API path preserved',()=>assert.match(page,/apiRequest\(`\/inventory-capabilities\/products\/\$\{targetProductId\}\/uom`, \{ method: 'POST'/));
 check('UoM read API path preserved',()=>assert.match(page,/apiRequest<UomResponse>\(`\/inventory-capabilities\/products\/\$\{productId\}\/uom`\)/));
 check('Expected version still sent from selected conversion',()=>assert.match(page,/expected_version: editingUom\?\.version \?\? 0/));
-check('Success invalidates submitted-product UoM query',()=>assert.match(page,/save = useMutation\([\s\S]*?onSuccess: \(_data, \{ targetProductId \}\) => \{\s*void qc\.invalidateQueries\(\{ queryKey: \['uom', targetProductId\] \}\)/));
+check('Success invalidates submitted-product UoM query',()=>assert.match(page,/save = useMutation\([\s\S]*?onSuccess: async \(_data, \{ targetProductId, targetSelectionEpoch, payload \}\) => \{[\s\S]*?qc\.setQueryData\(\['uom', targetProductId\], verified\)/));
 check('Error feedback remains',()=>assert.match(page,/Unable to save UoM\./));
 check('Conversion-test route remains unchanged',()=>assert.match(page,/\/uom\/convert`, \{ method: 'POST'/));
 check('Mutation toast translates message',()=>assert.match(api,/type: 'success', message: tenantMutationSuccessMessage\(path, method, requestOptions\.body\), translateMessage: true/));

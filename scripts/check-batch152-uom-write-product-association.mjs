@@ -27,17 +27,17 @@ let saveClick = null, deleteClick = null;
   ts.forEachChild(n, visit);
 })(uom);
 for (const key of ['save','remove','changeProduct','activeUomProductRef']) check(`${key} declared`,()=>assert(declarations[key]));
-check('save click captures exact current product ID',()=>assert.match(saveClick, /save\.mutate\(\{ targetProductId: productId, payload:/));
+check('save click captures exact current product ID',()=>assert.match(saveClick, /save\.mutate\(\{ targetProductId: productId, targetSelectionEpoch: uomSelectionEpochRef\.current, payload:/));
 check('save captures UoM business values at submission',()=>assert.match(saveClick, /uom_code: code, uom_name: name \|\| null, factor_to_base: Number\(factor\), purchase_uom: purchase, issue_uom: issue/));
 check('save retains version-based optimistic concurrency',()=>assert.match(saveClick, /expected_version: editingUom\?\.version \?\? 0/));
-check('delete captures same record and selected product',()=>assert.match(deleteClick,/remove\.mutate\(\{ targetProductId: productId, row \}\)/));
+check('delete captures same record and selected product',()=>assert.match(deleteClick,/remove\.mutate\(\{ targetProductId: productId, targetSelectionEpoch: uomSelectionEpochRef\.current, row \}\)/));
 check('synchronous product ref assigned before state setter',()=>assert.match(declarations.changeProduct.getText(ast), /activeUomProductRef\.current = id;[\s\S]*?setProductId\(id\)/));
 check('save calls versioned backend with saved request product',()=>assert.match(declarations.save.getText(ast), /apiRequest\(`\/inventory-capabilities\/products\/\$\{targetProductId\}\/uom`, \{ method: 'POST', body: JSON\.stringify\(payload\), skipMutationFeedback: true \}\)/));
 check('save success invalidates the originally submitted product',()=>assert.match(declarations.save.getText(ast), /onSuccess:[\s\S]*?invalidateQueries\(\{ queryKey: \['uom', targetProductId\] \}\)/));
 check('save stale completion never resets another product form',()=>assert.match(declarations.save.getText(ast), /if \(activeUomProductRef\.current !== targetProductId\) return;[\s\S]*?clearUomForm\(\)/));
 check('delete stale completion never resets another product form',()=>assert.match(declarations.remove.getText(ast), /if \(activeUomProductRef\.current !== targetProductId\) return;[\s\S]*?clearUomForm\(\)/));
 check('save error is scoped to current product',()=>assert.match(declarations.save.getText(ast), /onError:[\s\S]*?if \(activeUomProductRef\.current === targetProductId\) \{[\s\S]*?setError\(message\)/));
-check('delete error is scoped to current product',()=>assert.match(declarations.remove.getText(ast), /onError:[\s\S]*?if \(activeUomProductRef\.current === targetProductId\) setError/));
+check('delete error is scoped to current product',()=>assert.match(declarations.remove.getText(ast), /onError:[\s\S]*?if \(activeUomProductRef\.current === targetProductId && \(targetSelectionEpoch === undefined \|\| uomSelectionEpochRef\.current === targetSelectionEpoch\)\) setError/));
 check('delete preserves versioned route',()=>assert.match(declarations.remove.getText(ast), /apiRequest\(`\/inventory-capabilities\/uom\/\$\{row\.id\}`, \{ method: 'DELETE', version: row\.version \}\)/));
 const script = `const saveOptions = ${declarations.save.initializer.arguments[0].getText(ast)};\n` +
   `const removeOptions = ${declarations.remove.initializer.arguments[0].getText(ast)};\n` +
@@ -58,8 +58,8 @@ function scenario() {
   const ui = x => x;
   const messageFrom = e => e.message;
   const editingUom = {id:'u-1'};
-  const build = new Function('apiRequest','qc','activeUomProductRef','conversionRequestSeqRef','clearUomForm','setConverted','setError','setProductId','setFromUom','setToUom','messageFrom','ui','editingUom','showTenantActionSuccess','showTenantActionError', js+'\nreturn {saveOptions,removeOptions,changeProduct};');
-  return {...build(apiRequest,qc,activeUomProductRef,conversionRequestSeqRef,clearUomForm,setConverted,setError,setProductId,setFromUom,setToUom,messageFrom,ui,editingUom,()=>{},()=>{}), observed,activeUomProductRef,conversionRequestSeqRef};
+  const build = new Function('apiRequest','qc','activeUomProductRef','uomSelectionEpochRef','conversionRequestSeqRef','clearUomForm','setConverted','setError','setProductId','setFromUom','setToUom','messageFrom','ui','editingUom','showTenantActionSuccess','showTenantActionError', js+'\nreturn {saveOptions,removeOptions,changeProduct};');
+  return {...build(apiRequest,qc,activeUomProductRef,{current:0},conversionRequestSeqRef,clearUomForm,setConverted,setError,setProductId,setFromUom,setToUom,messageFrom,ui,editingUom,()=>{},()=>{}), observed,activeUomProductRef,conversionRequestSeqRef};
 }
 const payload = {uom_code:'CASE',uom_name:'Case',factor_to_base:24,purchase_uom:true,issue_uom:false,expected_version:0};
 const vars = {targetProductId:'p-A',payload};

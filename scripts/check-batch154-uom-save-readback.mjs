@@ -30,9 +30,9 @@ check('checks numeric factor from persisted row',()=>assert.match(handler,/Numbe
 check('checks purchase flag',()=>assert.match(handler,/Boolean\(savedRow\.purchase_uom\) !== payload\.purchase_uom/));
 check('checks issue flag',()=>assert.match(handler,/Boolean\(savedRow\.issue_uom\) !== payload\.issue_uom/));
 check('success updates submitted product cache',()=>assert.match(handler,/qc\.setQueryData\(\['uom', targetProductId\], verified\)/));
-check('successful clear protected by selected-product ref',()=>assert.match(handler,/if \(activeUomProductRef\.current !== targetProductId\) return;\s*clearUomForm\(\)/));
-check('missing-row error is scoped to submitted product',()=>assert.match(handler,/activeUomProductRef\.current === targetProductId\) \{[\s\S]*?const warning = ui\("The save was acknowledged, but the conversion was not found on reload/));
-check('unavailable-readback error is scoped to submitted product',()=>assert.match(handler,/activeUomProductRef\.current === targetProductId\) \{[\s\S]*?const warning = ui\("The save was acknowledged, but the conversion could not be checked/));
+check('successful clear protected by selected-product ref',()=>assert.match(handler,/if \(activeUomProductRef\.current !== targetProductId\) return;\s*if \(targetSelectionEpoch !== undefined && uomSelectionEpochRef\.current !== targetSelectionEpoch\) return;\s*clearUomForm\(\)/));
+check('missing-row error is scoped to submitted product',()=>assert.match(handler,/activeUomProductRef\.current === targetProductId && \(targetSelectionEpoch === undefined \|\| uomSelectionEpochRef\.current === targetSelectionEpoch\)\) \{[\s\S]*?const warning = ui\("The save was acknowledged, but the conversion was not found on reload/));
+check('unavailable-readback error is scoped to submitted product',()=>assert.match(handler,/activeUomProductRef\.current === targetProductId && \(targetSelectionEpoch === undefined \|\| uomSelectionEpochRef\.current === targetSelectionEpoch\)\) \{[\s\S]*?const warning = ui\("The save was acknowledged, but the conversion could not be checked/));
 check('POST suppresses premature global success toast',()=>assert.match(handler,/apiRequest\(`\/inventory-capabilities\/products\/\$\{targetProductId\}\/uom`, \{ method: 'POST', body: JSON\.stringify\(payload\), skipMutationFeedback: true \}\)/));
 check('verified success shows final success feedback',()=>assert.match(handler,/showTenantActionSuccess\(ui\(payload\.expected_version > 0/));
 check('missing-row warning raises error feedback',()=>assert.match(handler,/showTenantActionError\(warning\)/));
@@ -66,8 +66,8 @@ function scenario(behavior='ok'){
  const messageFrom=e=>e.message;
  const showTenantActionSuccess=x=>observed.feedback.push(['success',x]);
  const showTenantActionError=x=>observed.feedback.push(['error',x]);
- const build=new Function('apiRequest','qc','activeUomProductRef','conversionRequestSeqRef','clearUomForm','setConverted','setError','ui','messageFrom','showTenantActionSuccess','showTenantActionError',js+'\nreturn saveOptions;');
- return {handler:build(apiRequest,qc,activeUomProductRef,conversionRequestSeqRef,clearUomForm,setConverted,setError,ui,messageFrom,showTenantActionSuccess,showTenantActionError),observed,activeUomProductRef,conversionRequestSeqRef,vars,standard};
+ const build=new Function('apiRequest','qc','activeUomProductRef','uomSelectionEpochRef','conversionRequestSeqRef','clearUomForm','setConverted','setError','ui','messageFrom','showTenantActionSuccess','showTenantActionError',js+'\nreturn saveOptions;');
+ return {handler:build(apiRequest,qc,activeUomProductRef,{current:0},conversionRequestSeqRef,clearUomForm,setConverted,setError,ui,messageFrom,showTenantActionSuccess,showTenantActionError),observed,activeUomProductRef,conversionRequestSeqRef,vars,standard};
 }
 {
  const s=scenario(); await s.handler.mutationFn(s.vars);

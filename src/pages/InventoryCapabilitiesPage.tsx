@@ -790,10 +790,12 @@ function UomPanel({ products, canWrite }: { products: Product[]; canWrite: boole
   // Keep each write bound to the product selected when it was submitted, even if
   // the user moves to another product before the server responds.
   const activeUomProductRef = useRef(productId);
+  // A -> B -> A is a new editing session even when the product ID matches.
+  const uomSelectionEpochRef = useRef(0);
   const save = useMutation({
-    mutationFn: ({ targetProductId, payload }: { targetProductId: string; payload: { uom_code: string; uom_name: string | null; factor_to_base: number; purchase_uom: boolean; issue_uom: boolean; rounding_scale?: number; barcode?: string | null; expected_version: number } }) =>
+    mutationFn: ({ targetProductId, payload }: { targetProductId: string; targetSelectionEpoch?: number; payload: { uom_code: string; uom_name: string | null; factor_to_base: number; purchase_uom: boolean; issue_uom: boolean; rounding_scale?: number; barcode?: string | null; expected_version: number } }) =>
       apiRequest(`/inventory-capabilities/products/${targetProductId}/uom`, { method: 'POST', body: JSON.stringify(payload), skipMutationFeedback: true }),
-    onSuccess: async (_data, { targetProductId, payload }) => {
+    onSuccess: async (_data, { targetProductId, targetSelectionEpoch, payload }) => {
       // The original tenant audit recorded CASE=24 appearing to save but never
       // appearing in the product's saved-unit list, even after a full reload.
       // Do not discard the user's form merely because the POST returned 2xx:
@@ -806,7 +808,7 @@ function UomPanel({ products, canWrite }: { products: Product[]; canWrite: boole
           Math.abs(savedFactor - payload.factor_to_base) <= Math.max(1e-8, Math.abs(payload.factor_to_base) * 1e-9);
         if (!factorMatches || Boolean(savedRow.purchase_uom) !== payload.purchase_uom || Boolean(savedRow.issue_uom) !== payload.issue_uom) {
           void qc.invalidateQueries({ queryKey: ['uom', targetProductId] });
-          if (activeUomProductRef.current === targetProductId) {
+          if (activeUomProductRef.current === targetProductId && (targetSelectionEpoch === undefined || uomSelectionEpochRef.current === targetSelectionEpoch)) {
             const warning = ui("The save was acknowledged, but the conversion was not found on reload. Check the saved list before trying again.");
             setError(warning); showTenantActionError(warning);
           }
@@ -814,33 +816,36 @@ function UomPanel({ products, canWrite }: { products: Product[]; canWrite: boole
         }
         qc.setQueryData(['uom', targetProductId], verified);
         if (activeUomProductRef.current !== targetProductId) return;
+        if (targetSelectionEpoch !== undefined && uomSelectionEpochRef.current !== targetSelectionEpoch) return;
         clearUomForm(); setConverted(null); conversionRequestSeqRef.current += 1; setError(null);
         showTenantActionSuccess(ui(payload.expected_version > 0 ? "Unit conversion updated successfully." : "Unit conversion saved successfully."));
       } catch (_readbackError) {
         void qc.invalidateQueries({ queryKey: ['uom', targetProductId] });
-        if (activeUomProductRef.current === targetProductId) {
+        if (activeUomProductRef.current === targetProductId && (targetSelectionEpoch === undefined || uomSelectionEpochRef.current === targetSelectionEpoch)) {
           const warning = ui("The save was acknowledged, but the conversion could not be checked. Refresh the saved list before trying again.");
           setError(warning); showTenantActionError(warning);
         }
       }
     },
-    onError: (e, { targetProductId }) => {
+    onError: (e, { targetProductId, targetSelectionEpoch }) => {
       if (activeUomProductRef.current === targetProductId) {
+        if (targetSelectionEpoch !== undefined && uomSelectionEpochRef.current !== targetSelectionEpoch) return;
         const message = messageFrom(e, ui("Unable to save UoM."), ui);
         setError(message); showTenantActionError(message);
       }
     }
   });
   const remove = useMutation({
-    mutationFn: ({ row }: { targetProductId: string; row: UomRow }) => apiRequest(`/inventory-capabilities/uom/${row.id}`, { method: 'DELETE', version: row.version }),
-    onSuccess: (_data, { targetProductId }) => {
+    mutationFn: ({ row }: { targetProductId: string; targetSelectionEpoch?: number; row: UomRow }) => apiRequest(`/inventory-capabilities/uom/${row.id}`, { method: 'DELETE', version: row.version }),
+    onSuccess: (_data, { targetProductId, targetSelectionEpoch }) => {
       void qc.invalidateQueries({ queryKey: ['uom', targetProductId] });
       if (activeUomProductRef.current !== targetProductId) return;
+      if (targetSelectionEpoch !== undefined && uomSelectionEpochRef.current !== targetSelectionEpoch) return;
       if (editingUom) clearUomForm();
       setConverted(null); conversionRequestSeqRef.current += 1; setError(null);
     },
-    onError: (e, { targetProductId }) => {
-      if (activeUomProductRef.current === targetProductId) setError(messageFrom(e, ui("Unable to delete UoM conversion."), ui));
+    onError: (e, { targetProductId, targetSelectionEpoch }) => {
+      if (activeUomProductRef.current === targetProductId && (targetSelectionEpoch === undefined || uomSelectionEpochRef.current === targetSelectionEpoch)) setError(messageFrom(e, ui("Unable to delete UoM conversion."), ui));
     }
   });
   const convert = useMutation({
@@ -859,15 +864,15 @@ function UomPanel({ products, canWrite }: { products: Product[]; canWrite: boole
   });
   const units = useMemo(() => productId && query.data ? [query.data.base_uom, ...query.data.conversions.map((r) => r.uom_code)] : [], [productId, query.data]);
   useEffect(() => { if (units.length && !fromUom) { setFromUom(units[0]); setToUom(units[1] || units[0]); } }, [units, fromUom]);
-  const changeProduct = (id: string) => { activeUomProductRef.current = id; conversionRequestSeqRef.current += 1; setProductId(id); clearUomForm(); setFromUom(''); setToUom(''); setConverted(null); setError(null); };
+  const changeProduct = (id: string) => { uomSelectionEpochRef.current += 1; activeUomProductRef.current = id; conversionRequestSeqRef.current += 1; setProductId(id); clearUomForm(); setFromUom(''); setToUom(''); setConverted(null); setError(null); };
   return <section className="section" style={panelStyle}><div className="section__title">{ui("Units of measure")}</div>
     <div className="card"><div className="capability-help" aria-label={ui("How units of measure work")}>
       <p>{ui("Inventory is counted in the base unit (for example, pcs). Add a different unit only when the same product is bought or issued in packs.")}</p>
       <p>{ui("Example: enter CASE as the code, Case as the name and 24 as units in the base unit. This means 1 CASE = 24 pcs. Do not add the base unit again.")}</p>
       <p>{ui("Purchasing unit means this pack size can be used when buying from suppliers. Issue/selling unit means your team can use it when issuing or selling stock.")}</p>
-    </div><div style={formGridStyle}><ProductSelect products={products} value={productId} onChange={changeProduct} /><label>{ui("UoM code")}<input value={code} onChange={(e) => setCode(e.target.value)} placeholder="CASE" disabled={!canWrite || Boolean(editingUom)} /></label><label>{ui("Name")}<input value={name} onChange={(e) => setName(e.target.value)} placeholder={ui("Case")} disabled={!canWrite} /></label><label>{ui("Units in base unit")}<input type="number" step="any" min="0.000001" value={factor} onChange={(e) => setFactor(e.target.value)} placeholder="24" disabled={!canWrite} /></label><label><input type="checkbox" checked={purchase} onChange={(e) => setPurchase(e.target.checked)} disabled={!canWrite} /> {ui("Purchasing unit")}</label><label><input type="checkbox" checked={issue} onChange={(e) => setIssue(e.target.checked)} disabled={!canWrite} /> {ui("Issue/selling unit")}</label><div style={{ display: 'flex', gap: 8 }}><button className="button" type="button" disabled={!canWrite || !productId || query.isLoading || query.isError || !code.trim() || asNumber(factor) <= 0 || save.isPending} onClick={() => save.mutate({ targetProductId: productId, payload: { uom_code: code, uom_name: name || null, factor_to_base: Number(factor), purchase_uom: purchase, issue_uom: issue, rounding_scale: editingUom?.rounding_scale, barcode: editingUom?.barcode, expected_version: editingUom?.version ?? 0 } })}>{save.isPending ? ui("Saving…") : editingUom ? ui("Save changes") : ui("Save conversion")}</button>{editingUom ? <button className="button button--secondary" type="button" disabled={save.isPending} onClick={clearUomForm}>{ui("Cancel")}</button> : null}</div></div>{error ? <div className="form-error">{error}</div> : null}</div>
+    </div><div style={formGridStyle}><ProductSelect products={products} value={productId} onChange={changeProduct} /><label>{ui("UoM code")}<input value={code} onChange={(e) => setCode(e.target.value)} placeholder="CASE" disabled={!canWrite || Boolean(editingUom) || save.isPending} /></label><label>{ui("Name")}<input value={name} onChange={(e) => setName(e.target.value)} placeholder={ui("Case")} disabled={!canWrite || save.isPending} /></label><label>{ui("Units in base unit")}<input type="number" step="any" min="0.000001" value={factor} onChange={(e) => setFactor(e.target.value)} placeholder="24" disabled={!canWrite || save.isPending} /></label><label><input type="checkbox" checked={purchase} onChange={(e) => setPurchase(e.target.checked)} disabled={!canWrite || save.isPending} /> {ui("Purchasing unit")}</label><label><input type="checkbox" checked={issue} onChange={(e) => setIssue(e.target.checked)} disabled={!canWrite || save.isPending} /> {ui("Issue/selling unit")}</label><div style={{ display: 'flex', gap: 8 }}><button className="button" type="button" disabled={!canWrite || !productId || query.isLoading || query.isError || !code.trim() || asNumber(factor) <= 0 || save.isPending} onClick={() => save.mutate({ targetProductId: productId, targetSelectionEpoch: uomSelectionEpochRef.current, payload: { uom_code: code, uom_name: name || null, factor_to_base: Number(factor), purchase_uom: purchase, issue_uom: issue, rounding_scale: editingUom?.rounding_scale, barcode: editingUom?.barcode, expected_version: editingUom?.version ?? 0 } })}>{save.isPending ? ui("Saving…") : editingUom ? ui("Save changes") : ui("Save conversion")}</button>{editingUom ? <button className="button button--secondary" type="button" disabled={save.isPending} onClick={clearUomForm}>{ui("Cancel")}</button> : null}</div></div>{error ? <div className="form-error">{error}</div> : null}</div>
     <div className="card"><h3>{ui("Conversion test")}</h3><p className="card__subtext capability-help">{ui("Check quantities without changing stock. Example: 2 CASE = 48 pcs, and 48 pcs = 2 CASE.")}</p><div style={formGridStyle}><label>{ui("Quantity")}<input type="number" step="any" value={convertQty} onChange={(e) => { setConvertQty(e.target.value); setConverted(null); conversionRequestSeqRef.current += 1; }} /></label><label>{ui("From unit")}<select value={fromUom} onChange={(e) => { setFromUom(e.target.value); setConverted(null); conversionRequestSeqRef.current += 1; }}>{units.map((u) => <option key={u}>{u}</option>)}</select></label><label>{ui("To unit")}<select value={toUom} onChange={(e) => { setToUom(e.target.value); setConverted(null); conversionRequestSeqRef.current += 1; }}>{units.map((u) => <option key={u}>{u}</option>)}</select></label><button className="button" type="button" disabled={!productId || !fromUom || !toUom || convert.isPending} onClick={() => convert.mutate()}>{convert.isPending ? ui("Converting…") : ui("Convert")}</button>{converted !== null ? <strong className="capability-result">{ui("Result:")} {converted} {toUom}</strong> : null}</div></div>
-    <div className="card" style={tableWrapStyle}>{productId && query.isLoading ? <div className="muted">{ui("Loading units of measure…")}</div> : null}{productId && query.isError ? <div className="form-error">{messageFrom(query.error, ui("Unable to load units of measure."), ui)}</div> : null}<table><thead><tr><th>{ui("Unit")}</th><th>{ui("Factor to base")}</th><th>{ui("Purchase")}</th><th>{ui("Issue")}</th><th>{ui("Action")}</th></tr></thead><tbody>{productId ? <tr><td>{query.data?.base_uom || '—'} <span className="capability-base-badge">{ui("Base")}</span></td><td>1</td><td>—</td><td>—</td><td>—</td></tr> : <EmptyTableRow colSpan={5} message={ui("Select a product to view its units of measure.")} />}{(query.data?.conversions || []).map((row) => <tr key={row.id}><td>{row.uom_code} {row.uom_name ? `— ${row.uom_name}` : ''}</td><td>{formatLocalizedNumber(Number(row.factor_to_base), locale)}</td><td>{row.purchase_uom ? ui("Yes") : ui("No")}</td><td>{row.issue_uom ? ui("Yes") : ui("No")}</td><td>{canWrite ? <div style={{ display: 'flex', gap: 6 }}><button className="button button--secondary" type="button" disabled={save.isPending || remove.isPending} onClick={() => editUom(row)}>{ui("Edit")}</button><button className="button button--secondary" type="button" disabled={save.isPending || remove.isPending} onClick={() => { if (window.confirm(`${ui('Delete')} ${row.uom_code} ${ui('conversion? Existing inventory quantities are not changed.')}`)) remove.mutate({ targetProductId: productId, row }); }}>{ui("Delete")}</button></div> : '—'}</td></tr>)}</tbody></table></div>
+    <div className="card" style={tableWrapStyle}>{productId && query.isLoading ? <div className="muted">{ui("Loading units of measure…")}</div> : null}{productId && query.isError ? <div className="form-error">{messageFrom(query.error, ui("Unable to load units of measure."), ui)}</div> : null}<table><thead><tr><th>{ui("Unit")}</th><th>{ui("Factor to base")}</th><th>{ui("Purchase")}</th><th>{ui("Issue")}</th><th>{ui("Action")}</th></tr></thead><tbody>{productId ? <tr><td>{query.data?.base_uom || '—'} <span className="capability-base-badge">{ui("Base")}</span></td><td>1</td><td>—</td><td>—</td><td>—</td></tr> : <EmptyTableRow colSpan={5} message={ui("Select a product to view its units of measure.")} />}{(query.data?.conversions || []).map((row) => <tr key={row.id}><td>{row.uom_code} {row.uom_name ? `— ${row.uom_name}` : ''}</td><td>{formatLocalizedNumber(Number(row.factor_to_base), locale)}</td><td>{row.purchase_uom ? ui("Yes") : ui("No")}</td><td>{row.issue_uom ? ui("Yes") : ui("No")}</td><td>{canWrite ? <div style={{ display: 'flex', gap: 6 }}><button className="button button--secondary" type="button" disabled={save.isPending || remove.isPending} onClick={() => editUom(row)}>{ui("Edit")}</button><button className="button button--secondary" type="button" disabled={save.isPending || remove.isPending} onClick={() => { if (window.confirm(`${ui('Delete')} ${row.uom_code} ${ui('conversion? Existing inventory quantities are not changed.')}`)) remove.mutate({ targetProductId: productId, targetSelectionEpoch: uomSelectionEpochRef.current, row }); }}>{ui("Delete")}</button></div> : '—'}</td></tr>)}</tbody></table></div>
   </section>;
 }
 
