@@ -517,7 +517,8 @@
     "check:batch156-custom-field-draft-refresh": "node scripts/check-batch156-custom-field-draft-refresh.mjs",
     "check:batch157-custom-field-reselection-epoch": "node scripts/check-batch157-custom-field-reselection-epoch.mjs",
     "check:batch158-uom-reselection-session": "node scripts/check-batch158-uom-reselection-session.mjs",
-    "check:batch160-persistence-smoke-contract": "node scripts/check-batch160-persistence-smoke-contract.mjs"
+    "check:batch160-persistence-smoke-contract": "node scripts/check-batch160-persistence-smoke-contract.mjs",
+    "check:batch161-exact-case-persistence-smoke-contract": "node scripts/check-batch161-exact-case-persistence-smoke-contract.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
