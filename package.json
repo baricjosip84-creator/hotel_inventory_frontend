@@ -519,6 +519,7 @@
     "check:batch158-uom-reselection-session": "node scripts/check-batch158-uom-reselection-session.mjs",
     "check:batch160-persistence-smoke-contract": "node scripts/check-batch160-persistence-smoke-contract.mjs",
     "check:batch161-exact-case-persistence-smoke-contract": "node scripts/check-batch161-exact-case-persistence-smoke-contract.mjs",
+    "check:batch167-uom-selector-cache-coherence": "node scripts/check-batch167-uom-selector-cache-coherence.mjs",
     "check:batch162-staging-origin-contract": "node scripts/check-batch162-staging-origin-contract.mjs"
   },
   "dependencies": {

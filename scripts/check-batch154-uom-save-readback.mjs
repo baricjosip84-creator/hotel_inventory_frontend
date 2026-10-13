@@ -88,7 +88,7 @@ for(const state of ['missing','wrongFactor','wrongPurchase','wrongIssue','throwE
  const s=scenario(state); await s.handler.onSuccess({},s.vars);
  check(`${state} does not falsely clear the save form`,()=>assert.equal(s.observed.clears,0));
  check(`${state} does not update cache with an unverified conversion`,()=>assert.equal(s.observed.cache.length,0));
- check(`${state} retries correct product cache`,()=>assert.deepEqual(s.observed.invalidations,[['uom','A']]));
+ check(`${state} retries correct product cache`,()=>assert.deepEqual(s.observed.invalidations,[['uom','A'],['product-uom-options','A']]));
  check(`${state} shows verification warning`,()=>assert.match(s.observed.errors.at(-1),/The save was acknowledged, but the conversion/));
  check(`${state} has warning toast, never premature green success`,()=>assert.deepEqual(s.observed.feedback,[['error',s.observed.errors.at(-1)]]));
 }
@@ -107,12 +107,12 @@ for(const state of ['missing','wrongFactor','wrongPurchase','wrongIssue','throwE
 }
 {
  const s=scenario('missing'); s.activeUomProductRef.current='B'; await s.handler.onSuccess({},s.vars);
- check('missing old product conversion invalidates old cache only',()=>assert.deepEqual(s.observed.invalidations,[['uom','A']]));
+ check('missing old product conversion invalidates old cache only',()=>assert.deepEqual(s.observed.invalidations,[['uom','A'],['product-uom-options','A']]));
  check('missing old product conversion does not show error on B',()=>assert.equal(s.observed.errors.length,0));
 }
 {
  const s=scenario('throwError'); s.activeUomProductRef.current='B'; await s.handler.onSuccess({},s.vars);
- check('GET failure on old product invalidates only old cache',()=>assert.deepEqual(s.observed.invalidations,[['uom','A']]));
+ check('GET failure on old product invalidates only old cache',()=>assert.deepEqual(s.observed.invalidations,[['uom','A'],['product-uom-options','A']]));
  check('GET failure on old product cannot show error on B',()=>assert.equal(s.observed.errors.length,0));
 }
 {

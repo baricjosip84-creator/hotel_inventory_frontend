@@ -808,6 +808,9 @@ function UomPanel({ products, canWrite }: { products: Product[]; canWrite: boole
           Math.abs(savedFactor - payload.factor_to_base) <= Math.max(1e-8, Math.abs(payload.factor_to_base) * 1e-9);
         if (!factorMatches || Boolean(savedRow.purchase_uom) !== payload.purchase_uom || Boolean(savedRow.issue_uom) !== payload.issue_uom) {
           void qc.invalidateQueries({ queryKey: ['uom', targetProductId] });
+          // Inventory workflow UoM selectors keep a separate 60s cache.
+          // Invalidate it for uncertain saves or deletion of a conversion.
+          void qc.invalidateQueries({ queryKey: ['product-uom-options', targetProductId] });
           if (activeUomProductRef.current === targetProductId && (targetSelectionEpoch === undefined || uomSelectionEpochRef.current === targetSelectionEpoch)) {
             const warning = ui("The save was acknowledged, but the conversion was not found on reload. Check the saved list before trying again.");
             setError(warning); showTenantActionError(warning);
@@ -815,12 +818,18 @@ function UomPanel({ products, canWrite }: { products: Product[]; canWrite: boole
           return;
         }
         qc.setQueryData(['uom', targetProductId], verified);
+        // Make the verified CASE (and any other conversion) visible immediately
+        // in purchase-order, transfer, reservation and outbound selectors.
+        qc.setQueryData(['product-uom-options', targetProductId], verified);
         if (activeUomProductRef.current !== targetProductId) return;
         if (targetSelectionEpoch !== undefined && uomSelectionEpochRef.current !== targetSelectionEpoch) return;
         clearUomForm(); setConverted(null); conversionRequestSeqRef.current += 1; setError(null);
         showTenantActionSuccess(ui(payload.expected_version > 0 ? "Unit conversion updated successfully." : "Unit conversion saved successfully."));
       } catch (_readbackError) {
         void qc.invalidateQueries({ queryKey: ['uom', targetProductId] });
+        // Inventory workflow UoM selectors keep a separate 60s cache.
+        // Invalidate it for uncertain saves or deletion of a conversion.
+        void qc.invalidateQueries({ queryKey: ['product-uom-options', targetProductId] });
         if (activeUomProductRef.current === targetProductId && (targetSelectionEpoch === undefined || uomSelectionEpochRef.current === targetSelectionEpoch)) {
           const warning = ui("The save was acknowledged, but the conversion could not be checked. Refresh the saved list before trying again.");
           setError(warning); showTenantActionError(warning);
@@ -839,6 +848,9 @@ function UomPanel({ products, canWrite }: { products: Product[]; canWrite: boole
     mutationFn: ({ row }: { targetProductId: string; targetSelectionEpoch?: number; row: UomRow }) => apiRequest(`/inventory-capabilities/uom/${row.id}`, { method: 'DELETE', version: row.version }),
     onSuccess: (_data, { targetProductId, targetSelectionEpoch }) => {
       void qc.invalidateQueries({ queryKey: ['uom', targetProductId] });
+      // Inventory workflow UoM selectors keep a separate 60s cache.
+      // Invalidate it for uncertain saves or deletion of a conversion.
+      void qc.invalidateQueries({ queryKey: ['product-uom-options', targetProductId] });
       if (activeUomProductRef.current !== targetProductId) return;
       if (targetSelectionEpoch !== undefined && uomSelectionEpochRef.current !== targetSelectionEpoch) return;
       if (editingUom) clearUomForm();

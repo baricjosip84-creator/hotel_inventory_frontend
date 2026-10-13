@@ -54,7 +54,7 @@ function scenario(mode='valid'){
  check('A-B-A returns to same ID with different epoch',()=>{assert.equal(s.active.current,'p-A');assert.equal(s.epoch.current,2);assert.notEqual(s.epoch.current,s.vars.targetSelectionEpoch)});
  const clears=s.events.clears,events=s.events.success.length;
  await s.saveOptions.onSuccess({},s.vars);
- check('stale verified save still caches original A',()=>assert.deepEqual(s.events.cache.at(-1).key,['uom','p-A']));
+ check('stale verified save still caches original A',()=>assert.deepEqual(s.events.cache.map(entry=>entry.key),[['uom','p-A'],['product-uom-options','p-A']]));
  check('stale verified save does not clear newly selected A draft',()=>assert.equal(s.events.clears,clears));
  check('stale verified save does not report new-session success',()=>assert.equal(s.events.success.length,events));
  s.saveOptions.onError(new Error('old POST failed'),s.vars);
@@ -62,7 +62,7 @@ function scenario(mode='valid'){
 }
 {
  const s=scenario('missing');s.changeProduct('p-B');s.changeProduct('p-A');await s.saveOptions.onSuccess({},s.vars);
- check('stale unverified POST still invalidates original A query',()=>assert.deepEqual(s.events.invalidations.at(-1),['uom','p-A']));
+ check('stale unverified POST still invalidates original A query',()=>assert.deepEqual(s.events.invalidations.slice(-2),[['uom','p-A'],['product-uom-options','p-A']]));
  check('stale unverified POST cannot warn freshly selected A',()=>assert.equal(s.events.failure.length,0));
 }
 {
@@ -71,7 +71,7 @@ function scenario(mode='valid'){
 }
 {
  const s=scenario();s.changeProduct('p-B');s.changeProduct('p-A');s.deleteOptions.onSuccess({},s.removeVars);
- check('stale delete invalidates original A cache',()=>assert.deepEqual(s.events.invalidations.at(-1),['uom','p-A']));
+ check('stale delete invalidates original A cache',()=>assert.deepEqual(s.events.invalidations.slice(-2),[['uom','p-A'],['product-uom-options','p-A']]));
  check('stale delete does not clear newly selected A form',()=>assert.equal(s.events.clears,2));
  check('stale delete does not reset current conversion',()=>assert.equal(s.events.conversions.length,2));
  s.deleteOptions.onError(new Error('old delete failed'),s.removeVars);
@@ -80,7 +80,7 @@ function scenario(mode='valid'){
 {
  const s=scenario();s.deleteOptions.onSuccess({},s.removeVars);
  check('current delete still clears edit form',()=>assert.equal(s.events.clears,1));
- check('current delete still refreshes original product',()=>assert.deepEqual(s.events.invalidations,[['uom','p-A']]));
+ check('current delete still refreshes original product',()=>assert.deepEqual(s.events.invalidations,[['uom','p-A'],['product-uom-options','p-A']]));
  s.deleteOptions.onError(new Error('delete failed'),s.removeVars);
  check('current delete still reports error',()=>assert.equal(s.events.errors.at(-1),'delete failed'));
 }
