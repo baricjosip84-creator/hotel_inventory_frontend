@@ -570,6 +570,7 @@ type ReportFilterOptions = {
   products: string[];
   historical_products?: string[];
   locations: string[];
+  current_locations?: string[];
   suppliers: string[];
   departments: string[];
 };
@@ -1448,7 +1449,7 @@ export default function ReportsPage() {
           filters={
             <>
               <ChoiceFilterField label={ui("Category")} value={inventoryFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setInventoryFilters, 'category', value)} />
-              <ChoiceFilterField label={ui("Location")} value={inventoryFilters.location} placeholder={ui("All locations")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setInventoryFilters, 'location', value)} />
+              <ChoiceFilterField label={ui("Location")} value={inventoryFilters.location} placeholder={ui("All locations")} options={filterOptions.current_locations ?? filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setInventoryFilters, 'location', value)} />
               <div className="reports-filter-note">{ui("Filters apply to the on-screen report and PDF/CSV exports.")}</div>
             </>
           }
@@ -1477,7 +1478,7 @@ export default function ReportsPage() {
           filters={
             <>
               <ChoiceFilterField label={ui("Category")} value={stockFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setStockFilters, 'category', value)} />
-              <ChoiceFilterField label={ui("Location")} value={stockFilters.location} placeholder={ui("All locations")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setStockFilters, 'location', value)} />
+              <ChoiceFilterField label={ui("Location")} value={stockFilters.location} placeholder={ui("All locations")} options={filterOptions.current_locations ?? filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setStockFilters, 'location', value)} />
             </>
           }
         >
@@ -1728,7 +1729,7 @@ export default function ReportsPage() {
               <label className="reports-field reports-field--compact"><span>{ui("Threshold scope")}</span><select value={lowStockFilters.scope} onChange={(event) => updateAndClear(setLowStockFilters, 'scope', event.target.value as 'product' | 'par' | 'both')} disabled={isExporting}><option value="both">{ui("Product minima + location par levels")}</option><option value="product">{ui("Product minimum only")}</option><option value="par">{ui("Location par levels only")}</option></select></label>
               <ChoiceFilterField label={ui("Category")} value={lowStockFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setLowStockFilters, 'category', value)} />
               <ChoiceFilterField label={ui("Supplier")} value={lowStockFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setLowStockFilters, 'supplier', value)} />
-              <ChoiceFilterField label={ui("Location")} value={lowStockFilters.location} placeholder={ui("Any location")} options={filterOptions.locations} disabled={isExporting || lowStockFilters.scope === 'product'} onChange={(value) => updateAndClear(setLowStockFilters, 'location', value)} />
+              <ChoiceFilterField label={ui("Location")} value={lowStockFilters.location} placeholder={ui("Any location")} options={filterOptions.current_locations ?? filterOptions.locations} disabled={isExporting || lowStockFilters.scope === 'product'} onChange={(value) => updateAndClear(setLowStockFilters, 'location', value)} />
               <div className="reports-filter-note">{ui("Product minima compare against tenant-wide stock. Location par rows use active, currently effective par levels and compare against stock at that location.")}</div>
             </>
           }
@@ -1824,7 +1825,7 @@ export default function ReportsPage() {
             <>
               <label className="reports-field reports-field--compact"><span>{ui("Expiry horizon")}</span><select value={expiryFilters.days} onChange={(event) => updateAndClear(setExpiryFilters, 'days', Number(event.target.value))} disabled={isExporting}>{EXPIRY_HORIZON_OPTIONS.map((days) => <option key={days} value={days}>{ui('Next {days} days').replace('{days}', formatNumber(days, locale, 0))}</option>)}</select></label>
               <ChoiceFilterField label={ui("Category")} value={expiryFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setExpiryFilters, 'category', value)} />
-              <ChoiceFilterField label={ui("Location")} value={expiryFilters.location} placeholder={ui("Any location")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setExpiryFilters, 'location', value)} />
+              <ChoiceFilterField label={ui("Location")} value={expiryFilters.location} placeholder={ui("Any location")} options={filterOptions.current_locations ?? filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setExpiryFilters, 'location', value)} />
               <div className="reports-filter-note">{ui("Already expired positive-balance lots are always included.")}</div>
             </>
           }
