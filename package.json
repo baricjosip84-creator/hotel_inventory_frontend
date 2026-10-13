@@ -6,6 +6,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "check:batch181-custom-field-text-type-contract": "node scripts/check-batch181-custom-field-text-type-contract.mjs",
     "check:batch177-required-custom-field-contract": "node scripts/check-batch177-required-custom-field-contract.mjs",
     "check:batch178-uom-complete-readback": "node scripts/check-batch178-uom-complete-readback.mjs",
     "check:batch131-landed-cost-finalization-feedback": "node scripts/check-batch131-landed-cost-finalization-feedback.mjs",
@@ -533,7 +534,8 @@
     "check:batch175-case-lost-post-contract": "node scripts/check-batch175-case-lost-post-contract.mjs",
     "check:batch176-custom-field-decimal-contract": "node scripts/check-batch176-custom-field-decimal-contract.mjs",
     "check:batch179-staging-identity-contract": "node scripts/check-batch179-staging-identity-contract.mjs",
-    "check:batch180-case-cleanup-ownership": "node scripts/check-batch180-case-cleanup-ownership-contract.mjs"
+    "check:batch180-case-cleanup-ownership": "node scripts/check-batch180-case-cleanup-ownership-contract.mjs",
+    "check:batch186-unclassified-movement-display": "node scripts/check-batch186-unclassified-movement-display.cjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

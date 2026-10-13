@@ -12333,3 +12333,141 @@ NEXT: Configure/approve staging workflow on the expected backend deployment,
 run read-only schema/API check, then opt-in disposable test writes. Confirm
 Node24 CI build and deployed-browser acceptance on the exact same revision.
 ================================================================================
+
+
+================================================================================
+BATCH 181 — CUSTOM FIELDS TEXT VALUES: REJECT NON-STRING JSON SCALARS
+Date: 2026-10-13
+Full baseline: Frontend surgical-fix-175 + Backend surgical-fix-092 (Batch180)
+New full project source: Frontend surgical-fix-176 + Backend surgical-fix-093.
+
+CONFIRMED SOURCE DEFECT:
+The Custom Fields validation function ended in `return String(value)` for Text
+fields. JSON booleans and numeric values (false, true, 0, 24, 2.5) could silently
+become the Text values 'false', 'true', '0', '24', '2.5' through coercion.
+Ordinary Text fields and the documented `test_country='Croatia'` case use JSON
+strings and should not be affected by the safeguard.
+
+CHANGE:
+- In the real Custom Fields service validation, reject non-string nonempty
+  values when data_type='text', using the existing operational HTTP 400
+  CUSTOM_FIELD_VALUE_INVALID error. Preserve required/blank behavior,
+  literal strings including 'false', select/date/number/boolean branches and
+  existing JSON.stringify(value)::jsonb database parameter behavior.
+- Add 36-assertion executable backend validation contract and 8-assertion
+  cross-repository frontend contract; register their npm scripts.
+- No database migrations, SQL write changes, UI behavior changes, permissions,
+  CSRF policy or tenant isolation changes.
+
+ACTUAL VERIFICATION:
+- Old Backend092 fails new negative regression on non-string Text input.
+- Corrected Backend093: 36/36 focused assertions PASS.
+- Cross-repository frontend/backend contract: 8/8 PASS.
+- Inherited selected regression: 118/118 PASS.
+- Combined selected: 120/120 scripts PASS (99 frontend, 21 backend).
+- Backend JavaScript syntax PASS; full archives/changed-files parity SHA256 PASS.
+- The inherited suite ran on Node22.16.0 with test-only TypeScript symlink and
+  legacy backend fixture alias; these links were excluded from release ZIPs.
+
+CRITICAL LIMITS:
+Historical CASE=24 persisted conversion disappears after reload and Text
+`test_country='Croatia'` invalid-format saving remain OPEN until authorized
+staging/PostgreSQL/API and deployed browser tests establish their status.
+The new test verifies validation logic only; it is NOT database acceptance.
+A clean Node24 npm ci/typecheck/build remains NOT VERIFIED. No staging
+credentials, database or deployed browser were accessed.
+
+NEXT: Collect Node24 CI artifacts and run protected staging read-only schema
+checks followed by expressly authorized disposable-product CASE=24 and Croatia
+write/readback probes; retain SQLSTATE and exact deployed commit evidence.
+================================================================================
+
+
+======================================================================
+2026-10-13 — POST-BATCH181 ACCEPTANCE PREFLIGHT (NO NEW CODE BATCH)
+======================================================================
+Baseline retained unchanged: Full Frontend176 / Backend093. No Batch182 source
+change was justified or issued in this continuation.
+
+VERIFIED HERE:
+- Original full FE/BE ZIP SHA-256 hashes match the Batch181 manifest.
+- Both complete source ZIPs extracted successfully.
+- Re-executed all 120 named inherited regression scripts from Batch181
+  regression_results.txt: 120 PASS / 0 FAIL (FE99, BE21), local Node22.16.0.
+- Test-only setup: temporary symlink to globally installed TypeScript and
+  backend source alias for cross-repository source-reading tests; these were
+  NOT bundled into the authoritative full source ZIPs.
+- All staging-capable scripts in this offline rerun used safe self-test mode
+  where required, with no external HTTP or PostgreSQL request.
+
+BLOCKED / STILL UNVERIFIED:
+- Clean Node24 npm ci + TypeScript/lint + Vite production build: NOT RUN.
+  Current environment Node22.16.0; only Node22 installed.
+  Offline npm ci returned ENOTCACHED for zod-validation-error@4.0.2.
+  registry.npmjs.org and nodejs.org DNS resolution unavailable.
+- Staging PostgreSQL schema (migrations 512/538, usable unique indexes):
+  NOT VERIFIED against a real database. No staging DB credential supplied.
+- Original CASE=24 save/readback/refresh and test_country=Croatia Custom
+  Fields save/readback: HISTORICAL FAILS REMAIN OPEN (no real write tested).
+- Deployed frontend/backend commit identity and browser acceptance: NOT DONE.
+
+Interpretation: 120 offline tests passing is NOT live persistence acceptance.
+No application code changes, staging writes, migrations, or production
+operations were performed. Next action: execute existing GitHub Actions
+frontend-validation workflow on FE176 commit with Node24; use protected
+Original Audit Persistence Staging Verification workflow in read-only mode,
+then (after explicit staging approval) disposable-staging-write mode.
+Evidence: Inventory_Management_App_ACCEPTANCE_PREFLIGHT_after_Batch181_2026-10-13.txt.
+
+=== BATCH 182 — 2026-10-13 — BACKEND TRANSACTIONAL PERSISTENCE READBACK SAFETY ===
+AUTHORITY: Source-of-truth FE176 unchanged; corrected full BE094, superseding BE093. Batch 181 remains in cumulative history.
+ROOT CAUSE STATUS: The original 28 September CASE=24 missing-after-save and required test_country=Croatia invalid-format findings remain OPEN: neither historical failure was reproduced on real PostgreSQL, and the particular deployed root cause remains unknown. This batch must not be presented as complete production acceptance.
+DEMONSTRABLE SOURCE GAP: saveUomConversion and saveCustomFieldValues previously trusted INSERT/UPDATE RETURNING even if an AFTER-trigger or database-side modification changed/deleted the row before a subsequent SELECT in the same transaction. This allowed an application write response without an independent backend verification of table visibility/content. The frontend after-COMMIT GET guards from earlier batches remain in place.
+IMPLEMENTATION: Backend service now performs a tenant/product/code-scoped UoM SELECT after INSERT or UPDATE and checks row identity, version, factor, name, rounding, purchasing/issue flags and barcode. Missing/mismatched row throws 409 UOM_WRITE_READBACK_MISMATCH. Custom-field save performs one tenant/entity-scoped SELECT for submitted field keys after all writes, checking row IDs, versions and parsed JSONB scalars with exact value matching. Missing/mismatched row throws 409 CUSTOM_FIELD_WRITE_READBACK_MISMATCH. Both failures prevent success and trigger ordinary transaction rollback. Existing JSON.stringify('Croatia')::jsonb behavior is preserved.
+BACKEND FILES: src/services/inventory/inventoryCapabilitiesService.js; package.json; new scripts/check-batch182-transactional-persistence-readback.cjs; updated isolated SQL mocks check-batch166,168,172,176; new docs/BATCH182_TRANSACTIONAL_PERSISTENCE_READBACK.md. Frontend files not changed.
+VERIFICATION: New targeted 26/26 PASS on actual extracted production readback functions with strict fake SQL adapter; inherited 120/120 scripts PASS (FE99, BE21) under local Node22.16.0 with temporary TypeScript symlink (excluded from archives); modified preexisting isolated SQL scripts pass. Source syntax checks pass. FE 176 full ZIP copied byte-for-byte from previous authoritative baseline. No migrations or tenant table changes.
+LIMITS: No live authorized staging credentials, no PostgreSQL write/readback or SQLSTATE, no deployed browser inspection, no GitHub Node24 CI and no production-version SHA proof. The original failed cases are STILL OPEN pending protected staging acceptance. Do not claim Backend094 is deployed. No tenant record changed in this batch.
+NEXT: Deploy FE176/BE094 to approved staging; verify migrations512/538/indexes and deployed SHA with existing protected staging workflow; explicitly approve disposable staging fixture; execute real CASE=24 POST+GET/switch/full refresh and test_country=Croatia PUT+GET, capture API/SQLSTATE and PostgreSQL evidence; then verify Node24 CI and browser. If a real persistence failure remains, fix its demonstrated cause rather than inventing it.
+
+
+=== POST-BATCH182 ORIGINAL-AUDIT SOURCE RECONCILIATION — 2026-10-13 — NO CODE BATCH ===
+No application files were changed. Re-examined original tenant audit against full FE176/BE094 and this cumulative log. Confirmed additional known-unreconciled source issue: CROSS-DATA-001 Products inventory valuation considers finalized landed cost/movement while Reports inventory valuation considers movement/shipment unit cost; totals need a shared policy or explicit differing-method labels; logged source evidence in SOURCE_RECONCILIATION TXT. Original CASE=24 and required Croatia saves remain open pending real PG. Product Movements 'Historical unit unavailable' still appears when pre-snapshot movement rows lack product_unit_snapshot; do not invent old units. Node24, PG migration/unique index, deployed browser and deferred scenarios unverified. This is documentation-only analysis, NOT Batch183 and NOT proof that all other original findings are closed.
+
+
+=== BATCH 183 — 2026-10-13 — CROSS-DATA-001 PRODUCT / REPORT VALUATION POLICY CLOSURE IN SOURCE ===
+Authority: FULL Frontend 176 unchanged; FULL Backend 095 (NEW), supersedes Backend 094. No modifications to frontend runtime, SQL migrations, or tenant data.
+Original audit: Products page estimated inventory value EUR 1,176.80 vs Reports Inventory Valuation EUR 1,347.80 (EUR 171 difference). Source-level cause: different cost policy and different archived-location stock scope. Backend094 Products used latest timestamped eligible finalized landed-cost allocation or movement cost, then standard fallback; Reports preferred latest movement, then shipment-item cost, then standard cost. Both could report different totals for identical stock.
+Implementation: New shared `src/services/catalog/productInventoryValuationSql.js` encapsulates latest finalized tenant-currency landed-cost vs costed stock-movement candidate ordered by date/id DESC NULLS LAST, with standard fallback handled by each consumer. Shared active-location stock aggregation excludes archived locations. Wired into getAllProducts and Products valuation summary/details; Reports getInventoryValuationReport uses the SAME shared eligible-cost selection, eliminates its separate shipment fallback, retains category/location filtering and tenant currency checks, and continues per-location quantity grouping. This is a read-only calculation correction.
+Files: backend src/services/catalog/productInventoryValuationSql.js (NEW), src/services/catalog/productReadQueries.js, src/services/catalog/productCostValuation.js, src/services/analytics/reportService.js; updated historical source assertion tests in tests/reports-page-hardening.test.js and tests/priority-nine-inventory-capabilities.test.js; scripts/check-batch183-inventory-valuation-parity.cjs (NEW); docs/BATCH183_PRODUCTS_REPORTS_VALUATION_PARITY.md (NEW); package.json.
+Verification: New offline captured-production-query / service-entrypoint parity regression 27/27 PASS; inherited selected scripts 120/120 PASS (FE99/BE21); Node22.16; `node --check` changed JS PASS; archive parity + SHA evidence in manifest. Temporary TypeScript symlink used to run some frontend source checks; not shipped. No clean Node24, installed full Jest suite, real PostgreSQL/CI or deployed browser acceptance was run.
+Limits: CROSS-DATA-001 is SOURCE CODE CORRECTED, PENDING LIVE ACCEPTANCE, not proven closed in production. No new measured live inventory values. For nonnegative normal stock quantities and the same tenant/currency/active locations (and unchanged stock between requests), Products summary and Reports use matching unit costs and stock scope. Exceptional legacy negative stock balances may need dedicated reconciliation; they were not hidden or rewritten here.
+Prior open original CASE=24 and test_country=Croatia PostgreSQL save issues NOT affected or accepted. Historical units without evidence NOT altered. All original records remain intact. Next: deploy FE176/BE095 to staging, check Node24 build and source commit, run matching Products/Reports valuation, then protected persistence tests and historical unit evidence review.
+
+
+================================================================================
+2026-10-13 — POST-BATCH183 ORIGINAL-AUDIT CROSS-CHECK (REVIEW ONLY; NO SOURCE BATCH)
+================================================================================
+Compared the original audit against complete Frontend176, Backend095 and cumulative FIX_LOG through Batch183. Catalogued named DEF/UX issue IDs and checked their correction-history links. 34 named DEF codes (33 exact-match documented; OPER-DEF-002 covered by FIX011), and 80 named UX codes (79 exact-match documented; ACTION-UX-001 addressed across several UX improvements). These cross-references are NOT proof of browser acceptance. No new confirmed additional code defect established during this review. Original CASE=24 unit-conversion and test_country=Croatia text saving remain OPEN pending real database/API evidence; Batch183 Products-vs-Reports shared valuation code remains LIVE RETEST REQUIRED. Legacy historical unit snapshots still may be unproven; do not fabricate missing units. Barcode OS print, notification delivery worker, fresh requisition approvals, Reports Product Movements PDF/print, Movement Ledger limit, permissions and other deferred scenarios remain acceptance tasks. Node24 clean build, staging schema and deployed browser remain unverified. No application code was changed, no Batch184 created. Details: Inventory_Management_App_POST183_ORIGINAL_AUDIT_RECONCILIATION_2026-10-13.txt.
+
+
+=== BATCH 184 — 2026-10-13 — STOCK MOVEMENTS HISTORICAL UNIT / METADATA EVIDENCE INTEGRITY ===
+Authority: Full Frontend176 unchanged, Full Backend096 NEW supersedes Backend095; cumulative prior 183 batches retained. No migration and no tenant data write.
+Verified source defect in Backend095 active Stock Movements service: historical movement list exposed mutable present-day product name/unit, storage location name, actor name, shipment PO reference and package attributes even though migration533 stores immutable snapshots. Product unit/name changes after movement would misrepresent prior stock quantity units and provenance. Reports Movement Ledger already used snapshots; Stock Movements did not. Backend096 now selects eight matching immutable `sm.*_snapshot` aliases for display (unit also exposed by raw snapshot field) and extends free-text search to historical snapshot names, while preserving existing search for discovery, filters and pagination. Legacy pre-snapshot rows remain unproven and render null/unavailable; no fabricated backfill. No need to change frontend, which already handles absent historical fields.
+Changed backend files: src/services/inventory/stockService.js, new scripts/check-batch184-stock-movement-historical-evidence.cjs, docs/BATCH184_HISTORICAL_STOCK_MOVEMENT_EVIDENCE.md, package.json, embedded cumulative FIX_LOG. Source BEFORE correction fails new focused test; AFTER correction 34/34 PASS. Inherited 120/120 selected regression scripts pass (Frontend99/Backend21), Node22.16; syntax and ZIP parity checks pass. Tests execute service query-generation against mock SQL, NOT real PostgreSQL. No clean Node24 frontend build, full Jest suite or deployed-browser acceptance completed.
+Original CASE=24 (UoM save) and test_country=Croatia (Custom Fields save) remain OPEN pending authorized real PostgreSQL/API tracing; Products/Reports value parity Batch183 pending live data check. Original historical unit snapshot NULLs cannot safely be reconstructed. Continue protected staging verification; do not misstate production acceptance.
+
+
+=== BATCH 185 — 2026-10-13 — STOCK MOVEMENTS UNPROVEN LEGACY CLASSIFICATION API CLOSURE ===
+CUMULATIVE SOURCE: Full Frontend176 unchanged; Full Backend097 new, supersedes Backend096 (Batch184). No migrations or tenant-data mutation.
+ORIGINAL AUDIT CONTEXT: September Stock Movements/Reports recorded older rows whose classification or original unit evidence was unavailable. Existing migration526 intentionally labels ambiguous historical stock movements as movement_kind='unclassified'. Frontend StockMovementsPage.tsx already displays 'Unproven legacy movement' if movement_kind='unclassified' and movement_type is stock_count, manual_adjustment or other. But Backend096 getStockMovements returned movement_type only, omitting movement_kind entirely, disabling that frontend branch and potentially depicting an ambiguous old movement as a proven count/adjustment.
+SURGICAL IMPLEMENTATION: Backend src/services/inventory/stockService.js getStockMovements SELECT now returns sm.movement_kind alongside sm.movement_type. No derived/faked historical classifications. No change to pagination, quantity, costs, routes, snapshots, filters, permissions, or the frontend.
+REPRODUCTION AND TESTS: New executable check-batch185-stock-movement-classification-contract.cjs fails against the untouched Backend096 source (missing response field). Corrected Backend097 passes 16/16 source-actual query/front-end classifier assertions. Inherited 120/120 offline scripts pass (FE99/BE21); retained Batch184 historical snapshot test 34/34 and Batch183 valuation parity 27/27 pass; changed JS syntax pass. Code and file hashes in SHA256 manifest. Tests ran on Node22.16.0 using test-only frontend dependency setup from prior baseline.
+LIMITS: No real PostgreSQL/staging/deployed browser acceptance or clean Node24 production build. This correction improves status labeling ONLY: pre-migration missing units remain unavailable and are NOT reconstructed. Historical CASE24 UoM saving, Croatia Custom Field write, and Products/Reports valuation corrections still require authorized actual staging/Postgres/browser acceptance. Do not mark those as resolved from offline tests.
+
+
+=== BATCH 186 — 2026-10-13 — UNCLASSIFIED LEGACY STOCK MOVEMENTS MUST NOT APPEAR PROVEN ===
+SOURCE: Complete Frontend177 NEW (supersedes FE176) + complete Backend098 NEW (supersedes BE097 only because inherited test/documentation updated; backend runtime source unchanged).
+PROVEN DEFECT: After Backend097 began returning persisted movement_kind, Frontend176 only displayed 'Unproven legacy movement' for unclassified stock_count/manual_adjustment/other. An unclassified shipment_receive or usage still appeared as an unequivocal receipt/consumption even though migration527 requires reliable movement type and direction before classifying legacy data. This persisted uncertainty was therefore concealed on the page and in exported CSV.
+FIX: Frontend177 now checks movement_kind='unclassified' BEFORE any movement_type or reason fallbacks. This preserves uncertainty for EVERY ambiguous legacy movement in on-screen ledger and filtered CSV. Confirmed structured classifications retain their original displayed type. No DB write/backfill/migration, no quantity or valuation change, no permissions or route changes.
+TEST EVIDENCE: New executable FE Batch186 regression FAILS on unchanged FE176 for unclassified shipment_receive and PASSES on FE177 (28/28 checks). Batch185 inherited check updated to expect truthful unproven display and passes 16/16; Batch184 34/34; Batch183 27/27; Batch182 26/26; selected inherited offline regression scripts 120/120 (FE99/BE21) on Node22.16.0; FE TSX parser shows zero diagnostics; updated JS syntax checks pass. Each ZIP checked for integrity / parity. This is a source-level fix, NOT an actual deployed acceptance test.
+UNRESOLVED ACCEPTANCE: Original CASE=24 and required Text test_country=Croatia saves still lack real PostgreSQL/API evidence; Products/Reports valuation needs deployed check; historical pre-533 snapshots cannot be reconstructed; Node24 clean frontend build, real migrations and browser acceptance remain unverified.

@@ -245,10 +245,11 @@ function usageReasonLabel(value?: string | null): string {
 function movementTypeFromRow(movement: StockMovement): string {
   const explicitType = movement.movement_type?.trim();
   const movementKind = movement.movement_kind?.trim();
-  if (explicitType) {
-    if (movementKind === 'unclassified' && ['stock_count', 'manual_adjustment', 'other'].includes(explicitType)) return 'unproven_legacy';
-    return explicitType;
-  }
+  // The database's classification is stronger evidence than a legacy type or
+  // free-form reason. An unclassified movement must not appear as a proven
+  // receipt, consumption, transfer or count in the ledger or its CSV export.
+  if (movementKind === 'unclassified') return 'unproven_legacy';
+  if (explicitType) return explicitType;
 
   const reason = movement.reason || '';
   if (reason === 'shipment_receive') return 'shipment_receive';
