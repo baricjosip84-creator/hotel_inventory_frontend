@@ -36,7 +36,7 @@ function scenario(mode='valid'){
  const epoch={current:0},active={current:'p-A'},seq={current:0};
  const events={requests:[],cache:[],invalidations:[],clears:0,conversions:[],errors:[],success:[],failure:[],selected:[]};
  const qc={setQueryData:(key,data)=>events.cache.push({key,data}),invalidateQueries:({queryKey})=>events.invalidations.push(queryKey)};
- const apiRequest=async (url,opts)=>{events.requests.push({url,opts});if(opts)return {ok:true};if(mode==='throw')throw new Error('readback unavailable');return {base_uom:'pcs',conversions:mode==='missing'?[]:[{uom_code:'CASE',factor_to_base:24,purchase_uom:true,issue_uom:false}]}};
+ const apiRequest=async (url,opts)=>{events.requests.push({url,opts});if(opts)return {ok:true};if(mode==='throw')throw new Error('readback unavailable');return {base_uom:'pcs',conversions:mode==='missing'?[]:[{uom_code:'CASE',uom_name:'Case',factor_to_base:24,purchase_uom:true,issue_uom:false,version:1}]}};
  const build=new Function('apiRequest','qc','activeUomProductRef','uomSelectionEpochRef','conversionRequestSeqRef','clearUomForm','setConverted','setError','ui','messageFrom','showTenantActionSuccess','showTenantActionError','editingUom','setProductId','setFromUom','setToUom',code+'return {saveOptions,deleteOptions,changeProduct};');
  const x=build(apiRequest,qc,active,epoch,seq,()=>events.clears++,x=>events.conversions.push(x),x=>events.errors.push(x),x=>x,e=>e.message,x=>events.success.push(x),x=>events.failure.push(x),{id:'CASE'},x=>events.selected.push(x),()=>{},()=>{});
  const payload={uom_code:'CASE',uom_name:'Case',factor_to_base:24,purchase_uom:true,issue_uom:false,expected_version:0};

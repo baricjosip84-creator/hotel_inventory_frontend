@@ -48,7 +48,7 @@ function scenario() {
   const conversionRequestSeqRef = {current:0};
   const observed = { requests:[], invalidations:[], readbackCache:[], formClears:0, conversions:[], errors:[], selected:[], units:[] };
   const qc = { invalidateQueries: ({queryKey}) => observed.invalidations.push(queryKey), setQueryData: (queryKey,data) => observed.readbackCache.push({queryKey,data}) };
-  const apiRequest = (url, opts) => { observed.requests.push({url,opts}); return Promise.resolve(opts ? {id:'ok'} : {base_uom:'pcs',conversions:[{id:'u-1',uom_code:'CASE',factor_to_base:24,purchase_uom:true,issue_uom:false}]}); };
+  const apiRequest = (url, opts) => { observed.requests.push({url,opts}); return Promise.resolve(opts ? {id:'ok'} : {base_uom:'pcs',conversions:[{id:'u-1',uom_code:'CASE',uom_name:'Case',factor_to_base:24,purchase_uom:true,issue_uom:false,version:1}]}); };
   const clearUomForm = () => { observed.formClears++; };
   const setConverted = val => observed.conversions.push(val);
   const setError = val => observed.errors.push(val);

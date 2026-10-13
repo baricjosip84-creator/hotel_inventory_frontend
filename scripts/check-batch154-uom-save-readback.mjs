@@ -55,7 +55,7 @@ function scenario(behavior='ok'){
  const conversionRequestSeqRef={current:0};
  const payload={uom_code:'CASE',uom_name:'Case',factor_to_base:24,purchase_uom:false,issue_uom:false,expected_version:0};
  const vars={targetProductId:'A',payload};
- const standard={base_uom:'pcs',conversions:[{id:'unit-1',uom_code:'case',factor_to_base:'24',purchase_uom:false,issue_uom:false}]};
+ const standard={base_uom:'pcs',conversions:[{id:'unit-1',uom_code:'case',uom_name:'Case',factor_to_base:'24',purchase_uom:false,issue_uom:false,version:1}]};
  const behaviors={ok:standard,missing:{base_uom:'pcs',conversions:[]},wrongFactor:{base_uom:'pcs',conversions:[{...standard.conversions[0],factor_to_base:12}]},wrongPurchase:{base_uom:'pcs',conversions:[{...standard.conversions[0],purchase_uom:true}]},wrongIssue:{base_uom:'pcs',conversions:[{...standard.conversions[0],issue_uom:true}]},throwError:new Error('GET unavailable'),rounding:{base_uom:'pcs',conversions:[{...standard.conversions[0],factor_to_base:24.00000000001}]}};
  const apiRequest=(url,opts)=>{observed.calls.push({url,opts});return behaviors[behavior] instanceof Error? Promise.reject(behaviors[behavior]):Promise.resolve(behaviors[behavior]);};
  const qc={invalidateQueries:({queryKey})=>observed.invalidations.push(queryKey),setQueryData:(key,data)=>observed.cache.push({key,data})};

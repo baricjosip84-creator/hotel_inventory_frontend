@@ -1,0 +1,67 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const ts = require('typescript');
+const root = process.cwd();
+const source = readFileSync(process.env.BATCH178_PAGE_SOURCE || path.join(root,'src/pages/InventoryCapabilitiesPage.tsx'),'utf8');
+const pkg = JSON.parse(readFileSync(path.join(root,'package.json'),'utf8'));
+let count = 0;
+const check = (name,fn)=>{ fn(); count++; console.log('PASS',name); };
+const ast = ts.createSourceFile('InventoryCapabilitiesPage.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+check('page TSX parses',()=>assert.equal(ast.parseDiagnostics.length,0));
+check('page TSX transpiles',()=>assert.equal((ts.transpileModule(source,{fileName:'InventoryCapabilitiesPage.tsx',reportDiagnostics:true,compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).diagnostics||[]).filter(x=>x.category===ts.DiagnosticCategory.Error).length,0));
+check('batch 178 test registered',()=>assert.equal(pkg.scripts['check:batch178-uom-complete-readback'],'node scripts/check-batch178-uom-complete-readback.mjs'));
+const panel = ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='UomPanel');
+check('original UoM panel found',()=>assert(panel));
+let save;
+(function walk(n){ if(ts.isVariableDeclaration(n)&&n.name.getText(ast)==='save')save=n;ts.forEachChild(n,walk); })(panel);
+check('real save mutation found',()=>assert(save));
+const sourceHandler=save.initializer.arguments[0].getText(ast);
+for (const needle of ['versionMatches','nameMatches','roundingMatches','barcodeMatches','factorMatches']) check('readback checks '+needle,()=>assert(sourceHandler.includes(needle)));
+const js=ts.transpileModule(`const saveOptions = ${sourceHandler};`,{fileName:'batch178-handler.ts',compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+function scenario({payloadOverrides={},rowOverrides={},missing=false,fail=false,active='A',epoch=0}={}){
+ const payload={uom_code:'CASE',uom_name:'Case',factor_to_base:24,purchase_uom:false,issue_uom:false,expected_version:0,...payloadOverrides};
+ const row={id:'u-1',uom_code:'CASE',uom_name:'Case',factor_to_base:24,purchase_uom:false,issue_uom:false,rounding_scale:4,barcode:null,version:1,...rowOverrides};
+ const events={set:[],invalidate:[],formClears:0,errors:[],success:[],requestUrls:[],converted:[],seq:0};
+ const qc={setQueryData:(key,data)=>events.set.push([key,data]),invalidateQueries:({queryKey})=>events.invalidate.push(queryKey)};
+ const apiRequest=async(url)=>{events.requestUrls.push(url);if(fail)throw new Error('Readback unavailable');return {base_uom:'PCS',conversions:missing?[]:[row]};};
+ const activeUomProductRef={current:active},uomSelectionEpochRef={current:epoch},conversionRequestSeqRef={current:0};
+ const build=new Function('apiRequest','qc','activeUomProductRef','uomSelectionEpochRef','conversionRequestSeqRef','clearUomForm','setConverted','setError','ui','showTenantActionSuccess','showTenantActionError','messageFrom',js+'\nreturn saveOptions;');
+ const saveOptions=build(apiRequest,qc,activeUomProductRef,uomSelectionEpochRef,conversionRequestSeqRef,()=>events.formClears++,x=>events.converted.push(x),x=>events.errors.push(x),x=>x,x=>events.success.push(x),x=>events.errors.push(x),e=>e.message);
+ return {events,saveOptions,vars:{targetProductId:'A',targetSelectionEpoch:0,payload}};
+}
+async function verify(name,opts,expected){
+ const s=scenario(opts);await s.saveOptions.onSuccess({},s.vars);
+ check(name+' GET uses submitted product',()=>assert.deepEqual(s.events.requestUrls,['/inventory-capabilities/products/A/uom']));
+ check(name+' verified outcome',()=>assert.equal(s.events.success.length,expected?1:0));
+ check(name+' never discards unverified draft',()=>assert.equal(s.events.formClears,expected?1:0));
+ check(name+' does not publish unverified cache',()=>assert.equal(s.events.set.length,expected?2:0));
+ if(!expected) check(name+' invalidates both UoM caches',()=>assert.deepEqual(s.events.invalidate,[['uom','A'],['product-uom-options','A']]));
+}
+await verify('CASE 24 verified',{},true);
+await verify('CASE 24 name normalized',{payloadOverrides:{uom_name:' Case '},rowOverrides:{uom_name:'Case'}},true);
+await verify('CASE 24 stored name missing',{rowOverrides:{uom_name:null}},false);
+await verify('CASE 24 stale version',{rowOverrides:{version:2}},false);
+await verify('CASE 24 unknown version',{rowOverrides:{version:undefined}},false);
+await verify('CASE 24 stored factor wrong',{rowOverrides:{factor_to_base:12}},false);
+await verify('CASE 24 usage flag wrong',{rowOverrides:{purchase_uom:true}},false);
+await verify('CASE 24 no row',{missing:true},false);
+await verify('CASE 24 GET unavailable',{fail:true},false);
+await verify('CASE 24 update fully verified',{payloadOverrides:{expected_version:2,rounding_scale:5,barcode:'Pack-A'},rowOverrides:{version:3,rounding_scale:5,barcode:'Pack-A'}},true);
+await verify('CASE 24 update stale version',{payloadOverrides:{expected_version:2,rounding_scale:5,barcode:'Pack-A'},rowOverrides:{version:2,rounding_scale:5,barcode:'Pack-A'}},false);
+await verify('CASE 24 changed rounding',{payloadOverrides:{rounding_scale:5},rowOverrides:{rounding_scale:4}},false);
+await verify('CASE 24 changed barcode',{payloadOverrides:{barcode:'Pack-A'},rowOverrides:{barcode:'Pack-B'}},false);
+await verify('tiny factor exact',{payloadOverrides:{factor_to_base:1e-10},rowOverrides:{factor_to_base:'0.0000000001'}},true);
+await verify('tiny factor false positive prevented',{payloadOverrides:{factor_to_base:1e-10},rowOverrides:{factor_to_base:'0.000000000001'}},false);
+await verify('tiny factor within relative numeric tolerance',{payloadOverrides:{factor_to_base:1e-10},rowOverrides:{factor_to_base:1e-10*(1+1e-13)}},true);
+await verify('readback base factor zero cannot verify',{payloadOverrides:{factor_to_base:1e-10},rowOverrides:{factor_to_base:0}},false);
+const oldKnown = {factor_to_base:1e-12,purchase_uom:false,issue_uom:false};
+check('untouched previous absolute epsilon wrongly treats different tiny factors as equal',()=>assert(Math.abs(oldKnown.factor_to_base-1e-10)<=Math.max(1e-8,Math.abs(1e-10)*1e-9)));
+{const s=scenario({active:'B'});await s.saveOptions.onSuccess({},s.vars);
+ check('product switching cannot clear B draft',()=>assert.equal(s.events.formClears,0));
+ check('product switching still caches A result',()=>assert.equal(s.events.set.length,2));
+ check('product switching cannot show A toast in B',()=>assert.equal(s.events.success.length,0));
+}
+console.log(`BATCH178 UOM COMPLETE READBACK: ${count}/${count} PASS`);

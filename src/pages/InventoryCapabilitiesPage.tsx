@@ -804,9 +804,18 @@ function UomPanel({ products, canWrite }: { products: Product[]; canWrite: boole
         const verified = await apiRequest<UomResponse>(`/inventory-capabilities/products/${targetProductId}/uom`);
         const savedRow = verified.conversions.find((row) => row.uom_code.toUpperCase() === payload.uom_code.trim().toUpperCase());
         const savedFactor = Number(savedRow?.factor_to_base);
-        const factorMatches = savedRow && Number.isFinite(savedFactor) &&
-          Math.abs(savedFactor - payload.factor_to_base) <= Math.max(1e-8, Math.abs(payload.factor_to_base) * 1e-9);
-        if (!factorMatches || Boolean(savedRow.purchase_uom) !== payload.purchase_uom || Boolean(savedRow.issue_uom) !== payload.issue_uom) {
+        // NUMERIC has no fixed scale in the database: a fixed absolute epsilon can
+        // falsely verify tiny unit factors. Compare relative error instead.
+        const factorMatches = savedRow && Number.isFinite(savedFactor) && savedFactor > 0 &&
+          Number.isFinite(payload.factor_to_base) && payload.factor_to_base > 0 &&
+          Math.abs(savedFactor - payload.factor_to_base) <=
+            Math.max(Math.abs(savedFactor), Math.abs(payload.factor_to_base)) * 1e-12;
+        const expectedRowVersion = payload.expected_version > 0 ? payload.expected_version + 1 : 1;
+        const versionMatches = savedRow && Number(savedRow.version) === expectedRowVersion;
+        const nameMatches = savedRow && (savedRow.uom_name || '').trim() === (payload.uom_name || '').trim();
+        const roundingMatches = savedRow && (payload.rounding_scale === undefined || Number(savedRow.rounding_scale) === payload.rounding_scale);
+        const barcodeMatches = savedRow && (payload.barcode === undefined || (savedRow.barcode || '').trim() === (payload.barcode || '').trim());
+        if (!factorMatches || !versionMatches || !nameMatches || !roundingMatches || !barcodeMatches || Boolean(savedRow.purchase_uom) !== payload.purchase_uom || Boolean(savedRow.issue_uom) !== payload.issue_uom) {
           void qc.invalidateQueries({ queryKey: ['uom', targetProductId] });
           // Inventory workflow UoM selectors keep a separate 60s cache.
           // Invalidate it for uncertain saves or deletion of a conversion.
