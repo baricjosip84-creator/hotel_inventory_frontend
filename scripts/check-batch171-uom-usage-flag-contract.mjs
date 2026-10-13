@@ -13,7 +13,7 @@ test(source.includes('Boolean(body.issue_uom)') === false, 'Unsafe issue flag co
 test(source.includes("assertUomUsageFlag(body.purchase_uom, 'purchase_uom')"), 'purchase flag in save SQL');
 test(source.includes("assertUomUsageFlag(body.issue_uom, 'issue_uom')"), 'issue flag in save SQL');
 test(source.includes("'UOM_USAGE_FLAG_INVALID'"), 'clear validation error code');
-test(source.includes('const factor = assertPositiveNumber(body.factor_to_base'), 'CASE factor check unchanged');
+test(source.includes('const factor = assertUomFactorToBase(body.factor_to_base)'), 'CASE factor now uses explicit decimal guard');
 test(source.includes('ON CONFLICT (tenant_id, product_id, uom_code) DO NOTHING'), 'conflict protection unchanged');
 test(validator.includes('async function save('), 'real save handler tested');
 test(validator.includes('captured[6]'), 'actual purchase SQL flag checked');

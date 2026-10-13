@@ -1,0 +1,21 @@
+#!/usr/bin/env node
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+const backendRoot = process.env.BACKEND_ROOT || path.resolve(process.cwd(), '../hotel-inventory-backend');
+const src = fs.readFileSync(path.join(backendRoot,'src/services/inventory/inventoryCapabilitiesService.js'),'utf8');
+const harness=fs.readFileSync(path.join(backendRoot,'scripts/check-batch172-uom-numeric-save.cjs'),'utf8');
+let n=0; const check=(ok,description)=>{assert.ok(ok,description);n++;};
+check(src.includes('const assertUomFactorToBase = (value)'), 'factor numeric boundary');
+check(src.includes('const assertUomExpectedVersion = (value)'), 'version numeric boundary');
+check(src.includes('const factor = assertUomFactorToBase(body.factor_to_base)'), 'production create and update use factor parser');
+check(src.includes('const expectedVersion = assertUomExpectedVersion(body.expected_version)'), 'production save checks version');
+check(!src.includes("const factor = assertPositiveNumber(body.factor_to_base"), 'unsafe factor coercion not used');
+check(src.includes("ON CONFLICT (tenant_id, product_id, uom_code) DO NOTHING"), 'create conflict protection intact');
+check(src.includes("AND version=$4"), 'optimistic version lock preserved');
+check(src.includes("WHERE tenant_id=$1 AND product_id=$2 AND uom_code=$3"), 'tenant and product-scoped SQL retained');
+check(harness.includes("uom_code:'CASE'"), 'historical CASE fixture exists');
+check(harness.includes('factor_to_base:24'), 'factor 24 retained');
+check(harness.includes('RUN_OLD_BASELINE'), 'baseline reproduction present');
+check(harness.includes('UPDATE product_uom_conversions'), 'update SQL tested');
+console.log(`Batch172 cross-repository UoM numeric-save contract: ${n}/${n} PASS`);
