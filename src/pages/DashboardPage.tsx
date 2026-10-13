@@ -117,8 +117,8 @@ type UnresolvedAlertRow = {
 type RecentActivityRow = {
   id: string;
   product_id: string;
-  product_name: string;
-  product_unit: string;
+  product_name: string | null;
+  product_unit: string | null;
   shipment_id?: string | null;
   shipment_po_number?: string | null;
   storage_location_id?: string | null;
@@ -326,13 +326,20 @@ function toNumber(value: number | string | null | undefined): number {
 }
 
 function movementDisplayValue(row: RecentActivityRow): string {
+  const kind = String(row.movement_kind || '').trim().toLowerCase();
+  // The persisted classification is authoritative. A legacy free-form type
+  // cannot turn an unclassified movement into a proven receipt or usage.
+  if (kind === 'unclassified') return 'unproven_legacy';
   const specificType = String(row.movement_type || '').trim().toLowerCase();
   if (specificType && specificType !== 'other') return specificType;
-  return String(row.movement_kind || specificType || 'other');
+  return kind || specificType || 'other';
 }
 
 function dashboardReasonLabel(row: RecentActivityRow, ui: (englishText: string) => string): string {
   const reason = String(row.reason || '').trim();
+  // An unclassified legacy record's reason is raw evidence, NOT proof of an
+  // operational event. Avoid translating it into a confirmed receipt/usage.
+  if (String(row.movement_kind || '').trim().toLowerCase() === 'unclassified') return reason || '-';
   if (!reason) return '-';
 
   if (row.shipment_id && (reason === 'shipment_receive' || reason.startsWith('shipment_receive:'))) {
@@ -423,6 +430,7 @@ function changeDisplay(value: number, locale: Parameters<typeof formatLocalizedN
 type UiTranslator = (englishText: string) => string;
 
 function enumDisplayLabel(value: string, ui: UiTranslator): string {
+  if (value === 'unproven_legacy') return ui('Unproven legacy movement');
   if (value === 'bom_assembly') return ui('BOM assembly');
   if (value === 'bom_disassembly') return ui('BOM disassembly');
   const englishLabel = value
@@ -1145,7 +1153,7 @@ export default function DashboardPage() {
                 (lowStockQuery.data ?? []).map((row) => (
                   <article className="dashboard-record-card" key={row.id}>
                     <div className="dashboard-record-card__header">
-                      <strong>{row.product_name}</strong>
+                      <strong>{row.product_name || ui('Historical Product name unavailable')}</strong>
                       <span>{row.storage_location_name}</span>
                     </div>
                     <div className="dashboard-record-card__metrics dashboard-record-card__metrics--three">
@@ -1382,8 +1390,8 @@ export default function DashboardPage() {
                     <article className="dashboard-activity-card" key={row.id}>
                       <div className="dashboard-activity-card__top">
                         <div>
-                          <strong>{row.product_name}</strong>
-                          <span>{row.product_unit || '-'}</span>
+                          <strong>{row.product_name || ui('Historical Product name unavailable')}</strong>
+                          <span>{row.product_unit || ui('Historical unit unavailable')}</span>
                         </div>
                         <div className="dashboard-activity-card__change">
                           <span style={changeBadgeStyle(amount)}>{changeDisplay(amount, locale)}</span>
@@ -1391,10 +1399,10 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div className="dashboard-activity-card__details">
-                        <span><small>{ui('Location')}</small><b>{row.storage_location_name || ui('Location unavailable')}</b></span>
+                        <span><small>{ui('Location')}</small><b>{row.storage_location_name || ui('Historical location unavailable')}</b></span>
                         <span><small>{ui('Type')}</small><b>{enumDisplayLabel(movementDisplayValue(row), ui)}</b></span>
                         <span><small>{ui('Reason')}</small><b>{dashboardReasonLabel(row, ui)}</b></span>
-                        <span><small>{ui('User')}</small><b>{row.user_name || (row.user_id ? ui('User name unavailable') : ui('System'))}</b></span>
+                        <span><small>{ui('User')}</small><b>{row.user_name || (row.user_id ? ui('Historical actor unavailable') : ui('System'))}</b></span>
                       </div>
                     </article>
                   );

@@ -22,7 +22,8 @@ requireText(page, 'formatAvailableNumber(summary.master_data.total_products)', '
 requireText(page, 'formatAvailableNumber(summary.master_data.total_suppliers)', 'suppliers null is not rendered as zero');
 requireText(page, 'formatAvailableNumber(summary.master_data.total_storage_locations)', 'locations null is not rendered as zero');
 requireText(page, "specificType !== 'other'", 'legacy generic movement type fallback');
-requireText(page, 'row.movement_kind || specificType || \'other\'', 'semantic movement kind fallback');
+requireText(page, "return kind || specificType || 'other';", 'semantic movement kind fallback');
+requireText(page, "if (kind === 'unclassified') return 'unproven_legacy';", 'stored unclassified legacy classification wins over mutable movement type');
 // Batch114: Dashboard now translates known system reasons while preserving user-entered reasons.
 requireText(page, 'function dashboardReasonLabel(row: RecentActivityRow, ui:', 'readable system reason formatter');
 requireText(page, "const reason = String(row.reason || '').trim();", 'original reason is read without rewriting');
