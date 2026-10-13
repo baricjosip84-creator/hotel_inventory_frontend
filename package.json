@@ -6,6 +6,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "check:batch177-required-custom-field-contract": "node scripts/check-batch177-required-custom-field-contract.mjs",
     "check:batch131-landed-cost-finalization-feedback": "node scripts/check-batch131-landed-cost-finalization-feedback.mjs",
     "check:batch126-uom-success-feedback": "node scripts/check-batch126-uom-success-feedback.mjs",
     "check:batch119-po-guided-delivery-contract": "node scripts/check-batch119-po-guided-delivery-contract.mjs",
