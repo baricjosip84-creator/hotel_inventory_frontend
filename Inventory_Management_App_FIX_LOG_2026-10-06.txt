@@ -12204,3 +12204,35 @@ TESTS: New real-handler fake-SQL Backend172: 230/230 assertions PASS; original B
 LIMITS: No actual PostgreSQL connection, staging API request, GitHub Node24 production build or deployed browser test. Original UoM CASE=24 missing after save/product change/reload and required text test_country='Croatia' invalid-format save both remain OPEN. No proof of live database write/readback or deployed code equivalence.
 RELEASE: Complete Frontend167 + Backend085 ZIPs, changed-files ZIP, preserved-and-appended original audit and FIX_LOG, eight TXT artifacts and complete 11-member all-in-one ZIP. Changed-file parity, archive CRC, original-history prefixes and SHA-256 checks PASS.
 ================================================================================
+
+
+=== BATCH 173 — 2026-10-13 — UOM STORED CONVERSION CORRUPTION GUARD ===
+Code source: Frontend167 and Backend085, released as Frontend168 + Backend086.
+Changed backend: src/services/inventory/inventoryCapabilitiesService.js; scripts/check-batch173-uom-stored-conversion-guard.cjs; package.json.
+Changed frontend: scripts/check-batch173-uom-stored-conversion-contract.mjs; package.json.
+New behavior: convertUom rejects invalid stored unit factors and rounding_scale instead of raw RangeError or silent bad result; base-unit behavior and normal CASE=24 unchanged.
+Reproduction: Batch173 regression FAIL on untouched Backend085 and 26/26 PASS on Backend086; FE contract 16/16; inherited 91/91 frontend and 14/14 backend selected scripts PASS.
+Testing limitation: isolated SQL source verification only, no actual PostgreSQL or deployed browser acceptance; Node24 build unavailable.
+Outstanding historical audit items remain CASE=24 persistence and custom-field Croatia saving; do not mark resolved.
+
+
+=== BATCH 174 — 2026-10-13 — STAGING CUSTOM FIELDS UNCERTAIN-WRITE RECONCILIATION ===
+Baseline: complete Frontend168 + Backend086. Released: complete Frontend169 + Backend087.
+Defect: check-batch160-persistence-smoke.cjs skipped restoration if the Croatia PUT completed in PostgreSQL but its HTTP response was lost. The test was therefore not reliably self-restoring.
+Changes (backend): scripts/check-batch160-persistence-smoke.cjs; new scripts/check-batch174-country-uncertain-write-reconcile.cjs; .github/workflows/original-audit-persistence-staging.yml; package.json; embedded cumulative FIX_LOG. Changes (frontend): new scripts/check-batch174-country-uncertain-write-contract.mjs; package.json.
+Repair: after uncertain PUT response, GET current value/version; recognize exactly one version increment to Croatia, restore prior value using version-checked PUT and verify readback. If unchanged, no restore; if another version/value or GET failure, fail for manual review. Never silently overwrite concurrent edits. Add regression guard to manual staging workflow preflight.
+Test evidence: new test fails against untouched Backend086; passes Backend087 20/20 assertions. Frontend contract 21/21. Inherited 91/91 FE and 14/14 BE scripts, total 107/107 with new tests, PASS. YAML parsed. ZIP archives/parity/SHA manifest checked.
+No live staging writes or database acceptance. Historical CASE=24 persistence and Croatia text saving remain OPEN. Clean Node24 production build and browser acceptance still outstanding.
+
+
+================================================================================
+BATCH175 — DISPOSABLE CASE=24 STAGING POST-RECEIPT RECOVERY — 2026-10-13
+================================================================================
+AUTHORITATIVE INPUT: Complete Frontend169 + Backend087 (Batch174 package), original historical September tenant audit v93, cumulative FIX_LOG Batches001–174. Original text retained as exact byte prefixes; this record appended.
+REPRODUCED DEFECT: The existing protected persistence diagnostic checks exact CASE/Case/24 and cleans by returned row ID/version. If the POST commits but the response is lost, its uomRecord is null and the finally block cannot reclaim its own CASE. Previous code deliberately avoids deleting any row without a receipt, but could leave its disposable test record behind. This is a DIAGNOSTIC cleanup failure, NOT evidence for the original September 28 application save/persistence defect.
+BATCH175: Backend scripts/check-batch160-persistence-smoke.cjs now adds a random, distinctive temporary barcode to the CASE write. When the POST receipt is missing, it fetches conversions again and recovers ONLY a single record matching that marker plus CASE/24/false/false/initial version 1. It then uses the same existing If-Match-Version DELETE and verifies absence. Any changed values, different marker, absent/unavailable readback, or incompatible version results in manual review; no blind delete. An uncertain POST never yields an acceptance PASS just because cleanup succeeded. The previous approved-staging-origin controls and disposable/write approvals remain in place.
+FILES: Backend existing diagnostic, new scripts/check-batch175-case-lost-post-reconcile.cjs, original-audit-persistence-staging.yml, package.json, embedded FIX_LOG. Frontend new scripts/check-batch175-case-lost-post-contract.mjs, package.json, embedded FIX_LOG. No application runtime or migrations changed.
+ACTUAL TESTS: New test FAILS as expected against unchanged Backend087 (temporary CASE is left behind), corrected Backend088 passes 28/28 backend assertions. FE170 contract 26/26. Inherited selected FE92/92 plus new FE1 and BE15/15 plus new BE1 = 93/93 frontend +16/16 backend =109/109 PASS. Batch174 uncertain-Croatia and Batch161 exact-CASE focused regressions pass independently. Node22 offline test infrastructure only; no external API access or database write attempted.
+RELEASE: Complete cumulative Frontend170 and Backend088 ZIPs, changed ZIP, cumulative FIX_LOG, original audit, verification, 109-script regression TXT, compact handoff, cumulative detailed handoff, START HERE, SHA256 manifest, all-in-one 11-file ZIP. Check ZIP CRC, unchanged-member byte parity, changed-member parity, historical document exact prefixes and checksums.
+LIMITS/REMAINING: Real staging GET/POST/PUT, PostgreSQL migration/schema verification, original CASE=24 save readback, original Croatia text saving SQLSTATE, clean Node24 build, and deployed-browser acceptance are OPEN. No new source-level diagnostic outcome should be represented as an original production-failure closure. Next action: run existing manually dispatched protected staging workflow with real authorized credentials and disposable product; use results to guide an application fix if required.
+================================================================================
