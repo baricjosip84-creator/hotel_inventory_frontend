@@ -522,7 +522,8 @@
     "check:batch167-uom-selector-cache-coherence": "node scripts/check-batch167-uom-selector-cache-coherence.mjs",
     "check:batch168-custom-field-value-integrity-contract": "node scripts/check-batch168-custom-field-value-integrity-contract.mjs",
     "check:batch169-persistence-schema-readiness-contract": "node scripts/check-batch169-persistence-schema-readiness-contract.mjs",
-    "check:batch162-staging-origin-contract": "node scripts/check-batch162-staging-origin-contract.mjs"
+    "check:batch162-staging-origin-contract": "node scripts/check-batch162-staging-origin-contract.mjs",
+    "check:batch170-staging-unique-index-readiness-contract": "node scripts/check-batch170-staging-unique-index-readiness-contract.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
