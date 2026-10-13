@@ -572,6 +572,8 @@ type ReportFilterOptions = {
   locations: string[];
   current_locations?: string[];
   suppliers: string[];
+  historical_suppliers?: string[];
+  historical_categories?: string[];
   departments: string[];
 };
 
@@ -1702,9 +1704,9 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={spendFilters.from} to={spendFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setSpendFilters, 'from', value)} onToChange={(value) => updateAndClear(setSpendFilters, 'to', value)} />
-              <ChoiceFilterField label={ui("Supplier")} value={spendFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'supplier', value)} />
-              <ChoiceFilterField label={ui("Category")} value={spendFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'category', value)} />
-              <Fragment key={filterResetRevision}><AutocompleteFilterField label={ui("Product")} value={spendFilters.product} placeholder={ui("Any product name")} options={filterOptions.products} listId="report-products-spend" disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'product', value)} /></Fragment>
+              <ChoiceFilterField label={ui("Supplier")} value={spendFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.historical_suppliers ?? filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'supplier', value)} />
+              <ChoiceFilterField label={ui("Category")} value={spendFilters.category} placeholder={ui("All categories")} options={filterOptions.historical_categories ?? filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'category', value)} />
+              <Fragment key={filterResetRevision}><AutocompleteFilterField label={ui("Product")} value={spendFilters.product} placeholder={ui("Any product name")} options={filterOptions.historical_products ?? filterOptions.products} listId="report-products-spend" disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'product', value)} /></Fragment>
               <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={spendFilters.limit} onChange={(event) => updateAndClear(setSpendFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
             </>
           }
