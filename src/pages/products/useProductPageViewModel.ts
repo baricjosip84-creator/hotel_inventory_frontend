@@ -27,6 +27,7 @@ export function useProductPageViewModel() {
 
   const queries = useProductPageQueries({
     workspaceView: productPageState.workspaceView,
+    focusedProductId: productPageState.focusedProductId,
     categoryFilter: productPageState.categoryFilter,
     supplierFilter: canViewSuppliers ? productPageState.supplierFilter : '',
     costStatusFilter: productPageState.costStatusFilter,

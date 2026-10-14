@@ -23,6 +23,9 @@ type ProductListFiltersPanelProps = {
   setCostVarianceStatusFilter: (value: string) => void;
   productsCount: number;
   totalProductsCount: number;
+  focusedProductId: string;
+  focusedProductName: string | null;
+  setFocusedProductId: (value: string) => void;
   canViewSuppliers: boolean;
   onExportProductsCsv: () => void;
 };
@@ -46,6 +49,9 @@ export function ProductListFiltersPanel({
   setCostVarianceStatusFilter,
   productsCount,
   totalProductsCount,
+  focusedProductId,
+  focusedProductName,
+  setFocusedProductId,
   canViewSuppliers,
   onExportProductsCsv
 }: ProductListFiltersPanelProps) {
@@ -58,10 +64,11 @@ export function ProductListFiltersPanel({
     costBasisFilter ||
     costVarianceStatusFilter
   );
-  const hasActiveFilters = hasTextSearch || hasStructuredFilters;
+  const hasActiveFilters = Boolean(focusedProductId) || hasTextSearch || hasStructuredFilters;
   const supplierFilterDisabled = !canViewSuppliers || suppliersQuery.isLoading || suppliersQuery.isError;
 
   const clearFilters = () => {
+    setFocusedProductId('');
     setSearch('');
     setCategoryFilter('');
     setSupplierFilter('');
@@ -70,8 +77,26 @@ export function ProductListFiltersPanel({
     setCostVarianceStatusFilter('');
   };
 
+  // Entering a search or changing a filter exits an exact product link.
+  // Otherwise the invisible product_id restriction overrides visible controls.
+  const beginBrowsing = (change: (value: string) => void, value: string) => {
+    setFocusedProductId('');
+    change(value);
+  };
+
   return (
     <>
+      {focusedProductId && !productsQuery.isLoading && !productsQuery.isError ? (
+        <div className={focusedProductName ? 'app-info-state' : 'app-warning-state'} style={styles.warningBox}>
+          <strong>{focusedProductName || ui('Product not found')}</strong>
+          <div style={styles.productSearchHelp}>
+            {ui('Selected product')} · {formatLocalizedNumber(Number(productsCount), locale)} {ui('of')} {formatLocalizedNumber(Number(totalProductsCount), locale)}
+          </div>
+          <button type="button" style={styles.secondaryButton} onClick={clearFilters}>
+            {ui('Show all products')}
+          </button>
+        </div>
+      ) : null}
       <div style={styles.productSearchToolsRow}>
         <div>
           <label htmlFor="product-list-search" style={styles.label}>{ui("Search products")}</label>
@@ -84,7 +109,7 @@ export function ProductListFiltersPanel({
               autoComplete="off"
               placeholder={ui("SKU, name, category, unit, supplier, or barcode")}
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => beginBrowsing(setSearch, event.target.value)}
               style={styles.productSearchInput}
               aria-describedby="product-list-search-help"
             />
@@ -95,7 +120,7 @@ export function ProductListFiltersPanel({
                 aria-label={ui("Clear product search")}
                 title={ui("Clear product search")}
                 style={styles.clearSearchButton}
-                onClick={() => setSearch('')}
+                onClick={() => beginBrowsing(setSearch, '')}
               >
                 ×
               </button>
@@ -106,7 +131,7 @@ export function ProductListFiltersPanel({
           </div>
         </div>
 
-        <ProductSearchBarcodeScanner onDecoded={setSearch} />
+        <ProductSearchBarcodeScanner onDecoded={(value) => beginBrowsing(setSearch, value)} />
       </div>
 
       <div style={styles.toolbarGrid}>
@@ -115,7 +140,7 @@ export function ProductListFiltersPanel({
           <select
             id="product-list-category"
             value={categoryFilter}
-            onChange={(event) => setCategoryFilter(event.target.value)}
+            onChange={(event) => beginBrowsing(setCategoryFilter, event.target.value)}
             style={styles.searchInput}
           >
             <option value="">{ui("All categories")}</option>
@@ -132,7 +157,7 @@ export function ProductListFiltersPanel({
           <select
             id="product-list-supplier"
             value={supplierFilter}
-            onChange={(event) => setSupplierFilter(event.target.value)}
+            onChange={(event) => beginBrowsing(setSupplierFilter, event.target.value)}
             style={styles.searchInput}
             disabled={supplierFilterDisabled}
           >
@@ -153,7 +178,7 @@ export function ProductListFiltersPanel({
           <select
             id="product-list-cost-status"
             value={costStatusFilter}
-            onChange={(event) => setCostStatusFilter(event.target.value)}
+            onChange={(event) => beginBrowsing(setCostStatusFilter, event.target.value)}
             style={styles.searchInput}
           >
             <option value="">{ui("All cost statuses")}</option>
@@ -167,7 +192,7 @@ export function ProductListFiltersPanel({
           <select
             id="product-list-cost-basis"
             value={costBasisFilter}
-            onChange={(event) => setCostBasisFilter(event.target.value)}
+            onChange={(event) => beginBrowsing(setCostBasisFilter, event.target.value)}
             style={styles.searchInput}
           >
             <option value="">{ui("All cost bases")}</option>
@@ -182,7 +207,7 @@ export function ProductListFiltersPanel({
           <select
             id="product-list-variance"
             value={costVarianceStatusFilter}
-            onChange={(event) => setCostVarianceStatusFilter(event.target.value)}
+            onChange={(event) => beginBrowsing(setCostVarianceStatusFilter, event.target.value)}
             style={styles.searchInput}
           >
             <option value="">{ui("All standard variances")}</option>
@@ -197,7 +222,11 @@ export function ProductListFiltersPanel({
 
       <div style={styles.filterActionRow}>
         <div style={styles.filterResultText} aria-live="polite">
-          {productsQuery.isLoading ? ui('Loading products...') : productsQuery.isError ? ui('Product counts unavailable.') : hasTextSearch ? (
+          {productsQuery.isLoading ? ui('Loading products...') : productsQuery.isError ? ui('Product counts unavailable.') : focusedProductId ? (
+            <>
+              {formatLocalizedNumber(Number(productsCount), locale)} {ui('of')} {formatLocalizedNumber(Number(totalProductsCount), locale)} {ui(totalProductsCount === 1 ? 'product' : 'products')} {ui('shown')}.
+            </>
+          ) : hasTextSearch ? (
             <>
               {formatLocalizedNumber(Number(productsCount), locale)} {ui('of')} {formatLocalizedNumber(Number(totalProductsCount), locale)}{' '}
               {ui(totalProductsCount === 1 ? 'product' : 'products')} {ui('match the text search')}

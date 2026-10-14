@@ -16,6 +16,8 @@ type ProductListPanelProps = {
   productsQuery: ProductsQueryState;
   products: ProductItem[];
   totalProductsCount: number;
+  focusedProductId: string;
+  setFocusedProductId: (value: string) => void;
   suppliers: SupplierItem[];
   suppliersQuery: SuppliersQueryState;
   categoryOptions: string[];
@@ -47,6 +49,8 @@ export function ProductListPanel({
   productsQuery,
   products,
   totalProductsCount,
+  focusedProductId,
+  setFocusedProductId,
   suppliers,
   suppliersQuery,
   categoryOptions,
@@ -100,6 +104,9 @@ export function ProductListPanel({
         setCostVarianceStatusFilter={setCostVarianceStatusFilter}
         productsCount={products.length}
         totalProductsCount={totalProductsCount}
+        focusedProductId={focusedProductId}
+        focusedProductName={products.find((product) => product.id === focusedProductId)?.name ?? null}
+        setFocusedProductId={setFocusedProductId}
         canViewSuppliers={canViewSuppliers}
         onExportProductsCsv={onExportProductsCsv}
       />
@@ -107,7 +114,7 @@ export function ProductListPanel({
       <ProductListTablePanel
         productsQuery={productsQuery}
         products={products}
-        emptyMessage={search.trim() ? ui('No products match the current search and filters.') : ui('No products found for the current filters.')}
+        emptyMessage={focusedProductId ? ui('Product not found') : search.trim() ? ui('No products match the current search and filters.') : ui('No products found for the current filters.')}
         canManageProducts={canManageProducts}
         canViewProductPackages={canViewProductPackages}
         canViewSuppliers={canViewSuppliers}

@@ -6,6 +6,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "check:products-deeplink-focus-exit": "node scripts/check-products-deeplink-focus-exit.mjs",
     "check:batch181-custom-field-text-type-contract": "node scripts/check-batch181-custom-field-text-type-contract.mjs",
     "check:batch177-required-custom-field-contract": "node scripts/check-batch177-required-custom-field-contract.mjs",
     "check:batch178-uom-complete-readback": "node scripts/check-batch178-uom-complete-readback.mjs",

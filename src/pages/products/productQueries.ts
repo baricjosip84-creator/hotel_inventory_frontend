@@ -42,9 +42,11 @@ import type {
   CostValuationDetailFilterState
 } from './productCostAssessmentApi';
 import type { ProductWorkspaceView } from './useProductPageState';
+import { scopedProductDirectoryFilters } from './productDirectoryScope';
 
 export type ProductPageQueryInput = {
   workspaceView: ProductWorkspaceView;
+  focusedProductId: string;
   categoryFilter: string;
   supplierFilter: string;
   costStatusFilter: string;
@@ -63,6 +65,7 @@ export type ProductPageQueryInput = {
 
 export function useProductPageQueries({
   workspaceView,
+  focusedProductId,
   categoryFilter,
   supplierFilter,
   costStatusFilter,
@@ -82,17 +85,23 @@ export function useProductPageQueries({
   const actionsEnabled = canViewStock && workspaceView === 'actions';
   const governanceEnabled = canViewStock && workspaceView === 'governance';
 
+  // A product_id deep link must remain findable even if a previous session left
+  // unrelated category/supplier/cost filters in the URL. Normal filters return
+  // immediately when the operator starts browsing and exits the focus.
+  const directoryScope = scopedProductDirectoryFilters({
+    category: categoryFilter,
+    supplierId: supplierFilter,
+    costStatus: costStatusFilter,
+    costBasis: costBasisFilter,
+    costVarianceStatus: costVarianceStatusFilter
+  }, focusedProductId);
+
   const productsQuery = useQuery({
-    queryKey: ['products', categoryFilter, supplierFilter, costStatusFilter, costBasisFilter, costVarianceStatusFilter],
-    queryFn: () =>
-      fetchProducts({
-        search: '',
-        category: categoryFilter,
-        supplierId: supplierFilter,
-        costStatus: costStatusFilter,
-        costBasis: costBasisFilter,
-        costVarianceStatus: costVarianceStatusFilter
-      })
+    queryKey: [
+      'products', directoryScope.category, directoryScope.supplierId,
+      directoryScope.costStatus, directoryScope.costBasis, directoryScope.costVarianceStatus
+    ],
+    queryFn: () => fetchProducts({ search: '', ...directoryScope })
   });
 
   const costValuationQuery = useQuery({

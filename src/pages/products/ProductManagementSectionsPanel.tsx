@@ -30,6 +30,8 @@ export function ProductManagementSectionsPanel({
   products,
   totalProductsCount,
   categoryOptions,
+  focusedProductId,
+  setFocusedProductId,
   search,
   setSearch,
   categoryFilter,
@@ -99,6 +101,8 @@ export function ProductManagementSectionsPanel({
         productsQuery={productsQuery}
         products={products}
         totalProductsCount={totalProductsCount}
+        focusedProductId={focusedProductId}
+        setFocusedProductId={setFocusedProductId}
         suppliers={suppliers}
         suppliersQuery={suppliersQuery}
         categoryOptions={categoryOptions}
