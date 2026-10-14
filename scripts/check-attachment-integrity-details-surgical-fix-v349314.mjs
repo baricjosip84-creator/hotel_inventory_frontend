@@ -47,7 +47,7 @@ check('Exactly one existing DE/ES/FR/HR translation for Technical details', (cat
 check('Attachment upload preserves selected record and original file mutation', source.includes('createAttachmentMutation.mutate({') && source.includes('form: attachmentForm,') && source.includes('file: selectedFile,'));
 check('File picker and 8MB maximum preserved', source.includes('<EnterpriseFilePicker') && source.includes('MAX_FILE_BYTES = 8 * 1024 * 1024'));
 check('Download endpoint and original filename preserved', source.includes('`/enterprise-inventory/attachments/${encodeURIComponent(attachment.id)}/download`') && source.includes('attachment.original_filename'));
-check('Download still respects capability and pending state', source.includes('!attachment.can_download || downloadingId') && source.includes('disabled={!item.can_download || downloadingId === item.id}'));
+check('Download still respects capability and pending state', source.includes('!attachment.can_download || downloadingId') && source.includes('disabled={!item.can_download || downloadingId !== null}'));
 check('Delete preserves permission, archived-record guard and confirmation', source.includes("window.confirm(ui('Delete attachment \"{filename}\"?')") && source.includes('disabled={!canWriteAttachments || selectedRecordArchived || deleteAttachmentMutation.isPending}'));
 check('Technical checksum is neither removed from the model nor sent in mutations', source.includes('item.content_sha256') && !source.includes('delete item.content_sha256'));
 check('Regression command is registered', packageJson.scripts?.['check:inventory-attachment-integrity-details-v349314'] === 'node scripts/check-attachment-integrity-details-surgical-fix-v349314.mjs');

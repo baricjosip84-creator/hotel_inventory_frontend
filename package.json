@@ -569,7 +569,8 @@
     "check:policy-effectiveness-evidence": "node --experimental-strip-types scripts/check-policy-effectiveness-evidence.mjs",
     "check:intelligence-review-compact-queue": "node scripts/check-intelligence-review-compact-queue.mjs",
     "check:intelligence-review-route-durability": "node scripts/check-intelligence-review-route-durability.mjs",
-    "check:deployment-api-config-tests": "node scripts/check-deployment-api-config-tests.mjs"
+    "check:deployment-api-config-tests": "node scripts/check-deployment-api-config-tests.mjs",
+    "check:original-audit-fe224": "node scripts/check-original-audit-corrections-fe224.cjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

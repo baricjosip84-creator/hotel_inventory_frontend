@@ -2829,6 +2829,7 @@ export default function PurchaseOrdersPage() {
 
           <div className="purchase-orders-items-heading">
             <div><strong>{ui("Order items")}</strong><span>{ui("Add the products, quantities, ordering units, and supplier purchase prices for this order.")}</span></div>
+            <button type="button" className="app-button app-button--secondary" onClick={addItem}>{ui('Add item')}</button>
           </div>
 
           <div className="purchase-orders-item-list">
@@ -2936,7 +2937,7 @@ export default function PurchaseOrdersPage() {
           </div>
 
           <div className="purchase-orders-items-actions">
-            <button type="button" className="app-button app-button--secondary" onClick={addItem}>{ui('Add item')}</button>
+            <button type="button" className="app-button app-button--secondary" onClick={addItem}>{ui('Add another item')}</button>
           </div>
           </fieldset>
 

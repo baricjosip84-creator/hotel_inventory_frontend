@@ -360,7 +360,24 @@ function dashboardReasonLabel(row: RecentActivityRow, ui: (englishText: string) 
   if (reason === 'inventory_count') return ui('Physical count');
   if (reason === 'manual_adjustment') return ui('Manual adjustment');
 
+  // Preserve ordinary human notes; obscure raw system keys in the business-facing summary.
+  if (/^[a-z][a-z0-9_]*(?::[a-z0-9_-]+)?$/i.test(reason) && (reason.includes('_') || reason.includes(':'))) {
+    const category = reason.split(':', 1)[0].replace(/_/g, ' ');
+    return `${ui('Other recorded movement')}: ${category}`;
+  }
   return reason;
+}
+
+
+// The underlying classification helper retains raw legacy evidence for audit and
+// compatibility. This presentation helper shows a neutral business label while
+// the original reason remains available on hover and in the source movement.
+function dashboardBusinessReasonLabel(row: RecentActivityRow, ui: (englishText: string) => string): string {
+  const raw = dashboardReasonLabel(row, ui);
+  if (String(row.movement_kind || '').trim().toLowerCase() === 'unclassified') {
+    return raw === '-' ? ui('Unclassified legacy movement') : ui('Unclassified legacy movement — review source record');
+  }
+  return raw;
 }
 
 
@@ -1401,7 +1418,7 @@ export default function DashboardPage() {
                       <div className="dashboard-activity-card__details">
                         <span><small>{ui('Location')}</small><b>{row.storage_location_name || ui('Historical location unavailable')}</b></span>
                         <span><small>{ui('Type')}</small><b>{enumDisplayLabel(movementDisplayValue(row), ui)}</b></span>
-                        <span><small>{ui('Reason')}</small><b>{dashboardReasonLabel(row, ui)}</b></span>
+                        <span><small>{ui('Reason')}</small><b title={row.reason || undefined}>{dashboardBusinessReasonLabel(row, ui)}</b></span>
                         <span><small>{ui('User')}</small><b>{row.user_name || (row.user_id ? ui('Historical actor unavailable') : ui('System'))}</b></span>
                       </div>
                     </article>

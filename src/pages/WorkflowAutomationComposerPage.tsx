@@ -758,7 +758,7 @@ export default function WorkflowAutomationComposerPage() {
             </div>
           ) : (
             <div className="workflow-composer-page__blueprint-list">
-              {blueprints.map((blueprint) => {
+              {blueprints.map((blueprint, blueprintIndex) => {
                 const sourceLink = blueprintSourceLink(blueprint);
                 const urgencyValue = blueprint.escalation_policy_preview?.urgency || blueprint.trigger_preview?.trigger_urgency;
                 const approvalSteps = blueprint.approval_chain_preview || [];
@@ -795,8 +795,8 @@ export default function WorkflowAutomationComposerPage() {
                           ) : null}
                         </div>
                         <h3 className="workflow-composer-page__blueprint-title">{visibleTitle}</h3>
-                        {duplicateTitle && sourceReference ? (
-                          <div className="workflow-composer-page__short-reference"><span>{ui("Reference")}</span> {sourceReference}</div>
+                        {duplicateTitle ? (
+                          <div className="workflow-composer-page__short-reference"><span>{ui(sourceReference ? 'Reference' : 'Plan number')}</span> {sourceReference || String(blueprintIndex + 1)}</div>
                         ) : null}
                           </div>
                         </div>

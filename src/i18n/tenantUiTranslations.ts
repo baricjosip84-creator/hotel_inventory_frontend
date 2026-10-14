@@ -2,6 +2,11 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // FE224 audit closure: distinguish missing evidence, legacy machine keys, and duplicate plans.
+  ["Unclassified legacy movement — review source record", "Nicht klassifizierte Altbewegung – Quelldatensatz prüfen", "Movimiento histórico sin clasificar: revise el registro de origen", "Mouvement historique non classé — consulter l'enregistrement source", "Nerazvrstano povijesno kretanje — provjerite izvorni zapis"],
+  ["Unclassified legacy movement", "Nicht klassifizierte Altbewegung", "Movimiento histórico sin clasificar", "Mouvement historique non classé", "Nerazvrstano povijesno kretanje"],
+  ["Other recorded movement", "Andere erfasste Bewegung", "Otro movimiento registrado", "Autre mouvement enregistré", "Drugo evidentirano kretanje"],
+  ["Plan number", "Plannummer", "Número de plan", "Numéro du plan", "Broj plana"],
   // FE223 / original WFC-DEF-001: avoid directing operators to repeat completed work.
   ["This source work is already closed. Review its recorded result; no new execution is suggested.", "Diese Quellaufgabe ist bereits abgeschlossen. Prüfen Sie das erfasste Ergebnis; es wird keine erneute Ausführung empfohlen.", "Este trabajo de origen ya está cerrado. Revise el resultado registrado; no se recomienda volver a ejecutarlo.", "Ce travail source est déjà clos. Consultez le résultat enregistré ; aucune nouvelle exécution n'est suggérée.", "Ovaj izvorni posao već je zaključen. Pregledajte evidentirani rezultat; ne predlaže se novo izvršavanje."],
   ["The source workflow is closed; no further action steps are suggested.", "Der Quellworkflow ist abgeschlossen; es werden keine weiteren Schritte vorgeschlagen.", "El flujo de origen está cerrado; no se sugieren más acciones.", "Le processus source est clos ; aucune autre action n'est suggérée.", "Izvorni tijek rada je zaključen; ne predlažu se dodatne radnje."],

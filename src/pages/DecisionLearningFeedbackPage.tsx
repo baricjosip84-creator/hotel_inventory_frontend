@@ -1880,12 +1880,16 @@ function learningNextReviewFocusLabel(value: unknown, ui: LearningUi): string {
 }
 
 function formatNormalizedLearningScore(value: unknown, locale: AppLocale): string {
+  // Null/empty scores mean evidence is unavailable, not a measured zero.
+  if (value === null || value === undefined || value === '' || typeof value === 'boolean') return '—';
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return '—';
   return formatLocalizedNumber(numeric, locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function formatLearningPercentage(value: unknown, locale: AppLocale): string {
+  // Preserve real numeric zero; never coerce missing or boolean values to zero.
+  if (value === null || value === undefined || value === '' || typeof value === 'boolean') return '—';
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return '—';
   return `${formatLocalizedNumber(numeric, locale, { maximumFractionDigits: 2 })}%`;

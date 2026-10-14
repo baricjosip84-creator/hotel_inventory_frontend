@@ -1453,7 +1453,7 @@ export default function AIOperationsCopilotPage() {
                 <Badge>{ui('Evidence confidence')} {formatConfidence(selectedRun.confidence_score, locale, ui)}</Badge>
               </div>
               <div style={styles.snapshotNotice}>
-                <strong>{ui('Saved result snapshot')}.</strong> {ui('Values reflect the evidence captured for this run and are not live operational values.')}
+                <strong>{ui('Saved result snapshot')} — {formatDateTime(selectedRun.created_at, locale, ui)}.</strong> {ui('Values reflect the evidence captured for this run and are not live operational values.')}
               </div>
               <div style={styles.confidenceNotice}>
                 {ui('Evidence confidence describes the evidence available to this run; it is not AI model confidence.')}
