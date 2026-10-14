@@ -18,18 +18,10 @@ import {
 } from '../components/ui/OperationalWorkspace';
 import './decisionIntelligencePages.css';
 import './CrossDomainOptimizationPage.css';
+import { readCrossDomainRouteState, updateCrossDomainRouteParams, type CrossDomainFilterState, type CrossDomainView } from '../lib/crossDomainRouteState';
 
-type OptimizationView = 'evidence' | 'plan' | 'readiness';
-
-type OptimizationFilterState = {
-  optimization_domain: string;
-  optimization_status: string;
-  objective_type: string;
-  option_status: string;
-  impact_direction: string;
-  result_status: string;
-  limit: string;
-};
+type OptimizationView = CrossDomainView;
+type OptimizationFilterState = CrossDomainFilterState;
 
 type OptimizationRun = {
   id?: string;
@@ -268,10 +260,6 @@ type ReviewConfig = {
   scoreKey: string;
   checksKey: string;
   blockersKey: string;
-};
-
-const DEFAULT_FILTERS: OptimizationFilterState = {
-  optimization_domain: '', optimization_status: '', objective_type: '', option_status: '', impact_direction: '', result_status: '', limit: '25'
 };
 
 const OPTIMIZATION_DOMAIN_OPTIONS = ['inventory', 'procurement', 'reservation', 'execution', 'optimization', 'control_tower', 'financial', 'integration', 'multi_domain', 'system'];
@@ -983,10 +971,8 @@ export default function CrossDomainOptimizationPage() {
   const canOpenIntelligenceReview = hasPermission(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ) && hasPermission(TENANT_PERMISSIONS.DECISION_INTELLIGENCE_READ);
   const canOpenTasks = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
   const canOpenReplenishmentPlanning = hasPermission(TENANT_PERMISSIONS.INSIGHTS_READ);
-  const [view, setView] = useState<OptimizationView>('evidence');
-  const [filters, setFilters] = useState<OptimizationFilterState>(DEFAULT_FILTERS);
-  const requestedRunId = searchParams.get('review_run_id')?.trim() || '';
-  const [selectedRunId, setSelectedRunId] = useState(requestedRunId);
+  const { view, filters, selectedRunId } = readCrossDomainRouteState(searchParams);
+  const setView = (nextView: OptimizationView) => setSearchParams((current) => updateCrossDomainRouteParams(current, { type: 'view', value: nextView }));
   const [showCreate, setShowCreate] = useState(false);
   const [createStep, setCreateStep] = useState(1);
   const [reviewDraft, setReviewDraft] = useState<DraftReview>(emptyReview());
@@ -997,24 +983,21 @@ export default function CrossDomainOptimizationPage() {
   const [settingsDraft, setSettingsDraft] = useState({ high_impact_tradeoff_threshold: '0.5', reusable_pattern_value_threshold: '0.75', scaling_value_threshold: '0.8', weak_value_threshold: '0.5', minimum_objective_count: '2', minimum_business_domain_count: '2', monitoring_cadence: 'weekly_first_30_days_then_monthly' });
 
   const selectRunId = (nextRunId: string) => {
-    const nextParams = new URLSearchParams(searchParams);
-    if (nextRunId) nextParams.set('review_run_id', nextRunId);
-    else nextParams.delete('review_run_id');
-    setSelectedRunId(nextRunId);
-    setSearchParams(nextParams, { replace: true });
+    setSearchParams((current) => updateCrossDomainRouteParams(current, { type: 'run', value: nextRunId }));
+  };
+  const openRunInPlan = (nextRunId: string) => {
+    setSearchParams((current) => updateCrossDomainRouteParams(current, { type: 'run', value: nextRunId, view: 'plan' }));
+  };
+  const clearFilters = () => {
+    setSearchParams((current) => updateCrossDomainRouteParams(current, { type: 'clear-filters' }));
   };
 
-  useEffect(() => {
-    const nextRunId = searchParams.get('review_run_id')?.trim() || '';
-    setSelectedRunId((current) => current === nextRunId ? current : nextRunId);
-  }, [searchParams]);
-
-  const queryString = useMemo(() => {
+  const queryString = (() => {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => { if (value) params.set(key, value); });
     if (selectedRunId) params.set('review_run_id', selectedRunId);
     return params.toString();
-  }, [filters, selectedRunId]);
+  })();
 
   const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: ['cross-domain-optimization-summary', queryString],
@@ -1220,8 +1203,7 @@ export default function CrossDomainOptimizationPage() {
       setReviewDraft(emptyReview());
       setSelectedRecommendationIds([]);
       setSourceBuildReport(null);
-      selectRunId(result.optimization_run_id);
-      setView('plan');
+      openRunInPlan(result.optimization_run_id);
       await refetch();
     }
   });
@@ -1267,8 +1249,7 @@ export default function CrossDomainOptimizationPage() {
       setCreateStep(1);
       setReviewDraft(emptyReview());
       setSelectedRecommendationIds([]);
-      selectRunId(result.optimization_run_id);
-      setView('plan');
+      openRunInPlan(result.optimization_run_id);
       await refetch();
     }
   });
@@ -1306,8 +1287,7 @@ export default function CrossDomainOptimizationPage() {
   });
 
   const updateFilter = (key: keyof OptimizationFilterState, value: string) => {
-    selectRunId('');
-    setFilters((current) => ({ ...current, [key]: value }));
+    setSearchParams((current) => updateCrossDomainRouteParams(current, { type: 'filter', key, value }));
   };
 
   const runCount = Number(data?.governance?.optimization_run_count ?? data?.optimization_runs?.length ?? 0);
@@ -1342,8 +1322,7 @@ export default function CrossDomainOptimizationPage() {
 
   const openRun = (run: OptimizationRun) => {
     if (!run.id) return;
-    selectRunId(run.id);
-    setView('plan');
+    openRunInPlan(run.id);
   };
 
   const setTradeoffDraft = (tradeoff: OptimizationTradeoff, patch: Partial<{ status: string; reason: string; conditions: string }>) => {
@@ -1714,11 +1693,11 @@ export default function CrossDomainOptimizationPage() {
       </section> : null}
 
       {hasEvidence || hasActiveEvidenceFilters ? <section className="card cross-domain-filters" aria-label={ui('Cross-domain optimization filters')}>
-        <div className="card__header"><div><h2>{ui('Filter the evidence')}</h2><p className="card__subtext">{ui('Filters change the overview lists. Selecting a run separately controls every readiness calculation.')}</p></div><button className="button button--secondary" type="button" onClick={() => { setFilters(DEFAULT_FILTERS); selectRunId(''); }}>{ui('Clear filters')}</button></div>
+        <div className="card__header"><div><h2>{ui('Filter the evidence')}</h2><p className="card__subtext">{ui('Filters change the overview lists. Selecting a run separately controls every readiness calculation.')}</p></div><button className="button button--secondary" type="button" onClick={clearFilters}>{ui('Clear filters')}</button></div>
         <div className="cross-domain-filter-grid"><label><span className="form-label">{ui('Business area')}</span><select className="input" value={filters.optimization_domain} onChange={(event) => updateFilter('optimization_domain', event.target.value)}><option value="">{ui('All areas')}</option>{OPTIMIZATION_DOMAIN_OPTIONS.map((value) => <option key={value} value={value}>{label(value, ui)}</option>)}</select></label><label><span className="form-label">{ui('Run status')}</span><select className="input" value={filters.optimization_status} onChange={(event) => updateFilter('optimization_status', event.target.value)}><option value="">{ui('All run statuses')}</option>{OPTIMIZATION_STATUS_OPTIONS.map((value) => <option key={value} value={value}>{label(value, ui)}</option>)}</select></label><label><span className="form-label">{ui('Objective type')}</span><select className="input" value={filters.objective_type} onChange={(event) => updateFilter('objective_type', event.target.value)}><option value="">{ui('All objective types')}</option>{OBJECTIVE_TYPE_OPTIONS.map((value) => <option key={value} value={value}>{label(value, ui)}</option>)}</select></label><label><span className="form-label">{ui('Option status')}</span><select className="input" value={filters.option_status} onChange={(event) => updateFilter('option_status', event.target.value)}><option value="">{ui('All option statuses')}</option>{OPTION_STATUS_OPTIONS.map((value) => <option key={value} value={value}>{label(value, ui)}</option>)}</select></label><label><span className="form-label">{ui('Tradeoff direction')}</span><select className="input" value={filters.impact_direction} onChange={(event) => updateFilter('impact_direction', event.target.value)}><option value="">{ui('All directions')}</option>{IMPACT_DIRECTION_OPTIONS.map((value) => <option key={value} value={value}>{label(value, ui)}</option>)}</select></label><label><span className="form-label">{ui('Recorded outcome status')}</span><select className="input" value={filters.result_status} onChange={(event) => updateFilter('result_status', event.target.value)}><option value="">{ui('All outcome statuses')}</option>{RESULT_STATUS_OPTIONS.map((value) => <option key={value} value={value}>{label(value, ui)}</option>)}</select></label><label><span className="form-label">{ui('Maximum records per evidence list')}</span><select className="input" value={filters.limit} onChange={(event) => updateFilter('limit', event.target.value)}>{['25', '50', '100', '200'].map((value) => <option key={value} value={value}>{value}</option>)}</select></label></div>
       </section> : null}
 
-      {!hasEvidence && !showCreate ? <section className="card cross-domain-section cross-domain-first-use"><div><span className="cross-domain-eyebrow">{hasActiveEvidenceFilters ? ui('Filtered view') : ui('Start here')}</span><h2>{hasActiveEvidenceFilters ? ui('No evidence matches the current filters') : ui('No decision comparisons yet')}</h2><p>{hasActiveEvidenceFilters ? ui('The tenant may still have Cross-Domain evidence. Change or clear the active filters to restore matching records.') : canGovern ? ui('Create a comparison, add a human note, then let the application load or build structured planning recommendations. A comparison is available only when at least two distinct actions refer to the same structured business subject.') : ui('No decision comparisons are available for this tenant and filter set.')}</p></div>{hasActiveEvidenceFilters ? <button className="button button--secondary" type="button" onClick={() => { setFilters(DEFAULT_FILTERS); selectRunId(''); }}>{ui('Clear filters')}</button> : canGovern ? <button className="button" type="button" onClick={() => { setCreateStep(1); setShowCreate(true); setSourceBuildReport(null); }}>{ui('Create decision comparison')}</button> : null}</section> : null}
+      {!hasEvidence && !showCreate ? <section className="card cross-domain-section cross-domain-first-use"><div><span className="cross-domain-eyebrow">{hasActiveEvidenceFilters ? ui('Filtered view') : ui('Start here')}</span><h2>{hasActiveEvidenceFilters ? ui('No evidence matches the current filters') : ui('No decision comparisons yet')}</h2><p>{hasActiveEvidenceFilters ? ui('The tenant may still have Cross-Domain evidence. Change or clear the active filters to restore matching records.') : canGovern ? ui('Create a comparison, add a human note, then let the application load or build structured planning recommendations. A comparison is available only when at least two distinct actions refer to the same structured business subject.') : ui('No decision comparisons are available for this tenant and filter set.')}</p></div>{hasActiveEvidenceFilters ? <button className="button button--secondary" type="button" onClick={clearFilters}>{ui('Clear filters')}</button> : canGovern ? <button className="button" type="button" onClick={() => { setCreateStep(1); setShowCreate(true); setSourceBuildReport(null); }}>{ui('Create decision comparison')}</button> : null}</section> : null}
 
       {view === 'evidence' && hasEvidence ? <>
         <EvidenceSection title={ui('Optimization runs')} description={ui('Stored planning exercises. Open one to see its complete decision story.')} rows={(data?.optimization_runs || []) as Array<Record<string, unknown>>} headers={['Run', 'Business area', 'Status', 'Owner', 'Due', 'Updated', 'Action']} renderRow={(row, index) => { const run = row as OptimizationRun; return <tr key={run.id || index}><td><strong>{run.title || run.optimization_label || ui('Planning run {number}').replace('{number}', formatLocalizedNumber(index + 1, locale))}</strong>{run.summary ? <span className="cross-domain-subtext">{run.summary}</span> : null}</td><td>{label(run.optimization_domain, ui)}</td><td><StatusBadge value={run.optimization_status} /></td><td>{run.owner_name || run.owner_email || '—'}</td><td>{formatDate(run.due_at, locale)}</td><td>{formatDate(run.updated_at || run.created_at, locale)}</td><td><button className="button button--secondary" type="button" onClick={() => openRun(run)}>{ui('Open plan')}</button></td></tr>; }} />

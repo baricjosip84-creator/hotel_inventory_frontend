@@ -2,10 +2,11 @@ import fs from 'node:fs';
 const page = fs.readFileSync('src/pages/CrossDomainOptimizationPage.tsx', 'utf8');
 const css = fs.readFileSync('src/pages/CrossDomainOptimizationPage.css', 'utf8');
 const oldGuard = fs.readFileSync('scripts/check-tenant-cross-domain-optimization-multilingual.mjs', 'utf8');
+const crossDomainRoute = fs.readFileSync('src/lib/crossDomainRouteState.ts', 'utf8');
 let failed = false;
 const check = (ok, message) => { if (ok) console.log(`PASS: ${message}`); else { console.error(`FAIL: ${message}`); failed = true; } };
 
-check(page.includes("type OptimizationView = 'evidence' | 'plan' | 'readiness'"), 'Selected-plan detail view is present.');
+check(page.includes('type OptimizationView = CrossDomainView;') && crossDomainRoute.includes("export type CrossDomainView = 'evidence' | 'plan' | 'readiness'") && page.includes("view === 'plan'"), 'Selected-plan detail view is present.');
 check(page.includes("params.set('review_run_id', selectedRunId)"), 'Review query is tied to one planning run.');
 check(page.includes("'/decision-intelligence/cross-domain-optimization/reviews'"), 'Create planning review workflow is wired.');
 check(page.includes("`/decision-intelligence/cross-domain-optimization/tradeoffs/${") && page.includes('Record tradeoff decision'), 'Tradeoff governance recording is wired.');
