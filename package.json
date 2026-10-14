@@ -28,6 +28,7 @@
     "check:tenant-shipments-page-completion-multilingual": "node scripts/check-tenant-shipments-page-completion-multilingual.mjs",
     "check:tenant-shipments-detail-receiving-multilingual": "node scripts/check-tenant-shipments-detail-receiving-multilingual.mjs",
     "check:tenant-shipments-registry-creation-multilingual": "node scripts/check-tenant-shipments-registry-creation-multilingual.mjs",
+    "check:operations-feed-source-link-search": "node scripts/check-operations-feed-source-navigation-and-search.mjs",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",

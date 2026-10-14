@@ -340,10 +340,25 @@ function statusClass(value?: string | null): string {
 }
 
 function sourceSurfaceToAppPath(sourceSurface?: string | null): string | null {
-  if (!sourceSurface || !sourceSurface.startsWith('/')) return null;
+  // A source route comes from a backend event, not from the user's navigation.
+  // Only send operators to known tenant pages; do not accept absolute URLs,
+  // protocol-relative routes or a backslash that a router could reinterpret.
+  if (!sourceSurface || !sourceSurface.startsWith('/') || sourceSurface.startsWith('//') ||
+      sourceSurface.includes('\\') || /[\r\n#]/.test(sourceSurface) || sourceSurface.length > 2048) return null;
+
+  // Preserve direct legacy links without a query string.
   if (sourceSurface === '/control-tower') return '/action-center';
   if (sourceSurface === '/operational-action-center/summary') return '/action-center';
 
+  const queryIndex = sourceSurface.indexOf('?');
+  const routePath = queryIndex === -1 ? sourceSurface : sourceSurface.slice(0, queryIndex);
+  const routeQuery = queryIndex === -1 ? '' : sourceSurface.slice(queryIndex);
+  const normalizedPath = routePath === '/control-tower' || routePath === '/operational-action-center/summary'
+    ? '/action-center' : routePath;
+
+  // Keep in sync with actual tenant router destinations. The old list omitted
+  // source surfaces emitted by the digital-twin / operations backend, making
+  // valid business records appear to have no "Open source page" link.
   const tenantRoutes = new Set([
     '/action-center',
     '/workspace',
@@ -364,10 +379,19 @@ function sourceSurfaceToAppPath(sourceSurface?: string | null): string | null {
     '/intelligence-review',
     '/ai-copilot',
     '/adaptive-policy-engine',
-    '/probabilistic-forecasting'
+    '/probabilistic-forecasting',
+    '/products',
+    '/suppliers',
+    '/storage-locations',
+    '/stock',
+    '/stock-movements',
+    '/purchase-orders',
+    '/audit',
+    '/collaboration',
+    '/cross-domain-optimization'
   ]);
 
-  return tenantRoutes.has(sourceSurface) ? sourceSurface : null;
+  return tenantRoutes.has(normalizedPath) ? `${normalizedPath}${routeQuery}` : null;
 }
 
 function timelineItemTimestamp(item: TimelineItem): number | null {
@@ -390,6 +414,13 @@ function timelineItemSearchText(item: TimelineItem, ui: (englishText: string) =>
     canonicalLabel(item.event_type, ui),
     item.event_status,
     canonicalLabel(item.event_status, ui),
+    // Exact source identifiers are shown under Technical event details; they
+    // must also be searchable when an operator pastes a task/event reference.
+    item.timeline_item_id,
+    item.correlation_id,
+    item.source_reference?.source_id,
+    item.source_reference?.source_type,
+    item.delivery_event_name,
     String(item.timeline_domain || '').replace(/_/g, ' '),
     canonicalLabel(item.timeline_domain, ui),
     item.delivery_target
@@ -707,7 +738,7 @@ export default function RealTimeOperationsFeedPage() {
             </label>
             <label className="operations-feed-page__field operations-feed-page__field--search">
               <span>{ui("Search current feed")}</span>
-              <input className="operations-feed-page__input" type="search" value={searchText} onChange={(event) => updateFeedControl('search', event.target.value, '')} placeholder={ui("Search title, summary, status, or work area")} />
+              <input className="operations-feed-page__input" type="search" value={searchText} onChange={(event) => updateFeedControl('search', event.target.value, '')} placeholder={ui("Search title, status, work area, or reference")} />
             </label>
             <label className="operations-feed-page__field">
               <span>{ui("Time")}</span>
