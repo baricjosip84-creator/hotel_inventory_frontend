@@ -4,6 +4,8 @@ import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
 import { ApiError, apiRequest } from '../lib/api';
+import { selectedRecordId, withSelectedRecordId } from '../lib/recordSelectionParams';
+import { resolveExecutionTaskQueue } from '../lib/executionTaskQueueSelection';
 import { getCurrentTenantUserId } from '../lib/auth';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
 import { SidebarAttentionMarker, SidebarAttentionTabDot } from '../components/ui/SidebarAttentionMarker';
@@ -419,12 +421,14 @@ function payloadFacts(payload: Record<string, unknown> | undefined, ui: UiFn): A
 export default function ExecutionTasksPage() {
   const { locale, ui } = useAppTranslation();
   const currentUserId = getCurrentTenantUserId();
-  const [searchParams] = useSearchParams();
-  const requestedTaskId = searchParams.get('task_id')?.trim() || '';
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTaskId = selectedRecordId(searchParams, 'task_id', 'taskId');
   const queueRef = useRef<HTMLDivElement | null>(null);
   const createRef = useRef<HTMLDivElement | null>(null);
   const detailRef = useRef<HTMLElement | null>(null);
   const managementRef = useRef<HTMLDetailsElement | null>(null);
+  const queueRequestSequence = useRef(0);
+  const taskOpenSequence = useRef(0);
 
   const canRead = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
   const canCreate = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_CREATE);
@@ -488,6 +492,7 @@ export default function ExecutionTasksPage() {
     && selectedCreateAssignee.replenishment_capability
     && !selectedCreateAssignee.replenishment_capability.can_perform_replenishment;
   const displayedTasks = tasks.slice(0, pageSize);
+  const linkedOutsideQueue = Boolean(requestedTaskId && selected?.id === requestedTaskId && !tasks.some((task) => task.id === requestedTaskId));
   const canGoPrevious = offset > 0;
   const visibleStart = displayedTasks.length ? offset + 1 : 0;
   const visibleEnd = offset + displayedTasks.length;
@@ -557,8 +562,13 @@ export default function ExecutionTasksPage() {
   }, [canRead, ui]);
 
   const loadOperationalData = useCallback(async (preserveMessage = false) => {
-    if (!canRead) return;
+    const requestSequence = ++queueRequestSequence.current;
+    if (!canRead) {
+      setLoading(false);
+      return;
+    }
     if (advancedIdError) {
+      setLoading(false);
       setError(advancedIdError);
       return;
     }
@@ -575,36 +585,33 @@ export default function ExecutionTasksPage() {
         apiRequest<ExecutionTask[]>(`${taskEndpoint}?${taskParams.toString()}`),
         apiRequest<ExecutionTaskSummary>(`/execution-tasks/summary?${summaryParams.toString()}`)
       ]);
-      let nextTasks = taskRows;
       let linkedTaskError: string | null = null;
-      setHasNextPage(taskRows.length > pageSize);
-      nextTasks = taskRows.slice(0, pageSize);
-
-      if (requestedTaskId && isUuid(requestedTaskId) && !nextTasks.some((task) => task.id === requestedTaskId)) {
+      let directTask: ExecutionTask | null = null;
+      const pageRows = taskRows.slice(0, pageSize);
+      if (requestedTaskId && isUuid(requestedTaskId) && !pageRows.some((task) => task.id === requestedTaskId)) {
         try {
-          const linkedTask = await apiRequest<ExecutionTask>(`/execution-tasks/${requestedTaskId}`);
-          nextTasks = [linkedTask, ...nextTasks.filter((task) => task.id !== linkedTask.id)].slice(0, pageSize);
+          directTask = await apiRequest<ExecutionTask>(`/execution-tasks/${requestedTaskId}`);
         } catch (requestError) {
           linkedTaskError = `${ui('The linked task could not be opened.')} ${errorMessage(requestError, ui)}`;
         }
       } else if (requestedTaskId && !isUuid(requestedTaskId)) {
         linkedTaskError = ui('The linked execution task ID is invalid.');
       }
-
-      setTasks(nextTasks);
+      // Superseded filters, link selections, or slow direct reads must not replace
+      // the latest queue, selected task, or error state.
+      if (requestSequence !== queueRequestSequence.current) return;
+      const resolved = resolveExecutionTaskQueue(taskRows, pageSize, requestedTaskId, directTask);
+      setHasNextPage(resolved.hasNextPage);
+      setTasks(resolved.queue);
       setSummary(nextSummary);
-      setSelected((current) => {
-        if (requestedTaskId) {
-          const linked = nextTasks.find((task) => task.id === requestedTaskId);
-          if (linked) return linked;
-        }
-        return nextTasks.find((task) => task.id === current?.id) || nextTasks[0] || null;
-      });
+      setSelected((current) => requestedTaskId
+        ? resolved.selectedLinkedTask
+        : resolved.queue.find((task) => task.id === current?.id) || resolved.queue[0] || null);
       if (linkedTaskError) setError(linkedTaskError);
     } catch (requestError) {
-      setError(errorMessage(requestError, ui));
+      if (requestSequence === queueRequestSequence.current) setError(errorMessage(requestError, ui));
     } finally {
-      setLoading(false);
+      if (requestSequence === queueRequestSequence.current) setLoading(false);
     }
   }, [advancedIdError, buildTaskParams, canRead, pageSize, priorityQueueMode, requestedTaskId, ui]);
 
@@ -669,6 +676,7 @@ export default function ExecutionTasksPage() {
 
   useEffect(() => {
     void loadOperationalData();
+    return () => { queueRequestSequence.current += 1; };
   }, [loadOperationalData]);
 
   useEffect(() => {
@@ -717,6 +725,8 @@ export default function ExecutionTasksPage() {
   };
 
   const selectTask = (task: ExecutionTask) => {
+    taskOpenSequence.current += 1;
+    setSearchParams((previous) => withSelectedRecordId(previous, 'task_id', 'taskId', task.id));
     setSelected(task);
     setActiveWorkspaceSection('detail');
     window.setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
@@ -728,13 +738,14 @@ export default function ExecutionTasksPage() {
       selectTask(loadedTask);
       return;
     }
+    const openSequence = ++taskOpenSequence.current;
     setSaving(true);
     setError(null);
     try {
       const task = await apiRequest<ExecutionTask>(`/execution-tasks/${taskId}`);
-      selectTask(task);
+      if (openSequence === taskOpenSequence.current) selectTask(task);
     } catch (requestError) {
-      setError(errorMessage(requestError, ui));
+      if (openSequence === taskOpenSequence.current) setError(errorMessage(requestError, ui));
     } finally {
       setSaving(false);
     }
@@ -785,9 +796,9 @@ export default function ExecutionTasksPage() {
         })
       });
       setForm(INITIAL_FORM);
-      setSelected(created);
       setMessage(ui('Created {taskCode}.').replace('{taskCode}', created.task_code));
       await loadOperationalData(true);
+      selectTask(created);
     } catch (requestError) {
       setError(errorMessage(requestError, ui));
     } finally {
@@ -1107,6 +1118,7 @@ export default function ExecutionTasksPage() {
             </table>
           </div>
 
+          {linkedOutsideQueue ? <p className="execution-tasks-alert execution-tasks-alert--warning" role="status">{ui('Selected task is outside the current queue filters. It remains available in Task detail.')}</p> : null}
           <div className="execution-tasks-pagination">
             <button type="button" className="btn btn-secondary" disabled={loading || !canGoPrevious} onClick={() => setOffset(Math.max(0, offset - pageSize))}>{ui("Previous")}</button>
             <span>{ui('{start}–{end} of {total} matching tasks').replace('{start}', formatNumber(visibleStart, locale)).replace('{end}', formatNumber(visibleEnd, locale)).replace('{total}', formatNumber(summary.matching_task_count, locale))}</span>

@@ -6,6 +6,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "check:execution-task-queue-selection": "node scripts/check-execution-task-queue-selection.mjs",
     "check:learning-feedback-focus-and-cancel": "node scripts/check-learning-feedback-focus-and-cancel.mjs",
     "check:expanded-csv-formula-safety": "node scripts/check-expanded-csv-formula-safety.mjs",
     "check:products-deeplink-focus-exit": "node scripts/check-products-deeplink-focus-exit.mjs",
