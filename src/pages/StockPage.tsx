@@ -936,6 +936,7 @@ export default function StockPage() {
 
       return apiRequest<StockMutationResponse>('/stock/consume', {
         method: 'POST',
+        skipMutationFeedback: true, // Operation-specific result is rendered beside the stock controls.
         body: JSON.stringify({
           product_id: selectedRow.product_id,
           storage_location_id: selectedRow.storage_location_id,
@@ -978,6 +979,7 @@ export default function StockPage() {
 
       return apiRequest<StockMutationResponse>('/stock/count', {
         method: 'POST',
+        skipMutationFeedback: true, // Operation-specific result is rendered beside the stock controls.
         body: JSON.stringify({
           product_id: selectedRow.product_id,
           storage_location_id: selectedRow.storage_location_id,
@@ -1022,6 +1024,7 @@ export default function StockPage() {
 
       return apiRequest<StockMutationResponse>('/stock/adjust', {
         method: 'POST',
+        skipMutationFeedback: true, // Operation-specific result is rendered beside the stock controls.
         body: JSON.stringify({
           product_id: selectedRow.product_id,
           storage_location_id: selectedRow.storage_location_id,

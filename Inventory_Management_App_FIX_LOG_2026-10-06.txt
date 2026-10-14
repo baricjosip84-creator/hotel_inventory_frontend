@@ -13461,3 +13461,51 @@ FE209 CODE CORRECTION:
 
 LIMITS: These were Node22 source and mocked-response checks only, NOT live tenant/PostgreSQL, production clean Node24 frontend build, Node20 backend clean tests, or deployed browser acceptance. The original observed stock ledger PASS remains historical, not a FE209 user retest. No migration required. Outstanding original CASE=24, required Croatia custom field, live valuation parity, PO spend comparisons and broad production acceptance remain OPEN.
 ================================================================================
+
+================================================================================
+2026-10-14 — FRONTEND 210 / BACKEND 122 — STOCK/BOM ACTION-SPECIFIC FEEDBACK
+================================================================================
+ORIGINAL AUDIT EVIDENCE PRESERVED:
+- 2026-09-28 20:34 Advanced Inventory > BOM & assemblies: successful
+  assembly showed the correct inline completed message but also a misleading
+  global success toast, "Item created successfully" (original line ~14336).
+- 2026-09-28 22:50 and 22:54 Stock > Manual Adjustment: successful -1
+  cleanup displayed a correct inline "Stock adjustment applied successfully"
+  but also generic "Stock created successfully" toast (original lines
+  ~14520/14535). Original stock reconciliation and PASS/FAIL remain unchanged.
+
+FE209 SOURCE REPRODUCTION:
+- Both BOM create and BOM execute and the three Stock workbench writes
+  (consume/count/adjust) use shared apiRequest without skipMutationFeedback.
+- src/lib/api.ts emits a generic tenant mutation success toast for write
+  requests unless this property is enabled. Pages already provide their own
+  distinct inline success and error messages; generic toast duplicates or
+  misidentifies these stock-changing actions.
+- The new executable source-handler test FAILS on the actual FE209 pages
+  with expected assertion: skipMutationFeedback was undefined, not true.
+
+FE210 CORRECTION:
+- On precisely five existing write requests (Stock consume, count, adjust;
+  BOM create, assemble/disassemble execute), use the existing API option
+  skipMutationFeedback:true. This removes the misleading generic *success and
+  error* toasts; action-specific inline success and error feedback remains.
+- No route, payload, stock mutation, unit, price, permission, backend or
+  database operation changes. BOM post-execution /stock refresh remains.
+- New executable test scripts/check-stock-bom-action-feedback.mjs runs the
+  actual AST-extracted mutations with mocked apiRequest and asserts endpoints,
+  payload fields, local success/errors, stock result receipt, revalidation.
+  It passes 38/38 on FE210. It is registered in package.json and CI.
+- All 19/19 selected scripts (1 new, 18 inherited) PASS on Node22 after
+  test-environment corrections (TypeScript package exposed to test runner,
+  BACKEND_ROOT pointed to the extracted sibling BE122, CSV test ran with
+  --experimental-strip-types). Initial environment errors were not application
+  code failures. No clean Node24 npm ci/typecheck/production build run.
+
+STATUS:
+- Corrected at frontend source level, NOT verified in deployed browser;
+  no live PostgreSQL or tenant session used, no DB migration added.
+- Backend 122 application code unchanged; its cumulative FIX_LOG is updated.
+- CASE=24 UoM conversion persistence, test_country=Croatia save-readback,
+  live valuation parity, historical PO spend discrepancy, and other original
+  audit acceptance items remain OPEN. Historical manual test PASS/FAIL unchanged.
+================================================================================

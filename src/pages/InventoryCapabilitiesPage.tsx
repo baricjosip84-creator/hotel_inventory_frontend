@@ -1451,13 +1451,13 @@ function BomPanel({ products, locations, canWrite, canExecute }: { products: Pro
   const componentsValid = selectedComponents.length > 0
     && componentIds.length === new Set(componentIds).size
     && selectedComponents.every((component) => asNumber(component.quantity) > 0 && asNumber(component.waste_percent || '0') >= 0 && asNumber(component.waste_percent || '0') <= 100);
-  const create = useMutation({ mutationFn: () => apiRequest('/inventory-capabilities/boms', { method: 'POST', body: JSON.stringify({ product_id: outputProductId, name, output_quantity: Number(outputQty), components: selectedComponents.map((c) => ({ product_id: c.product_id, quantity: Number(c.quantity), waste_percent: Number(c.waste_percent || 0) })) }) }), onSuccess: () => { setMessage(ui("BOM created successfully.")); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-boms'] }); }, onError: (e) => { setMessage(null); setError(messageFrom(e, ui("Unable to create BOM."), ui)); } });
+  const create = useMutation({ mutationFn: () => apiRequest('/inventory-capabilities/boms', { method: 'POST', skipMutationFeedback: true, body: JSON.stringify({ product_id: outputProductId, name, output_quantity: Number(outputQty), components: selectedComponents.map((c) => ({ product_id: c.product_id, quantity: Number(c.quantity), waste_percent: Number(c.waste_percent || 0) })) }) }), onSuccess: () => { setMessage(ui("BOM created successfully.")); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-boms'] }); }, onError: (e) => { setMessage(null); setError(messageFrom(e, ui("Unable to create BOM."), ui)); } });
   // Capture the confirmed operation once: changing the form during the POST must
   // not change the executed direction or the settlement feedback.
   type BomExecutionRequest = { bomId: string; direction: 'assemble' | 'disassemble'; locationId: string; quantity: number };
   const execute = useMutation({
     mutationFn: (request: BomExecutionRequest) => apiRequest(`/inventory-capabilities/boms/${request.bomId}/execute`, {
-      method: 'POST', body: JSON.stringify({ direction: request.direction, storage_location_id: request.locationId, output_quantity: request.quantity, reservation_shortfall_acknowledged: false })
+      method: 'POST', skipMutationFeedback: true, body: JSON.stringify({ direction: request.direction, storage_location_id: request.locationId, output_quantity: request.quantity, reservation_shortfall_acknowledged: false })
     }),
     onSuccess: (_result, request) => {
       setMessage(`${request.direction === 'assemble' ? ui('Assembly') : ui('Disassembly')} ${ui('completed and stock movements recorded.')}`);
