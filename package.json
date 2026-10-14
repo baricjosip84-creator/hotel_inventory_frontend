@@ -563,7 +563,9 @@
     "check:outbound-tab-url-durability": "node scripts/check-outbound-tab-url-durability.mjs",
     "check:outbound-specific-feedback": "node scripts/check-outbound-specific-feedback.mjs",
     "check:outbound-return-detail-focus": "node scripts/check-outbound-return-detail-focus.mjs",
-    "check:forecast-policy-specific-feedback": "node scripts/check-forecast-policy-specific-feedback.mjs"
+    "check:forecast-policy-specific-feedback": "node scripts/check-forecast-policy-specific-feedback.mjs",
+    "check:policy-effectiveness-evidence": "node --experimental-strip-types scripts/check-policy-effectiveness-evidence.mjs",
+    "check:intelligence-review-compact-queue": "node scripts/check-intelligence-review-compact-queue.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

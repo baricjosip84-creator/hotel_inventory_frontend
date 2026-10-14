@@ -493,10 +493,49 @@
   gap: 14px !important;
 }
 
+/* IR-UX-001: compact navigable queue with one legible, full-width review. */
 .ai-review-page__queue-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(240px, 290px) minmax(0, 1fr);
+  align-items: start;
   gap: 16px;
+}
+.ai-review-page__queue-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.ai-review-page__queue-picker-title {
+  font-size: 13px;
+  font-weight: 800;
+  padding: 7px 2px;
+}
+.ai-review-page__queue-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 13px;
+  text-align: left;
+  color: inherit;
+  background: var(--surface, #fff);
+  border: 1px solid #d5dce6;
+  border-radius: 11px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.ai-review-page__queue-choice strong { font-size: 14px; }
+.ai-review-page__queue-choice span { font-size: 12px; color: #596679; }
+.ai-review-page__queue-choice:hover { border-color: #64748b; }
+.ai-review-page__queue-choice:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+.ai-review-page__queue-choice--selected { border-color: #2563eb; background: #eff6ff; box-shadow: inset 3px 0 0 #2563eb; }
+.ai-review-page__queue-choice:disabled { opacity: .65; cursor: default; }
+.ai-review-page__selected-review { min-width: 0; }
+.ai-review-page__selected-review > .ai-review-page__review-card { width: 100%; max-width: none; }
+@media (max-width: 840px) {
+  .ai-review-page__queue-list { grid-template-columns: minmax(0, 1fr); }
+  .ai-review-page__queue-picker { max-height: 280px; overflow-y: auto; }
 }
 
 .ai-review-page__technical-details {

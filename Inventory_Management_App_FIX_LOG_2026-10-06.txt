@@ -13655,3 +13655,43 @@ TEST EVIDENCE / LIMITS:
 - A clean Node20 dependency install, full clean frontend Node24 build, actual database save/read, deployed tenant-browser display and live human acceptance were NOT performed. PF-UX-002 is SOURCE CORRECTED / LIVE ACCEPTANCE OPEN; PF-OBS-007 remains a historical observation with a source-level clarity improvement.
 - Other original live priorities remain OPEN: CASE=24 UoM conversion persistence; test_country=Croatia custom-field save/readback; valuation scope parity; historical PO spend; production webhook delivery and clean production builds.
 ================================================================================
+
+================================================================================
+2026-10-14 — FRONTEND 218 / BACKEND 125 — APE-UX-003 VERIFIED POLICY-EFFECTIVENESS PROVENANCE
+================================================================================
+ORIGINAL MANUAL TESTING CASE: APE-UX-003, Adaptive Policy Engine evidence review.
+ORIGINAL USER OBSERVATION: “Effectiveness measurements” could imply a policy helped, harmed or had no measured change even when no valid before/after application evidence existed; at original test Applied changes=0 and baseline/change were missing.
+LATEST SOURCE REVIEW: Existing FE217 had an incomplete UI safeguard: it considered a measurement effective based only on non-null baseline_score and delta_score. It ignored application_id and observed_score, and displayed a numeric change even when a record was not linked to a documented applied policy. The backend SELECT includes e.application_id and distinguishes pre_application_observation from post_application_monitoring. This is a reproducible source-level mismatch with the original audit's requirement.
+FE218 SOURCE CORRECTION:
+- New pure adaptivePolicyEffectiveness.ts helper accepts an effectiveness row as *measured after application* only if a nonblank application_id and all three finite numeric baseline, observed and delta scores are present. A genuine zero is a valid number, not missing evidence.
+- Summary “Effectiveness measurements” is used only when one or more returned rows meet that strict rule. Otherwise the panel is “Current policy observations.”
+- Every row now clearly distinguishes measured post-application evidence from a current observation. The change column displays “Not assessed” for unproven rows instead of suggesting a verified before/after policy effect. Raw source data is preserved in the backend; no edits to stored evidence.
+- The guide explains that both a recorded application and valid before-and-after measurements are required. All newly introduced wording translated in English, German, Spanish, French and Croatian.
+- New focused check script is wired after npm ci into the frontend validation workflow; an inherited older clarity script was updated to test the stronger wording without removing its existing checks.
+VERIFICATION:
+- 33/33 executable helper, page, translation, and backend-contract assertions PASS on FE218.
+- 12/12 selected local frontend regression scripts PASS on Node 22.16.0, including Adaptive Policy Engine UI, multilingual, forecasting, policy feedback and Intelligence Review.
+- FE217 source accepted rows with baseline_score=0 and delta_score=5 while application_id and observed_score were absent. FE218 rejects this case, preserving original source-level defect reproduction. No full Node24 clean npm ci/typecheck/build or deployment/browser/DB work was performed.
+- FE218 frontend application code changed; BE125 runtime is unchanged (cumulative documentation refresh only). No schema migration needed.
+ACCEPTANCE STATUS: SOURCE CORRECTED / LIVE BROWSER ACCEPTANCE OPEN. Do not revise any historical manual PASS/FAIL/DEFERRED observations; full 328-case audit is not closed. The user's original data (including no applied changes in the historical test) remains historical, not a fresh tenant observation.
+OTHER OPEN GATES: CASE=24 UoM persistence, Croatia custom-field persistence, Products-versus-Reports valuation parity, historical PO spend, webhook scheduling/delivery acceptance, clean production builds, deployed tenant/browser acceptance.
+================================================================================
+
+================================================================================
+2026-10-14 — FRONTEND 219 / BACKEND 125 — IR-UX-001 INTELLIGENCE REVIEW COMPACT QUEUE
+================================================================================
+ORIGINAL SOURCE: Original 2026-09-25 Intelligence Review manual tenant audit, IR-UX-001 (lines 8034 onward; major/user-confirmed), describing four very narrow full-detail recommendation cards, large scrolling effort, and preference for compact queue plus one selected detail panel. Historical manual FAIL/UX observations are unchanged.
+BASELINE SOURCE REPRODUCTION (FE218): src/pages/HumanInLoopAIReviewPage.tsx rendered `reviews.map((review) => <article ...>)` for every queued review, while HumanInLoopAIReviewPage.css used `grid-template-columns: repeat(2, minmax(0, 1fr))`, still presenting two full-detail cards side by side. Thus selecting a review did not isolate its decision/evidence details.
+FE219 IMPLEMENTATION:
+- Replaces multi-detail cards with a compact selectable left queue (title, status, urgency, domain, confidence) and ONE wide selected review detail. Full existing decision forms, audit history, permissions, linked actions and source navigation retained within the selected card.
+- Deep link source_action_id remains authoritative. If the requested exact review is missing, another record is NOT selected in its place. When ordinary filtering/pagination removes the local choice, selection falls back to the first visible review safely.
+- Selection uses buttons with accessible focus styles/aria-current. Responsive layout uses single column at 840px and allows queue scrolling on narrow screens. No backend logic, data mutation, approval behavior, or schema changed.
+- Added pure source helper `src/utils/intelligenceReviewQueueSelection.ts`, executable 33-check regression, package test script and CI job. Updated one inherited old queue-layout test expectation; original test's other safety/behavior checks remain.
+- Added missing exact-review-unavailable message translation in all five languages (EN/DE/ES/FR/HR).
+LOCAL VERIFICATION:
+- 33/33 new focused checks PASS under local Node 22 with executable selection helper and TypeScript TSX parser.
+- 15/15 existing+new available selected regression scripts PASS after Node TypeScript loading flag and local test-only TypeScript symlink for two scripts. Two optional names were absent and not counted.
+- FE218 source does not have the new selection helper, test, compact queue choices or single-review mapping; previous CSS renders two detailed cards per row. Baseline reproduction is SOURCE-LEVEL, not a real-browser measurement.
+- No backend runtime change, no migration. The original 328-case audit is NOT declared closed. Clean Node24 npm ci/typecheck/Vite build, actual browser screen-reader/navigation/scroll acceptance, real PostgreSQL and deployed application tests are NOT VERIFIED.
+OTHER OPEN ACCEPTANCE: CASE=24 unit conversion persistence, test_country=Croatia custom field, Products versus Reports valuation, historic PO spend, webhook production delivery and clean deployment builds.
+================================================================================

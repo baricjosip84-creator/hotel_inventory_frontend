@@ -9,6 +9,7 @@ import type { AppLocale } from '../i18n/config';
 import { getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { getTenantAccessSnapshot } from '../lib/tenantAccess';
 import { getSupportSessionInfo } from '../lib/auth';
+import { selectVisibleIntelligenceReview } from '../utils/intelligenceReviewQueueSelection';
 import { TenantNavIcon } from '../components/ui/TenantNavIcon';
 import { SidebarAttentionMarker, SidebarAttentionTabDot } from '../components/ui/SidebarAttentionMarker';
 import { sidebarAttentionItemStyle } from '../components/ui/SidebarAttentionStyles';
@@ -5266,6 +5267,7 @@ export default function HumanInLoopAIReviewPage() {
   const [urgency, setUrgency] = useState<'all' | Urgency>('all');
   const [selectedReadinessFeatureKey, setSelectedReadinessFeatureKey] = useState<string>('');
   const [selectedHistorySourceActionId, setSelectedHistorySourceActionId] = useState<string | null>(requestedSourceActionId);
+  const [selectedQueueReviewId, setSelectedQueueReviewId] = useState<string | null>(null);
   const [reviewDecisionDrafts, setReviewDecisionDrafts] = useState<Record<string, ReviewDecisionDraft>>({});
   const [reviewActionMessage, setReviewActionMessage] = useState<string | null>(null);
   const [isForcingReadinessRefresh, setIsForcingReadinessRefresh] = useState(false);
@@ -5498,6 +5500,12 @@ export default function HumanInLoopAIReviewPage() {
   const summary = response?.summary || {};
   const guidance = response?.guidance || {};
   const reviews = useMemo(() => response?.reviews || [], [response?.reviews]);
+  // A filtered/paged queue can replace its records. Never keep an invisible stale selection.
+  // Explicit source-action deep links remain authoritative over local queue selection.
+  const selectedQueueReview = useMemo(
+    () => selectVisibleIntelligenceReview(reviews, selectedQueueReviewId, requestedSourceActionId),
+    [reviews, selectedQueueReviewId, requestedSourceActionId]
+  );
 
   useEffect(() => {
     if (activeView !== 'recommendations') return;
@@ -9489,7 +9497,32 @@ export default function HumanInLoopAIReviewPage() {
           <div className="empty-state">{ui(requestedSourceActionId ? 'The requested review is not available to your role or is no longer available.' : 'No recommendation review items match the selected filters.')}</div>
         ) : (
           <div className="ai-review-page__queue-list">
-            {reviews.map((review) => {
+            <nav className="ai-review-page__queue-picker" aria-label={ui('Review queue')}>
+              <div className="ai-review-page__queue-picker-title">{ui('Review queue')} · {formatLocalizedNumber(reviews.length, locale)}</div>
+              {reviews.map((review) => {
+                const rowId = review.source_action_id || review.review_id;
+                const selected = selectedQueueReview === review;
+                return (
+                  <button
+                    key={review.review_id}
+                    type="button"
+                    className={`ai-review-page__queue-choice ${selected ? 'ai-review-page__queue-choice--selected' : ''}`}
+                    aria-current={selected ? 'true' : undefined}
+                    disabled={Boolean(requestedSourceActionId) && !selected}
+                    onClick={() => { setSelectedQueueReviewId(rowId); setSelectedHistorySourceActionId(null); }}
+                  >
+                    <strong>{intelligenceReviewTitle(review, ui)}</strong>
+                    <span>{recommendationLabel(review.review_state, ui)} · {recommendationLabel(review.urgency, ui)}</span>
+                    <span>{recommendationLabel(review.ai_operation_domain, ui)} · {ui('Source confidence')}: {formatPercent(review.confidence_visualization?.confidence_score, locale, ui)}</span>
+                  </button>
+                );
+              })}
+            </nav>
+            <div className="ai-review-page__selected-review" aria-live="off">
+            {requestedSourceActionId && !selectedQueueReview ? (
+              <div className="card" role="status">{ui('The requested review is not available to your role or is no longer available.')}</div>
+            ) : null}
+            {reviews.filter((review) => review === selectedQueueReview).map((review) => {
               const sourcePath = sourceReviewToAppPath(review);
               const confidence = review.confidence_visualization;
               const evidencePreview = review.simulation_preview;
@@ -9862,6 +9895,7 @@ export default function HumanInLoopAIReviewPage() {
                 </article>
               );
             })}
+            </div>
           </div>
         )}
         {!isFocusedReview

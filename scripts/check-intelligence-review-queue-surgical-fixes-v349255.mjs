@@ -8,7 +8,7 @@ const translations = fs.readFileSync(path.join(root, 'src/i18n/tenantUiTranslati
 
 const checks = [
   ['review queue uses dedicated wider layout', 'className="ai-review-page__queue-list"', page],
-  ['review queue is limited to two desktop columns', 'grid-template-columns: repeat(2, minmax(0, 1fr));', css],
+  ['review queue presents compact choices and one full-width selected detail', 'grid-template-columns: minmax(240px, 290px) minmax(0, 1fr);', css],
   ['review queue collapses to one column at narrower desktop width', '@media (max-width: 1180px)', css],
   ['machine-style source scope gets human fallback', "return canonical ? ui(canonical) : formatLabel(raw);", page],
   ['minimum-stock source scope has business label', "prepare_min_stock_proposal: 'Minimum-stock proposal'", page],
