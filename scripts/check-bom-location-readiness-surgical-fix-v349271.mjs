@@ -31,8 +31,8 @@ check(page.includes("Number(component.quantity || 0) * ratio * (1 + Number(compo
 check(page.includes("selectedExecutionBom.product_id"), 'disassembly readiness evaluates the finished-product stock');
 check(page.includes("ui('Insufficient stock') : ui('Stock check passed')"), 'location options surface readiness instead of presenting every location identically');
 check(page.includes("selectedLocationReadiness?.blocked"), 'selected-location insufficiency is carried into the execution guard');
-check(page.includes("if (!bom || !location || selectedLocationReadiness?.blocked) return;"), 'known-insufficient operations cannot reach the confirmation dialog');
-check(page.includes("stockReadiness.isLoading || Boolean(selectedLocationReadiness?.blocked)"), 'submit control waits for the readiness check and disables known-insufficient execution');
+check(page.includes("stockReadiness.isFetching || selectedLocationReadiness?.blocked) return;"), 'known-insufficient operations and refetching stock cannot reach the confirmation dialog');
+check(page.includes("stockReadiness.isLoading || stockReadiness.isFetching || Boolean(selectedLocationReadiness?.blocked)"), 'submit control waits for the readiness check or refetch and disables known-insufficient execution');
 check(page.includes("Checking current unreserved stock before execution…"), 'loading feedback tells the user why execution is temporarily unavailable');
 check(page.includes("This location cannot currently support the selected operation."), 'blocked location gets explicit business-readable feedback');
 check(page.includes("Choose another location or correct the stock position before confirming a stock-changing action."), 'blocked feedback gives an immediate recovery path');

@@ -13442,3 +13442,22 @@ CASE=24 UoM persistence; required test_country='Croatia' custom field;
 Products vs Reports valuation parity; Procurement draft spend comparison;
 clean production builds and other 328-heading/source findings.
 ================================================================================
+
+================================================================================
+2026-10-14 — FRONTEND 209 / BACKEND 122 — BOM POST-EXECUTION STOCK-READINESS REFRESH
+================================================================================
+SOURCE OF ORIGINAL WORKFLOW: 2026-09-28 Page 24, Advanced Inventory > BOM & assemblies. The manual audit includes a successful kit assembly followed by a separately verified disassembly and stock movement reconciliation. These original PASS records remain untouched.
+
+ADDITIONAL SOURCE-LEVEL DEFECT DISCOVERED WHILE REVIEWING THE ORIGINAL WORKFLOW:
+- FE208 BOM execution POST success invalidated only ['inventory-capabilities-products'], not ['inventory-bom-stock-readiness']. The BOM panel's location readines used that latter cached /stock response. Immediately after a successful assembly the UI could incorrectly show insufficient finished-product stock when the operator switched to disassemble, or could continue showing components available for another assembly after they were consumed. The backend still revalidates stock; this is a frontend precheck/UX cache invalidation defect, not evidence of corrupted stock or broken live persistence.
+- FE208 success feedback used the current form `direction` at request completion rather than the confirmed submitted direction. Switching direction during an in-flight POST could report the opposite action.
+
+FE209 CODE CORRECTION:
+- The confirmed BOM ID, direction, storage location and output quantity are frozen as request variables before the POST and used by mutationFn and success feedback.
+- After success, the BOM stock-readiness query is invalidated/refetched together with the existing product-reference invalidation. No stock-readiness refresh is claimed for cancelled or failed actions.
+- Active stock refetch hides old readiness status and temporarily disables the execute button and confirmation; once refreshed, the same per-location checks work with current stock.
+- An unsuccessful optional /stock precheck still allows explicit execution and relies on the backend's authoritative validations (previous behavior retained); no permission, approval, lot, serial, reservation or stock service logic changed.
+- New executable test uses TypeScript AST to run the actual extracted mutation/confirmation handlers with deferred mocked API responses, including assemble->disassemble direction change, failure, cancellation and refresh guard. Baseline FE208 fails the new focused regression at stale stock refetch contract; FE209 passes 37/37. Existing BOM location readiness regression updated to reflect stronger guard and passes 29/29. 11/11 selected local regression scripts pass.
+
+LIMITS: These were Node22 source and mocked-response checks only, NOT live tenant/PostgreSQL, production clean Node24 frontend build, Node20 backend clean tests, or deployed browser acceptance. The original observed stock ledger PASS remains historical, not a FE209 user retest. No migration required. Outstanding original CASE=24, required Croatia custom field, live valuation parity, PO spend comparisons and broad production acceptance remain OPEN.
+================================================================================
