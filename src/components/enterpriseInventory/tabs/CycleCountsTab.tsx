@@ -131,9 +131,9 @@ export function CycleCountsTab({
                         {evidence.length ? evidence.map((line, index) => {
                           return (
                             <div key={`${line.product_id}-${line.storage_location_id || index}`} style={index ? { marginTop: 8 } : undefined}>
-                              <strong>{line.product_name || ui('Unknown product')}</strong>
-                              <div style={styles.helper}>{line.storage_location_name || ui('Unknown location')}</div>
-                              <div style={styles.helper}>{ui('Expected quantity')}: {evidenceNumber(line.expected_quantity)} · {ui('Counted quantity')}: {evidenceNumber(line.counted_quantity)} · {ui('Variance')}: {evidenceNumber(line.variance_quantity)}</div>
+                              <strong>{line.product_name || ui('Historical Product name unavailable')}</strong>
+                              <div style={styles.helper}>{line.storage_location_name || ui('Historical location unavailable')}</div>
+                              <div style={styles.helper}>{ui('Expected quantity')}: {evidenceNumber(line.expected_quantity)} · {ui('Counted quantity')}: {evidenceNumber(line.counted_quantity)} · {ui('Variance')}: {evidenceNumber(line.variance_quantity)} · {line.product_unit || ui('Historical unit unavailable')}</div>
                               {line.lot_number ? <div style={styles.helper}>{ui('Lot number')}: {line.lot_number}</div> : null}
                               {line.batch_number ? <div style={styles.helper}>{ui('Batch number')}: {line.batch_number}</div> : null}
                               {line.serial_numbers?.length ? <div style={styles.helper}>{ui('Serial numbers counted')}: {formatLocalizedNumber(line.serial_numbers.length, locale)}</div> : null}

@@ -1590,10 +1590,9 @@ export default function ReportsPage() {
           {!inventoryVarianceQuery.isLoading && !inventoryVarianceQuery.isError && varianceRows.length === 0 ? <EmptyState message={ui("No cycle-count or manual-adjustment records matched these filters.")} /> : null}
           {varianceRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Date / time")}</th><th>{ui("Record")}</th><th>{ui("Product")}</th><th>{ui("Location")}</th><th>{ui("Expected")}</th><th>{ui("Counted")}</th><th>{ui("Variance")}</th><th>{ui("Status / actor")}</th></tr></thead><tbody>
             {varianceRows.map((row) => {
-              const historicalMovement = row.record_type === 'manual_adjustment';
-              const productName = row.product_name || (historicalMovement ? ui("Historical Product name unavailable") : ui("Unavailable"));
-              const locationName = row.storage_location_name || (historicalMovement ? ui("Historical location unavailable") : '-');
-              const unit = row.product_unit || (historicalMovement ? ui("Historical unit unavailable") : ui("units"));
+              const productName = row.product_name || ui("Historical Product name unavailable");
+              const locationName = row.storage_location_name || ui("Historical location unavailable");
+              const unit = row.product_unit || ui("Historical unit unavailable");
               const actor = row.actor_name || (row.actor_label ? ui(row.actor_label) : ui('System / unknown'));
               return <tr key={`${row.record_type}-${row.record_id}`}><td>{formatDateTime(row.created_at, locale)}</td><td>{row.record_type === 'cycle_count' ? ui("Cycle count") : ui("Manual adjustment")}<span className="reports-subtext">{row.reason || '-'}</span></td><td className="reports-strong">{productName}</td><td>{locationName}</td><td>{row.expected_quantity === null || row.expected_quantity === undefined ? '-' : ui('{quantity} {unit}').replace('{quantity}', formatNumber(row.expected_quantity, locale)).replace('{unit}', unit)}</td><td>{row.counted_quantity === null || row.counted_quantity === undefined ? '-' : ui('{quantity} {unit}').replace('{quantity}', formatNumber(row.counted_quantity, locale)).replace('{unit}', unit)}</td><td className={toNumber(row.variance_quantity) !== 0 ? 'reports-warning-text' : ''}>{row.variance_quantity === null || row.variance_quantity === undefined ? '-' : formatSignedQuantity(row.variance_quantity, locale, ui, unit)}</td><td>{formatStatus(row.status, ui)}<span className="reports-subtext">{actor}</span></td></tr>;
             })}

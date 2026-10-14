@@ -12650,3 +12650,98 @@ pending actual approved staging PostgreSQL and deployed acceptance evidence.
 The full original 328-case audit and the additional unnumbered observations
 are NOT represented as all accepted/closed by this limited code correction.
 ================================================================================
+
+=== ENGINEERING FOLLOW-UP — 2026-10-14 — HISTORICAL DOCUMENT UNITS ===
+Source baseline: Frontend 185 + Backend 111. New release: Frontend 186 + Backend 112.
+Issue: PO Commitments and Requisition Activity reports used the present-day Product.unit
+label for past document quantities, even after a Product unit changed.
+Correction: Migration 558 stores the original base unit on new PO/requisition
+lines using tenant-checked triggers. Report aggregations now use captured units
+and explicitly return "Historical unit unavailable" instead of false totals on
+legacy lines lacking evidence. The web report, CSV and PDF expose the warning.
+New focused checks: 37/37 PASS (simulated database response and source/SQL contracts).
+Inherited offline regression scripts: 138/138 PASS (10 required documented
+local path/test-only setup corrections). Previous historical report tests PASS.
+Backend syntax PASS; Frontend ReportsPage.tsx syntax PASS. Complete archives PASS.
+NOT VERIFIED: execution of migration 558 in PostgreSQL; live CASE=24 and
+Croatia saves; deployed browser; production frontend Node24 and backend Node20
+clean installs/builds; full original end-to-end tenant acceptance.
+Do not mark the original historical cases closed without real acceptance evidence.
+=== END FOLLOW-UP ===
+
+
+=== 2026-10-14 — CONSOLIDATED PURCHASING UNIT EVIDENCE CORRECTIONS (FE187 / BE113) ===
+Previous: FE186 / BE112. Code changes in Reports → Procurement Summary and Reports → Purchasing Spend.
+PROCUREMENT SUMMARY: Previously displayed historical shipment quantities under today's mutable Products.unit. Migration 559 captures base product unit at new shipment line insert/reassignment, enforces the shipment/product tenant relationship, and does not invent units for older records. The report uses product_unit_snapshot; if historical unit is missing it suppresses misleading aggregates and labels "Historical unit unavailable". If different units are present, unit-by-unit breakdown remains separate and combined scalar quantities are null; the response labels "Multiple units". CSV/PDF evidence accompanies the report data.
+PURCHASING SPEND: Previously labeled old supplier-invoice quantities with today's Products.unit. Migration 560 captures unit on new invoice lines, preserves same-product unit evidence and rejects cross-tenant records. Older unit-NULL lines remain NULL. The browser and CSV/PDF export explicitly show "Historical unit unavailable"; invoices and recognized spend amounts are unchanged.
+Regression: new Procurement 33/33 and Purchasing Spend 22/22 PASS; previous PO/Requisition unit 37/37 PASS; earlier archived Purchasing Spend 64/64 PASS; inherited selected offline regression scripts 141/141 PASS; ReportsPage TSX parse 0 errors. Updated Batch195 adapter tenant check to accept equivalent `p.tenant_id = sh.tenant_id` scoped by `sh.tenant_id=$1`; application permission and tenant scope NOT weakened. Two complete ZIPs preserve all prior application paths; changed ZIP parity checked.
+NOT VERIFIED: PostgreSQL migrations 558, 559, 560 deployed/executed, actual CASE=24 and Croatia persisted save/readback, production browser workflow, clean Node24 frontend build, full original-audit acceptance. These remain open. No production/staging data accessed or modified.
+=== END CONSOLIDATED PURCHASING UNIT EVIDENCE CORRECTIONS ===
+
+
+================================================================================
+2026-10-14 — Audit search/filters consolidated source repair (FE188 / BE114)
+================================================================================
+BASELINE: Complete FE187 + BE113 archive from 2026-10-14 historical-unit release.
+Actual files modified:
+  Backend src/services/tenancy/tenantAuditService.js
+  Backend scripts/check-tenant-audit-human-label-search.cjs (new)
+  Backend package.json (new focused test command)
+  Frontend src/pages/TenantAuditPage.tsx
+  Frontend src/i18n/tenantUiTranslations.ts
+  Frontend scripts/check-tenant-audit-auto-filters.mjs (new)
+  Frontend package.json (new focused test command)
+  Embedded cumulative FIX_LOG copies refreshed in both full sources.
+
+Implemented: existing exact phrase audit search retained; additional
+AND-across-fields token search for multiword human operation labels, with
+lifecycle normalization and a maximum 8 search tokens. All tenant and exact
+filter constraints retained. Frontend audit filters auto-apply after 350ms
+instead of requiring a manual Apply button; invalid date range guarded;
+whitespace normalization avoids permanently pending state; CSV export blocked
+while unapplied edits exist; messages added for EN/DE/ES/FR/HR.
+
+Regression evidence: 8/8 new backend tests, 8/8 new frontend tests. Each test
+fails against corresponding unchanged prior source. Existing Tenant Audit
+service checks PASS; tenant-audit page hardening/multilingual checks PASS.
+Inherited selected scripts 138/138 after correcting 10 test invocation paths/
+arguments, latest three unit-history scripts PASS. BE syntax and frontend TSX
+transpilation diagnostics zero. Full Node24 production build and real tenant
+PostgreSQL/browser acceptance NOT performed. No database migration.
+
+DO NOT mark the original September CASE=24 / Croatia failures, valuation
+parity, or the complete original audit as live PASS based on these tests.
+================================================================================
+
+
+================================================================================
+2026-10-14 — CYCLE COUNT HISTORICAL EVIDENCE REPAIR — FE189 / BE115
+================================================================================
+SOURCE-LEVEL DEFECT: Reports -> Count Variance used mutable Products.unit,
+Products.name/category and current Storage Locations.name for older physical
+cycle counts. The Cycle Counts list likewise used today's catalog labels.
+Changing a product base unit or renaming/archiving its product/location could
+therefore misrepresent a physical count and its historical variance.
+
+CORRECTION: New migration 561 adds nullable name, SKU, category, base-unit and
+location-name snapshots to cycle_count_items. A tenant-scoped database trigger
+captures them when new count lines are inserted and protects the evidence from
+being overwritten by ordinary edits. Previously existing records remain NULL:
+no historical unit/name is guessed or backfilled from the current catalog.
+The historical Count Variance report and Cycle Counts list now use these
+snapshots and explicitly label missing evidence. Historical filter suggestions
+include count-specific snapshots. Existing stock quantities are not modified.
+
+VERIFICATION: NEW targeted executable regression 50/50 PASS with actual Report
+service and deterministic SQL adapter; test FAILS on unchanged BE114 source.
+19/19 selected inherited Batch180-198 report/inventory scripts PASS with normal
+paths; additional Batch182 transaction readback 26/26 PASS with its required
+source-file argument. Backend JavaScript syntax PASS, modified frontend TSX
+transpile PASS, migration dependency ordering PASS, fresh database baseline PASS.
+All tests are local/mock SQL, NOT a PostgreSQL migration or a live application
+acceptance test. Migration 561 must be deployed and run before updated APIs.
+
+OPEN: September CASE=24 and test_country=Croatia PostgreSQL saving failures;
+deployed Products/Reports valuation parity; fresh Node24 production build;
+all original browser/tenant functional acceptance; migration 561 execution.
+================================================================================
