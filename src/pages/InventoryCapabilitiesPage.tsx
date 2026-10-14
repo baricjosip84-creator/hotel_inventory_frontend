@@ -463,6 +463,10 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
   const [apiAllowedIps, setApiAllowedIps] = useState('');
   const [editingApiClient, setEditingApiClient] = useState<ApiClient | null>(null);
   const [revealedKey, setRevealedKey] = useState<{ value: string; clientId: string } | null>(null);
+  const [apiClientMessage, setApiClientMessage] = useState<string | null>(null);
+  const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [webhookActionError, setWebhookActionError] = useState<string | null>(null);
   const [systemName, setSystemName] = useState('');
   const [systemType, setSystemType] = useState('custom');
   const [baseUrl, setBaseUrl] = useState('');
@@ -488,37 +492,44 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
   useEffect(() => { if (webhooks.data) { setWebhookRows(webhooks.data.items); setWebhookNextCursor(webhooks.data.next_cursor); } }, [webhooks.data]);
   const deliveries = useQuery({ queryKey: ['inventory-webhook-deliveries'], queryFn: () => apiRequest<WebhookDelivery[]>('/inventory-capabilities/webhook-deliveries?limit=25') });
   const createClient = useMutation({
-    mutationFn: () => apiRequest<ApiClient & { api_key: string }>('/inventory-capabilities/api-clients', { method: 'POST', body: JSON.stringify({ name, description, scopes: apiScopes, expires_at: toApiExpiry(apiExpiresAt), allowed_ips: apiAllowedIps.split(',').map((value) => value.trim()).filter(Boolean) }) }),
-    onSuccess: (data) => { setRevealedKey({ value: data.api_key, clientId: data.id }); setName(''); setDescription(''); setApiScopes([]); setApiExpiresAt(''); setApiAllowedIps(''); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
+    onMutate: () => setApiClientMessage(null),
+    mutationFn: () => apiRequest<ApiClient & { api_key: string }>('/inventory-capabilities/api-clients', { method: 'POST', skipMutationFeedback: true, body: JSON.stringify({ name, description, scopes: apiScopes, expires_at: toApiExpiry(apiExpiresAt), allowed_ips: apiAllowedIps.split(',').map((value) => value.trim()).filter(Boolean) }) }),
+    onSuccess: (data) => { setApiClientMessage(ui("API key created. Copy it now; it cannot be shown again.")); setRevealedKey({ value: data.api_key, clientId: data.id }); setName(''); setDescription(''); setApiScopes([]); setApiExpiresAt(''); setApiAllowedIps(''); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
     onError: (err) => setError(messageFrom(err, ui("Unable to create API client."), ui))
   });
   const clearApiClientForm = () => { setEditingApiClient(null); setName(''); setDescription(''); setApiScopes([]); setApiExpiresAt(''); setApiAllowedIps(''); };
-  const editApiClient = (client: ApiClient) => { setEditingApiClient(client); setName(client.name); setDescription(client.description || ''); setApiScopes(client.scopes || []); setApiExpiresAt(toLocalDateTimeInput(client.expires_at)); setApiAllowedIps((client.allowed_ips || []).join(', ')); setError(null); };
+  const editApiClient = (client: ApiClient) => { setApiClientMessage(null); setEditingApiClient(client); setName(client.name); setDescription(client.description || ''); setApiScopes(client.scopes || []); setApiExpiresAt(toLocalDateTimeInput(client.expires_at)); setApiAllowedIps((client.allowed_ips || []).join(', ')); setError(null); };
   const updateClient = useMutation({
-    mutationFn: () => apiRequest<ApiClient>(`/inventory-capabilities/api-clients/${editingApiClient!.id}`, { method: 'PATCH', body: JSON.stringify({ description, scopes: apiScopes, expires_at: toApiExpiry(apiExpiresAt), allowed_ips: apiAllowedIps.split(',').map((value) => value.trim()).filter(Boolean) }), version: editingApiClient!.version }),
-    onSuccess: () => { clearApiClientForm(); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
+    onMutate: () => setApiClientMessage(null),
+    mutationFn: () => apiRequest<ApiClient>(`/inventory-capabilities/api-clients/${editingApiClient!.id}`, { method: 'PATCH', skipMutationFeedback: true, body: JSON.stringify({ description, scopes: apiScopes, expires_at: toApiExpiry(apiExpiresAt), allowed_ips: apiAllowedIps.split(',').map((value) => value.trim()).filter(Boolean) }), version: editingApiClient!.version }),
+    onSuccess: () => { clearApiClientForm(); setApiClientMessage(ui("API key settings saved.")); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
     onError: (err) => setError(messageFrom(err, ui("Unable to update API client."), ui))
   });
   const rotateClient = useMutation({
-    mutationFn: (client: ApiClient) => apiRequest<ApiClient & { api_key: string }>(`/inventory-capabilities/api-clients/${client.id}/rotate`, { method: 'POST', body: JSON.stringify({}), version: client.version }),
-    onSuccess: (data) => { setRevealedKey({ value: data.api_key, clientId: data.id }); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
+    onMutate: () => setApiClientMessage(null),
+    mutationFn: (client: ApiClient) => apiRequest<ApiClient & { api_key: string }>(`/inventory-capabilities/api-clients/${client.id}/rotate`, { method: 'POST', skipMutationFeedback: true, body: JSON.stringify({}), version: client.version }),
+    onSuccess: (data) => { setApiClientMessage(ui("API key rotated. Copy the replacement now; the previous key is no longer valid.")); setRevealedKey({ value: data.api_key, clientId: data.id }); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
     onError: (err) => setError(messageFrom(err, ui("Unable to rotate API key."), ui))
   });
   const revokeClient = useMutation({
-    mutationFn: (client: ApiClient) => apiRequest(`/inventory-capabilities/api-clients/${client.id}/revoke`, { method: 'POST', body: JSON.stringify({ reason: 'Revoked from tenant Integrations page' }), version: client.version }),
-    onSuccess: (_data, client) => { if (revealedKey?.clientId === client.id) setRevealedKey(null); clearApiClientForm(); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
+    onMutate: () => setApiClientMessage(null),
+    mutationFn: (client: ApiClient) => apiRequest(`/inventory-capabilities/api-clients/${client.id}/revoke`, { method: 'POST', skipMutationFeedback: true, body: JSON.stringify({ reason: 'Revoked from tenant Integrations page' }), version: client.version }),
+    onSuccess: (_data, client) => { if (revealedKey?.clientId === client.id) setRevealedKey(null); clearApiClientForm(); setApiClientMessage(ui("API key revoked. Systems using that key can no longer authenticate.")); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-api-clients'] }); },
     onError: (err) => setError(messageFrom(err, ui("Unable to revoke API key."), ui))
   });
   const clearConnectionForm = () => { setEditingConnection(null); setSystemName(''); setSystemType('custom'); setBaseUrl(''); setDirection('bidirectional'); setCredentialReference(''); };
-  const editConnection = (row: Connection) => { setEditingConnection(row); setSystemName(row.system_name); setSystemType(row.system_type || 'custom'); setBaseUrl(row.base_url || ''); setDirection(row.direction || 'bidirectional'); setCredentialReference(row.credential_reference || ''); setError(null); };
+  const editConnection = (row: Connection) => { setConnectionError(null); setConnectionMessage(null); setEditingConnection(row); setSystemName(row.system_name); setSystemType(row.system_type || 'custom'); setBaseUrl(row.base_url || ''); setDirection(row.direction || 'bidirectional'); setCredentialReference(row.credential_reference || ''); setError(null); };
   const saveConnection = useMutation({
-    mutationFn: () => apiRequest('/inventory-capabilities/connections', { method: 'POST', body: JSON.stringify({ system_name: systemName, system_type: systemType, base_url: baseUrl || null, direction, credential_reference: credentialReference || null, expected_version: editingConnection?.version ?? 0 }) }),
-    onSuccess: () => { clearConnectionForm(); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-external-connections'] }); },
-    onError: (err) => setError(messageFrom(err, ui("Unable to save connection."), ui))
+    onMutate: () => { setConnectionMessage(null); setConnectionError(null); },
+    mutationFn: (wasEditing: boolean) => apiRequest('/inventory-capabilities/connections', { method: 'POST', skipMutationFeedback: true, body: JSON.stringify({ system_name: systemName, system_type: systemType, base_url: baseUrl || null, direction, credential_reference: credentialReference || null, expected_version: wasEditing ? editingConnection!.version : 0 }) }),
+    onSuccess: (_data, wasEditing) => { clearConnectionForm(); setConnectionMessage(ui(wasEditing ? "Connection changes saved." : "Connection registered.")); setConnectionError(null); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-external-connections'] }); },
+    onError: (err) => setConnectionError(messageFrom(err, ui("Unable to save connection."), ui))
   });
   const changeConnectionStatus = useMutation({
+    onMutate: () => { setConnectionMessage(null); setConnectionError(null); },
     mutationFn: ({ row, status }: { row: Connection; status: 'configured' | 'disabled' }) => apiRequest('/inventory-capabilities/connections', {
       method: 'POST',
+      skipMutationFeedback: true,
       body: JSON.stringify({
         system_name: row.system_name,
         system_type: row.system_type || 'custom',
@@ -529,15 +540,18 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
         expected_version: row.version
       })
     }),
-    onSuccess: (_data, { row }) => {
+    onSuccess: (_data, { row, status }) => {
       if (editingConnection?.id === row.id) clearConnectionForm();
+      setConnectionMessage(ui(status === 'disabled' ? "Connection disabled." : "Connection enabled."));
+      setConnectionError(null);
       setError(null);
       void qc.invalidateQueries({ queryKey: ['inventory-external-connections'] });
       void qc.invalidateQueries({ queryKey: ['inventory-capabilities-overview'] });
     },
-    onError: (err) => setError(messageFrom(err, ui("Unable to update connection status."), ui))
+    onError: (err) => setConnectionError(messageFrom(err, ui("Unable to update connection status."), ui))
   });
   const createWebhook = useMutation({
+    onMutate: () => { setWebhookMessage(null); setWebhookActionError(null); },
     mutationFn: () => apiRequest<WebhookSubscription & { signing_secret: string }>('/inventory-capabilities/webhooks', {
       method: 'POST',
       skipMutationFeedback: true,
@@ -553,20 +567,22 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
       setWebhookUrl('');
       setWebhookEvents([]);
       setWebhookMessage(ui("Webhook created. Events will be queued automatically from the inventory audit trail."));
-      setError(null);
+      setWebhookActionError(null); setError(null);
       void qc.invalidateQueries({ queryKey: ['inventory-webhooks'] });
     },
-    onError: (err) => setError(messageFrom(err, ui("Unable to create webhook."), ui))
+    onError: (err) => setWebhookActionError(messageFrom(err, ui("Unable to create webhook."), ui))
   });
   const changeWebhookStatus = useMutation({
-    mutationFn: ({ row, status }: { row: WebhookSubscription; status: 'configured' | 'disabled' }) => apiRequest(`/inventory-capabilities/webhooks/${row.id}`, { method: 'PATCH', body: JSON.stringify({ status }), version: row.version }),
-    onSuccess: () => { setError(null); void qc.invalidateQueries({ queryKey: ['inventory-webhooks'] }); },
-    onError: (err) => setError(messageFrom(err, ui("Unable to update webhook."), ui))
+    onMutate: () => { setWebhookMessage(null); setWebhookActionError(null); },
+    mutationFn: ({ row, status }: { row: WebhookSubscription; status: 'configured' | 'disabled' }) => apiRequest(`/inventory-capabilities/webhooks/${row.id}`, { method: 'PATCH', skipMutationFeedback: true, body: JSON.stringify({ status }), version: row.version }),
+    onSuccess: (_data, { status }) => { setWebhookMessage(ui(status === 'disabled' ? "Webhook disabled." : "Webhook enabled.")); setWebhookActionError(null); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-webhooks'] }); },
+    onError: (err) => setWebhookActionError(messageFrom(err, ui("Unable to update webhook."), ui))
   });
   const rotateWebhook = useMutation({
+    onMutate: () => { setWebhookMessage(null); setWebhookActionError(null); },
     mutationFn: (row: WebhookSubscription) => apiRequest<WebhookSubscription & { signing_secret: string }>(`/inventory-capabilities/webhooks/${row.id}/rotate-secret`, { method: 'POST', skipMutationFeedback: true, body: JSON.stringify({}), version: row.version }),
-    onSuccess: (data) => { setRevealedWebhookSecret(data.signing_secret); setWebhookMessage(ui("Webhook secret rotated. Copy the new secret now.")); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-webhooks'] }); },
-    onError: (err) => setError(messageFrom(err, ui("Unable to rotate webhook secret."), ui))
+    onSuccess: (data) => { setRevealedWebhookSecret(data.signing_secret); setWebhookMessage(ui("Webhook secret rotated. Copy the new secret now.")); setWebhookActionError(null); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-webhooks'] }); },
+    onError: (err) => setWebhookActionError(messageFrom(err, ui("Unable to rotate webhook secret."), ui))
   });
   const loadMoreWebhooks = useMutation({
     mutationFn: (cursor: string) => apiRequest<PagedResponse<WebhookSubscription>>(`/inventory-capabilities/webhooks?paged=true&limit=100&cursor=${encodeURIComponent(cursor)}`),
@@ -577,14 +593,15 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
         return Array.from(byId.values());
       });
       setWebhookNextCursor(page.next_cursor);
-      setError(null);
+      setWebhookActionError(null); setError(null);
     },
-    onError: (err) => setError(messageFrom(err, ui("Unable to load more webhooks."), ui))
+    onError: (err) => setWebhookActionError(messageFrom(err, ui("Unable to load more webhooks."), ui))
   });
   const testWebhook = useMutation({
+    onMutate: () => { setWebhookMessage(null); setWebhookActionError(null); },
     mutationFn: (id: string) => apiRequest<{ delivery_id: string; queued: boolean }>(`/inventory-capabilities/webhooks/${id}/test`, { method: 'POST', skipMutationFeedback: true, body: JSON.stringify({}) }),
-    onSuccess: () => { setWebhookMessage(ui("Test webhook queued. Delivery status will appear below.")); setError(null); setTimeout(() => void qc.invalidateQueries({ queryKey: ['inventory-webhook-deliveries'] }), 750); },
-    onError: (err) => setError(messageFrom(err, ui("Unable to queue webhook test."), ui))
+    onSuccess: () => { setWebhookMessage(ui("Test webhook queued. Delivery status will appear below.")); setWebhookActionError(null); setError(null); setTimeout(() => void qc.invalidateQueries({ queryKey: ['inventory-webhook-deliveries'] }), 750); },
+    onError: (err) => setWebhookActionError(messageFrom(err, ui("Unable to queue webhook test."), ui))
   });
 
   return (
@@ -598,6 +615,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
           <div className="form-success"><strong>{ui("Copy this key now. It is only shown once:")}</strong><br /><code style={{ wordBreak: 'break-all' }}>{revealedKey.value}</code></div>
         ) : null}
         {error ? <div className="form-error">{error}</div> : null}
+        {apiClientMessage ? <div className="form-success">{apiClientMessage}</div> : null}
         <form onSubmit={(e) => { e.preventDefault(); if (editingApiClient) updateClient.mutate(); else createClient.mutate(); }} style={formGridStyle}>
           <label>{ui("Connection name")}<input value={name} onChange={(e) => setName(e.target.value)} placeholder={ui("Company ERP")} disabled={!canWrite || Boolean(editingApiClient)} /></label>
           <label>{ui("Description")}<input value={description} onChange={(e) => setDescription(e.target.value)} placeholder={ui("Used by head-office integration")} disabled={!canWrite} /></label>
@@ -607,7 +625,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
             <legend>{ui("API permissions")}</legend>
             <p className="card__subtext">{ui("Select only the API permissions this connection genuinely needs. You can grant only permissions available to your current role.")}</p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>{grantableApiScopes.map((scope) => <label key={scope.value} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={apiScopes.includes(scope.value)} onChange={(event) => setApiScopes((current) => event.target.checked ? Array.from(new Set([...current, scope.value])) : current.filter((value) => value !== scope.value))} />{ui(scope.label)}</label>)}</div>
-            {!editingApiClient && apiScopes.length === 0 ? <p className="card__subtext" style={{ marginTop: 10 }}>{ui("Select at least one API permission.")}</p> : null}
+            {apiScopes.length === 0 ? <p className="card__subtext" style={{ marginTop: 10 }}>{ui("Select at least one API permission.")}</p> : null}
           </fieldset>
           <div style={{ alignSelf: 'end', display: 'flex', gap: 8 }}><button className="button" disabled={!canWrite || !name.trim() || apiScopes.length === 0 || createClient.isPending || updateClient.isPending}>{editingApiClient ? ui("Save changes") : ui("Create API key")}</button>{editingApiClient ? <button className="button button--secondary" type="button" onClick={clearApiClientForm} disabled={updateClient.isPending}>{ui("Cancel")}</button> : null}</div>
         </form>
@@ -626,6 +644,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
         <p className="card__subtext">{ui("Another system can give this app an HTTPS address. Choose which inventory events it should receive. “All listed events” means every event shown in this picker, not internal audit activity.")}</p>
         {revealedWebhookSecret ? <div className="form-success"><strong>{ui("Copy this signing secret now. It is only shown once:")}</strong><br /><code style={{ wordBreak: 'break-all' }}>{revealedWebhookSecret}</code></div> : null}
         {webhookMessage ? <div className="form-success">{webhookMessage}</div> : null}
+        {webhookActionError ? <div className="form-error">{webhookActionError}</div> : null}
         <form onSubmit={(e) => { e.preventDefault(); createWebhook.mutate(); }} style={formGridStyle}>
           <label>{ui("Name")}<input value={webhookName} onChange={(e) => setWebhookName(e.target.value)} placeholder={ui("Head office events")} disabled={!canWrite} /></label>
           <label>{ui("HTTPS destination")}<input value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} placeholder="https://example.com/inventory-webhook" disabled={!canWrite} /></label>
@@ -651,7 +670,9 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
         <div className="card__label">{ui("Known external systems")}</div>
         <h3>{editingConnection ? ui("Edit connection") : ui("Connection registry")}</h3>
         <p className="card__subtext">{ui("Record an ERP, accounting, e-commerce, WMS, or custom system your company uses. Saving this entry documents the connection details; it does not start synchronization by itself.")}</p>
-        <form onSubmit={(e) => { e.preventDefault(); saveConnection.mutate(); }} style={formGridStyle}>
+        {connectionMessage ? <div className="form-success">{connectionMessage}</div> : null}
+        {connectionError ? <div className="form-error">{connectionError}</div> : null}
+        <form onSubmit={(e) => { e.preventDefault(); saveConnection.mutate(Boolean(editingConnection)); }} style={formGridStyle}>
           <label>{ui("System name")}<input value={systemName} onChange={(e) => setSystemName(e.target.value)} placeholder={ui("SAP Business One")} disabled={!canWrite || Boolean(editingConnection)} /></label>
           <label>{ui("Type")}<select value={systemType} onChange={(e) => setSystemType(e.target.value)} disabled={!canWrite}><option value="custom">{ui("Custom")}</option><option value="erp">{ui("ERP")}</option><option value="accounting">{ui("Accounting")}</option><option value="ecommerce">{ui("E-commerce")}</option><option value="wms">{ui("WMS")}</option></select></label>
           <label>{ui("Base URL")}<input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://..." disabled={!canWrite} /></label>

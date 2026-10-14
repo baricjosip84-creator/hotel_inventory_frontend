@@ -17,7 +17,7 @@ for(const [name,endpoint,inline] of [
  check(fragment.includes('skipMutationFeedback: true'),`${name}: generic toast suppressed`);
  check(file.includes(inline),`${name}: specific inline success remains`);
 }
-check(file.includes('onError: (err) => setError(messageFrom(err, ui("Unable to queue webhook test."), ui))'),'Error feedback preserved');
-check(file.includes('onError: (err) => setError(messageFrom(err, ui("Unable to rotate webhook secret."), ui))'),'Rotation error preserved');
-check(file.includes('onError: (err) => setError(messageFrom(err, ui("Unable to create webhook."), ui))'),'Creation error preserved');
+check(file.includes('onError: (err) => setWebhookActionError(messageFrom(err, ui("Unable to queue webhook test."), ui))'),'Error feedback preserved');
+check(file.includes('onError: (err) => setWebhookActionError(messageFrom(err, ui("Unable to rotate webhook secret."), ui))'),'Rotation error preserved');
+check(file.includes('onError: (err) => setWebhookActionError(messageFrom(err, ui("Unable to create webhook."), ui))'),'Creation error preserved');
 console.log(`Integration webhook action feedback: ${count}/${count} passed`);
