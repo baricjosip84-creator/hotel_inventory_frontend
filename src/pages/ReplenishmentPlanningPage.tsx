@@ -383,9 +383,16 @@ export default function ReplenishmentPlanningPage() {
       next.delete('source_par_level_id');
       next.delete('source_optimization_plan_id');
       next.delete('source_optimization_item_id');
+      // Seed the unfiltered list BEFORE changing the selected URL. Otherwise
+      // the route resolver may reject the freshly created ID against its stale
+      // list cache and show an unrelated/unavailable selection until refetch.
+      await queryClient.cancelQueries({ queryKey: ['location-replenishment-runs', 'all'], exact: true });
+      queryClient.setQueryData<PlanningRunListItem[]>(['location-replenishment-runs', 'all'], (previous) =>
+        [data.run, ...(previous ?? []).filter((run) => run.id !== data.run.id)].slice(0, 100)
+      );
+      queryClient.setQueryData(['location-replenishment-run', data.run.id], data);
       setSearchParams(withReplenishmentRunSelection(next, data.run.id));
       await queryClient.invalidateQueries({ queryKey: ['location-replenishment-runs'] });
-      queryClient.setQueryData(['location-replenishment-run', data.run.id], data);
     },
     onError: (mutationError) => {
       const failureMessage = errorMessage(mutationError);

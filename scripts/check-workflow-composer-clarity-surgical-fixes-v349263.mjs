@@ -18,7 +18,7 @@ function check(label, condition) {
 }
 
 check('Workflow Composer still suppresses the obsolete assign-owner step when responsibility already exists.',
-  page.includes("step === 'assign_human_owner' && responsibilityAlreadyAssigned(blueprint)")
+  page.includes('actionableWorkflowSteps(blueprint.recommended_steps_preview || [], responsibilityAlreadyAssigned(blueprint), triggerStatus)') && read('src/pages/workflowStateGuidance.ts').includes("if (step === 'assign_human_owner' && alreadyAssigned) return false;")
   && page.includes('responsibility?.assignee_name')
   && page.includes('responsibility?.responsible_role'));
 
@@ -60,8 +60,8 @@ check('Duplicate titles are detected using the user-visible title.',
 
 check('A compact source reference is shown only when a title is duplicated.',
   page.includes('function shortSourceReference(blueprint: WorkflowBlueprint): string | null')
-  && page.includes('duplicateTitle && sourceReference')
-  && page.includes('ui("Reference")'));
+  && page.includes('{duplicateTitle ? (') && page.includes('sourceReference || String(blueprintIndex + 1)')
+  && page.includes("ui(sourceReference ? 'Reference' : 'Plan number')"));
 
 check('UUID references are shortened rather than exposing a full UUID in the normal card.',
   page.includes("const uuidPrefix = tail.match(/^([0-9a-f]{8})-/i);")

@@ -20,7 +20,7 @@ check('Planning-run creation still emits the standardized success toast', create
 check('Planning-run creation no longer duplicates the same success into the persistent page banner', !createBlock.includes('setMessage(successMessage);'));
 check('Planning-run generation clears any previous page banner before starting', handleGenerateBlock.includes("setMessage('');"));
 check('Planning-run generation still clears previous page errors before starting', handleGenerateBlock.includes("setError('');"));
-check('Planning-run creation still selects the newly created run', createBlock.includes('setSelectedRunId(data.run.id);'));
+check('Planning-run creation still selects the newly created run', createBlock.includes('setSearchParams(withReplenishmentRunSelection(next, data.run.id))') && createBlock.includes("setQueryData<PlanningRunListItem[]>(['location-replenishment-runs', 'all']"));
 check('Planning-run creation still refreshes the saved-run list', createBlock.includes("invalidateQueries({ queryKey: ['location-replenishment-runs'] })"));
 check('Planning-run creation still seeds the exact new-run detail cache', createBlock.includes("setQueryData(['location-replenishment-run', data.run.id], data)"));
 check('Shared API mutation feedback remains suppressed to avoid a third success surface', page.includes("skipMutationFeedback: true"));

@@ -16,7 +16,7 @@ const requiredPageContracts = [
   ['parent-owned completion key increment', 'key: current.key + 1'],
   ['specific successful completion message', 'Quick consume recorded successfully'],
   ['global success feedback', 'detail: { type: "success", message: completionMessage }'],
-  ['global failure feedback', 'detail: { type: "error", message: `Quick consume failed: ${message}` }'],
+  ['global failure feedback', 'detail: { type: "error", message: `${ui("Quick consume failed: ")}${message}` }'],
   ['mutation promise returned to the panel', 'return barcodeUsageMutation.mutateAsync({']
 ];
 

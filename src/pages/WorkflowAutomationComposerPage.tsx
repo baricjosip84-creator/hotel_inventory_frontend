@@ -377,10 +377,14 @@ function responsibilityText(blueprint: WorkflowBlueprint, ui: (englishText: stri
 function responsibilityAlreadyAssigned(blueprint: WorkflowBlueprint): boolean {
   const responsibility = blueprint.responsibility;
   const assignmentState = String(responsibility?.assignment_state || '').trim().toLowerCase();
+  // A pending, offered, unknown or explicitly unassigned responsibility is
+  // not evidence of an assigned owner. Never hide the owner-assignment step
+  // solely because the backend supplied a nonempty provisional state.
+  if (['unassigned', 'pending', 'offered', 'unknown', 'none'].includes(assignmentState)) return false;
   return Boolean(
     responsibility?.assignee_name
     || responsibility?.responsible_role
-    || (assignmentState && assignmentState !== 'unassigned')
+    || ['assigned', 'accepted', 'claimed', 'in_progress', 'working', 'active', 'completed'].includes(assignmentState)
   );
 }
 

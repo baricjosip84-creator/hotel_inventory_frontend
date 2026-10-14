@@ -2,6 +2,7 @@ import { csvSpreadsheetCell } from '../lib/spreadsheetCsv';
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAppTranslation } from "../i18n/I18nContext";
+import { safeInventoryUsageStockQuantity } from './inventoryUsage/inventoryUsageSafeQuantity';
 import { formatLocalizedNumber } from "../i18n/formatters";
 
 import { InventoryUsageDashboard } from "./inventoryUsage/InventoryUsageDashboard";
@@ -177,9 +178,9 @@ export default function InventoryUsagePage() {
     },
     onSuccess: async (data, variables) => {
       const productName = data.product?.name || ui("Inventory item");
-      const restoredQuantity = data.stock ? Number(data.stock.restored_quantity) : null;
-      const previousQuantity = data.stock ? Number(data.stock.previous_quantity) : null;
-      const newQuantity = data.stock ? Number(data.stock.new_quantity) : null;
+      const restoredQuantity = safeInventoryUsageStockQuantity(data.stock?.restored_quantity);
+      const previousQuantity = safeInventoryUsageStockQuantity(data.stock?.previous_quantity);
+      const newQuantity = safeInventoryUsageStockQuantity(data.stock?.new_quantity);
       const unit = data.product?.unit?.trim() || ui("units");
       const stockSummary = restoredQuantity !== null
         && previousQuantity !== null

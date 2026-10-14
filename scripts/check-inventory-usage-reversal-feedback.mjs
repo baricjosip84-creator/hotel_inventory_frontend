@@ -26,9 +26,10 @@ for (const [label, contract] of requiredApiContracts) {
 
 const requiredPageContracts = [
   ['specific success wording', 'Inventory usage reversed successfully'],
-  ['restored stock details', 'restored; stock ${previousQuantity} → ${newQuantity}.'],
+  ['restored stock details', '${ui("restored; stock")} ${formatLocalizedNumber(previousQuantity, locale)} → ${formatLocalizedNumber(newQuantity, locale)}.'],
+  ['stock evidence is finite and non-empty', 'safeInventoryUsageStockQuantity(data.stock?.restored_quantity)'],
   ['success feedback event', 'detail: { type: "success", message: completionMessage }'],
-  ['specific failure wording', 'Inventory usage reversal failed: ${message}'],
+  ['specific failure wording', '${ui("Inventory usage reversal failed: ")}${message}'],
   ['usage summary refresh', 'queryKey: ["inventory-usage-summary-page"]'],
   ['usage ledger refresh', 'queryKey: ["inventory-usage-logs-page"]']
 ];
