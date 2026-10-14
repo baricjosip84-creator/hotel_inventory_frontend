@@ -21,6 +21,7 @@ import {
   OperationalWorkspaceTabs
 } from '../components/ui/OperationalWorkspace';
 import './ReplenishmentPlanningPage.css';
+import { resolveReplenishmentRunSelection, withReplenishmentRunSelection } from './replenishmentRunSelection';
 
 const DECISIONS = ['pending', 'accepted', 'overridden', 'rejected', 'deferred', 'already_handled'] as const;
 type Decision = (typeof DECISIONS)[number];
@@ -254,6 +255,9 @@ export default function ReplenishmentPlanningPage() {
   const { locale, ui } = useAppTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const sourceParLevelId = searchParams.get('source_par_level_id')?.trim() || '';
+  // Run selection lives in the URL so cross-workflow review, refresh and browser history
+  // cannot silently switch the operator to another saved planning snapshot.
+  const requestedRunId = searchParams.get('run_id')?.trim() || '';
   const handoffActive = Boolean(sourceParLevelId);
   const capabilities = getRoleCapabilities();
   const replenishmentAttentionItemsQuery = useOperationalAttentionItems(
@@ -318,7 +322,6 @@ export default function ReplenishmentPlanningPage() {
     deferred: 'Defer decision',
     already_handled: 'Already handled outside this plan'
   }[value]);
-  const [selectedRunId, setSelectedRunId] = useState('');
   const [coverageDays, setCoverageDays] = useState(14);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -332,8 +335,11 @@ export default function ReplenishmentPlanningPage() {
     queryKey: ['location-replenishment-runs', sourceParLevelId || 'all'],
     queryFn: () => listRuns(sourceParLevelId)
   });
-  const effectiveRunId = selectedRunId || runsQuery.data?.[0]?.id || '';
-  const currentHandoffRun = handoffActive ? runsQuery.data?.find((run) => run.id === effectiveRunId) || runsQuery.data?.[0] : undefined;
+  // An explicit, unavailable run MUST NOT silently fall through to another run.
+  const runSelection = resolveReplenishmentRunSelection(requestedRunId, runsQuery.data?.map((run) => run.id));
+  const unavailableRequestedRun = runSelection.unavailable && !runsQuery.isError;
+  const effectiveRunId = runSelection.runId;
+  const currentHandoffRun = handoffActive ? runsQuery.data?.find((run) => run.id === effectiveRunId) : undefined;
   const handoffProductId = currentHandoffRun?.handoff_product_id || '';
   const handoffStorageLocationId = currentHandoffRun?.handoff_storage_location_id || '';
   const currentRunNeedsReviewAttention = Boolean(
@@ -353,6 +359,17 @@ export default function ReplenishmentPlanningPage() {
     enabled: Boolean(effectiveRunId && detailQuery.data?.run.status === 'materialized')
   });
 
+  // Browser Back/Forward also changes the selected run. Never carry unsaved
+  // line decisions, old success messages or filters into a different snapshot.
+  useEffect(() => {
+    setDrafts({});
+    setMessage('');
+    setError('');
+    setLineSearch('');
+    setDecisionFilter('all');
+    setConfirmation(null);
+  }, [effectiveRunId]);
+
   const createMutation = useMutation({
     mutationFn: createRun,
     onSuccess: async (data) => {
@@ -360,7 +377,13 @@ export default function ReplenishmentPlanningPage() {
       showTenantActionSuccess(successMessage);
       setError('');
       setDrafts({});
-      setSelectedRunId(data.run.id);
+      // Newly generated runs may not be included in the originating par-level filter.
+      // Clear that filter before selecting the newly created run, but retain a durable URL.
+      const next = new URLSearchParams(searchParams);
+      next.delete('source_par_level_id');
+      next.delete('source_optimization_plan_id');
+      next.delete('source_optimization_item_id');
+      setSearchParams(withReplenishmentRunSelection(next, data.run.id));
       await queryClient.invalidateQueries({ queryKey: ['location-replenishment-runs'] });
       queryClient.setQueryData(['location-replenishment-run', data.run.id], data);
     },
@@ -565,8 +588,8 @@ export default function ReplenishmentPlanningPage() {
     next.delete('source_par_level_id');
     next.delete('source_optimization_plan_id');
     next.delete('source_optimization_item_id');
-    setSelectedRunId('');
-    setSearchParams(next, { replace: true });
+    next.delete('run_id');
+    setSearchParams(next);
   };
 
   const refreshPage = async () => {
@@ -583,7 +606,7 @@ export default function ReplenishmentPlanningPage() {
 
   const changeRun = (nextRunId: string) => {
     if (changedDecisions.length && !window.confirm(ui('Discard unsaved planning decisions and open another run?'))) return;
-    setSelectedRunId(nextRunId);
+    setSearchParams(withReplenishmentRunSelection(searchParams, nextRunId));
     setDrafts({});
     setLineSearch('');
     setDecisionFilter('all');
@@ -765,6 +788,13 @@ export default function ReplenishmentPlanningPage() {
             </select>
           </label>
         </div>
+        {unavailableRequestedRun ? (
+          <div className="replenishment-planning-warning-note" role="alert">
+            <strong>{ui('The selected planning run is not available in this view.')}</strong>{' '}
+            {ui('It may have been removed or does not match the originating product and location. No other run has been opened in its place.')}{' '}
+            <button type="button" className="app-button app-button--secondary" onClick={() => changeRun('')}>{ui('Choose an available run')}</button>
+          </div>
+        ) : null}
         {handoffActive ? runsQuery.isLoading ? <div className="replenishment-planning-note">{ui('Finding a saved planning run for the source decision…')}</div> : runsQuery.data?.length ? <div className="replenishment-planning-note"><strong>{ui('Opened from Cross-Domain Optimization.')}</strong> {ui('The newest saved planning run containing the same product and destination location is selected. The original optimization recommendation was not tied to a specific replenishment run ID, so the app will not silently open an unrelated run.')} <button type="button" className="app-button app-button--secondary" onClick={clearSourceHandoff}>{ui('Show all planning runs')}</button></div> : <div className="replenishment-planning-warning-note"><strong>{ui('No saved planning run matches this source decision.')}</strong> {ui('The original replenishment scope is unavailable in saved planning runs. Generate a fresh run for current data or show all runs; no unrelated run has been selected.')} <button type="button" className="app-button app-button--secondary" onClick={clearSourceHandoff}>{ui('Show all planning runs')}</button></div> : null}
         {!canGenerate ? <div className="replenishment-planning-note">{ui("Your role can review planning runs but cannot generate a new run.")}</div> : null}
         {!handoffActive && !runsQuery.isLoading && runsQuery.data?.length === 0 ? (

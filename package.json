@@ -6,6 +6,8 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "check:replenishment-run-selection-fe223": "node scripts/check-replenishment-run-selection-audit-fe223.mjs",
+    "check:workflow-state-guidance-fe223": "node scripts/check-workflow-state-guidance-audit-fe223.mjs",
     "check:cross-domain-durable-route-state": "node --experimental-strip-types scripts/check-cross-domain-durable-route-state.mjs",
     "check:execution-task-queue-selection": "node scripts/check-execution-task-queue-selection.mjs",
     "check:learning-feedback-focus-and-cancel": "node scripts/check-learning-feedback-focus-and-cancel.mjs",

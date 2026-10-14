@@ -15,6 +15,7 @@ import {
   OperationalWorkspaceStatus
 } from '../components/ui/OperationalWorkspace';
 import './WorkflowAutomationComposerPage.css';
+import { actionableWorkflowSteps, isTerminalSourceStatus } from './workflowStateGuidance';
 
 type WorkflowDomain =
   | 'execution'
@@ -761,8 +762,9 @@ export default function WorkflowAutomationComposerPage() {
                 const sourceLink = blueprintSourceLink(blueprint);
                 const urgencyValue = blueprint.escalation_policy_preview?.urgency || blueprint.trigger_preview?.trigger_urgency;
                 const approvalSteps = blueprint.approval_chain_preview || [];
-                const suggestedSteps = (blueprint.recommended_steps_preview || []).filter((step) => !(step === 'assign_human_owner' && responsibilityAlreadyAssigned(blueprint)));
                 const triggerStatus = blueprint.trigger_preview?.trigger_status || blueprint.trigger_preview?.contract_status;
+                const terminalSource = isTerminalSourceStatus(triggerStatus);
+                const suggestedSteps = actionableWorkflowSteps(blueprint.recommended_steps_preview || [], responsibilityAlreadyAssigned(blueprint), triggerStatus);
                 const visibleTitle = sourceTitle(blueprint, ui);
                 const duplicateTitle = blueprints.filter((candidate) => sourceTitle(candidate, ui) === visibleTitle).length > 1;
                 const sourceReference = shortSourceReference(blueprint);
@@ -810,12 +812,14 @@ export default function WorkflowAutomationComposerPage() {
                       <div className="workflow-composer-page__situation-panel">
                         <div className="workflow-composer-page__context-label">{ui("What should happen next")}</div>
                         <p className="card__subtext workflow-composer-page__blueprint-summary">
-                          {localizedGuidance(
-                            blueprint.recommended_next_step_key,
-                            blueprint.recommended_next_step,
-                            'Follow the suggested steps and continue in the source workflow.',
-                            ui
-                          )}
+                          {terminalSource
+                            ? ui('This source work is already closed. Review its recorded result; no new execution is suggested.')
+                            : localizedGuidance(
+                                blueprint.recommended_next_step_key,
+                                blueprint.recommended_next_step,
+                                'Follow the suggested steps and continue in the source workflow.',
+                                ui
+                              )}
                         </p>
                       </div>
                     </div>
@@ -861,7 +865,7 @@ export default function WorkflowAutomationComposerPage() {
                                 {suggestedSteps.map((step) => <li key={step}>{plainStep(step, ui)}</li>)}
                               </ol>
                             ) : (
-                              <p className="card__subtext">{ui("No suggested steps were returned.")}</p>
+                              <p className="card__subtext">{terminalSource ? ui('The source workflow is closed; no further action steps are suggested.') : ui('No suggested steps were returned.')}</p>
                             )}
                           </div>
                           <div className="workflow-composer-page__plan-panel">
