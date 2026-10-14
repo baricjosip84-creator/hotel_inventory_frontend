@@ -10799,6 +10799,7 @@ const rows: readonly TranslationRow[] = [
   ["No active reorder quantity is currently recommended.", "Derzeit wird keine aktive Nachbestellmenge empfohlen.", "Actualmente no se recomienda ninguna cantidad activa de reposición.", "Aucune quantité de réapprovisionnement active n’est actuellement recommandée.", "Trenutačno se ne preporučuje aktivna količina za ponovnu narudžbu."],
   ["No active supplier risk flags.", "Keine aktiven Lieferanten-Risikoindikatoren.", "No hay indicadores activos de riesgo del proveedor.", "Aucun indicateur de risque fournisseur actif.", "Nema aktivnih signala rizika dobavljača."],
   ["No active supplier risk flags. Keep normal monitoring and periodic review cadence.", "Keine aktiven Lieferanten-Risikoindikatoren. Behalten Sie die normale Überwachung und den regelmäßigen Prüfungsrhythmus bei.", "No hay indicadores activos de riesgo del proveedor. Mantenga la supervisión normal y una revisión periódica.", "Aucun indicateur de risque fournisseur actif. Maintenez la surveillance normale et une cadence de revue périodique.", "Nema aktivnih signala rizika dobavljača. Održavajte uobičajeno praćenje i periodični ritam pregleda."],
+  ["No unusual outbound activity detected.", "Keine ungewöhnliche Abgangsaktivität festgestellt.", "No se ha detectado actividad saliente inusual.", "Aucune activité sortante inhabituelle détectée.", "Nije otkrivena neuobičajena izlazna aktivnost."],
   ["No anomaly rows returned.", "Keine Anomaliezeilen zurückgegeben.", "No se devolvieron filas de anomalías.", "Aucune ligne d’anomalie retournée.", "Nisu vraćeni retci anomalija."],
   ["No blocking anomaly-review issues were found.", "Keine blockierenden Probleme bei der Anomalieprüfung gefunden.", "No se encontraron problemas bloqueantes en la revisión de anomalías.", "Aucun problème bloquant trouvé lors de la revue des anomalies.", "Nisu pronađeni blokirajući problemi u pregledu anomalija."],
   ["No depletion risk rows returned.", "Keine Zeilen mit Verbrauchsrisiko zurückgegeben.", "No se devolvieron filas de riesgo de agotamiento.", "Aucune ligne de risque d’épuisement retournée.", "Nisu vraćeni retci rizika iscrpljivanja."],
@@ -14416,6 +14417,8 @@ const rows: readonly TranslationRow[] = [
   ["Attribute names must be unique.", "Attributnamen müssen eindeutig sein.", "Los nombres de atributo deben ser únicos.", "Les noms d’attribut doivent être uniques.", "Nazivi atributa moraju biti jedinstveni."],
   ["Color", "Farbe", "Color", "Couleur", "Boja"],
   ["Red", "Rot", "Rojo", "Rouge", "Crvena"],
+  ["Linked alert could not be loaded.", "Die verknüpfte Warnung konnte nicht geladen werden.", "No se pudo cargar la alerta vinculada.", "Impossible de charger l’alerte liée.", "Povezano upozorenje nije moguće učitati."],
+  ["The linked alert is shown separately and is not included in the filtered totals.", "Die verknüpfte Warnung wird separat angezeigt und nicht in die gefilterten Summen eingerechnet.", "La alerta vinculada se muestra por separado y no se incluye en los totales filtrados.", "L’alerte liée s’affiche séparément et n’est pas comprise dans les totaux filtrés.", "Povezano upozorenje prikazuje se zasebno i nije uključeno u filtrirane ukupne brojeve."],
 ];
 
 const indexes: Record<AppLocale, number> = { 'en-GB': 0, 'de-DE': 1, 'es-ES': 2, 'fr-FR': 3, 'hr-HR': 4 };

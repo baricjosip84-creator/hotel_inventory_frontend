@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
+import { formatNullableAlertQuantity, isFocusedAlertOutsideFilters, mergeFocusedAlert, summarizeFilteredAlerts } from '../lib/alertQueueIntegrity';
 import type { AppLocale } from '../i18n/config';
 import {
   formatAlertMessage,
@@ -193,10 +194,8 @@ function formatDateTime(value: string | null | undefined, locale: AppLocale): st
 }
 
 function quantityLabel(value: number | string | null | undefined, locale: AppLocale, unit?: string | null): string {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return '—';
-  const formatted = formatLocalizedNumber(numeric, locale, { maximumFractionDigits: 4 });
-  return unit ? `${formatted} ${unit}` : formatted;
+  return formatNullableAlertQuantity(value, unit, (numeric) =>
+    formatLocalizedNumber(numeric, locale, { maximumFractionDigits: 4 }));
 }
 
 function severityLabel(severity: AlertSeverity, ui: (englishText: string) => string): string {
@@ -434,12 +433,12 @@ export default function AlertsPage() {
     }
   });
 
-  const alerts = useMemo(() => {
-    const baseAlerts = alertsQuery.data ?? [];
-    const focusedAlert = focusedAlertQuery.data;
-    if (!focusedAlert) return baseAlerts;
-    return [focusedAlert, ...baseAlerts.filter((alert) => alert.id !== focusedAlert.id)];
-  }, [alertsQuery.data, focusedAlertQuery.data]);
+  const filteredAlerts = alertsQuery.data ?? [];
+  const alerts = useMemo(
+    () => mergeFocusedAlert(filteredAlerts, focusedAlertQuery.data),
+    [filteredAlerts, focusedAlertQuery.data]
+  );
+  const focusedOutsideFilters = isFocusedAlertOutsideFilters(filteredAlerts, focusedAlertQuery.data);
 
   useEffect(() => {
     if (!requestedAlertId || !focusedAlertQuery.data) return;
@@ -453,15 +452,9 @@ export default function AlertsPage() {
       document.getElementById('alerts-queue')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }, [alerts.length, alertsQuery.isLoading, focusQueue]);
-  const summary = useMemo(
-    () => ({
-      total: alerts.length,
-      unresolved: alerts.filter((alert) => !alert.resolved).length,
-      critical: alerts.filter((alert) => !alert.resolved && alert.severity === 'critical').length,
-      unacknowledged: alerts.filter((alert) => !alert.resolved && !alert.acknowledged).length
-    }),
-    [alerts]
-  );
+  // The separately loaded linked alert is not necessarily part of the applied filter.
+  // Count only the server-filtered queue, not a pinned record outside that queue.
+  const summary = useMemo(() => summarizeFilteredAlerts(filteredAlerts), [filteredAlerts]);
 
   const updateManualAlertField = (field: keyof ManualAlertFormState, value: string) => {
     setManualAlertForm((current) => ({ ...current, [field]: value }));
@@ -740,6 +733,17 @@ export default function AlertsPage() {
           {alertsQuery.isFetching ? <span style={styles.refreshingText}>{ui('Refreshing…')}</span> : null}
         </div>
 
+        {requestedAlertId && focusedAlertQuery.isError ? (
+          <div className="app-error-state" style={styles.messageBox} role="alert">
+            <strong>{ui('Linked alert could not be loaded.')}</strong>
+            <span>{mutationErrorMessage(focusedAlertQuery.error, ui('The alert request failed.'))}</span>
+          </div>
+        ) : null}
+        {focusedOutsideFilters ? (
+          <div className="app-warning-state" style={styles.messageBox} role="status">
+            {ui('The linked alert is shown separately and is not included in the filtered totals.')}
+          </div>
+        ) : null}
         {alerts.length === 0 ? (
           <div className="app-empty-state" style={styles.emptyState}>
             <strong>{ui('No alerts match the applied filters.')}</strong>
