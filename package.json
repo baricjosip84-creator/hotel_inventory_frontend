@@ -551,7 +551,8 @@
     "check:csv-spreadsheet-formula-safety": "node --experimental-strip-types scripts/check-csv-spreadsheet-formula-safety.mjs",
     "check:feed-anomaly-freshness": "node --experimental-strip-types scripts/check-feed-anomaly-freshness.mjs",
     "check:reservation-requisition-url-selection": "node scripts/check-reservation-requisition-url-selection.cjs",
-    "check:alert-queue-integrity": "node scripts/check-alert-queue-integrity.mjs"
+    "check:alert-queue-integrity": "node scripts/check-alert-queue-integrity.mjs",
+    "check:advanced-inventory-durable-route": "node scripts/check-advanced-inventory-durable-route.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
