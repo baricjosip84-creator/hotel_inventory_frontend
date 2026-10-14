@@ -90,7 +90,8 @@ if (!storageSource.includes("location.temperature_zone ? location.temperature_zo
 if (storageSource.includes('{ui(formatTemperatureZone(location.temperature_zone))}')) {
   fail('Tenant-entered storage-condition evidence must not be reinterpreted through the translation catalog.');
 }
-if (!storageSource.includes('value={zone} label={ui(zone)}')) {
+if (!storageSource.includes('value={zone} label={ui(zone)}')
+  && !storageSource.includes('<option key={zone} value={zone}>{ui(zone)}</option>')) {
   fail('Recommended storage-condition suggestions must keep canonical values while displaying localized labels.');
 }
 if (storageSource.includes('>Create Storage Location<') || storageSource.includes("setFormMessage('Storage location created successfully.')")) {

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
 import { apiRequest, ApiError } from '../lib/api';
 import { scrollToFormSection } from '../lib/scrollToForm';
+import { supplierDirectorySearchParams, supplierDirectoryShowAllParams } from '../lib/supplierDirectoryUrl';
 import { getCurrentAccessRoleLabel, getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import type { SupplierItem } from '../types/inventory';
 import { InventoryCsvImportPanel } from '../components/imports/InventoryCsvImportPanel';
@@ -474,10 +475,22 @@ export default function SuppliersPage() {
 
   const requestedSupplier = requestedSupplierId ? supplierById.get(requestedSupplierId) ?? null : null;
 
+  // A supplier deep link is a temporary selection, not a permanent search lock.
+  // Typing in the search field must remove that selection before applying the query.
+  const changeSupplierSearch = (nextValue: string) => {
+    setSearch(nextValue);
+    if (!requestedSupplierId) return;
+    const nextParams = supplierDirectorySearchParams(searchParams, nextValue);
+    // Keep the URL synchronizer from treating this intentional change as stale input.
+    lastSyncedSearchParamsRef.current = nextParams.toString();
+    setSearchParams(nextParams, { replace: true });
+  };
+
   const clearRequestedSupplier = () => {
-    const nextSearchParams = new URLSearchParams(searchParams);
-    nextSearchParams.delete('supplier_id');
-    setSearchParams(nextSearchParams, { replace: true });
+    const nextParams = supplierDirectoryShowAllParams(searchParams);
+    setSearch('');
+    lastSyncedSearchParamsRef.current = nextParams.toString();
+    setSearchParams(nextParams, { replace: true });
   };
 
   const slaBreachBySupplierId = useMemo(() => {
@@ -756,14 +769,14 @@ export default function SuppliersPage() {
                 type="search"
                 placeholder={ui("Supplier name, email, address, phone, tax ID, or contact info")}
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => changeSupplierSearch(event.target.value)}
                 style={styles.searchInput}
                 autoComplete="off"
               />
               <button
                 type="button"
                 style={!search ? styles.disabledButton : styles.secondaryButton}
-                onClick={() => setSearch('')}
+                onClick={() => changeSupplierSearch('')}
                 disabled={!search}
               >
                 {ui("Clear Search")}
@@ -827,9 +840,11 @@ export default function SuppliersPage() {
                 {filteredSuppliers.length === 0 ? (
                   <tr>
                     <td style={styles.emptyCell} colSpan={6}>
-                      {search.trim()
-                        ? ui("No suppliers match the current search.")
-                        : ui("No suppliers have been created yet.")}
+                      {requestedSupplierId
+                        ? ui('The linked supplier is not available in the current tenant view.')
+                        : search.trim()
+                          ? ui("No suppliers match the current search.")
+                          : ui("No suppliers have been created yet.")}
                     </td>
                   </tr>
                 ) : (
