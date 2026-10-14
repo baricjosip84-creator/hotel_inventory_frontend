@@ -1038,6 +1038,8 @@ async function decideRecommendationsBulk(
         status,
         note: note || null,
       }),
+      // This page shows authoritative partial-success/error details inline.
+      skipMutationFeedback: true,
     },
   );
 }
@@ -1098,6 +1100,8 @@ async function convertRecommendationsToPoDrafts(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ product_ids: productIds }),
+      // This page shows authoritative partial-success/error details inline.
+      skipMutationFeedback: true,
     },
   );
 }
@@ -2482,7 +2486,7 @@ export default function ProcurementRecommendationsPage() {
             value={formatUiNumber(selectedProductIds.length, 0)}
           />
           <StatCard
-            label={ui("Ready to approve")}
+            label={ui("Approval checks met")}
             value={formatUiNumber(approvableSelectedCount, 0)}
             tone={
               approvableSelectedCount === selectedProductIds.length &&
@@ -2517,6 +2521,9 @@ export default function ProcurementRecommendationsPage() {
                 : "good"
             }
           />
+        </div>
+        <div style={{ ...styles.mutedText, marginTop: 8 }}>
+          {ui("Approval checks can include already-approved recommendations. PO draft eligibility is counted separately.")}
         </div>
         <label style={{ ...styles.label, marginTop: 12 }}>
           {ui("Bulk decision note")}

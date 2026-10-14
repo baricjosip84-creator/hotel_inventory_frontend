@@ -2,6 +2,9 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // FE207: clarify approval checks for already-approved recommendations.
+  ["Approval checks met", "Genehmigungskriterien erfüllt", "Criterios de aprobación cumplidos", "Critères d’approbation remplis", "Kriteriji odobrenja zadovoljeni"],
+  ["Approval checks can include already-approved recommendations. PO draft eligibility is counted separately.", "Die Genehmigungskriterien können auch bereits genehmigte Empfehlungen umfassen. Die Eignung für Bestellentwürfe wird separat gezählt.", "Los criterios de aprobación pueden incluir recomendaciones ya aprobadas. La elegibilidad para borradores de órdenes de compra se cuenta por separado.", "Les critères d’approbation peuvent inclure des recommandations déjà approuvées. L’admissibilité aux brouillons de commande est comptée séparément.", "Kriteriji odobrenja mogu uključivati već odobrene preporuke. Mogućnost izrade nacrta narudžbenice broji se zasebno."],
   // FE202: task selected from a deep link must not pollute the filtered work queue.
   ["Selected task is outside the current queue filters. It remains available in Task detail.", "Die ausgewählte Aufgabe liegt außerhalb der aktuellen Wartelistenfilter. Sie bleibt unter Aufgabendetails verfügbar.", "La tarea seleccionada no coincide con los filtros actuales de la cola. Sigue disponible en Detalle de tarea.", "La tâche sélectionnée ne correspond pas aux filtres actuels de la file. Elle reste disponible dans Détails de la tâche.", "Odabrani zadatak nije obuhvaćen trenutačnim filtrima reda čekanja. I dalje je dostupan u detaljima zadatka."],
   // Batch 140: a cancelled customer order is not a newly created item.

@@ -554,7 +554,8 @@
     "check:alert-queue-integrity": "node scripts/check-alert-queue-integrity.mjs",
     "check:advanced-inventory-durable-route": "node scripts/check-advanced-inventory-durable-route.mjs",
     "check:po-deep-link-and-provenance": "node --experimental-strip-types scripts/check-purchase-order-deep-link-and-provenance.mjs",
-    "check:procurement-po-page-scope": "node scripts/check-procurement-draft-review-page-scope.mjs"
+    "check:procurement-po-page-scope": "node scripts/check-procurement-draft-review-page-scope.mjs",
+    "check:procurement-decision-feedback-and-criteria": "node scripts/check-procurement-decision-feedback-and-criteria.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

@@ -12745,3 +12745,648 @@ OPEN: September CASE=24 and test_country=Croatia PostgreSQL saving failures;
 deployed Products/Reports valuation parity; fresh Node24 production build;
 all original browser/tenant functional acceptance; migration 561 execution.
 ================================================================================
+
+
+================================================================================
+2026-10-14 — BACKEND 116 / FRONTEND 189 — CURRENT LOCATION ACTIVITY REPAIR
+================================================================================
+Actual backend source files changed:
+  src/services/analytics/reportService.js
+  src/services/inventory/financialIntelligenceService.js
+  scripts/check-slow-moving-active-location-activity.cjs (new regression)
+  scripts/check-location-specific-financial-stock-aging.cjs (new regression)
+  package.json (new dedicated test commands)
+  .github/workflows/phase16-production-validation.yml (runs new checks)
+
+Corrected: Slow-Moving Stock no longer treats archived-location movement as
+proof that stock in active locations was moved. Financial Intelligence carrying
+cost and dead-stock risk use storage-location-specific movement age rather
+than a product-global latest movement. Records without a proven movement
+timestamp now have null/unknown stock age rather than false zero days.
+
+Before fix: 2 new tests FAIL on Backend115. After fix: 21/21 and 18/18
+focused checks PASS; 15 existing report scripts PASS; migration dependency
+and baseline scripts PASS. SQL execution against PostgreSQL, deployed
+acceptance, CASE24/Croatia saves, real valuation comparison, fresh Node24
+build, and 328 original audit cases were NOT marked as passing. No migration.
+Frontend 189 is otherwise unchanged (documentation refreshed).
+
+
+================================================================================
+2026-10-14 — FRONTEND 190 / BACKEND 117 — REPORT USAGE/FILTER ACTUAL CORRECTIONS
+================================================================================
+Corrections made in application source:
+(1) Usage Summary product dropdown now includes former product names captured
+on usage-linked stock movements as well as current names. Tenant boundaries
+and reversal exclusions apply to BOTH lookup branches; unrelated stock
+movements and reversed usage do not populate this selector. Previously the
+report query could search former names but the UI list did not offer them.
+(2) Usage Summary sorts quantity_evidence_status=mixed/unproven rows, whose
+total_consumed is NULL, AFTER proven totals (NULLS LAST). PostgreSQL defaults
+to NULLS FIRST under DESC; the prior behavior let unknown totals crowd out
+actual proven totals when the result cap applied. Unknown totals remain
+unknown, not zero.
+(3) Reports > Low Stock changing scope from PAR/both to Product minimum
+clears the previous location selection atomically. Product minimum is
+company-wide; the disabled location field must not display a misleading
+active filter from the previous PAR view.
+
+Files changed:
+  backend/src/services/analytics/reportService.js
+  backend/scripts/check-reports-usage-filter-history-and-scope.cjs (new)
+  backend/scripts/check-batch196-historical-report-filter-coverage.cjs (updated)
+  backend/package.json
+  backend/.github/workflows/phase16-production-validation.yml
+  frontend/src/pages/ReportsPage.tsx
+
+Verification: previous FE189/BE116 fails the new 21-check script (missing
+former name). New FE190/BE117 passes 21/21 new regression checks, plus 18
+other selected inherited offline scripts = 19/19 scripts passing. Backend JS
+node --check and Frontend TSX parser pass. No live browser or PostgreSQL run.
+No new database migration and no change to transaction or stock data.
+
+Not marked resolved: original CASE=24 and Croatia persistence live failures;
+production clean builds/deploy, migration 561 execution, and all individual
+original audit acceptance cases. They remain not verified.
+
+================================================================================
+2026-10-14 — FRONTEND 191 / BACKEND 117 — OPERATIONS FEED SOURCE NAVIGATION REPAIR
+================================================================================
+Confirmed source defect: Operations Feed frontend route whitelist omitted valid
+backend-emitted source surfaces (including Products, Suppliers, Stock,
+Purchase Orders, Storage Locations, Collaboration, Cross-domain Optimization).
+The feed therefore displayed source records without a working source-page link.
+Frontend191 accepts only known tenant pages, carries a safe record-selection
+query string, preserves the existing Action Center aliases, and rejects
+unsupported/external routes. Search now matches timeline IDs, correlation IDs,
+source IDs/types and delivery event names. Updated search placeholder has full
+DE/ES/FR/HR translations. Backend117 unchanged; no schema migration.
+
+Source changes:
+  frontend/src/pages/RealTimeOperationsFeedPage.tsx
+  frontend/src/i18n/tenantUiTranslations.ts
+  frontend/scripts/check-operations-feed-source-navigation-and-search.mjs (NEW)
+  frontend/package.json (test command)
+  frontend/.github/workflows/frontend-validation.yml (CI test step)
+
+Old Frontend190 fails new executable test; Frontend191 passes 33/33.
+Inherited Operations Feed guard 23/23, translation guard and Batch198 usage
+UI guard 8/8 pass. TSX syntax parse passes. No Node24 clean build / browser
+runtime proof; do not mark all original-audit findings accepted. This release
+is not a resolution of CASE=24/Croatia live database failures.
+
+================================================================================
+2026-10-14 — FRONTEND 192 / BACKEND 117 — SUPPLIER EXACT-LINK SEARCH UNLOCK
+================================================================================
+Original referenced finding: DASH-DEF-006 — supplier deep-link filter clarity/count.
+Additional reproducible source defect in Frontend 191: SuppliersPage respected the
+supplier_id query parameter ahead of the visible search input, so typing a new
+search while viewing an exact supplier appeared to do nothing; the "Show all
+suppliers" action removed supplier_id without clearing a previous search term,
+so it could misleadingly leave the list narrowed. Missing linked suppliers could
+also show "No suppliers have been created yet" rather than identifying the
+unavailable link.
+
+Source changes: frontend/src/pages/SuppliersPage.tsx uses supplierDirectorySearchParams
+and supplierDirectoryShowAllParams from frontend/src/lib/supplierDirectoryUrl.ts.
+New search and Clear Search remove the exact supplier selection and preserve
+unrelated query keys; "Show all suppliers" removes supplier_id AND stale search;
+URL state synchronization accounts for the deliberate change. Missing supplier
+rows show an appropriate linked-supplier error. Translation keys already existed.
+The previous frontend FAILS the new test; new frontend PASS 29/29. Existing
+Suppliers refresh PASS 33/33, Operations Feed PASS 33/33. Existing multilingual
+suite now PASS after correcting one stale storage-option expectation in the
+TEST ONLY (page already renders canonical value and translated label).
+The new supplier test is executed in frontend-validation GitHub Actions.
+
+NO backend runtime source change; Backend 117 code carried forward unchanged.
+NO database migration. Local source/regression checks only. Deployed tenant
+browser, PostgreSQL original CASE=24 and Croatia persistence, valuation parity,
+full original audit, clean Node24 build and staging acceptance NOT VERIFIED.
+Historical original findings and all prior fix entries retained.
+
+
+================================================================================
+2026-10-14 — STORAGE LOCATION EXACT-LINK SEARCH / FILTER CORRECTION
+Frontend 193 + Backend 117 (backend application source unchanged)
+================================================================================
+Confirmed current-source defect: opening /storage-locations?location_id=<id>
+pre-filtered the list to that ID BEFORE the visible Search and Storage condition
+filters, while the Clear Filters action only reset the visible two controls.
+A person could type a new search or clear all visible filters yet stay pinned
+to the old location. A missing linked ID displayed a misleading empty-state.
+
+Implemented:
+- Editing Search or Storage condition exits the exact linked-location focus,
+  updates the URL, and preserves the other active visible filter.
+- Clear Filters removes the hidden location_id restriction as well as search
+  and zone, retaining unrelated navigation URL parameters.
+- Focused result count displays the selected location's name and 1/N; a
+  missing linked location clearly says Storage location not found.
+- The Clear Filters button is enabled whenever location_id restricts results.
+- New source regression test and GitHub CI step.
+
+Local evidence: NEW 31/31, existing Suppliers 29/29, Storage feedback 25/25,
+CSV file picker 38/38, Operations Feed 33/33, multilingual suite PASS.
+The prior Frontend 192 fails the new check because it lacks these behaviors.
+No database migration. Backend 117 unchanged. Live tenant browser acceptance,
+full clean production build and the earlier CASE=24 / Croatia / valuation
+acceptance remain unverified. Do not mark the entire original audit closed.
+================================================================================
+
+================================================================================
+2026-10-14 — PRODUCT DIRECTORY EXACT-LINK SEARCH / FILTER FIX
+Frontend 194 + Backend 117 (no backend runtime changes; no migration)
+================================================================================
+CURRENT SOURCE DEFECT: Existing Frontend193 Products view gives a product_id
+URL focus precedence over visible text search and structured filters. Editing
+Search, Category, Supplier, Cost Status, Cost Basis, Standard Variance or
+scanning a new barcode does not clear the hidden product_id. Clear Product
+Filters is disabled if the ONLY restriction is product_id and does not clear
+product_id even when clicked. An invalid product_id gives a generic empty-state.
+An exact link combined with leftover structured filters can exclude that
+product from the backend results BEFORE client-side exact-ID focusing.
+
+IMPLEMENTED IN FRONTEND194:
+- All visible list search/filter controls and barcode scan exit exact product
+  focus before applying new visible criteria. Clear Product Filters removes
+  all filters plus the otherwise hidden focused ID. URL syncing preserves
+  unrelated parameters and removes product_id when focus has ended.
+- An exact product link explicitly displays the selected product's name and
+  a Show all products control; missing/deleted/wrong-tenant IDs clearly say
+  Product not found rather than implying there are no products.
+- Product list query ignores unrelated previous structured filters only while
+  a product_id exact link is being displayed, so stale filters cannot hide it.
+  Normal list query filtering resumes when a person changes a visible filter.
+- The count and CSV export use the same actual displayed list and a focused
+  link enables the Clear Product Filters button even with no text filters.
+- New localized Show all products label (EN/DE/ES/FR/HR), focused regression
+  check, npm script and GitHub Actions validation step.
+
+OFFLINE VERIFICATION: Products focus regression 41/41; previous Suppliers focus
+29/29; Storage Locations focus 31/31; Products multilingual PASS; prior
+Products picker 36/36, UoM association 44/44, UoM readback 94/94, Custom
+Fields contract 8/8, Storage feedback 25/25. TypeScript parser PASS for
+modified components. This is source/code-level verification, not deployed
+browser E2E, and full clean Node24 npm build was not available here.
+
+Production persistence, original CASE=24/Croatia database regressions, live
+valuation parity and the original full-page tenant audit remain unverified.
+No live claim of full closure. Preserve all older original audit records.
+================================================================================
+
+================================================================================
+2026-10-14 — SCANNER-TO-SHIPMENT EXACT-ID FALLBACK
+Frontend 195 + Backend 117 (unchanged backend runtime; no migration)
+================================================================================
+ORIGINAL AUDIT CONNECTION: Scanner / Shipments exact-record handoff and
+Dashboard-to-Shipments navigation reliability. Historical scanner test shows
+that exact shipment identity and focus were user-visible priorities.
+
+DEFECT VERIFIED IN FRONTEND194 SOURCE:
+The generic scanner shipment handoff (/shipments?shipmentId=<ID>) selects a
+shipment only if it is present in the current GET /shipments registry response.
+When that list is empty, failed or omits a valid linked record, navigation
+never opens the shipment or shows a false "not found in current list" error,
+despite GET /shipments/:id being available and used by the two other handoff
+paths (Dashboard and Purchase Orders). The query parameters remain stranded.
+
+IMPLEMENTED IN FRONTEND195:
+- Scanner handoff now first accepts exact matches from the ordinary registry.
+- When a linked ID is not in the completed registry list, request the shipment
+  by its own ID, reject mismatched replies, and integrate the exact record into
+  the local registry cache so the existing scanner selection/focus code works.
+- Leave scan parameters intact until resolved. Reject/forbidden/not-found
+  responses are displayed as backend errors rather than as false list results.
+- Cancel stale async results after URL changes or page unmount.
+- Dashboard / Purchase Orders direct handoffs are unchanged; scanner item
+  auto-receiving semantics are unchanged. Lookup itself never writes inventory.
+- New executable 20-check regression test and CI entry.
+
+OFFLINE VERIFICATION: New 20/20; existing scanner focus 16/16; shipment
+registry/detail/receiving/translation tests PASS; Operations Feed 33/33;
+Products deep-link 41/41; TSX and TS parser diagnostics 0; original FE194
+lacks the new helper and fails the regression. All ZIP CRC checks PASS.
+
+LIMITATIONS: No clean Node24 npm ci/full build/browser acceptance or real
+PostgreSQL staging acceptance was performed in this workspace. The full
+original audit remains open; do not claim its remaining original issues fixed.
+================================================================================
+
+================================================================================
+2026-10-14 — FRONTEND 196 / BACKEND 118 — CSV FORMULA-SAFETY SOURCE REPAIR
+================================================================================
+Actual source defect: tenant-controlled product names/notes, purchase-order
+fields, and inventory requisition data were exported as bare spreadsheet cells.
+Values beginning with =, +, - or @ (including whitespace-prefixed formulas)
+could be treated as formulas by spreadsheet software. Platform Audit CSV had
+an equivalent unsafe encoding path. Previous Frontend 195 reproducibly failed
+a new formula-safety test (Products export: =SUM(1,2)).
+
+IMPLEMENTED:
+- Shared safe CSV encoding for Products, Purchase Orders and Requisitions.
+- Preserves real negative/positive numeric literals, quotes and line breaks.
+- Platform Audit export now reuses the already-hardened backend CSV encoder.
+- Frontend and backend regressions wired into CI; no DB schema migration.
+
+LOCAL EVIDENCE: new end-to-end encoder/wiring regressions: 98/98 PASS;
+separate backend Platform Audit CSV 17/17 PASS; related Product, Purchasing,
+Requisition, Scanner and Reporting checks PASS. TS/JS parser checks PASS.
+Original FE195 fails the new test; this is an actual code correction.
+
+NOT VERIFIED: production deployment, user-browser spreadsheet opening,
+PostgreSQL acceptance, CASE=24 save persistence and Croatia custom-field
+persistence. Other original audit items still remain unverified. This entry
+does not convert any earlier PASS/FAIL/DEFERRED audit result into a live PASS.
+================================================================================
+
+================================================================================
+2026-10-14 — FRONTEND 197 / BACKEND 118 — EXPANDED CSV EXPORT-SAFETY REPAIR
+================================================================================
+New actual frontend correction: Eleven additional CSV export source files were
+still using older cell encoders, including an entirely unsafe CSV import-error
+exporter. Several old encoders did not protect whitespace-prefixed spreadsheet
+formulas such as '  =2+3' or tab-prefixed formulas. Some escaped literal
+negative numbers as text even when they were genuine numeric quantities.
+
+IMPLEMENTED: Reuse the existing canonical csvSpreadsheetCell converter in:
+- Import CSV validation error downloads
+- Execution Requests exports
+- Stock Transfers (filtered/detail) exports
+- Stock Movements exports
+- Procurement Recommendations exports
+- Insights exports
+- Inventory Usage history, dashboard, bulk readiness/result, governance,
+  period close preview/closures CSV exports
+Genuine negative quantities stay numeric; CSV quoting, embedded newlines and
+quotes are escaped correctly. Added runnable regression/TypeScript parser checks
+and wired new test into Frontend Validation CI.
+
+REPRODUCTION: This release's regression test runs the original exporter
+function from previous Frontend 196 and fails on a concrete unsafe
+whitespace-prefixed formula in import-validation CSV. Current source PASS
+126/126 checks across 11 files; 12 earlier related checks and language
+regressions also passed. The previous 98/98 safety regression passes with
+local Node22 TypeScript support enabled.
+
+DEPLOYMENT / ACCEPTANCE: No backend runtime change and no database migration.
+Only source-level checks were run. Browser, clean Node24 build, real CSV opened
+in Excel and live PostgreSQL were not tested; original CASE=24 and Croatia
+persistence checks and other audit issues remain unverified. Do not convert
+any historical audit FAIL/NOT VERIFIED to a production PASS.
+================================================================================
+
+
+================================================================================
+2026-10-14 — FRONTEND 198 / BACKEND 118 — OPERATIONS FEED FRESHNESS + INSIGHTS ANOMALY GATING
+================================================================================
+ORIGINAL FINDING LINKS: Operations Feed auto-refresh timestamp/health (OPER-DEF-001); Insights inappropriate anomalous-activity guidance (INSIGHTS-DEF-001). This fixes two remaining code-level edge cases, not the full original acceptance requirement.
+
+FIX 1 — OPERATIONS FEED: Status previously claimed Auto-refresh on after a background refresh error. It now reports Refresh failed and displays the locale-formatted time of the most recent SUCCESSFUL data fetch. While fetching, shows Refreshing. Empty initial state does not invent a timestamp. Data and filters remain unchanged; no mutation was introduced.
+
+FIX 2 — INSIGHTS: Unknown, empty, null or malformed anomaly tiers were previously treated as unusual because the code only excluded `normal`. Anomaly guidance and the visible unusual list now accept only recognized watch/high/critical tiers; normal or unknown does not trigger urgent guidance. If the backend supplies no actionable anomaly, the correct translated empty-state text says no unusual outbound activity detected rather than inaccurately saying the API returned zero rows.
+
+EVIDENCE: previous FE197 source contains both old failure patterns; new executable check 27/27 passes, source-navigation 33/33 passes, operations feed and Insights existing localization/behavior checks pass. All changed TypeScript files pass syntax parser. Node24 full frontend clean install/lint/build and deployed browser were not executed in this workspace; therefore NOT A PRODUCTION PASS. Original CASE=24, Croatia save issues, valuation parity and all other unresolved audit cases remain open.
+
+Source of truth FE198 / BE118. No database migration.
+================================================================================
+
+
+============================================================
+2026-10-14 — FRONTEND 199 / BACKEND 118 — RESERVATION + REQUISITION URL SELECTION
+============================================================
+REPAIR SCOPE: Inventory Reservations and Inventory Requisitions selected-record navigation. The previous pages maintained selection both in local React state and in URL parameters, so selecting from the queue or after a mutation could leave the URL and currently selected record out of sync. Inventory Requisitions queue selection did not update the URL at all, so F5 could lose the exact selected requisition. Browser Back/Forward could also restore the wrong selection.
+SOURCE CORRECTION: Both pages now read the selected record ID directly from URLSearchParams. Queue clicks and successful requisition mutations update the canonical reservationId/requisitionId URL query, preserve unrelated query parameters, and remove legacy snake_case aliases when writing. Opening links with legacy reservation_id / requisition_id remains supported. Existing exact detail fetch, tenant permissions, stock write paths and focus/scroll behavior are preserved.
+VERIFICATION: new executable URL selection checks 42/42 PASS; 17/17 selected regression scripts PASS with proper Node22 experimental TypeScript stripping used for the two existing TS-import scripts. Frontend 198 failed the new check because it lacked URL selection synchronization. Both changed TSX pages parsed without syntax diagnostics. Full Node24 npm ci/build and real deployed browser verification not performed here.
+CHANGED APPLICATION CODE: frontend/src/pages/InventoryReservationsPage.tsx; frontend/src/pages/InventoryRequisitionsPage.tsx; frontend/src/lib/recordSelectionParams.ts. Test/CI and package script entries also changed. Backend runtime code not changed; no database migration needed.
+ACCEPTANCE: SOURCE CORRECTED AND LOCALLY TESTED, NOT YET VERIFIED ON DEPLOYED BROWSER. Does not close original CASE=24 UoM or text_custom_field Croatia persistence cases, live valuation comparison, or all other original audit findings.
+============================================================
+
+
+============================================================
+2026-10-14 — FRONTEND 200 / BACKEND 118 — ALERT QUEUE DISPLAY INTEGRITY
+============================================================
+SOURCE ISSUES (confirmed from Frontend 199 source):
+1. A deep-linked alert fetched by alert_id was inserted into the filtered Alert queue even when it did not match active filters. The Open, Critical, Unacknowledged and Visible Results counts then included that extra alert, creating misleading totals. Fixed: linked alert remains visible but filtered counts calculate exclusively from the API-filtered queue; a visible notice identifies a linked record outside the applied filters.
+2. Low Stock current-quantity formatting converted null/undefined/blank stock evidence to zero, which misrepresented unknown measurements as actual stock. Fixed: unknown values display —; actual zero remains 0.
+3. A direct alert link returning an error was silently ignored and the rest of the queue remained visible, with no explicit explanation that the targeted alert had failed to load. Fixed: linked-record fetch failure displays an error without hiding the regular filtered list.
+4. An inherited Dashboard/Suppliers navigation test still asserted that supplier_id was removed inline on the page. The earlier correct implementation moved that behavior to supplierDirectoryUrl helpers. Fixed the outdated test expectation; no change to supplier runtime behavior.
+TESTS: 42/42 new alert integrity checks PASS; 15/15 selected regression scripts PASS (Node22 with --experimental-strip-types on existing TS-import tests; locally provided TypeScript package). This is source-and-test evidence, not a deployed-browser test.
+CHANGED FRONTEND FILES: src/lib/alertQueueIntegrity.ts (NEW), src/pages/AlertsPage.tsx, src/i18n/tenantUiTranslations.ts, scripts/check-alert-queue-integrity.mjs (NEW), scripts/check-dashboard-navigation-surgical-fixes-v349251.mjs, .github/workflows/frontend-validation.yml, package.json.
+BACKEND: v118 unchanged; NO database migration. Original 328 named audit cases not individually marked as live pass. Clean Node24 npm ci/lint/build, live PostgreSQL, deployed browser testing were not performed. Original CASE=24, test_country=Croatia, live valuation parity and other acceptance gaps remain OPEN.
+============================================================
+
+
+2026-10-14 — FE201 / BE118 — LEARNING FEEDBACK VIEW/EDIT FOCUS AND CANCEL: Corrected two confirmed source-level UX paths from LF-DEF-001 / LF-DEF-002 by increasing sticky-header scroll clearance, preserving action-row focus on close/cancel, and explicitly clearing edit state without saving. Async evidence GET selection is now last-request-wins; changing feedback mode and cancelling edit invalidate stale responses. Re-editing same record triggers focus. Previous FE200 fails new regression test; FE201 26/26 PASS and 18/18 selected regressions pass. Corrected one outdated static test expectation ('Avg forecast error' => existing 'Avg forecast error (%)' label). FE201 code changed; BE118 runtime unchanged; no migration. Live acceptance and clean production build not verified.
+
+
+================================================================================
+2026-10-14 — FRONTEND 201 / BACKEND 119 — RESERVATION + EXECUTION TASK CSV FORMULA GUARDS
+================================================================================
+ORIGINAL AUDIT CONNECTION: Inventory Reservations, Execution Tasks/Operations
+and report/export usability and evidence fidelity. This is an additional real
+source-level CSV exporter defect found while continuing the original audit.
+
+BASELINE REPRODUCTION: Backend118 directly quoted tenant-controlled values
+using a narrow formula prefix check (/^[=+\-@\t\r]/). Leading spaces or
+other whitespace followed by spreadsheet operators passed through unguarded;
+legitimate signed numeric strings such as -42.5 also received an apostrophe,
+losing their genuine numeric representation when opened in spreadsheets.
+A focused regression initially FAILED on Backend118 as expected.
+
+IMPLEMENTATION: Backend119 reuses the existing shared backend CSV encoder in
+both Inventory Reservation exports and Execution Task analytics exports, adding
+an optional quoteEveryCell parameter to preserve the existing all-quoted CSV
+wire format. Formula-bearing strings following whitespace are prefixed with a
+literal apostrophe; legitimate positive/negative numeric literals remain
+numeric. Proper quotes, line breaks, and CSV escape sequences remain intact.
+The exported fields, permission checks, SQL and all stock mutation paths are
+unchanged. CI Phase16 backend validation now runs the focused exporter guard.
+
+CHANGED APPLICATION FILES (BACKEND119):
+- src/utils/csvExport.js
+- src/services/inventory/inventoryReservationService.js
+- src/services/inventory/executionTaskService.js
+- scripts/check-reservation-task-export-csv-safety.cjs (NEW)
+- package.json
+- .github/workflows/phase16-production-validation.yml
+FRONTEND: FE201 runtime unchanged. DATABASE: no new migration.
+
+TEST EVIDENCE: New 42/42 reservation/task CSV assertions PASS; platform audit
+CSV 17/17 PASS; report CSV presentation 136/136 PASS; Reports usage 21/21;
+historical evidence 34/34; Custom Field text contract 36/36. Frontend FE201
+Learning Feedback 26/26, Alerts 42/42 and Reservation/Requisition URL 42/42.
+Backend edited files pass Node syntax checks. Focused local/source/mocked tests;
+NOT production acceptance. A staging-schema preflight could not run because
+INVENTORY_STAGING_DATABASE_URL was not configured.
+
+NOT VERIFIED: Clean Node20 backend npm ci/full test, clean Node24 frontend
+install/typecheck/lint/build, live PostgreSQL migrations/save/readback,
+deployed browser/Excel tests. Historical CASE=24 conversion persistence,
+test_country=Croatia persistence, current valuation parity and other original
+finding acceptance requirements remain OPEN. No historical findings are
+rewritten as passing based on this local patch.
+================================================================================
+
+
+================================================================================
+2026-10-14 — FRONTEND 202 / BACKEND 119 — EXECUTION TASK SELECTION (HISTORICAL RELEASE RECORD)
+================================================================================
+Original audit connection: ACTION-DEF-001 durable exact task context and related
+Execution Tasks filtered queue/detail navigation. Previous standalone FE202
+verification recorded 45/45 focused checks. The task selector now uses task_id
+URL state, keeps deep-linked items outside filtered totals, and protects against
+stale detail/queue fetches. FE202 was delivered before this FE203 patch; this
+entry records prior delivery without reclassifying historical browser results.
+Backend119 application source unchanged. No database migration.
+Local code assertions are not deployed-browser acceptance.
+================================================================================
+
+
+================================================================================
+2026-10-14 — FRONTEND 203 / BACKEND 119 — CROSS-DOMAIN ROUTE STATE DURABILITY
+================================================================================
+ORIGINAL TESTING LINKS: CDO-DEF-003 (exact planning run lost after Back/F5),
+CDO-DEF-006 (filtered zero-results recovery and browser Back), CDO-TEST-005,
+CDO-TEST-006, CDO-TEST-016/017 and subsequent zero-result checks.
+
+BASELINE REPRODUCED IN FE202: CrossDomainOptimizationPage stored active tab and
+filters in transient useState('evidence') / useState(DEFAULT_FILTERS). Its
+review_run_id was URL-backed, but the tab and seven filters were not, so an F5,
+bookmark or re-entry lost part of the current working review. Filter changes
+also cleared the run by writing URL + React state separately; changing the
+chosen run and opening its Plan tab in consecutive URL updates risked losing
+part of the intended navigation state. Browser Back could not restore filter
+choices because the changes were not encoded as separate history entries.
+
+IMPLEMENTED IN FRONTEND203:
+- New pure URL route-state helper (src/lib/crossDomainRouteState.ts) owns the
+  selected run, active evidence / plan / readiness view and seven filters.
+- Selecting a planning run, opening a plan, switching tab or changing/clearing
+  filters updates one canonical URL query state; unrelated query params retained.
+- Opening the selected plan writes run ID and plan tab atomically.
+- Filter changes invalidate the previous run and return to the evidence view;
+  clearing filters restores the default unfiltered comparisons view.
+- Review query to backend still omits blank optional filters; stock, approvals,
+  decision writes and backend API contracts are unchanged.
+- Existing FE202 zero-results filter controls and Clear filters were preserved.
+- Corrected an obsolete Cross-Domain regression guard that checked for the old
+  local type declaration; it now validates the shared type and plan view.
+
+BASELINE/REGRESSION EVIDENCE: New 50/50 focused URL restoration / Back / filter
+checks pass, including two checks confirming old FE202 state-loss signatures.
+Selected 13/13 frontend regression suites pass (Cross-Domain translation,
+operational, readiness and governance, plus Execution Tasks, Operations Feed,
+Dashboard, Learning Feedback, Reservations/Requisitions, Alerts and freshness).
+Frontend TSX/TS syntax parser passes; standalone shared helper strict TS check
+passes. No dependencies were installed; clean Node24 typecheck/build, real
+browser Back/F5, permissions, live PostgreSQL and deployed acceptance are NOT
+verified. This is a source-corrected case, NOT a production PASS.
+
+CHANGED APPLICATION FILES: src/pages/CrossDomainOptimizationPage.tsx,
+src/lib/crossDomainRouteState.ts (NEW), scripts/check-cross-domain-durable-route-state.mjs
+(NEW), scripts/check-cross-domain-optimization-operational-completion-v349170.mjs,
+package.json, .github/workflows/frontend-validation.yml.
+BACKEND 119: UNCHANGED. NEW DB MIGRATION: NONE.
+
+OPEN: CASE=24 conversion persistence, test_country=Croatia save/readback,
+Products/Reports valuation parity, staging migration evidence, clean production
+builds, deployed-browser audit acceptance, and other manual findings remain
+unverified. Exact Replenishment Planning and Intelligence Review handoff mapping
+has not been declared independently fixed.
+================================================================================
+
+
+================================================================================
+2026-10-14 — FRONTEND 204 / BACKEND 119 — ADVANCED INVENTORY UOM/TAB ROUTE DURABILITY
+================================================================================
+ORIGINAL AUDIT TRACE: 2026-09-28 Page 24 Advanced Inventory — Units of measure
+checkpoints. During CASE / Case / 24 testing, full browser reload returned to
+Serial tracking, forcing manual UoM tab re-entry and product reselection. The
+production CASE=24 database persistence defect is NOT thereby resolved.
+
+REPRODUCED IN FE203 SOURCE: InventoryCapabilitiesPage hard-coded
+useState<TabKey>('serials'), while UomPanel hard-coded useState('') for the
+selected product. Neither was part of the URL. Refresh, bookmarking and
+Back/Forward therefore could not preserve both the UoM view and test product.
+
+SOURCE CORRECTION FE204:
+- Use capability_tab and uom_product_id as typed, query-backed location state.
+- All nine permitted capability tabs survive refresh/Back/bookmarks.
+- Units-of-measure product selection is kept in the URL and restored on re-entry.
+- Navigation preserves unrelated query parameters; leaving UoM clears only
+  irrelevant product selection, while Back restores its prior URL context.
+- Deep links to unauthorized tabs cannot mount the restricted panel. When
+  permissions reject the requested tab, replace the URL with a permitted view.
+- Restored product selection uses the existing changeProduct cleanup path,
+  invalidating old editing epochs and conversion response generations.
+- Saved business data, version controls, save/readback guards and all backend
+  endpoints remain unchanged.
+
+TESTS: FE203 source reproduced both ephemeral defaults. FE204 new URL helper
+61/61 focused checks pass, including helper runtime, Back/Forward state,
+permission-gate source wiring, UoM target selection and default tab handling.
+20/20 selected regression suites PASS, including prior UoM save/readback,
+selection epoch, Custom Fields, Cross-Domain, Execution Tasks, and Alerts.
+Isolated helper strict TypeScript check PASS; page TSX parser/transpilation PASS.
+CI runs the new focused regression. No new DB migration.
+
+CHANGED FRONTEND FILES: src/pages/InventoryCapabilitiesPage.tsx;
+src/lib/advancedInventoryRouteState.ts (NEW); scripts/check-advanced-inventory-durable-route.mjs
+(NEW); package.json; .github/workflows/frontend-validation.yml.
+BACKEND APPLICATION SOURCE: BE119 UNCHANGED.
+
+ACCEPTANCE NOT VERIFIED: live PostgreSQL CASE=24 conversion save/readback,
+test_country = Croatia save/readback, valuation parity, migrations, clean
+Node24/Node20 installs/builds, live role-specific Back/Forward/F5, production
+browser testing. Original historical FAIL results remain intact. This release
+fixes navigation durability, NOT the separately identified persistence defect.
+================================================================================
+
+================================================================================
+2026-10-14 — FRONTEND205 / BACKEND120 — PURCHASE ORDER EXACT FOCUS & BUSINESS PROVENANCE
+================================================================================
+ORIGINAL USER AUDIT: PROC-REC-008 (Open generated purchase order leaves detail
+out of viewport), PROC-REC-010 (generated PO notes display raw `Recommendation
+keys: product:<UUID>` to tenant staff); the related Procurement Recommendations
+audit checkpoints describe the same master/detail continuity and exposure.
+
+REPRODUCED ON FE204 / BE119: FE204 PurchaseOrdersPage sets selectedId from
+purchaseOrderId but never brings the loaded deep-linked detail into view. It
+renders stored notes verbatim in the visible detail, edit form, CSV and print.
+BE119 generated purchase-order notes with `Recommendation keys: product:UUID`
+and line notes with machine urgency, governed_min_stock and formula fields.
+
+SOURCE CORRECTED FE205 / BE120:
+- Direct links wait for the matching loaded Purchase Order detail (or exact
+  error); select Order detail workspace tab and scroll/focus the existing exact
+  detail below sticky navigation. Last-route guard avoids repeat jumps on normal
+  background refresh, and cleanup cancels a superseded animation frame.
+- Source-generated order header and line notes now show product names and
+  business wording. Internal calculation provenance is retained in structured
+  procurement audit metadata; exact recommendation keys and tenant-bound
+  decision linkage remain intact, so inventory quantities/approval unchanged.
+- For older saved POs, the frontend renders human-readable notes in visible
+  detail, draft editing, list/detail CSV and printed detail. Raw historical
+  records are not rewritten or migrated. Manually entered ordinary notes stay
+  unchanged. Frontend preserves existing API payload and permissions.
+- New deterministic tests directly execute the real backend PO draft builder
+  using isolated fake SQL/audit dependencies, and runtime-test the frontend
+  legacy-note sanitization. CI executes both new regression scripts.
+- Updated the pre-existing multilingual static guard to expect the new safe
+  item-note representation rather than verbatim `item.notes ??`.
+
+REPRODUCTION/TESTING: FE204 has no direct-link auto-focus and outputs raw
+selectedDetail.notes; BE119 constructs technical Recommendation keys and
+technical item notes. FE205 focused 30/30 PASS, BE120 focused 12/12 PASS.
+21/21 selected legacy/new regression scripts PASS. TSX/TS syntax diagnostics
+0; isolated helper strict TypeScript compile PASS; backend JS syntax PASS.
+The first regression run had 3 missing local TypeScript-module imports and one
+obsolete source guard; after linking existing global TypeScript locally for
+isolated tests and updating the guard, all 21/21 passed. `node_modules` is
+excluded from release archives. No clean npm ci or full frontend build was run.
+
+SOURCE OF TRUTH: FE205 + BE120 full source ZIPs, and this cumulative original
+audit / FIX_LOG. New database migration: NONE. Deployed browser, live PostgreSQL
+UoM CASE=24, Croatia custom field, valuation parity, production build and full
+328-case acceptance remain NOT VERIFIED. Historical FAILs are not rewritten.
+================================================================================
+
+================================================================================
+2026-10-14 — FRONTEND 206 / BACKEND 121 — GENERATED PO REVIEW LINEAGE, PAGINATION & SPEND SCOPE
+================================================================================
+ORIGINAL AUDIT REFERENCE: PROC-REC-001 and PROC-REC-007 (30 Sep 2026):
+Procurement Recommendations > Purchase order drafts included completed POs and
+showed a Loaded spend card that did not explain which rows were counted. The
+live historical values (€29.75 vs two observed rows €87.35; later €137.75 vs
+three observed rows €195.35) are preserved above. Their exact original live
+root cause has NOT been established or retested in production.
+
+FE205/BE120 SOURCE DEFECT REPRODUCTION:
+- listRecommendationPurchaseOrderDrafts joined purchase_order_items directly
+  to every procurement_recommendation_decisions historical row with the same PO
+  and product. Migration 325 allows repeated decisions; there is no UNIQUE
+  constraint across those columns. When more than one decision matched, the
+  join could duplicate PO item rows and inflate SUM(quantity), cost, item_count,
+  linked_recommendation_count and aggregated item evidence.
+- The prior query applied LIMIT/OFFSET after a CROSS JOIN between grouped
+  orders and counted. An out-of-range page returned NO SQL rows, so its
+  service read total=0 even when earlier pages still existed.
+- The frontend called summary spending simply 'Loaded spend' with no explicit
+  explanation that draft/submitted/warning/spend counts were page-scoped.
+
+BE121 SOURCE CHANGES:
+- Use a tenant/product/order-scoped LATERAL decision lookup returning only
+  the most recent linked decision for each PO item. Join multiplication no
+  longer affects quantities and totals. Exact historical decision rows remain
+  stored unchanged; the review displays one relevant lineage row per PO item.
+- Count the entire matching registry separately from the paged list and LEFT
+  JOIN the count to the page, so empty/out-of-range pages preserve real total.
+- Filter the null placeholder row and build monetary totals once from the
+  displayed response rows; add summary.scope='current_page'.
+
+FE206 SOURCE CHANGES:
+- The draft-review summary says 'This page spend' and explains that counts,
+  warnings and spend reflect only the current page. Next/Previous and list
+  export remain unchanged. Added text in all 5 supported tenant languages.
+- No data mutation, role change, approval change, migration, or status filter
+  changes. API response keeps all existing fields and only adds optional scope.
+
+SOURCE TESTING: baseline BE120 reproduces direct join and empty-page count
+loss from source. Corrected BE121 focused test: 25/25 PASS, FE206 wording and
+paging test: 6/6 PASS, selected inherited 22 suites PASS (24 total). TypeScript
+parser on changed TSX and translations: zero syntax diagnostics. Backend JS
+syntax check PASS. Tests use isolated fake SQL responses, not a live database.
+No Node24 clean install / full production build or deployed-browser acceptance.
+The original live Loaded spend observations, CASE=24 conversion persistence,
+Croatia custom-field save/readback and Products/Reports valuation parity remain
+OPEN pending controlled tenant + PostgreSQL acceptance. Historic FAILs intact.
+================================================================================
+
+================================================================================
+2026-10-14 — FRONTEND207 / BACKEND121 — PROCUREMENT BULK FEEDBACK AND APPROVAL-CRITERIA CLARITY
+================================================================================
+ORIGINAL TEST RECORDS: PROC-REC-004/005/006 (2026-09-30).
+The historic test showed generic success feedback for single approval and draft
+creation, and a confusing "Ready to approve" count on an already-approved row.
+FE206 code inspection established that single recommendation decisions ALREADY
+use precise action-specific global feedback; that part needed NO new correction.
+Historic browser failures are preserved; FE206 source fixes are not live tests.
+
+FE206 SOURCE DEFECT:
+- Bulk recommendation approval sent a POST that triggered shared generic status
+  feedback such as "Recommendations approved successfully.", even when the
+  server's bulk result contained blocked or failed entries. The page already
+  rendered exact decided/blocked/failed numbers inline, so the global toast
+  could inaccurately imply complete success.
+- PO draft conversion triggered the fallback "Item created successfully."
+  global toast while simultaneously rendering exact created PO count, links,
+  and errors inline.
+- Bulk summary used "Ready to approve" for the `isRecommendationRowApprovalReady`
+  predicate, which can return true for an ALREADY approved recommendation;
+  this described commercial readiness, not whether a pending decision existed.
+
+FE207 SOURCE CORRECTION:
+- Set `skipMutationFeedback: true` on ONLY the bulk recommendation-decision
+  and PO-draft-conversion HTTP requests. The page's existing inline success,
+  partial-result, and error feedback remains active. Single recommendation
+  approval/rejection/deferral keeps its previously correct global toast.
+- Relabel the counter to "Approval checks met" and explain that already-
+  approved rows may be counted while PO draft eligibility is separate.
+- Add the two explanatory translation keys in English, German, Spanish,
+  French and Croatian; register a new focused 33-check executable regression
+  in frontend CI. Approval rules, quantities, selected rows, permissions,
+  purchase orders, stock, and backend data contracts are unchanged.
+
+VALIDATION:
+- FE206 source reproduction of the new test FAILS on missing feedback
+  suppression for bulk decision and PO conversion; FE207 passes 33/33.
+- 25/25 selected local regression scripts PASS after correcting isolated
+  test-runner setup (sibling frontend/backend path and Node TS flag).
+- TypeScript source/TSX/catalog parse diagnostics: 0, checked by regression.
+- BE121 application code is unchanged, no migration added.
+- No clean Node24 build, live PostgreSQL operation, deployed browser, or
+  complete 328-case acceptance is claimed.
+- CASE=24 UoM persistence, Croatia custom-field persistence, valuations,
+  PO spend production comparison and clean deployment builds remain OPEN.
+================================================================================
