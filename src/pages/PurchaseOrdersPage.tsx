@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { csvSpreadsheetCell } from '../lib/spreadsheetCsv';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router';
@@ -669,9 +670,7 @@ function formatPercentForLocale(value: number | string | null | undefined, local
 }
 
 function escapeCsvCell(value: unknown): string {
-  const raw = value === null || value === undefined ? '' : String(value);
-  const escaped = raw.replace(/"/g, '""');
-  return /[",\r\n]/.test(escaped) ? `"${escaped}"` : escaped;
+  return csvSpreadsheetCell(value);
 }
 
 function escapeHtml(value: unknown): string {

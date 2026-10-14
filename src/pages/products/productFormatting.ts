@@ -1,4 +1,5 @@
 import { getActiveTenantCurrency } from '../../lib/tenantCurrency';
+import { csvSpreadsheetCell } from '../../lib/spreadsheetCsv';
 import { DEFAULT_LOCALE, type AppLocale } from '../../i18n/config';
 import { formatLocalizedCurrency, formatLocalizedDateTime, formatLocalizedNumber } from '../../i18n/formatters';
 
@@ -318,8 +319,7 @@ export function formatGovernanceValue(
 }
 
 function csvEscape(value: unknown): string {
-  const text = value === null || value === undefined ? '' : String(value);
-  return `"${text.replace(/"/g, '""')}"`;
+  return csvSpreadsheetCell(value, true);
 }
 
 export function downloadCsv(filename: string, rows: Array<Record<string, unknown>>) {

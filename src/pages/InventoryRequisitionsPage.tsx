@@ -1,4 +1,5 @@
 import { getActiveTenantCurrency } from '../lib/tenantCurrency';
+import { csvSpreadsheetCell } from '../lib/spreadsheetCsv';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -1149,12 +1150,7 @@ function rangeError(
 
 
 function csvCell(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  const text = String(value);
-  if (/[",\n\r]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`;
-  }
-  return text;
+  return csvSpreadsheetCell(value);
 }
 
 function downloadCsv(filename: string, rows: Array<Array<unknown>>) {
