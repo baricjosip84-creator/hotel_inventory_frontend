@@ -476,10 +476,11 @@ type ProcurementSummaryReport = {
   };
   lines: {
     total_active_shipment_lines: number | string;
-    total_ordered_quantity: number | string;
-    total_received_quantity: number | string;
-    total_discrepancy: number | string;
-    quantity_by_unit?: ProcurementQuantityByUnit;
+    total_ordered_quantity: number | string | null;
+    total_received_quantity: number | string | null;
+    total_discrepancy: number | string | null;
+    quantity_by_unit?: ProcurementQuantityByUnit | null;
+    quantity_evidence?: 'Available' | 'Multiple units' | 'Historical unit unavailable';
   };
 };
 
@@ -1473,7 +1474,7 @@ export default function ReportsPage() {
               <th>{ui("Product")}</th><th>{ui("Category")}</th><th>{ui("Location")}</th><th>{ui("Quantity")}</th><th>{ui("Unit cost")}</th><th>{ui("Cost source")}</th><th>{ui("Estimated value")}</th><th>{ui("Updated")}</th>
             </tr></thead><tbody>{inventoryRows.map((row) => <tr key={`${row.product_id}-${row.storage_location_id}`}>
               <td className="reports-strong">{row.product_name}</td><td>{row.product_category || '-'}</td><td>{row.storage_location_name}</td>
-              <td>{formatNumber(row.quantity, locale)} {row.product_unit || ui("units")}</td><td>{formatCostAmount(row.estimated_unit_cost, row.currency_code, locale)}</td>
+              <td>{formatNumber(row.quantity, locale)} {row.product_unit || ui('Historical unit unavailable')}</td><td>{formatCostAmount(row.estimated_unit_cost, row.currency_code, locale)}</td>
               <td>{formatCostSource(row.estimated_cost_source, ui)}</td><td className="reports-strong">{formatCostAmount(row.estimated_total_value, row.currency_code, locale)}</td><td>{formatDateTime(row.updated_at, locale)}</td>
             </tr>)}</tbody></table></div>
           ) : null}
@@ -1670,9 +1671,11 @@ export default function ReportsPage() {
               <div><span>{ui("Overdue")}</span><strong>{formatNumber(procurementSummary.shipments.overdue_shipments, locale, 0)}</strong></div>
             </article>
             <article className="reports-summary-card"><h4>{ui("Shipment lines")}</h4><div><span>{ui("Active lines")}</span><strong>{formatNumber(procurementSummary.lines.total_active_shipment_lines, locale, 0)}</strong></div>
-              {procurementSummary.lines.quantity_by_unit && Object.keys(procurementSummary.lines.quantity_by_unit).length > 0
-                ? Object.entries(procurementSummary.lines.quantity_by_unit).sort(([a], [b]) => a.localeCompare(b)).map(([unit, values]) => <div className="reports-unit-block" key={unit}><h5>{unit}</h5><div><span>{ui("Ordered")}</span><strong>{formatNumber(values.ordered_quantity, locale)} {unit}</strong></div><div><span>{ui("Received")}</span><strong>{formatNumber(values.received_quantity, locale)} {unit}</strong></div><div><span>{ui("Discrepancy")}</span><strong>{formatNumber(values.discrepancy, locale)} {unit}</strong></div></div>)
-                : <p className="reports-note">{ui("No procurement quantity-by-unit rows returned.")}</p>}
+              {procurementSummary.lines.quantity_evidence === 'Historical unit unavailable'
+                ? <p className="reports-note">{ui('Historical unit unavailable')}</p>
+                : procurementSummary.lines.quantity_by_unit && Object.keys(procurementSummary.lines.quantity_by_unit).length > 0
+                  ? Object.entries(procurementSummary.lines.quantity_by_unit).sort(([a], [b]) => a.localeCompare(b)).map(([unit, values]) => <div className="reports-unit-block" key={unit}><h5>{unit}</h5><div><span>{ui("Ordered")}</span><strong>{formatNumber(values.ordered_quantity, locale)} {unit}</strong></div><div><span>{ui("Received")}</span><strong>{formatNumber(values.received_quantity, locale)} {unit}</strong></div><div><span>{ui("Discrepancy")}</span><strong>{formatNumber(values.discrepancy, locale)} {unit}</strong></div></div>)
+                  : <p className="reports-note">{ui("No procurement quantity-by-unit rows returned.")}</p>}
             </article>
           </div> : null}
         </ReportPanel>
