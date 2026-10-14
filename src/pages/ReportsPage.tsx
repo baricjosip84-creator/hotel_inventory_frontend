@@ -536,10 +536,11 @@ type UsageSummaryRow = {
   product_unit?: string | null;
   product_archived?: boolean;
   usage_count: number | string;
-  total_consumed: number | string;
-  guest_use_quantity: number | string;
-  internal_use_quantity: number | string;
-  damage_waste_quantity: number | string;
+  quantity_evidence_status?: 'proven' | 'mixed' | 'unproven';
+  total_consumed: number | string | null;
+  guest_use_quantity: number | string | null;
+  internal_use_quantity: number | string | null;
+  damage_waste_quantity: number | string | null;
   last_consumed_at?: string | null;
 };
 
@@ -1794,7 +1795,16 @@ export default function ReportsPage() {
           {usageSummaryQuery.isError ? <ErrorState message={ui('Failed to load usage report: {error}').replace('{error}', getReadableError(usageSummaryQuery.error, ui))} /> : null}
           {!usageSummaryQuery.isLoading && !usageSummaryQuery.isError && usageRows.length === 0 ? <EmptyState message={ui("No non-reversed usage matched the selected period and filters.")} /> : null}
           {usageRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Product")}</th><th>{ui("Entries")}</th><th>{ui("Total consumed")}</th><th>{ui("Guest use")}</th><th>{ui("Internal use")}</th><th>{ui("Damage / waste")}</th><th>{ui("Last use")}</th></tr></thead><tbody>
-            {usageRows.map((row) => <tr key={row.product_id}><td className="reports-strong">{row.product_name}<span className="reports-subtext">{row.product_archived ? `${ui('Archived')} · ` : ''}{row.product_category || ui("Uncategorized")}</span></td><td>{formatNumber(row.usage_count, locale, 0)}</td><td>{formatNumber(row.total_consumed, locale)} {row.product_unit || ui("units")}</td><td>{formatNumber(row.guest_use_quantity, locale)} {row.product_unit || ui("units")}</td><td>{formatNumber(row.internal_use_quantity, locale)} {row.product_unit || ui("units")}</td><td>{formatNumber(row.damage_waste_quantity, locale)} {row.product_unit || ui("units")}</td><td>{formatDateTime(row.last_consumed_at, locale)}</td></tr>)}
+            {usageRows.map((row) => {
+              const evidence = row.quantity_evidence_status === 'mixed'
+                ? ui('Mixed historical units')
+                : row.quantity_evidence_status === 'unproven'
+                  ? ui('Historical unit unavailable')
+                  : null;
+              const formatUsageQuantity = (quantity: number | string | null) =>
+                evidence || (quantity === null ? ui('Historical unit unavailable') : `${formatNumber(quantity, locale)} ${row.product_unit || ui('units')}`);
+              return <tr key={row.product_id}><td className="reports-strong">{row.product_name}<span className="reports-subtext">{row.product_archived ? `${ui('Archived')} · ` : ''}{row.product_category || ui('Uncategorized')}</span></td><td>{formatNumber(row.usage_count, locale, 0)}</td><td>{formatUsageQuantity(row.total_consumed)}</td><td>{formatUsageQuantity(row.guest_use_quantity)}</td><td>{formatUsageQuantity(row.internal_use_quantity)}</td><td>{formatUsageQuantity(row.damage_waste_quantity)}</td><td>{formatDateTime(row.last_consumed_at, locale)}</td></tr>;
+            })}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}

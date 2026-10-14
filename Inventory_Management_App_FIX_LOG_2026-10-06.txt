@@ -12568,3 +12568,85 @@ SOURCE DEFECT B (Reports > Product Movements, former product name): Historical n
 New checks: 35/35 plus 17/17 PASS, old source fails both (expected). All 120 inherited selected offline regression scripts PASS on Node22.16.0 with temporary test-only link/path aliases. Previous Reports focused regressions 183/188/189/190/191/192/193/194/195/196 PASS. Backend JavaScript syntax PASS. No migrations, live writes, live API, or tenant data modifications.
 IMPORTANT OPEN ITEMS: Original UoM CASE=24 and custom field test_country='Croatia' historical saving failures are not closed without staging PostgreSQL/API readback/refresh evidence. Batch183 valuation source correction also requires deployed comparison. Node24 clean npm ci/Vite build remains unverified (only Node22 available locally); staging schema and real browser acceptance remain unverified. The original 328 named-case index does not cover all original narrative findings, and all unverified/deferred cases remain open. Do not claim complete original tenant-audit acceptance from these tests.
 ================================================================================
+
+
+================================================================================
+Five-step completion — STEP 3 of 5: consolidated Reports CSV presentation correction
+Date: 2026-10-14
+Starting verified source: FULL Frontend 184 + FULL Backend 109 (Batch 197).
+Issue: Reports CSV exports: 13 of 16 reports lacked friendly column headings, and many contained internal UUIDs or JSON-like quantity summaries.
+SOURCE CORRECTION: backend/src/controllers/reportsController.js uses a new export-only presentation step for all 16 reports, backed by backend/src/utils/reportCsvPresentation.js. Internal UUID columns are excluded; all business columns receive readable headings, quantity-by-unit progress maps become English summaries, nested metric values become readable text, percentages display %, booleans Yes/No, status/metric codes are humanized. Backend API JSON and PDF output remain unchanged.
+REGRESSION: backend/scripts/check-stage3-report-csv-business-exports.cjs registered as npm run check:step3-report-csv-exports; 136/136 mock-controller assertions PASS; prior Backend 109 fails the new test. Existing 120/120 selected offline regression scripts PASS after resolving environment/test-only paths and using --self-test for staging probes; inherited Reports guard 9/9 PASS, frontend CSV UI guard PASS. Backend JS syntax PASS.
+SCOPE: source code corrected locally; NO live PostgreSQL, deployed browser, Node 24 production build or tenant data mutations performed. Historical CASE=24, Croatia JSONB persistence and actual valuation parity remain open for acceptance. No claim of final application-wide closure.
+RELEASE: Five-step Stage 3; FE184 unchanged, full cumulative Backend 110; dedicated changed-files ZIP and accompanying documentation.
+================================================================================
+
+
+===============================================================================
+2026-10-14 — FIVE-STEP CLOSURE, STAGE 4 TECHNICAL VERIFICATION ADDENDUM
+===============================================================================
+Authoritative full source remains Frontend 184 + Backend 110. No source changes
+or new correction batch in Stage 4. Previous Stage 3 CSV correction retained.
+120/120 inherited isolated regression scripts passed (three initial setup-only
+failures rerun using explicit backend path or the script's offline self-test).
+19/19 recent targeted tests passed (one initial missing source-path argument).
+Static TypeScript 5.8.3 parser scan: 903 frontend + 1503 backend source/script files,
+zero syntax parse errors. This is NOT a TypeScript typecheck.
+Frontend `npm ci --offline` failed ENOTCACHED (zod-validation-error 4.0.2 missing),
+backend `npm ci --offline` failed ENOTCACHED (yocto-queue 0.1.0 missing).
+Runner Node v22.16.0; frontend requires Node24.x, backend requires Node20.x.
+Production build, full lint, typecheck, live PostgreSQL, deployment, print and
+browser workflows NOT verified; do not record these as passed or bugs corrected.
+Original CASE=24, Croatia, valuation and other deployed tests remain open.
+Original audit findings and fix history above are preserved verbatim.
+===============================================================================
+
+
+================================================================================
+INTEGRATED SOURCE CORRECTION — 2026-10-14 — FE185 / BE111
+================================================================================
+Scope: Reports > Usage Summary historical-unit safety and former-name filters;
+Reports > Count Variance former product/location alias filter correction.
+
+FINDING 1 — Usage Summary used the MUTABLE current product unit when presenting
+old consumption totals. When a product unit changed, it could present historical
+numbers with the wrong unit. The corrected query uses the linked stock movement's
+saved product_unit_snapshot (migration 533) and explicitly marks units as
+'proven', 'mixed', or 'unproven'. It withholds combined quantity totals for mixed
+or missing historical unit evidence, rather than falsely attaching current units.
+The UI and CSV/PDF exports display evidence status. Counts and identities remain
+visible, including on old rows with missing evidence.
+
+FINDING 2 — Usage Summary former-product/former-location searches matched only
+CURRENT catalog labels. Corrected by tenant-, product-, movement- and
+location-scoped lookups against saved usage movement name snapshots.
+
+FINDING 3 — Count Variance historical filters offered former product and location
+names in the dropdown, but the cycle-count query accepted only CURRENT names.
+Corrected with tenant-scoped EXISTS lookups of actual movement snapshots for the
+product/location. The manual-adjustment branch already used snapshots.
+
+SOURCES ALTERED:
+  Backend: src/services/analytics/reportService.js
+  Backend: src/controllers/reportsController.js
+  Backend: src/utils/reportCsvPresentation.js
+  Backend: scripts/check-batch198-historical-report-evidence.cjs (NEW)
+  Backend: package.json, .github/workflows/phase16-production-validation.yml
+  Frontend: src/pages/ReportsPage.tsx
+  Frontend: scripts/check-batch198-usage-history-ui.mjs (NEW)
+  Frontend: package.json, .github/workflows/frontend-validation.yml
+
+LOCAL EVIDENCE:
+  New SQL-service test: 34/34 PASS (mocked database)
+  New frontend check: 8/8 PASS (source contract)
+  New SQL-service test correctly FAILS against previous BE110 source.
+  Inherited offline test scripts: 138/138 PASS (local test modes).
+  Relevant recent Reports tests: 19/19 PASS (one requires explicit source paths).
+  ReportsPage TypeScript transpile parser: no syntax errors.
+  No live PostgreSQL, deployed browser, clean Node 24 build, or external writes.
+
+Original historical failures CASE=24 and test_country='Croatia' REMAIN OPEN
+pending actual approved staging PostgreSQL and deployed acceptance evidence.
+The full original 328-case audit and the additional unnumbered observations
+are NOT represented as all accepted/closed by this limited code correction.
+================================================================================
