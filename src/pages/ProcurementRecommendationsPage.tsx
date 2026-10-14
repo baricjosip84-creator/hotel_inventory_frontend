@@ -2818,13 +2818,16 @@ export default function ProcurementRecommendationsPage() {
                 }
               />
               <StatCard
-                label={ui("Loaded spend")}
+                label={ui("This page spend")}
                 value={formatUiMoneyBreakdown(
                   poDraftReviewQuery.data.summary.estimated_total_cost_by_currency,
                   poDraftReviewQuery.data.summary.estimated_total_cost,
                 )}
               />
             </div>
+            <p style={{ ...styles.mutedText, marginTop: 8 }}>
+              {ui("Draft counts, warnings and spend cover the purchase orders on this page only. Use Next to review more orders.")}
+            </p>
             {toNumber(poDraftReviewQuery.data.summary.warning_count) > 0 ? (
               <div style={styles.commercialWarningBox}>
                 {ui("Commercial review required: one or more generated PO drafts have missing or zero item costs. Open the draft in Purchase Orders, edit the draft line costs, then submit or approve it from the normal PO lifecycle.")}
