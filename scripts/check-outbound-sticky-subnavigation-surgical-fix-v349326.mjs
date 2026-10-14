@@ -35,7 +35,7 @@ const checks = [
   ['customers permission guard retained', () => assert.match(tabs, /showCustomerTab \? <OperationalWorkspaceTab/)],
   ['returns permission guard retained', () => assert.match(tabs, /showReturnTab \? <OperationalWorkspaceTab/)],
   ['trace destination retained', () => assert.match(tabs, /onClick=\{\(\) => setTab\('trace'\)\}/)],
-  ['tab selection uses same state transition', () => assert.match(page, /const setTab = \(tab: OutboundTab\) => \{\s*setMessage\(''\);\s*setError\(''\);\s*setActiveTab\(tab\);/)],
+  ['tab selection uses URL-backed state transition', () => {assert.match(page, /const setTab = \(tab: OutboundTab\) => \{/);assert.match(page, /setSearchParams\(updateOutboundRouteTab\(searchParams, tab\)/);assert.doesNotMatch(page,/setActiveTab\(tab\)/)}],
   ['shared tab retains keyboard button element', () => assert.match(shared, /<button\s*\{\.\.\.buttonProps\}\s*type="button"\s*role="tab"/)],
   ['shared tab retains active aria selection', () => assert.match(shared, /aria-selected=\{active\}/)],
   ['component keeps horizontal scroll behavior', () => assert.match(read('src/components/ui/OperationalWorkspace.css'), /\.io-workspace-tabs__items \{[\s\S]*?overflow-x: auto;/)],

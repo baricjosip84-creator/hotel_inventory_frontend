@@ -661,7 +661,8 @@ export default function OutboundPage() {
     mutationFn: ({ path, method = 'POST', body, version }: MutationInput) => apiRequest(path, {
       method,
       headers: version === undefined ? undefined : { 'If-Match-Version': String(version) },
-      body: JSON.stringify(body ?? {})
+      body: JSON.stringify(body ?? {}),
+      skipMutationFeedback: true // Outbound sets its action-specific result in onSuccess.
     }),
     onSuccess: async (_data, variables) => {
       setError('');
@@ -818,7 +819,7 @@ export default function OutboundPage() {
   const createOrderDocument = async (order: Order, type: 'order_confirmation' | 'pick_list' | 'packing_slip' | 'delivery_note') => {
     try {
       setError('');
-      await apiRequest(`/outbound/orders/${order.id}/documents`, { method: 'POST', body: JSON.stringify({ type }) });
+      await apiRequest(`/outbound/orders/${order.id}/documents`, { method: 'POST', body: JSON.stringify({ type }), skipMutationFeedback: true });
       setMessage(ui('Document created and stored with this order.'));
       setSelectedOrderId(order.id);
       await Promise.all([orderDocuments.refetch(), orderActivity.refetch()]);
@@ -902,7 +903,7 @@ export default function OutboundPage() {
   const createReturnReceipt = async (row: CustomerReturn) => {
     try {
       setError('');
-      const created = await apiRequest<OutboundDocument>(`/outbound/returns/${row.id}/documents`, { method: 'POST', body: JSON.stringify({}) });
+      const created = await apiRequest<OutboundDocument>(`/outbound/returns/${row.id}/documents`, { method: 'POST', body: JSON.stringify({}), skipMutationFeedback: true });
       setMessage(ui('Document created and stored.'));
       setSelectedReturnId(row.id);
       await returnDocuments.refetch();

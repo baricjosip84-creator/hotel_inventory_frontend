@@ -64,8 +64,8 @@ check('empty subject never calls API',()=>assert.equal(emptySubject.calls.length
 const noCompose=make(null,{});await noCompose.send();
 check('missing compose does not send',()=>assert.equal(noCompose.calls.length,0));
 check('preview already suppresses mutation feedback',()=>assert.match(outbound,/email-preview[^\n]*skipMutationFeedback:\s*true/));
-check('stored order PDF still triggers document creation mutation feedback',()=>assert.match(outbound,/\/outbound\/orders\/\$\{order\.id\}\/documents`,\s*\{\s*method:\s*'POST',\s*body:\s*JSON\.stringify\(\{\s*type\s*\}\)\s*\}/));
-check('stored return receipt still triggers its own mutation feedback',()=>assert.match(outbound,/\/outbound\/returns\/\$\{row\.id\}\/documents`,\s*\{\s*method:\s*'POST',\s*body:\s*JSON\.stringify\(\{\}\)\s*\}/));
+check('stored order PDF uses its inline confirmation without a generic toast',()=>assert.match(outbound,/\/outbound\/orders\/\$\{order\.id\}\/documents`,\s*\{\s*method:\s*'POST',\s*body:\s*JSON\.stringify\(\{\s*type\s*\}\),\s*skipMutationFeedback:\s*true\s*\}/));
+check('stored return receipt uses its inline confirmation without a generic toast',()=>assert.match(outbound,/\/outbound\/returns\/\$\{row\.id\}\/documents`,\s*\{\s*method:\s*'POST',\s*body:\s*JSON\.stringify\(\{\}\),\s*skipMutationFeedback:\s*true\s*\}/));
 check('shared API guards mutation dispatch behind skipMutationFeedback',()=>assert.match(api,/!\(options as SafeMutationRequestInit\)\.skipMutationFeedback/));
 check('backend requires explicit email confirmation',()=>assert(backend.includes("body.confirmed!==true")));
 check('backend validates tenant user',()=>assert(backend.includes("requireTenantUser(userId")));

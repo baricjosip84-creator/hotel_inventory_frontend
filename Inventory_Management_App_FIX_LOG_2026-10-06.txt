@@ -13572,3 +13572,25 @@ TEST EVIDENCE:
 - Not a declaration that the 328-case audit is closed. Live CASE=24 unit conversion persistence, Croatia custom field, valuation comparison, historical PO spend, and webhook worker acceptance remain OPEN. No database migration.
 - All original manual test records, dates, PASS/FAIL and previous log entries retained; no production acceptance claims.
 ================================================================================
+
+================================================================================
+2026-10-14 — FRONTEND 214 / BACKEND 124 — OUTBOUND RETURN FEEDBACK AND CUSTOMER RECEIPT CONDITION WORDING
+================================================================================
+ORIGINAL AUDIT (Page 26, Customer returns, 2026-09-29):
+- Creating, receiving and cancelling customer returns produced generic "Item created successfully" notifications, despite detailed inline action confirmations. Keep the original recorded functional PASS for return posting/cancellation and the visual UX finding as historical evidence.
+- Return Receipt PDF displayed "Condition: available" while the UI displayed "Return to usable stock" for the same internal stock condition. This is a documented tenant-facing consistency defect, not a failed stock restoration.
+- Stock Movements showed the received return actually restored +1 piece to the intended Storage Vezica, and cancellation produced no movement; those original PASS observations remain unchanged.
+SOURCE-LEVEL BASELINE REPRODUCTION (FE213 / BE123):
+- OutboundPage shared mutationFn called apiRequest without skipMutationFeedback, even though onSuccess set the record-specific successMessage. Stored order/return receipt creation similarly combined default mutation feedback with its own inline result.
+- Backend outboundDocumentPdf.js directly interpolated item.condition after only replacing underscores, so 'available' appeared literally in the generated receipt.
+IMPLEMENTATION:
+- FE214 uses skipMutationFeedback:true for the existing shared Outbound mutationFn and order/return receipt creation; preserves POST/PUT request shape, version conditional headers, errors, query invalidation, confirmations, download actions and business permissions.
+- BE124 maps human-readable customer-return receipt labels only at PDF rendering time: available => Return to usable stock; hold => Hold / inspect first; quarantine, damaged, rejected => capitalized human names. Other outbound document types retain their historical wording; unknown condition codes remain legible. Stored inventory condition values, audit and document payload are unchanged.
+- Added 24-check frontend source/AST contract test and 14-check backend generated-PDF test; wired new suites to frontend and backend CI after npm ci. Updated three inherited brittle tests (FE213 URL routing expectations and superseded generic document feedback).
+VERIFICATION:
+- New suites both FAIL against original FE213/BE123 (expected) and PASS against FE214/BE124 (24/24 and 14/14).
+- 20/20 selected executable local regression scripts PASS (15 FE, 5 BE) with no absent tests in the final run. Local Node 22; PDF binary emitted and inspected. Original source archived unchanged.
+- Frontend TSX parser diagnostics zero, backend scripts syntax checks PASS. Full clean frontend Node24 build, real PostgreSQL, real browser and document creation/download through live tenant APIs NOT VERIFIED; do not label the original audit acceptance closed.
+- Previously generated, stored PDF files are historical immutable documents and are NOT modified by the new PDF generator. New document creation uses updated display wording; a production redeploy is required.
+- No database migration. Other OPEN items include CASE=24 UoM save/readback, Croatia custom-field persistence, production valuation parity, historical procurement spend and webhook delivery acceptance.
+================================================================================
