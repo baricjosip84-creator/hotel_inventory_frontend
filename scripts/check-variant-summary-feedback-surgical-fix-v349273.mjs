@@ -34,7 +34,7 @@ check(translations.includes('"Variante créée avec succès."'), 'French variant
 check(translations.includes('"Varijanta je uspješno stvorena."'), 'Croatian variant success translation is present');
 check(page.includes("queryKey: ['product-variants']"), 'variant list remains independently queryable');
 check(page.includes("<ProductSelect products={parents}"), 'variant creation still uses the filtered parent set');
-check(page.includes("disabled={!canWrite || !parentId || !sku.trim() || !name.trim() || create.isPending}"), 'minimum variant-create gating remains intact');
+check(page.includes("disabled={!canWrite || !parentId || !effectiveSku || !name.trim() || Boolean(attributeIssue) || create.isPending}"), 'variant-create gate uses current generated/manual SKU and structured-attribute validation');
 
 if (backendRoot) {
   check(backend.includes("if (parent.parent_product_id) throw new AppError(409, 'VARIANT_PARENT_INVALID'"), 'backend rejects variant-on-variant nesting before child creation');

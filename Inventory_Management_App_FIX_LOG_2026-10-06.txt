@@ -13390,3 +13390,55 @@ VALIDATION:
 - CASE=24 UoM persistence, Croatia custom-field persistence, valuations,
   PO spend production comparison and clean deployment builds remain OPEN.
 ================================================================================
+
+================================================================================
+2026-10-14 — FRONTEND 208 / BACKEND 122 — VARIANT PARENT SELECTION DATA CONTRACT
+================================================================================
+ORIGINAL MANUAL TEST REFERENCE: 2026-09-28 16:42 CEST, Advanced Inventory >
+Variants: a created variant TEST-EI-RED was incorrectly offered as a parent
+product after refresh. Also see the 16:35/16:39 variant creation and KPI
+refresh findings, which were separate observations.
+
+SOURCE REPRODUCTION AGAINST LAST DELIVERED FE207/BE121:
+- The existing Advanced Inventory Variants panel correctly computes
+  `parents = products.filter(p => !p.parent_product_id)` and the actual
+  variant-create backend already rejects nested variants.
+- The frontend obtains `products` from GET /products, but BE121's
+  getAllProducts SQL in src/services/catalog/productReadQueries.js did NOT
+  SELECT p.parent_product_id. Consequently the database response did not
+  include that property; every active product passed the frontend filter.
+- The archived product list also omitted this relationship metadata.
+- New executed fake-SQL service contract regression reproduces the defect
+  against original BE121 (EXPECTED FAIL: Product list SELECT returns
+  parent_product_id). The corrected BE122 passes the same contract 20/20.
+
+BE122 CORRECTION:
+- Include p.parent_product_id in active product SELECT and its GROUP BY;
+  preserve SQL tenant/deleted filters, stock/cost calculations and permissions.
+- Include p.parent_product_id for archived product reads for consistent
+  catalog relationship metadata.
+- Add scripts/check-variant-parent-product-contract.cjs to backend scripts,
+  package.json and phase16 backend validation CI. It executes the actual
+  product read service against a fake query driver that respects selected
+  fields, and checks parent choice plus permission masking.
+
+FE208 TEST MAINTENANCE (NO APPLICATION UI SOURCE CHANGE):
+- Update the outdated variant-summary-feedback regression: it still expected
+  old manual SKU gating even though a previous release implemented suggested
+  SKUs and structured attributes. The test now verifies the current SKU and
+  attribute validation. All existing user-facing variant form controls stay
+  unchanged; frontend is repackaged complete per delivery contract.
+
+VERIFICATION: 20/20 new backend checks, 27/27 valuation parity, 37/37
+variant auto SKU, 52/52 attributes, 28/28 parent label, 18/18 feedback,
+61/61 Advanced Inventory route, plus multilingual contract: 8/8 selected
+scripts PASS. Node22 offline environment. No PostgreSQL, full Node24/Node20
+clean installation/build, deployed-browser acceptance, or live user retest.
+No schema migration required. User's historical FAIL is preserved as a
+historical test, not rewritten as a live PASS.
+
+OUTSTANDING: live confirmed variant-parent selection after deployment;
+CASE=24 UoM persistence; required test_country='Croatia' custom field;
+Products vs Reports valuation parity; Procurement draft spend comparison;
+clean production builds and other 328-heading/source findings.
+================================================================================
