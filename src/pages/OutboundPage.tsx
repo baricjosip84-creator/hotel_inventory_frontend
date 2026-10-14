@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router';
+import { readOutboundRouteTab, updateOutboundRouteTab, type OutboundRouteTab } from '../lib/outboundRouteState';
 import { apiRequest, apiDownloadFile, apiMutationRequest, ApiError, getVersionConflictMessage, isVersionConflictError } from '../lib/api';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
@@ -192,7 +194,7 @@ type OutboundSummary = {
 
 type CustomerForm = { name: string; email: string; phone: string; address: string; notes: string };
 type OrderForm = { customer_id: string; requested_date: string; customer_reference: string; delivery_contact_name: string; delivery_email: string; delivery_phone: string; delivery_address: string; delivery_instructions: string; notes: string; items: Line[] };
-type OutboundTab = 'orders' | 'customers' | 'returns' | 'trace';
+type OutboundTab = OutboundRouteTab;
 type ReturnLineForm = {
   allocation_id: string;
   storage_location_id: string;
@@ -446,7 +448,11 @@ export default function OutboundPage() {
   };
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<OutboundTab>('orders');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab: OutboundTab = readOutboundRouteTab(searchParams, {
+    customers: hasPermission(TENANT_PERMISSIONS.CUSTOMERS_READ) || hasPermission(TENANT_PERMISSIONS.CUSTOMERS_WRITE),
+    returns: hasPermission(TENANT_PERMISSIONS.CUSTOMER_RETURNS_READ) || hasPermission(TENANT_PERMISSIONS.CUSTOMER_RETURNS_CREATE)
+  });
   const [includeArchivedCustomers, setIncludeArchivedCustomers] = useState(false);
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [customerForm, setCustomerForm] = useState<CustomerForm>(emptyCustomer);
@@ -1061,7 +1067,7 @@ export default function OutboundPage() {
   const setTab = (tab: OutboundTab) => {
     setMessage('');
     setError('');
-    setActiveTab(tab);
+    if (tab !== activeTab) setSearchParams(updateOutboundRouteTab(searchParams, tab), { preventScrollReset: true });
   };
 
   return <div className="io-operational-page io-outbound-page io-workspace-page">

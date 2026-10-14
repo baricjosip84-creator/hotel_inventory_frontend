@@ -13509,3 +13509,66 @@ STATUS:
   live valuation parity, historical PO spend discrepancy, and other original
   audit acceptance items remain OPEN. Historical manual test PASS/FAIL unchanged.
 ================================================================================
+
+================================================================================
+2026-10-14 — FE211/BE123 — WEBHOOK DELIVERY DISPATCH & FEEDBACK, LOCAL VERIFICATION ONLY
+================================================================================
+Audit reference: 2026-09-29 Advanced Inventory > APIs & integrations, Webhooks. Historical Test row stuck Pending Attempts=0 for five minutes, while Webhook Create/Test/Rotate secret all showed generic "Item created successfully." notifications.
+Root-cause scope: existing BE122 GitHub hourly scheduler can leave fresh queue records waiting up to the next job. Backend continuous job startup remains deliberately gated by RUN_SCHEDULED_JOBS. This is a demonstrable scheduling gap, not yet proof that the historical Render/GitHub configuration actually ran this workflow.
+Implementation: dedicated .github/workflows/tenant-webhook-delivery.yml every 5 minutes; scripts/runTenantWebhookDeliveriesOnce.js and tenant-webhooks:once package script; eight-delivery batch with exclusive GitHub job group. Retains existing DB SKIP LOCKED claims. Dedicated runner uses only the tenant webhook job, closes DB pool and logs aggregate results only. CI mock regression added.
+FE211: suppress shared generic mutation toasts only for create/test/rotate webhook requests; action-specific inline results (including one-time secret visibility and errors) are retained, CI regression added.
+Baseline: FE210 fails new frontend test; BE122 has no dedicated five-minute job. New checks 13/13 FE, 28/28 BE. Twelve inherited selected suites passed. Tested on Node22 mock/source infrastructure, NOT live database, external HTTP, production GitHub Actions, deployed browser, full Node24 frontend build or Node20 clean backend install.
+Deploy requirement: merge/push the new backend workflow to repository default branch and supply matching DB/JWT GitHub Actions secrets; scheduled execution may be delayed by the GitHub platform. Verify actual Actions run and advancing webhook Attempts. Existing general hourly job remains unchanged. No migration.
+All previous audit/fix log records preserved. Other high-priority live acceptance defects remain OPEN.
+================================================================================
+
+================================================================================
+2026-10-14 — FRONTEND 212 / BACKEND 123 — API KEY & CONNECTION LIFECYCLE FEEDBACK
+================================================================================
+ORIGINAL TENANT AUDIT EVIDENCE (2026-09-29, Advanced Inventory > APIs & integrations):
+- API-key lifecycle and connection-registry save/edit repeatedly displayed generic "Item created successfully." success toasts for operations such as secret rotation, revocation and record updates.
+- Connection registry edit/save was proven to persist, but gave a semantically incorrect create notification; this was a UX message defect, NOT evidence of lost saved data.
+- API key creation without selected permissions was disabled; the original zero-permission feedback was unclear. A no-scopes explanation already existed for creation but not for editing.
+- Webhook create/test/rotate had been corrected in FE211; webhook Enable/Disable still triggered generic mutation notification.
+ORIGINAL PASS/FAIL, TEST DATA, TIMESTAMPS AND SCREEN OBSERVATIONS ABOVE ARE PRESERVED UNMODIFIED.
+
+FE211/BE123 SOURCE REPRODUCTION:
+- Seven existing API key/connection mutation paths and webhook status updates use shared apiRequest with default generic POST/PATCH feedback, and no nearby API-key/connection success confirmation. API and connection errors also shared a remote top-of-page error region.
+- Running the new regression against FE211 fails at absent action-specific locale contract; API key/connection mutation request objects lack skipMutationFeedback. No live tenant was accessed.
+
+FE212 / BE123 CODE CORRECTION:
+- API key create, update, rotate, revoke now suppress the misleading shared generic toast, show contextual feedback in the API key card and preserve one-time key disclosure (and clear a matching revealed key after successful revoke).
+- Connection create, edit, enable and disable now show the correct operation and keep the existing version/permission/payload contract. Submission captures whether a connection is being edited; a disable never reports enabled and vice versa.
+- Webhook enable/disable now show exact state-specific confirmation; existing webhook create/test/rotate single-purpose messages remain.
+- Connection and webhook errors appear inside their corresponding cards instead of only in a distant generic error section. Pending/new action clears stale feedback.
+- The zero-API-permissions explanation now applies to API key editing as well as creation; existing zero-permissions blocking remains.
+- Added ten new translation rows across English, German, Spanish, French and Croatian. No business-data, API authorization, backend application or database schema changes.
+- Added executable real-mutation-handler mock regression (98/98 checks), adjusted older webhook-feedback regression to assert nearer error placement (13/13), integrated new test into npm scripts and CI.
+
+TESTING AND LIMITS:
+- FE211 baseline FAILS the new regression; FE212 focused 98/98 PASS.
+- 16/16 available selected local scripts PASS (13 frontend, 3 backend); one suggested variant-summary script was absent and was NOT counted. See separate regression record.
+- FE212 TypeScript AST syntax parsed, five-language catalog and targeted source-contract tests passed. Full production clean Node24 build remains UNVERIFIED: local Node22 typecheck could not resolve vite/client because full locked dependencies were not installed.
+- No live PostgreSQL, GitHub scheduled delivery execution, browser retesting, tenant API-key revoke authentication check, or deployed acceptance was performed. Historical webhook Pending/0 Attempts remains OPEN until real worker evidence exists. No migration.
+- Other OPEN items: CASE=24 conversion save/readback, test_country=Croatia save/readback, Products vs Reports valuation parity, PO draft spend historical reconciliation, full deployment acceptance.
+================================================================================
+
+================================================================================
+2026-10-14 — FRONTEND 213 / BACKEND 123 — OUTBOUND WORKSPACE TAB URL DURABILITY
+================================================================================
+AUDIT CONNECTION:
+- Original manual audit Page 26 Outbound, 2026-09-29, notes that after closing customer-return details the operator had difficulty reaching Dispatch trace; key navigation was outside the viewport and caused a navigation misstep (original audit line ~15765). This is historical UX evidence, not a claim that an active-tab refresh defect was directly observed in the live audit.
+- FE212 source review separately confirmed a reproducible adjacent navigation limitation: activeTab is React-only useState('orders'), so refreshing on Customer returns/Dispatch trace or using browser Back/Forward does not restore the work area. No URL-backed tab selection exists.
+- Earlier sticky section navigation, order-detail focus, document preview and PDF feedback fixes already exist and are preserved; not redone here.
+CORRECTION:
+- FE213 uses react-router useSearchParams and src/lib/outboundRouteState.ts to derive work area from ?tab=customers|returns|trace; Orders stays canonical /outbound without tab.
+- Section controls push history preserving unrelated URL parameters; browser Back/Forward and refresh restore current permitted tab.
+- A URL requesting Customers or Returns for a role with no corresponding read/write permission safely displays Orders; existing query permission gates remain. Invalid tab also falls back safely.
+- No stock, order/return mutation, customer form, backend authorization, business validation, API payload, SQL schema, or backend application code changes.
+TEST EVIDENCE:
+- FE212 baseline source has useState<OutboundTab>('orders') and setActiveTab, no outbound tab route-state module: tab selection is transient. FE213 removes this and adds source-level 47/47 executable URL parsing/updating assertions plus syntax, CI and permission-gate checks.
+- 12/12 executed targeted inherited+new frontend regression scripts PASS on local Node 22; five requested optional test file names absent and NOT counted. TypeScript transpile has zero diagnostics.
+- Full `npm run typecheck:ci` exits TS2688 because vite/client types are unavailable locally. A clean Node 24 install/build/lint, browser refresh/Back/Forward and live Vercel behavior were NOT verified.
+- Not a declaration that the 328-case audit is closed. Live CASE=24 unit conversion persistence, Croatia custom field, valuation comparison, historical PO spend, and webhook worker acceptance remain OPEN. No database migration.
+- All original manual test records, dates, PASS/FAIL and previous log entries retained; no production acceptance claims.
+================================================================================
