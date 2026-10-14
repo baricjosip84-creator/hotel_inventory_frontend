@@ -5168,8 +5168,8 @@ function EvidenceTable({
   loading: boolean;
   unavailable: boolean;
   canEdit: boolean;
-  onView: (mode: FeedbackMode, row: Record<string, unknown>) => void;
-  onEdit: (mode: FeedbackMode, row: Record<string, unknown>) => void;
+  onView: (mode: FeedbackMode, row: Record<string, unknown>, origin: HTMLButtonElement) => void;
+  onEdit: (mode: FeedbackMode, row: Record<string, unknown>, origin: HTMLButtonElement) => void;
   onPage: (direction: 'previous' | 'next') => void;
 }) {
   const { locale, ui } = useAppTranslation();
@@ -5213,7 +5213,7 @@ function EvidenceTable({
                     <td>{learningMetricValue(mode, score, locale)}</td>
                     <td>{row.observed_at ? formatLocalizedDateTime(String(row.observed_at), locale) : '—'}</td>
                     <td>{ui(formatLabel(row.learning_feedback_review_status || 'unreviewed'))}</td>
-                    <td><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><button className="button button--secondary" type="button" onClick={() => onView(mode, row)}>{ui('View details')}</button>{canEdit ? <button className="button button--secondary" type="button" onClick={() => onEdit(mode, row)}>{ui('Edit')}</button> : null}</div></td>
+                    <td><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><button className="button button--secondary" type="button" onClick={(event) => onView(mode, row, event.currentTarget)}>{ui('View details')}</button>{canEdit ? <button className="button button--secondary" type="button" onClick={(event) => onEdit(mode, row, event.currentTarget)}>{ui('Edit')}</button> : null}</div></td>
                   </tr>
                 );
               })}</tbody>
@@ -5286,6 +5286,10 @@ export default function DecisionLearningFeedbackPage() {
   const [selectedEvidenceMode, setSelectedEvidenceMode] = useState<FeedbackMode | null>(null);
   const feedbackFormRef = useRef<HTMLElement | null>(null);
   const evidenceDetailRef = useRef<HTMLDivElement | null>(null);
+  const evidenceOriginRef = useRef<HTMLButtonElement | null>(null);
+  // A single sequence prevents slow detail/edit fetches from overwriting a later selection.
+  const evidenceRequestSequenceRef = useRef(0);
+  const [editFocusToken, setEditFocusToken] = useState(0);
   const handoffAppliedRef = useRef(false);
   const pageLimit = 25;
   const reviewLimit = 25;
@@ -5306,7 +5310,7 @@ export default function DecisionLearningFeedbackPage() {
       feedbackFormRef.current?.focus({ preventScroll: true });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [form.recordKey]);
+  }, [form.recordKey, editFocusToken]);
 
   const summaryQuery = useQuery({
     queryKey: ['decision-learning-summary', pageOffsets, reviewOffset, view, canViewDiagnostics, canReadInsights, evidenceSearch, evidenceReviewStatus, evidenceDateFrom, evidenceDateTo, evidenceSort],
@@ -5404,6 +5408,7 @@ export default function DecisionLearningFeedbackPage() {
 
   const handleModeChange = (nextMode: FeedbackMode) => {
     if (nextMode === 'forecast-accuracy' && !canReadInsights) return;
+    evidenceRequestSequenceRef.current += 1;
     setMode(nextMode);
     setForm({ ...defaultForm, observedAt: nowLocalDateTimeValue(), subtype: defaultSubtypeForMode(nextMode), financialImpactCurrency: getActiveTenantCurrency(), status: statusOptions[nextMode][0] || 'observed' });
     setSourceId('');
@@ -5529,19 +5534,55 @@ export default function DecisionLearningFeedbackPage() {
     handoffAppliedRef.current = true;
   }, [mode, requestedMode, requestedSourceId, requestedOptionId, sourceQuery.data]);
 
-  const viewEvidence = async (nextMode: FeedbackMode, row: Record<string, unknown>) => {
+  const restoreEvidenceRowFocus = (origin: HTMLButtonElement | null) => {
+    if (!origin?.isConnected) return;
+    window.requestAnimationFrame(() => {
+      if (!origin.isConnected) return;
+      origin.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      origin.focus({ preventScroll: true });
+    });
+  };
+
+  const closeEvidenceDetail = () => {
+    // Closing a detail opened far above a table should return the operator to that row.
+    evidenceRequestSequenceRef.current += 1;
+    setSelectedEvidenceDetail(null);
+    setSelectedEvidenceMode(null);
+    restoreEvidenceRowFocus(evidenceOriginRef.current);
+    evidenceOriginRef.current = null;
+  };
+
+  const cancelEvidenceEditing = () => {
+    if (mutation.isPending) return;
+    evidenceRequestSequenceRef.current += 1;
+    const origin = evidenceOriginRef.current;
+    setForm({ ...defaultForm, observedAt: nowLocalDateTimeValue(), subtype: defaultSubtypeForMode(mode), financialImpactCurrency: getActiveTenantCurrency(), status: statusOptions[mode][0] || 'observed' });
+    setSourceId('');
+    setSourceSearch('');
+    setBusinessEvidenceSnapshots({});
+    setMessage(null);
+    restoreEvidenceRowFocus(origin);
+    evidenceOriginRef.current = null;
+  };
+
+  const viewEvidence = async (nextMode: FeedbackMode, row: Record<string, unknown>, origin: HTMLButtonElement) => {
     if (nextMode === 'forecast-accuracy' && !canReadInsights) return;
     const evidenceKey = recordKeyForMode(nextMode, row);
     if (!evidenceKey) return;
+    const requestSequence = ++evidenceRequestSequenceRef.current;
     setMessage(ui('Loading feedback record…'));
     try {
       const params = new URLSearchParams({ evidence_type: evidenceTypeForMode(nextMode), evidence_key: evidenceKey });
       const full = await apiRequest<Record<string, unknown>>(`/decision-intelligence-feedback/record?${params.toString()}`);
+      if (requestSequence !== evidenceRequestSequenceRef.current) return;
+      evidenceOriginRef.current = origin;
       setSelectedEvidenceDetail(full);
       setSelectedEvidenceMode(nextMode);
       setMessage(null);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : ui('Unable to load the feedback record.'));
+      if (requestSequence === evidenceRequestSequenceRef.current) {
+        setMessage(error instanceof Error ? error.message : ui('Unable to load the feedback record.'));
+      }
     }
   };
 
@@ -5571,17 +5612,20 @@ export default function DecisionLearningFeedbackPage() {
     });
   };
 
-  const editEvidence = async (nextMode: FeedbackMode, row: Record<string, unknown>) => {
+  const editEvidence = async (nextMode: FeedbackMode, row: Record<string, unknown>, origin: HTMLButtonElement) => {
     if (nextMode === 'forecast-accuracy' && !canReadInsights) {
       setMessage(ui('Insights access is required to view or record forecast feedback.'));
       return;
     }
     const evidenceKey = recordKeyForMode(nextMode, row);
     if (!evidenceKey) return;
+    const requestSequence = ++evidenceRequestSequenceRef.current;
     setMessage(ui('Loading feedback record…'));
     try {
       const params = new URLSearchParams({ evidence_type: evidenceTypeForMode(nextMode), evidence_key: evidenceKey });
       const full = await apiRequest<Record<string, unknown>>(`/decision-intelligence-feedback/record?${params.toString()}`);
+      if (requestSequence !== evidenceRequestSequenceRef.current) return;
+      evidenceOriginRef.current = origin;
       setMode(nextMode);
       const domain = String(full.learning_domain ?? full.forecast_domain ?? full.policy_domain ?? full.result_domain ?? 'multi_domain');
       const status = String(full.outcome_status ?? full.calibration_status ?? full.effectiveness_status ?? full.result_status ?? 'observed');
@@ -5702,8 +5746,10 @@ export default function DecisionLearningFeedbackPage() {
         learningActionCompletedAt: toLocalDateTimeValue(full.recommendation_outcome_learning_action_completed_at),
         learningActionEvidence: formBusinessEvidence(full.recommendation_outcome_learning_action_evidence, locale, ui)
       });
+      setEditFocusToken((current) => current + 1);
       setMessage(ui('Editing an existing feedback record. Saving will update that record instead of creating a duplicate.'));
     } catch (error) {
+      if (requestSequence !== evidenceRequestSequenceRef.current) return;
       setMessage(error instanceof Error ? error.message : ui('Unable to load the feedback record.'));
     }
   };
@@ -5818,7 +5864,7 @@ export default function DecisionLearningFeedbackPage() {
       ) : null}
 
       {view === 'feedback' ? (canGovern ? (
-      <section ref={feedbackFormRef} tabIndex={-1} style={{ scrollMarginTop: 16 }} className={'card learning-feedback-form-card'}>
+      <section ref={feedbackFormRef} tabIndex={-1} style={{ scrollMarginTop: 'clamp(96px, 12vh, 152px)' }} className={'card learning-feedback-form-card'}>
         <div className="card__header">
           <div>
             <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path="/decision-learning-feedback" size={18} /></span>{ui('Record what happened')}</h2>
@@ -6345,6 +6391,7 @@ export default function DecisionLearningFeedbackPage() {
             <TenantNavIcon path="/decision-learning-feedback" size={16} />
             {mutation.isPending ? ui('Saving…') : form.recordKey ? ui('Save feedback changes') : ui('Save feedback')}
           </button>
+          {form.recordKey ? <button className="button button--secondary" type="button" disabled={mutation.isPending} onClick={cancelEvidenceEditing}>{ui('Cancel editing')}</button> : null}
           {!mutation.isPending && !message && feedbackValidationError ? <span className="card__subtext learning-feedback-save-hint">{feedbackValidationError}</span> : null}
           {message ? <span className="card__subtext" role="status">{message}</span> : null}
         </div>
@@ -6375,7 +6422,7 @@ export default function DecisionLearningFeedbackPage() {
             </p>
           </section>
 
-          {selectedEvidenceDetail ? <div ref={evidenceDetailRef} tabIndex={-1} style={{ scrollMarginTop: 16 }}><EvidenceDetailCard detail={selectedEvidenceDetail} canCreateFollowUp={canCreateExecutionRequests} canViewDiagnostics={canViewDiagnostics} creatingFollowUp={followUpMutation.isPending} onClose={() => { setSelectedEvidenceDetail(null); setSelectedEvidenceMode(null); }} onCreateFollowUp={createEvidenceFollowUp} /></div> : null}
+          {selectedEvidenceDetail ? <div ref={evidenceDetailRef} tabIndex={-1} style={{ scrollMarginTop: 'clamp(96px, 12vh, 152px)' }}><EvidenceDetailCard detail={selectedEvidenceDetail} canCreateFollowUp={canCreateExecutionRequests} canViewDiagnostics={canViewDiagnostics} creatingFollowUp={followUpMutation.isPending} onClose={closeEvidenceDetail} onCreateFollowUp={createEvidenceFollowUp} /></div> : null}
 
           <section className="card learning-feedback-section learning-feedback-history-filters">
             <div className="card__header"><div><h2>{ui('Find recorded feedback')}</h2><p className="card__subtext">{ui('Search and filter the full feedback history, not only the rows currently visible on this page.')}</p></div></div>

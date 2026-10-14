@@ -89,7 +89,7 @@ for (const required of [
   'formatLocalizedNumber(action.evidence_count ?? 0, locale)',
   "{ui('Learning impact assessment')}",
   '<LocalizedLearningStatCard label="Impact posture"',
-  '<LocalizedLearningStatCard label="Avg forecast error"',
+  '<LocalizedLearningStatCard label="Avg forecast error (%)"',
   "<th>{ui('Review pressure')}</th>",
   'formatLocalizedNumber(domain.review_pressure ?? 0, locale)',
   'ui(formatLabel(domain.impact_posture))',
