@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { csvSpreadsheetCell } from '../lib/spreadsheetCsv';
+import { purchaseOrderBusinessNotes, purchaseOrderBusinessItemNotes } from '../lib/purchaseOrderProvenance';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router';
@@ -1019,13 +1020,13 @@ function detailToForm(detail: PurchaseOrderDetail): PurchaseOrderFormState {
     supplier_id: detail.supplier_id,
     po_number: detail.po_number || '',
     expected_delivery_date: detail.expected_delivery_date ? String(detail.expected_delivery_date).slice(0, 10) : '',
-    notes: detail.notes || '',
+    notes: purchaseOrderBusinessNotes(detail.notes, detail.items.map((item) => item.product_name)),
     items: detail.items.map((item) => ({
       product_id: item.product_id,
       quantity: String(item.entered_quantity ?? item.quantity ?? ''),
       uom_code: item.uom_code || '',
       unit_cost: item.unit_cost === null || item.unit_cost === undefined ? '' : String(item.unit_cost),
-      notes: item.notes || ''
+      notes: purchaseOrderBusinessItemNotes(item.notes, item.product_name)
     }))
   };
 }
@@ -1103,6 +1104,7 @@ export default function PurchaseOrdersPage() {
   const registryRef = useRef<HTMLDivElement>(null);
   const createRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
+  const lastAutoFocusedPurchaseOrderRef = useRef<string | null>(null);
 
   const subscriptionAccessQuery = useQuery({
     queryKey: ['tenant-subscription-access', 'purchase-orders'],
@@ -1158,6 +1160,25 @@ export default function PurchaseOrdersPage() {
   const purchaseOrderFormCurrency = purchaseOrderCreateOptionsQuery.data?.purchase_order_currency || getActiveTenantCurrency();
 
   const selectedDetail = detailQuery.data ?? null;
+  // External links from Procurement Recommendations and other pages must show
+  // the exact order, not merely select it below the current viewport.
+  // Wait for the matching detail response; never focus an older async result.
+  const routePurchaseOrderId = searchParams.get('purchaseOrderId') || searchParams.get('purchase_order_id');
+  useEffect(() => {
+    if (!routePurchaseOrderId) {
+      lastAutoFocusedPurchaseOrderRef.current = null;
+      return;
+    }
+    if (selectedId !== routePurchaseOrderId || lastAutoFocusedPurchaseOrderRef.current === routePurchaseOrderId) return;
+    if (selectedDetail?.id !== routePurchaseOrderId && !detailQuery.isError) return;
+    lastAutoFocusedPurchaseOrderRef.current = routePurchaseOrderId;
+    setActiveWorkspaceSection('detail');
+    const frame = window.requestAnimationFrame(() => {
+      detailRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' });
+      detailRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [routePurchaseOrderId, selectedId, selectedDetail?.id, detailQuery.isError]);
   const selectedEmailShipmentIds = useMemo(
     () => (selectedDetail?.linked_shipments ?? []).map((shipment) => shipment.id).filter(Boolean),
     [selectedDetail]
@@ -1624,7 +1645,7 @@ export default function PurchaseOrdersPage() {
       row.completion_reason ?? '',
       row.cancelled_at ?? '',
       row.cancelled_by_user_name ?? '',
-      row.notes ?? ''
+      purchaseOrderBusinessNotes(row.notes)
     ])
   ];
 
@@ -1780,7 +1801,7 @@ export default function PurchaseOrdersPage() {
       ['Completion Reason', selectedDetail.completion_reason ?? ''],
       ['Cancelled At', selectedDetail.cancelled_at ?? ''],
       ['Cancelled By', selectedDetail.cancelled_by_user_name ?? ''],
-      ['Notes', selectedDetail.notes ?? ''],
+      ['Notes', purchaseOrderBusinessNotes(selectedDetail.notes, selectedDetail.items.map((item) => item.product_name))],
       [],
       ['Items'],
       ['Product', 'Ordered Unit', 'Ordered Quantity', 'Base Unit', 'Base Quantity', 'Received (Base)', 'Remaining (Base)', 'Receiving Status', 'Receiving Percent', 'Variance Status', 'Quantity Variance', 'Estimated Cost Variance', 'Cost / Ordered Unit', 'Base Unit Cost', 'Estimated Total', 'Received Value', 'Remaining Value', 'Notes'],
@@ -1802,7 +1823,7 @@ export default function PurchaseOrdersPage() {
         item.estimated_line_total ?? '',
         item.received_estimated_cost ?? '',
         item.remaining_estimated_cost ?? '',
-        item.notes ?? ''
+        purchaseOrderBusinessItemNotes(item.notes, item.product_name)
       ])
     ];
 
@@ -1987,7 +2008,7 @@ export default function PurchaseOrdersPage() {
             <div><span class="label">${escapeHtml(ui('Cancelled'))}:</span> ${escapeHtml(formatDateTime(selectedDetail.cancelled_at))}</div>
           </div>
 
-          ${selectedDetail.notes ? `<div class="notes"><strong>${escapeHtml(ui('Notes'))}:</strong><br />${escapeHtml(selectedDetail.notes)}</div>` : ''}
+          ${selectedDetail.notes ? `<div class="notes"><strong>${escapeHtml(ui('Notes'))}:</strong><br />${escapeHtml(purchaseOrderBusinessNotes(selectedDetail.notes, selectedDetail.items.map((item) => item.product_name)))}</div>` : ''}
 
           <h2>${escapeHtml(ui('Items'))}</h2>
           <table>
@@ -2946,7 +2967,7 @@ export default function PurchaseOrdersPage() {
         </form>
       </div>
 
-      <div ref={detailRef} id="purchase-order-detail" className="purchase-orders-scroll-anchor">
+      <div ref={detailRef} id="purchase-order-detail" className="purchase-orders-scroll-anchor" tabIndex={-1}>
         <section className="app-panel purchase-orders-card purchase-orders-detail-card">
           <OperationalSectionHeader
             iconPath="/audit"
@@ -2983,7 +3004,7 @@ export default function PurchaseOrdersPage() {
                 {selectedIsLocked ? <span style={{ ...styles.badge, ...styles.lockedBadge }}>{ui("Locked")}</span> : null}
               </div>
 
-              {selectedDetail.notes ? <div className="purchase-orders-note-box"><strong>{ui("Internal notes")}</strong><p>{selectedDetail.notes}</p></div> : null}
+              {selectedDetail.notes ? <div className="purchase-orders-note-box"><strong>{ui("Internal notes")}</strong><p>{purchaseOrderBusinessNotes(selectedDetail.notes, selectedDetail.items.map((item) => item.product_name))}</p></div> : null}
 
               {selectedIsLocked ? <p className="purchase-orders-muted">{ui("This order is no longer an editable draft. Continue through shipment, receiving, or lifecycle actions instead.")}</p> : null}
               {actionMutation.error ? <p style={styles.error}>{actionError}</p> : null}

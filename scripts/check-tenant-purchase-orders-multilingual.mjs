@@ -140,7 +140,7 @@ for (const required of [
   'selectedDetail.supplier_name',
   'selectedDetail.notes',
   'item.product_name',
-  'item.notes ??',
+  'purchaseOrderBusinessItemNotes(item.notes, item.product_name)',
   'selectedDetail.completion_reason',
   'purchaseOrderAuditEventLabel(event.action, ui)',
   'purchaseOrderAuditMetadataSummary(event.metadata, ui)',

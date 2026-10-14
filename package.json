@@ -552,7 +552,8 @@
     "check:feed-anomaly-freshness": "node --experimental-strip-types scripts/check-feed-anomaly-freshness.mjs",
     "check:reservation-requisition-url-selection": "node scripts/check-reservation-requisition-url-selection.cjs",
     "check:alert-queue-integrity": "node scripts/check-alert-queue-integrity.mjs",
-    "check:advanced-inventory-durable-route": "node scripts/check-advanced-inventory-durable-route.mjs"
+    "check:advanced-inventory-durable-route": "node scripts/check-advanced-inventory-durable-route.mjs",
+    "check:po-deep-link-and-provenance": "node --experimental-strip-types scripts/check-purchase-order-deep-link-and-provenance.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
