@@ -1737,7 +1737,17 @@ export default function ReportsPage() {
           actions={actionButtons('low-stock', lowStockQuery.isFetching)}
           filters={
             <>
-              <label className="reports-field reports-field--compact"><span>{ui("Threshold scope")}</span><select value={lowStockFilters.scope} onChange={(event) => updateAndClear(setLowStockFilters, 'scope', event.target.value as 'product' | 'par' | 'both')} disabled={isExporting}><option value="both">{ui("Product minima + location par levels")}</option><option value="product">{ui("Product minimum only")}</option><option value="par">{ui("Location par levels only")}</option></select></label>
+              <label className="reports-field reports-field--compact"><span>{ui("Threshold scope")}</span><select value={lowStockFilters.scope} onChange={(event) => {
+                const nextScope = event.target.value as 'product' | 'par' | 'both';
+                clearDownloadStatus();
+                setLowStockFilters((previous) => ({
+                  ...previous,
+                  scope: nextScope,
+                  // Product-minimum is tenant-wide; keep no disabled/stale
+                  // location selected when switching from PAR-only filtering.
+                  location: nextScope === 'product' ? '' : previous.location
+                }));
+              }} disabled={isExporting}><option value="both">{ui("Product minima + location par levels")}</option><option value="product">{ui("Product minimum only")}</option><option value="par">{ui("Location par levels only")}</option></select></label>
               <ChoiceFilterField label={ui("Category")} value={lowStockFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setLowStockFilters, 'category', value)} />
               <ChoiceFilterField label={ui("Supplier")} value={lowStockFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setLowStockFilters, 'supplier', value)} />
               <ChoiceFilterField label={ui("Location")} value={lowStockFilters.location} placeholder={ui("Any location")} options={filterOptions.current_locations ?? filterOptions.locations} disabled={isExporting || lowStockFilters.scope === 'product'} onChange={(value) => updateAndClear(setLowStockFilters, 'location', value)} />
