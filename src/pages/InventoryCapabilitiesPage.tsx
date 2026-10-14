@@ -540,6 +540,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
   const createWebhook = useMutation({
     mutationFn: () => apiRequest<WebhookSubscription & { signing_secret: string }>('/inventory-capabilities/webhooks', {
       method: 'POST',
+      skipMutationFeedback: true,
       body: JSON.stringify({
         display_name: webhookName,
         destination_url: webhookUrl,
@@ -563,7 +564,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
     onError: (err) => setError(messageFrom(err, ui("Unable to update webhook."), ui))
   });
   const rotateWebhook = useMutation({
-    mutationFn: (row: WebhookSubscription) => apiRequest<WebhookSubscription & { signing_secret: string }>(`/inventory-capabilities/webhooks/${row.id}/rotate-secret`, { method: 'POST', body: JSON.stringify({}), version: row.version }),
+    mutationFn: (row: WebhookSubscription) => apiRequest<WebhookSubscription & { signing_secret: string }>(`/inventory-capabilities/webhooks/${row.id}/rotate-secret`, { method: 'POST', skipMutationFeedback: true, body: JSON.stringify({}), version: row.version }),
     onSuccess: (data) => { setRevealedWebhookSecret(data.signing_secret); setWebhookMessage(ui("Webhook secret rotated. Copy the new secret now.")); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-webhooks'] }); },
     onError: (err) => setError(messageFrom(err, ui("Unable to rotate webhook secret."), ui))
   });
@@ -581,7 +582,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
     onError: (err) => setError(messageFrom(err, ui("Unable to load more webhooks."), ui))
   });
   const testWebhook = useMutation({
-    mutationFn: (id: string) => apiRequest<{ delivery_id: string; queued: boolean }>(`/inventory-capabilities/webhooks/${id}/test`, { method: 'POST', body: JSON.stringify({}) }),
+    mutationFn: (id: string) => apiRequest<{ delivery_id: string; queued: boolean }>(`/inventory-capabilities/webhooks/${id}/test`, { method: 'POST', skipMutationFeedback: true, body: JSON.stringify({}) }),
     onSuccess: () => { setWebhookMessage(ui("Test webhook queued. Delivery status will appear below.")); setError(null); setTimeout(() => void qc.invalidateQueries({ queryKey: ['inventory-webhook-deliveries'] }), 750); },
     onError: (err) => setError(messageFrom(err, ui("Unable to queue webhook test."), ui))
   });
