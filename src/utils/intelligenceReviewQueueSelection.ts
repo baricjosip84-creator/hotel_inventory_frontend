@@ -10,5 +10,7 @@ export function selectVisibleIntelligenceReview<T extends { source_action_id?: s
   if (requestedSourceActionId) {
     return reviews.find((review) => review.source_action_id === requestedSourceActionId);
   }
-  return reviews.find((review) => (review.source_action_id || review.review_id) === selectedLocalId) || reviews[0];
+  return selectedLocalId
+    ? reviews.find((review) => (review.source_action_id || review.review_id) === selectedLocalId)
+    : reviews[0];
 }

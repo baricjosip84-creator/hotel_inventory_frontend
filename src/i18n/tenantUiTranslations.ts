@@ -2,6 +2,8 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // FE220: a previously selected review may no longer be present after permission/data changes.
+  ["The selected review is no longer on this page. Choose a review from the queue to continue.", "Die ausgewählte Prüfung befindet sich nicht mehr auf dieser Seite. Wählen Sie eine Prüfung aus der Liste aus, um fortzufahren.", "La revisión seleccionada ya no aparece en esta página. Elija una revisión de la lista para continuar.", "La révision sélectionnée ne figure plus sur cette page. Choisissez une révision dans la liste pour continuer.", "Odabrani pregled više nije na ovoj stranici. Odaberite pregled s popisa za nastavak."],
   // FE219: missing exact-governance-review source must never show a different selection.
   ["The requested review is not available to your role or is no longer available.", "Die angeforderte Prüfung ist für Ihre Rolle nicht verfügbar oder existiert nicht mehr.", "La revisión solicitada no está disponible para su rol o ya no existe.", "La révision demandée n’est pas disponible pour votre rôle ou n’existe plus.", "Traženi pregled nije dostupan vašoj ulozi ili više ne postoji."],
   // FE218: APE-UX-003 do not label raw observations as measured policy effectiveness.

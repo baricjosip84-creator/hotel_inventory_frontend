@@ -23,10 +23,10 @@ function check(name,fn){fn();checks++;console.log('PASS',name)}
 check('defaults to first visible review',()=>assert.equal(select(rows,null,null),rows[0]));
 check('local second selection selects exactly second',()=>assert.equal(select(rows,'b',null),rows[1]));
 check('local third selection selects exactly third',()=>assert.equal(select(rows,'c',null),rows[2]));
-check('unknown local selection defaults to visible first',()=>assert.equal(select(rows,'old',null),rows[0]));
+check('unknown explicitly selected review cannot be substituted',()=>assert.equal(select(rows,'old',null),undefined));
 check('pagination retains selection when still present',()=>assert.equal(select(rows.slice(1),'b',null),rows[1]));
-check('pagination resets missing selection',()=>assert.equal(select(rows.slice(1),'a',null),rows[1]));
-check('filtered out local selection resets',()=>assert.equal(select([rows[2]],'b',null),rows[2]));
+check('pagination never replaces explicitly selected review',()=>assert.equal(select(rows.slice(1),'a',null),undefined));
+check('filtered out explicitly selected review shows no unrelated details',()=>assert.equal(select([rows[2]],'b',null),undefined));
 check('requested exact deep link takes priority',()=>assert.equal(select(rows,'a','c'),rows[2]));
 check('requested id must not silently select another review',()=>assert.equal(select(rows,'a','absent'),undefined));
 check('empty list has no selected review',()=>assert.equal(select([],null,null),undefined));
@@ -34,17 +34,17 @@ check('empty list cannot satisfy requested id',()=>assert.equal(select([],null,'
 check('supports id fallback for record without source action',()=>assert.deepEqual(select([{review_id:'r'}],'r',null),{review_id:'r'}));
 check('missing source selection is not a mutation',()=>assert.equal(rows.length,3));
 const required = [
-  [page,"const [selectedQueueReviewId, setSelectedQueueReviewId] = useState<string | null>(null)"],
+  [page,"const selectedQueueReviewId = queueRoute.selectedReviewId;"],
   [page,'selectVisibleIntelligenceReview(reviews, selectedQueueReviewId, requestedSourceActionId)'],
   [page,'<nav className="ai-review-page__queue-picker"'],
   [page,'aria-label={ui(\'Review queue\')}'],
   [page,'className={`ai-review-page__queue-choice ${selected ?'],
   [page,'aria-current={selected ? \'true\' : undefined}'],
-  [page,'setSelectedQueueReviewId(rowId)'],
+  [page,"updateQueueRoute('selected_review_id', rowId)"],
   [page,'setSelectedHistorySourceActionId(null)'],
   [page,'disabled={Boolean(requestedSourceActionId) && !selected}'],
   [page,'reviews.filter((review) => review === selectedQueueReview).map'],
-  [page,'requestedSourceActionId && !selectedQueueReview'],
+  [page,'(requestedSourceActionId || selectedQueueReviewId) && !selectedQueueReview'],
   [page,'reviewDecisionValidationMessage(selectedDecision, decisionDraft, ui)'],
   [page,'recordAIReviewDecision(sourceActionId, body)'],
   [page,'aria-live="off"'],

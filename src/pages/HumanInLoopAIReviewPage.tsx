@@ -1,3 +1,4 @@
+import { readIntelligenceReviewQueueRoute, withIntelligenceReviewQueueChange } from '../utils/intelligenceReviewQueueRoute';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -5259,15 +5260,27 @@ export default function HumanInLoopAIReviewPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedSourceActionId = searchParams.get('source_action_id');
   const activeView: IntelligenceReviewView = searchParams.get('view') === 'readiness' ? 'readiness' : 'recommendations';
-  const [aiOperationDomain, setAiOperationDomain] = useState<'all' | AIOperationDomain>('all');
-  const [reviewState, setReviewState] = useState<'all' | ReviewStateFilter>('all');
-  const [reviewSearch, setReviewSearch] = useState('');
-  const [reviewSort, setReviewSort] = useState<ReviewSort>('priority');
-  const [reviewOffset, setReviewOffset] = useState(0);
-  const [urgency, setUrgency] = useState<'all' | Urgency>('all');
+  // The URL is the single source of truth for review queue filters, pagination and selection.
+  // This restores the same record after hard refresh and browser Back/Forward.
+  const queueRoute = readIntelligenceReviewQueueRoute(searchParams);
+  const aiOperationDomain: 'all' | AIOperationDomain = DOMAIN_FILTERS.some((option) => option.value === queueRoute.domain)
+    ? queueRoute.domain as 'all' | AIOperationDomain : 'all';
+  const reviewState: 'all' | ReviewStateFilter = REVIEW_STATE_FILTERS.some((option) => option.value === queueRoute.state)
+    ? queueRoute.state as 'all' | ReviewStateFilter : 'all';
+  const urgency: 'all' | Urgency = URGENCY_FILTERS.some((option) => option.value === queueRoute.urgency)
+    ? queueRoute.urgency as 'all' | Urgency : 'all';
+  const reviewSort: ReviewSort = REVIEW_SORT_OPTIONS.some((option) => option.value === queueRoute.sort)
+    ? queueRoute.sort as ReviewSort : 'priority';
+  const reviewSearch = queueRoute.search;
+  const reviewOffset = queueRoute.offset;
+  const updateQueueRoute = (
+    key: 'review_domain' | 'review_state' | 'review_urgency' | 'review_q' | 'review_sort' | 'review_offset' | 'selected_review_id',
+    value: string,
+    options: { resetPage?: boolean; replace?: boolean } = {}
+  ) => setSearchParams((current) => withIntelligenceReviewQueueChange(current, key, value, options), { replace: options.replace ?? false });
   const [selectedReadinessFeatureKey, setSelectedReadinessFeatureKey] = useState<string>('');
   const [selectedHistorySourceActionId, setSelectedHistorySourceActionId] = useState<string | null>(requestedSourceActionId);
-  const [selectedQueueReviewId, setSelectedQueueReviewId] = useState<string | null>(null);
+  const selectedQueueReviewId = queueRoute.selectedReviewId;
   const [reviewDecisionDrafts, setReviewDecisionDrafts] = useState<Record<string, ReviewDecisionDraft>>({});
   const [reviewActionMessage, setReviewActionMessage] = useState<string | null>(null);
   const [isForcingReadinessRefresh, setIsForcingReadinessRefresh] = useState(false);
@@ -5290,7 +5303,7 @@ export default function HumanInLoopAIReviewPage() {
     const total = numberValue(reviewQuery.data?.pagination?.total);
     const visibleCount = reviewQuery.data?.reviews?.length || 0;
     if (total > 0 && visibleCount === 0 && reviewOffset >= total) {
-      setReviewOffset(Math.max(0, reviewOffset - 25));
+      updateQueueRoute('review_offset', String(Math.max(0, reviewOffset - 25)), { replace: true });
     }
   }, [requestedSourceActionId, reviewQuery.isFetching, reviewQuery.data?.pagination?.total, reviewQuery.data?.reviews?.length, reviewOffset]);
 
@@ -9446,23 +9459,23 @@ export default function HumanInLoopAIReviewPage() {
         <div className="card ai-review-page__controls-card">
           <div className="ai-review-page__toolbar" style={toolbarStyle}>
             {!isFocusedReview ? (<>
-              <label className="ai-review-page__field"><span>{ui("Review category")}</span><select aria-label={ui("Review category")} style={selectStyle} value={aiOperationDomain} onChange={(event) => { setAiOperationDomain(event.target.value as 'all' | AIOperationDomain); setReviewOffset(0); }}>
+              <label className="ai-review-page__field"><span>{ui("Review category")}</span><select aria-label={ui("Review category")} style={selectStyle} value={aiOperationDomain} onChange={(event) => { updateQueueRoute('review_domain', event.target.value, { resetPage: true }); }}>
                 {DOMAIN_FILTERS.map((option) => (
                   <option key={option.value} value={option.value}>{ui(option.label)}</option>
                 ))}
               </select></label>
-              <label className="ai-review-page__field"><span>{ui("Review state")}</span><select aria-label={ui("Review state")} style={selectStyle} value={reviewState} onChange={(event) => { setReviewState(event.target.value as 'all' | ReviewStateFilter); setReviewOffset(0); }}>
+              <label className="ai-review-page__field"><span>{ui("Review state")}</span><select aria-label={ui("Review state")} style={selectStyle} value={reviewState} onChange={(event) => { updateQueueRoute('review_state', event.target.value, { resetPage: true }); }}>
                 {REVIEW_STATE_FILTERS.map((option) => (
                   <option key={option.value} value={option.value}>{ui(option.label)}</option>
                 ))}
               </select></label>
-              <label className="ai-review-page__field"><span>{ui("Urgency")}</span><select aria-label={ui("Review urgency")} style={selectStyle} value={urgency} onChange={(event) => { setUrgency(event.target.value as 'all' | Urgency); setReviewOffset(0); }}>
+              <label className="ai-review-page__field"><span>{ui("Urgency")}</span><select aria-label={ui("Review urgency")} style={selectStyle} value={urgency} onChange={(event) => { updateQueueRoute('review_urgency', event.target.value, { resetPage: true }); }}>
                 {URGENCY_FILTERS.map((option) => (
                   <option key={option.value} value={option.value}>{ui(option.label)}</option>
                 ))}
               </select></label>
-              <label className="ai-review-page__field ai-review-page__search-field"><span>{ui('Search reviews')}</span><input aria-label={ui('Search reviews')} value={reviewSearch} onChange={(event) => { setReviewSearch(event.target.value); setReviewOffset(0); }} placeholder={ui('Search title, summary, source, or work area')} /></label>
-              <label className="ai-review-page__field"><span>{ui('Sort')}</span><select aria-label={ui('Sort reviews')} style={selectStyle} value={reviewSort} onChange={(event) => { setReviewSort(event.target.value as ReviewSort); setReviewOffset(0); }}>
+              <label className="ai-review-page__field ai-review-page__search-field"><span>{ui('Search reviews')}</span><input aria-label={ui('Search reviews')} value={reviewSearch} onChange={(event) => { updateQueueRoute('review_q', event.target.value, { resetPage: true, replace: true }); }} placeholder={ui('Search title, summary, source, or work area')} /></label>
+              <label className="ai-review-page__field"><span>{ui('Sort')}</span><select aria-label={ui('Sort reviews')} style={selectStyle} value={reviewSort} onChange={(event) => { updateQueueRoute('review_sort', event.target.value, { resetPage: true }); }}>
                 {REVIEW_SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{ui(option.label)}</option>)}
               </select></label>
             </>) : (
@@ -9509,7 +9522,7 @@ export default function HumanInLoopAIReviewPage() {
                     className={`ai-review-page__queue-choice ${selected ? 'ai-review-page__queue-choice--selected' : ''}`}
                     aria-current={selected ? 'true' : undefined}
                     disabled={Boolean(requestedSourceActionId) && !selected}
-                    onClick={() => { setSelectedQueueReviewId(rowId); setSelectedHistorySourceActionId(null); }}
+                    onClick={() => { updateQueueRoute('selected_review_id', rowId); setSelectedHistorySourceActionId(null); }}
                   >
                     <strong>{intelligenceReviewTitle(review, ui)}</strong>
                     <span>{recommendationLabel(review.review_state, ui)} · {recommendationLabel(review.urgency, ui)}</span>
@@ -9519,8 +9532,8 @@ export default function HumanInLoopAIReviewPage() {
               })}
             </nav>
             <div className="ai-review-page__selected-review" aria-live="off">
-            {requestedSourceActionId && !selectedQueueReview ? (
-              <div className="card" role="status">{ui('The requested review is not available to your role or is no longer available.')}</div>
+            {(requestedSourceActionId || selectedQueueReviewId) && !selectedQueueReview ? (
+              <div className="card" role="status">{ui('The selected review is no longer on this page. Choose a review from the queue to continue.')}</div>
             ) : null}
             {reviews.filter((review) => review === selectedQueueReview).map((review) => {
               const sourcePath = sourceReviewToAppPath(review);
@@ -9906,8 +9919,8 @@ export default function HumanInLoopAIReviewPage() {
           <div className="ai-review-page__pagination">
             <span className="card__subtext">{ui('Showing')} {formatLocalizedNumber(numberValue(reviewQuery.data?.pagination?.from), locale)}–{formatLocalizedNumber(numberValue(reviewQuery.data?.pagination?.to), locale)} {ui('of')} {formatLocalizedNumber(numberValue(reviewQuery.data?.pagination?.total), locale)}</span>
             <div>
-              <button className="button button--secondary" type="button" disabled={reviewQuery.data?.pagination?.previous_offset === null || reviewQuery.data?.pagination?.previous_offset === undefined} onClick={() => setReviewOffset(numberValue(reviewQuery.data?.pagination?.previous_offset))}>{ui('Previous')}</button>
-              <button className="button button--secondary" type="button" disabled={reviewQuery.data?.pagination?.next_offset === null || reviewQuery.data?.pagination?.next_offset === undefined} onClick={() => setReviewOffset(numberValue(reviewQuery.data?.pagination?.next_offset))}>{ui('Next')}</button>
+              <button className="button button--secondary" type="button" disabled={reviewQuery.data?.pagination?.previous_offset === null || reviewQuery.data?.pagination?.previous_offset === undefined} onClick={() => updateQueueRoute('review_offset', String(numberValue(reviewQuery.data?.pagination?.previous_offset)))}>{ui('Previous')}</button>
+              <button className="button button--secondary" type="button" disabled={reviewQuery.data?.pagination?.next_offset === null || reviewQuery.data?.pagination?.next_offset === undefined} onClick={() => updateQueueRoute('review_offset', String(numberValue(reviewQuery.data?.pagination?.next_offset)))}>{ui('Next')}</button>
             </div>
           </div>
         ) : null}
