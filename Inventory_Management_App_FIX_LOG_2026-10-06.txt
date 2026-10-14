@@ -13594,3 +13594,42 @@ VERIFICATION:
 - Previously generated, stored PDF files are historical immutable documents and are NOT modified by the new PDF generator. New document creation uses updated display wording; a production redeploy is required.
 - No database migration. Other OPEN items include CASE=24 UoM save/readback, Croatia custom-field persistence, production valuation parity, historical procurement spend and webhook delivery acceptance.
 ================================================================================
+
+================================================================================
+2026-10-14 — FRONTEND 215 / BACKEND 124 — CUSTOMER RETURNS DETAIL NAVIGATION & FOCUS
+================================================================================
+ORIGINAL AUDIT CONNECTION (Page 26, Customer Returns, September 29, 2026):
+- The operator reported customer-return details were visually crowded and difficult to scan, and repeatedly requested more consistent navigation and record/action association across Outbound.
+- The original audit confirmed correct return selection, creation/receiving, stock restoration and cancellation. Those historical PASS results are preserved. This fix addresses a source-reproducible adjacent keyboard/navigation limitation, not a newly claimed live historical wrong-record bug.
+FE214 SOURCE-LEVEL REPRODUCTION:
+- Selecting an Order already triggered a scroll+focus effect for the expanded order-details region. Selecting a Customer Return only toggled selectedReturnId; the expanded return-details grid was not focusable, did not have a named screen-reader region, and received no scroll positioning below the sticky Outbound tabs.
+FE215 CORRECTION:
+- Give only the selected return's expanded details grid a ref, role=region, contextual accessible label containing the exact return number, and tabIndex=-1 for programmatic keyboard focus without adding a normal Tab stop.
+- After React renders a newly selected return on the Returns tab, scroll its detail panel into view (respect reduced-motion preference) and focus it without a second scroll. Cancel pending focus on selection/tab changes; do nothing on close or when the selected panel is no longer mounted.
+- Add scroll-margin-top 110px for the sticky Outbound header and a visible focus outline for keyboard focus. Preserve existing return-card framing, detail sections, responsive layout, permissions, posted stock, PDF, emails, APIs, and backend behavior.
+VERIFICATION:
+- Executable new focused 28/28 PASS on FE215. It FAILS against FE214 as expected at the absent ref/focus behavior. 22/22 selected existing+new regression scripts PASS (17 frontend, 5 backend); TypeScript TSX parser diagnostics zero.
+- No backend application code change and no migration. Clean Node24 build, real browser focus/scroll, Vercel/Render and live PostgreSQL acceptance remain UNVERIFIED. Do not mark the overall 328-case audit completed.
+- Other open acceptance: CASE=24 conversion persistence, test_country=Croatia custom field persistence, Products versus Reports stock valuation parity, historical Purchase Order spend comparison and GitHub Actions webhook delivery execution.
+================================================================================
+
+
+================================================================================
+2026-10-14 — FRONTEND 216 / BACKEND 124 — ORIGINAL AUDIT APE-UX-006 + PF-UX-001
+================================================================================
+ORIGINAL TESTING FINDINGS (PRESERVED ABOVE):
+- APE-UX-006 (Adaptive Policy Engine): "Run new policy analysis" showed the generic "Item created successfully" toast; an analysis refresh records evidence, but does not apply business policy changes.
+- PF-UX-001 (Probabilistic Forecasting): "Refresh forecast analysis" showed "Item created successfully" instead of identifying the forecast refresh.
+- These were both reproduced from FE215 source: the POST calls used apiRequest without skipMutationFeedback, which triggers the shared generic mutation-success notification.
+CORRECTION (FE216):
+- For both existing analysis POST calls, send skipMutationFeedback:true. Keep the original endpoint, HTTP method, request body, permission gating, refetch, and loading/error state behavior.
+- APE's existing translated in-page analysis-snapshot confirmation remains, now exposed as role=status / aria-live=polite for assistive technology.
+- Forecast analysis now shows its existing five-language translated "Forecast analysis refreshed successfully." as a visible role=status / aria-live=polite result after a successful POST.
+- No global feedback disablement, new API action, change to business approvals, database migration, or backend code change.
+REPRODUCTION / TESTS:
+- FE215 independently fails the executable new check when either the legacy PF or APE refresh handler is supplied, because skipMutationFeedback is missing.
+- FE216 passes the focused runtime-executed handler check, 30/30 assertions, including exact endpoints, POST, JSON body, normal/focused forecast refetch, policy refetch, visible status, error presentation, and five-language translations.
+- 21/21 selected existing+new frontend regression scripts PASS with Node 22 and globally installed TypeScript linked locally for test-only execution. Updated two inherited brittle checks which expected a literal old API call or pre-FE203 inline Cross-Domain route-state source text; product behavior not changed by these test updates.
+- Full clean Node24 dependency install, Vite build, browser/deployed actions, and live PostgreSQL are NOT VERIFIED. Historical manual audit outcomes remain unchanged. APE-UX-006 and PF-UX-001 are source-corrected, awaiting tenant-browser acceptance.
+- Other OPEN acceptance: CASE=24 unit-conversion persistence, Croatia custom-field save/readback, valuation parity, historical PO spend, webhook delivery and clean production build.
+================================================================================

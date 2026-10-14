@@ -817,7 +817,7 @@ export default function ProbabilisticForecastingPage() {
   };
 
   const refreshAnalysis = useMutation({
-    mutationFn: () => apiRequest('/decision-intelligence/probabilistic-forecasting-refresh', { method: 'POST', body: JSON.stringify({}) }),
+    mutationFn: () => apiRequest('/decision-intelligence/probabilistic-forecasting-refresh', { method: 'POST', body: JSON.stringify({}), skipMutationFeedback: true }),
     onSuccess: async () => {
       if (focusedMode) {
         await focusedEvidenceQuery.refetch();
@@ -898,6 +898,9 @@ export default function ProbabilisticForecastingPage() {
         description={ui('Build and review advisory demand ranges, stockout risk, and forecast accuracy from the app’s real operating data. Forecasts never change inventory or other business records automatically.')}
         aside={<><OperationalWorkspaceStatus value={heroStatusValue} label={heroStatusLabel} />{canGovern ? <button className="button button--secondary" type="button" onClick={() => refreshAnalysis.mutate()} disabled={refreshAnalysis.isPending || visibleIsFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />{ui(refreshAnalysis.isPending ? 'Refreshing forecast analysis…' : 'Refresh forecast analysis')}</button> : <button className="button button--secondary" type="button" onClick={() => void refreshVisibleEvidence()} disabled={visibleIsFetching}><TenantNavIcon path="/probabilistic-forecasting" size={14} />{ui(visibleIsFetching ? 'Refreshing…' : 'Refresh page')}</button>}</>}
       />
+      {refreshAnalysis.isSuccess ? (
+        <p className="forecast-limit-note" role="status" aria-live="polite">{ui('Forecast analysis refreshed successfully.')}</p>
+      ) : null}
       {refreshAnalysis.isError ? (
         <section className="card card--danger forecast-refresh-error" role="alert">
           <strong>{ui('Forecast analysis could not be refreshed.')}</strong>

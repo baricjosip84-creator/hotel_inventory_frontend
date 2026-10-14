@@ -109,7 +109,7 @@ else pass('Backend titles and units remain source data; stored risk explanations
 
 for (const required of [
   "apiRequest<ProbabilisticForecastingSummary>(`/decision-intelligence/probabilistic-forecasting-summary?${queryString}`)",
-  "apiRequest('/decision-intelligence/probabilistic-forecasting-refresh', { method: 'POST', body: JSON.stringify({}) })",
+  "apiRequest('/decision-intelligence/probabilistic-forecasting-refresh', { method: 'POST', body: JSON.stringify({}), skipMutationFeedback: true })",
   'TENANT_PERMISSIONS.DECISION_INTELLIGENCE_GOVERN',
   'TENANT_PERMISSIONS.TENANT_DIAGNOSTICS_READ',
   "ui('Build and review advisory demand ranges, stockout risk, and forecast accuracy from the app’s real operating data. Forecasts never change inventory or other business records automatically.')",

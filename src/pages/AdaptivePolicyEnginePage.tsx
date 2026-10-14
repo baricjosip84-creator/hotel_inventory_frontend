@@ -771,7 +771,7 @@ export default function AdaptivePolicyEnginePage() {
   const refreshAnalysis = useMutation({
     mutationFn: () => apiRequest<{ refreshed: boolean }>(
       '/decision-intelligence/adaptive-policy-engine-refresh',
-      { method: 'POST' }
+      { method: 'POST', skipMutationFeedback: true }
     ),
     onSuccess: async () => {
       await refetch();
@@ -901,7 +901,7 @@ export default function AdaptivePolicyEnginePage() {
       />
       {canGovern ? <p className="adaptive-policy-limit-note">{ui('Running a new policy analysis records a new evidence snapshot from current operating data. It does not apply policy changes automatically.')}</p> : null}
       {refreshAnalysis.isError ? <section className="card card--danger adaptive-policy-state-card adaptive-policy-state-card--danger"><p>{ui('New policy analysis could not be run. No operating rule was changed.')}</p></section> : null}
-      {refreshAnalysis.isSuccess ? <p className="adaptive-policy-limit-note">{ui('New policy analysis snapshot recorded from current operating data. No policy changes were applied; recommendations still require human review.')}</p> : null}
+      {refreshAnalysis.isSuccess ? <p className="adaptive-policy-limit-note" role="status" aria-live="polite">{ui('New policy analysis snapshot recorded from current operating data. No policy changes were applied; recommendations still require human review.')}</p> : null}
 
 <OperationalWorkspaceStats ariaLabel={ui('Adaptive policy evidence summary')}>
         <MetricCard label="Policies" value={policyCount} iconPath="/adaptive-policy-engine" tone="blue" />
