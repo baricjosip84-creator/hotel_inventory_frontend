@@ -13633,3 +13633,25 @@ REPRODUCTION / TESTS:
 - Full clean Node24 dependency install, Vite build, browser/deployed actions, and live PostgreSQL are NOT VERIFIED. Historical manual audit outcomes remain unchanged. APE-UX-006 and PF-UX-001 are source-corrected, awaiting tenant-browser acceptance.
 - Other OPEN acceptance: CASE=24 unit-conversion persistence, Croatia custom-field save/readback, valuation parity, historical PO spend, webhook delivery and clean production build.
 ================================================================================
+
+================================================================================
+2026-10-14 — FRONTEND 217 / BACKEND 125 — PF-UX-002 STOCKOUT RISK EXPLANATION EVIDENCE
+================================================================================
+ORIGINAL TESTING TXT, Probabilistic Forecasting, September 25–26, 2026:
+- PF-UX-002 (high priority UX / decision support): 100% stockout risk displayed with a blank explanation. User needs a reason derived from saved inventory and demand evidence before taking action.
+- PF-OBS-007: even 0% stockout risk had a blank explanation; preserve as historical observation, not previously confirmed calculation defect.
+- Current FE216 already had a generic missing-explanation fallback, but BE124 persistently INSERTed explanation_summary=NULL for every new generated stockout-risk observation, so a business-evidence explanation was still absent.
+SOURCE CORRECTION:
+- Backend 125 has new pure src/services/decisionIntelligence/forecastRiskExplanation.js; it derives an advisory explanation only from stored, validated empirical-demand-band evidence: usable stock; 30-day expected demand; lower/upper error-band bounds; estimated probability; and physical stock where distinct from usable stock.
+- Backend probabilisticForecastingService.js writes this generated explanation_summary for NEW risk observations. It preserves probability/severity calculations, source fingerprint/idempotency, tenant checks, APIs, schema, and review permissions.
+- For EXISTING legacy stockout observations whose explanation is blank, the list/read endpoint derives a display explanation from that row's persisted expected_impact without updating or modifying the historical database record. Existing authored explanations are never overwritten.
+- Other risk types and records without sufficient valid stored input are not assigned an invented explanation. The text explicitly identifies the triangular probability assumption as advisory rather than a guaranteed business outcome.
+- This fix does NOT claim to account for inbound deliveries, reservations or future stock changes not represented in the stored calculation.
+TEST EVIDENCE / LIMITS:
+- Backend 124 baseline: new executable regression fails because forecastRiskExplanation module is absent; original code binds SQL NULL for explanation_summary. Independent source check confirms the original defect.
+- Backend 125 new regression PASS 54/54; exercises explanation math/text, historical rows, tenant-scoped mocked SQL read, real insert statement and bind count, preservation of fingerprint/idempotency and non-stockout scope.
+- 9/9 additional existing backend regression scripts PASS; one new focused script also PASS (10/10 total). Two suggested optional filenames absent, not counted. Node 22 local environment. CI suite added after npm ci under phase16-production-validation.yml.
+- No DB migration. No frontend runtime code changed; FE217 is cumulative-documentation refresh of FE216, and full FE217 ZIP is still delivered. Backend 125 application code is changed.
+- A clean Node20 dependency install, full clean frontend Node24 build, actual database save/read, deployed tenant-browser display and live human acceptance were NOT performed. PF-UX-002 is SOURCE CORRECTED / LIVE ACCEPTANCE OPEN; PF-OBS-007 remains a historical observation with a source-level clarity improvement.
+- Other original live priorities remain OPEN: CASE=24 UoM conversion persistence; test_country=Croatia custom-field save/readback; valuation scope parity; historical PO spend; production webhook delivery and clean production builds.
+================================================================================
