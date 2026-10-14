@@ -545,7 +545,9 @@
     "check:supplier-deeplink-search-unlock": "node scripts/check-supplier-deeplink-search-unlock.mjs",
     "check:storage-location-deeplink-search": "node scripts/check-storage-location-deeplink-search.mjs",
     "check:scanner-direct-shipment-lookup": "node --experimental-strip-types scripts/check-scanner-direct-shipment-lookup.mjs",
-    "check:csv-spreadsheet-formula-safety": "node --experimental-strip-types scripts/check-csv-spreadsheet-formula-safety.mjs"
+    "check:csv-spreadsheet-formula-safety": "node --experimental-strip-types scripts/check-csv-spreadsheet-formula-safety.mjs",
+    "check:feed-anomaly-freshness": "node --experimental-strip-types scripts/check-feed-anomaly-freshness.mjs",
+    "check:reservation-requisition-url-selection": "node scripts/check-reservation-requisition-url-selection.cjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

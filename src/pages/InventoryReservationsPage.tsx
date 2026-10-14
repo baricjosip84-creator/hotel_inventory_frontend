@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
+import { selectedRecordId, withSelectedRecordId } from '../lib/recordSelectionParams';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
@@ -544,7 +545,7 @@ export default function InventoryReservationsPage() {
   const reservationAttentionIds = reservationAttentionItemsQuery.attentionIds;
   const reservationConflictAttentionIds = useMemo(() => new Set(reservationAttentionItemsQuery.data?.conflict_reservation_ids || []), [reservationAttentionItemsQuery.data?.conflict_reservation_ids]);
   const [filters, setFilters] = useState<Filters>(defaultFilters);
-  const [selectedReservationId, setSelectedReservationId] = useState('');
+  const selectedReservationId = selectedRecordId(searchParams, 'reservationId', 'reservation_id');
   const [draft, setDraft] = useState<ReservationDraft>(defaultDraft);
   const [editDraft, setEditDraft] = useState<ReservationDraft | null>(null);
   const [actionNote, setActionNote] = useState('');
@@ -559,13 +560,6 @@ export default function InventoryReservationsPage() {
   const lastFocusedReservationIdRef = useRef('');
 
   useEffect(() => {
-    const reservationIdFromUrl = searchParams.get('reservationId') || searchParams.get('reservation_id') || '';
-    if (reservationIdFromUrl && reservationIdFromUrl !== selectedReservationId) {
-      setSelectedReservationId(reservationIdFromUrl);
-    }
-  }, [searchParams, selectedReservationId]);
-
-  useEffect(() => {
     setFulfillmentQuantities({});
     setEditDraft(null);
     setActionNote('');
@@ -576,13 +570,7 @@ export default function InventoryReservationsPage() {
   const editDraftValidationMessage = editDraft ? ui(getDraftValidationMessage(editDraft)) : '';
 
   const handleSelectReservation = (reservationId: string) => {
-    setSelectedReservationId(reservationId);
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      next.set('reservationId', reservationId);
-      next.delete('reservation_id');
-      return next;
-    });
+    setSearchParams((current) => withSelectedRecordId(current, 'reservationId', 'reservation_id', reservationId));
   };
 
   const optionsQuery = useQuery({

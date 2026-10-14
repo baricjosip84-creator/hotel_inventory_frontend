@@ -20,7 +20,7 @@ const checks = [
   ['detail panel has accessible label', /aria-label=\{ui\("Reservation detail"\)\}/],
   ['fixed-header scroll margin exists', /scrollMarginTop: '104px'/],
   ['queue Open still selects exact reservation', /onClick=\{\(\) => handleSelectReservation\(reservation\.id\)\}/],
-  ['exact reservation deep-link remains supported', /searchParams\.get\('reservationId'\)[\s\S]*?setSelectedReservationId\(reservationIdFromUrl\)/],
+  ['exact reservation deep-link remains supported through the URL', /selectedRecordId\(searchParams, 'reservationId', 'reservation_id'\)/],
 ];
 
 let pass = 0;

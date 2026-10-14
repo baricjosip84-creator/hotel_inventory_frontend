@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router';
+import { selectedRecordId, withSelectedRecordId } from '../lib/recordSelectionParams';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
@@ -1438,8 +1439,7 @@ function formFromRequisition(requisition: InventoryRequisition): RequisitionForm
 export default function InventoryRequisitionsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const requestedRequisitionId = searchParams.get('requisitionId')?.trim() || searchParams.get('requisition_id')?.trim() || '';
+  const [searchParams, setSearchParams] = useSearchParams();
   const { locale, ui } = useAppTranslation();
   const formatDateTime = (value: string | null | undefined): string => {
     if (!value) return '-';
@@ -1502,10 +1502,10 @@ export default function InventoryRequisitionsPage() {
   const [queueSearch, setQueueSearch] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const selectedRequestRef = useRef<HTMLElement | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(() => requestedRequisitionId || null);
-  useEffect(() => {
-    if (requestedRequisitionId) setSelectedId(requestedRequisitionId);
-  }, [requestedRequisitionId]);
+  const selectedId = selectedRecordId(searchParams, 'requisitionId', 'requisition_id') || null;
+  const selectRequisition = (id: string) => {
+    setSearchParams((current) => withSelectedRecordId(current, 'requisitionId', 'requisition_id', id));
+  };
   const [form, setForm] = useState<RequisitionFormState>(() => emptyForm());
   const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
   const [editingDraftVersion, setEditingDraftVersion] = useState<number | string | null>(null);
@@ -1798,7 +1798,7 @@ export default function InventoryRequisitionsPage() {
       setForm(emptyForm());
       setEditingDraftId(null);
       setEditingDraftVersion(null);
-      setSelectedId(saved.id);
+      selectRequisition(saved.id);
       await invalidateRequisitions();
     }
   });
@@ -1810,7 +1810,7 @@ export default function InventoryRequisitionsPage() {
         body: JSON.stringify(body || {})
       }),
     onSuccess: async (updated) => {
-      setSelectedId(updated.id);
+      selectRequisition(updated.id);
       setWorkflowNotes('');
       await invalidateRequisitions();
     }
@@ -1861,7 +1861,7 @@ export default function InventoryRequisitionsPage() {
       });
     },
     onSuccess: async (response) => {
-      setSelectedId(response.requisition.id);
+      selectRequisition(response.requisition.id);
       setFulfillmentLines({});
       setFulfillmentLineNotes({});
       setFulfillmentSerialNumbers({});
@@ -2218,7 +2218,7 @@ export default function InventoryRequisitionsPage() {
       });
     },
     onSuccess: async (response) => {
-      setSelectedId(response.requisition.id);
+      selectRequisition(response.requisition.id);
       setActivityComment('');
       await invalidateRequisitions();
     }
@@ -3700,7 +3700,7 @@ export default function InventoryRequisitionsPage() {
                 <button
                   type="button"
                   style={item.id === selectedId ? styles.selectedListItem : styles.listItem}
-                  onClick={() => setSelectedId(item.id)}
+                  onClick={() => selectRequisition(item.id)}
                 >
                   <span style={styles.listTitle}>{item.requisition_number}</span>
                   {causesSidebarAttention ? <SidebarAttentionMarker label={ui('Attention required')} /> : null}

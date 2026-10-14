@@ -14,7 +14,7 @@ const checks = [
   ['panel is programmatically focusable', /tabIndex=\{-1\}/],
   ['panel has accessible label', /aria-label=\{ui\('Selected request'\)\}/],
   ['fixed-header margin exists', /scrollMarginTop: 104/],
-  ['queue selection still selects exact row', /onClick=\{\(\) => setSelectedId\(item\.id\)\}/],
+  ['queue selection still selects exact row', /onClick=\{\(\) => selectRequisition\(item\.id\)\}/],
   ['detail query still keyed by selected id', /queryKey: \['inventory-requisition-detail', selectedId\]/],
   ['no requisition mutation added to focus effect', /useEffect\(\(\) => \{[\s\S]*?selectedRequestRef[\s\S]*?\}, \[selected\?\.id, selectedId\]\)/],
 ];
