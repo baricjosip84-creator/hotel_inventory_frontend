@@ -1,3 +1,4 @@
+import { resolveShipmentForHandoff } from '../utils/resolveShipmentForHandoff';
 import { formatCurrencyAmount, getActiveTenantCurrency, normalizeCurrencyCode } from '../lib/tenantCurrency';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
@@ -1400,6 +1401,36 @@ export default function ShipmentsPage() {
   }, [dashboardHandoffShipmentId, queryClient, setSearchParams]);
 
 
+  // A scanner QR can reference a valid shipment missing from the registry list
+  // (for example, after an archive/filter change or a failed list request).
+  // Open it by its own id, like PO and Dashboard handoffs, without receiving stock.
+  useEffect(() => {
+    const shipmentId = searchParams.get('shipmentId');
+    const source = searchParams.get('source');
+    if (!shipmentId || source === 'purchase-order' || source === 'dashboard') return;
+    if (shipments.some((shipment) => shipment.id === shipmentId)) return;
+    // Let the ordinary registry request complete first to avoid an extra read.
+    if (shipmentsQuery.isPending) return;
+
+    let cancelled = false;
+    void resolveShipmentForHandoff(shipmentId, shipments, fetchShipmentById)
+      .then(({ shipment }) => {
+        if (cancelled) return;
+        queryClient.setQueryData<ShipmentSummary[]>(['shipments'], (current) => {
+          if (current?.some((item) => item.id === shipment.id)) return current;
+          return [shipment, ...(current ?? [])];
+        });
+        // The existing scanner handoff effect below now selects the resolved
+        // shipment and processes scanner fields exactly once.
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setPageMessage(null);
+        setPageError(error instanceof ApiError ? error.message : uiRef.current('Failed to open shipment.'));
+      });
+    return () => { cancelled = true; };
+  }, [shipments, shipmentsQuery.isPending, searchParams, queryClient]);
+
   useEffect(() => {
     const shipmentIdFromQuery = searchParams.get('shipmentId');
 
@@ -1413,16 +1444,11 @@ export default function ShipmentsPage() {
       return;
     }
 
-    if (shipments.length === 0) {
-      return;
-    }
-
     const matchedShipment = shipments.find((shipment) => shipment.id === shipmentIdFromQuery);
 
-    if (!matchedShipment) {
-      setPageError(ui('Scanned shipment was not found in the current shipment list.'));
-      return;
-    }
+    // The separate direct-read effect resolves shipments omitted by the list.
+    // Do not consume scan parameters or report a false "not found" until it ends.
+    if (!matchedShipment) return;
 
     setWorkspaceSection('receiving');
     setSelectedShipmentId(matchedShipment.id);
