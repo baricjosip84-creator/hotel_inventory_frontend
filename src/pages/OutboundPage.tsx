@@ -483,6 +483,7 @@ export default function OutboundPage() {
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const orderDetailRef = useRef<HTMLElement | null>(null);
   const [selectedReturnId, setSelectedReturnId] = useState('');
+  const returnDetailRef = useRef<HTMLDivElement | null>(null);
   const [documentPreview, setDocumentPreview] = useState<DocumentPreview | null>(null);
   const [returnDocumentPreview, setReturnDocumentPreview] = useState<DocumentPreview | null>(null);
   const [emailCompose, setEmailCompose] = useState<EmailCompose | null>(null);
@@ -594,6 +595,19 @@ export default function OutboundPage() {
     }, 50);
     return () => window.clearTimeout(handle);
   }, [editingOrder, showOrderForm, activeTab]);
+  // Opening a return should move the review destination into view, as opening an
+  // order already does. Never steal focus when the details are closed.
+  useEffect(() => {
+    if (!selectedReturnId || activeTab !== 'returns') return undefined;
+    const handle = window.setTimeout(() => {
+      const detail = returnDetailRef.current;
+      if (!detail) return;
+      const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+      detail.scrollIntoView({ behavior, block: 'start' });
+      detail.focus({ preventScroll: true });
+    }, 50);
+    return () => window.clearTimeout(handle);
+  }, [selectedReturnId, activeTab]);
   const orderActivity = useQuery({ queryKey: ['outbound-order-activity', selectedOrderId, orderAuditPage], queryFn: () => apiRequest<OrderActivity>(`/outbound/orders/${selectedOrderId}/activity?audit_page=${orderAuditPage}&audit_page_size=${AUDIT_PAGE_SIZE}`), enabled: Boolean(selectedOrderId) });
   const orderDocuments = useQuery({ queryKey: ['outbound-order-documents', selectedOrderId], queryFn: () => apiRequest<OutboundDocument[]>(`/outbound/orders/${selectedOrderId}/documents`), enabled: Boolean(selectedOrderId) });
   const orderCommunications = useQuery({ queryKey: ['outbound-order-communications', selectedOrderId], queryFn: () => apiRequest<Communication[]>(`/outbound/orders/${selectedOrderId}/communications`), enabled: Boolean(selectedOrderId) });
@@ -1470,7 +1484,7 @@ export default function OutboundPage() {
               </div>
             </div>
             {cancelReturnId === row.id ? <div className="outbound-inline-action-form"><label className="outbound-field">{ui('Return cancellation reason')}<textarea value={cancelReturnReason} onChange={(event) => setCancelReturnReason(event.target.value)} autoFocus /></label><div className="outbound-actions-row"><button type="button" className="outbound-button-danger" disabled={mutation.isPending || cancelReturnReason.trim().length < 3} onClick={() => mutation.mutate({ path: `/outbound/returns/${row.id}/cancel`, version: Number(row.version), body: { reason: cancelReturnReason.trim() }, successMessage: ui('{return} cancelled.').replace('{return}', row.return_number) }, { onSuccess: () => { setCancelReturnId(''); setCancelReturnReason(''); } })}>{ui('Confirm')}</button><button type="button" className="outbound-button" onClick={() => { setCancelReturnId(''); setCancelReturnReason(''); }}>{ui('Close')}</button></div></div> : null}
-            {selectedReturnId === row.id ? <div className="outbound-detail-grid" style={{ marginTop: 12 }}>
+            {selectedReturnId === row.id ? <div className="outbound-detail-grid" ref={returnDetailRef} role="region" tabIndex={-1} aria-label={`${ui('Customer returns')} · ${row.return_number}`} style={{ marginTop: 12 }}>
               <div className="outbound-detail-card"><h4>{ui('Activity')}</h4>
                 {returnActivity.isLoading ? <div className="outbound-muted">{ui('Loading activity…')}</div> : (returnActivity.data?.events ?? []).length ? <div className="outbound-activity-list">{(returnActivity.data?.events ?? []).map((event,index) => <div key={`${event.key}-${event.at}-${index}`} className="outbound-activity-row"><strong>{ui(OUTBOUND_ACTIVITY_LABELS[event.key] || humanizeStatus(event.key))}</strong><span>{event.user_name || ui('User unavailable')} · {formatDate(event.at)}</span>{event.quantity !== undefined && event.quantity !== null ? <small>{ui('Dispatched quantity:')} {formatNumber(event.quantity)}</small> : event.details ? <small>{event.details}</small> : null}</div>)}</div> : <div className="outbound-muted">{ui('No activity recorded.')}</div>}
                 {canAuditRead && returnActivity.data?.audit ? <details className="outbound-audit-details"><summary>{ui('Full audit history')} ({returnActivity.data.audit.total})</summary>{returnActivity.data.audit.items.map((auditRow) => <div key={auditRow.id} className="outbound-audit-row"><strong>{ui(OUTBOUND_AUDIT_LABELS[auditRow.action] || humanizeStatus(auditRow.action))}</strong><span>{auditRow.user_name || auditRow.user_email || ui('User unavailable')} · {formatDate(auditRow.created_at)}</span></div>)}{returnActivity.data.audit.total > AUDIT_PAGE_SIZE ? <div className="outbound-pagination"><button type="button" className="outbound-button" disabled={returnAuditPage <= 1} onClick={() => setReturnAuditPage((page) => Math.max(1,page-1))}>{ui('Previous')}</button><span>{ui('Page')} {returnAuditPage} {ui('of')} {Math.max(1,Math.ceil(returnActivity.data.audit.total/AUDIT_PAGE_SIZE))}</span><button type="button" className="outbound-button" disabled={returnAuditPage >= Math.ceil(returnActivity.data.audit.total/AUDIT_PAGE_SIZE)} onClick={() => setReturnAuditPage((page) => page+1)}>{ui('Next')}</button></div> : null}</details> : null}

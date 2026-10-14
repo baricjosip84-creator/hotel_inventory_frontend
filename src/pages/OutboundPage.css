@@ -740,6 +740,17 @@ main[data-route-scroll-container]:has(> .io-outbound-page) {
 .outbound-return-action-context strong { color: #0f172a; overflow-wrap: anywhere; }
 .outbound-return-action-buttons { margin-top: 9px; }
 
+/* Bring the opened return details below the sticky Outbound tabs, with an
+   obvious keyboard focus destination that remains inside the correct card. */
+.outbound-return-card--expanded > .outbound-detail-grid {
+  scroll-margin-top: 110px;
+  outline: none;
+}
+.outbound-return-card--expanded > .outbound-detail-grid:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+
 .outbound-return-card--expanded > .outbound-detail-grid {
   border: 1px solid #dbe4ee;
   border-radius: 12px;

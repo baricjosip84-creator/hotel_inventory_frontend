@@ -561,7 +561,8 @@
     "check:integration-webhook-feedback": "node scripts/check-integration-webhook-feedback.mjs",
     "check:integration-api-key-connection-feedback": "node scripts/check-integration-api-key-connection-feedback.mjs",
     "check:outbound-tab-url-durability": "node scripts/check-outbound-tab-url-durability.mjs",
-    "check:outbound-specific-feedback": "node scripts/check-outbound-specific-feedback.mjs"
+    "check:outbound-specific-feedback": "node scripts/check-outbound-specific-feedback.mjs",
+    "check:outbound-return-detail-focus": "node scripts/check-outbound-return-detail-focus.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
