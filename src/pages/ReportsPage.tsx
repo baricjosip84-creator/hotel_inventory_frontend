@@ -602,7 +602,8 @@ type PurchaseOrderCommitmentRow = {
   known_ordered_value: number | string;
   known_received_value: number | string;
   known_remaining_value: number | string;
-  quantity_by_unit?: PurchaseOrderQuantityByUnit;
+  quantity_by_unit?: PurchaseOrderQuantityByUnit | null;
+  quantity_evidence?: 'Available' | 'Historical unit unavailable';
   overdue: boolean;
 };
 
@@ -638,7 +639,8 @@ type RequisitionActivityRow = {
   source_location?: string | null;
   target_location?: string | null;
   item_count: number | string;
-  quantity_by_unit?: RequisitionQuantityByUnit;
+  quantity_by_unit?: RequisitionQuantityByUnit | null;
+  quantity_evidence?: 'Available' | 'Historical unit unavailable';
   created_by?: string | null;
   overdue: boolean;
 };
@@ -1639,7 +1641,7 @@ export default function ReportsPage() {
           {requisitionActivityQuery.isError ? <ErrorState message={ui('Failed to load requisitions: {error}').replace('{error}', getReadableError(requisitionActivityQuery.error, ui))} /> : null}
           {!requisitionActivityQuery.isLoading && !requisitionActivityQuery.isError && requisitionRows.length === 0 ? <EmptyState message={ui("No inventory requisitions matched these filters.")} /> : null}
           {requisitionRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("Requisition")}</th><th>{ui("Department")}</th><th>{ui("Status")}</th><th>{ui("Priority")}</th><th>{ui("Needed by")}</th><th>{ui("Source → target")}</th><th>{ui("Fulfillment by unit")}</th><th>{ui("Created by")}</th></tr></thead><tbody>
-            {requisitionRows.map((row) => <tr key={row.requisition_id}><td className="reports-strong">{row.requisition_number}<span className="reports-subtext">{formatDateTime(row.created_at, locale)}</span></td><td>{row.requesting_department || '-'}{row.target_department ? <span className="reports-subtext">{ui('To: {department}').replace('{department}', row.target_department)}</span> : null}</td><td className={row.overdue ? 'reports-warning-text' : ''}>{formatStatus(row.status, ui)}{row.overdue ? <span className="reports-subtext">{ui("Past needed-by date")}</span> : null}</td><td>{formatStatus(row.priority, ui)}</td><td>{formatDate(row.needed_by, locale)}</td><td>{ui('{source} → {target}').replace('{source}', row.source_location || '—').replace('{target}', row.target_location || '—')}</td><td>{formatRequisitionProgress(row.quantity_by_unit, locale, ui)}</td><td>{row.created_by || ui("System")}</td></tr>)}
+            {requisitionRows.map((row) => <tr key={row.requisition_id}><td className="reports-strong">{row.requisition_number}<span className="reports-subtext">{formatDateTime(row.created_at, locale)}</span></td><td>{row.requesting_department || '-'}{row.target_department ? <span className="reports-subtext">{ui('To: {department}').replace('{department}', row.target_department)}</span> : null}</td><td className={row.overdue ? 'reports-warning-text' : ''}>{formatStatus(row.status, ui)}{row.overdue ? <span className="reports-subtext">{ui("Past needed-by date")}</span> : null}</td><td>{formatStatus(row.priority, ui)}</td><td>{formatDate(row.needed_by, locale)}</td><td>{ui('{source} → {target}').replace('{source}', row.source_location || '—').replace('{target}', row.target_location || '—')}</td><td>{row.quantity_evidence === 'Historical unit unavailable' ? ui('Historical unit unavailable') : formatRequisitionProgress(row.quantity_by_unit, locale, ui)}</td><td>{row.created_by || ui("System")}</td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
@@ -1697,7 +1699,7 @@ export default function ReportsPage() {
           {purchaseOrderCommitmentsQuery.isError ? <ErrorState message={ui('Failed to load purchase-order commitments: {error}').replace('{error}', getReadableError(purchaseOrderCommitmentsQuery.error, ui))} /> : null}
           {!purchaseOrderCommitmentsQuery.isLoading && !purchaseOrderCommitmentsQuery.isError && poCommitmentRows.length === 0 ? <EmptyState message={ui("No purchase orders matched these commitment filters.")} /> : null}
           {poCommitmentRows.length > 0 ? <div className="reports-table-wrap"><table className="reports-table"><thead><tr><th>{ui("PO")}</th><th>{ui("Supplier")}</th><th>{ui("Status")}</th><th>{ui("Expected")}</th><th>{ui("Receiving progress")}</th><th>{ui("Known ordered")}</th><th>{ui("Known remaining")}</th><th>{ui("Unpriced")}</th></tr></thead><tbody>
-            {poCommitmentRows.map((row) => <tr key={row.purchase_order_id}><td className="reports-strong">{row.po_number}<span className="reports-subtext">{ui('Created {date}').replace('{date}', formatDate(row.created_at, locale))}</span></td><td>{row.supplier_name}</td><td className={row.overdue ? 'reports-warning-text' : ''}>{formatStatus(row.status, ui)}{row.overdue ? <span className="reports-subtext">{ui("Overdue")}</span> : null}</td><td>{formatDate(row.expected_delivery_date, locale)}</td><td>{formatPurchaseOrderProgress(row.quantity_by_unit, locale, ui)}</td><td>{formatCostAmount(row.known_ordered_value, row.currency, locale)}</td><td className={toNumber(row.known_remaining_value) > 0 ? 'reports-warning-text' : ''}>{formatCostAmount(row.known_remaining_value, row.currency, locale)}</td><td>{ui('{unpriced} of {lines} lines').replace('{unpriced}', formatNumber(row.unpriced_line_count, locale, 0)).replace('{lines}', formatNumber(row.line_count, locale, 0))}</td></tr>)}
+            {poCommitmentRows.map((row) => <tr key={row.purchase_order_id}><td className="reports-strong">{row.po_number}<span className="reports-subtext">{ui('Created {date}').replace('{date}', formatDate(row.created_at, locale))}</span></td><td>{row.supplier_name}</td><td className={row.overdue ? 'reports-warning-text' : ''}>{formatStatus(row.status, ui)}{row.overdue ? <span className="reports-subtext">{ui("Overdue")}</span> : null}</td><td>{formatDate(row.expected_delivery_date, locale)}</td><td>{row.quantity_evidence === 'Historical unit unavailable' ? ui('Historical unit unavailable') : formatPurchaseOrderProgress(row.quantity_by_unit, locale, ui)}</td><td>{formatCostAmount(row.known_ordered_value, row.currency, locale)}</td><td className={toNumber(row.known_remaining_value) > 0 ? 'reports-warning-text' : ''}>{formatCostAmount(row.known_remaining_value, row.currency, locale)}</td><td>{ui('{unpriced} of {lines} lines').replace('{unpriced}', formatNumber(row.unpriced_line_count, locale, 0)).replace('{lines}', formatNumber(row.line_count, locale, 0))}</td></tr>)}
           </tbody></table></div> : null}
         </ReportPanel>
       ) : null}
