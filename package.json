@@ -540,7 +540,8 @@
     "check:batch187-dashboard-historical-classification": "node scripts/check-batch187-dashboard-historical-classification.mjs",
     "check:batch198-usage-history-ui": "node scripts/check-batch198-usage-history-ui.mjs",
     "check:tenant-audit-auto-filters": "node scripts/check-tenant-audit-auto-filters.mjs",
-    "check:supplier-deeplink-search-unlock": "node scripts/check-supplier-deeplink-search-unlock.mjs"
+    "check:supplier-deeplink-search-unlock": "node scripts/check-supplier-deeplink-search-unlock.mjs",
+    "check:storage-location-deeplink-search": "node scripts/check-storage-location-deeplink-search.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
