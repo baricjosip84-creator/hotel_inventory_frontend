@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAppTranslation } from '../i18n/I18nContext';
 import type { AppLocale } from '../i18n/config';
@@ -334,7 +334,15 @@ export default function TenantAuditPage() {
     ? ui('Last refreshed {date}').replace('{date}', formatDateTime(new Date(auditQuery.dataUpdatedAt).toISOString(), locale))
     : ui('Not refreshed yet');
 
-  const filtersChanged = JSON.stringify(draftFilters) !== JSON.stringify(appliedFilters);
+  // Compare canonical values: spaces typed around a search must not leave
+  // filters perpetually "pending" after the request has been applied.
+  const normalizedDraftFilters = useMemo(() => ({
+    ...draftFilters,
+    search: draftFilters.search.trim(),
+    action: draftFilters.action.trim(),
+    entityType: draftFilters.entityType.trim()
+  }), [draftFilters]);
+  const filtersChanged = JSON.stringify(normalizedDraftFilters) !== JSON.stringify(appliedFilters);
   const anyFilterApplied = Boolean(
     appliedFilters.search.trim() ||
     appliedFilters.from ||
@@ -347,24 +355,21 @@ export default function TenantAuditPage() {
 
   const draftDateRangeInvalid = Boolean(draftFilters.from && draftFilters.to && draftFilters.from > draftFilters.to);
 
-  const applyFilters = () => {
-    if (draftDateRangeInvalid) {
-      setFilterError(ui('From date must be before or equal to To date.'));
-      return;
-    }
-
-    setAppliedFilters({
-      ...draftFilters,
-      search: draftFilters.search.trim(),
-      action: draftFilters.action.trim(),
-      entityType: draftFilters.entityType.trim()
-    });
-    setPageIndex(0);
-    setSelectedAuditId(null);
-    setFilterError(null);
-    setRefreshMessage(null);
-    setRefreshError(null);
-  };
+  // Apply filter changes automatically, including search text after a short
+  // typing pause. Never submit an incomplete/invalid date range. This also
+  // keeps the summary, paged list and CSV export on the same filter state.
+  useEffect(() => {
+    if (!filtersChanged || draftDateRangeInvalid) return;
+    const handle = window.setTimeout(() => {
+      setAppliedFilters(normalizedDraftFilters);
+      setPageIndex(0);
+      setSelectedAuditId(null);
+      setFilterError(null);
+      setRefreshMessage(null);
+      setRefreshError(null);
+    }, 350);
+    return () => window.clearTimeout(handle);
+  }, [normalizedDraftFilters, filtersChanged, draftDateRangeInvalid]);
 
   const resetFilters = () => {
     setDraftFilters(DEFAULT_FILTERS);
@@ -458,7 +463,7 @@ export default function TenantAuditPage() {
         <OperationalSectionHeader
           iconPath="/audit"
           title={ui('Audit filters')}
-          description={ui('Narrow the audit trail by date, actor or evidence. Filters are applied only when you choose Apply filters.')}
+          description={ui('Narrow the audit trail by date, actor or evidence. Filters update automatically.')}
           actions={
             <>
               <button
@@ -468,14 +473,6 @@ export default function TenantAuditPage() {
                 disabled={!anyFilterApplied && !filtersChanged}
               >
                 {ui('Reset')}
-              </button>
-              <button
-                type="button"
-                className="app-button app-button--primary"
-                onClick={applyFilters}
-                disabled={!filtersChanged || auditQuery.isFetching || draftDateRangeInvalid}
-              >
-                {ui('Apply filters')}
               </button>
             </>
           }
@@ -580,8 +577,8 @@ export default function TenantAuditPage() {
           </label>
           <div className="tenant-audit-filter-note">
             {ui('CSV export uses the currently applied filters, not unfinished filter edits.')}
-            {filtersChanged ? (
-              <strong className="tenant-audit-filter-pending">{ui('Pending filter changes — choose Apply filters to update the audit results.')}</strong>
+            {filtersChanged && !draftDateRangeInvalid ? (
+              <strong className="tenant-audit-filter-pending">{ui('Updating filters…')}</strong>
             ) : anyFilterApplied ? (
               <strong className="tenant-audit-filter-applied">{ui('Applied filters are active.')}</strong>
             ) : null}
@@ -613,7 +610,7 @@ export default function TenantAuditPage() {
                 type="button"
                 className="app-button app-button--secondary"
                 onClick={handleExport}
-                disabled={exporting || auditQuery.isFetching}
+                disabled={exporting || auditQuery.isFetching || filtersChanged || draftDateRangeInvalid}
               >
                 {exporting ? ui('Exporting…') : ui('Export CSV')}
               </button>

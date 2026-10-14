@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+const root = process.argv[2] || process.cwd();
+const page=fs.readFileSync(path.join(root,'src/pages/TenantAuditPage.tsx'),'utf8');
+const translations=fs.readFileSync(path.join(root,'src/i18n/tenantUiTranslations.ts'),'utf8');
+let checks=0;
+const check=(name,fn)=>{fn();checks++;console.log(`PASS: ${name}`);};
+check('React effect handles draft filter updates',()=>{assert.match(page,/import \{[^}]*useEffect/);assert.match(page,/useEffect\(\(\) => \{/);});
+check('auto filter update debounced while typing',()=>{assert.match(page,/window\.setTimeout\(\(\) => \{/);assert.match(page,/\}, 350\)/);assert.match(page,/window\.clearTimeout\(handle\)/);});
+check('invalid and unchanged dates do not trigger requests',()=>{assert.match(page,/if \(!filtersChanged \|\| draftDateRangeInvalid\) return;/);});
+check('auto-applied values trim search while resetting pagination',()=>{assert.match(page,/setAppliedFilters\(normalizedDraftFilters\)/);assert.match(page,/search: draftFilters\.search\.trim\(\)/);assert.match(page,/setAppliedFilters\(normalizedDraftFilters\)/);assert.match(page,/setPageIndex\(0\)/);});
+check('no manual Apply filters button remains',()=>{assert.ok(!page.includes("ui('Apply filters')"));});
+check('exports cannot silently use pending stale filters',()=>{assert.match(page,/disabled=\{exporting \|\| auditQuery\.isFetching \|\| filtersChanged \|\| draftDateRangeInvalid\}/);});
+check('user sees automatic update description',()=>{assert.ok(page.includes('Filters update automatically.'));});
+check('all five language UI strings are available',()=>{assert.ok(translations.includes('Filters update automatically.'));assert.ok(translations.includes('Ažuriranje filtara…'));});
+console.log(`${checks}/${checks} tenant audit filter UI checks passed`);
