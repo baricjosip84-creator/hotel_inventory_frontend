@@ -1,3 +1,4 @@
+import { csvSpreadsheetCell } from '../lib/spreadsheetCsv';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -479,11 +480,7 @@ function changeBadgeStyle(value: number): CSSProperties {
 }
 
 function csvValue(value: string | number | null | undefined): string {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'number') return String(value);
-  let text = value;
-  if (/^[\t\r ]*[=+\-@]/.test(text)) text = `'${text}`;
-  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  return csvSpreadsheetCell(value);
 }
 
 function csvNumericValue(value: number | string | null | undefined): number | '' {

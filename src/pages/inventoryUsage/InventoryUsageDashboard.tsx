@@ -1,3 +1,4 @@
+import { csvSpreadsheetCell } from '../../lib/spreadsheetCsv';
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { useAppTranslation } from "../../i18n/I18nContext";
 import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from "../../i18n/formatters";
@@ -375,11 +376,7 @@ export function InventoryUsageDashboard({
     }
   }, [activeArea, permissions.canBulkRecord, permissions.canClosePeriods, permissions.canRecord]);
 
-  const escapeCsvCell = (value: unknown) => {
-    const raw = value === null || value === undefined ? "" : String(value);
-    const safeRaw = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
-    return `"${safeRaw.replace(/"/g, '""')}"`;
-  };
+  const escapeCsvCell = (value: unknown) => csvSpreadsheetCell(value, true);
 
   const downloadCsv = (
     filename: string,

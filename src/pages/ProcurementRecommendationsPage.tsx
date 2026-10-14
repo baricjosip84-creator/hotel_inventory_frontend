@@ -1,3 +1,4 @@
+import { csvSpreadsheetCell } from '../lib/spreadsheetCsv';
 import { formatCurrencyAmount, getActiveTenantCurrency, normalizeCurrencyCode } from '../lib/tenantCurrency';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
@@ -1122,15 +1123,8 @@ async function runRecommendationScheduledRun(
   );
 }
 
-function neutralizeCsvCell(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  const text = String(value);
-  return /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
-}
-
 function csvEscape(value: unknown): string {
-  const safe = neutralizeCsvCell(value);
-  return `"${safe.replace(/"/g, '""')}"`;
+  return csvSpreadsheetCell(value, true);
 }
 
 function downloadCsv(filename: string, headers: string[], rows: unknown[][]) {

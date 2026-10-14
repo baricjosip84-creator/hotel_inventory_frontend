@@ -1,3 +1,4 @@
+import { csvSpreadsheetCell } from '../../lib/spreadsheetCsv';
 import { useEffect, useMemo, useState } from 'react';
 import { useAppTranslation } from '../../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../../i18n/formatters';
@@ -309,11 +310,7 @@ export function InventoryUsageBulkRecorder({
       period_closure_id: previewResult.period_closure?.id || ''
     }));
 
-    const escapeCell = (value: unknown) => {
-      const raw = value === null || value === undefined ? '' : String(value);
-      const safeRaw = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
-      return `"${safeRaw.replace(/"/g, '""')}"`;
-    };
+    const escapeCell = (value: unknown) => csvSpreadsheetCell(value, true);
 
     const csv = [
       headers.join(','),
@@ -360,11 +357,7 @@ export function InventoryUsageBulkRecorder({
       consumed_at: item.usage?.consumed_at || ''
     }));
 
-    const escapeCell = (value: unknown) => {
-      const raw = value === null || value === undefined ? '' : String(value);
-      const safeRaw = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
-      return `"${safeRaw.replace(/"/g, '""')}"`;
-    };
+    const escapeCell = (value: unknown) => csvSpreadsheetCell(value, true);
 
     const csv = [
       headers.join(','),

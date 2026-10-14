@@ -1,3 +1,4 @@
+import { csvSpreadsheetCell } from '../../lib/spreadsheetCsv';
 import { useRef, useState } from 'react';
 import type { CSSProperties, ChangeEvent } from 'react';
 import { ApiError } from '../../lib/api';
@@ -152,10 +153,7 @@ export function InventoryCsvImportPanel({
     if (!batch?.validation_errors?.length) return;
     const columns = ['row_number', 'field', 'code', 'message'];
     const lines = [columns.join(',')];
-    const escape = (value: unknown) => {
-      const text = value === undefined || value === null ? '' : String(value);
-      return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-    };
+    const escape = (value: unknown) => csvSpreadsheetCell(value);
     for (const item of batch.validation_errors) {
       lines.push([item.row_number ?? '', item.field ?? '', item.code, item.message].map(escape).join(','));
     }

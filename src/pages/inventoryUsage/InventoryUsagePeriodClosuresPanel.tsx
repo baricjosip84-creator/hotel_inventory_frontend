@@ -1,3 +1,4 @@
+import { csvSpreadsheetCell } from '../../lib/spreadsheetCsv';
 import { useMemo, useState } from "react";
 import { OperationalSectionHeader } from "../../components/ui/OperationalWorkspace";
 import { useAppTranslation } from "../../i18n/I18nContext";
@@ -130,11 +131,7 @@ export function InventoryUsagePeriodClosuresPanel({
     onPreviewPeriodClose(buildDraft());
   };
 
-  const escapeCsvCell = (value: unknown) => {
-    const raw = value === null || value === undefined ? "" : String(value);
-    const safeRaw = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
-    return `"${safeRaw.replace(/"/g, '""')}"`;
-  };
+  const escapeCsvCell = (value: unknown) => csvSpreadsheetCell(value, true);
 
   const downloadCsv = (
     filename: string,

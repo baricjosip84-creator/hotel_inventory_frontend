@@ -1,3 +1,4 @@
+import { csvSpreadsheetCell } from '../lib/spreadsheetCsv';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -317,11 +318,6 @@ function normalizeLookbackDays(value: string | null): number {
   return [14, 30, 60, 90].includes(parsed) ? parsed : 30;
 }
 
-function neutralizeSpreadsheetFormula(value: unknown): string {
-  const normalized = value === null || value === undefined ? '' : String(value);
-  return /^[=+\-@]/.test(normalized) ? `'${normalized}` : normalized;
-}
-
 function toReadableError(error: unknown, unknownErrorLabel: string): string {
   if (error instanceof ApiError) {
     return error.message;
@@ -348,8 +344,7 @@ function toNumber(value: number | string | null | undefined): number {
 }
 
 function escapeCsv(value: unknown): string {
-  const normalized = neutralizeSpreadsheetFormula(value);
-  return `"${normalized.replace(/"/g, '""')}"`;
+  return csvSpreadsheetCell(value, true);
 }
 
 function downloadCsv(filename: string, rows: Array<Array<unknown>>) {

@@ -1,3 +1,4 @@
+import { csvSpreadsheetCell } from '../lib/spreadsheetCsv';
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAppTranslation } from "../i18n/I18nContext";
@@ -916,11 +917,7 @@ export default function InventoryUsagePage() {
       "stock_movement_id",
     ];
 
-    const escapeCell = (value: unknown) => {
-      const raw = value === null || value === undefined ? "" : String(value);
-      const safeRaw = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
-      return `"${safeRaw.replace(/"/g, '""')}"`;
-    };
+    const escapeCell = (value: unknown) => csvSpreadsheetCell(value, true);
 
     const csv = [
       headers.join(","),

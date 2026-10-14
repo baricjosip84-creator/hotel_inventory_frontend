@@ -1,3 +1,4 @@
+import { csvSpreadsheetCell } from '../lib/spreadsheetCsv';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { CSSProperties } from 'react';
@@ -200,9 +201,7 @@ function getExpectedValue(request: ExecutionRequest): unknown {
 }
 
 function csvCell(value: unknown): string {
-  const rawText = value === undefined || value === null ? '' : String(value);
-  const safeText = /^[=+\-@\t\r]/.test(rawText) ? `'${rawText}` : rawText;
-  return `"${safeText.replace(/"/g, '""')}"`;
+  return csvSpreadsheetCell(value, true);
 }
 
 function downloadCsv(filename: string, rows: string[][]) {

@@ -1,3 +1,4 @@
+import { csvSpreadsheetCell } from '../../lib/spreadsheetCsv';
 import { useState } from 'react';
 import { OperationalSectionHeader } from '../../components/ui/OperationalWorkspace';
 import { useAppTranslation } from '../../i18n/I18nContext';
@@ -136,11 +137,7 @@ export function InventoryUsageGovernancePanel({
     exceptionSummary?.follow_up_required_count,
   );
 
-  const escapeCsvCell = (value: unknown) => {
-    const raw = value === null || value === undefined ? '' : String(value);
-    const safeRaw = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
-    return `"${safeRaw.replace(/"/g, '""')}"`;
-  };
+  const escapeCsvCell = (value: unknown) => csvSpreadsheetCell(value, true);
 
   const exportExceptionsCsv = async () => {
     setExportingExceptions(true);

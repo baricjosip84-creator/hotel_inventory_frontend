@@ -1,3 +1,4 @@
+import { csvSpreadsheetCell } from '../lib/spreadsheetCsv';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { useSearchParams } from 'react-router';
@@ -328,13 +329,7 @@ function normalizeError(error: unknown, fallback: string, ui: (englishText: stri
 }
 
 function escapeCsvCell(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
-  let raw = String(value);
-  const canonicalNumber = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(raw.trim());
-  if (!canonicalNumber && /^[\t\r ]*[=+\-@]/.test(raw)) raw = `'${raw}`;
-  const escaped = raw.replace(/"/g, '""');
-  return /[",\r\n]/.test(escaped) ? `"${escaped}"` : escaped;
+  return csvSpreadsheetCell(value);
 }
 
 function escapeHtml(value: unknown): string {
@@ -468,7 +463,9 @@ export default function StockTransfersPage() {
   const { locale, ui } = useAppTranslation();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const linkedTransferId = searchParams.get('transfer_id');
   const detailSectionRef = useRef<HTMLElement | null>(null);
+  const lastFocusedDeepLinkIdRef = useRef<string | null>(null);
   const errorFeedbackRef = useRef<HTMLDivElement | null>(null);
   const syncingFromUrlRef = useRef(false);
   const {
@@ -608,6 +605,28 @@ export default function StockTransfersPage() {
     queryFn: () => fetchTransferById(selectedTransferId as string),
     enabled: Boolean(selectedTransferId)
   });
+
+  // A URL such as /stock-transfers?transfer_id=... already loads its record,
+  // but an initial deep link must also bring that record into view once the
+  // detail (or a safe not-found/permission error) has finished loading.
+  // Local selection and sidebar-attention scrolling remain independent.
+  useEffect(() => {
+    if (!linkedTransferId) {
+      lastFocusedDeepLinkIdRef.current = null;
+      return;
+    }
+    if (linkedTransferId !== selectedTransferId || lastFocusedDeepLinkIdRef.current === linkedTransferId) return;
+    if (!transferDetailQuery.isSuccess && !transferDetailQuery.isError) return;
+
+    const timer = window.setTimeout(() => {
+      const detailSection = detailSectionRef.current;
+      if (!detailSection) return;
+      detailSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      detailSection.focus({ preventScroll: true });
+      lastFocusedDeepLinkIdRef.current = linkedTransferId;
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [linkedTransferId, selectedTransferId, transferDetailQuery.isSuccess, transferDetailQuery.isError]);
 
   const transferMovementsQuery = useQuery({
     queryKey: ['stock-transfer-movements', selectedTransferId],
@@ -1516,7 +1535,7 @@ export default function StockTransfersPage() {
       </section>
 
       {selectedTransferId ? (
-        <section ref={detailSectionRef} className="app-panel app-panel--padded" style={styles.panel}>
+        <section ref={detailSectionRef} tabIndex={-1} className="app-panel app-panel--padded" style={{ ...styles.panel, scrollMarginTop: 104 }}>
           <div style={styles.sectionHeader}>
             <div className="io-section-heading-with-icon">
               <span className="io-section-heading-icon"><TenantNavIcon path="/stock-transfers" size={17} /></span>
