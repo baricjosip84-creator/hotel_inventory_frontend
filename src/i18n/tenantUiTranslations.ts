@@ -2,6 +2,8 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // FT033: render known stock-movement audit reasons in the selected language.
+  ["Cleanup: reverse temporary +1 stock added for BOM assembly audit test.", "Bereinigung: Temporäre +1-Bestandserhöhung für den Stücklisten-Audittest rückgängig machen.", "Limpieza: revertir el aumento temporal de 1 unidad de stock añadido para la prueba de auditoría de ensamblaje de lista de materiales.", "Nettoyage : annuler l’ajout temporaire d’une unité de stock pour le test d’audit d’assemblage de nomenclature.", "Čišćenje: poništavanje privremenog povećanja zalihe za 1 jedinicu tijekom revizijskog testa sastavljanja prema sastavnici."],
   // FT030: explicit fallback provenance and focused alert navigation.
   ["Current user name — original snapshot missing", "Aktueller Benutzername – ursprünglicher Snapshot fehlt", "Nombre de usuario actual; falta la instantánea original", "Nom d’utilisateur actuel — capture d’origine absente", "Trenutačno ime korisnika — nedostaje izvorni povijesni zapis"],
   ["Current product name — original snapshot missing", "Aktueller Produktname – ursprünglicher Snapshot fehlt", "Nombre actual del producto; falta la instantánea original", "Nom actuel du produit — capture d'origine absente", "Trenutačni naziv proizvoda — nedostaje izvorni povijesni zapis"],

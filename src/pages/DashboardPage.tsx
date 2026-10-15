@@ -358,6 +358,32 @@ function dashboardReasonLabel(row: RecentActivityRow, ui: (englishText: string) 
   const knownReasonLabel = knownReasonLabels.get(normalizedReasonCode);
   if (knownReasonLabel) return ui(knownReasonLabel);
 
+  // Customer returns persist an event reference and a stock condition as a
+  // colon-delimited audit key. Show the business event without leaking that key
+  // into the Dashboard. The original value is still preserved in the tooltip.
+  if (reason.toLowerCase().startsWith('customer_return:')) {
+    const parts = reason.split(':');
+    const returnReference = (parts[1] || '').trim();
+    const condition = (parts[2] || '').trim().toLowerCase();
+    const readableCondition: Record<string, string> = {
+      available: 'Available',
+      damaged: 'Damaged',
+      expired: 'Expired',
+    };
+    const reference = /^RET-[a-z0-9-]+$/i.test(returnReference) ? ` ${returnReference}` : '';
+    const conditionText = parts.length === 3 && readableCondition[condition]
+      ? ` · ${ui(readableCondition[condition])}`
+      : '';
+    return `${ui('Customer return')}${reference}${conditionText}`;
+  }
+
+  // An existing tenant test record used a free-text English note. Translate
+  // only this exact known message rather than pretending arbitrary user-entered
+  // notes can be reliably machine-translated. The original remains on hover.
+  if (reason === 'Cleanup: reverse temporary +1 stock added for BOM assembly audit test.') {
+    return ui('Cleanup: reverse temporary +1 stock added for BOM assembly audit test.');
+  }
+
   if (row.shipment_id && (reason === 'shipment_receive' || reason.startsWith('shipment_receive:'))) {
     return row.shipment_po_number || ui('Shipment received');
   }
