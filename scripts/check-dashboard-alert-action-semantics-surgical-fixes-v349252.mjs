@@ -1,0 +1,26 @@
+// FE226: restore missing functional regression for v3.49.252 without weakening the assertions.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const read = name => fs.readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
+const dashboard = read('src/pages/DashboardPage.tsx');
+const alerts = read('src/pages/AlertsPage.tsx');
+const action = read('src/pages/OperationalActionCenterPage.tsx');
+const reports = read('src/pages/ReportsPage.tsx');
+const translations = read('src/i18n/tenantUiTranslations.ts');
+const pkg = JSON.parse(read('package.json'));
+let count=0;
+const check = (condition, label) => {assert.ok(condition,label); count++;};
+check(dashboard.includes('function dashboardReasonLabel('), 'Dashboard uses a dedicated activity reason formatter');
+check(dashboard.includes('dashboardReasonLabel(row, ui)'), 'Dashboard activity cards invoke that formatter');
+check(dashboard.includes("reason.startsWith('stock_transfer_out:')"), 'Known transfer machine reasons are detected');
+check(dashboard.includes("reason.startsWith('outbound_dispatch:')"), 'Known outbound machine reasons are detected');
+check(dashboard.includes('/alerts?resolved=false&focus_queue=true'), 'Dashboard links to real pending alerts');
+check(alerts.includes("searchParams.get('focus_queue') === 'true'"), 'Alert queue consumes focus query');
+check(alerts.includes("document.getElementById('alerts-queue')?.scrollIntoView"), 'Alert focus targets queue region');
+check(dashboard.includes('/stock?stock_id=${encodeURIComponent(row.stock_id)}'), 'Stock links target exact inventory row');
+check(action.includes('canonicalLabel('), 'Action Center provides readable status codes');
+check(reports.includes('fetchMovementLedger('), 'Movement Ledger retains report data query');
+check(reports.includes('buildQueryString(filters)'), 'Report filtering sends explicit parameters');
+check(translations.includes('Dashboard supplier context'), 'Dashboard context has catalog translations');
+check(pkg.scripts['check:inventory-dashboard-alert-action-semantics-surgical-fixes-v349252'] === 'node scripts/check-dashboard-alert-action-semantics-surgical-fixes-v349252.mjs', 'Restored check is registered');
+console.log(`Dashboard/Alert action semantics: ${count}/${count} PASS`);

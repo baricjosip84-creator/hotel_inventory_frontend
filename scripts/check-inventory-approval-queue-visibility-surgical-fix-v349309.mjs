@@ -33,7 +33,7 @@ check('service scopes to tenant id', () => assert.match(reqService, /const condi
 check('query gated by both read and approve permissions', () => { assert.match(tab, /hasPermission\(TENANT_PERMISSIONS\.INVENTORY_REQUISITIONS_READ\)/); assert.match(tab, /hasPermission\(TENANT_PERMISSIONS\.INVENTORY_REQUISITIONS_APPROVE\)/); assert.match(tab, /enabled: canReviewInventoryRequisitions/); });
 check('not using shared enterprise approval-execute mutation for inventory', () => assert.doesNotMatch(tab, /handleApprovalAction\(item, 'approved'\).*inventory_requisition/));
 check('inventory rows navigate to correct request detail', () => assert.match(tab, /navigate\(`\/inventory-requisitions\?requisitionId=\$\{encodeURIComponent\(item\.id\)\}`\)/));
-check('target page understands requisitionId', () => assert.match(reqPage, /searchParams\.get\('requisitionId'\)/));
+check('target page understands requisitionId', () => { assert.match(reqPage, /selectedRecordId\(searchParams, 'requisitionId', 'requisition_id'\)/); assert.match(reqPage, /withSelectedRecordId\(current, 'requisitionId', 'requisition_id', id\)/); });
 check('query cache separated from ordinary requisition list', () => assert.match(tab, /'approval-queue-submitted', requisitionPage/));
 check('queue refetches when revisited', () => assert.match(tab, /refetchOnMount: 'always'/));
 check('server-side pagination applied', () => { assert.match(tab, /REQUISITION_APPROVAL_PAGE_SIZE \+ 1/); assert.match(tab, /offset=\$\{requisitionPage \* REQUISITION_APPROVAL_PAGE_SIZE\}/); });

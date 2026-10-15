@@ -4,7 +4,7 @@
 
 .reports-page .reports-panel {
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   padding: 18px;
   border: 1px solid var(--io-workspace-border, #e2e8f0);
   border-radius: var(--io-workspace-panel-radius, 14px);
@@ -383,3 +383,22 @@
     flex-basis: 100%;
   }
 }
+
+/* FE226: one accessible, application-styled filter popup across all Reports. */
+.reports-picker { position: relative; width: min(300px, 100%); }
+.reports-picker--wide { width: min(480px, 100%); }
+.reports-picker-label { display: block; margin-bottom: 5px; color: #334155; font-size: 12px; font-weight: 800; }
+.reports-picker-trigger { width: 100%; min-height: 38px; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 9px; border: 1px solid #cbd5e1; background: white; color: #0f172a; text-align: left; font: inherit; font-size: 12px; cursor: pointer; }
+.reports-picker-trigger:focus-visible, .reports-picker-option:focus-visible, .reports-picker-search:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+.reports-picker-trigger:disabled { background: #f1f5f9; opacity: .65; cursor: not-allowed; }
+.reports-picker-trigger-text { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.reports-picker-menu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 90; padding: 6px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; color: #0f172a; box-shadow: 0 10px 28px rgba(15,23,42,.19); min-width: min(260px, 85vw); }
+.reports-picker-search { width: 100%; min-height: 36px; margin-bottom: 6px; padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; color: #0f172a; }
+.reports-picker-options { overflow-y: auto; max-height: min(290px, 45vh); overscroll-behavior: contain; }
+.reports-picker-option { display: block; width: 100%; padding: 9px 10px; border: 0; border-radius: 6px; background: #fff; text-align: left; color: #0f172a; font: inherit; font-size: 12px; cursor: pointer; }
+.reports-picker-option:hover, .reports-picker-option[data-active="true"] { background: #eff6ff; }
+.reports-picker-option[aria-selected="true"] { font-weight: 800; color: #1d4ed8; }
+.reports-picker-empty { padding: 9px; color: #64748b; font-size: 12px; }
+.reports-filter-stack { width: min(300px, 100%); display: grid; gap: 6px; }
+.reports-filter-manual { width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 9px; }
+@media (max-width: 680px) { .reports-picker-menu { min-width: 0; } }

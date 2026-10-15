@@ -18,6 +18,7 @@ import { ApiError, apiDownloadFile, apiRequest, type ApiDownloadMetadata } from 
 import { getCurrentAccessRoleLabel, getRoleCapabilities, hasPermission, TENANT_PERMISSIONS } from '../lib/permissions';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
 import { formatCurrencyAmount, getActiveTenantCurrency, normalizeCurrencyCode } from '../lib/tenantCurrency';
+import ReportPicker from '../components/reports/ReportPicker';
 import './ReportsPage.css';
 
 type ReportTab =
@@ -782,18 +783,13 @@ function ChoiceFilterField({ label, value, placeholder, options, onChange, disab
     return <TextFilterField label={label} value={value} placeholder={placeholder} onChange={onChange} disabled={disabled} compact={compact} />;
   }
   return (
-    <label className={`reports-field${compact ? ' reports-field--compact' : ''}`}>
-      <span>{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
-        <option value="">{placeholder}</option>
-        {options.map((option) => <option key={option} value={option}>{option}</option>)}
-      </select>
-    </label>
+    <ReportPicker label={label} value={value} disabled={disabled} onChange={onChange}
+      options={[["", placeholder], ...options.map((option): [string, string] => [option, option])]}
+      compact={compact} />
   );
 }
 
-// Native select for normal report locations, with an explicit typed fallback for
-// historic/renamed locations not present in the available option catalog.
+// Historical location names must remain selectable after a rename/archive.
 function HistoricalLocationFilterField({ label, value, placeholder, options, onChange, disabled }: {
   label: string;
   value: string;
@@ -810,43 +806,26 @@ function HistoricalLocationFilterField({ label, value, placeholder, options, onC
   const customOptionValue = '__historical_location__';
   const manual = customMode || Boolean(value && !options.includes(value));
   return (
-    <label className="reports-field reports-field--compact">
-      <span>{label}</span>
-      <select
-        value={manual ? customOptionValue : value}
-        disabled={disabled}
-        onChange={(event) => {
-          if (event.target.value === customOptionValue) {
-            setCustomMode(true);
-            onChange('');
-          } else {
-            setCustomMode(false);
-            onChange(event.target.value);
-          }
-        }}
-      >
-        <option value="">{placeholder}</option>
-        {options.map((option) => <option key={option} value={option}>{option}</option>)}
-        <option value={customOptionValue}>{ui('Other or historical location…')}</option>
-      </select>
+    <div className="reports-filter-stack">
+      <ReportPicker label={label} value={manual ? customOptionValue : value} disabled={disabled}
+        options={[["", placeholder], ...options.map((option): [string, string] => [option, option]),
+          [customOptionValue, ui('Other or historical location…')]]}
+        onChange={(next) => {
+          if (next === customOptionValue) { setCustomMode(true); onChange(''); }
+          else { setCustomMode(false); onChange(next); }
+        }} />
       {manual ? (
-        <input
-          type="text"
-          value={value}
-          maxLength={MAX_REPORT_FILTER_LENGTH}
+        <input type="text" className="reports-filter-manual"
+          value={value} maxLength={MAX_REPORT_FILTER_LENGTH}
           aria-label={ui('Enter a historical location or search term')}
           placeholder={ui('Enter a historical location or search term')}
-          disabled={disabled}
-          onChange={(event) => onChange(event.target.value)}
-        />
+          disabled={disabled} onChange={(event) => onChange(event.target.value)} />
       ) : null}
-    </label>
+    </div>
   );
 }
 
-// Shared product filter used by Reports. Keep the existing component name so all
-// report panels retain their filter wiring; native datalist popups are no longer
-// used. Manual search preserves historical names and partial-name matching.
+// Existing product options plus deliberate manual historical-name search.
 function AutocompleteFilterField({ label, value, placeholder, options, onChange, disabled, listId }: {
   label: string;
   value: string;
@@ -864,38 +843,22 @@ function AutocompleteFilterField({ label, value, placeholder, options, onChange,
   const manualOptionValue = '__manual_product_search__';
   const manual = customMode || Boolean(value && !options.includes(value));
   return (
-    <label className="reports-field reports-field--compact">
-      <span>{label}</span>
-      <select
-        id={listId}
-        value={manual ? manualOptionValue : value}
-        disabled={disabled}
-        onChange={(event) => {
-          if (event.target.value === manualOptionValue) {
-            setCustomMode(true);
-            onChange('');
-          } else {
-            setCustomMode(false);
-            onChange(event.target.value);
-          }
-        }}
-      >
-        <option value="">{placeholder}</option>
-        {options.map((option) => <option key={option} value={option}>{option}</option>)}
-        <option value={manualOptionValue}>{ui('Other product or manual search…')}</option>
-      </select>
+    <div className="reports-filter-stack">
+      <ReportPicker id={listId} label={label} value={manual ? manualOptionValue : value} disabled={disabled}
+        options={[["", placeholder], ...options.map((option): [string, string] => [option, option]),
+          [manualOptionValue, ui('Other product or manual search…')]]}
+        onChange={(next) => {
+          if (next === manualOptionValue) { setCustomMode(true); onChange(''); }
+          else { setCustomMode(false); onChange(next); }
+        }} />
       {manual ? (
-        <input
-          type="text"
-          value={value}
-          maxLength={MAX_REPORT_FILTER_LENGTH}
+        <input type="text" className="reports-filter-manual"
+          value={value} maxLength={MAX_REPORT_FILTER_LENGTH}
           aria-label={ui('Enter a product name or search term')}
           placeholder={ui('Enter a product name or search term')}
-          disabled={disabled}
-          onChange={(event) => onChange(event.target.value)}
-        />
+          disabled={disabled} onChange={(event) => onChange(event.target.value)} />
       ) : null}
-    </label>
+    </div>
   );
 }
 
@@ -1511,7 +1474,7 @@ export default function ReportsPage() {
               <DateRangeFields from={movementFilters.from} to={movementFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setMovementFilters, 'from', value)} onToChange={(value) => updateAndClear(setMovementFilters, 'to', value)} />
               <ChoiceFilterField label={ui("Category")} value={movementFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setMovementFilters, 'category', value)} />
               <Fragment key={filterResetRevision}><AutocompleteFilterField label={ui("Product")} value={movementFilters.product} placeholder={ui("Any product name")} options={filterOptions.historical_products ?? filterOptions.products} listId="report-products-movements" disabled={isExporting} onChange={(value) => updateAndClear(setMovementFilters, 'product', value)} /></Fragment>
-              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={movementFilters.limit} onChange={(event) => updateAndClear(setMovementFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{PRODUCT_MOVEMENT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <ReportPicker label={ui("Result limit")} value={String(movementFilters.limit)} onChange={(nextValue) => updateAndClear(setMovementFilters, 'limit', Number(nextValue))} disabled={isExporting} options={PRODUCT_MOVEMENT_LIMIT_OPTIONS.map((n): [string, string] => [String(n), String(n)])} />
             </>
           }
         >
@@ -1548,10 +1511,10 @@ export default function ReportsPage() {
           filters={
             <>
               <DateRangeFields from={ledgerFilters.from} to={ledgerFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setLedgerFilters, 'from', value)} onToChange={(value) => updateAndClear(setLedgerFilters, 'to', value)} />
-              <label className="reports-field reports-field--compact"><span>{ui("Movement type")}</span><select value={ledgerFilters.movement_type} onChange={(event) => updateAndClear(setLedgerFilters, 'movement_type', event.target.value)} disabled={isExporting}>{MOVEMENT_TYPE_OPTIONS.map(([value, label]) => <option key={value || 'all'} value={value}>{ui(label)}</option>)}</select></label>
+              <ReportPicker label={ui("Movement type")} value={String(ledgerFilters.movement_type)} onChange={(nextValue) => updateAndClear(setLedgerFilters, 'movement_type', nextValue)} disabled={isExporting} options={MOVEMENT_TYPE_OPTIONS.map(([id, name]): [string, string] => [id, ui(name)])} />
               <Fragment key={filterResetRevision}><AutocompleteFilterField label={ui("Product")} value={ledgerFilters.product} placeholder={ui("Any product name")} options={filterOptions.historical_products ?? filterOptions.products} listId="report-products-ledger" disabled={isExporting} onChange={(value) => updateAndClear(setLedgerFilters, 'product', value)} /></Fragment>
               <ChoiceFilterField label={ui("Location")} value={ledgerFilters.location} placeholder={ui("Any location")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setLedgerFilters, 'location', value)} />
-              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={ledgerFilters.limit} onChange={(event) => updateAndClear(setLedgerFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <ReportPicker label={ui("Result limit")} value={String(ledgerFilters.limit)} onChange={(nextValue) => updateAndClear(setLedgerFilters, 'limit', Number(nextValue))} disabled={isExporting} options={REPORT_RESULT_LIMIT_OPTIONS.map((n): [string, string] => [String(n), String(n)])} />
             </>
           }
         >
@@ -1579,7 +1542,7 @@ export default function ReportsPage() {
               <DateRangeFields from={varianceFilters.from} to={varianceFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setVarianceFilters, 'from', value)} onToChange={(value) => updateAndClear(setVarianceFilters, 'to', value)} />
               <ChoiceFilterField label={ui("Product")} value={varianceFilters.product} placeholder={ui("Any product name")} options={filterOptions.historical_products ?? filterOptions.products} disabled={isExporting} onChange={(value) => updateAndClear(setVarianceFilters, 'product', value)} />
               <ChoiceFilterField label={ui("Location")} value={varianceFilters.location} placeholder={ui("Any location")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setVarianceFilters, 'location', value)} />
-              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={varianceFilters.limit} onChange={(event) => updateAndClear(setVarianceFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <ReportPicker label={ui("Result limit")} value={String(varianceFilters.limit)} onChange={(nextValue) => updateAndClear(setVarianceFilters, 'limit', Number(nextValue))} disabled={isExporting} options={REPORT_RESULT_LIMIT_OPTIONS.map((n): [string, string] => [String(n), String(n)])} />
             </>
           }
         >
@@ -1608,8 +1571,8 @@ export default function ReportsPage() {
             <>
               <DateRangeFields from={transferFilters.from} to={transferFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setTransferFilters, 'from', value)} onToChange={(value) => updateAndClear(setTransferFilters, 'to', value)} />
               <Fragment key={filterResetRevision}><HistoricalLocationFilterField label={ui("Location")} value={transferFilters.location} placeholder={ui("Any current or historical source/destination")} options={filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setTransferFilters, 'location', value)} /></Fragment>
-              <label className="reports-field reports-field--compact"><span>{ui("Status")}</span><select value={transferFilters.status} onChange={(event) => updateAndClear(setTransferFilters, 'status', event.target.value)} disabled={isExporting}>{TRANSFER_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{ui(label)}</option>)}</select></label>
-              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={transferFilters.limit} onChange={(event) => updateAndClear(setTransferFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <ReportPicker label={ui("Status")} value={String(transferFilters.status)} onChange={(nextValue) => updateAndClear(setTransferFilters, 'status', nextValue)} disabled={isExporting} options={TRANSFER_STATUS_OPTIONS.map(([id, name]): [string, string] => [id, ui(name)])} />
+              <ReportPicker label={ui("Result limit")} value={String(transferFilters.limit)} onChange={(nextValue) => updateAndClear(setTransferFilters, 'limit', Number(nextValue))} disabled={isExporting} options={REPORT_RESULT_LIMIT_OPTIONS.map((n): [string, string] => [String(n), String(n)])} />
             </>
           }
         >
@@ -1631,8 +1594,8 @@ export default function ReportsPage() {
             <>
               <DateRangeFields from={requisitionFilters.from} to={requisitionFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setRequisitionFilters, 'from', value)} onToChange={(value) => updateAndClear(setRequisitionFilters, 'to', value)} />
               <ChoiceFilterField label={ui("Department")} value={requisitionFilters.department} placeholder={ui("Any requesting department")} options={filterOptions.departments} disabled={isExporting} onChange={(value) => updateAndClear(setRequisitionFilters, 'department', value)} />
-              <label className="reports-field reports-field--compact"><span>{ui("Status")}</span><select value={requisitionFilters.status} onChange={(event) => updateAndClear(setRequisitionFilters, 'status', event.target.value)} disabled={isExporting}>{REQUISITION_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{ui(label)}</option>)}</select></label>
-              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={requisitionFilters.limit} onChange={(event) => updateAndClear(setRequisitionFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <ReportPicker label={ui("Status")} value={String(requisitionFilters.status)} onChange={(nextValue) => updateAndClear(setRequisitionFilters, 'status', nextValue)} disabled={isExporting} options={REQUISITION_STATUS_OPTIONS.map(([id, name]): [string, string] => [id, ui(name)])} />
+              <ReportPicker label={ui("Result limit")} value={String(requisitionFilters.limit)} onChange={(nextValue) => updateAndClear(setRequisitionFilters, 'limit', Number(nextValue))} disabled={isExporting} options={REPORT_RESULT_LIMIT_OPTIONS.map((n): [string, string] => [String(n), String(n)])} />
             </>
           }
         >
@@ -1689,8 +1652,8 @@ export default function ReportsPage() {
               <DateRangeFields from={poCommitmentFilters.from} to={poCommitmentFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setPoCommitmentFilters, 'from', value)} onToChange={(value) => updateAndClear(setPoCommitmentFilters, 'to', value)} />
               <ChoiceFilterField label={ui("Supplier")} value={poCommitmentFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.historical_operational_suppliers ?? filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setPoCommitmentFilters, 'supplier', value)} />
               <Fragment key={filterResetRevision}><AutocompleteFilterField label={ui("Product")} value={poCommitmentFilters.product} placeholder={ui("Any product name")} options={filterOptions.historical_products ?? filterOptions.products} listId="report-products-po-commitments" disabled={isExporting} onChange={(value) => updateAndClear(setPoCommitmentFilters, 'product', value)} /></Fragment>
-              <label className="reports-field reports-field--compact"><span>{ui("Status")}</span><select value={poCommitmentFilters.status} onChange={(event) => updateAndClear(setPoCommitmentFilters, 'status', event.target.value)} disabled={isExporting}>{PURCHASE_ORDER_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{ui(label)}</option>)}</select></label>
-              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={poCommitmentFilters.limit} onChange={(event) => updateAndClear(setPoCommitmentFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <ReportPicker label={ui("Status")} value={String(poCommitmentFilters.status)} onChange={(nextValue) => updateAndClear(setPoCommitmentFilters, 'status', nextValue)} disabled={isExporting} options={PURCHASE_ORDER_STATUS_OPTIONS.map(([id, name]): [string, string] => [id, ui(name)])} />
+              <ReportPicker label={ui("Result limit")} value={String(poCommitmentFilters.limit)} onChange={(nextValue) => updateAndClear(setPoCommitmentFilters, 'limit', Number(nextValue))} disabled={isExporting} options={REPORT_RESULT_LIMIT_OPTIONS.map((n): [string, string] => [String(n), String(n)])} />
               <div className="reports-filter-note">{ui("Date range uses expected delivery date. “Open commitments” means submitted or approved purchase orders.")}</div>
             </>
           }
@@ -1716,7 +1679,7 @@ export default function ReportsPage() {
               <ChoiceFilterField label={ui("Supplier")} value={spendFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.historical_suppliers ?? filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'supplier', value)} />
               <ChoiceFilterField label={ui("Category")} value={spendFilters.category} placeholder={ui("All categories")} options={filterOptions.historical_categories ?? filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'category', value)} />
               <Fragment key={filterResetRevision}><AutocompleteFilterField label={ui("Product")} value={spendFilters.product} placeholder={ui("Any product name")} options={filterOptions.historical_products ?? filterOptions.products} listId="report-products-spend" disabled={isExporting} onChange={(value) => updateAndClear(setSpendFilters, 'product', value)} /></Fragment>
-              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={spendFilters.limit} onChange={(event) => updateAndClear(setSpendFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <ReportPicker label={ui("Result limit")} value={String(spendFilters.limit)} onChange={(nextValue) => updateAndClear(setSpendFilters, 'limit', Number(nextValue))} disabled={isExporting} options={REPORT_RESULT_LIMIT_OPTIONS.map((n): [string, string] => [String(n), String(n)])} />
             </>
           }
         >
@@ -1737,17 +1700,17 @@ export default function ReportsPage() {
           actions={actionButtons('low-stock', lowStockQuery.isFetching)}
           filters={
             <>
-              <label className="reports-field reports-field--compact"><span>{ui("Threshold scope")}</span><select value={lowStockFilters.scope} onChange={(event) => {
-                const nextScope = event.target.value as 'product' | 'par' | 'both';
-                clearDownloadStatus();
-                setLowStockFilters((previous) => ({
-                  ...previous,
-                  scope: nextScope,
-                  // Product-minimum is tenant-wide; keep no disabled/stale
-                  // location selected when switching from PAR-only filtering.
-                  location: nextScope === 'product' ? '' : previous.location
-                }));
-              }} disabled={isExporting}><option value="both">{ui("Product minima + location par levels")}</option><option value="product">{ui("Product minimum only")}</option><option value="par">{ui("Location par levels only")}</option></select></label>
+              <ReportPicker label={ui("Threshold scope")} value={lowStockFilters.scope}
+                options={[["both", ui("Product minima + location par levels")], ["product", ui("Product minimum only")], ["par", ui("Location par levels only")]]}
+                disabled={isExporting} onChange={(nextValue) => {
+                  const nextScope = nextValue as 'product' | 'par' | 'both';
+                  clearDownloadStatus();
+                  setLowStockFilters((previous) => ({
+                    ...previous,
+                    scope: nextScope,
+                    location: nextScope === 'product' ? '' : previous.location
+                  }));
+                }} />
               <ChoiceFilterField label={ui("Category")} value={lowStockFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setLowStockFilters, 'category', value)} />
               <ChoiceFilterField label={ui("Supplier")} value={lowStockFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setLowStockFilters, 'supplier', value)} />
               <ChoiceFilterField label={ui("Location")} value={lowStockFilters.location} placeholder={ui("Any location")} options={filterOptions.current_locations ?? filterOptions.locations} disabled={isExporting || lowStockFilters.scope === 'product'} onChange={(value) => updateAndClear(setLowStockFilters, 'location', value)} />
@@ -1771,10 +1734,10 @@ export default function ReportsPage() {
           actions={actionButtons('slow-moving', slowMovingQuery.isFetching)}
           filters={
             <>
-              <label className="reports-field reports-field--compact"><span>{ui("Inactive for")}</span><select value={slowFilters.days} onChange={(event) => updateAndClear(setSlowFilters, 'days', Number(event.target.value))} disabled={isExporting}>{SLOW_MOVING_DAYS_OPTIONS.map((days) => <option key={days} value={days}>{ui('{days}+ days').replace('{days}', formatNumber(days, locale, 0))}</option>)}</select></label>
+              <ReportPicker label={ui("Inactive for")} value={String(slowFilters.days)} onChange={(nextValue) => updateAndClear(setSlowFilters, 'days', Number(nextValue))} disabled={isExporting} options={SLOW_MOVING_DAYS_OPTIONS.map((n): [string, string] => [String(n), ui('{days}+ days').replace('{days}', formatNumber(n, locale, 0))])} />
               <ChoiceFilterField label={ui("Category")} value={slowFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setSlowFilters, 'category', value)} />
               <Fragment key={filterResetRevision}><AutocompleteFilterField label={ui("Product")} value={slowFilters.product} placeholder={ui("Any product name")} options={filterOptions.products} listId="report-products-slow" disabled={isExporting} onChange={(value) => updateAndClear(setSlowFilters, 'product', value)} /></Fragment>
-              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={slowFilters.limit} onChange={(event) => updateAndClear(setSlowFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <ReportPicker label={ui("Result limit")} value={String(slowFilters.limit)} onChange={(nextValue) => updateAndClear(setSlowFilters, 'limit', Number(nextValue))} disabled={isExporting} options={REPORT_RESULT_LIMIT_OPTIONS.map((n): [string, string] => [String(n), String(n)])} />
             </>
           }
         >
@@ -1795,7 +1758,7 @@ export default function ReportsPage() {
           actions={actionButtons('usage-summary', usageSummaryQuery.isFetching)}
           filters={
             <>
-              <label className="reports-field reports-field--compact"><span>{ui("Quick period")}</span><select value={usageFilters.days} onChange={(event) => updateAndClear(setUsageFilters, 'days', Number(event.target.value))} disabled={isExporting}>{USAGE_PERIOD_OPTIONS.map((days) => <option key={days} value={days}>{ui('Last {days} days').replace('{days}', formatNumber(days, locale, 0))}</option>)}</select></label>
+              <ReportPicker label={ui("Quick period")} value={String(usageFilters.days)} onChange={(nextValue) => updateAndClear(setUsageFilters, 'days', Number(nextValue))} disabled={isExporting} options={USAGE_PERIOD_OPTIONS.map((n): [string, string] => [String(n), ui('Last {days} days').replace('{days}', formatNumber(n, locale, 0))])} />
               <DateRangeFields from={usageFilters.from} to={usageFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setUsageFilters, 'from', value)} onToChange={(value) => updateAndClear(setUsageFilters, 'to', value)} />
               <ChoiceFilterField label={ui("Category")} value={usageFilters.category} placeholder={ui("All categories")} options={filterOptions.usage_categories ?? filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setUsageFilters, 'category', value)} />
               <Fragment key={filterResetRevision}><AutocompleteFilterField label={ui("Product")} value={usageFilters.product} placeholder={ui("Any product name")} options={filterOptions.usage_products ?? filterOptions.products} listId="report-products-usage" disabled={isExporting} onChange={(value) => updateAndClear(setUsageFilters, 'product', value)} /></Fragment>
@@ -1831,7 +1794,7 @@ export default function ReportsPage() {
             <>
               <DateRangeFields from={supplierFilters.from} to={supplierFilters.to} disabled={isExporting} onFromChange={(value) => updateAndClear(setSupplierFilters, 'from', value)} onToChange={(value) => updateAndClear(setSupplierFilters, 'to', value)} />
               <ChoiceFilterField label={ui("Supplier")} value={supplierFilters.supplier} placeholder={ui("Any supplier")} options={filterOptions.performance_suppliers ?? filterOptions.suppliers} disabled={isExporting} onChange={(value) => updateAndClear(setSupplierFilters, 'supplier', value)} />
-              <label className="reports-field reports-field--compact"><span>{ui("Result limit")}</span><select value={supplierFilters.limit} onChange={(event) => updateAndClear(setSupplierFilters, 'limit', Number(event.target.value))} disabled={isExporting}>{REPORT_RESULT_LIMIT_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <ReportPicker label={ui("Result limit")} value={String(supplierFilters.limit)} onChange={(nextValue) => updateAndClear(setSupplierFilters, 'limit', Number(nextValue))} disabled={isExporting} options={REPORT_RESULT_LIMIT_OPTIONS.map((n): [string, string] => [String(n), String(n)])} />
               <div className="reports-filter-note">{ui("Date range filters shipment and supplier-return activity by creation date.")}</div>
             </>
           }
@@ -1853,7 +1816,7 @@ export default function ReportsPage() {
           actions={actionButtons('expiry-risk', expiryRiskQuery.isFetching)}
           filters={
             <>
-              <label className="reports-field reports-field--compact"><span>{ui("Expiry horizon")}</span><select value={expiryFilters.days} onChange={(event) => updateAndClear(setExpiryFilters, 'days', Number(event.target.value))} disabled={isExporting}>{EXPIRY_HORIZON_OPTIONS.map((days) => <option key={days} value={days}>{ui('Next {days} days').replace('{days}', formatNumber(days, locale, 0))}</option>)}</select></label>
+              <ReportPicker label={ui("Expiry horizon")} value={String(expiryFilters.days)} onChange={(nextValue) => updateAndClear(setExpiryFilters, 'days', Number(nextValue))} disabled={isExporting} options={EXPIRY_HORIZON_OPTIONS.map((n): [string, string] => [String(n), ui('Next {days} days').replace('{days}', formatNumber(n, locale, 0))])} />
               <ChoiceFilterField label={ui("Category")} value={expiryFilters.category} placeholder={ui("All categories")} options={filterOptions.categories} disabled={isExporting} onChange={(value) => updateAndClear(setExpiryFilters, 'category', value)} />
               <ChoiceFilterField label={ui("Location")} value={expiryFilters.location} placeholder={ui("Any location")} options={filterOptions.current_locations ?? filterOptions.locations} disabled={isExporting} onChange={(value) => updateAndClear(setExpiryFilters, 'location', value)} />
               <div className="reports-filter-note">{ui("Already expired positive-balance lots are always included.")}</div>
