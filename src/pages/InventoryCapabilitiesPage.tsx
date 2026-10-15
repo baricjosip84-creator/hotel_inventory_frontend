@@ -903,7 +903,9 @@ function UomPanel({ products, canWrite, routeProductId, onRouteProductChange }: 
     }
   });
   const convert = useMutation({
-    mutationFn: () => apiRequest<{ converted_quantity: number }>(`/inventory-capabilities/products/${productId}/uom/convert`, { method: 'POST', body: JSON.stringify({ from_uom: fromUom, to_uom: toUom, quantity: Number(convertQty) }) }),
+    // Conversion only calculates a result; it does not create a product or alter stock.
+    // Suppress the generic POST mutation toast (the result is displayed inline).
+    mutationFn: () => apiRequest<{ converted_quantity: number }>(`/inventory-capabilities/products/${productId}/uom/convert`, { method: 'POST', skipMutationFeedback: true, body: JSON.stringify({ from_uom: fromUom, to_uom: toUom, quantity: Number(convertQty) }) }),
     // onMutate runs for each attempt; rapid clicks must not let an older response win.
     onMutate: () => ({ requestSeq: ++conversionRequestSeqRef.current }),
     onSuccess: (data, _variables, context) => {

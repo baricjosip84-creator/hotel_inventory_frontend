@@ -573,7 +573,8 @@
     "check:original-audit-fe224": "node scripts/check-original-audit-corrections-fe224.cjs",
     "check:fe225-original-audit-functional-closure": "node scripts/check-fe225-original-audit-functional-closure.mjs",
     "check:reports-picker-fe226": "node scripts/check-reports-picker-fe226.mjs",
-    "check:original-audit-fe227": "node scripts/check-original-audit-fe227.mjs"
+    "check:original-audit-fe227": "node scripts/check-original-audit-fe227.mjs",
+    "check:uom-conversion-no-product-toast-fe228": "node scripts/check-uom-conversion-no-product-toast-fe228.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
