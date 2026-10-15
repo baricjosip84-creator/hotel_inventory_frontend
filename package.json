@@ -571,6 +571,7 @@
     "check:intelligence-review-route-durability": "node scripts/check-intelligence-review-route-durability.mjs",
     "check:deployment-api-config-tests": "node scripts/check-deployment-api-config-tests.mjs",
     "check:original-audit-fe224": "node scripts/check-original-audit-corrections-fe224.cjs",
+    "check:ft015-dashboard-reasons": "node scripts/check-ft015-dashboard-reason-localization.mjs",
     "check:fe225-original-audit-functional-closure": "node scripts/check-fe225-original-audit-functional-closure.mjs",
     "check:reports-picker-fe226": "node scripts/check-reports-picker-fe226.mjs",
     "check:original-audit-fe227": "node scripts/check-original-audit-fe227.mjs",

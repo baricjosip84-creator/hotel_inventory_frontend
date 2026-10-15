@@ -342,6 +342,22 @@ function dashboardReasonLabel(row: RecentActivityRow, ui: (englishText: string) 
   if (String(row.movement_kind || '').trim().toLowerCase() === 'unclassified') return reason || '-';
   if (!reason) return '-';
 
+  // These persisted reasons can use spaces or snake_case. Only translate
+  // explicitly known business events; leave free-form notes and unclassified
+  // legacy evidence untouched. The raw value remains available on hover.
+  const normalizedReasonCode = reason.split(':', 1)[0]
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+  const knownReasonLabels = new Map([
+    ['requisition fulfillment', 'Requisition Fulfillment'],
+    ['supplier return dispatch', 'Supplier Return Dispatch'],
+    ['cycle count reconciliation', 'Cycle Count Reconciliation'],
+  ]);
+  const knownReasonLabel = knownReasonLabels.get(normalizedReasonCode);
+  if (knownReasonLabel) return ui(knownReasonLabel);
+
   if (row.shipment_id && (reason === 'shipment_receive' || reason.startsWith('shipment_receive:'))) {
     return row.shipment_po_number || ui('Shipment received');
   }
