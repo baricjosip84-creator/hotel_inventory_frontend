@@ -1630,6 +1630,7 @@ function businessEvidenceScalar(value: unknown, locale: AppLocale, ui: LearningU
 
 const BUSINESS_EVIDENCE_FIELD_LABELS: Record<string, string> = {
   note: 'Note',
+  policy: 'Policy',
   summary: 'Summary',
   description: 'Description',
   reason: 'Reason',
@@ -1667,6 +1668,8 @@ const BUSINESS_EVIDENCE_FIELD_LABELS: Record<string, string> = {
 
 function businessEvidenceFieldLabel(key: string, ui: LearningUi): string {
   const systemLabel = BUSINESS_EVIDENCE_FIELD_LABELS[key];
+  // Preserve unknown/user-authored field identifiers exactly for audit fidelity.
+  // Known system policy keys receive business-readable labels above.
   return systemLabel ? ui(systemLabel) : key;
 }
 

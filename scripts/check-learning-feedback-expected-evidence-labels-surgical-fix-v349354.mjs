@@ -54,7 +54,7 @@ for (const locale of locales) {
   const unknown=sandbox.__testFormatter.businessEvidenceEntries({basis:'client_authored_custom_basis',custom_field:'user_authored_message'},locale,ui);
   check(`${locale}: unknown/user-authored values preserved`,unknown[0]?.value==='client_authored_custom_basis' && unknown[1]?.label==='custom_field' && unknown[1]?.value==='user_authored_message');
   const nested=sandbox.__testFormatter.businessEvidenceEntries({policy:{consumption_only_demand:false}},locale,ui);
-  check(`${locale}: nested names are localized without losing hierarchy`,nested[0]?.label===`policy · ${ui(expectedKeys.consumption_only_demand)}` && nested[0]?.value===ui('No'));
+  check(`${locale}: nested names are localized without losing hierarchy`,nested[0]?.label===`${ui('Policy')} · ${ui(expectedKeys.consumption_only_demand)}` && nested[0]?.value===ui('No'));
 }
 const failed=checks.filter(c=>!c.ok);
 for(const c of checks) console.log(`${c.ok?'PASS':'FAIL'} - ${c.name}`);

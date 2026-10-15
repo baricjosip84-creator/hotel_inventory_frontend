@@ -1346,7 +1346,7 @@ const styles: Record<string, CSSProperties> = {
     width: '100%', border: '1px solid rgba(255,255,255,.10)', borderRadius: '8px', padding: '9px 10px', background: 'rgba(255,255,255,.04)', color: 'rgba(255,255,255,.78)', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
   },
   mainArea: {
-    flex: 1, minWidth: 0, minHeight: 0, height: '100dvh', overflowY: 'auto', display: 'flex', flexDirection: 'column', background: '#f8fafc'
+    flex: 1, minWidth: 0, minHeight: 0, height: '100dvh', overflowY: 'auto', scrollPaddingBottom: '96px', display: 'flex', flexDirection: 'column', background: '#f8fafc'
   },
   header: {
     padding: '18px 24px 15px', flexShrink: 0, minWidth: 0, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '24px', background: '#fff', borderBottom: '1px solid #e2e8f0'
@@ -1466,6 +1466,8 @@ const styles: Record<string, CSSProperties> = {
   },
   content: {
     flex: '1 0 auto',
+    minHeight: 0,
+    scrollMarginBottom: '96px',
     minWidth: 0,
     width: '100%',
     maxWidth: '1400px',

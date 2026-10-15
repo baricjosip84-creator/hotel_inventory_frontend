@@ -1,0 +1,43 @@
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const read=(rel)=>fs.readFileSync(path.join(root,rel),'utf8');
+const app=read('src/layouts/AppLayout.tsx');
+const footer=read('src/components/CopyrightNotice.tsx');
+const learning=read('src/pages/DecisionLearningFeedbackPage.tsx');
+const mobile=read('src/pages/MobileExecutionPage.tsx');
+const mobileText=read('src/pages/mobileExecutionSystemText.ts');
+const catalog=read('src/i18n/tenantUiTranslations.ts');
+const reports=read('src/pages/ReportsPage.tsx');
+const outboundCss=read('src/pages/OutboundPage.css');
+const action=read('src/pages/OperationalActionCenterPage.tsx');
+const results=[];
+const check=(label,test)=>results.push({label,pass:!!test});
+// SHELL-DEF-001: footer is a normal flow child after main inside the actual scrolling area.
+check('Tenant layout uses a page-height scrolling column',app.includes("height: '100dvh', overflowY: 'auto'"));
+check('Tenant layout reserves scroll clearance below focused controls',app.includes("scrollPaddingBottom: '96px'"));
+check('Tenant main content has safe bottom scroll margin',app.includes("scrollMarginBottom: '96px'"));
+check('Footer occurs after the route content',app.indexOf('<CopyrightNotice />',app.indexOf('<Outlet />'))>0);
+check('Footer never uses a fixed overlay',!footer.includes("position: 'fixed'") && !footer.includes("position: 'sticky'"));
+check('Footer does not shrink across tall content',footer.includes('flexShrink: 0'));
+// LF-UX-008/010: do not modify stored evidence or expose arbitrary raw data to regular users.
+check('Known policy evidence gets a localized label',learning.includes("policy: 'Policy'"));
+check('Unknown user-authored evidence keys are preserved, not mutated',learning.includes('return systemLabel ? ui(systemLabel) : key;'));
+check('Known policy basis code has a readable presentation',learning.includes("key === 'basis' && value === 'shared_procurement_replenishment_position_and_location_policy'"));
+check('Raw JSON diagnostics require permission',learning.includes('{canViewDiagnostics ? (') && learning.includes('Technical structured evidence'));
+check('Technical diagnostics are collapsed by default',learning.includes('<details className="learning-feedback-advanced"'));
+// Re-checked previously reported deficiencies; they must not be re-introduced.
+check('User role is localized in the tenant shell',app.includes('visibleAccessRoleLabel') && app.includes("ui('Admin')"));
+check('Mobile connection status is localized',mobile.includes("ui(online ? 'Online' : 'Offline')") && catalog.includes('"Na mreži"'));
+check('Known system-generated task titles are localized only with exact template match',mobileText.includes("task.source_type !== 'execution_request'") && mobileText.includes('description !== EXECUTION_CLOSURE_DESCRIPTION'));
+check('Unassigned mobile tasks expose Take when the backend permits it',mobile.includes("return task.can_take ? ['take'] : []"));
+check('Action Center technical evidence is formatted for operators',action.includes('actionTechnicalFactorLabel(factor, ui)'));
+check('Reports uses the controlled picker',reports.includes('ReportPicker'));
+check('Outbound workflow uses a native keyboard-accessible disclosure',outboundCss.includes('.outbound-workflow-summary:focus-visible'));
+check('Outbound disclosure has a visible expand icon',outboundCss.includes('.outbound-workflow-summary::after'));
+check('Unknown evidence values remain unchanged',learning.includes('return businessEvidenceScalar(value, locale, ui);'));
+const failed=results.filter(x=>!x.pass);
+for(const r of results)console.log(`${r.pass?'PASS':'FAIL'} ${r.label}`);
+console.log(`Original audit FE227 focused guard: ${results.length-failed.length}/${results.length}`);
+if(failed.length)process.exitCode=1;
