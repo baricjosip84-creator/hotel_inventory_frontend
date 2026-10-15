@@ -456,3 +456,10 @@
     min-width: 100%;
   }
 }
+
+/* FT035: a quiet, readable explanation; displayed only for source Alerts. */
+.action-center-alert-priority-explanation {
+  margin: 6px 0 10px;
+  line-height: 1.45;
+  max-width: 78ch;
+}

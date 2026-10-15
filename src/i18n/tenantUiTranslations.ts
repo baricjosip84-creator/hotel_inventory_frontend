@@ -2,6 +2,11 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // FT035: fixed labels of the three system-generated execution-closure task types.
+  ["Product Min Stock Update", "Produkt-Mindestbestand aktualisieren", "Actualizar stock mínimo del producto", "Mettre à jour le stock minimum du produit", "Ažuriranje minimalne zalihe proizvoda"],
+  ["Standard Cost Update", "Standardkosten aktualisieren", "Actualizar coste estándar", "Mettre à jour le coût standard", "Ažuriranje standardnog troška"],
+  // FT035: distinguish Action Center ranking from source alert severity.
+  ["Action urgency sets queue order; alert severity describes the alert itself. An informational alert may still need review.", "Die Aktionsdringlichkeit bestimmt die Reihenfolge der Liste; der Warnungsschweregrad beschreibt die Warnung. Auch eine informative Warnung kann eine Prüfung erfordern.", "La urgencia de la acción establece el orden de la lista; la gravedad describe la alerta. Una alerta informativa también puede requerir revisión.", "L’urgence de l’action détermine l’ordre de la liste ; la gravité décrit l’alerte. Une alerte informative peut tout de même nécessiter un examen.", "Hitnost radnje određuje redoslijed u popisu; ozbiljnost opisuje samo upozorenje. I informativno upozorenje može zahtijevati pregled."],
   // FT033: render known stock-movement audit reasons in the selected language.
   ["Cleanup: reverse temporary +1 stock added for BOM assembly audit test.", "Bereinigung: Temporäre +1-Bestandserhöhung für den Stücklisten-Audittest rückgängig machen.", "Limpieza: revertir el aumento temporal de 1 unidad de stock añadido para la prueba de auditoría de ensamblaje de lista de materiales.", "Nettoyage : annuler l’ajout temporaire d’une unité de stock pour le test d’audit d’assemblage de nomenclature.", "Čišćenje: poništavanje privremenog povećanja zalihe za 1 jedinicu tijekom revizijskog testa sastavljanja prema sastavnici."],
   // FT030: explicit fallback provenance and focused alert navigation.

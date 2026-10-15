@@ -393,15 +393,26 @@ function executionModeLabel(value: string | null | undefined, ui: (englishText: 
   return canonicalLabel(value, ui);
 }
 
+// FT035: Localize only known, application-generated task descriptions.
+// Arbitrary user-authored titles and notes must remain unchanged.
+const EXECUTION_REQUEST_CLOSURE_PREFIX = 'Close approved execution request: ';
+const EXECUTION_REQUEST_CLOSURE_SUMMARY =
+  'Review and close the approved execution request through the operational task queue. This task is a human closure record only; it does not execute adapters or mutate inventory.';
+
 function actionTitleLabel(action: OperationalAction, ui: (englishText: string) => string): string {
   const title = String(action.title || '').trim();
   if (!title) return ui('Action');
+  if (!action.title_key && action.source_type === 'execution_task' && title.startsWith(EXECUTION_REQUEST_CLOSURE_PREFIX)) {
+    const adapterLabel = title.slice(EXECUTION_REQUEST_CLOSURE_PREFIX.length).trim();
+    if (adapterLabel) return `${ui('Close approved execution request:')} ${ui(adapterLabel)}`;
+  }
   return action.title_key ? ui(title) : title;
 }
 
 function actionSummaryLabel(action: OperationalAction, ui: (englishText: string) => string): string {
   const summary = String(action.summary || '').trim();
   if (!summary) return ui('No summary provided.');
+  if (action.source_type === 'execution_task' && summary === EXECUTION_REQUEST_CLOSURE_SUMMARY) return ui(summary);
   return action.summary_key ? ui(summary) : summary;
 }
 
@@ -785,6 +796,11 @@ export default function OperationalActionCenterPage() {
                         {action.alert_severity ? <span style={badgeStyle}>{ui('Alert severity:')} {canonicalLabel(action.alert_severity, ui)}</span> : null}
                       </div>
                     </div>
+                    {action.source_type === 'alert' && action.alert_severity ? (
+                      <p className="card__subtext action-center-alert-priority-explanation">
+                        {ui('Action urgency sets queue order; alert severity describes the alert itself. An informational alert may still need review.')}
+                      </p>
+                    ) : null}
 
                     <div className="action-center-action-guidance">
                       <span className="action-center-action-guidance-label">{ui("Recommended next step")}</span>
