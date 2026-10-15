@@ -17,6 +17,7 @@ import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement, type Tenant
 import { getCurrentAccessRoleLabel, getCurrentUserRole, hasAllPermissions, hasAnyPermission, hasPermission, TENANT_PERMISSIONS, TENANT_PERMISSION_SNAPSHOT_EVENT } from '../lib/permissions';
 import { getTenantAccessSnapshot } from '../lib/tenantAccess';
 import { getTenantModuleForPathname, getTenantPageMeta, tenantNavigationSections } from '../app/navigationRegistry';
+import { scrollToRouteAnchor } from './scrollToRouteAnchor';
 import type { TenantNavigationItem } from '../app/navigationRegistry';
 import CopyrightNotice from '../components/CopyrightNotice';
 import { InventoryBrand } from '../components/brand/InventoryBrand';
@@ -665,13 +666,19 @@ export default function AppLayout() {
   }, []);
 
   useLayoutEffect(() => {
-    forcePageScrollTop();
+    // Keep navigation reset for ordinary pages, but never overwrite an explicit
+    // deep-link scroll. Delayed top resets previously undid the Usage damage/
+    // waste anchor opened from Alerts, leaving the user at the page header.
+    const placeScroll = () => {
+      if (!scrollToRouteAnchor(location.hash)) forcePageScrollTop();
+    };
+    placeScroll();
 
-    const animationFrame = window.requestAnimationFrame(forcePageScrollTop);
-    const shortTimer = window.setTimeout(forcePageScrollTop, 0);
-    const renderTimer = window.setTimeout(forcePageScrollTop, 50);
-    const settledTimer = window.setTimeout(forcePageScrollTop, 150);
-    const lateTimer = window.setTimeout(forcePageScrollTop, 350);
+    const animationFrame = window.requestAnimationFrame(placeScroll);
+    const shortTimer = window.setTimeout(placeScroll, 0);
+    const renderTimer = window.setTimeout(placeScroll, 50);
+    const settledTimer = window.setTimeout(placeScroll, 150);
+    const lateTimer = window.setTimeout(placeScroll, 350);
 
     return () => {
       window.cancelAnimationFrame(animationFrame);
@@ -680,7 +687,7 @@ export default function AppLayout() {
       window.clearTimeout(settledTimer);
       window.clearTimeout(lateTimer);
     };
-  }, [location.pathname]);
+  }, [location.pathname, location.hash]);
 
   useEffect(() => {
     let cancelled = false;
