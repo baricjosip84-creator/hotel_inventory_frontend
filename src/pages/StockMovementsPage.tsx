@@ -20,7 +20,9 @@ type StockMovement = {
   id: string;
   product_id: string;
   product_name?: string | null;
+  product_name_source?: 'historical_snapshot' | 'current_catalog';
   product_unit?: string | null;
+  product_unit_source?: 'historical_snapshot' | 'current_catalog';
   product_unit_snapshot?: string | null;
   movement_kind?: string | null;
   shipment_id?: string | null;
@@ -29,6 +31,7 @@ type StockMovement = {
   stock_transfer_id?: string | null;
   storage_location_id?: string | null;
   storage_location_name?: string | null;
+  storage_location_name_source?: 'historical_snapshot' | 'current_catalog' | 'unavailable';
   temperature_zone?: string | null;
   movement_type?: string | null;
   change: number | string;
@@ -40,6 +43,7 @@ type StockMovement = {
   cost_currency?: string | null;
   user_id?: string | null;
   user_name?: string | null;
+  actor_name_source?: 'historical_snapshot' | 'current_directory' | 'unavailable';
   created_at: string;
   package_id?: string | null;
   package_count_received?: number | string | null;
@@ -790,12 +794,19 @@ export default function StockMovementsPage() {
                 return <Fragment key={movement.id}>
                   <tr>
                     <td style={styles.td}>{formatDateTime(movement.created_at, locale)}</td>
-                    <td style={styles.td}><div style={styles.rowTitle}>{movement.product_name || ui("Historical Product name unavailable")}</div><div style={styles.rowSubtle}>{movement.storage_location_name || ui("Historical location unavailable")}</div><div style={styles.rowSubtle}>{movement.product_unit || ui("Historical unit unavailable")}</div></td>
+                    <td style={styles.td}>
+                      <div style={styles.rowTitle}>{movement.product_name || ui("Historical Product name unavailable")}</div>
+                      {movement.product_name_source === 'current_catalog' ? <div className="stock-movements-catalog-fallback">{ui('Current product name — original snapshot missing')}</div> : null}
+                      <div style={styles.rowSubtle}>{movement.storage_location_name || ui("Historical location unavailable")}</div>
+                      {movement.storage_location_name_source === 'current_catalog' ? <div className="stock-movements-catalog-fallback">{ui('Current location name — original snapshot missing')}</div> : null}
+                      <div style={styles.rowSubtle}>{movement.product_unit || ui("Historical unit unavailable")}</div>
+                      {movement.product_unit_source === 'current_catalog' ? <div className="stock-movements-catalog-fallback">{ui('Current unit — original snapshot missing')}</div> : null}
+                    </td>
                     <td style={styles.td}><span style={changeBadgeStyle(amount)}>{amount > 0 ? `+${formatLocalizedNumber(amount, locale)}` : formatLocalizedNumber(amount, locale)}</span><div style={styles.rowSubtle}>{formatLocalizedNumber(Math.abs(amount), locale)} {movement.product_unit || ui("Historical unit unavailable")}</div></td>
                     <td style={styles.td}><span style={badgeStyle(type)}>{ui(movementTypeLabel(type))}</span>{displayedDetail ? <div style={styles.rowSubtle}>{displayedDetail}</div> : null}{displayedReceivingNote(movement, ui) && detail !== safeReceivingNote(movement) ? <div style={styles.note}>{ui("Note:")} {displayedReceivingNote(movement, ui)}</div> : null}</td>
                     <td style={styles.td}>{canOpenReference && reference.to ? <Link className="stock-movements-reference-link" to={reference.to}>{localizeComposedLabel(reference.label, ui)}</Link> : <div style={styles.rowTitle}>{localizeComposedLabel(reference.label, ui)}</div>}</td>
-                    <td style={styles.td}><div style={styles.rowTitle}>{actorDisplay(movement, ui)}</div></td>
-                    <td style={styles.td}><button type="button" className="app-button app-button--secondary stock-movements-details-button" onClick={() => toggleMovementDetails(movement.id)} aria-expanded={isExpanded}>{isExpanded ? ui("Hide") : ui("View")}</button></td>
+                    <td style={styles.td}><div style={styles.rowTitle}>{actorDisplay(movement, ui)}</div>{movement.actor_name_source === 'current_directory' ? <div className="stock-movements-catalog-fallback">{ui('Current user name — original snapshot missing')}</div> : null}</td>
+                    <td style={{ ...styles.td, minWidth: 108 }}><button type="button" className="app-button app-button--secondary stock-movements-details-button" onClick={() => toggleMovementDetails(movement.id)} aria-expanded={isExpanded}>{isExpanded ? ui("Hide") : ui("View")}</button></td>
                   </tr>
                   {isExpanded ? <tr className="stock-movements-details-row">
                     <td colSpan={7}>

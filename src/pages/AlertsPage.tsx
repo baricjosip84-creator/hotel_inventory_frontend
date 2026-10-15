@@ -250,7 +250,11 @@ function nextActionLink(alert: AlertRow): { to: string; label: string } | null {
     return { to: '/inventory-requisitions', label: 'Open Requisitions' };
   }
 
-  if ((type.includes('USAGE') || type.includes('CONSUMPTION') || type.includes('DAMAGE')) && hasPermission(TENANT_PERMISSIONS.INVENTORY_USAGE_READ)) {
+  if ((type.includes('DAMAGE') || type.includes('WASTE')) && hasPermission(TENANT_PERMISSIONS.INVENTORY_USAGE_READ)) {
+    return { to: '/inventory-usage#usage-damage-waste-review', label: 'Review damage and waste records' };
+  }
+
+  if ((type.includes('USAGE') || type.includes('CONSUMPTION')) && hasPermission(TENANT_PERMISSIONS.INVENTORY_USAGE_READ)) {
     return { to: '/inventory-usage', label: 'Open Inventory Usage' };
   }
 
@@ -577,93 +581,6 @@ export default function AlertsPage() {
       {actionError ? <div className="app-error-state" style={styles.messageBox} role="alert">{actionError}</div> : null}
       {actionMessage ? <div className="app-success-state" style={styles.messageBox} role="status">{actionMessage}</div> : null}
 
-      {canManageAlerts ? (
-        <section className="app-panel app-panel--padded alerts-section alerts-section--manual" style={styles.panel}>
-          <div className="alerts-section-heading"><span className="alerts-heading-icon"><TenantNavIcon path="/alerts" size={18} /></span><h2 style={styles.panelTitle}>{ui('Create a manual alert')}</h2></div>
-          <p style={styles.formHint}>
-            {ui('Use this only for a real operational issue that is not already represented by an existing alert. New manual alerts start at escalation level 0.')}
-          </p>
-
-          <form onSubmit={submitManualAlert} style={styles.formStack}>
-            <div className="app-grid-toolbar" style={styles.createGrid}>
-              <label style={styles.fieldLabel}>
-                <span>{ui('Alert type')}</span>
-                <input
-                  style={styles.input}
-                  value={manualAlertForm.type}
-                  onChange={(event) => updateManualAlertField('type', event.target.value)}
-                  placeholder={ui('Example: Supplier delivery delay')}
-                  maxLength={100}
-                  disabled={createAlertMutation.isPending}
-                  required
-                />
-              </label>
-
-              <label style={styles.fieldLabel}>
-                <span>{ui('Severity')}</span>
-                <select
-                  style={styles.input}
-                  value={manualAlertForm.severity}
-                  onChange={(event) => updateManualAlertField('severity', event.target.value as AlertSeverity)}
-                  disabled={createAlertMutation.isPending}
-                >
-                  <option value="info">{ui('Info')}</option>
-                  <option value="warning">{ui('Warning')}</option>
-                  <option value="critical">{ui('Critical')}</option>
-                </select>
-                {manualAlertForm.severity === 'critical' ? (
-                  <small style={styles.criticalHelp}>{ui('Critical alerts can block protected stock or shipment operations according to alert scope until resolved.')}</small>
-                ) : null}
-              </label>
-
-              {canReadProducts ? (
-                <label style={styles.fieldLabel}>
-                  <span>{ui('Related product (optional)')}</span>
-                  <select
-                    style={styles.input}
-                    value={manualAlertForm.product_id}
-                    onChange={(event) => updateManualAlertField('product_id', event.target.value)}
-                    disabled={createAlertMutation.isPending || productsQuery.isLoading}
-                  >
-                    <option value="">{ui('No product link')}</option>
-                    {(productsQuery.data ?? []).map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.name}{product.category ? ` — ${product.category}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {productsQuery.isError ? <small style={styles.fieldHelp}>{ui('Products could not be loaded. The alert can still be created without a product link.')}</small> : null}
-                </label>
-              ) : null}
-            </div>
-
-            <label style={styles.fieldLabel}>
-              <span>{ui('Alert message')}</span>
-              <textarea
-                style={styles.textareaNeutral}
-                value={manualAlertForm.message}
-                onChange={(event) => updateManualAlertField('message', event.target.value)}
-                placeholder={ui('Describe the issue, its impact, and what needs attention.')}
-                maxLength={2000}
-                rows={4}
-                disabled={createAlertMutation.isPending}
-                required
-              />
-            </label>
-
-            <div className="app-actions">
-              <button
-                style={styles.primaryButton}
-                disabled={createAlertMutation.isPending || !manualAlertForm.type.trim() || !manualAlertForm.message.trim()}
-                type="submit"
-              >
-                {createAlertMutation.isPending ? ui('Creating…') : ui('Create alert')}
-              </button>
-            </div>
-          </form>
-        </section>
-      ) : null}
-
       <section className="app-panel app-panel--padded alerts-section" style={styles.panel}>
         <div className="alerts-section-heading"><span className="alerts-heading-icon alerts-heading-icon--slate"><TenantNavIcon path="/reports" size={18} /></span><h2 style={styles.panelTitle}>{ui('Filter the alert queue')}</h2></div>
         <form onSubmit={applyFilters} style={styles.formStack}>
@@ -969,6 +886,94 @@ export default function AlertsPage() {
           </div>
         )}
       </section>
+
+      {canManageAlerts ? (
+        <details className="app-panel app-panel--padded alerts-section alerts-section--manual" style={styles.panel}>
+          <summary className="alerts-manual-disclosure">{ui('Create a manual alert')}</summary>
+          <p style={styles.formHint}>
+            {ui('Use this only for a real operational issue that is not already represented by an existing alert. New manual alerts start at escalation level 0.')}
+          </p>
+
+          <form onSubmit={submitManualAlert} style={styles.formStack}>
+            <div className="app-grid-toolbar" style={styles.createGrid}>
+              <label style={styles.fieldLabel}>
+                <span>{ui('Alert type')}</span>
+                <input
+                  style={styles.input}
+                  value={manualAlertForm.type}
+                  onChange={(event) => updateManualAlertField('type', event.target.value)}
+                  placeholder={ui('Example: Supplier delivery delay')}
+                  maxLength={100}
+                  disabled={createAlertMutation.isPending}
+                  required
+                />
+              </label>
+
+              <label style={styles.fieldLabel}>
+                <span>{ui('Severity')}</span>
+                <select
+                  style={styles.input}
+                  value={manualAlertForm.severity}
+                  onChange={(event) => updateManualAlertField('severity', event.target.value as AlertSeverity)}
+                  disabled={createAlertMutation.isPending}
+                >
+                  <option value="info">{ui('Info')}</option>
+                  <option value="warning">{ui('Warning')}</option>
+                  <option value="critical">{ui('Critical')}</option>
+                </select>
+                {manualAlertForm.severity === 'critical' ? (
+                  <small style={styles.criticalHelp}>{ui('Critical alerts can block protected stock or shipment operations according to alert scope until resolved.')}</small>
+                ) : null}
+              </label>
+
+              {canReadProducts ? (
+                <label style={styles.fieldLabel}>
+                  <span>{ui('Related product (optional)')}</span>
+                  <select
+                    style={styles.input}
+                    value={manualAlertForm.product_id}
+                    onChange={(event) => updateManualAlertField('product_id', event.target.value)}
+                    disabled={createAlertMutation.isPending || productsQuery.isLoading}
+                  >
+                    <option value="">{ui('No product link')}</option>
+                    {(productsQuery.data ?? []).map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name}{product.category ? ` — ${product.category}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {productsQuery.isError ? <small style={styles.fieldHelp}>{ui('Products could not be loaded. The alert can still be created without a product link.')}</small> : null}
+                </label>
+              ) : null}
+            </div>
+
+            <label style={styles.fieldLabel}>
+              <span>{ui('Alert message')}</span>
+              <textarea
+                style={styles.textareaNeutral}
+                value={manualAlertForm.message}
+                onChange={(event) => updateManualAlertField('message', event.target.value)}
+                placeholder={ui('Describe the issue, its impact, and what needs attention.')}
+                maxLength={2000}
+                rows={4}
+                disabled={createAlertMutation.isPending}
+                required
+              />
+            </label>
+
+            <div className="app-actions">
+              <button
+                style={styles.primaryButton}
+                disabled={createAlertMutation.isPending || !manualAlertForm.type.trim() || !manualAlertForm.message.trim()}
+                type="submit"
+              >
+                {createAlertMutation.isPending ? ui('Creating…') : ui('Create alert')}
+              </button>
+            </div>
+          </form>
+        </details>
+      ) : null}
+
     </div>
   );
 }

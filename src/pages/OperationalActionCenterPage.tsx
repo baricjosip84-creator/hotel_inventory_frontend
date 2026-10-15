@@ -810,6 +810,7 @@ export default function OperationalActionCenterPage() {
                       <details style={actionMetadataStyle} className="action-center-technical-details">
                         <summary style={{ cursor: 'pointer', fontWeight: 700 }}>{ui("Technical details")}</summary>
                         <div className="card__subtext">{ui("Ranking score:")} {formatLocalizedNumber(numberValue(action.priority_score), locale)}</div>
+                        <div className="card__subtext">{ui("Internal ordering score, not a percentage or task priority. Compare within this action queue; use Action urgency for decisions.")}</div>
                         {action.execution_task_priority ? <div className="card__subtext">{ui('Task priority:')} {canonicalLabel(action.execution_task_priority, ui)}</div> : null}
                         {action.explainability?.primary_factors?.length ? (
                           <div className="card__subtext action-center-evidence-list">

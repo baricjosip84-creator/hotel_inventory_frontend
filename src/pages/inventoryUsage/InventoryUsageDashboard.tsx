@@ -1,5 +1,6 @@
 import { csvSpreadsheetCell } from '../../lib/spreadsheetCsv';
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useLocation } from "react-router";
 import { useAppTranslation } from "../../i18n/I18nContext";
 import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from "../../i18n/formatters";
 import {
@@ -365,6 +366,15 @@ export function InventoryUsageDashboard({
   const [exportingAnomalies, setExportingAnomalies] = useState(false);
   const [analyticsExportError, setAnalyticsExportError] = useState("");
   const [activeArea, setActiveArea] = useState<UsageWorkspaceArea>("overview");
+  const location = useLocation();
+
+  // A damage/write-off alert targets the authoritative usage governance review,
+  // not a made-up single usage record. Ensure React-mounted content is visible.
+  useEffect(() => {
+    if (location.hash !== '#usage-damage-waste-review' || activeArea !== 'overview') return;
+    const target = document.getElementById('usage-damage-waste-review');
+    target?.scrollIntoView({ block: 'start' });
+  }, [location.hash, activeArea]);
 
   useEffect(() => {
     if (activeArea === "record" && !permissions.canRecord && !permissions.canBulkRecord) {
@@ -865,6 +875,7 @@ export function InventoryUsageDashboard({
       {activeArea === "overview" ? (
         <>
 
+      <div id="usage-damage-waste-review" style={{ scrollMarginTop: 90 }}>
       <InventoryUsageGovernancePanel
         filters={filters}
         canReviewUsage={permissions.canReview}
@@ -883,6 +894,7 @@ export function InventoryUsageDashboard({
         onScanAlerts={onScanAlerts}
         onReviewUsage={onReviewUsage}
       />
+      </div>
 
       <section style={styles.breakdownGrid}>
         <div style={styles.card}>
