@@ -204,3 +204,186 @@ Next: Push both updated source archives, select HRC-0006, enter Croatia,
   beginning [CUSTOM_FIELD_VALUE_SQL_FORMAT] (stage, SQLSTATE, type only).
   Do not enter any credentials or secrets in this testing record.
 =======================================================================
+
+=======================================================================
+2026-10-15 — FT-003 / BE127 DEPLOYMENT LOG REVIEW (NOT A SAVE RETEST)
+Evidence: Render log excerpt supplied by user. Service reported live,
+  GET / returned 200 and repeated GET /health requests returned 200.
+  GET /api/auth/csrf returned 401 REFRESH_COOKIE_REQUIRED for requests
+  without a refresh-session cookie (user_id and tenant_id were null).
+  Such a 401 is not evidence that the custom-field save was attempted.
+  Supplied excerpt contained no custom-field value write request and no
+  [CUSTOM_FIELD_VALUE_SQL_FORMAT] diagnostic. It does not establish
+  whether test_country = Croatia can now save.
+Current result: FT-003 REMAINS FAIL from the last actual save screenshot;
+  BE127 deployment/health confirmed by logs only.
+Next: Log in to the frontend, select HRC-0006 in Custom fields, attempt
+  Save custom fields with Croatia. If error recurs, share Render log entries
+  immediately after that attempt (redact tokens, cookies, secrets).
+  If save succeeds, refresh and reselect HRC-0006 to verify persistence.
+=======================================================================
+
+
+=======================================================================
+2026-10-15 — FT-003 / FE231 BE127 SECOND LIVE RETEST — FAIL
+Screenshot: Test Country = Croatia for product HRC-0006, save attempted.
+Observed: Action failed toast and correctly located inline message:
+  "Custom field values were not confirmed as saved. The request contains
+   an invalid value format".
+Render evidence: Authenticated PUT /api/inventory-capabilities/custom-fields/
+  product/<product-id> -> HTTP 400, INVALID_INPUT_FORMAT, PostgreSQL SQLSTATE
+  22P02. The corresponding GET succeeded (200). The supplied logs do not show
+  a [CUSTOM_FIELD_VALUE_SQL_FORMAT] stage line, so the failing SQL stage has
+  NOT been established from those logs.
+Status: FAIL, save did not succeed. No F5 readback PASS.
+FE231 UI error-placement fix: PASS in live browser; original save: FAIL.
+
+BE128 SOURCE CHANGE / LIVE RETEST REQUIRED:
+- Product custom field INSERT/UPDATE now bind validated native scalar values
+  into PostgreSQL jsonb_build_object(...), with text/numeric/boolean types,
+  instead of client JSON.stringify(value) followed by a ::jsonb input parse.
+- Expanded safe 22P02 diagnostics to the configuration lock and product
+  existence check before the previously instrumented field queries.
+- Preserves required-field validation, version guards, tenant scoping,
+  transactional rollback, and exact same-transaction readback verification.
+- 99/99 new fake-DB source checks; old service fails new check as expected.
+- PostgreSQL-specific CI smoke provided but not run in the local container.
+No promise of a live fix until backend BE128 is deployed and Croatia survives F5.
+Next: Deploy Backend128 only (Frontend231 unchanged). Retry save ONCE. If it
+fails, look for [CUSTOM_FIELD_VALUE_SQL_FORMAT] near the PUT time in Render
+logs; report only safe stage and SQLSTATE. Do not paste tokens or credentials.
+=======================================================================
+
+=======================================================================
+2026-10-15 — FT-003 / ANOTHER LIVE CUSTOM FIELD SAVE — FAIL
+User screenshot: Test Company 001 > Advanced Inventory > Custom Fields.
+Selected HRC-0006 La Fiesta Tortilla Chips; Test Country = Croatia.
+After clicking Save custom fields, displayed inline error and red toast:
+"The request contains an invalid value format". No success / persistence.
+User Render excerpt at 2026-10-15T08:37:36.986Z:
+Authenticated PUT /api/inventory-capabilities/custom-fields/product/<id>
+returned HTTP 400 INVALID_INPUT_FORMAT with PostgreSQL code 22P02.
+Related GET succeeded with HTTP 200. The provided excerpt does NOT include
+[CUSTOM_FIELD_VALUE_SQL_FORMAT], the safe per-query diagnostic implemented
+in Backend 128. Therefore the source/deploy version at the time of the PUT
+and the failing SQL stage cannot be established from this evidence alone.
+Source review: BE128 contains a per-query catch that logs that marker for
+22P02 inside saveCustomFieldValues (including configuration lock and entity
+existence check); earlier BE127/BE128 changes have not been proven to repair
+the live database failure. Do not mark source correction PASS.
+Status: FAIL — this user-facing test remains open.
+Next: Inspect https://hotel-inventory-backend.onrender.com/health for
+deployment.git_commit; compare with the commit containing BE128, and review
+complete Render log lines immediately around a NEW save request, including
+any stage diagnostic. Do not paste secrets, cookies or DB connection URLs.
+No new code package has been released in this entry.
+=======================================================================
+
+
+=======================================================================
+2026-10-15 — FT-003 / BACKEND 129 SOURCE ATTEMPT — RETEST REQUIRED
+User direction: fix with the code and logs already supplied; do not ask the
+user for another health check, screenshot, or Render log before supplying code.
+Live evidence: authenticated PUT returned HTTP 400 / INVALID_INPUT_FORMAT,
+PostgreSQL SQLSTATE 22P02 after test_country=Croatia was submitted. Earlier
+Backend 128 source change did NOT establish a production fix. No matching
+[CUSTOM_FIELD_VALUE_SQL_FORMAT] log entry was in the available excerpt.
+New source: Backend 129 uses a fully parameterized typed PostgreSQL scalar
+conversion COALESCE(to_jsonb($5::text/numeric/boolean), 'null'::jsonb) rather
+than an application string-to-JSON conversion or a jsonb_build_object call.
+Typed value validation and all optimistic concurrency, tenant, permission and
+same-transaction readback checks remain intact. Added isolated/CI checks for
+native text, boolean, number, select, date, null, insert/update and readback.
+Added CI with disposable PostgreSQL 16 (automated on backend source changes)
+that executes the SQL expression from the production handler. This CI smoke
+has not been run in this local workspace. Production save is not verified.
+Current FT-003 STATUS: FAIL (last live retest) / BE129 SOURCE FIX ATTEMPTED,
+AWAITING LIVE RETEST. Do NOT mark PASS before saving Croatia and F5 readback.
+Next end-user action after backend deploy: retry same Save once; if success,
+press F5 and reselect HRC-0006. Do not ask for new logs first.
+=======================================================================
+
+
+=======================================================================
+2026-10-15 — FT-003 / FE231 BE130 SOURCE ATTEMPT — USER LIVE RECHECK REQUIRED
+Source of truth: Previous FT-003 live result is FAIL (HTTP 400 INVALID_INPUT_FORMAT / SQLSTATE 22P02).
+Production Backend130 revision: serialize the ALREADY validated custom-field scalar into a
+complete JSON document with JSON.stringify(value), then bind it as $5::jsonb for INSERT/UPDATE.
+For a Text value, the bound JSON document is the quoted string "Croatia"; PostgreSQL then
+stores the JSONB string Croatia. Numeric, boolean, select, date, escaped text and optional
+JSON null retain proper types. Per-stage 22P02 logging remains safe. Entity/tenant checks,
+optimistic versions, transaction guard, same-transaction readback and FE231 remain intact.
+BE129 PostgreSQL expression-only smoke was insufficient to prove end-to-end persistence.
+BE130 adds PostgreSQL 16 disposable-CI coverage of production handler and migration-derived
+custom-field table schema (INSERT, COMMIT, GET, UPDATE, versions, rollback and tenant scope).
+These real PostgreSQL CI checks are INCLUDED but COULD NOT RUN in this session (no PostgreSQL
+server, installed pg runtime or live database access). Isolated source/mock checks PASS;
+NO database-backed PASS has been observed, and no Render/Vercel deployment was performed.
+Current FT-003 LIVE STATUS: FAIL / RETEST REQUIRED AFTER BACKEND130 DEPLOY.
+Existing LIVE PASS preserved: FT-001, FT-002, FT-004.
+After BE130 is deployed, enter Croatia in existing test_country field on HRC-0006,
+Save custom fields, press F5, reselect product and check the saved value.
+Do not re-create the field and do not repeat already-passed conversion tests.
+=======================================================================
+
+=======================================================================
+2026-10-15 — FT-003 — NEW LIVE FAILURE AFTER BE130 PACKAGE (DEPLOYMENT REVISION NOT VERIFIED)
+Screenshot: Product HRC-0006 / Test Country = Croatia. Save custom fields showed:
+  "Custom field values were not confirmed as saved. The request contains an invalid value format"
+Render logs 2026-10-15T09:32:39.504Z, request_id=18c50ac8-fd0d-4844-a5ef-197dc136b818:
+  PUT /api/inventory-capabilities/custom-fields/product/<id>
+  HTTP 400 INVALID_INPUT_FORMAT / PostgreSQL SQLSTATE 22P02.
+  Earlier GET of custom-field definitions and values both returned HTTP 200.
+  [CUSTOM_FIELD_VALUE_SQL_FORMAT] stage marker absent in provided 90-line excerpt.
+  Render service startup line is not proof of deployed commit/version.
+  Do NOT infer Backend130 was deployed or that the failing SQL is in the save service.
+
+NEW CAUSAL SOURCE FINDING (BE131):
+- Frontend src/lib/api.ts adds Idempotency-Key to every ordinary write.
+- Backend routes/index.js attaches operational idempotency before inventory-capabilities routes.
+- A successful saveCustomFieldValues() returns an ARRAY of saved rows.
+- Backend src/middleware/idempotency.js fresh-claim and reclaimed-claim branches stored
+  that ARRAY directly in idempotency_keys.response_body (type JSONB, 001_initial.sql).
+- node-postgres serializes JS arrays as PostgreSQL ARRAY literals, not JSON; a JSONB
+  input conversion can therefore fail with SQLSTATE 22P02 during response persistence.
+- transactionMiddleware commits the business transaction before idempotency's response
+  interceptor persists the response. Thus an HTTP 400 from the response interceptor can
+  occur AFTER the underlying Custom Fields save commits. No proof exists this happened
+  in the user's actual database; check F5 retrieval rather than assuming either outcome.
+
+BE131 CODE CHANGE:
+- In BOTH new and reclaimed idempotency paths, serialize the entire response to JSON
+  explicitly with JSON.stringify(body === undefined ? null : body) and bind $2::jsonb.
+- Avoid accidental PostgreSQL ARRAY syntax for arrays of custom-field save results.
+- Preserve existing request hashing, isolation, concurrency, replay, and no-key behavior.
+- Workflow ft003-postgres-jsonb-storage.yml triggers on idempotency changes and runs
+  new scripts/check-ft003-idempotency-jsonb-responses.cjs test.
+
+VERIFICATION (LOCAL, OFFLINE ONLY):
+- New actual middleware VM/executor test: 14/14 assertions PASS, including success,
+  replay, reclaimed key, object/string/null and res.send; JSONB mock rejects
+  non-JSON arrays as PostgreSQL would.
+- Existing checkIdempotencyScopeIsolation.js PASS.
+- Existing checkPlatformIdempotencyHardening.js PASS.
+- Existing FT003 tests check-ft003-typed-jsonb-save.cjs 99/99,
+  check-ft003-custom-field-save-diagnostics.cjs 9/9,
+  check-batch166-custom-field-review-versions.cjs 68/68,
+  check-batch168-custom-field-value-integrity.cjs 51/51,
+  check-batch181-custom-field-text-type.cjs 37/37,
+  check-batch182-transactional-persistence-readback.cjs 26/26 PASS.
+- PostgreSQL database-backed test NOT RUN: no DB service/access in current workspace.
+- GitHub Actions job on disposable PostgreSQL NOT OBSERVED.
+- Production deployment and persisted values NOT VERIFIED; do not claim PASS.
+
+STATUS: FT-003 LIVE FAIL / BE131 CODE CANDIDATE PREPARED, REQUIRES DEPLOY + LIVE RETEST.
+PRESERVED: FT-001, FT-002, FT-004 LIVE PASS. FE231 application source unchanged.
+NEXT: Deploy complete Backend131 to Render (no new migrations; FE231 unchanged).
+Use same existing test_country on product HRC-0006; refresh/reselect product to check
+whether Croatia was already persisted despite earlier HTTP error, then Save once and F5.
+If 400 persists, inspect latest request_id + stage and verify Render's deployed commit.
+
+=======================================================================
+
+BE131 RELEASE ADDENDUM — 2026-10-15
+The FT-003 PostgreSQL 16 CI workflow additionally runs check-ft003-postgres-idempotency-responses.cjs, restricted to a disposable database named ft003 with session-temporary idempotency_keys. The test checks both the original raw-JS-array 22P02 reproduction and repaired array persistence/replay. This PostgreSQL script has NOT been executed here.
+Offline BE130 focused suite re-run 392/392 PASS; new idempotency middleware regression 14/14 PASS, combined 406/406 focused checks plus two idempotency contract scripts PASS. None is a live PASS.
