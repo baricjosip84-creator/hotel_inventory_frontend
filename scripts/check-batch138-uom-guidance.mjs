@@ -36,7 +36,7 @@ check('Save checkbox values preserved',()=>assert.match(uom,/purchase_uom: purch
 check('Save requires write permission',()=>assert.match(uom,/disabled=\{!canWrite \|\| !productId/));
 check('Conversion API route unchanged',()=>assert.match(uom,/`\/inventory-capabilities\/products\/\$\{productId\}\/uom\/convert`/));
 check('Conversion payload unchanged',()=>assert.match(uom,/from_uom: fromUom, to_uom: toUom, quantity: Number\(convertQty\)/));
-check('Conversion result remains visible',()=>assert.match(uom,/converted !== null \? <strong className="capability-result">/));
+check('Conversion result remains visible',()=>assert.match(uom,/converted !== null \? <strong className="capability-result" role="status" aria-live="polite">/));
 check('Product change still resets test state',()=>assert.match(uom,/setFromUom\(''\); setToUom\(''\); setConverted\(null\)/));
 check('Save invalidates submitted product UoM query',()=>assert.match(uom,/invalidateQueries\(\{ queryKey: \['uom', targetProductId\] \}\)/));
 check('Stock quantity mutation not introduced',()=>assert.doesNotMatch(uom,/\/stock\/adjust|\/stock\/count|\/stock-transfers/));

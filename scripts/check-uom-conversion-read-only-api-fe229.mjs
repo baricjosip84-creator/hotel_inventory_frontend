@@ -66,7 +66,7 @@ check('request skip still suppresses other routes', () => assert.equal(execute('
 check('GET never shows mutation success', () => assert.equal(execute('/products', 'GET').show,false));
 check('original per-request flag remains on calculator mutation', () => assert.match(page,/uom\/convert`,\s*\{ method: 'POST', skipMutationFeedback: true/));
 check('correct result still shown in UI', () => assert.match(page,/setConverted\(String\(data\.converted_quantity\)\)/));
-check('visible FE229 marker distinguishes deployed version', () => assert.match(page, /data-uom-calculator-release="FE229">FE229/));
+check('no developer version marker is shown to users', () => assert.doesNotMatch(page, /data-uom-calculator-release|<small[^>]*>FE229<\/small>/));
 check('focused test registered', () => assert.equal(pkg.scripts['check:uom-conversion-read-only-api-fe229'], 'node scripts/check-uom-conversion-read-only-api-fe229.mjs'));
 check('focused test included in CI', () => assert.match(workflow, /npm run check:uom-conversion-read-only-api-fe229/));
 console.log(`FE229 calculator shared feedback regression: ${checks}/${checks} PASS`);

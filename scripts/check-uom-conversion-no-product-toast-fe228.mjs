@@ -45,6 +45,7 @@ const calls = [];
 const toasts = [];
 const converted = [];
 const errors = [];
+const confirmations = [];
 let nextValue = { converted_quantity: 24 };
 let nextError = null;
 const ref = {current: 0};
@@ -56,6 +57,7 @@ const context = {
   convertQty: '1',
   conversionRequestSeqRef: ref,
   setConverted: x => converted.push(x),
+  showTenantActionSuccess: x => confirmations.push(x),
   setError: x => errors.push(x),
   messageFrom: x => x?.message || 'Unable to convert quantity.',
   ui: text => text,
@@ -78,15 +80,16 @@ mutation.onSuccess(result, undefined, attempt);
 check('real request is POST to unit-conversion calculator', () => assert.equal(calls[0].url, '/inventory-capabilities/products/product-123/uom/convert'));
 check('request method remains POST', () => assert.equal(calls[0].options.method, 'POST'));
 check('request body still carries correct values', () => assert.deepEqual(JSON.parse(calls[0].options.body), {from_uom: 'CASE', to_uom: 'piece', quantity: 1}));
-check('generic success feedback is suppressed', () => assert.equal(toasts.length, 0));
+check('generic product-created feedback is suppressed', () => assert.equal(toasts.length, 0));
+check('conversion has meaningful confirmation', () => assert.deepEqual(confirmations, ['Conversion calculated: 1 CASE = 24 piece']));
 check('result remains visible inline as 24 pieces', () => assert.deepEqual(converted, ['24']));
 check('successful calculation clears previous error', () => assert.deepEqual(errors, [null]));
 const oldRequest = mutation.onMutate();
 const freshRequest = mutation.onMutate();
 mutation.onSuccess({converted_quantity: 36}, undefined, oldRequest);
-check('stale success cannot override the latest result', () => assert.deepEqual(converted, ['24']));
+check('stale success cannot override the latest result', () => { assert.deepEqual(converted, ['24']); assert.equal(confirmations.length, 1); });
 mutation.onSuccess({converted_quantity: 48}, undefined, freshRequest);
-check('latest success still updates inline result', () => assert.deepEqual(converted, ['24', '48']));
+check('latest success still updates inline result', () => { assert.deepEqual(converted, ['24', '48']); assert.equal(confirmations.length, 2); });
 mutation.onError(new Error('Network unavailable'), undefined, oldRequest);
 check('stale errors remain suppressed', () => assert.deepEqual(errors, [null, null]));
 mutation.onError(new Error('Network unavailable'), undefined, freshRequest);

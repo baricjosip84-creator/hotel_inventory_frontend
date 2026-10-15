@@ -2033,6 +2033,7 @@ const rows: readonly TranslationRow[] = [
   ["Controlled product change", "Kontrollierte Produktänderung", "Cambio controlado de producto", "Modification contrôlée du produit", "Kontrolirana promjena proizvoda"],
   ["Controlled risk", "Kontrolliertes Risiko", "Riesgo controlado", "Risque maîtrisé", "Kontrolirani rizik"],
   ["Controlled:", "Kontrolliert:", "Controladas:", "Contrôlées :", "Kontrolirano:"],
+  ["Conversion calculated:", "Umrechnung berechnet:", "Conversión calculada:", "Conversion calculée :", "Pretvorba izračunata:"],
   ["Conversion test", "Umrechnungstest", "Prueba de conversión", "Test de conversion", "Test pretvorbe"],
   ["Convert", "Umrechnen", "Convertir", "Convertir", "Pretvori"],
   ["Converted", "Umgewandelt", "Convertido", "Converti", "Pretvoreno"],
