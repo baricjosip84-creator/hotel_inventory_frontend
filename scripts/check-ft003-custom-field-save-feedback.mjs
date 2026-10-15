@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+const source=readFileSync(resolve('src/pages/InventoryCapabilitiesPage.tsx'),'utf8');
+const translations=readFileSync(resolve('src/i18n/tenantUiTranslations.ts'),'utf8');
+let checks=0;
+const check=(description,fn)=>{fn();checks++;};
+check('separate value error state',()=>assert.match(source,/const \[valueSaveError, setValueSaveError\]/));
+check('failed PUT sets values error',()=>assert.match(source,/setValueSaveError\(message\)/));
+check('values failure appears near the values save button',()=>{const p=source.indexOf('{valueSaveError ? <div className="form-error"');assert(p>source.indexOf('Save custom fields')&&p<source.indexOf('function LandedCostPanel'));});
+check('value failure announces not saved',()=>assert.match(source,/Custom field values were not confirmed as saved\./));
+check('field-definition error remains independent',()=>assert.match(source,/\{error \? <div className="form-error"/));
+check('values save retains authoritative PUT route',()=>assert.match(source,/method: 'PUT',[\s\S]*?skipMutationFeedback: true/));
+check('value error announced accessibly',()=>assert.match(source,/\{valueSaveError \? <div className="form-error" role="alert"/));
+check('value-error reset on target change',()=>assert.match(source,/const changeEntityId = [\s\S]*?setValueSaveError\(null\)/));
+check('error toast appears for value write failure',()=>assert.match(source,/setValueSaveError\(message\);[\s\S]*?showTenantActionError\(message\)/));
+check('new five-language message exists',()=>assert.match(translations,/\["Custom field values were not confirmed as saved\.",\s*"[^"\n]+",\s*"[^"\n]+",\s*"[^"\n]+",\s*"[^"\n]+"\]/));
+console.log(`${checks}/${checks} FT-003 frontend checks PASS`);

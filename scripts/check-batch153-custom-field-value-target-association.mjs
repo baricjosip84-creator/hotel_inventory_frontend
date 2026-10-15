@@ -43,7 +43,7 @@ check('click copies definition versions',()=>assert.match(click,/definition_vers
 check('write route uses captured entity type and ID',()=>assert.match(defs.saveValues.getText(ast),/custom-fields\/\$\{targetEntityType\}\/\$\{targetEntityId\}/));
 check('write retains PUT with immutable submitted payload',()=>assert.match(defs.saveValues.getText(ast),/method: 'PUT',[\s\S]*?body: JSON\.stringify\(payload\)/));
 check('write updates original record cache after readback',()=>assert.match(defs.saveValues.getText(ast),/setQueryData\(\['custom-field-values', targetEntityType, targetEntityId\], verifiedRows\)/));
-check('save success guards new selection error',()=>assert.match(defs.saveValues.getText(ast),/activeCustomValueTargetRef\.current\.entityType === targetEntityType && activeCustomValueTargetRef\.current\.entityId === targetEntityId && customFieldSelectionEpochRef\.current === targetSelectionEpoch\) \{[\s\S]*?setError\(null\)/));
+check('save success guards new selection error',()=>assert.match(defs.saveValues.getText(ast),/activeCustomValueTargetRef\.current\.entityType === targetEntityType && activeCustomValueTargetRef\.current\.entityId === targetEntityId && customFieldSelectionEpochRef\.current === targetSelectionEpoch\) \{[\s\S]*?setValueSaveError\(null\)/));
 check('save failure guards new selection error',()=>assert.match(defs.saveValues.getText(ast),/onError:[\s\S]*?activeCustomValueTargetRef\.current\.entityType === targetEntityType && activeCustomValueTargetRef\.current\.entityId === targetEntityId && customFieldSelectionEpochRef\.current === targetSelectionEpoch\) \{/));
 check('save permission gate retained',()=>assert.match(panel.getText(ast),/disabled=\{!canWrite \|\| !entityId \|\| entityValues\.isLoading \|\| entityValues\.isError \|\| !entityValues\.data \|\| saveValues\.isPending\}/));
 check('backend write permission retained',()=>assert.match(backend,/router\.put\('\/custom-fields\/:entityType\/:entityId', requireCustomFieldEntityPermission\('write'\)/));
@@ -67,8 +67,8 @@ function make() {
  const setDefinitionVersions = value=>observed.definitionVersions.push(value);
  const messageFrom = error => error.message;
  const ui = value=>value;
- const maker = new Function('apiRequest','qc','activeCustomValueTargetRef','customFieldSelectionEpochRef','customFieldDraftDirtyRef','setError','setEntityId','setEntityType','setValues','setValueVersions','setDefinitionVersions','messageFrom','ui','entityType','verifyCustomFieldReadback','showTenantActionSuccess','showTenantActionError',exprJs+'\nreturn {saveOptions,changeEntityId,changeEntityType};');
- const handlers=maker(apiRequest,qc,activeCustomValueTargetRef,customFieldSelectionEpochRef,customFieldDraftDirtyRef,setError,setEntityId,setEntityType,setValues,setValueVersions,setDefinitionVersions,messageFrom,ui,'product',(values,rows)=>Object.entries(values).every(([key,value])=>rows.some(row=>row.field_key===key && row.value===value)),()=>{},()=>{});
+ const maker = new Function('apiRequest','qc','activeCustomValueTargetRef','customFieldSelectionEpochRef','customFieldDraftDirtyRef','setError','setValueSaveError','setEntityId','setEntityType','setValues','setValueVersions','setDefinitionVersions','messageFrom','ui','entityType','verifyCustomFieldReadback','showTenantActionSuccess','showTenantActionError',exprJs+'\nreturn {saveOptions,changeEntityId,changeEntityType};');
+ const handlers=maker(apiRequest,qc,activeCustomValueTargetRef,customFieldSelectionEpochRef,customFieldDraftDirtyRef,setError,setError,setEntityId,setEntityType,setValues,setValueVersions,setDefinitionVersions,messageFrom,ui,'product',(values,rows)=>Object.entries(values).every(([key,value])=>rows.some(row=>row.field_key===key && row.value===value)),()=>{},()=>{});
  return {...handlers,observed,activeCustomValueTargetRef,customFieldDraftDirtyRef};
 }
 const payload = {values:{test_country:'Croatia'},value_versions:{test_country:0},definition_versions:{test_country:1}};

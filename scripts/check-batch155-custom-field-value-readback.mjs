@@ -72,8 +72,8 @@ function scenario(mode='good') {
  const qc={setQueryData:(k,v)=>events.cached.push({k,v}),invalidateQueries:({queryKey})=>events.invalidated.push(queryKey)};
  const setError=v=>events.errors.push(v), ui=v=>v, messageFrom=e=>e.message;
  const showTenantActionSuccess=v=>events.success.push(v), showTenantActionError=v=>events.failure.push(v);
- const factory=new Function('apiRequest','qc','activeCustomValueTargetRef','customFieldSelectionEpochRef','customFieldDraftDirtyRef','setError','ui','messageFrom','showTenantActionSuccess','showTenantActionError','verifyCustomFieldReadback',js+'; return options;');
- const options=factory(apiRequest,qc,state,customFieldSelectionEpochRef,customFieldDraftDirtyRef,setError,ui,messageFrom,showTenantActionSuccess,showTenantActionError,verify);
+ const factory=new Function('apiRequest','qc','activeCustomValueTargetRef','customFieldSelectionEpochRef','customFieldDraftDirtyRef','setError','setValueSaveError','ui','messageFrom','showTenantActionSuccess','showTenantActionError','verifyCustomFieldReadback',js+'; return options;');
+ const options=factory(apiRequest,qc,state,customFieldSelectionEpochRef,customFieldDraftDirtyRef,setError,setError,ui,messageFrom,showTenantActionSuccess,showTenantActionError,verify);
  const vars={targetEntityType:'product',targetEntityId:'p-A',targetSelectionEpoch:0,payload:{values:{test_country:'Croatia'},value_versions:{test_country:0},definition_versions:{test_country:1}}};
  return {events,state,options,vars,customFieldDraftDirtyRef};
 }
@@ -106,7 +106,7 @@ for (const mode of ['mismatch','missing','getFail']) {
  check('failed PUT never triggers readback',()=>assert.equal(s.events.requests.length,1));
  s.options.onError(error,s.vars);
  check('failed PUT is not mislabeled as accepted',()=>assert.equal(s.events.errors.at(-1),'invalid value format'));
- check('failed PUT emits no extra verification toast',()=>assert.deepEqual(s.events.failure,[]));
+ check('failed PUT shows one action-specific failure toast',()=>assert.deepEqual(s.events.failure,['invalid value format']));
 }
 {
  const s=scenario();const result=await s.options.mutationFn(s.vars);s.state.current={entityType:'product',entityId:'p-B'};s.options.onSuccess(result,s.vars);

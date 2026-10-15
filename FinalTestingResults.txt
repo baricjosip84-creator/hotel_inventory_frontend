@@ -1,0 +1,206 @@
+FINAL TESTING RESULTS — INVENTORY MANAGEMENT APP
+=======================================================================
+This file is the cumulative, authoritative record of the USER'S LIVE browser
+acceptance tests from 2026-10-15 onward. Continue to append future test
+entries to this exact file. Do not replace it with the older original audit.
+
+Testing tenant: Test Company 001 (as shown in user screenshots)
+Testing started: 2026-10-15
+Live testing source: Frontend 227 / Backend 126 (deployed via GitHub/Vercel/Render)
+Previous correction: Frontend 228 / Backend 126
+Latest deployed and live tested: Frontend 230 / Backend 126
+
+STATUS DEFINITIONS
+PASS = user tested in browser and confirmed expected outcome.
+FAIL = user tested in browser and observed incorrect behavior.
+FIXED IN SOURCE / RETEST REQUIRED = source patched and local regression passed;
+                                    updated deployment not yet user-verified.
+NOT TESTED = no live acceptance result yet.
+
+=======================================================================
+FT-001 — CASE=24 | SAVING A UNIT CONVERSION AND REFRESH PERSISTENCE
+Date: 2026-10-15
+Section: Advanced Inventory > Units of measure
+Product: HRC-0006 — La Fiesta Tortilla Chips (label partly truncated)
+Steps: Create CASE / Case with factor-to-base 24, purchasing and issue
+       options checked; save; press F5; reselect/verify same product; select
+       From = CASE, To = piece, Quantity = 1; press Convert.
+Expected: CASE is still saved after browser refresh, 1 CASE = 24 piece.
+Observed: CASE — Case (factor 24, Purchase Yes, Issue Yes) remains in the
+          saved unit list after refresh. Conversion displays 'Result: 24 piece'.
+Result: PASS — confirmed by user in browser and screenshots on 2026-10-15.
+Evidence: User-provided screenshots in this conversation, not simulated data.
+Database interpretation: persisted conversion survives an actual browser F5.
+
+FT-002 — INCORRECT GENERIC TOAST AFTER READ-ONLY UNIT CONVERSION
+Date: 2026-10-15
+Section: Advanced Inventory > Units of measure > Conversion test
+Live tested build: FE227 / BE126
+Steps: After conversion 1 CASE -> piece, observe success notification.
+Expected: Inline result only; conversion does not create a product.
+Observed: Correct inline 'Result: 24 piece' PLUS green 'Product created
+          successfully.' notification.
+Initial live result: FAIL (UI feedback misleading; calculation itself PASS).
+Root cause: Conversion uses a read-only calculator POST /inventory-capabilities/
+            products/:id/uom/convert; the shared API layer displays generic
+            'Product created successfully.' for POST unless suppressed.
+Source correction: FE228 adds skipMutationFeedback: true to ONLY the unit
+                   calculator request; the inline result and API route remain.
+Local verification: New 24/24 check passes FE228 and fails against FE227;
+                    inherited UoM regressions also pass (see verification).
+FE228 live retest: FAIL — user pushed FE228 source to Git and provided a
+  2026-10-15 09:17 browser screenshot still displaying both Result: 24 piece
+  and the false Product created successfully toast. The exact JS version Vercel
+  served in that screenshot is not independently proven.
+FE228 status: NOT ACCEPTED. Do not label this defect as resolved.
+FE229 correction: Enforces the no-toast rule in BOTH the UoM page request AND
+  the shared tenant API, specifically for POST /inventory-capabilities/products/
+  :id/uom/convert. FE229 displays a small version marker beside Conversion test
+  to confirm that the new deployed frontend loaded.
+FE229 local tests: New shared guard 35/35 PASS; inherited FE228 guard 24/24 PASS;
+  10 additional UoM regression scripts PASS (426 checks).
+Current FT-002 status: FAIL IN LAST LIVE RETEST / FE229 SOURCE FIX AWAITS RETEST.
+Next live action: Push FE229 frontend and wait for Vercel to finish deploying.
+  Confirm small FE229 marker beside Conversion test; press Ctrl+F5; convert
+  1 CASE -> piece again. Expected: inline 24 piece, no product-created toast.
+  If marker is absent: report deployment/cache mismatch, not another API fix.
+
+=======================================================================
+NEXT LIVE TEST — FT-003 | CUSTOM FIELD PERSISTENCE
+Section: Advanced Inventory > Custom fields
+Original failure: Saving value test_country = Croatia returned invalid-format
+                  error; persistence never conclusively accepted.
+Status: NOT TESTED in the current 2026-10-15 session.
+Do not mark PASS before user confirms actual save and F5 persistence.
+
+MAINTENANCE RULE
+Every future browser test must append: ID, date, original audit ID,
+reproduction steps, expected versus observed outcome, PASS/FAIL, screenshots
+or other evidence when supplied, source correction version, retest status.
+Never mark an offline test result as a user's live PASS.
+=======================================================================
+
+
+=======================================================================
+2026-10-15 — FT-002 / FE229 LIVE RETEST EVIDENCE — USER SCREENSHOTS
+Source visible in browser: FE229 marker beside Conversion test.
+Result: Result: 24 piece after CASE-to-piece conversion, with no false
+        "Product created successfully." toast.
+Conclusion for the ORIGINAL FT-002 false-product-created notification:
+        PASS — LIVE VERIFIED ON FE229.
+Evidence: User screenshots sent at about 09:32–09:33 on 2026-10-15.
+Important: The temporary FE229 release label itself is not production UI.
+
+FT-004 — CONVERSION CONFIRMATION AND PRODUCTION UI CLEANLINESS
+Section: Advanced Inventory > Units of measure > Conversion test
+User-observed problem in FE229: Diagnostic "FE229" label beside heading;
+    a conversion provides the inline result but no meaningful success toast.
+Result FE229: FAIL — user explicitly requested removal of the version label
+    and a proper conversion completion message.
+FE230 SOURCE FIX / RETEST REQUIRED:
+  - Removes the developer diagnostic marker entirely from the UI.
+  - Preserves read-only calculation, displayed numeric result, and shared API
+    guard blocking the generic product-creation success notification.
+  - Shows a *specific* successful conversion confirmation, for example
+    "Conversion calculated: 1 CASE = 24 piece".
+  - Translates the message into all five supported languages.
+  - Makes the inline result an accessible live status.
+  - Suppresses stale successful responses and never confirms on failures.
+Local evidence: 31/31 FE230 checks plus inherited UoM regressions PASS.
+Current status: FIXED IN SOURCE — USER LIVE RETEST REQUIRED AFTER FE230.
+Next step: Deploy FE230 frontend only; choose existing product and convert
+    1 CASE to piece. Expect inline Result: 24 piece, the specific success toast,
+    NO "Product created successfully" and NO FE229/FE230 diagnostic label.
+
+FT-003 — CUSTOM FIELD PERSISTENCE "test_country = Croatia": NOT TESTED.
+=======================================================================
+
+=======================================================================
+2026-10-15 — FT-004 / FE230 LIVE RETEST — PASS
+Section: Advanced Inventory > Units of measure > Conversion test
+Build observed: Frontend 230 (based on disappearance of FE229 label and FE230
+                action-specific message; no separate deployment log verified).
+User action: Convert quantity 1 from CASE to piece for HRC-0006.
+Expected: Inline result 24 piece; specific success toast; no generic product
+          creation toast and no diagnostic version badge or label.
+Observed in user screenshot (2026-10-15, approximately 09:49):
+  - Inline 'Result: 24 piece' visible.
+  - Green toast 'Conversion calculated: 1 CASE = 24 piece' visible.
+  - No 'Product created successfully.' toast visible.
+  - No FE229 or FE230 diagnostic marker visible.
+Result FT-004: PASS — LIVE BROWSER EVIDENCE.
+FT-002 final status: PASS — incorrect generic product-created toast removed.
+FT-001: PASS remains unchanged (saved unit persists through F5; conversion 24).
+Next: FT-003 — Custom Fields 'test_country = Croatia' save and refresh.
+Status FT-003: NOT TESTED.
+=======================================================================
+
+=======================================================================
+2026-10-15 — FT-003 / CUSTOM FIELD SCREEN REVIEW — IN PROGRESS
+Section: Advanced Inventory > Custom fields, entity type Product.
+Evidence: Two user browser screenshots around 09:52 on 2026-10-15.
+Existing field shown in saved field definitions:
+  Key: test_country
+  Label: Test Country
+  Type: Text
+  Required: Yes
+  Status: Active
+Finding: The custom field DEFINITION already exists; do not create a duplicate.
+Next live action: Under 'Use fields on products', select product HRC-0006
+  (the same item used in FT-001); inspect the resulting Test Country value
+  input, then enter Croatia, save custom fields, refresh (F5), reselect
+  product and confirm value Croatia persists without a format error.
+Status: IN PROGRESS — definition visible; per-product value save and refresh
+  NOT YET TESTED. Do NOT mark the original persistence issue PASS yet.
+=======================================================================
+
+
+=======================================================================
+2026-10-15 — FT-003 / CUSTOM FIELD VALUE INPUT — LIVE SCREENSHOT
+Section: Advanced Inventory > Custom fields > Use fields on products.
+Evidence: User screenshot at approximately 09:54 on 2026-10-15,
+  source image(20261015-075407).png in current conversation.
+Selected product: La Fiesta Tortilla Chips 200g — HRC-0006.
+Existing field: Test Country (test_country), required Text field.
+Visible value in input: Croatia.
+Not yet demonstrated: Save custom fields action, successful/no-error
+  response, browser refresh, product reselection, retained saved value.
+Caution: A value visible before pressing Save does NOT demonstrate that
+  it has been committed to the database.
+Current result: IN PROGRESS, NOT PASS OR FAIL for original persistence case.
+Next live action: Click Save custom fields, observe confirmation/error;
+  press F5, reselect HRC-0006, verify Test Country still shows Croatia.
+=======================================================================
+
+
+=======================================================================
+2026-10-15 — FT-003 / CUSTOM FIELD SAVE — LIVE FAIL
+Evidence: user's screenshot image(20261015-075650).png after pressing
+  "Save custom fields" for product HRC-0006, existing required Text field
+  test_country = Croatia.
+Observed: Red/neutral inline text "The request contains an invalid value format"
+  appeared below the unrelated "Create custom field" form, not next to
+  the "Use fields on products" save button. No positive save confirmation.
+Result: FAIL — custom-field value was NOT confirmed saved to PostgreSQL.
+  Do NOT mark persistence PASS merely because Croatia remains typed onscreen.
+
+FE231 / BE127 SOURCE CORRECTION (2026-10-15, NO LIVE RETEST YET):
+- Separate definition-save error and product-value-save error states.
+- Failed product value save now places accessible error next to its Save button,
+  preserves the unsaved user draft and produces one error notification.
+- Server records PostgreSQL SQLSTATE 22P02 with SAFE stage details
+  [CUSTOM_FIELD_VALUE_SQL_FORMAT] for definitions-read, existing-values-read,
+  value-insert, value-update or write-readback, if one of those operations fails.
+  The log omits field values and SQL parameters.
+- Existing exact tenant/product scoping, version checks, JSONB text encoding,
+  readback validation, user permissions and transactional rollback unchanged.
+- 16/16 selected regression scripts passed, plus 18/18 new focused checks.
+- The *database rejection's precise cause remains UNKNOWN* without a live
+  PostgreSQL trace; the UI fix/diagnostics do not constitute a persistence fix.
+Status: FAIL — awaiting re-test of BE127 and FE231, and server diagnostic
+  evidence if it again rejects Croatia.
+Next: Push both updated source archives, select HRC-0006, enter Croatia,
+  click Save custom fields once. If it fails, capture the Render log line
+  beginning [CUSTOM_FIELD_VALUE_SQL_FORMAT] (stage, SQLSTATE, type only).
+  Do not enter any credentials or secrets in this testing record.
+=======================================================================

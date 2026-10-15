@@ -980,6 +980,7 @@ function CustomFieldsPanel({
   const [valueVersions, setValueVersions] = useState<Record<string, number>>({});
   const [definitionVersions, setDefinitionVersions] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
+  const [valueSaveError, setValueSaveError] = useState<string | null>(null);
 
   const entityConfigs: Record<EntityType, { label: string; plural: string; rows: Array<{ id: string; label: string }> }> = {
     // Keep the product name legible before long legacy SKUs in the Custom Fields assignment picker.
@@ -1039,6 +1040,7 @@ function CustomFieldsPanel({
     setCustomizeFieldKey(false);
     setFieldKey(''); setLabel(''); setDataType('text'); setOptions(''); setRequired(false);
     setError(null);
+    setValueSaveError(null);
   }, [canRead, entityType, readableEntityTypes]);
 
   useEffect(() => {
@@ -1081,6 +1083,7 @@ function CustomFieldsPanel({
     setValueVersions({});
     setDefinitionVersions({});
     setError(null);
+    setValueSaveError(null);
   };
 
   const saveDefinition = useMutation({
@@ -1159,7 +1162,7 @@ function CustomFieldsPanel({
       }
       qc.setQueryData(['custom-field-values', targetEntityType, targetEntityId], verifiedRows);
       if (activeCustomValueTargetRef.current.entityType === targetEntityType && activeCustomValueTargetRef.current.entityId === targetEntityId && customFieldSelectionEpochRef.current === targetSelectionEpoch) {
-        setError(null);
+        setValueSaveError(null);
         showTenantActionSuccess(ui('Custom field values saved and verified.'));
       }
     },
@@ -1171,8 +1174,10 @@ function CustomFieldsPanel({
         const message = verificationUnknown
           ? ui('The save was accepted, but its values could not be verified. Refresh before retrying.')
           : messageFrom(errorValue, ui('Unable to save custom values.'), ui);
-        setError(message);
-        if (verificationUnknown) showTenantActionError(message);
+        setValueSaveError(message);
+        // This failure belongs to the VALUE editor, never the field-definition form.
+        // The PUT uses skipMutationFeedback, so show a single actionable error toast.
+        showTenantActionError(message);
       }
     }
   });
@@ -1234,7 +1239,8 @@ function CustomFieldsPanel({
                 : <input disabled={saveValues.isPending} type={row.data_type === 'number' ? 'number' : row.data_type === 'date' ? 'date' : 'text'} value={String(values[row.field_key] || '')} onChange={(event) => { customFieldDraftDirtyRef.current = true; setValues({ ...values, [row.field_key]: event.target.value }); }} />}
           </label>
         ))}
-        <button className="button" style={{ marginTop: 14 }} type="button" disabled={!canWrite || !entityId || entityValues.isLoading || entityValues.isError || !entityValues.data || saveValues.isPending} onClick={() => saveValues.mutate({ targetEntityType: entityType, targetEntityId: entityId, targetSelectionEpoch: customFieldSelectionEpochRef.current, payload: { values: { ...values }, value_versions: { ...valueVersions }, definition_versions: { ...definitionVersions } } })}>{saveValues.isPending ? ui("Saving…") : ui("Save custom fields")}</button>
+        <button className="button" style={{ marginTop: 14 }} type="button" disabled={!canWrite || !entityId || entityValues.isLoading || entityValues.isError || !entityValues.data || saveValues.isPending} onClick={() => { setValueSaveError(null); saveValues.mutate({ targetEntityType: entityType, targetEntityId: entityId, targetSelectionEpoch: customFieldSelectionEpochRef.current, payload: { values: { ...values }, value_versions: { ...valueVersions }, definition_versions: { ...definitionVersions } } }); }}>{saveValues.isPending ? ui("Saving…") : ui("Save custom fields")}</button>
+        {valueSaveError ? <div className="form-error" role="alert" style={{ marginTop: 12 }}>{ui("Custom field values were not confirmed as saved.")} {valueSaveError}</div> : null}
       </div>
       <div className="card" style={tableWrapStyle}>
         {definitions.isLoading ? <div className="muted">{ui("Loading custom field definitions…")}</div> : null}{definitions.isError ? <div className="form-error">{messageFrom(definitions.error, ui("Unable to load custom field definitions."), ui)}</div> : null}<table><thead><tr><th>{ui("Key")}</th><th>{ui("Label")}</th><th>{ui("Type")}</th><th>{ui("Required")}</th><th>{ui("Status")}</th><th>{ui("Action")}</th></tr></thead><tbody>{!definitions.isLoading && !definitions.isError && !(definitions.data || []).length ? <EmptyTableRow colSpan={6} message={ui("No custom fields are configured for this entity type.")} /> : null}{(definitions.data || []).map((definition) => <tr key={definition.id}><td>{definition.field_key}</td><td>{definition.label}</td><td>{displayCanonicalLabel(definition.data_type, ui)}</td><td>{definition.is_required ? ui("Yes") : ui("No")}</td><td>{definition.is_active ? ui("Active") : ui("Inactive")}</td><td>{canWrite ? <div className="capability-action-row"><button className="button button--secondary" type="button" disabled={saveDefinition.isPending || toggleDefinition.isPending} onClick={() => editDefinition(definition)}>{ui("Edit")}</button><button className="button button--secondary" type="button" disabled={saveDefinition.isPending || toggleDefinition.isPending} onClick={() => toggleDefinition.mutate(definition)}>{definition.is_active ? ui("Deactivate") : ui("Activate")}</button></div> : '—'}</td></tr>)}</tbody></table>

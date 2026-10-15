@@ -37,8 +37,8 @@ function create(){
  const events={cache:[],errors:[],success:[],failure:[],requests:[]};
  const apiRequest=async (route,opts)=>{events.requests.push({route,opts});return opts?{ok:true}:[{field_key:'test_country',data_type:'text',value:'Croatia'}]};
  const qc={setQueryData:(key,data)=>events.cache.push({key,data})};
- const factory=new Function('apiRequest','qc','activeCustomValueTargetRef','customFieldSelectionEpochRef','customFieldDraftDirtyRef','setError','showTenantActionSuccess','showTenantActionError','verifyCustomFieldReadback','ui','messageFrom',js+'return options;');
- const options=factory(apiRequest,qc,state,epoch,dirty,x=>events.errors.push(x),x=>events.success.push(x),x=>events.failure.push(x), (values,rows)=>Object.entries(values).every(([k,v])=>rows.some(r=>r.field_key===k&&r.value===v)),x=>x,x=>x.message);
+ const factory=new Function('apiRequest','qc','activeCustomValueTargetRef','customFieldSelectionEpochRef','customFieldDraftDirtyRef','setError','setValueSaveError','showTenantActionSuccess','showTenantActionError','verifyCustomFieldReadback','ui','messageFrom',js+'return options;');
+ const options=factory(apiRequest,qc,state,epoch,dirty,x=>events.errors.push(x),x=>events.errors.push(x),x=>events.success.push(x),x=>events.failure.push(x), (values,rows)=>Object.entries(values).every(([k,v])=>rows.some(r=>r.field_key===k&&r.value===v)),x=>x,x=>x.message);
  const vars={targetEntityType:'product',targetEntityId:'p-A',targetSelectionEpoch:epoch.current,payload:{values:{test_country:'Croatia'},value_versions:{test_country:2},definition_versions:{test_country:5}}};
  return {state,epoch,dirty,events,options,vars};
 }

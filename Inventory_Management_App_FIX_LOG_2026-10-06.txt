@@ -13751,3 +13751,154 @@ BACKEND: BE126 source unchanged. No migration added.
 NOT VERIFIED: clean Node24/Node20 production builds, actual live PostgreSQL transactions, Vercel/Render deployment, browser acceptance of all original test cases. Original issues are NOT declared fully closed by this local release.
 OPEN: CASE=24 unit conversion save/readback, test_country=Croatia custom field save/readback, matching-scope valuation, historical PO spend, production webhook timing, live browser and full build.
 ================================================================================
+
+
+================================================================================
+2026-10-14 — FE225 / BE126 — CONSOLIDATED ORIGINAL-AUDIT HARDENING
+================================================================================
+SOURCE BASE: FE224 / BE126. Application code was actually modified and tested.
+WFC-DEF-001: Workflow Composer does not assume a workflow owner is assigned when the source merely says 'pending', 'offered', 'unknown', 'none', or explicitly 'unassigned'. Proven assignee, responsible role, or assigned/claimed/completed states still suppress the already-satisfied assignment suggestion. Actual runtime helper assertions cover 10 cases.
+CDO-DEF-002 / Replenishment Planning handoff and run-selection continuity: after creating a new planning run, seed its unfiltered list cache and exact detail cache before updating the run_id URL. Prevent a brief erroneous 'unavailable' selection while the list request catches up. Refreshes still fetch authoritative server data; no stock or PO action changed.
+Inventory Usage reversal: invalid, missing, blank, NaN or Infinity stock quantities no longer become misleading numeric stock-restoration messages. Real zero and valid quantities remain visible. Original reversal API, stock mutation and tenant-localized outcome text preserved.
+Deployment readiness: manual deployment-readiness runs now explicitly bind EXPECTED_FRONTEND_COMMIT to github.sha when no workflow_run SHA exists; commit-specific automatic checks remain unchanged. The actual workflow contract passes locally.
+Historical regression repair: updated stale tests for current, stronger supplier-return readiness gate, URL-based replenishment selection, stronger in-flight attachment download lock, localized stock-feedback wording, and workflow guidance helper extraction. These are test-only corrections and MUST NOT be counted as separate application features.
+NEW focused check: 34/34 PASS; inherited selected regression scripts: 65/65 PASS; seven focused historical checks rerun and pass (plus deployment workflow). Frontend TS/TSX syntax: 389/389. Backend JS syntax: 1523/1523.
+FULL HISTORICAL SWEEP: FE224 prior recorded 309/357 scripts passing; many historical checks are obsolete/order-dependent or unavailable without dependencies. A full FE225 357-script sweep timed out and is not reported as passing. This is NOT production browser acceptance.
+UNVERIFIED: clean Node 24 frontend npm ci/typecheck/build (registry DNS inaccessible, no vite/client dependency), clean Node 20 backend install, real PostgreSQL persistence and deployed-browser validation. DO NOT mark all 119 named issues fixed or accepted from offline source tests.
+Still open for REAL deployed checks: CASE=24 UoM conversion persistence, Croatia custom-field save/readback, same-scope inventory valuation reconciliation, original historical Purchase Order spend discrepancy, webhook deliveries, and remaining original visual/interaction behavior.
+================================================================================
+
+
+================================================================================
+[2026-10-15] FE226 / BE126 — ORIGINAL AUDIT SOURCE REPAIR: REPORTS FILTERS AND BUILD GUARDS
+================================================================================
+SOURCE FIX (not a deployed browser result):
+- Original case GLOBAL-UX-003 and REPORT-CV-UX-001/002/003: The Reports page's
+  native browser select controls were replaced by a consistent app-rendered
+  ReportPicker with visible selection, custom popup, search for larger lists,
+  pointer / keyboard input (Arrow, Enter, Escape), focus outline and outside
+  click handling. Existing category, product, supplier, location, status,
+  period, numeric limit and threshold filters retain their backend values.
+  The historic/manual product and location search path remains available.
+- Original OCT-05 Movement Ledger Location selection blocker: selecting a
+  different listed location now passes its exact value into the existing
+  ledger filter callback and reflects it from controlled state. This path
+  is supported by a new executable picker interaction regression. Live browser
+  behavior still requires verification in the deployed tenant.
+- The frontend prebuild chain now restores the complete established audit
+  guards, runs the deployment URL gate, and finishes at TypeScript gate.
+  Reinstated two missing, executable audit checks (Dashboard/Alert action
+  semantics and Operations Feed clarity) instead of disabling them.
+- Updated three obsolete historical regression expectations to preserve and
+  verify the stronger present behavior: inventory requisition selectedRecordId
+  deep links, persisted cycle-count historical name snapshots, and a mocked
+  procurement history service dependency.
+
+LOCAL VERIFICATION:
+- All 358 previously indexed offline scripts plus the new picker interaction
+  test passed: 359/359 in the corrected local test layout.
+- 28/28 checks in the new ReportPicker regression, including actual change
+  from Main Warehouse to Kitchen Store and controlled rerender.
+- Frontend prebuild prerequisites reached TypeScript check. npm ci (offline)
+  cannot install an uncached package; vite/client type definitions are absent
+  and Node 24 is not available in this environment. Clean production build
+  NOT VERIFIED and must not be marked PASS.
+- PostgreSQL CASE=24 readback, Croatia custom-field persistence, real-data
+  valuation / PO comparison, production webhook delivery and browser acceptance
+  remain NOT VERIFIED. No user production data was accessed or modified.
+
+This entry records SOURCE CHANGES and offline test results only; it does not
+replace or override previous manual FAIL observations with a live PASS.
+================================================================================
+
+================================================================================
+[2026-10-15] FE227 / BE126 — ORIGINAL TESTING TXT CASE-BY-CASE SOURCE-ATTEMPT CLOSURE
+================================================================================
+PURPOSE: Satisfy the requirement to examine all original named problems and make a real source-level attempt BEFORE asking the user to test. This entry records what was actually attempted, not a fictitious production PASS.
+
+Records inspected and individually cross-referenced:
+- 119 original named functional/usability/localization issues: every row of the original case index was opened and inspected against its current target code and relevant historical correction references; individual result in ALL_119_ORIGINAL_ISSUES_INDIVIDUAL_SOURCE_REVIEW_FE227.csv.
+- All 328 indexed headings: retained, reviewed and cross-referenced; non-defect test scenarios and observations are NOT miscounted as defects.
+- All 166 literal FAIL references in the original TXT were scanned, including 134 without a canonical 119-case match; inspected relevant source for the unindexed/historical references. These are FAIL mentions, NOT 166 distinct current defects.
+- 11 additional known live release/database gates were individually reviewed.
+
+FE227 application corrections:
+1. SHELL-DEF-001: reserve 96px safe scrolling clearance and bottom scroll margin in the tenant page scrolling area. Existing normal-flow footer placement is preserved. This is a source-level mitigation; desktop/mobile viewport acceptance is still open.
+2. LF-UX-008 / LF-UX-010: display known nested system-generated `policy` evidence as a localized business label. Preserve arbitrary unknown custom keys and recorded user evidence verbatim; retain permission-gated, collapsed raw diagnostics. Updated related 5-language regression expectations without weakening the user-value preservation checks.
+3. Added 20-check FE227 original-audit focused regression verifying shell, localization, mobile claim, business-evidence privacy/presentation, report pickers and workflow affordance.
+
+Existing key functional safeguards reverified (offline):
+- UoM CASE=24 simulated save/readback: 80/80.
+- Custom field save/readback: 62/62.
+- UoM frontend/backend stored-conversion contract: 16/16.
+- Location hierarchy parent eligibility and backend rejection rule: 25/25.
+- Full historical script sweep: 359/359 scripts passed after the two FE227 display changes and coherent test runner sibling layout. New FE227 guard: 20/20 focused checks passed. (Distinct counts: 360 script commands including the new guard.)
+
+NOT VERIFIED against production: Node24 dependency install/typecheck/production Vite build; Node20 backend full install; real PostgreSQL UoM persistence and Croatia text-field persistence; historical tenant-valuations / PO spend; GitHub Actions webhook firing; and browser acceptance. No production data were accessed or modified. These must NOT be marked PASS.
+
+This source-attempt review is now documented across the named issues, additional FAIL references and known unindexed gates. Completing an attempt does not prove every historical screenshot defect is cured; do not instruct user that real acceptance is complete.
+================================================================================
+
+
+=======================================================================
+2026-10-15 — LIVE ACCEPTANCE ADDENDUM | UOM CASE=24 + CONVERT TOAST
+FE227/BE126 user's browser: PASS — CASE saved, persists through F5 reload,
+and conversion 1 CASE = 24 piece returns the correct inline result.
+Additional UI defect observed: "Product created successfully." toast is
+incorrectly displayed after the read-only conversion calculation.
+FE228 source correction: suppress generic POST mutation success feedback ONLY
+for /inventory-capabilities/products/:id/uom/convert, retaining inline result.
+Code-level tests pass; awaiting deployed FE228 toast retest. Do not confuse
+this new source-level correction with a second live confirmation.
+Authoritative ongoing USER testing record: FinalTestingResults.txt.
+=======================================================================
+
+
+=======================================================================
+2026-10-15 — FE229 LIVE UOM CONVERSION TOAST FOLLOW-UP
+User screenshot at 09:17 after pushing FE228 still shows "Product created
+successfully." alongside correct "Result: 24 piece". LIVE FT-002 is FAIL.
+Cannot independently establish whether served JS was actually FE228 versus
+stale deployed JS; the FE228 request contains a suppression flag as written.
+New FE229 source has a second, exact-route guard in src/lib/api.ts that disables
+shared POST success feedback for /inventory-capabilities/products/:id/uom/convert
+regardless of caller flags. Real product creates still emit normal feedback.
+FE229 version marker added beside Conversion test to distinguish stale builds.
+Code/tests: FE228 baseline fails new shared API route test; FE229 35/35 PASS,
+FE228 inherited 24/24 PASS, ten prior UoM regression scripts PASS (426 checks).
+Live FT-002 awaits deployed FE229 retest; FT-001 stays PASS.
+See FinalTestingResults.txt for authoritative live testing record.
+=======================================================================
+
+
+=======================================================================
+2026-10-15 — FT-003 / CUSTOM FIELD SAVE — LIVE FAIL
+Evidence: user's screenshot image(20261015-075650).png after pressing
+  "Save custom fields" for product HRC-0006, existing required Text field
+  test_country = Croatia.
+Observed: Red/neutral inline text "The request contains an invalid value format"
+  appeared below the unrelated "Create custom field" form, not next to
+  the "Use fields on products" save button. No positive save confirmation.
+Result: FAIL — custom-field value was NOT confirmed saved to PostgreSQL.
+  Do NOT mark persistence PASS merely because Croatia remains typed onscreen.
+
+FE231 / BE127 SOURCE CORRECTION (2026-10-15, NO LIVE RETEST YET):
+- Separate definition-save error and product-value-save error states.
+- Failed product value save now places accessible error next to its Save button,
+  preserves the unsaved user draft and produces one error notification.
+- Server records PostgreSQL SQLSTATE 22P02 with SAFE stage details
+  [CUSTOM_FIELD_VALUE_SQL_FORMAT] for definitions-read, existing-values-read,
+  value-insert, value-update or write-readback, if one of those operations fails.
+  The log omits field values and SQL parameters.
+- Existing exact tenant/product scoping, version checks, JSONB text encoding,
+  readback validation, user permissions and transactional rollback unchanged.
+- 16/16 selected regression scripts passed, plus 18/18 new focused checks.
+- The *database rejection's precise cause remains UNKNOWN* without a live
+  PostgreSQL trace; the UI fix/diagnostics do not constitute a persistence fix.
+Status: FAIL — awaiting re-test of BE127 and FE231, and server diagnostic
+  evidence if it again rejects Croatia.
+Next: Push both updated source archives, select HRC-0006, enter Croatia,
+  click Save custom fields once. If it fails, capture the Render log line
+  beginning [CUSTOM_FIELD_VALUE_SQL_FORMAT] (stage, SQLSTATE, type only).
+  Do not enter any credentials or secrets in this testing record.
+=======================================================================

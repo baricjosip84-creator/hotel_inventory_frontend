@@ -576,7 +576,8 @@
     "check:original-audit-fe227": "node scripts/check-original-audit-fe227.mjs",
     "check:uom-conversion-no-product-toast-fe228": "node scripts/check-uom-conversion-no-product-toast-fe228.mjs",
     "check:uom-conversion-read-only-api-fe229": "node scripts/check-uom-conversion-read-only-api-fe229.mjs",
-    "check:uom-conversion-production-feedback-fe230": "node scripts/check-uom-conversion-production-feedback-fe230.mjs"
+    "check:uom-conversion-production-feedback-fe230": "node scripts/check-uom-conversion-production-feedback-fe230.mjs",
+    "check:ft003-custom-field-save-feedback": "node scripts/check-ft003-custom-field-save-feedback.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
