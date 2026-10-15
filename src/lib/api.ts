@@ -1288,6 +1288,18 @@ export async function apiMutationRequest<T>(
   return apiRequest<T>(path, options);
 }
 
+/**
+ * A UoM conversion POST is a read-only calculator operation. It does not
+ * create a product or change inventory. Suppress generic mutation feedback at
+ * the shared API boundary even if a future caller forgets the optional flag.
+ * Only this exact route is exempt; real product mutations keep their toasts.
+ */
+function isReadOnlyUnitConversionRequest(path: string, method: string): boolean {
+  const pathOnly = path.split('?')[0];
+  return method.toUpperCase() === 'POST' &&
+    /^\/inventory-capabilities\/products\/[^/]+\/uom\/convert\/?$/i.test(pathOnly);
+}
+
 export async function apiRequest<T>(
   path: string,
   options: SafeMutationRequestInit = {}
@@ -1330,6 +1342,7 @@ export async function apiRequest<T>(
   const shouldShowMutationFeedback =
     isWriteRequest(requestOptions) &&
     !(options as SafeMutationRequestInit).skipMutationFeedback &&
+    !isReadOnlyUnitConversionRequest(path, method) &&
     !isLoginRequest &&
     !isRefreshRequest &&
     !isCsrfRequest;
