@@ -742,6 +742,8 @@ export default function InsightsPage() {
   const [supplierPageSize, setSupplierPageSize] = useState<SupplierPageSize>(() => normalizeSupplierPageSize(searchParams.get('supplier_page_size')));
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(() => searchParams.get('supplier_id'));
   const [showAllDepletionEvidence, setShowAllDepletionEvidence] = useState(false);
+  const [depletionReviewPage, setDepletionReviewPage] = useState(0);
+  const [selectedDepletionStockId, setSelectedDepletionStockId] = useState<string | null>(null);
   const lastSyncedSearchParamsRef = useRef(searchParams.toString());
   const hasMountedSupplierFilterResetRef = useRef(false);
   const skipNextSupplierFilterResetRef = useRef(false);
@@ -887,6 +889,15 @@ export default function InsightsPage() {
       .filter((row) => showAllDepletionEvidence || row.production_safety.requires_human_review),
     [depletionRootCauseQuery.data?.rows, showAllDepletionEvidence]
   );
+
+  // Keep the queue compact: eight rows per page, one detail panel at a time.
+  // Selection always resolves within the visible page, so an old selection
+  // cannot silently display an unrelated or hidden stock record.
+  const depletionReviewPageCount = Math.max(1, Math.ceil(rootCauseRowsForDisplay.length / 8));
+  const visibleDepletionReviewPage = Math.min(depletionReviewPage, depletionReviewPageCount - 1);
+  const visibleDepletionReviewRows = rootCauseRowsForDisplay.slice(visibleDepletionReviewPage * 8, (visibleDepletionReviewPage + 1) * 8);
+  const selectedDepletionRow = visibleDepletionReviewRows.find((row) => row.stock_id === selectedDepletionStockId)
+    ?? visibleDepletionReviewRows[0] ?? null;
 
   const allInsightQueries = [
     depletionRiskQuery,
@@ -2258,47 +2269,88 @@ export default function InsightsPage() {
                 <div className="app-empty-state" style={styles.infoState}>{ui('No stock rows require review.')}</div>
               ) : null}
               {depletionRootCauseQuery.data.rows.some((row) => !row.production_safety.requires_human_review) ? (
-                <button type="button" className="insights-secondary-button" style={styles.secondaryButton} onClick={() => setShowAllDepletionEvidence((current) => !current)}>
+                <button type="button" className="insights-secondary-button" style={styles.secondaryButton} onClick={() => {
+                  setShowAllDepletionEvidence((current) => !current);
+                  setDepletionReviewPage(0);
+                  setSelectedDepletionStockId(null);
+                }}>
                   {showAllDepletionEvidence ? ui('Show only rows needing review') : ui('Show all reviewed stock rows')}
                 </button>
               ) : null}
-              {rootCauseRowsForDisplay.slice(0, 8).map((row) => (
-                <article key={`${row.stock_id}-root-cause`} className="insights-item-card insights-item-card--root-cause" style={styles.itemCard}>
-                  <div style={styles.itemTitle}>{row.product_name}</div>
-                  <div style={styles.itemMeta}>
-                    {ui('{location} · Highest concern {severity} · Risk {score} / {tier}').replace('{location}', row.storage_location_name).replace('{severity}', formatReadableStatus(row.highest_factor_severity)).replace('{score}', formatNumber(row.risk_score, 0)).replace('{tier}', formatReadableStatus(row.risk_tier))}
-                  </div>
-                  <div style={styles.riskFlagDetailList}>
-                    {row.root_cause_factors.slice(0, 3).map((factor) => (
-                      (() => {
-                        const localizedFactor = localizeDepletionRootCauseFactor(factor, row, ui, formatNumber);
-                        return (
-                          <div key={`${row.stock_id}-${factor.code}`} style={styles.riskFlagDetailItem}>
-                            <span style={factor.severity === 'critical' || factor.severity === 'high' ? styles.riskFlagHigh : factor.severity === 'medium' ? styles.riskFlagMedium : styles.riskFlagLow}>
-                              {formatReadableStatus(factor.severity)}
-                            </span>
-                            <div>
-                              <div style={styles.itemTitle}>{localizedFactor.label}</div>
-                              <div style={styles.itemText}>{localizedFactor.detail}</div>
-                            </div>
-                          </div>
-                        );
-                      })()
+              {rootCauseRowsForDisplay.length ? (
+                <div className="insights-stock-review-layout">
+                  <div className="insights-stock-review-queue" role="group" aria-label={ui('Reviewed stock rows')}>
+                    <div className="insights-stock-review-header" aria-hidden="true">
+                      <span>{ui('Product')}</span><span>{ui('Location')}</span><span>{ui('Concern')}</span><span>{ui('Details')}</span>
+                    </div>
+                    {visibleDepletionReviewRows.map((row) => (
+                      <button
+                        key={`${row.stock_id}-root-cause-row`}
+                        type="button"
+                        className={`insights-stock-review-row${selectedDepletionRow?.stock_id === row.stock_id ? ' insights-stock-review-row--selected' : ''}`}
+                        aria-pressed={selectedDepletionRow?.stock_id === row.stock_id}
+                        aria-label={ui('Review {product} at {location}').replace('{product}', row.product_name).replace('{location}', row.storage_location_name)}
+                        onClick={() => setSelectedDepletionStockId(row.stock_id)}
+                      >
+                        <span className="insights-stock-review-product">{row.product_name}</span>
+                        <span className="insights-stock-review-location">{row.storage_location_name}</span>
+                        <span className="insights-stock-review-risk">
+                          {formatReadableStatus(row.highest_factor_severity)} · {formatNumber(row.risk_score, 0)}
+                        </span>
+                        <span className="insights-stock-review-view">{ui('Details')}</span>
+                      </button>
                     ))}
+                    {depletionReviewPageCount > 1 ? (
+                      <div className="insights-stock-review-pagination">
+                        <button type="button" className="app-button app-button--secondary" disabled={visibleDepletionReviewPage === 0} onClick={() => {
+                          setDepletionReviewPage((page) => Math.max(0, page - 1));
+                          setSelectedDepletionStockId(null);
+                        }}>{ui('Previous')}</button>
+                        <span>{ui('Page {page} of {total}').replace('{page}', String(visibleDepletionReviewPage + 1)).replace('{total}', String(depletionReviewPageCount))}</span>
+                        <button type="button" className="app-button app-button--secondary" disabled={visibleDepletionReviewPage >= depletionReviewPageCount - 1} onClick={() => {
+                          setDepletionReviewPage((page) => Math.min(depletionReviewPageCount - 1, page + 1));
+                          setSelectedDepletionStockId(null);
+                        }}>{ui('Next')}</button>
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="insights-recommended-action-panel" style={styles.recommendedActionPanel}>
-                    <div style={styles.itemTitle}>{ui("Investigation steps")}</div>
-                    <ul style={styles.compactList}>
-                      {row.recommended_investigation_steps.slice(0, 3).map((step) => (
-                        <li key={`${row.stock_id}-${step}`} style={styles.itemText}>{localizeInsightsSystemText(step, ui)}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  {canOpenStock ? (
-                    <Link to={`/stock?stock_id=${encodeURIComponent(row.stock_id)}`} style={styles.inlineActionLink}>{ui("Open in Stock")}</Link>
+                  {selectedDepletionRow ? (
+                    <article key={`${selectedDepletionRow.stock_id}-root-cause-detail`} className="insights-stock-review-detail" aria-label={ui('Selected stock review')}>
+                      <div style={styles.itemTitle}>{selectedDepletionRow.product_name}</div>
+                      <div style={styles.itemMeta}>
+                        {ui('{location} · Highest concern {severity} · Risk {score} / {tier}').replace('{location}', selectedDepletionRow.storage_location_name).replace('{severity}', formatReadableStatus(selectedDepletionRow.highest_factor_severity)).replace('{score}', formatNumber(selectedDepletionRow.risk_score, 0)).replace('{tier}', formatReadableStatus(selectedDepletionRow.risk_tier))}
+                      </div>
+                      <div style={styles.riskFlagDetailList}>
+                        {selectedDepletionRow.root_cause_factors.slice(0, 3).map((factor) => {
+                          const localizedFactor = localizeDepletionRootCauseFactor(factor, selectedDepletionRow, ui, formatNumber);
+                          return (
+                            <div key={`${selectedDepletionRow.stock_id}-${factor.code}`} style={styles.riskFlagDetailItem}>
+                              <span style={factor.severity === 'critical' || factor.severity === 'high' ? styles.riskFlagHigh : factor.severity === 'medium' ? styles.riskFlagMedium : styles.riskFlagLow}>
+                                {formatReadableStatus(factor.severity)}
+                              </span>
+                              <div>
+                                <div style={styles.itemTitle}>{localizedFactor.label}</div>
+                                <div style={styles.itemText}>{localizedFactor.detail}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="insights-recommended-action-panel" style={styles.recommendedActionPanel}>
+                        <div style={styles.itemTitle}>{ui('Investigation steps')}</div>
+                        <ul style={styles.compactList}>
+                          {selectedDepletionRow.recommended_investigation_steps.slice(0, 3).map((step) => (
+                            <li key={`${selectedDepletionRow.stock_id}-${step}`} style={styles.itemText}>{localizeInsightsSystemText(step, ui)}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      {canOpenStock ? (
+                        <Link to={`/stock?stock_id=${encodeURIComponent(selectedDepletionRow.stock_id)}`} style={styles.inlineActionLink}>{ui('Open in Stock')}</Link>
+                      ) : null}
+                    </article>
                   ) : null}
-                </article>
-              ))}
+                </div>
+              ) : null}
             </div>
           ) : !depletionRootCauseQuery.isLoading && !depletionRootCauseQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No depletion root-cause review returned.")}</div> : null}
         </Section>

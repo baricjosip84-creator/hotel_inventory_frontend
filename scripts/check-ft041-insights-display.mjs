@@ -8,7 +8,7 @@ const source=fs.readFileSync(path.join(root,'src/pages/InsightsPage.tsx'),'utf8'
 const translations=fs.readFileSync(path.join(root,'src/i18n/tenantUiTranslations.ts'),'utf8');
 assert.match(source,/filter\(\(row\) => \['watch', 'high', 'critical'\]\.includes\(row\.risk_tier\.toLowerCase\(\)\)\)/);
 assert.match(source,/depletionRootCauseQuery\.data\?\.rows \?\? \[\]\)\s*\.filter\(\(row\) => showAllDepletionEvidence \|\| row\.production_safety\.requires_human_review\)/);
-assert.match(source,/rootCauseRowsForDisplay\.slice\(0, 8\)/);
+assert.match(source,/visibleDepletionReviewRows = rootCauseRowsForDisplay\.slice\(visibleDepletionReviewPage \* 8, \(visibleDepletionReviewPage \+ 1\) \* 8\)/);
 assert.match(source,/showAllDepletionEvidence \? ui\('Show only rows needing review'\) : ui\('Show all reviewed stock rows'\)/);
 assert.match(source,/stable: 'Stable'/);
 for(const label of ['No stock rows require review.','Show only rows needing review','Show all reviewed stock rows']) {

@@ -2,6 +2,11 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // FT043: compact stock review queue and selected detail panel.
+  ["Reviewed stock rows", "Geprüfte Bestandszeilen", "Filas de inventario revisadas", "Lignes de stock examinées", "Pregledani redci zaliha"],
+  ["Selected stock review", "Ausgewählte Bestandsprüfung", "Revisión de inventario seleccionada", "Examen du stock sélectionné", "Odabrani pregled zaliha"],
+  ["Concern", "Risiko", "Riesgo", "Risque", "Razina zabrinutosti"],
+  ["Review {product} at {location}", "{product} am Standort {location} prüfen", "Revisar {product} en {location}", "Examiner {product} à {location}", "Pregledaj {product} na lokaciji {location}"],
   // FT041: keep routine stock evidence available without presenting stable rows as depletion alerts.
   ["No stock rows require review.", "Keine Bestandszeilen erfordern eine Prüfung.", "Ninguna fila de existencias requiere revisión.", "Aucune ligne de stock ne nécessite de vérification.", "Nijedan redak zaliha ne zahtijeva pregled."],
   ["Show only rows needing review", "Nur prüfbedürftige Zeilen anzeigen", "Mostrar solo filas que requieren revisión", "Afficher uniquement les lignes à examiner", "Prikaži samo retke koji zahtijevaju pregled"],

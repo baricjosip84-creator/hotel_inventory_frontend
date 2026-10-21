@@ -433,3 +433,79 @@
   border-color: #93c5fd;
   background: #eff6ff;
 }
+
+/* FT043: compact review queue + one selected detail replaces full-height cards. */
+.insights-stock-review-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+}
+.insights-stock-review-queue,
+.insights-stock-review-detail {
+  min-width: 0;
+  border: 1px solid #dbe4ef;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+.insights-stock-review-header,
+.insights-stock-review-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, .9fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 11px;
+  text-align: left;
+}
+.insights-stock-review-header {
+  color: #64748b;
+  background: #f8fafc;
+  font-size: .78rem;
+  font-weight: 750;
+}
+.insights-stock-review-row {
+  cursor: pointer;
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+  border-radius: 0;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-size: .86rem;
+  line-height: 1.3;
+}
+.insights-stock-review-row:hover { background: #f8fafc; }
+.insights-stock-review-row--selected { background: #eff6ff; box-shadow: inset 3px 0 #2563eb; }
+.insights-stock-review-row:focus-visible { outline: 3px solid #2563eb; outline-offset: -3px; }
+.insights-stock-review-row span { min-width: 0; overflow-wrap: anywhere; }
+.insights-stock-review-product { font-weight: 750; color: #0f172a; }
+.insights-stock-review-location { color: #64748b; }
+.insights-stock-review-risk { color: #334155; }
+.insights-stock-review-view { font-weight: 700; color: #1d4ed8; }
+.insights-stock-review-detail { display: grid; gap: 10px; padding: 14px; background: #f8fafc; }
+.insights-stock-review-detail .insights-recommended-action-panel { margin: 0; }
+.insights-stock-review-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 10px;
+  border-top: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: .8rem;
+}
+.insights-stock-review-pagination button { min-height: 34px; padding: 5px 9px; }
+@media (max-width: 1050px) {
+  .insights-stock-review-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .insights-stock-review-header { display: none; }
+  .insights-stock-review-row { grid-template-columns: minmax(0, 1fr) auto; gap: 3px 8px; }
+  .insights-stock-review-product { grid-column: 1; }
+  .insights-stock-review-location { grid-column: 1; font-size: .8rem; }
+  .insights-stock-review-risk { grid-column: 2; grid-row: 1; font-size: .8rem; }
+  .insights-stock-review-view { grid-column: 2; grid-row: 2; }
+}
