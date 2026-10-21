@@ -101,3 +101,9 @@
   .system-context-metrics, .system-context-summary-grid, .system-context-snapshot-summary { grid-template-columns: 1fr; }
   .system-context-confidence-block > div { grid-template-columns: 1fr; align-items: flex-start; }
 }
+
+/* FT047: compact, audit-friendly planning score explanation (not a data accuracy percentage). */
+.system-context-score-details { margin: 12px 0; border: 1px solid #dbe4ef; border-radius: 10px; padding: 12px; display: grid; gap: 5px; background: #f8fafc; }
+.system-context-score-details > strong { margin-bottom: 4px; }
+.system-context-score-details > div { display: flex; justify-content: space-between; gap: 12px; font-size: .88rem; }
+.system-context-score-details > div:last-child { padding-top: 6px; border-top: 1px solid #dbe4ef; font-weight: 700; }

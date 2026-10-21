@@ -488,7 +488,7 @@ export default function SystemContextPage() {
             <MetricCard iconPath="/system-context" label={ui('Context status')} value={formatKnownValue(data.status, ui)} detail={ui('Overall posture of the information available to the system.')} tone={toneForStatus(data.status)} />
             <MetricCard iconPath="/alerts" label={ui('Risk signals')} value={formatNumber(riskCount, locale)} detail={(criticalCount === 1 ? ui('{count} critical signal.') : ui('{count} critical signals.')).replace('{count}', formatNumber(criticalCount, locale))} tone={criticalCount ? 'bad' : riskCount ? 'warn' : 'good'} />
             <MetricCard iconPath="/action-center" label={ui('Recommended actions')} value={formatNumber(recommendationCount, locale)} detail={(highPriorityRecommendationCount === 1 ? ui('{count} high-priority item.') : ui('{count} high-priority items.')).replace('{count}', formatNumber(highPriorityRecommendationCount, locale))} tone={highPriorityRecommendationCount ? 'bad' : recommendationCount ? 'warn' : 'good'} />
-            <MetricCard iconPath="/insights" label={ui('Data quality')} value={formatPercentScore(contextQualityScore, locale)} detail={formatKnownValue(data.context_quality?.status, ui)} tone={toneForStatus(data.context_quality?.status)} />
+            <MetricCard iconPath="/insights" label={ui('Planning context score')} value={formatPercentScore(contextQualityScore, locale)} detail={formatKnownValue(data.context_quality?.status, ui)} tone={toneForStatus(data.context_quality?.status)} />
             <MetricCard iconPath="/reliability-command" label={ui('Planning readiness')} value={formatPercentScore(automationReadinessScore, locale)} detail={(toNumber(data.automation_readiness?.failed_checks) === 1 ? ui('{count} blocker.') : ui('{count} blockers.')).replace('{count}', formatNumber(data.automation_readiness?.failed_checks, locale))} tone={toneForStatus(data.automation_readiness?.status)} />
           </section>
 
@@ -585,12 +585,23 @@ export default function SystemContextPage() {
                 </div>
 
                 <div className="app-panel app-panel--padded system-context-panel">
-                  <PanelHeading iconPath="/reliability-command" title={ui('Data confidence')} subtitle={ui('How complete and current the information is before people rely on it for planning.')} />
+                  <PanelHeading iconPath="/reliability-command" title={ui('Planning context assessment')} subtitle={ui('This score measures planning risk and review workload, not the accuracy of inventory records.')} />
                   <div className="system-context-confidence-block">
-                    <div><span>{ui('Quality')}</span><strong>{formatPercentScore(data.context_quality.score, locale)}</strong><StatusPill tone={toneForStatus(data.context_quality.status)}>{formatKnownValue(data.context_quality.status, ui)}</StatusPill></div>
+                    <div><span>{ui('Context score')}</span><strong>{formatPercentScore(data.context_quality.score, locale)}</strong><StatusPill tone={toneForStatus(data.context_quality.status)}>{formatKnownValue(data.context_quality.status, ui)}</StatusPill></div>
                     <div><span>{ui('Freshness')}</span><strong>{formatKnownValue(data.context_freshness.status, ui)}</strong><StatusPill tone={toneForStatus(data.context_freshness.status)}>{(toNumber(data.context_freshness.stale_sources) === 1 ? ui('{count} stale source') : ui('{count} stale sources')).replace('{count}', formatNumber(data.context_freshness.stale_sources, locale))}</StatusPill></div>
                     <div><span>{ui('Planning readiness')}</span><strong>{formatPercentScore(data.automation_readiness.score, locale)}</strong><StatusPill tone={toneForStatus(data.automation_readiness.status)}>{formatKnownValue(data.automation_readiness.status, ui)}</StatusPill></div>
                   </div>
+                  <p className="system-context-muted">{ui('This score is not a measure of incorrect or missing inventory data. Source age means time since observed activity, not whether all records are outdated.')}</p>
+                  {data.context_quality.score_breakdown ? (
+                    <div className="system-context-score-details" aria-label={ui('How the context score is calculated')}>
+                      <strong>{ui('How the context score is calculated')}</strong>
+                      <div><span>{ui('Planning readiness')}</span><strong>{formatNumber(data.context_quality.score_breakdown.readiness_score, locale)}</strong></div>
+                      <div><span>{ui('Risk signal deductions')}</span><strong>−{formatNumber(data.context_quality.score_breakdown.risk_penalty, locale)}</strong></div>
+                      <div><span>{ui('Recommendation deductions')}</span><strong>−{formatNumber(data.context_quality.score_breakdown.recommendation_penalty, locale)}</strong></div>
+                      <div><span>{ui('Successful check bonus')}</span><strong>+{formatNumber(data.context_quality.score_breakdown.passed_checks_bonus, locale)}</strong></div>
+                      <div><span>{ui('Context score result')}</span><strong>{formatNumber(data.context_quality.score_breakdown.final_score, locale)}</strong></div>
+                    </div>
+                  ) : null}
                   <p className="system-context-muted">{formatSystemOwnedText(data.context_quality.summary, ui)}</p>
                   {toNumber(data.context_freshness.stale_sources) > 0 || toNumber(data.context_freshness.aging_sources) > 0 || toNumber(data.context_freshness.unknown_sources) > 0 ? (
                     <div className="system-context-mini-list">
@@ -663,7 +674,7 @@ export default function SystemContextPage() {
                       <div><span>{ui('Status')}</span><strong>{formatKnownValue(selectedSnapshotQuery.data.snapshot_status, ui)}</strong></div>
                       <div><span>{ui('Risk signals')}</span><strong>{selectedSnapshotContext ? formatNumber(selectedSnapshotContext.risk_signals?.length, locale) : ui('Not stored')}</strong></div>
                       <div><span>{ui('Recommendations')}</span><strong>{selectedSnapshotContext ? formatNumber(selectedSnapshotContext.recommendations?.length, locale) : ui('Not stored')}</strong></div>
-                      <div><span>{ui('Context quality')}</span><strong>{selectedSnapshotContext ? formatPercentScore(selectedSnapshotContext.context_quality?.score, locale) : ui('Not stored')}</strong></div>
+                      <div><span>{ui('Context score')}</span><strong>{selectedSnapshotContext ? formatPercentScore(selectedSnapshotContext.context_quality?.score, locale) : ui('Not stored')}</strong></div>
                       <div><span>{ui('Planning readiness')}</span><strong>{selectedSnapshotContext ? formatPercentScore(selectedSnapshotContext.automation_readiness?.score, locale) : ui('Not stored')}</strong></div>
                     </div>
                   ) : !selectedSnapshotId ? <EmptyState>{ui('Select a snapshot to review its summary.')}</EmptyState> : null}
@@ -775,6 +786,7 @@ export default function SystemContextPage() {
 
               <section className="app-panel app-panel--padded system-context-panel">
                 <PanelHeading iconPath="/insights" title={ui('Source health')} subtitle={ui('Logical source groups only. Database table names are deliberately not exposed in the tenant UI.')} />
+                <p className="system-context-muted">{ui('A missing timestamp does not mean the inventory data is wrong. Stale labels refer to the latest recorded event, not a validation of every source record.')}</p>
                 <div className="system-context-source-grid">
                   {data.context_sources.map((source) => {
                     const freshness = data.context_freshness.items.find((item) => item.section === source.section);
@@ -783,7 +795,7 @@ export default function SystemContextPage() {
                       <article key={source.section}>
                         <div><strong>{formatKnownValue(source.section, ui)}</strong><StatusPill tone={toneForStatus(freshness?.status)}>{formatKnownValue(freshness?.status, ui)}</StatusPill></div>
                         <p>{formatSystemOwnedText(source.description, ui)}</p>
-                        <span>{ui('Quality {quality} · Last observed {time}').replace('{quality}', quality ? formatPercentScore(quality.score, locale) : '—').replace('{time}', formatDateTime(source.last_observed_at, locale, ui))}</span>
+                        <span>{quality?.status === 'available' ? ui('Included in this snapshot') : ui('Source unavailable')} · {freshness?.status === 'not_timestamped' ? ui('Current-state snapshot; no single activity timestamp') : ui('Latest recorded activity: {time}').replace('{time}', formatDateTime(source.last_observed_at, locale, ui))}</span>
                       </article>
                     );
                   })}

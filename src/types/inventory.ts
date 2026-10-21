@@ -1463,6 +1463,13 @@ export interface SystemContextResponse {
     status: 'strong' | 'usable_with_review' | 'limited' | string;
     score: number | string;
     summary: string;
+    score_breakdown?: {
+      readiness_score: number | string;
+      risk_penalty: number | string;
+      recommendation_penalty: number | string;
+      passed_checks_bonus: number | string;
+      final_score: number | string;
+    };
     factors: Array<{
       code: string;
       label: string;

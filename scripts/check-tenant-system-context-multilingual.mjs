@@ -107,7 +107,7 @@ for (const anchor of [
   "ui('{count} affected items.')",
   "ui('{count} stale source')",
   "ui('{count} stale sources')",
-  "ui('Quality {quality} · Last observed {time}')",
+  "ui('Latest recorded activity: {time}')",
   "ui('{count} risk signal · refreshed {time}')",
   "ui('{count} risk signals · refreshed {time}')"
 ]) if (!page.includes(anchor)) fail(`System Context dynamic presentation localization missing: ${anchor}`);
