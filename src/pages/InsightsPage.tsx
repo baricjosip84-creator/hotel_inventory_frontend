@@ -744,6 +744,8 @@ export default function InsightsPage() {
   const [showAllDepletionEvidence, setShowAllDepletionEvidence] = useState(false);
   const [depletionReviewPage, setDepletionReviewPage] = useState(0);
   const [selectedDepletionStockId, setSelectedDepletionStockId] = useState<string | null>(null);
+  const [reorderReviewPage, setReorderReviewPage] = useState(0);
+  const [selectedReorderProductId, setSelectedReorderProductId] = useState<string | null>(null);
   const lastSyncedSearchParamsRef = useRef(searchParams.toString());
   const hasMountedSupplierFilterResetRef = useRef(false);
   const skipNextSupplierFilterResetRef = useRef(false);
@@ -870,6 +872,14 @@ export default function InsightsPage() {
       }),
     [reorderQuery.data?.rows]
   );
+
+  // FT044: show all recommended products in an eight-row paginated queue.
+  // Selection is bound to the visible page, including after API refreshes.
+  const reorderReviewPageCount = Math.max(1, Math.ceil(activeReorderRows.length / 8));
+  const visibleReorderReviewPage = Math.min(reorderReviewPage, reorderReviewPageCount - 1);
+  const visibleReorderReviewRows = activeReorderRows.slice(visibleReorderReviewPage * 8, (visibleReorderReviewPage + 1) * 8);
+  const selectedReorderRow = visibleReorderReviewRows.find((row) => row.product_id === selectedReorderProductId)
+    ?? visibleReorderReviewRows[0] ?? null;
 
   // The endpoint returns ALL stock observations. Only live warning tiers
   // belong in the user-facing depletion queue; stable rows are not warnings.
@@ -2359,19 +2369,54 @@ export default function InsightsPage() {
           {reorderQuery.isLoading ? <div className="app-empty-state" style={styles.infoState}>{ui("Loading reorder recommendations...")}</div> : null}
           {reorderQuery.isError ? <div className="app-error-state" style={styles.errorState}>{toReadableError(reorderQuery.error, ui('Unknown error'))}</div> : null}
           {activeReorderRows.length ? (
-            <div style={styles.list}>
-              {activeReorderRows.slice(0, 8).map((row) => (
-                <article key={row.product_id} className="insights-item-card" style={styles.itemCard}>
-                  <div style={styles.itemTitle}>{row.product_name}</div>
-                  <div style={styles.itemMeta}>{ui('Urgency {urgency} · Reorder {quantity}').replace('{urgency}', formatReadableStatus(row.urgency)).replace('{quantity}', formatNumber(row.recommended_reorder_quantity))}</div>
+            <div className="insights-stock-review-layout">
+              <div className="insights-stock-review-queue" role="group" aria-label={ui('Reorder recommendations queue')}>
+                <div className="insights-stock-review-header insights-reorder-review-columns" aria-hidden="true">
+                  <span>{ui('Product')}</span><span>{ui('Urgency')}</span><span>{ui('Reorder quantity')}</span><span>{ui('Details')}</span>
+                </div>
+                {visibleReorderReviewRows.map((row) => (
+                  <button
+                    key={`${row.product_id}-reorder-row`}
+                    type="button"
+                    className={`insights-stock-review-row insights-reorder-review-columns${selectedReorderRow?.product_id === row.product_id ? ' insights-stock-review-row--selected' : ''}`}
+                    aria-pressed={selectedReorderRow?.product_id === row.product_id}
+                    aria-label={ui('Review reorder for {product}').replace('{product}', row.product_name)}
+                    onClick={() => setSelectedReorderProductId(row.product_id)}
+                  >
+                    <span className="insights-stock-review-product">{row.product_name}</span>
+                    <span className="insights-stock-review-risk">{formatReadableStatus(row.urgency)}</span>
+                    <span className="insights-stock-review-location">{formatNumber(row.recommended_reorder_quantity)}</span>
+                    <span className="insights-stock-review-view">{ui('Details')}</span>
+                  </button>
+                ))}
+                {reorderReviewPageCount > 1 ? (
+                  <div className="insights-stock-review-pagination">
+                    <button type="button" className="app-button app-button--secondary" disabled={visibleReorderReviewPage === 0} onClick={() => {
+                      setReorderReviewPage((page) => Math.max(0, page - 1));
+                      setSelectedReorderProductId(null);
+                    }}>{ui('Previous')}</button>
+                    <span>{ui('Page {page} of {total}').replace('{page}', String(visibleReorderReviewPage + 1)).replace('{total}', String(reorderReviewPageCount))}</span>
+                    <button type="button" className="app-button app-button--secondary" disabled={visibleReorderReviewPage >= reorderReviewPageCount - 1} onClick={() => {
+                      setReorderReviewPage((page) => Math.min(reorderReviewPageCount - 1, page + 1));
+                      setSelectedReorderProductId(null);
+                    }}>{ui('Next')}</button>
+                  </div>
+                ) : null}
+              </div>
+              {selectedReorderRow ? (
+                <article key={`${selectedReorderRow.product_id}-reorder-detail`} className="insights-stock-review-detail" aria-label={ui('Selected reorder recommendation')}>
+                  <div style={styles.itemTitle}>{selectedReorderRow.product_name}</div>
+                  <div style={styles.itemMeta}>
+                    {ui('Urgency {urgency} · Reorder {quantity}').replace('{urgency}', formatReadableStatus(selectedReorderRow.urgency)).replace('{quantity}', formatNumber(selectedReorderRow.recommended_reorder_quantity))}
+                  </div>
                   <div style={styles.itemText}>
-                    {ui('Current {current} · Min {min} · Avg Daily Usage {usage}').replace('{current}', formatNumber(row.current_quantity)).replace('{min}', formatNumber(row.min_stock)).replace('{usage}', formatNumber(row.average_daily_usage))}
+                    {ui('Current {current} · Min {min} · Avg Daily Usage {usage}').replace('{current}', formatNumber(selectedReorderRow.current_quantity)).replace('{min}', formatNumber(selectedReorderRow.min_stock)).replace('{usage}', formatNumber(selectedReorderRow.average_daily_usage))}
                   </div>
                   {canOpenProducts ? (
-                    <Link to={`/products?product_id=${encodeURIComponent(row.product_id)}`} style={styles.inlineActionLink}>{ui("Open product")}</Link>
+                    <Link to={`/products?product_id=${encodeURIComponent(selectedReorderRow.product_id)}`} style={styles.inlineActionLink}>{ui('Open product')}</Link>
                   ) : null}
                 </article>
-              ))}
+              ) : null}
             </div>
           ) : !reorderQuery.isLoading && !reorderQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No active reorder quantity is currently recommended.")}</div> : null}
         </Section>

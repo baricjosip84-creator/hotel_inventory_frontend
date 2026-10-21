@@ -2,6 +2,10 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // FT044: compact reorder recommendation queue and selected detail panel.
+  ["Reorder recommendations queue", "Liste der Nachbestellempfehlungen", "Lista de recomendaciones de reposición", "Liste des recommandations de réapprovisionnement", "Popis preporuka za ponovnu narudžbu"],
+  ["Selected reorder recommendation", "Ausgewählte Nachbestellempfehlung", "Recomendación de reposición seleccionada", "Recommandation de réapprovisionnement sélectionnée", "Odabrana preporuka za ponovnu narudžbu"],
+  ["Review reorder for {product}", "Nachbestellung für {product} prüfen", "Revisar reposición de {product}", "Examiner le réapprovisionnement de {product}", "Pregledaj preporuku za ponovnu narudžbu proizvoda {product}"],
   // FT043: compact stock review queue and selected detail panel.
   ["Reviewed stock rows", "Geprüfte Bestandszeilen", "Filas de inventario revisadas", "Lignes de stock examinées", "Pregledani redci zaliha"],
   ["Selected stock review", "Ausgewählte Bestandsprüfung", "Revisión de inventario seleccionada", "Examen du stock sélectionné", "Odabrani pregled zaliha"],

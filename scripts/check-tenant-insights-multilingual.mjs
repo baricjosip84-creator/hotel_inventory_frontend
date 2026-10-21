@@ -214,7 +214,9 @@ for (const exactHandoff of [
   'to={`/suppliers?supplier_id=${encodeURIComponent(row.supplier_id)}`}',
   'to={`/suppliers?supplier_id=${encodeURIComponent(selectedSupplierTrustRow.supplier_id)}`}',
   'to={`/stock?stock_id=${encodeURIComponent(row.stock_id)}`}',
-  'to={`/products?product_id=${encodeURIComponent(row.product_id)}`}'
+  // FT044 moves the product handoff into the selected detail panel.
+  // Require the currently selected product ID, never a broad product search.
+  'to={`/products?product_id=${encodeURIComponent(selectedReorderRow.product_id)}`}'
 ]) {
   if (!page.includes(exactHandoff)) fail(`Insights exact-record handoff missing: ${exactHandoff}`);
 }
