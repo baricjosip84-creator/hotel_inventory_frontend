@@ -104,7 +104,7 @@ check('Insights supplier action opens exact supplier_id', has(files.insights, '`
 check('Insights supplier rows open exact supplier_id', has(files.insights, '`/suppliers?supplier_id=${encodeURIComponent(row.supplier_id)}`'));
 check('Insights selected supplier opens exact supplier_id', has(files.insights, '`/suppliers?supplier_id=${encodeURIComponent(selectedSupplierTrustRow.supplier_id)}`'));
 check('Insights depletion rows open exact stock_id', has(files.insights, '`/stock?stock_id=${encodeURIComponent(row.stock_id)}`'));
-check('Insights reorder rows open exact product_id', has(files.insights, '`/products?product_id=${encodeURIComponent(row.product_id)}`'));
+check('Insights selected reorder recommendation opens exact product_id', has(files.insights, 'to={`/products?product_id=${encodeURIComponent(selectedReorderRow.product_id)}`}') && has(files.insights, 'selectedReorderRow = visibleReorderReviewRows.find((row) => row.product_id === selectedReorderProductId)'));
 check('Insights does not send unsupported Dashboard panel parameter', lacks(files.insights, '/dashboard?panel='));
 check('Insights no longer uses supplier-name search handoff', lacks(files.insights, '/suppliers?search='));
 check('Insights no longer uses product-name search handoff', lacks(files.insights, '/products?search='));

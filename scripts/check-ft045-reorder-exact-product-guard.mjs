@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+const root = path.resolve(import.meta.dirname, '..');
+const insights = fs.readFileSync(path.join(root, 'src/pages/InsightsPage.tsx'), 'utf8');
+const guard = fs.readFileSync(path.join(root, 'scripts/check-command-wide-operational-closure-v349194.mjs'), 'utf8');
+const detailRoute = 'to={`/products?product_id=${encodeURIComponent(selectedReorderRow.product_id)}`}';
+assert.ok(insights.includes('const selectedReorderRow = visibleReorderReviewRows.find((row) => row.product_id === selectedReorderProductId)'), 'Selected detail must resolve a product from the visible page');
+assert.ok(insights.includes('onClick={() => setSelectedReorderProductId(row.product_id)}'), 'Selecting an item must store its product ID');
+assert.ok(insights.includes(detailRoute), 'Open product must encode the exact selected product ID');
+assert.ok(guard.includes(detailRoute), 'Existing command-wide guard must protect the updated selected-row link');
+assert.ok(!insights.includes('to={`/products?search='), 'No ambiguous name-based product navigation');
+console.log('FT045 exact reorder product route PASS: selected product ID, encoded URL, guard updated, no text search.');
