@@ -1,3 +1,4 @@
+import { isUnusualOutboundTier } from '../lib/feedAnomalyDisplay';
 import { csvSpreadsheetCell } from '../lib/spreadsheetCsv';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
@@ -702,7 +703,7 @@ export default function InsightsPage() {
   const formatReadableStatus = useCallback((value: string | null | undefined) => {
     if (!value) return ui('Not available');
     const known: Record<string, string> = {
-      critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', healthy: 'Healthy', watch: 'Watch',
+      critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low', healthy: 'Healthy', watch: 'Watch', stable: 'Stable',
       excellent: 'Excellent', strong: 'Strong', risk: 'Risk', unrated: 'Unrated', rated: 'Rated',
       blocked: 'Blocked', needs_review: 'Needs review', ready_for_controlled_use: 'Ready for controlled use', monitor_only: 'Monitor only',
       insufficient_history: 'Not enough history'
@@ -740,6 +741,7 @@ export default function InsightsPage() {
   const [supplierPage, setSupplierPage] = useState(() => normalizeSupplierPage(searchParams.get('supplier_page')));
   const [supplierPageSize, setSupplierPageSize] = useState<SupplierPageSize>(() => normalizeSupplierPageSize(searchParams.get('supplier_page_size')));
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(() => searchParams.get('supplier_id'));
+  const [showAllDepletionEvidence, setShowAllDepletionEvidence] = useState(false);
   const lastSyncedSearchParamsRef = useRef(searchParams.toString());
   const hasMountedSupplierFilterResetRef = useRef(false);
   const skipNextSupplierFilterResetRef = useRef(false);
@@ -867,13 +869,23 @@ export default function InsightsPage() {
     [reorderQuery.data?.rows]
   );
 
+  // The endpoint returns ALL stock observations. Only live warning tiers
+  // belong in the user-facing depletion queue; stable rows are not warnings.
   const prioritizedDepletionRows = useMemo(
-    () => [...(depletionRiskQuery.data?.rows ?? [])].sort((a, b) =>
-      toNumber(b.risk_score) - toNumber(a.risk_score)
-      || a.product_name.localeCompare(b.product_name)
-      || a.storage_location_name.localeCompare(b.storage_location_name)
-    ),
+    () => [...(depletionRiskQuery.data?.rows ?? [])]
+      .filter((row) => ['watch', 'high', 'critical'].includes(row.risk_tier.toLowerCase()))
+      .sort((a, b) =>
+        toNumber(b.risk_score) - toNumber(a.risk_score)
+        || a.product_name.localeCompare(b.product_name)
+        || a.storage_location_name.localeCompare(b.storage_location_name)
+      ),
     [depletionRiskQuery.data?.rows]
+  );
+
+  const rootCauseRowsForDisplay = useMemo(
+    () => (depletionRootCauseQuery.data?.rows ?? [])
+      .filter((row) => showAllDepletionEvidence || row.production_safety.requires_human_review),
+    [depletionRootCauseQuery.data?.rows, showAllDepletionEvidence]
   );
 
   const allInsightQueries = [
@@ -893,7 +905,7 @@ export default function InsightsPage() {
     .some((query) => query.isError);
 
   const unusualAnomalyRows = useMemo(
-    () => (anomaliesQuery.data?.rows ?? []).filter((row) => String(row.anomaly_tier || '').toLowerCase() !== 'normal'),
+    () => (anomaliesQuery.data?.rows ?? []).filter((row) => isUnusualOutboundTier(row.anomaly_tier)),
     [anomaliesQuery.data?.rows]
   );
 
@@ -2229,7 +2241,7 @@ export default function InsightsPage() {
                 </article>
               ))}
             </div>
-          ) : !depletionRiskQuery.isLoading && !depletionRiskQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No depletion risk rows returned.")}</div> : null}
+          ) : !depletionRiskQuery.isLoading && !depletionRiskQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No active depletion risk")}</div> : null}
         </Section>
 
         <Section title={ui("Why stock is under pressure")} subtitle={ui("Explains the current stock and recent usage factors that operators should verify before replenishment decisions.")} iconPath="/stock">
@@ -2242,7 +2254,15 @@ export default function InsightsPage() {
                 <span>{ui('{count} need human review').replace('{count}', formatNumber(depletionRootCauseQuery.data.summary.rows_requiring_human_review, 0))}</span>
                 <span>{ui('Read-only: {value}').replace('{value}', depletionRootCauseQuery.data.safety_contract.read_only ? ui('Yes') : ui('No'))}</span>
               </div>
-              {depletionRootCauseQuery.data.rows.slice(0, 8).map((row) => (
+              {!rootCauseRowsForDisplay.length ? (
+                <div className="app-empty-state" style={styles.infoState}>{ui('No stock rows require review.')}</div>
+              ) : null}
+              {depletionRootCauseQuery.data.rows.some((row) => !row.production_safety.requires_human_review) ? (
+                <button type="button" className="insights-secondary-button" style={styles.secondaryButton} onClick={() => setShowAllDepletionEvidence((current) => !current)}>
+                  {showAllDepletionEvidence ? ui('Show only rows needing review') : ui('Show all reviewed stock rows')}
+                </button>
+              ) : null}
+              {rootCauseRowsForDisplay.slice(0, 8).map((row) => (
                 <article key={`${row.stock_id}-root-cause`} className="insights-item-card insights-item-card--root-cause" style={styles.itemCard}>
                   <div style={styles.itemTitle}>{row.product_name}</div>
                   <div style={styles.itemMeta}>
@@ -2392,7 +2412,7 @@ export default function InsightsPage() {
               </article>
             ))}
           </div>
-        ) : !anomaliesQuery.isLoading && !anomaliesQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No anomaly rows returned.")}</div> : null}
+        ) : !anomaliesQuery.isLoading && !anomaliesQuery.isError ? <div className="app-empty-state" style={styles.infoState}>{ui("No unusual outbound activity detected.")}</div> : null}
       </Section>
     </div>
   );

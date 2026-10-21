@@ -2,6 +2,10 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // FT041: keep routine stock evidence available without presenting stable rows as depletion alerts.
+  ["No stock rows require review.", "Keine Bestandszeilen erfordern eine Prüfung.", "Ninguna fila de existencias requiere revisión.", "Aucune ligne de stock ne nécessite de vérification.", "Nijedan redak zaliha ne zahtijeva pregled."],
+  ["Show only rows needing review", "Nur prüfbedürftige Zeilen anzeigen", "Mostrar solo filas que requieren revisión", "Afficher uniquement les lignes à examiner", "Prikaži samo retke koji zahtijevaju pregled"],
+  ["Show all reviewed stock rows", "Alle geprüften Bestandszeilen anzeigen", "Mostrar todas las filas de existencias revisadas", "Afficher toutes les lignes de stock examinées", "Prikaži sve pregledane retke zaliha"],
   // FT035: fixed labels of the three system-generated execution-closure task types.
   ["Product Min Stock Update", "Produkt-Mindestbestand aktualisieren", "Actualizar stock mínimo del producto", "Mettre à jour le stock minimum du produit", "Ažuriranje minimalne zalihe proizvoda"],
   ["Standard Cost Update", "Standardkosten aktualisieren", "Actualizar coste estándar", "Mettre à jour le coût standard", "Ažuriranje standardnog troška"],
