@@ -33,6 +33,8 @@ jobs:
         run: npm run repo:clean-generated
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
+      - name: Verify all frontend validation scripts exist in the checked-out source (FT049)
+        run: npm run check:ft049-ci-entrypoints
       - name: Verify TypeScript checks resolve the project compiler (FT048)
         run: npm run check:ft048-portable-typescript
       - name: Verify hosted API build configuration cannot silently use SPA fallback
@@ -184,3 +186,6 @@ jobs:
       - name: Validate backend/frontend permission and AI contracts
         working-directory: frontend
         run: npm run check:cross-repo
+      - name: Validate backend applied-policy evidence against frontend contract (FT049)
+        working-directory: frontend
+        run: npm run check:policy-effectiveness-backend

@@ -580,7 +580,9 @@
     "check:uom-conversion-production-feedback-fe230": "node scripts/check-uom-conversion-production-feedback-fe230.mjs",
     "check:ft003-custom-field-save-feedback": "node scripts/check-ft003-custom-field-save-feedback.mjs",
     "check:ft042-source-completeness": "node scripts/check-ft042-frontend-source-completeness.mjs",
-    "check:ft048-portable-typescript": "node scripts/check-ft048-portable-typescript.cjs"
+    "check:ft048-portable-typescript": "node scripts/check-ft048-portable-typescript.cjs",
+    "check:policy-effectiveness-backend": "node scripts/check-policy-effectiveness-backend.mjs",
+    "check:ft049-ci-entrypoints": "node scripts/check-ft049-ci-entrypoints.cjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
