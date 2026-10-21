@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const ts = require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript');
+const ts = require('typescript');
 const read = (file) => fs.readFileSync(path.join(__dirname, '../src/pages', file), 'utf8');
 const learning = read('DecisionLearningFeedbackPage.tsx');
 const dashboard = read('DashboardPage.tsx');

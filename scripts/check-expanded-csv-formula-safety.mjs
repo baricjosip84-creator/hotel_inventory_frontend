@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 let ts;
 try { ts = require('typescript'); } catch {
   // Local offline-verification environment has the compiler globally installed.
-  ts = require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript');
+  ts = require('typescript');
 }
 const sharedTs = fs.readFileSync(path.join(localRoot, 'src/lib/spreadsheetCsv.ts'),'utf8');
 const sharedJs = ts.transpileModule(sharedTs,{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.ESNext}}).outputText;

@@ -49,7 +49,7 @@ has(provider, 'window.setTimeout(', 'Automatic toast dismissal');
 
 const req = createRequire(import.meta.url);
 let ts;
-try { ts = req('typescript'); } catch { ts = req('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript'); }
+ts = req('typescript');
 const result = ts.transpileModule(tenant, { fileName:'TenantPermissionsPage.tsx', reportDiagnostics:true, compilerOptions:{ jsx:ts.JsxEmit.ReactJSX, module:ts.ModuleKind.CommonJS, target:ts.ScriptTarget.ES2022 } });
 check((result.diagnostics || []).length === 0, 'TenantPermissionsPage TypeScript parse has zero diagnostics');
 const actionJs = ts.transpileModule(events, { fileName:'actionFeedback.ts', reportDiagnostics:true, compilerOptions:{ module:ts.ModuleKind.CommonJS, target:ts.ScriptTarget.ES2022 } });

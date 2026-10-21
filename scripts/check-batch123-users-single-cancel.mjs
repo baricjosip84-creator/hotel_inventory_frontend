@@ -3,7 +3,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const ts = require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js');
+const ts = require('typescript');
 const root = process.cwd();
 const page = readFileSync(path.join(root, 'src/pages/UsersPage.tsx'), 'utf8');
 const css = readFileSync(path.join(root, 'src/pages/UsersPage.css'), 'utf8');

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const ts = require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js');
+const ts = require('typescript');
 const root = process.cwd();
 const page = readFileSync(path.join(root, 'src/pages/SuppliersPage.tsx'), 'utf8');
 const translations = readFileSync(path.join(root, 'src/i18n/tenantUiTranslations.ts'), 'utf8');

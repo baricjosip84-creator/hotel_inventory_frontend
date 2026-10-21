@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
 
 const require = createRequire(import.meta.url);
-const ts = require(process.env.TYPESCRIPT_PATH || '/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript');
+const ts = require('typescript');
 const root = process.env.SOURCE_ROOT || process.cwd();
 const source = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 let assertions = 0;

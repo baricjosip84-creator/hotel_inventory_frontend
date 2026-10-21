@@ -6,11 +6,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const root = process.cwd();
-const tsPath = (() => {
-  try { return require.resolve('typescript'); }
-  catch { return '/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript/lib/typescript.js'; }
-})();
-const ts = require(tsPath);
+const ts = require('typescript');
 const catalogFile = path.join(root, 'src/i18n/tenantUiTranslations.ts');
 const pageFile = path.join(root, 'src/pages/OperationalActionCenterPage.tsx');
 const catalog = fs.readFileSync(catalogFile, 'utf8');
