@@ -34,7 +34,7 @@ type Tone = 'neutral' | 'good' | 'warn' | 'bad';
 type UiTranslator = (englishText: string) => string;
 
 const KNOWN_VALUE_LABELS: Record<string, string> = {
-  access: 'Access', alerts: 'Alerts', attention_required: 'Attention required', available: 'Available',
+  access: 'Access', audit: 'Audit', alerts: 'Alerts', attention_required: 'Attention required', available: 'Available',
   blocked: 'Blocked', captured: 'Captured', clean_observed: 'Clean observed', costing: 'Costing',
   critical: 'Critical', current: 'Current', fresh: 'Fresh', high: 'High', included: 'Included', info: 'Info',
   insufficient_history: 'Insufficient history', inventory: 'Inventory', limited: 'Limited', low: 'Low', medium: 'Medium',
@@ -87,6 +87,15 @@ const SYSTEM_CONTEXT_OWNED_TEXT = new Set([
   'Volatility Signal Count'
 ]);
 
+// Presentation-only replacements. Backend recommendation text remains the canonical
+// source contract; machine request codes are never exposed to tenant users.
+const SYSTEM_CONTEXT_USER_FACING_OVERRIDES: Record<string, string> = {
+  'Review affected product reorder thresholds and create product_min_stock_update execution requests only after human analysis and approval.':
+    'Review the affected reorder thresholds. After human review and approval, create a request to update minimum stock levels.',
+  'Review affected product pricing and create product_pricing_update execution requests only after human analysis and approval.':
+    'Review the affected product prices. After human review and approval, create a request to update product pricing.'
+};
+
 const SYSTEM_CONTEXT_METRIC_LABELS: Record<string, string> = {
   average_intelligence_score: 'Average Intelligence Score',
   forecast_scenario_count: 'Forecast Scenario Count',
@@ -96,6 +105,8 @@ const SYSTEM_CONTEXT_METRIC_LABELS: Record<string, string> = {
 
 function formatSystemOwnedText(value: string | null | undefined, ui: UiTranslator): string {
   if (!value) return '';
+  const friendly = SYSTEM_CONTEXT_USER_FACING_OVERRIDES[value];
+  if (friendly) return ui(friendly);
   return SYSTEM_CONTEXT_OWNED_TEXT.has(value) ? ui(value) : value;
 }
 
