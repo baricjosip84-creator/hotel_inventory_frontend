@@ -141,6 +141,7 @@ jobs:
         run: |
           npm run check:products-deeplink-focus-exit
           npm run check:ft061-insights-reorder-product-reveal
+          npm run check:ft062-ledger-legacy-quantity-wrap
           npm run check:ci
           npm run check:runtime-error-monitoring
       - name: Run pilot-critical TypeScript validation

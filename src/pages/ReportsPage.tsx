@@ -1527,7 +1527,14 @@ export default function ReportsPage() {
               const reason = row.reason
                 ? (row.reason_is_operator_evidence ? row.reason : localizeMovementLedgerText(row.reason, ui))
                 : (row.receiving_note || '—');
-              return <tr key={row.movement_id}><td>{formatDateTime(row.created_at, locale)}</td><td className="reports-strong">{row.product_name || ui("Historical Product name unavailable")}<span className="reports-subtext">{row.product_unit || ui("Historical unit unavailable")}</span></td><td>{row.storage_location_name || ui("Historical location unavailable")}</td><td className={toNumber(row.quantity_change) < 0 ? 'reports-warning-text' : 'reports-positive-text'}>{formatSignedQuantity(row.quantity_change, locale, ui, row.product_unit || ui("Historical unit unavailable"))}</td><td>{humanizeMovementType(row.movement_type, ui)}</td><td>{row.actor_name || (row.actor_label ? ui(row.actor_label) : ui("System / support actor"))}</td><td>{reason}<span className="reports-subtext">{localizeMovementLedgerText(row.reference_label, ui)}</span></td></tr>;
+              return <tr key={row.movement_id}><td>{formatDateTime(row.created_at, locale)}</td><td className="reports-strong">{row.product_name || ui("Historical Product name unavailable")}<span className="reports-subtext">{row.product_unit || ui("Historical unit unavailable")}</span></td><td>{row.storage_location_name || ui("Historical location unavailable")}</td><td className={toNumber(row.quantity_change) < 0 ? 'reports-warning-text' : 'reports-positive-text'}>
+                {row.product_unit
+                  ? formatSignedQuantity(row.quantity_change, locale, ui, row.product_unit)
+                  : <>
+                    <span className="reports-ledger-signed-number">{toNumber(row.quantity_change) > 0 ? '+' : ''}{formatNumber(row.quantity_change, locale)}</span>
+                    <span className="reports-subtext reports-ledger-missing-unit">{ui("Historical unit unavailable")}</span>
+                  </>}
+              </td><td>{humanizeMovementType(row.movement_type, ui)}</td><td>{row.actor_name || (row.actor_label ? ui(row.actor_label) : ui("System / support actor"))}</td><td>{reason}<span className="reports-subtext">{localizeMovementLedgerText(row.reference_label, ui)}</span></td></tr>;
             })}
           </tbody></table></div> : null}
         </ReportPanel>

@@ -188,6 +188,20 @@
   font-weight: 500;
 }
 
+.reports-ledger-signed-number {
+  display: block;
+  white-space: nowrap;
+}
+
+.reports-ledger-missing-unit {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  color: #64748b !important;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
 .reports-warning-text {
   color: #b45309 !important;
   font-weight: 800;

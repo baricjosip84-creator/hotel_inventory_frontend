@@ -583,7 +583,8 @@
     "check:ft048-portable-typescript": "node scripts/check-ft048-portable-typescript.cjs",
     "check:policy-effectiveness-backend": "node scripts/check-policy-effectiveness-backend.mjs",
     "check:ft049-ci-entrypoints": "node scripts/check-ft049-ci-entrypoints.cjs",
-    "check:ft061-insights-reorder-product-reveal": "node scripts/check-ft061-insights-reorder-product-reveal.mjs"
+    "check:ft061-insights-reorder-product-reveal": "node scripts/check-ft061-insights-reorder-product-reveal.mjs",
+    "check:ft062-ledger-legacy-quantity-wrap": "node scripts/check-ft062-ledger-legacy-quantity-wrap.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
