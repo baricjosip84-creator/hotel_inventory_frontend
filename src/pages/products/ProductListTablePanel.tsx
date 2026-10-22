@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import type { ProductItem } from '../../types/inventory';
+import { productRowAnchorId, scrollToFocusedProductRow } from './scrollToFocusedProductRow';
 import { formatCostVarianceStatus, formatMoney, formatPercent } from './productFormatting';
 import { styles } from './productStyles';
 import { useAppTranslation } from '../../i18n/I18nContext';
@@ -12,6 +14,7 @@ type ProductsQueryState = {
 type ProductListTablePanelProps = {
   productsQuery: ProductsQueryState;
   products: ProductItem[];
+  focusedProductId: string;
   emptyMessage: string;
   canManageProducts: boolean;
   canViewProductPackages: boolean;
@@ -39,6 +42,7 @@ const formatCostBasis = (source: string | null | undefined, ui: (englishText: st
 export function ProductListTablePanel({
   productsQuery,
   products,
+  focusedProductId,
   emptyMessage,
   canManageProducts,
   canViewProductPackages,
@@ -51,6 +55,21 @@ export function ProductListTablePanel({
   onDelete
 }: ProductListTablePanelProps) {
   const { ui, locale } = useAppTranslation();
+  const focusedProductIsVisible = Boolean(focusedProductId && products.some((product) => product.id === focusedProductId));
+
+  useEffect(() => {
+    // A deep-linked product is in the asynchronous table, not at the page top.
+    // AppLayout may reset scroll during its initial 350ms navigation settle.
+    if (!focusedProductIsVisible || productsQuery.isLoading || productsQuery.isError) return;
+    const reveal = () => scrollToFocusedProductRow(focusedProductId);
+    const frame = window.requestAnimationFrame(reveal);
+    const settled = window.setTimeout(reveal, 420);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(settled);
+    };
+  }, [focusedProductId, focusedProductIsVisible, productsQuery.isLoading, productsQuery.isError]);
+
   if (productsQuery.isLoading) {
     return <div style={styles.emptyCell}>{ui("Loading products...")}</div>;
   }
@@ -88,7 +107,12 @@ export function ProductListTablePanel({
               const belowMinimum = canViewStock && minimumStock > 0 && currentStock < minimumStock;
 
               return (
-                <tr key={product.id}>
+                <tr
+                  key={product.id}
+                  id={productRowAnchorId(product.id)}
+                  className={product.id === focusedProductId ? 'products-linked-product-row' : undefined}
+                  aria-current={product.id === focusedProductId ? 'location' : undefined}
+                >
                   <td style={styles.td}>
                     <div style={styles.rowTitle}>{product.name}</div>
                     <div style={styles.rowSubtle}>{ui("SKU:")} {product.sku || '-'}</div>

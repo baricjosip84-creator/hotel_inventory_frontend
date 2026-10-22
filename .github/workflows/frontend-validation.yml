@@ -140,6 +140,7 @@ jobs:
       - name: Run static commercial, security and runtime-monitoring checks
         run: |
           npm run check:products-deeplink-focus-exit
+          npm run check:ft061-insights-reorder-product-reveal
           npm run check:ci
           npm run check:runtime-error-monitoring
       - name: Run pilot-critical TypeScript validation

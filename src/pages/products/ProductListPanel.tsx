@@ -114,6 +114,7 @@ export function ProductListPanel({
       <ProductListTablePanel
         productsQuery={productsQuery}
         products={products}
+        focusedProductId={focusedProductId}
         emptyMessage={focusedProductId ? ui('Product not found') : search.trim() ? ui('No products match the current search and filters.') : ui('No products found for the current filters.')}
         canManageProducts={canManageProducts}
         canViewProductPackages={canViewProductPackages}
