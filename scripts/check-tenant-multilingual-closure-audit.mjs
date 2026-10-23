@@ -10,7 +10,7 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 const catalogSource = read('src/i18n/tenantUiTranslations.ts');
 const catalogRows = [];
 for (const line of catalogSource.split(/\r?\n/)) {
-  const match = line.match(/^\s*\[("(?:\\.|[^"\\])*")\s*,\s*("(?:\\.|[^"\\])*")\s*,\s*("(?:\\.|[^"\\])*")\s*,\s*("(?:\\.|[^"\\])*")\s*,\s*("(?:\\.|[^"\\])*")\],?\s*$/);
+  const match = line.match(/^\s*\[("(?:\\.|[^"\\])*")\s*,\s*("(?:\\.|[^"\\])*")\s*,\s*("(?:\\.|[^"\\])*")\s*,\s*("(?:\\.|[^"\\])*")\s*,\s*("(?:\\.|[^"\\])*")\]\s*,?\s*$/);
   if (!match) continue;
   try { catalogRows.push(match.slice(1).map((value) => JSON.parse(value))); } catch { failures.push(`catalog row could not be parsed: ${line.slice(0, 120)}`); }
 }
