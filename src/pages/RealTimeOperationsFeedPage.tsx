@@ -1,3 +1,4 @@
+import { feedRefreshStatus } from '../lib/feedAnomalyDisplay';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -676,7 +677,7 @@ export default function RealTimeOperationsFeedPage() {
           </>
         }
         */
-        aside={<OperationalWorkspaceStatus value={feedQuery.isFetching ? ui("Refreshing…") : ui("Auto-refresh on")} label={ui("about every minute while this page is open")} />}
+        aside={<OperationalWorkspaceStatus value={ui(feedRefreshStatus(feedQuery.isError, feedQuery.isFetching))} label={feedQuery.dataUpdatedAt ? `${ui("Last refreshed")}: ${formatDateTime(new Date(feedQuery.dataUpdatedAt).toISOString(), locale, ui)}` : ui("about every minute while this page is open")} />}
       />
 
       <OperationalWorkspaceStats ariaLabel={ui("Operations feed overview")}>
