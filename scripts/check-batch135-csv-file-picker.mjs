@@ -46,7 +46,7 @@ assert(code.includes("overflowWrap: 'anywhere'"),'long filenames do not overflow
 // Extract and actually execute the real onClick arrow with an inert ref mock.
 const clickAttribute=attr(trigger,'onClick');
 const expression=clickAttribute.initializer.expression;
-const transpiled=ts.transpileModule(`const click = ${expression.getText(src)}; click();`,{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.None}}).outputText;
+const transpiled=ts.transpileModule(`const click = ${expression.getText(src)}; click();`,{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.ESNext}}).outputText;
 let count=0;
 vm.runInNewContext(transpiled,{fileInputRef:{current:{click(){count++;}}}});
 assert(count===1,'visible trigger calls the real native input exactly once');

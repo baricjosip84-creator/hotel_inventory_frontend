@@ -18,7 +18,7 @@ check('translation source parses',()=>assert.equal(ts.createSourceFile('tenantUi
 check('batch runner registered',()=>assert.equal(pkg.scripts['check:batch128-variant-auto-sku'],'node scripts/check-batch128-variant-auto-sku.mjs'));
 const helperNode=sf.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='suggestVariantSku');
 check('new pure SKU helper is declared',()=>assert(helperNode));
-const helperJs=ts.transpileModule(helperNode.getText(sf),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText;
+const helperJs=ts.transpileModule(helperNode.getText(sf),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
 const context=vm.createContext({});
 vm.runInContext(helperJs+'\nthis.suggest=suggestVariantSku;',context);
 const suggest=context.suggest;

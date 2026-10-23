@@ -50,7 +50,7 @@ const context={
 const evaluate=(name)=>{
  ck(mutants.has(name),`${name} mutation found`);
  const expr=mutants.get(name);
- const transpiled=ts.transpileModule(`const subject = ${expr};\nsubject;`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}});
+ const transpiled=ts.transpileModule(`const subject = ${expr};\nsubject;`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}});
  return vm.runInNewContext(transpiled.outputText,{...context});
 };
 const cases=[

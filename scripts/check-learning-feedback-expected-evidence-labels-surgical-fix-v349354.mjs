@@ -37,7 +37,7 @@ const start=page.indexOf('function businessEvidenceScalar(');
 const end=page.indexOf('function businessEvidenceSnapshot(', start);
 check('Exact formatter helpers located in page',start>=0 && end>start);
 const snippet = `${page.slice(start,end)}\n globalThis.__testFormatter={businessEvidenceEntries,businessEvidenceText};`;
-const transpiled=ts.transpileModule(snippet,{fileName:'test.ts',compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None},reportDiagnostics:true});
+const transpiled=ts.transpileModule(snippet,{fileName:'test.ts',compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext},reportDiagnostics:true});
 check('Evidence formatter TypeScript parses',!transpiled.diagnostics?.length);
 for (const locale of locales) {
   const sandbox={formatLocalizedNumber:(v)=>String(v)};

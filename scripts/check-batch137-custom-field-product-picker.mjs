@@ -16,7 +16,7 @@ check('TSX isolated transpilation reports zero errors', () => assert.equal((ts.t
 check('Batch137 npm script registered', () => assert.equal(pkg.scripts['check:batch137-custom-field-product-picker'], 'node scripts/check-batch137-custom-field-product-picker.mjs'));
 const helper = ast.statements.find(n => ts.isFunctionDeclaration(n) && n.name?.text === 'productOptionLabel');
 check('Existing shared productOptionLabel reused', () => assert(helper));
-const helperJs = ts.transpileModule(helper.getText(ast),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText;
+const helperJs = ts.transpileModule(helper.getText(ast),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
 const sandbox = vm.createContext({});vm.runInContext(helperJs + '\nthis.productOptionLabel = productOptionLabel;', sandbox);
 const label = sandbox.productOptionLabel;
 const cases = [
@@ -39,8 +39,8 @@ check('Custom Fields mapping retains authoritative entity id',()=>assert.match(c
 check('Product option key remains its entity id',()=>assert.match(custom,/<option key=\{row\.id\} value=\{row\.id\}>\{row\.label\}<\/option>/));
 check('Product selection forwards unchanged authoritative entity id',()=>assert.match(custom,/onChange=\{\(event\) => changeEntityId\(event\.target\.value\)\}/));
 check('Value GET endpoint continues using selected id',()=>assert.match(custom,/\/inventory-capabilities\/custom-fields\/\$\{entityType\}\/\$\{entityId\}/));
-check('Value save PUT endpoint still uses same selected id',()=>assert.match(custom,/method: 'PUT',\s*body: JSON\.stringify\(\{ values, value_versions: valueVersions, definition_versions: definitionVersions \}\)/));
-check('Value optimistic-concurrency versions unchanged',()=>assert.match(custom,/value_versions: valueVersions, definition_versions: definitionVersions/));
+check('Value save PUT endpoint still uses same selected id',()=>assert.match(custom,/method: 'PUT',\s*body: JSON\.stringify\(payload\)/));
+check('Value optimistic-concurrency versions unchanged',()=>assert.match(custom,/value_versions: \{ \.\.\.valueVersions \}, definition_versions: \{ \.\.\.definitionVersions \}/));
 check('Same permission gate on values query',()=>assert.match(custom,/enabled: Boolean\(canRead && entityId\)/));
 check('Only readers are shown allowed entity types',()=>assert.match(custom,/const readableEntityTypes = useMemo<EntityType\[]>/));
 check('Missing entity selection still prevents value save',()=>assert.match(custom,/disabled=\{!canWrite \|\| !entityId/));

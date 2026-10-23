@@ -16,7 +16,7 @@ check('TSX isolated TypeScript transpiles',()=>assert.equal((ts.transpileModule(
 check('focused script is registered',()=>assert.equal(pkg.scripts['check:batch130-variant-parent-readable-label'],'node scripts/check-batch130-variant-parent-readable-label.mjs'));
 const helper=sf.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='productOptionLabel');
 check('readable label helper exists',()=>assert(helper));
-const executable=ts.transpileModule(helper.getText(sf),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText;
+const executable=ts.transpileModule(helper.getText(sf),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
 const ctx=vm.createContext({}); vm.runInContext(executable+'\nthis.label = productOptionLabel;',ctx);
 const label=ctx.label;
 const samples=[

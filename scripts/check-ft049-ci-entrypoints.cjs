@@ -68,6 +68,15 @@ while (queue.length) {
     }
   }
 }
+// FT069: TypeScript 6 treats `module: ts.ModuleKind.None` as a deprecated,
+// error-producing compiler option. Check all CI scripts up front instead of
+// failing one legacy isolated-transpilation regression at a time.
+for (const relative of inspected) {
+  const source = fs.readFileSync(path.join(root, relative), 'utf8');
+  if (relative !== 'scripts/check-ft049-ci-entrypoints.cjs' && /ts\.ModuleKind\.None\b/.test(source)) {
+    errors.add(`Unsupported TypeScript 6 compiler option in ${relative}: replace ts.ModuleKind.None with ts.ModuleKind.ESNext`);
+  }
+}
 assert.ok(refs.length >= 40, 'Expected frontend CI job definitions were not found');
 assert.deepEqual([...errors].sort(), [], `Frontend CI source is incomplete:\n${[...errors].sort().join('\n')}`);
 console.log(`FT049/FT064 frontend CI closure PASS: ${refs.length} workflow commands, ${visitedCommands.size} direct/indirect npm scripts, ${paths.size} Node entrypoints, ${inspected.size} dependency-checked files`);

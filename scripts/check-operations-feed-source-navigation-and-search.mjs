@@ -19,7 +19,7 @@ function slice(start, stop) {
 const extracted = slice('sourceSurfaceToAppPath', 'timelineItemTimestamp') +
   slice('timelineItemSearchText', 'buildLastSeenStorageKey') +
   slice('sourceItemLink', 'relatedActionLink');
-const { outputText } = ts.transpileModule(extracted, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } });
+const { outputText } = ts.transpileModule(extracted, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } });
 const context = {
   URLSearchParams,
   itemTitle: (item) => item.title || '',

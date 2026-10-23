@@ -12,7 +12,7 @@ const from = source.indexOf('  const restoreEvidenceRowFocus = ');
 const until = source.indexOf('  const createEvidenceFollowUp = ', from);
 check('Return-to-row and cancel-edit handlers exist', () => assert(from > 0 && until > from));
 const code = source.slice(from, until) + '\n globalThis.testFns = {viewEvidence, closeEvidenceDetail, cancelEvidenceEditing};';
-const compilation = ts.transpileModule(code, {fileName:'focus-actions.ts',reportDiagnostics:true,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}});
+const compilation = ts.transpileModule(code, {fileName:'focus-actions.ts',reportDiagnostics:true,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}});
 check('Extracted actions parse as TypeScript',()=>assert.equal(compilation.diagnostics?.length,0));
 const fullParse = ts.transpileModule(source, {fileName:'DecisionLearningFeedbackPage.tsx', reportDiagnostics:true, compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,jsx:ts.JsxEmit.ReactJSX}});
 check('Whole Learning Feedback page parses',()=>assert.equal(fullParse.diagnostics?.length,0));

@@ -30,7 +30,7 @@ check('shared API exposes page-owned feedback opt out',()=>assert.match(apiSourc
 check('shared API dispatch honours suppression flag',()=>assert.match(apiSource,/!\(options as SafeMutationRequestInit\)\.skipMutationFeedback/));
 function startMutation(node,sf,ctx) {
  const expression=node.getText(sf);
- const javascript=ts.transpileModule(`const chosen = ${expression}; globalThis.__mutation = chosen;`,{fileName:'execution.ts',compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText;
+ const javascript=ts.transpileModule(`const chosen = ${expression}; globalThis.__mutation = chosen;`,{fileName:'execution.ts',compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
  vm.runInNewContext(javascript,ctx);
  return ctx.__mutation;
 }

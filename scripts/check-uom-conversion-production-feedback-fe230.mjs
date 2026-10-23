@@ -29,7 +29,7 @@ const declaration=node.initializer.getText(ast);
 check('POST targets calculation endpoint only',()=>assert.match(declaration,/\/uom\/convert/));
 check('POST suppresses generic product creation message',()=>assert.match(declaration,/skipMutationFeedback:\s*true/));
 check('no stock mutation introduced',()=>assert.doesNotMatch(declaration,/\/stock\/adjust|\/stock\/count|\/products\/create/));
-const compiled=ts.transpileModule(`const mutation = ${declaration};`,{fileName:'convert.ts',compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}});
+const compiled=ts.transpileModule(`const mutation = ${declaration};`,{fileName:'convert.ts',compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}});
 let quantity='1',from='CASE',to='piece',next={converted_quantity:24},throws=false;
 const feedback=[],updates=[],errors=[],apiCalls=[],seq={current:0};
 const context={useMutation:x=>x,productId:'p-123',convertQty:quantity,fromUom:from,toUom:to,conversionRequestSeqRef:seq,setConverted:x=>updates.push(x),setError:x=>errors.push(x),ui:x=>x,showTenantActionSuccess:x=>feedback.push(x),messageFrom:e=>e.message,apiRequest:async(url,opts)=>{apiCalls.push({url,opts});if(throws)throw new Error('Backend unavailable');return next}};

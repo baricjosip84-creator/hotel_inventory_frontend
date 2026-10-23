@@ -32,7 +32,7 @@ check('UoM save mutation found', () => assert(saveNode));
 const declaration = convertNode.initializer.getText(ast);
 const compiled = ts.transpileModule(`const mutation = ${declaration};`, {
   fileName: 'uomConvert.ts',
-  compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None},
+  compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext},
   reportDiagnostics: true
 });
 check('real conversion mutation transpiles', () => assert.equal((compiled.diagnostics || []).filter(x => x.category === ts.DiagnosticCategory.Error).length, 0));

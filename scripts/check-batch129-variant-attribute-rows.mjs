@@ -21,7 +21,7 @@ const helperNames=['variantAttributeIssue','structuredVariantAttributes'];
 const helpers=helperNames.map(name=>{
  const node=sf.statements.find(n=>ts.isFunctionDeclaration(n) && n.name?.text===name);
  check(`${name} declared`,()=>assert(node));
- return ts.transpileModule(node.getText(sf),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText;
+ return ts.transpileModule(node.getText(sf),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
 });
 const ctx=vm.createContext({});
 vm.runInContext(helpers.join('\n')+'\nthis.validate=variantAttributeIssue; this.payload=structuredVariantAttributes;',ctx);

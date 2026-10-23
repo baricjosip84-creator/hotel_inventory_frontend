@@ -23,7 +23,7 @@ function functionNode(sf,name){
 }
 function loadFns(sf,names,context={}){
   const code=names.map(name=>functionNode(sf,name).getText(sf)).join('\n');
-  const js=ts.transpileModule(code+'\n({'+names.join(',')+'});',{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText;
+  const js=ts.transpileModule(code+'\n({'+names.join(',')+'});',{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
   return vm.runInNewContext(js,context);
 }
 const {tenantMutationSuccessMessage}=loadFns(api,['readMutationStringField','isProductPackageMutationPath','tenantMutationActionLabel','tenantMutationSuccessMessage'],{

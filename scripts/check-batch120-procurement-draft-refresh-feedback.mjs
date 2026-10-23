@@ -49,7 +49,7 @@ let handler = null;
 function visit(node) { if (ts.isFunctionDeclaration(node) && node.name?.text === 'refreshPoDraftReview') handler = node; ts.forEachChild(node, visit); }
 visit(sf);
 check(Boolean(handler), 'Manual refresh handler exists as a standalone inspectable function');
-const js = ts.transpileModule(`${handler.getText(sf)}\n globalThis.testRefresh = refreshPoDraftReview;`, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None }, reportDiagnostics: true });
+const js = ts.transpileModule(`${handler.getText(sf)}\n globalThis.testRefresh = refreshPoDraftReview;`, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }, reportDiagnostics: true });
 check(js.diagnostics?.length === 0, 'Refresh handler transpiles without TypeScript diagnostics');
 async function simulate({canView=true,isFetching=false,result=null,throws=null}={}) {
   const updates=[];

@@ -31,7 +31,7 @@ check('actual shared feedback gate found', () => assert(gate));
 check('shared gate explicitly calls calculator classifier', () => assert.match(gate, /!isReadOnlyUnitConversionRequest\(path, method\)/));
 check('per-request skip option remains supported', () => assert.match(gate, /skipMutationFeedback/));
 const source = `${helper.getText(ast)}\nconst gate = ${gate}; this.feedbackGate = gate; this.classifier = isReadOnlyUnitConversionRequest;`;
-const compiled = ts.transpileModule(source, { fileName: 'unit-feedback.ts', compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None}});
+const compiled = ts.transpileModule(source, { fileName: 'unit-feedback.ts', compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext}});
 check('classifier and feedback gate transpile', () => assert(!compiled.diagnostics?.some(d => d.category === ts.DiagnosticCategory.Error)));
 function execute(path, method = 'POST', skip = false) {
   const context = {

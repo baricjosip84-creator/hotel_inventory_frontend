@@ -36,7 +36,7 @@ check('checking message remains available for background refreshes', () => asser
 check('last server is authoritative for stock-changing operations', () => assert.match(source, /The server will still enforce lot, serial, reservation and other inventory safeguards/));
 
 const js = ts.transpileModule(`const execute = ${executeSrc};\nconst requestExecution = ${requestSrc};\nglobalThis.__callbacks = {execute, requestExecution};`, {
-  fileName: 'bom-regression.ts', compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None }
+  fileName: 'bom-regression.ts', compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
 }).outputText;
 function scenario({ direction = 'assemble', confirmed = true, reject = false } = {}) {
   const invalidations = [], requests = [], messages = [], errors = [], outstanding = [];

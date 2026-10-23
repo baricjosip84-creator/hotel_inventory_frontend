@@ -39,7 +39,7 @@ for (const c of cases) {
   focusedEvidenceQuery:{refetch:async()=>{calls.push('focusedRefetch')}},
   JSON
  };
- const js = ts.transpileModule(`globalThis.__mutation = ${mutationText};`, {fileName:'refresh.ts',compilerOptions:{module:ts.ModuleKind.None,target:ts.ScriptTarget.ES2022}}).outputText;
+ const js = ts.transpileModule(`globalThis.__mutation = ${mutationText};`, {fileName:'refresh.ts',compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
  vm.runInNewContext(js, ctx);
  const mutation = ctx.__mutation;
  check(`${c.name}: mutation handler can execute`, () => assert.equal(typeof mutation.mutationFn, 'function'));
