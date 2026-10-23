@@ -57,6 +57,9 @@ jobs:
       - name: Verify policy-effectiveness claims only from actual applied-policy evidence
         run: npm run check:policy-effectiveness-evidence
 
+      - name: Verify policy observation rows do not claim unmeasured effectiveness (FT068)
+        run: npm run check:ft068-policy-observation-row-labels
+
       - name: Verify original audit forecast and policy analysis feedback
         run: npm run check:forecast-policy-specific-feedback
 

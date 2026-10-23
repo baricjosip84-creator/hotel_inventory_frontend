@@ -34,12 +34,15 @@ for (const [label,needle] of [
  ['helper import',"import { hasMeasuredPolicyEffect } from '../utils/adaptivePolicyEffectiveness'"],
  ['model includes provenance','application_id?: string | null;'],
  ['summary derives from actual evidence','(data?.effectiveness || []).some(hasMeasuredPolicyEffect)'],
- ['row explains verified measurements',"hasMeasuredPolicyEffect(measurement) ? 'Measured after recorded policy application'"],
- ['row refuses to present unverified change',"hasMeasuredPolicyEffect(measurement) ? formatDelta(measurement.delta_score, locale) : ui('Not assessed')"],
+ ['verified evidence gates row content','const provenEffect = hasMeasuredPolicyEffect(measurement);'],
+ ['row explains verified measurements',"provenEffect ? 'Measured after recorded policy application'"],
+ ['row refuses to present unverified change',"provenEffect ? formatDelta(measurement.delta_score, locale) : ui('Not assessed')"],
+ ['rows label observed data without success claims',"measurementDisplayLabel(measurement.measurement_key, ui, provenEffect)"],
+ ['types label observed data without success claims',"!provenEffect && measurement.measurement_type === 'policy_effectiveness' ? ui('Policy observation')"],
  ['keeps original conditional evidence title',"hasMeasuredEffectiveness ? 'Effectiveness measurements' : 'Current policy observations'"],
  ['explicit mixed-data warning','Other rows are current observations, not proof of impact.'],
  ['explicit no-verification warning','Effectiveness cannot be determined yet; these rows are observations only.'],
 ]) check(label,()=>assert.ok(page.includes(needle)));
-for (const key of ['Only rows linked to a recorded policy application with valid before-and-after scores show measured change.', 'No verified before-and-after policy application evidence is available in the returned records.', 'Measured after recorded policy application','Current observation — impact not established'])
+for (const key of ['Only rows linked to a recorded policy application with valid before-and-after scores show measured change.', 'No verified before-and-after policy application evidence is available in the returned records.', 'Measured after recorded policy application','Current observation — impact not established','Current observation','Policy observation'])
  check('localized '+key.slice(0,35),()=>assert.ok(translations.includes(JSON.stringify(key).slice(0,-1))));
 if (!process.exitCode) console.log(`PASS ${passed}/${passed}`);

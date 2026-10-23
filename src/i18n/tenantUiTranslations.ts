@@ -68,6 +68,10 @@ const rows: readonly TranslationRow[] = [
   ["Measured after recorded policy application", "Nach dokumentierter Richtlinienanwendung gemessen", "Medido tras la aplicación registrada de la política", "Mesuré après une application de politique enregistrée", "Izmjereno nakon evidentirane primjene pravila"],
   ["Current observation — impact not established", "Aktuelle Beobachtung – Wirkung nicht nachgewiesen", "Observación actual: impacto no demostrado", "Observation actuelle — impact non établi", "Trenutačno opažanje — učinak nije potvrđen"],
 
+  // FT068: an observation without a valid applied-policy baseline must not be labelled measured effectiveness.
+  ["Current observation", "Aktuelle Beobachtung", "Observación actual", "Observation actuelle", "Trenutačno opažanje"],
+  ["Policy observation", "Richtlinienbeobachtung", "Observación de política", "Observation de politique", "Opažanje pravila"],
+
   // FE207: clarify approval checks for already-approved recommendations.
   ["Approval checks met", "Genehmigungskriterien erfüllt", "Criterios de aprobación cumplidos", "Critères d’approbation remplis", "Kriteriji odobrenja zadovoljeni"],
   ["Approval checks can include already-approved recommendations. PO draft eligibility is counted separately.", "Die Genehmigungskriterien können auch bereits genehmigte Empfehlungen umfassen. Die Eignung für Bestellentwürfe wird separat gezählt.", "Los criterios de aprobación pueden incluir recomendaciones ya aprobadas. La elegibilidad para borradores de órdenes de compra se cuenta por separado.", "Les critères d’approbation peuvent inclure des recommandations déjà approuvées. L’admissibilité aux brouillons de commande est comptée séparément.", "Kriteriji odobrenja mogu uključivati već odobrene preporuke. Mogućnost izrade nacrta narudžbenice broji se zasebno."],

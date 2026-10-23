@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
 import { apiRequest } from '../lib/api';
+import { hasMeasuredPolicyEffect } from '../utils/adaptivePolicyEffectiveness';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import { TENANT_PERMISSIONS, hasPermission } from '../lib/permissions';
@@ -119,6 +120,7 @@ type PolicyEffectivenessRecord = {
   policy_key?: string;
   measurement_key?: string;
   measurement_type?: string;
+  application_id?: string | null;
   baseline_score?: number | string | null;
   observed_score?: number | string | null;
   delta_score?: number | string | null;
@@ -432,10 +434,11 @@ function recommendationDisplayLabel(recommendationKey: unknown, ui: (key: string
   return text;
 }
 
-function measurementDisplayLabel(measurementKey: unknown, ui: (key: string) => string): string {
+function measurementDisplayLabel(measurementKey: unknown, ui: (key: string) => string, provenEffect = false): string {
   if (measurementKey === null || measurementKey === undefined || measurementKey === '') return ui('Not reported');
   const text = String(measurementKey);
-  return text.includes(':analysis:') ? ui('Effectiveness measurement') : text;
+  // A stored analysis key is not proof that a policy application improved performance.
+  return text.includes(':analysis:') ? ui(provenEffect ? 'Effectiveness measurement' : 'Current observation') : text;
 }
 
 function formatKnownSystemLabel(value: unknown, labels: Record<string, string>, ui: (key: string) => string): string {
@@ -833,10 +836,7 @@ export default function AdaptivePolicyEnginePage() {
     return grouped;
   }, [data?.signals]);
   const hasMeasuredEffectiveness = useMemo(
-    () => (data?.effectiveness || []).some((measurement) => measurement.baseline_score !== null
-      && measurement.baseline_score !== undefined
-      && measurement.delta_score !== null
-      && measurement.delta_score !== undefined),
+    () => (data?.effectiveness || []).some(hasMeasuredPolicyEffect),
     [data?.effectiveness]
   );
   const pageUpdated = dataUpdatedAt ? formatLocalizedDateTime(dataUpdatedAt, locale) : ui('Not refreshed yet');
@@ -1005,7 +1005,7 @@ export default function AdaptivePolicyEnginePage() {
               <div><strong>{ui('Variance')}</strong><span>{ui('How far the observed signal moved from its reference point; positive and negative values show direction.')}</span></div>
               <div><strong>{ui('Weight')}</strong><span>{ui('How much this signal contributes to the policy analysis relative to other signals.')}</span></div>
               <div><strong>{ui('Evidence confidence')}</strong><span>{ui('How strong the stored evidence is for this signal or recommendation; it is not automatic approval.')}</span></div>
-              <div><strong>{ui('Effectiveness')}</strong><span>{ui('Only determined when both a baseline and a later measured result exist. Without both, the page shows a current observation instead of claiming an effect.')}</span></div>
+              <div><strong>{ui('Effectiveness')}</strong><span>{ui('Only determined when a recorded policy application is linked to valid before-and-after measurements. Otherwise, the data is a current observation, not proven impact.')}</span></div>
             </div>
           </section>
           <p className="adaptive-policy-limit-note"><TenantNavIcon path="/system-context" size={14} />
@@ -1125,20 +1125,21 @@ export default function AdaptivePolicyEnginePage() {
             title={ui(hasMeasuredEffectiveness ? 'Effectiveness measurements' : 'Current policy observations')}
             iconPath="/reports"
             description={hasMeasuredEffectiveness
-              ? ui('Baseline and observed results used to understand whether a policy helped, harmed, or had no measured change.')
-              : ui('No before-and-after baseline is available in the returned records, so effectiveness cannot be determined yet. These rows show current policy observations only.')}
+              ? ui('Only rows linked to a recorded policy application with valid before-and-after scores show measured change. Other rows are current observations, not proof of impact.')
+              : ui('No verified before-and-after policy application evidence is available in the returned records. Effectiveness cannot be determined yet; these rows are observations only.')}
             rows={(data?.effectiveness || []) as Array<Record<string, unknown>>}
             headers={['Policy', 'Measurement', 'Type', 'Baseline', 'Observed', 'Change', 'Confidence', 'Measured']}
             renderRow={(row, index) => {
               const measurement = row as PolicyEffectivenessRecord;
+              const provenEffect = hasMeasuredPolicyEffect(measurement);
               return (
                 <tr key={`${measurement.measurement_key || 'measurement'}-${index}`}>
                   <td>{policyTitleFromKey(measurement.policy_key, data?.policies, ui)}</td>
-                  <td><strong>{measurementDisplayLabel(measurement.measurement_key, ui)}</strong></td>
-                  <td>{formatKnownSystemLabel(measurement.measurement_type, MEASUREMENT_TYPE_LABELS, ui)}</td>
+                  <td><strong>{measurementDisplayLabel(measurement.measurement_key, ui, provenEffect)}</strong><span className="adaptive-policy-table__subtext">{ui(provenEffect ? 'Measured after recorded policy application' : 'Current observation — impact not established')}</span></td>
+                  <td>{!provenEffect && measurement.measurement_type === 'policy_effectiveness' ? ui('Policy observation') : formatKnownSystemLabel(measurement.measurement_type, MEASUREMENT_TYPE_LABELS, ui)}</td>
                   <td>{formatNumber(measurement.baseline_score, locale)}</td>
                   <td>{formatNumber(measurement.observed_score, locale)}</td>
-                  <td>{formatDelta(measurement.delta_score, locale)}</td>
+                  <td>{provenEffect ? formatDelta(measurement.delta_score, locale) : ui('Not assessed')}</td>
                   <td>{formatStoredConfidence(measurement.confidence_score, locale)}</td>
                   <td>{formatLocalizedDateTime(measurement.measured_at, locale)}</td>
                 </tr>

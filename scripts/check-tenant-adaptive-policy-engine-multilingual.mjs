@@ -104,7 +104,7 @@ for (const required of [
   'formatKnownSystemLabel(signal.signal_type, SIGNAL_TYPE_LABELS, ui)',
   'recommendationDisplayLabel(recommendation.recommendation_key, ui)',
   'policyTitleFromKey(application.policy_key, data?.policies, ui)',
-  'measurementDisplayLabel(measurement.measurement_key, ui)',
+  'measurementDisplayLabel(measurement.measurement_key, ui, provenEffect)',
   'formatKnownSystemLabel(measurement.measurement_type, MEASUREMENT_TYPE_LABELS, ui)',
   'sourceWorkflowDisplayLabel(application.source_workflow, ui)',
   'sourceWorkflowDisplayLabel(applicationDraft.sourceWorkflow, ui)',

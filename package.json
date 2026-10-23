@@ -584,7 +584,8 @@
     "check:policy-effectiveness-backend": "node scripts/check-policy-effectiveness-backend.mjs",
     "check:ft049-ci-entrypoints": "node scripts/check-ft049-ci-entrypoints.cjs",
     "check:ft061-insights-reorder-product-reveal": "node scripts/check-ft061-insights-reorder-product-reveal.mjs",
-    "check:ft062-ledger-legacy-quantity-wrap": "node scripts/check-ft062-ledger-legacy-quantity-wrap.mjs"
+    "check:ft062-ledger-legacy-quantity-wrap": "node scripts/check-ft062-ledger-legacy-quantity-wrap.mjs",
+    "check:ft068-policy-observation-row-labels": "node --experimental-strip-types scripts/check-ft068-policy-observation-row-labels.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",
