@@ -4558,7 +4558,7 @@ type BusinessImpactRow = { label: string; value: string };
 function reviewSystemValueLabel(value: string | null | undefined, ui: (englishText: string) => string): string {
   const raw = String(value || 'unknown');
   const canonical = RECOMMENDATION_CANONICAL_LABELS[raw];
-  return canonical ? ui(canonical) : formatLabel(raw);
+  return canonical ? ui(canonical) : raw;
 }
 
 function explainabilityFactorLabel(value: string, ui: (englishText: string) => string): string {

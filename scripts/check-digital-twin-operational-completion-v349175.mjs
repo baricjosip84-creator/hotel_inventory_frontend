@@ -38,7 +38,7 @@ check('Digital Twin states that perspective changes real emphasis without preten
 check('Digital Twin exact stock link focuses stock_id', stock.includes("searchParams.get('stock_id')") && stock.includes('row.id !== requestedStockId'));
 check('Digital Twin exact supplier link focuses supplier_id', suppliers.includes("searchParams.get('supplier_id')") && suppliers.includes('supplier.id === requestedSupplierId'));
 check('Digital Twin exact location link focuses location_id', locations.includes("searchParams.get('location_id')") && locations.includes('location.id === requestedLocationId'));
-check('Digital Twin exact requisition link opens requisition detail', requisitions.includes("searchParams.get('requisitionId')") && requisitions.includes('setSelectedId(requestedRequisitionId)'));
+check('Digital Twin exact requisition link opens requisition detail', requisitions.includes("selectedRecordId(searchParams, 'requisitionId', 'requisition_id')") && requisitions.includes("withSelectedRecordId(current, 'requisitionId', 'requisition_id', id)"));
 check('Digital Twin exact product link focuses product_id', productState.includes("searchParams.get('product_id')") && productData.includes('product.id === focusedProductId'));
 check('New connected-context UI has responsive styling', ['digital-twin-review-first', 'digital-twin-focus-panel', 'digital-twin-impact-chain', 'digital-twin-pagination', 'digital-twin-freshness'].every((name) => css.includes(name)));
 check('Digital Twin remains business-facing without raw diagnostics UI', !page.includes('JSON.stringify(response, null, 2)') && !page.includes("view === 'diagnostics'"));

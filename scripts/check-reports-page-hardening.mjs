@@ -26,7 +26,7 @@ const requiredReportsSnippets = [
   "fetchSupplierPerformance",
   "const DEFAULT_SUPPLIER_FILTERS = { from: '', to: '', supplier: '', limit: 100 };",
   "const [supplierFilters, setSupplierFilters] = useState({ ...DEFAULT_SUPPLIER_FILTERS });",
-  "value={supplierFilters.limit}",
+  "value={String(supplierFilters.limit)}",
   "disabled={isExporting || disabled || isFetching} onClick={() => printReport(report)}",
   "Demand forecast from recent consumption and fulfillment stock movements over the last 30 days.",
   "fetchExpiryRisk",

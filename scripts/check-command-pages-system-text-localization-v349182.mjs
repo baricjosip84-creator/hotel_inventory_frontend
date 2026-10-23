@@ -45,7 +45,7 @@ check(ci.includes('npm run check:command-pages-system-text-localization-v349182'
 check(ci.indexOf('check:command-pages-system-text-localization-v349182') < ci.indexOf('check:cross-domain-translation-completion-v349181'), 'v3.49.182 guard runs before older command-page closure guards');
 
 check(mobile.includes('step_label_key?: string | null;'), 'Mobile Execution response model accepts backend step-label ownership keys');
-check(mobile.includes("task.description || localizedSystemText(task.step_label_key, task.step_label, 'No task summary was provided.', ui)"), 'Mobile Execution localizes fallback step guidance only when the backend supplies a stable key');
+check(mobile.includes("displayedSystemTask.description || localizedSystemText(task.step_label_key, task.step_label, 'No task summary was provided.', ui)"), 'Mobile Execution localizes fallback step guidance only when the backend supplies a stable key');
 check(mobile.includes('return text ? (key ? ui(text) : text) : ui(fallback);'), 'Mobile Execution keeps arbitrary business text raw when no system key exists');
 check(tasks.includes('step_label_key?: string | null;') && tasks.includes('task.step_label_key ? ui(task.step_label) : task.step_label'), 'Execution Tasks mobile queue also localizes the same keyed system step guidance');
 check(mobileStepLabels.every((label) => {
@@ -76,7 +76,7 @@ for (const english of [
   check(Boolean(row && row.slice(1).every((translation) => translation.trim() && translation !== row[0])), `Operations Feed keyed system text is genuinely translated: ${english}`);
 }
 
-check(mobileGuard.includes('localizing keyed backend-owned step guidance'), 'standing Mobile Execution multilingual guard protects keyed system-step localization');
+check(mobileGuard.includes("{displayedSystemTask.description || localizedSystemText(task.step_label_key, task.step_label, 'No task summary was provided.', ui)}") && mobileGuard.includes('displayMobileExecutionSystemTask(task, ui)'), 'standing Mobile Execution multilingual guard protects keyed system-step localization');
 check(taskGuard.includes('keyed mobile step guidance is localized'), 'standing Execution Tasks multilingual guard protects keyed mobile step localization');
 check(feedGuard.includes('localizes backend-owned keyed system text'), 'standing Operations Feed multilingual guard protects the keyed-versus-business text boundary');
 
