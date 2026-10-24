@@ -14,7 +14,7 @@ const display = extract(/function movementDisplayValue\(row: RecentActivityRow\)
 const reason = extract(/function dashboardReasonLabel\(row: RecentActivityRow, ui: \(englishText: string\) => string\): string \{[\s\S]*?\n\}/);
 const enumLabel = extract(/function enumDisplayLabel\(value: string, ui: UiTranslator\): string \{[\s\S]*?\n\}/);
 const code = display.replace('(row: RecentActivityRow): string', '(row)')
- + '\n' + reason.replace('(row: RecentActivityRow, ui: (englishText: string) => string): string','(row, ui)')
+ + '\n' + reason.replace('(row: RecentActivityRow, ui: (englishText: string) => string): string','(row, ui)').replaceAll(': Record<string, string>', '')
  + '\n' + enumLabel.replace('(value: string, ui: UiTranslator): string','(value, ui)')
  + '\nthis.display = movementDisplayValue; this.reason = dashboardReasonLabel; this.enumLabel = enumDisplayLabel;';
 const sandbox = vm.createContext({});
@@ -36,5 +36,6 @@ for (const fallback of ['Historical Product name unavailable','Historical unit u
   ok(source.includes(`ui('${fallback}')`),`Dashboard has explicit historical unavailable fallback: ${fallback}`);
 }
 ok(source.includes("enumDisplayLabel(movementDisplayValue(row), ui)"),'Recent Activity displayed type uses corrected classification helper');
-ok(source.includes("dashboardReasonLabel(row, ui)"),'Recent Activity reason uses evidence-aware helper');
+ok(source.includes("dashboardBusinessReasonLabel(row, ui)"),'Recent Activity displays business-friendly reason using the current helper');
+ok(source.includes('const raw = dashboardReasonLabel(row, ui);'),'business-facing presentation retains historical evidence-aware helper');
 console.log(`Batch187 dashboard historical UI classification: ${checks}/${checks} PASS (actual TS helper expressions; no browser)`);

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 const root = process.cwd();
 const read = (relativePath) => readFileSync(join(root, relativePath), 'utf8');
 const attentionItems = read('src/lib/sidebarAttentionItems.ts');
+const retryPolicy = read('src/lib/queryRetryPolicy.ts');
 const permissions = read('src/lib/permissions.ts');
 const permissionPolicies = read('src/lib/permissionPolicies.ts');
 const layout = read('src/layouts/AppLayout.tsx');
@@ -27,7 +28,11 @@ check(!/permissionKey\s*=\s*[^;]*loaded_at/s.test(attentionItems), 'no loaded_at
 check(has(attentionItems, "queryKey: ['tenant-sidebar', 'operational-navigation-attention', 'items', surface, identityKey, permissionKey]"), 'exact attention query still keeps tenant/user/role/permission isolation');
 check(has(attentionItems, 'refetchOnWindowFocus: true'), 'focus still refreshes exact attention using the same stable query rather than a blank replacement query');
 check(has(attentionItems, 'staleTime: 30_000'), 'existing exact-attention freshness policy remains unchanged');
-check(has(attentionItems, 'retry: 1'), 'existing exact-attention retry behavior remains unchanged');
+check(has(attentionItems, "import { shouldRetryReadQuery } from './queryRetryPolicy'"), 'exact-attention imports the shared read-query retry policy');
+check(has(attentionItems, 'retry: shouldRetryReadQuery'), 'exact-attention uses the shared 429-aware retry policy');
+check(!has(attentionItems, 'retry: 1'), 'exact-attention no longer has an unconditional retry on HTTP 429');
+check(has(retryPolicy, 'if (status === 429) return false'), 'shared policy prevents retrying HTTP 429');
+check(has(retryPolicy, 'return failureCount < 1'), 'shared policy preserves one retry for other transient failures');
 
 check(pkg.scripts?.['check:inventory-testing-hardening-v349244'] === 'node scripts/check-inventory-testing-hardening-v349244.mjs', 'v3.49.244 frontend guard is registered');
 for (const scriptName of ['prelint', 'prebuild', 'check:ci']) {
