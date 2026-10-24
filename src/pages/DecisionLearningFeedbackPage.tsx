@@ -1700,6 +1700,37 @@ function businessEvidenceEntries(value: unknown, locale: AppLocale, ui: Learning
     return rows;
   }
   if (typeof value !== 'object') {
+    // Older policy effectiveness records can store the generated planning policy as
+    // one flattened string, rather than the structured object we already format.
+    // Recognize ONLY the exact known seven-field system snapshot. Arbitrary user
+    // evidence or partly unknown snapshots must remain verbatim, not guessed.
+    if (typeof value === 'string' && value.startsWith('basis: ')) {
+      const parts = value.split(/\s+·\s+/);
+      const knownFlags = [
+        'consumption_only_demand', 'reliable_inbound_counted',
+        'at_risk_inbound_separated', 'location_par_and_minimum_rules',
+        'active_reservations_reduce_available_stock',
+        'approved_po_unshipped_counted_without_double_counting_shipments'
+      ];
+      const entries = parts.map((part) => /^([a-z][a-z0-9_]*):\s*(.+)$/.exec(part));
+      if (parts.length === 7 && entries.every((entry) => entry !== null)) {
+        const fields = new Map(entries.map((entry) => [entry![1], entry![2]]));
+        const allFlagsKnown = knownFlags.every((key) => /^(?:yes|no|true|false)$/i.test(fields.get(key) || ''));
+        if (fields.size === 7 &&
+          fields.get('basis') === 'shared_procurement_replenishment_position_and_location_policy' &&
+          allFlagsKnown) {
+          return entries.map((entry) => {
+            const key = entry![1];
+            const raw = entry![2];
+            const translated = key === 'basis'
+              ? businessEvidenceFieldScalar(key, raw, locale, ui)
+              : /^(?:yes|true)$/i.test(raw) ? ui('Yes') : ui('No');
+            const fieldLabel = businessEvidenceFieldLabel(key, ui);
+            return { label: prefix ? `${prefix} · ${fieldLabel}` : fieldLabel, value: translated };
+          });
+        }
+      }
+    }
     const text = businessEvidenceScalar(value, locale, ui);
     return text ? [{ label: prefix, value: text }] : [];
   }
