@@ -867,7 +867,7 @@ function UomPanel({ products, canWrite, routeProductId, onRouteProductChange }: 
         if (targetSelectionEpoch !== undefined && uomSelectionEpochRef.current !== targetSelectionEpoch) return;
         clearUomForm(); setConverted(null); conversionRequestSeqRef.current += 1; setError(null);
         showTenantActionSuccess(ui(payload.expected_version > 0 ? "Unit conversion updated successfully." : "Unit conversion saved successfully."));
-      } catch (_readbackError) {
+      } catch {
         void qc.invalidateQueries({ queryKey: ['uom', targetProductId] });
         // Inventory workflow UoM selectors keep a separate 60s cache.
         // Invalidate it for uncertain saves or deletion of a conversion.
