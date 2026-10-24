@@ -35,7 +35,15 @@ check(cross.includes("skipMutationFeedback: body.action === 'request_intelligenc
 check(cross.includes('const reviewRequested = approved || Boolean(selectedRun.review_requested_at || selectedRun.intelligence_review_status || selectedRun.intelligence_review_decision);'), 'Cross-Domain detects already-requested Intelligence Review state');
 check(cross.includes("ui('Sent to Intelligence Review')"), 'already-sent state is shown instead of another send button');
 check(cross.includes('projectedSourceWorkflowPath(selectedProjected)'), 'approved source-backed action resolves its authoritative source workflow');
-check(cross.includes("sourcePath === '/replenishment-planning' ? ui('Open Replenishment Planning') : ui('Open Execution Tasks')"), 'approved replenishment action offers Open Replenishment Planning');
+// FT117: approved source paths may carry source-specific query context.
+// Assert the human-readable label uses the route pathname while navigation retains
+// the complete sourcePath, not the former exact-URL comparison that failed FIX026.
+check(
+  cross.includes("sourcePath.split('?')[0] === '/replenishment-planning' ? ui('Open Replenishment Planning') : ui('Open Execution Tasks')") &&
+  cross.includes('onClick={() => navigate(sourcePath)}') &&
+  !cross.includes("sourcePath === '/replenishment-planning' ? ui('Open Replenishment Planning') : ui('Open Execution Tasks')"),
+  'approved replenishment action offers Open Replenishment Planning'
+);
 check(cross.includes("ui('The recommendation is approved, but the operational change still has to be carried out in its source workflow.')"), 'approved state explains that execution is still manual');
 
 check(cross.includes("showTenantActionSuccess(selectedRecommendations.length > 1 ? ui('Decision comparison saved.') : ui('Decision review saved.'))"), 'saved source-backed review uses a specific success message instead of generic item-created feedback');
