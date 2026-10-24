@@ -88,7 +88,7 @@ for (const required of [
   "ui('Feedback evidence is unavailable.')",
   "ui('Showing')",
   "ui('Older')",
-  "ui('No feedback evidence has been recorded in this category yet.')",
+  "feedbackEvidenceEmptyMessage(hasActiveFilters, ui)",
   '<th>{learningMetricLabel(mode, ui)}</th>',
   'learningMetricValue(mode, score, locale)',
   'learningEvidenceDisplayLabel(mode, row, index, locale, ui)',

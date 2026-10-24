@@ -5197,6 +5197,14 @@ function EvidenceDetailCard({ detail, canCreateFollowUp, canViewDiagnostics, cre
   );
 }
 
+// FT128: Search/date/review filters can hide existing evidence. Keep that
+// result distinct from a category where nothing has ever been recorded.
+function feedbackEvidenceEmptyMessage(hasActiveFilters: boolean, ui: (key: string) => string): string {
+  return hasActiveFilters
+    ? ui('No matching records were returned.')
+    : ui('No feedback evidence has been recorded in this category yet.');
+}
+
 function EvidenceTable({
   title,
   mode,
@@ -5204,6 +5212,7 @@ function EvidenceTable({
   pageInfo,
   loading,
   unavailable,
+  hasActiveFilters,
   canEdit,
   onView,
   onEdit,
@@ -5215,6 +5224,7 @@ function EvidenceTable({
   pageInfo?: PageInfo;
   loading: boolean;
   unavailable: boolean;
+  hasActiveFilters: boolean;
   canEdit: boolean;
   onView: (mode: FeedbackMode, row: Record<string, unknown>, origin: HTMLButtonElement) => void;
   onEdit: (mode: FeedbackMode, row: Record<string, unknown>, origin: HTMLButtonElement) => void;
@@ -5239,7 +5249,7 @@ function EvidenceTable({
         <div>
           <h2><span className={'learning-feedback-heading-icon'}><TenantNavIcon path={iconPath} size={18} /></span>{ui(title)}</h2>
           <p className="card__subtext">
-            {loading ? ui('Loading feedback evidence…') : unavailable ? ui('Feedback evidence is unavailable.') : rows.length ? `${ui('Showing')} ${formatLocalizedNumber(first, locale)}–${formatLocalizedNumber(last, locale)} ${ui('of')} ${formatLocalizedNumber(total, locale)}.` : ui('No feedback evidence has been recorded in this category yet.')}
+            {loading ? ui('Loading feedback evidence…') : unavailable ? ui('Feedback evidence is unavailable.') : rows.length ? `${ui('Showing')} ${formatLocalizedNumber(first, locale)}–${formatLocalizedNumber(last, locale)} ${ui('of')} ${formatLocalizedNumber(total, locale)}.` : feedbackEvidenceEmptyMessage(hasActiveFilters, ui)}
           </p>
         </div>
       </div>
@@ -5330,6 +5340,8 @@ export default function DecisionLearningFeedbackPage() {
   const [evidenceDateFrom, setEvidenceDateFrom] = useState('');
   const [evidenceDateTo, setEvidenceDateTo] = useState('');
   const [evidenceSort, setEvidenceSort] = useState('newest');
+  // Sort order alone is not a filter. Only narrowing controls change empty states.
+  const hasActiveEvidenceFilters = Boolean(evidenceSearch.trim() || evidenceReviewStatus || evidenceDateFrom || evidenceDateTo);
   const [selectedEvidenceDetail, setSelectedEvidenceDetail] = useState<Record<string, unknown> | null>(null);
   const [selectedEvidenceMode, setSelectedEvidenceMode] = useState<FeedbackMode | null>(null);
   const feedbackFormRef = useRef<HTMLElement | null>(null);
@@ -6484,10 +6496,10 @@ export default function DecisionLearningFeedbackPage() {
             </div>
           </section>
 
-          <EvidenceTable title={ui('Learning outcomes')} mode="learning-outcomes" rows={summaryQuery.data?.outcomes || []} pageInfo={summaryQuery.data?.pagination?.outcomes} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onView={viewEvidence} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('outcomes', direction)} />
-          {canReadInsights ? <EvidenceTable title={ui('Forecast accuracy')} mode="forecast-accuracy" rows={summaryQuery.data?.forecast_accuracy || []} pageInfo={summaryQuery.data?.pagination?.forecast_accuracy} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onView={viewEvidence} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('forecast_accuracy', direction)} /> : null}
-          <EvidenceTable title={ui('Policy effectiveness')} mode="policy-effectiveness" rows={summaryQuery.data?.policy_effectiveness || []} pageInfo={summaryQuery.data?.pagination?.policy_effectiveness} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onView={viewEvidence} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('policy_effectiveness', direction)} />
-          <EvidenceTable title={ui('Optimization results')} mode="optimization-results" rows={summaryQuery.data?.optimization_results || []} pageInfo={summaryQuery.data?.pagination?.optimization_results} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} canEdit={canGovern} onView={viewEvidence} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('optimization_results', direction)} />
+          <EvidenceTable title={ui('Learning outcomes')} mode="learning-outcomes" rows={summaryQuery.data?.outcomes || []} pageInfo={summaryQuery.data?.pagination?.outcomes} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} hasActiveFilters={hasActiveEvidenceFilters} canEdit={canGovern} onView={viewEvidence} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('outcomes', direction)} />
+          {canReadInsights ? <EvidenceTable title={ui('Forecast accuracy')} mode="forecast-accuracy" rows={summaryQuery.data?.forecast_accuracy || []} pageInfo={summaryQuery.data?.pagination?.forecast_accuracy} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} hasActiveFilters={hasActiveEvidenceFilters} canEdit={canGovern} onView={viewEvidence} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('forecast_accuracy', direction)} /> : null}
+          <EvidenceTable title={ui('Policy effectiveness')} mode="policy-effectiveness" rows={summaryQuery.data?.policy_effectiveness || []} pageInfo={summaryQuery.data?.pagination?.policy_effectiveness} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} hasActiveFilters={hasActiveEvidenceFilters} canEdit={canGovern} onView={viewEvidence} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('policy_effectiveness', direction)} />
+          <EvidenceTable title={ui('Optimization results')} mode="optimization-results" rows={summaryQuery.data?.optimization_results || []} pageInfo={summaryQuery.data?.pagination?.optimization_results} loading={summaryQuery.isLoading} unavailable={summaryQuery.isError} hasActiveFilters={hasActiveEvidenceFilters} canEdit={canGovern} onView={viewEvidence} onEdit={editEvidence} onPage={(direction) => changeEvidencePage('optimization_results', direction)} />
         </>
       ) : showTenantLearningFeedbackReadinessChecks && canViewDiagnostics ? (
         <>
