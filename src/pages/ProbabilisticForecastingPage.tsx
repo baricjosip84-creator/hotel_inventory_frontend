@@ -1175,7 +1175,12 @@ export default function ProbabilisticForecastingPage() {
                   </td>
                   <td>
                     <strong>{ui(observation.observation_source === 'learning_feedback' ? 'Learning Feedback outcome' : observation.observation_source === 'rolling_backtest' ? '30-day usage backtest' : 'Calibration observation')}</strong>
-                    {canViewDiagnostics && observation.calibration_key ? <span className="forecast-table__subtext">{observation.calibration_key}</span> : null}
+                    {canViewDiagnostics && observation.calibration_key ? (
+                      <details className="forecast-technical-reference">
+                        <summary>{ui('Technical details')}</summary>
+                        <code>{observation.calibration_key}</code>
+                      </details>
+                    ) : null}
                   </td>
                   <td>{formatCanonicalLabel(observation.calibration_type, ui)}</td>
                   <td>{formatNumber(observation.predicted_value, locale)}</td>

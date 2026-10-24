@@ -399,6 +399,52 @@
 .decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-table {
   margin: 0;
   border: 0;
+  /* Preserve complete business labels; wide evidence grids scroll inside their
+     own section instead of chopping ordinary words into vertical fragments. */
+  width: max(100%, 1020px);
+  table-layout: auto;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-table th,
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-table td {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-table th {
+  white-space: normal;
+  min-width: 72px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-table th:first-child {
+  min-width: 152px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-table td {
+  min-width: 78px;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-technical-reference {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-technical-reference summary {
+  display: list-item;
+  width: fit-content;
+  cursor: pointer;
+}
+
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-technical-reference code {
+  display: block;
+  max-width: 320px;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  font-size: 0.72rem;
+  color: #475569;
 }
 
 .decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-table th {
