@@ -688,7 +688,8 @@ function EvidenceSection({
   rows,
   headers,
   renderRow,
-  tableClassName
+  tableClassName,
+  emptyMessage
 }: {
   title: string;
   description: string;
@@ -697,6 +698,7 @@ function EvidenceSection({
   headers: string[];
   renderRow: (row: Record<string, unknown>, index: number) => ReactNode;
   tableClassName?: string;
+  emptyMessage?: string;
 }) {
   const { locale, ui } = useAppTranslation();
   return (
@@ -712,7 +714,7 @@ function EvidenceSection({
         <span className="adaptive-policy-badge adaptive-policy-badge--neutral">{ui('{count} returned').replace('{count}', formatLocalizedNumber(rows.length, locale))}</span>
       </div>
       {!rows.length ? (
-        <p className="adaptive-policy-muted">{ui('No matching records were returned.')}</p>
+        <p className="adaptive-policy-muted">{ui(emptyMessage || 'No matching records were returned.')}</p>
       ) : (
         <div className="table-wrap">
           <table className={`data-table adaptive-policy-table${tableClassName ? ` ${tableClassName}` : ''}`}>
@@ -740,6 +742,7 @@ export default function AdaptivePolicyEnginePage() {
     && hasPermission(TENANT_PERMISSIONS.OPERATIONAL_ACTION_CENTER_READ);
   const [view, setView] = useState<AdaptivePolicyView>('evidence');
   const [filters, setFilters] = useState<AdaptivePolicyFilters>(DEFAULT_FILTERS);
+  const hasActiveEvidenceFilters = Boolean(filters.policy_domain || filters.policy_type || filters.policy_status || filters.recommendation_type || requestedSourceActionId);
   const [applicationDraft, setApplicationDraft] = useState<{
     policyId: string;
     recommendationId: string;
@@ -1099,6 +1102,7 @@ export default function AdaptivePolicyEnginePage() {
             title={ui('Applied policy changes')}
             iconPath="/permissions"
             description="Approved recommendations appear here only after a person records that the business rule was actually changed. This record starts real before-and-after monitoring."
+            emptyMessage={!hasActiveEvidenceFilters ? 'No applied policy changes have been recorded yet.' : undefined}
             rows={(data?.applications || []) as Array<Record<string, unknown>>}
             headers={['Policy', 'Status', 'Recorded change', 'Applied value', 'Baseline', 'Applied', 'Lifecycle action']}
             renderRow={(row, index) => {

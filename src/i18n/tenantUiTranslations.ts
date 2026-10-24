@@ -2,6 +2,8 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // FT133 APE-UX-001: distinguish no recorded manual application from no matches under active evidence filters.
+  ["No applied policy changes have been recorded yet.", "Es wurden noch keine angewendeten Richtlinienänderungen erfasst.", "Todavía no se han registrado cambios de políticas aplicados.", "Aucune modification de politique appliquée n’a encore été enregistrée.", "Još nisu zabilježene primijenjene promjene pravila."],
   // FT047: make the planning-context heuristic and source timestamp semantics explicit.
   ["Planning context score", "Bewertung des Planungskontexts", "Puntuación del contexto de planificación", "Score du contexte de planification", "Ocjena konteksta planiranja"] ,
   ["Planning context assessment", "Bewertung des Planungskontexts", "Evaluación del contexto de planificación", "Évaluation du contexte de planification", "Procjena konteksta planiranja"] ,
