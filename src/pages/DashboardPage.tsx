@@ -419,6 +419,15 @@ function dashboardBusinessReasonLabel(row: RecentActivityRow, ui: (englishText: 
   if (String(row.movement_kind || '').trim().toLowerCase() === 'unclassified') {
     return raw === '-' ? ui('Unclassified legacy movement') : ui('Unclassified legacy movement — review source record');
   }
+  // Imported shipment receipts may store only an SHP- reference in the reason.
+  // Show the established business event, not a bare technical reference, only
+  // when the persisted movement classification independently proves receipt.
+  // The original reason is still available through the activity tooltip.
+  const movement = movementDisplayValue(row);
+  if ((movement === 'shipment_receive' || movement === 'receipt')
+      && /^SHP-[A-Z0-9-]+$/i.test(String(row.reason || '').trim())) {
+    return ui('Shipment received');
+  }
   return raw;
 }
 
