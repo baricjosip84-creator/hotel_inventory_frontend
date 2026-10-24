@@ -1,0 +1,26 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const css = fs.readFileSync(path.join(root, 'src/pages/ProbabilisticForecastingPage.css'), 'utf8');
+const tsx = fs.readFileSync(path.join(root, 'src/pages/ProbabilisticForecastingPage.tsx'), 'utf8');
+const shared = fs.readFileSync(path.join(root, 'src/pages/decisionIntelligencePages.css'), 'utf8');
+let passed = 0;
+function expect(ok, name) { if (!ok) { console.error('FAIL:',name); process.exitCode = 1; } else { console.log('PASS:',name); passed++; } }
+const scoped = css.match(/\.decision-intelligence-page\[data-probabilistic-forecasting-refined='true'\] \.forecast-table \.forecast-badge\s*\{([^}]+)\}/);
+const rules = scoped?.[1] || '';
+const has = (property, value) => new RegExp(`(?:^|[;\\n])\\s*${property}\\s*:\\s*${value}\\s*;`, 'm').test(rules);
+expect(Boolean(scoped), 'scoped table badge rule exists');
+expect(has('white-space','nowrap'), 'status badge cannot wrap mid-word');
+expect(has('max-width','none'), 'status badge is not restricted to narrow table cell');
+expect(has('width','max-content'), 'table must consider full status label width');
+expect(has('overflow-wrap','normal'), 'override shared overflow-wrap anywhere');
+expect(has('word-break','keep-all'), 'prevent arbitrary word splitting');
+expect(has('hyphens','none'), 'do not hyphenate statuses');
+expect(has('flex-shrink','0'), 'status badge content cannot be compressed');
+expect(/\.forecast-badge\s*\{[^}]*overflow-wrap:\s*anywhere/s.test(shared), 'guard diagnoses previous inherited cause');
+expect(/\.table-wrap\s*\{[^}]*overflow:\s*auto/s.test(css), 'table scrolls rather than clipping wider status');
+expect(/\.forecast-table\s*\{[^}]*table-layout:\s*auto/s.test(css), 'table reflows to preserve status text');
+expect(tsx.includes('<td><StatusBadge value={model.model_status} /></td>'), 'fix targets actual model status badge');
+expect(tsx.includes("calibrating: 'Calibrating'"), 'actual case shown live remains represented');
+console.log(`${passed}/13 checks passed`);

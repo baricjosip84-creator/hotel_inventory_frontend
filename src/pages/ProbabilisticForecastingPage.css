@@ -476,6 +476,19 @@
   letter-spacing: 0.01em;
 }
 
+/* FT136 / PF-UX: status text must never fracture inside the model table.
+   The existing scrollable table owns horizontal overflow instead of breaking
+   a single business word such as 'Calibrating' between arbitrary letters. */
+.decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-table .forecast-badge {
+  max-width: none;
+  width: max-content;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  hyphens: none;
+  flex-shrink: 0;
+}
+
 .decision-intelligence-page[data-probabilistic-forecasting-refined='true'] .forecast-badge::before {
   content: '';
   width: 6px;
