@@ -2,6 +2,10 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // FT149: align zero-usable-stock position labels with the Dashboard depletion advisory without redefining minimum breaches.
+  ["NO USABLE STOCK", "KEIN NUTZBARER BESTAND", "SIN EXISTENCIAS UTILIZABLES", "AUCUN STOCK UTILISABLE", "NEMA UPOTREBLJIVE ZALIHE"],
+  ["No usable stock", "Kein nutzbarer Bestand", "Sin existencias utilizables", "Aucun stock utilisable", "Nema upotrebljive zalihe"],
+  ["This location has no usable stock. A minimum of zero means there is no minimum-level breach; it does not mean the position contains usable inventory.", "An diesem Standort gibt es keinen nutzbaren Bestand. Ein Mindestbestand von null bedeutet nur, dass keine Mindestgrenze unterschritten wurde – nicht, dass nutzbarer Bestand vorhanden ist.", "Esta ubicación no tiene existencias utilizables. Un mínimo de cero significa que no se ha incumplido el mínimo, no que haya inventario utilizable.", "Cet emplacement ne dispose d’aucun stock utilisable. Un minimum de zéro signifie qu’aucun seuil minimal n’est franchi, pas que le stock est utilisable.", "Na ovoj lokaciji nema upotrebljive zalihe. Minimum nula znači da minimalni prag nije prekoračen prema dolje, a ne da postoji upotrebljiva zaliha."],
   // FT133 APE-UX-001: distinguish no recorded manual application from no matches under active evidence filters.
   ["No applied policy changes have been recorded yet.", "Es wurden noch keine angewendeten Richtlinienänderungen erfasst.", "Todavía no se han registrado cambios de políticas aplicados.", "Aucune modification de politique appliquée n’a encore été enregistrée.", "Još nisu zabilježene primijenjene promjene pravila."],
   // FT047: make the planning-context heuristic and source timestamp semantics explicit.

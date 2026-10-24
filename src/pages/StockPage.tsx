@@ -378,6 +378,14 @@ function hasStockLotDesync(item: StockItem): boolean {
   return Math.abs(toNumber(item.quantity) - getAvailableLotQuantity(item)) > 0.0000001;
 }
 
+// An empty position is still empty when its configured minimum is zero.
+// This display-only signal complements (and does not change) the threshold-based
+// LOW STOCK or Availability Risk calculations. Dashboard Depletion Risk uses the
+// same zero-usable-stock evidence as an advisory critical-risk signal.
+function hasNoUsableStock(item: StockItem): boolean {
+  return Math.min(toNumber(item.quantity), getUsableLotQuantity(item)) <= 0;
+}
+
 function parseSerialNumbers(value: string): string[] {
   return value.split(/[\n,]+/).map((serial) => serial.trim()).filter(Boolean);
 }
@@ -604,7 +612,7 @@ export default function StockPage() {
   const [searchText, setSearchText] = useState('');
   const [locationFilter, setLocationFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'healthy' | 'reserved-risk' | 'integrity-risk'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'empty' | 'healthy' | 'reserved-risk' | 'integrity-risk'>('all');
   const [expiryWindowDays, setExpiryWindowDays] = useState(30);
   const [lotPage, setLotPage] = useState(0);
   const [countBaseVersion, setCountBaseVersion] = useState<number | null>(null);
@@ -715,9 +723,11 @@ export default function StockPage() {
         const isLow = usableQuantity < minimum;
         const hasReservationRisk = !isLow && projectedFree < minimum;
         const hasIntegrityRisk = hasStockLotDesync(row);
+        const noUsableStock = hasNoUsableStock(row);
 
         if (statusFilter === 'low' && !isLow) return false;
-        if (statusFilter === 'healthy' && (isLow || hasReservationRisk || hasIntegrityRisk)) return false;
+        if (statusFilter === 'empty' && !noUsableStock) return false;
+        if (statusFilter === 'healthy' && (isLow || hasReservationRisk || hasIntegrityRisk || noUsableStock)) return false;
         if (statusFilter === 'reserved-risk' && !hasReservationRisk) return false;
         if (statusFilter === 'integrity-risk' && !hasIntegrityRisk) return false;
 
@@ -869,6 +879,7 @@ export default function StockPage() {
     : 0;
   const currentMinimum = selectedRow ? getEffectiveMinimum(selectedRow) : 0;
   const selectedStockLotDesync = Boolean(selectedRow) && hasStockLotDesync(selectedRow);
+  const selectedNoUsableStock = Boolean(selectedRow) && hasNoUsableStock(selectedRow);
   const selectedLowStock = Boolean(selectedRow) && Math.min(currentQuantity, currentUsableLotQuantity) < currentMinimum;
   const selectedOverReserved = Boolean(selectedRow) && currentProjectedFreeQuantity < 0;
   const selectedLowAvailable =
@@ -1841,6 +1852,7 @@ export default function StockPage() {
                   >
                     <option value="all">{ui("All statuses")}</option>
                     <option value="low">{ui("Low stock")}</option>
+                    <option value="empty">{ui("No usable stock")}</option>
                     <option value="reserved-risk">{ui("Low available after reservations")}</option>
                     <option value="integrity-risk">{ui("Stock / lot mismatch")}</option>
                     <option value="healthy">{ui("Healthy")}</option>
@@ -1879,6 +1891,7 @@ export default function StockPage() {
                       const overReserved = projectedFreeQuantity < 0;
                       const lowAvailable = !lowStock && projectedFreeQuantity < minQuantity;
                       const integrityRisk = hasStockLotDesync(item);
+                      const noUsableStock = hasNoUsableStock(item);
                       const selected = selectedRow?.id === item.id;
 
                       return (
@@ -1897,7 +1910,7 @@ export default function StockPage() {
                             </div>
                             <span
                               style={
-                                integrityRisk || overReserved
+                                integrityRisk || overReserved || noUsableStock
                                   ? styles.badgeError
                                   : lowStock || lowAvailable
                                     ? styles.badgeWarning
@@ -1908,6 +1921,8 @@ export default function StockPage() {
                                 ? ui('STOCK / LOT MISMATCH')
                                 : overReserved
                                   ? ui("OVER-RESERVED")
+                                  : noUsableStock
+                                    ? ui("NO USABLE STOCK")
                                   : lowStock
                                   ? ui("LOW STOCK")
                                   : lowAvailable
@@ -1960,6 +1975,7 @@ export default function StockPage() {
                             const overReserved = projectedFreeQuantity < 0;
                             const lowAvailable = !lowStock && projectedFreeQuantity < minQuantity;
                             const integrityRisk = hasStockLotDesync(item);
+                            const noUsableStock = hasNoUsableStock(item);
                             const selected = selectedRow?.id === item.id;
 
                             return (
@@ -1987,7 +2003,7 @@ export default function StockPage() {
                                 <td style={styles.td}>
                                   <span
                                     style={
-                                      integrityRisk || overReserved
+                                      integrityRisk || overReserved || noUsableStock
                                         ? styles.badgeError
                                         : lowStock || lowAvailable
                                           ? styles.badgeWarning
@@ -1998,6 +2014,8 @@ export default function StockPage() {
                                       ? ui('STOCK / LOT MISMATCH')
                                       : overReserved
                                         ? ui("OVER-RESERVED")
+                                        : noUsableStock
+                                          ? ui("NO USABLE STOCK")
                                         : lowStock
                                         ? ui("LOW STOCK")
                                         : lowAvailable
@@ -2035,7 +2053,7 @@ export default function StockPage() {
                         </div>
                         <span
                           style={
-                            selectedStockLotDesync || selectedOverReserved
+                            selectedStockLotDesync || selectedOverReserved || selectedNoUsableStock
                               ? styles.badgeError
                               : selectedLowStock || selectedLowAvailable
                                 ? styles.badgeWarning
@@ -2046,6 +2064,8 @@ export default function StockPage() {
                             ? ui('STOCK / LOT MISMATCH')
                             : selectedOverReserved
                               ? ui("OVER-RESERVED")
+                              : selectedNoUsableStock
+                                ? ui("NO USABLE STOCK")
                               : selectedLowStock
                               ? ui("LOW STOCK")
                               : selectedLowAvailable
@@ -2054,6 +2074,11 @@ export default function StockPage() {
                         </span>
                       </div>
 
+                      {selectedNoUsableStock ? (
+                        <p style={styles.rowSubtle}>
+                          {ui("This location has no usable stock. A minimum of zero means there is no minimum-level breach; it does not mean the position contains usable inventory.")}
+                        </p>
+                      ) : null}
                       <div style={styles.selectionGrid}>
                         <div style={styles.selectionItem}>
                           <div style={styles.selectionLabel}>{ui("Storage Location")}</div>
