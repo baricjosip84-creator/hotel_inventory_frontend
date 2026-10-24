@@ -1740,7 +1740,17 @@ function businessEvidenceEntries(value: unknown, locale: AppLocale, ui: Learning
   if (Object.keys(record).length === 1) {
     const onlyKey = Object.keys(record)[0];
     if (semanticKeys.includes(onlyKey)) {
-      const text = businessEvidenceScalar(record[onlyKey], locale, ui);
+      // Policy effectiveness JSONB can wrap an older generated policy snapshot
+      // as { note: 'basis: ... · ...' } (or another known prose field). The
+      // legacy-string formatter above must be reached before we unwrap it as
+      // ordinary unstructured text. Only the exact known seven-field system
+      // snapshot expands; unknown or operator-authored prose stays verbatim.
+      const semanticValue = record[onlyKey];
+      if (typeof semanticValue === 'string' && semanticValue.startsWith('basis: ')) {
+        const recognized = businessEvidenceEntries(semanticValue, locale, ui, prefix, depth + 1);
+        if (recognized.length === 7) return recognized;
+      }
+      const text = businessEvidenceScalar(semanticValue, locale, ui);
       return text ? [{ label: prefix, value: text }] : [];
     }
   }
