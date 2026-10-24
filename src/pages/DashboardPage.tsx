@@ -419,14 +419,20 @@ function dashboardBusinessReasonLabel(row: RecentActivityRow, ui: (englishText: 
   if (String(row.movement_kind || '').trim().toLowerCase() === 'unclassified') {
     return raw === '-' ? ui('Unclassified legacy movement') : ui('Unclassified legacy movement — review source record');
   }
-  // Imported shipment receipts may store only an SHP- reference in the reason.
-  // Show the established business event, not a bare technical reference, only
-  // when the persisted movement classification independently proves receipt.
-  // The original reason is still available through the activity tooltip.
+  // Dashboard and Stock Movements must give the same operator-facing name
+  // to a proven shipment receipt. Shipment references belong in audit/source
+  // details, not in the business-facing Reason field. Older records can carry
+  // formatting characters or extra shipment-reference annotation in reason;
+  // do not require its entire value to match a strict ASCII ID pattern.
+  // Never infer a receipt from an unclassified legacy record (guard above).
   const movement = movementDisplayValue(row);
-  if ((movement === 'shipment_receive' || movement === 'receipt')
-      && /^SHP-[A-Z0-9-]+$/i.test(String(row.reason || '').trim())) {
-    return ui('Shipment received');
+  if (movement === 'shipment_receive' || movement === 'receipt') {
+    const persistedReason = String(row.reason || '').normalize('NFKC').trim();
+    // Known system-generated shipment references, including historical imports.
+    // Preserve user-authored notes that do not begin with this reference prefix.
+    if (row.shipment_id || /^SHP(?:\p{Pd}|\s*:)\s*[A-Z0-9]/iu.test(persistedReason)) {
+      return ui('Shipment received');
+    }
   }
   return raw;
 }
