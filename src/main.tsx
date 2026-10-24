@@ -33,7 +33,7 @@ root.render(
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js').catch(() => {
+    navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' }).catch(() => {
       // App remains usable online if service-worker registration is unavailable.
     });
   });
