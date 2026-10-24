@@ -1,3 +1,4 @@
+import { shouldRetryReadQuery } from '../lib/queryRetryPolicy';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAppTranslation } from '../i18n/I18nContext';
@@ -287,7 +288,7 @@ export default function TenantAuditPage() {
     queryFn: () => apiRequest<TenantAuditFilterOptions>('/audit/filter-options'),
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
-    retry: 1
+    retry: shouldRetryReadQuery
   });
 
   const filterParams = useMemo(() => buildAppliedFilterParams(appliedFilters), [appliedFilters]);

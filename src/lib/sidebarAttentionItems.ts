@@ -1,3 +1,4 @@
+import { shouldRetryReadQuery } from './queryRetryPolicy';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from './api';
@@ -64,7 +65,7 @@ export function useOperationalAttentionItems(surface: OperationalAttentionSurfac
     enabled: enabled && tenantAccess.hasTenantContext,
     staleTime: 30_000,
     refetchOnWindowFocus: true,
-    retry: 1,
+    retry: shouldRetryReadQuery,
   });
 
   const attentionIds = useMemo(() => new Set(query.data?.attention_ids || []), [query.data?.attention_ids]);

@@ -1,3 +1,4 @@
+import { shouldRetryReadQuery } from '../lib/queryRetryPolicy';
 import { readIntelligenceReviewQueueRoute, withIntelligenceReviewQueueChange } from '../utils/intelligenceReviewQueueRoute';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
@@ -5255,7 +5256,7 @@ export default function HumanInLoopAIReviewPage() {
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
-    retry: 1
+    retry: shouldRetryReadQuery
   });
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedSourceActionId = searchParams.get('source_action_id');

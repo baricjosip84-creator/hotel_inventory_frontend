@@ -1,3 +1,4 @@
+import { shouldRetryReadQuery } from '../lib/queryRetryPolicy';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
@@ -167,7 +168,7 @@ export default function AppLayout() {
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
-    retry: 1
+    retry: shouldRetryReadQuery
   });
   const hasAlertAttention = canActOnAlerts && alertAttentionQuery.data?.requires_attention === true;
   const canViewExecutionRequests = hasTenantUserAttentionActor && hasPermission(TENANT_PERMISSIONS.EXECUTION_REQUESTS_VIEW);
@@ -187,7 +188,7 @@ export default function AppLayout() {
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
-    retry: 1
+    retry: shouldRetryReadQuery
   });
   const hasExecutionRequestAttention = canActOnExecutionRequests
     && executionRequestAttentionQuery.data?.requires_attention === true;
@@ -210,7 +211,7 @@ export default function AppLayout() {
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
-    retry: 1
+    retry: shouldRetryReadQuery
   });
   const hasIntelligenceReviewAttention = canHandleIntelligenceReviewEscalations
     && intelligenceReviewAttentionQuery.data?.requires_attention === true;
@@ -226,7 +227,7 @@ export default function AppLayout() {
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
-    retry: 1
+    retry: shouldRetryReadQuery
   });
   const hasLearningFeedbackAttention = canHandleLearningFeedbackReviews
     && learningFeedbackAttentionQuery.data?.requires_attention === true;
@@ -253,7 +254,7 @@ export default function AppLayout() {
     staleTime: 60_000,
     refetchInterval: 300_000,
     refetchOnWindowFocus: true,
-    retry: 1
+    retry: shouldRetryReadQuery
   });
   const hasProcurementRecommendationAttention = canActOnProcurementRecommendationsForAttention
     && procurementRecommendationAttentionQuery.data?.requires_attention === true;
@@ -430,7 +431,7 @@ export default function AppLayout() {
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
-    retry: 1
+    retry: shouldRetryReadQuery
   });
 
   const operationalAttention = operationalNavigationAttentionQuery.data;
@@ -486,7 +487,7 @@ export default function AppLayout() {
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
-    retry: 1
+    retry: shouldRetryReadQuery
   });
   const announcementContext: AnnouncementContext | null = announcementContextQuery.data ?? null;
 

@@ -587,7 +587,8 @@
     "check:ft062-ledger-legacy-quantity-wrap": "node scripts/check-ft062-ledger-legacy-quantity-wrap.mjs",
     "check:ft068-policy-observation-row-labels": "node --experimental-strip-types scripts/check-ft068-policy-observation-row-labels.mjs",
     "check:ft133-adaptive-policy-applied-empty-state": "node scripts/check-ft133-adaptive-policy-applied-empty-state.mjs",
-    "check:ft135-probabilistic-evidence-usability": "node scripts/check-ft135-probabilistic-evidence-usability.mjs"
+    "check:ft135-probabilistic-evidence-usability": "node scripts/check-ft135-probabilistic-evidence-usability.mjs",
+    "check:ft140-query-rate-limit-retry": "node scripts/check-ft140-query-rate-limit-retry.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

@@ -1,3 +1,4 @@
+import { shouldRetryReadQuery } from '../lib/queryRetryPolicy';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppTranslation } from '../i18n/I18nContext';
@@ -72,7 +73,7 @@ type RefreshResult = {
 const QUERY_OPTIONS = {
   staleTime: 15_000,
   refetchOnWindowFocus: false,
-  retry: 1
+  retry: shouldRetryReadQuery
 } as const;
 
 async function acknowledgeAdminAlert(id: string): Promise<{ message: string; alert: BlockingAlertRow }> {

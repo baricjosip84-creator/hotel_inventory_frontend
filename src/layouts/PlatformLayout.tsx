@@ -1,3 +1,4 @@
+import { shouldRetryReadQuery } from '../lib/queryRetryPolicy';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -28,7 +29,7 @@ export default function PlatformLayout() {
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
-    retry: 1
+    retry: shouldRetryReadQuery
   });
   const announcementContext: PlatformAnnouncementContext | null = announcementContextQuery.data ?? null;
   const visibleAnnouncements = useMemo(() => (announcementContext?.announcements || []).filter((announcement) => !dismissedAnnouncementIds.has(announcement.id)), [announcementContext, dismissedAnnouncementIds]);

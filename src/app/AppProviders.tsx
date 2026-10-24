@@ -1,3 +1,4 @@
+import { shouldRetryReadQuery } from '../lib/queryRetryPolicy';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PropsWithChildren } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -518,7 +519,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       defaultOptions: {
         queries: {
           refetchOnWindowFocus: false,
-          retry: 1
+          retry: shouldRetryReadQuery
         }
       }
     });

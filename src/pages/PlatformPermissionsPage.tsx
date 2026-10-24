@@ -1,3 +1,4 @@
+import { shouldRetryReadQuery } from '../lib/queryRetryPolicy';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
@@ -18,7 +19,7 @@ export default function PlatformPermissionsPage() {
     queryKey: ['platform-role-permissions'],
     queryFn: fetchPlatformPermissionPolicyMatrix,
     staleTime: 30_000,
-    retry: 1,
+    retry: shouldRetryReadQuery,
     refetchOnWindowFocus: true
   });
   const [selectedRole, setSelectedRole] = useState<PlatformRole>('support');
