@@ -33,6 +33,7 @@ export function StatusBadge(props: {
   status: string | null | undefined;
   detail?: number | string | null;
 }) {
+  const { ui } = useAppTranslation();
   const tone = getProductStatusTone(props.status);
   const toneStyle =
     tone === 'good'
