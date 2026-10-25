@@ -584,6 +584,9 @@ export default function StockPage() {
   const accessRoleLabel = getCurrentAccessRoleLabel();
   const preferredAction: StockActionType = canConsume ? 'consume' : canCount ? 'count' : canAdjust ? 'adjust' : 'consume';
   const selectedDetailsRef = useRef<HTMLElement | null>(null);
+  const linkedDesktopStockRowRef = useRef<HTMLTableRowElement | null>(null);
+  const linkedMobileStockRowRef = useRef<HTMLButtonElement | null>(null);
+  const lastFocusedLinkedStockIdRef = useRef<string>('');
   const [showOpeningStockImport, setShowOpeningStockImport] = useState(false);
   const [showLotIntegrity, setShowLotIntegrity] = useState(false);
 
@@ -765,6 +768,39 @@ export default function StockPage() {
     () => filteredRows.find((row) => row.id === selectedStockId) ?? null,
     [filteredRows, selectedStockId]
   );
+
+  // Dashboard/Insights links already select the correct stock_id. Reveal that
+  // selected position after the asynchronous stock list has actually rendered,
+  // just as in-page selection reveals its detail panel. Never steal the user's
+  // scroll position again on background refetches or routine state changes.
+  useEffect(() => {
+    if (!requestedStockId) {
+      lastFocusedLinkedStockIdRef.current = '';
+      return;
+    }
+    if (selectedRow?.id !== requestedStockId || lastFocusedLinkedStockIdRef.current === requestedStockId) return;
+
+    let secondFrame: number | null = null;
+    const frame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        const desktopRow = linkedDesktopStockRowRef.current;
+        const mobileRow = linkedMobileStockRowRef.current;
+        const target = desktopRow?.getClientRects().length
+          ? desktopRow
+          : mobileRow?.getClientRects().length
+            ? mobileRow
+            : selectedDetailsRef.current;
+        if (!target) return;
+        target.scrollIntoView({ behavior: 'auto', block: 'center' });
+        target.focus({ preventScroll: true });
+        lastFocusedLinkedStockIdRef.current = requestedStockId;
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (secondFrame !== null) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [requestedStockId, selectedRow?.id]);
 
   const [draft, setDraft] = useState<StockActionDraft>(() => getDefaultDraft(preferredAction));
   const [operationFeedback, setOperationFeedback] = useState<string>('');
@@ -1432,15 +1468,17 @@ export default function StockPage() {
     setCategoryFilter('all');
     setStatusFilter('all');
 
-    if (requestedProductId) {
+    if (requestedProductId || requestedStockId) {
       const nextSearchParams = new URLSearchParams(searchParams);
       nextSearchParams.delete('product_id');
+      nextSearchParams.delete('stock_id');
       setSearchParams(nextSearchParams, { replace: true });
     }
   };
 
   const hasActiveStockFilters = Boolean(
     requestedProductId ||
+    requestedStockId ||
     searchText.trim() ||
     locationFilter !== 'all' ||
     categoryFilter !== 'all' ||
@@ -1898,6 +1936,7 @@ export default function StockPage() {
                         <button
                           key={item.id}
                           type="button"
+                          ref={selected ? linkedMobileStockRowRef : undefined}
                           style={selected ? styles.stockCardSelectedButton : styles.stockCardButton}
                           onClick={() => selectStockRow(item.id)}
                         >
@@ -1979,7 +2018,12 @@ export default function StockPage() {
                             const selected = selectedRow?.id === item.id;
 
                             return (
-                              <tr key={item.id} style={selected ? styles.selectedRow : undefined}>
+                              <tr
+                                key={item.id}
+                                ref={selected ? linkedDesktopStockRowRef : undefined}
+                                tabIndex={selected ? -1 : undefined}
+                                style={selected ? styles.selectedRow : undefined}
+                              >
                                 <td style={styles.td}>
                                   <button
                                     type="button"
