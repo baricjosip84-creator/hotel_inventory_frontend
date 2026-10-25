@@ -41,6 +41,10 @@ jobs:
         run: |
           npm run check:production-env-governance
           npm run check:deployment-api-config-tests
+      - name: Prevent original Products Cost Controls undefined translation crash (FT176)
+        run: npm run check:ft176-products-status-badge-ui-scope
+      - name: Prevent all Products Cost Controls unresolved identifiers (FT177)
+        run: npm run check:ft177-products-identifier-scope
       - name: Verify original-audit business labels, evidence scores, and saved-result dates
         run: npm run check:original-audit-fe224
       - name: Verify localized Dashboard stock movement reasons (FT-015)

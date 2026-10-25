@@ -2,7 +2,7 @@ import type {
   ProductCostGovernanceAuditPackResponse,
   ProductCostGovernanceSignoffSummaryResponse
 } from '../../types/inventory';
-import { toNumber } from './productFormatting';
+import { formatStatusLabel, toNumber } from './productFormatting';
 import { styles } from './productStyles';
 import { StatCard, StatusBadge } from './productSummaryComponents';
 import { useAppTranslation } from '../../i18n/I18nContext';

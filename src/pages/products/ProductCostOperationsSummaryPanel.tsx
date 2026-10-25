@@ -8,6 +8,7 @@ import { formatPercent, formatStatusLabel, toNumber } from './productFormatting'
 import { styles } from './productStyles';
 import { StatCard, StatusBadge } from './productSummaryComponents';
 import { useAppTranslation } from '../../i18n/I18nContext';
+import { formatLocalizedNumber } from '../../i18n/formatters';
 
 type CostOperationsQueryState = {
   isLoading: boolean;
@@ -36,7 +37,7 @@ export function ProductCostOperationsSummaryPanel({
   costOperationsEvidenceSummary,
   costOperationsReadinessSummary
 }: ProductCostOperationsSummaryPanelProps) {
-  const { ui } = useAppTranslation();
+  const { ui, locale } = useAppTranslation();
   return (
     <>
             <div style={styles.riskListCard}>
