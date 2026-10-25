@@ -7,6 +7,7 @@
   "type": "module",
   "scripts": {
     "check:ft150-dashboard-stock-deep-link": "node scripts/check-ft150-dashboard-stock-deep-link.mjs",
+    "check:ft151-repeatable-stock-route-reveal": "node scripts/check-ft151-repeatable-stock-route-reveal.mjs",
     "check:replenishment-run-selection-fe223": "node scripts/check-replenishment-run-selection-audit-fe223.mjs",
     "check:workflow-state-guidance-fe223": "node scripts/check-workflow-state-guidance-audit-fe223.mjs",
     "check:cross-domain-durable-route-state": "node --experimental-strip-types scripts/check-cross-domain-durable-route-state.mjs",

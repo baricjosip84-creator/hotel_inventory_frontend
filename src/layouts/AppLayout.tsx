@@ -667,9 +667,15 @@ export default function AppLayout() {
   }, []);
 
   useLayoutEffect(() => {
-    // Keep navigation reset for ordinary pages, but never overwrite an explicit
-    // deep-link scroll. Delayed top resets previously undid the Usage damage/
-    // waste anchor opened from Alerts, leaving the user at the page header.
+    // The Stock page resolves ?stock_id only after its asynchronous stock query
+    // has loaded and the selected row has rendered. The layout's delayed top
+    // resets (0/50/150/350 ms) must not race and undo that record navigation.
+    // This protection applies on EVERY route entry, not just the first click.
+    // All ordinary navigation and existing #hash anchor behavior stay intact.
+    const hasDeferredStockTarget = location.pathname === '/stock'
+      && Boolean(new URLSearchParams(location.search).get('stock_id')?.trim());
+    if (hasDeferredStockTarget) return;
+
     const placeScroll = () => {
       if (!scrollToRouteAnchor(location.hash)) forcePageScrollTop();
     };
