@@ -1,6 +1,8 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const firstNonEmpty = (...values: Array<string | undefined>): string | null => {
   for (const value of values) {
@@ -61,13 +63,33 @@ if (sentrySourceMapsRequired && sentryAllowFailure) {
 
 const sentrySourceMapUploadEnabled = missingSentrySourceMapSettings.length === 0;
 
+// FT178: Version metadata must be generated from the same release manifest that
+// ships inside public/.  Before FT178, Vite overwrote public/deployment-version.json
+// with a JSON object that did not have `frontend` or `audit_round`.  The version
+// URL therefore could not prove whether FE277 was deployed.
+const buildIdentity = JSON.parse(
+  readFileSync(resolve(process.cwd(), 'public', 'deployment-version.json'), 'utf8')
+) as { application: string; frontend: string; backend: string; audit_round: string };
+if (!/^FE\d+$/.test(buildIdentity.frontend) || !/^FT\d+$/.test(buildIdentity.audit_round) || !/^BE\d+$/.test(buildIdentity.backend)) {
+  throw new Error('Missing or invalid Inventory release identity in public/deployment-version.json');
+}
+
 function deploymentVersionPlugin(): Plugin {
   return {
     name: 'deployment-version-metadata',
     apply: 'build',
-    generateBundle() {
+    // The HTML served to a browser also has a quick source identity marker.
+    transformIndexHtml(html) {
+      return html.replace('</head>', `  <meta name="inventory-frontend-release" content="${buildIdentity.frontend}" />\n</head>`);
+    },
+    generateBundle(_options, bundle) {
       const payload = {
+        application: buildIdentity.application,
+        frontend: buildIdentity.frontend,
+        backend: buildIdentity.backend,
+        audit_round: buildIdentity.audit_round,
         service: 'hotel-inventory-frontend',
+        entrypoint_assets: Object.keys(bundle).filter(name => /^assets\/index-[^/]+\.js$/.test(name)).sort(),
         git_commit: firstNonEmpty(
           process.env.VERCEL_GIT_COMMIT_SHA,
           process.env.GITHUB_SHA,

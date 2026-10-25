@@ -1,7 +1,7 @@
-// v2 drops the former cache-first policy for unversioned application resources.
+// FT178: v3 invalidates older inventory shell caches again after source upgrades.
 // Vite's /assets/* files are content-addressed; HTML, shell files and future
 // deployment metadata must be revalidated so a new release can become visible.
-const CACHE_NAME = 'inventory-operations-shell-v2';
+const CACHE_NAME = 'inventory-operations-shell-v3';
 const CACHE_PREFIX = 'inventory-operations-shell-';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg'];
 

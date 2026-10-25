@@ -97,24 +97,37 @@ if (!Number.isInteger(delayMs) || delayMs < 1000 || delayMs > 60000) {
   throw new Error('DEPLOYMENT_WAIT_DELAY_MS must be an integer between 1000 and 60000.');
 }
 
+// FT178: readiness requires release identity AND the HTML actually served at
+// /products to reference the exact same compiled entrypoint recorded by Vite.
+// A successful HTTP 200, or a correct manifest next to stale HTML, is not
+// evidence that the fixed Products bundle was deployed.
+const expectedRelease = JSON.parse(fs.readFileSync(new URL('../public/deployment-version.json', import.meta.url), 'utf8'));
 await waitFor(
   'Frontend deployment',
   async () => {
-    if (!expectedFrontendCommit) {
-      const response = await fetch(frontendOrigin, { redirect: 'follow' });
-      return {
-        ready: response.ok,
-        detail: response.ok ? `HTTP ${response.status}` : `HTTP ${response.status}`
-      };
-    }
-
     const payload = await readJson(`${frontendOrigin}/deployment-version.json`);
     const actualCommit = typeof payload?.git_commit === 'string' ? payload.git_commit.trim().toLowerCase() : '';
+    const identityOk = payload?.frontend === expectedRelease.frontend
+      && payload?.audit_round === expectedRelease.audit_round
+      && payload?.backend === expectedRelease.backend;
+    const commitOk = !expectedFrontendCommit || actualCommit === expectedFrontendCommit;
+    const assets = Array.isArray(payload?.entrypoint_assets) ? payload.entrypoint_assets : [];
+    if (!identityOk || !commitOk || assets.length === 0) {
+      return {
+        ready: false,
+        detail: `identity ${payload?.frontend || 'missing'}/${payload?.audit_round || 'missing'}, expected ${expectedRelease.frontend}/${expectedRelease.audit_round}; commit ${actualCommit || 'missing'}${expectedFrontendCommit ? `, expected ${expectedFrontendCommit}` : ''}; assets ${assets.length}`
+      };
+    }
+    const response = await fetch(`${frontendOrigin}/products?ft178_build_check=${Date.now()}`, {
+      headers: { 'Cache-Control': 'no-cache', Accept: 'text/html' }, redirect: 'follow'
+    });
+    const html = response.ok ? await response.text() : '';
+    const matching = response.ok && assets.some(asset => html.includes(`/${asset}`));
     return {
-      ready: actualCommit === expectedFrontendCommit,
-      detail: actualCommit
-        ? `deployed ${actualCommit}, expected ${expectedFrontendCommit}`
-        : 'deployment-version.json does not contain git_commit'
+      ready: Boolean(matching),
+      detail: matching
+        ? `${payload.frontend}, entrypoint ${assets.join(', ')}, commit ${actualCommit || 'not supplied'}`
+        : `Products HTML did not reference expected built entrypoint(s) ${assets.join(', ')} (HTTP ${response.status})`
     };
   },
   attempts,
