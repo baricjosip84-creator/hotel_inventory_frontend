@@ -8,8 +8,8 @@ const vm = require('node:vm');
 const ts = require('typescript');
 const root = path.resolve(__dirname, '..');
 const publicVersion = JSON.parse(fs.readFileSync(path.join(root, 'public/deployment-version.json'), 'utf8'));
-assert.equal(publicVersion.frontend, 'FE278');
-assert.equal(publicVersion.audit_round, 'FT178');
+assert.match(publicVersion.frontend, /^FE\d+$/);
+assert.match(publicVersion.audit_round, /^FT\d+$/);
 assert.equal(publicVersion.backend, 'BE154');
 const config = fs.readFileSync(path.join(root, 'vite.config.ts'), 'utf8');
 const ast = ts.createSourceFile('vite.config.ts', config, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -26,7 +26,7 @@ const plugin = context.module.exports.deploymentVersionPlugin();
 assert.equal(plugin.name,'deployment-version-metadata');
 const html = '<html><head></head><body><div id="root"></div></body></html>';
 const stamped = plugin.transformIndexHtml(html);
-assert.ok(stamped.includes('name="inventory-frontend-release" content="FE278"'),'HTML carries FE278 marker');
+assert.ok(stamped.includes(`name="inventory-frontend-release" content="${publicVersion.frontend}"`),'HTML carries FE278 marker');
 const emitted=[];
 plugin.generateBundle.call({emitFile:x=>emitted.push(x)}, {}, {
   'assets/index-NEWFE278.js':{type:'chunk'}, 'assets/vendor-react-123.js':{type:'chunk'}
@@ -50,4 +50,4 @@ for (const route of ['/','/index.html','/products','/deployment-version.json','/
 const check = JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
 assert.match(check.scripts.prebuild,/check:ft178-deployment-identity/);
 assert.match(check.scripts.postbuild,/check:ft178-built-artifacts/);
-console.log('FT178: Vite emitted FE278/FT178/BE154 identity + entrypoint JS PASS; HTML marker PASS; SW v3 and no-store headers PASS; build gates PASS');
+console.log(`FT178 inherited: Vite emitted ${publicVersion.frontend}/${publicVersion.audit_round}/${publicVersion.backend} identity + entrypoint JS PASS; HTML marker PASS; SW v3 and no-store headers PASS; build gates PASS`);

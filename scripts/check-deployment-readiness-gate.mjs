@@ -186,10 +186,11 @@ if (strictWorkflowValidation) {
 ].forEach((expected) => requireText(deploymentTsconfig, expected, 'tsconfig.deployment.json'));
 
 requireText(sourceDistribution, "'playwright-deployment-report'", 'source distribution staging');
-requireText(sourceDistribution, "'deployment-version.json'", 'source distribution staging');
+requireText(sourceDistribution, 'Keep the committed public/deployment-version.json', 'source distribution staging');
 requireText(vercel, '/deployment-version.json', 'vercel.json');
 requireText(vercel, 'no-store, max-age=0', 'vercel.json');
-requireText(gitignore, 'public/deployment-version.json', '.gitignore');
+if (/^\s*public\/deployment-version\.json\s*$/m.test(gitignore)) errors.push('Release manifest cannot be ignored by Git.');
+requireText(gitignore, 'dist/', '.gitignore');
 
 [
   '# Automated Deployment Readiness Gate',

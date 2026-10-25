@@ -81,3 +81,7 @@ It does not create products, change stock, receive shipments, alter tenant setti
 ## Manual fallback
 
 Open **Actions → Deployment Readiness Gate → Run workflow**, select `production`, leave `expected_backend_commit` blank unless a specific backend deployment must be paired, and run it. The selected workflow commit is always required to be live on Vercel before Playwright starts. A successful run uploads a 30-day HTML/JSON evidence artifact.
+
+## FT179 release manifest source policy
+
+Keep `public/deployment-version.json` committed alongside the frontend source. It is required by `vite.config.ts` at build time. Do not add it to `.gitignore`, delete it with generated-artifact cleanup, or exclude it from packaged source. Only the generated `dist/` output is ignored. `npm run check:ft179-release-identity-preservation` confirms the contract offline.
