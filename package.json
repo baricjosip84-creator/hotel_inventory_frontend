@@ -595,7 +595,8 @@
     "check:ft140-query-rate-limit-retry": "node scripts/check-ft140-query-rate-limit-retry.mjs",
     "check:stock-zero-usable-status-ft149": "node scripts/check-stock-zero-usable-status-ft149.mjs",
     "check:ft165-shipment-receiving-visible-toast": "node scripts/check-ft165-shipment-receiving-visible-toast.mjs",
-    "check:ft172-hierarchy-field-alignment": "node scripts/check-ft172-hierarchy-field-alignment.mjs"
+    "check:ft172-hierarchy-field-alignment": "node scripts/check-ft172-hierarchy-field-alignment.mjs",
+    "check:ft174-landed-cost-preview-and-finalize-guard": "node scripts/check-ft174-landed-cost-preview-and-finalize-guard.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

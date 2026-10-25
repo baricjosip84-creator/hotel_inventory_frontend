@@ -359,6 +359,12 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Variant created successfully.';
   }
 
+  // FT174: landed-cost Preview is a read-only calculation even though the
+  // API uses POST. It creates no inventory item, finalized cost or stock change.
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/inventory-capabilities/landed-costs/preview') {
+    return 'Landed cost preview calculated. No costs were finalized.';
+  }
+
   // Batch131: finalizing allocated landed cost is not creating a generic item.
   // The response is already committed when the shared mutation toast is emitted.
   if (normalizedMethod === 'POST' && normalizedPathOnly === '/inventory-capabilities/landed-costs/finalize') {

@@ -184,6 +184,18 @@
   min-width: 0;
 }
 
+/* FT174: a partially received shipment must not look finalizable.
+   The HTML disabled guard and server-side 409 remain the security boundary. */
+.io-advanced-inventory-page .capability-cost-finalize:disabled,
+.io-advanced-inventory-page .capability-cost-finalize:disabled:hover {
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  box-shadow: none;
+  opacity: 1;
+  cursor: not-allowed;
+}
+
 .io-advanced-inventory-page .form-error,
 .io-advanced-inventory-page .form-success {
   margin-top: 12px;

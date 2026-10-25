@@ -121,6 +121,7 @@ const rows: readonly TranslationRow[] = [
   // Batch 132: identity registration against existing on-hand stock.
   ["Serial registered successfully.", "Seriennummer erfolgreich registriert.", "Número de serie registrado correctamente.", "Numéro de série enregistré avec succès.", "Serijski broj uspješno je registriran."],
   // Batch 131: a finalized landed-cost allocation is not a newly created item.
+  ["Landed cost preview calculated. No costs were finalized.", "Vorschau der Einstandskosten berechnet. Es wurden keine Kosten finalisiert.", "Vista previa del coste calculada. No se ha finalizado ningún coste.", "Aperçu du coût rendu calculé. Aucun coût n’a été finalisé.", "Pregled zavisnog troška izračunat. Nijedan trošak nije finaliziran."],
   ["Landed cost finalized successfully.", "Einstandskosten erfolgreich finalisiert.", "Coste en destino finalizado correctamente.", "Coût rendu finalisé avec succès.", "Zavisni trošak uspješno je finaliziran."],
   // Batch 128: human-first variant creation and optional SKU override.
   ["Custom variant SKU", "Benutzerdefinierte Varianten-SKU", "SKU de variante personalizado", "SKU de variante personnalisé", "Prilagođena SKU oznaka varijante"],
