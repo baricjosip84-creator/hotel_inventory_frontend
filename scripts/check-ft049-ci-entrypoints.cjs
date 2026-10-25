@@ -7,7 +7,29 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const workflow = fs.readFileSync(path.join(root, '.github/workflows/frontend-validation.yml'), 'utf8');
-const scripts = require(path.join(root, 'package.json')).scripts;
+const packageMeta = require(path.join(root, 'package.json'));
+const scripts = packageMeta.scripts;
+
+// FT181: A previously untracked source identity caused GitHub to fail FT177
+// and prevented a fresh frontend deployment. Recover this reproducible JSON
+// from tracked package.json metadata before the CI checks and Vite build.
+// No application or inventory data is read or changed.
+const identity = packageMeta.inventorySourceIdentity;
+assert.ok(identity && /^FE\d+$/.test(identity.frontend) &&
+  /^FT\d+$/.test(identity.audit_round) && /^BE\d+$/.test(identity.backend),
+'package.json must declare inventorySourceIdentity for CI and production builds');
+const identityPath = path.join(root, 'public', 'deployment-version.json');
+if (!fs.existsSync(identityPath)) {
+  fs.mkdirSync(path.dirname(identityPath), {recursive: true});
+  fs.writeFileSync(identityPath, JSON.stringify({
+    ...identity,
+    products_cost_controls_fix: 'FT176 and FT177 source corrections',
+    purpose: 'Build identity recovered from versioned package.json source metadata',
+    live_acceptance: 'PENDING'
+  }, null, 2) + '\n', 'utf8');
+  console.log(`FT181: restored missing source identity ${identity.frontend}/${identity.audit_round} from package.json`);
+}
+
 const primaryJob = workflow.split('\n  cross-repository-contracts:')[0];
 const refs = [...primaryJob.matchAll(/\bnpm run ([a-z0-9:-]+)/g)].map(match => match[1]);
 const errors = new Set();
