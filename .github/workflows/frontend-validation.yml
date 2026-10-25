@@ -35,6 +35,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Verify all frontend validation scripts exist in the checked-out source (FT049)
         run: npm run check:ft049-ci-entrypoints
+      - name: Verify CI files are present in the Git index, not just a source ZIP (FT180)
+        run: npm run check:ft180-ci-source-tracking
       - name: Verify TypeScript checks resolve the project compiler (FT048)
         run: npm run check:ft048-portable-typescript
       - name: Verify hosted API build configuration cannot silently use SPA fallback

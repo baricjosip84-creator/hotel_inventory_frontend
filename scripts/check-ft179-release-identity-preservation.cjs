@@ -9,8 +9,8 @@ const cp = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const publicPath = 'public/deployment-version.json';
 const manifest = JSON.parse(fs.readFileSync(path.join(root, publicPath), 'utf8'));
-assert.equal(manifest.frontend, 'FE279');
-assert.equal(manifest.audit_round, 'FT179');
+assert.equal(manifest.frontend, 'FE280');
+assert.equal(manifest.audit_round, 'FT180');
 assert.equal(manifest.backend, 'BE154');
 const ignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
 assert.ok(!/^\s*public\/deployment-version\.json\s*$/m.test(ignore), 'Git must NOT ignore the version manifest');
@@ -46,4 +46,4 @@ try {
 } finally {
   fs.rmSync(scratch,{recursive:true,force:true});
 }
-console.log('FT179: Git tracking PASS; cleanup retention PASS; real source staging PASS; build manifest FE279/FT179/BE154 PASS');
+console.log('FT179: Git tracking PASS; cleanup retention PASS; real source staging PASS; build manifest FE280/FT180/BE154 PASS');

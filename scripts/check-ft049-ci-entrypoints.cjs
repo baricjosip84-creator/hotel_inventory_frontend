@@ -77,6 +77,35 @@ for (const relative of inspected) {
     errors.add(`Unsupported TypeScript 6 compiler option in ${relative}: replace ts.ModuleKind.None with ts.ModuleKind.ESNext`);
   }
 }
+// FT180: Files present in a downloaded ZIP can be absent from the Git index.
+// When run inside an actual repository, verify that all CI Node entrypoints
+// and their statically discovered local dependencies have been staged/tracked.
+// In a source ZIP without .git, keep the original filesystem checks.
+const { spawnSync } = require('node:child_process');
+function git(args) {
+  return spawnSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+}
+const topLevel = git(['rev-parse', '--show-toplevel']);
+if (topLevel.status === 0 && path.resolve(topLevel.stdout.trim()) === root) {
+  const index = git(['ls-files', '-z', '--cached']);
+  if (index.status !== 0) {
+    errors.add(`Cannot inspect staged/committed CI source files: ${index.stderr.trim()}`);
+  } else {
+    const tracked = new Set(index.stdout.split('\0').filter(Boolean));
+    const required = new Set([
+      'package.json',
+      '.github/workflows/frontend-validation.yml',
+      ...paths,
+      ...inspected
+    ]);
+    for (const relative of required) {
+      const normalized = relative.replace(/\\/g, '/');
+      if (fs.existsSync(path.join(root, relative)) && !tracked.has(normalized)) {
+        errors.add(`CI file exists locally but is not staged/tracked by Git: ${normalized} (run git add -- ${normalized})`);
+      }
+    }
+  }
+}
 assert.ok(refs.length >= 40, 'Expected frontend CI job definitions were not found');
 assert.deepEqual([...errors].sort(), [], `Frontend CI source is incomplete:\n${[...errors].sort().join('\n')}`);
 console.log(`FT049/FT064 frontend CI closure PASS: ${refs.length} workflow commands, ${visitedCommands.size} direct/indirect npm scripts, ${paths.size} Node entrypoints, ${inspected.size} dependency-checked files`);
