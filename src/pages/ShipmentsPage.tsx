@@ -7,6 +7,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedNumber } from '../i18n/formatters';
 import { apiRequest, ApiError } from '../lib/api';
+import { showTenantActionError, showTenantActionSuccess } from '../lib/actionFeedback';
 import { fetchTenantSubscriptionAccess, getTenantFeatureEntitlement } from '../lib/tenantSubscriptionAccess';
 import { getCurrentAccessRoleLabel, getRoleCapabilities } from '../lib/permissions';
 import { SidebarAttentionMarker, SidebarAttentionTabDot } from '../components/ui/SidebarAttentionMarker';
@@ -891,12 +892,17 @@ export default function ShipmentsPage() {
             .replace('{ordered}', formatShipmentQuantity(poSummary.ordered_quantity))}`
         : '';
 
-      setPageMessage(
-        ui('✔ {product} +{quantity} received into stock.{poProgress}')
-          .replace('{product}', productLabel)
-          .replace('{quantity}', quantityLabel)
-          .replace('{poProgress}', poProgressLabel)
-      );
+      // FT165-UX-01: Receiving takes place far below the inline page banner.
+      // Preserve the banner for history, but also show the existing fixed-position
+      // tenant success toast at the moment the backend confirms the receipt.
+      // The receive request opts out of generic API mutation feedback, so this
+      // operation-specific message does not produce a duplicate toast.
+      const receiptMessage = ui('✔ {product} +{quantity} received into stock.{poProgress}')
+        .replace('{product}', productLabel)
+        .replace('{quantity}', quantityLabel)
+        .replace('{poProgress}', poProgressLabel);
+      setPageMessage(receiptMessage);
+      showTenantActionSuccess(receiptMessage);
 
       await queryClient.refetchQueries({ queryKey: ['shipments'] });
       // Shipment lifecycle changes can affect sidebar, tab, and record attention.
@@ -915,11 +921,11 @@ export default function ShipmentsPage() {
       await queryClient.invalidateQueries({ queryKey: ['alerts'] });
     },
     onError: (error) => {
-      if (error instanceof ApiError) {
-        setPageError(error.message);
-      } else {
-        setPageError(ui('Failed to receive shipment item.'));
-      }
+      const receiveErrorMessage = error instanceof ApiError
+        ? error.message
+        : ui('Failed to receive shipment item.');
+      setPageError(receiveErrorMessage);
+      showTenantActionError(receiveErrorMessage);
       setPageMessage(null);
     }
   });
