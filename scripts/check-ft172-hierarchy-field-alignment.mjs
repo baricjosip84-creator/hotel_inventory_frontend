@@ -1,0 +1,23 @@
+// FT172: Parent helper guidance must never change the common grid input baseline.
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const page = readFileSync(new URL('../src/pages/InventoryCapabilitiesPage.tsx', import.meta.url), 'utf8');
+const style = readFileSync(new URL('../src/pages/InventoryCapabilitiesPage.css', import.meta.url), 'utf8');
+const start = page.indexOf('function HierarchyPanel(');
+const end = page.indexOf('function BomPanel(', start);
+assert.ok(start >= 0 && end > start, 'HierarchyPanel must exist');
+const hierarchy = page.slice(start, end);
+const fromParent = hierarchy.indexOf('<label>{ui("Parent")}');
+const fromType = hierarchy.indexOf('<label>{ui("Type")}');
+assert.ok(fromParent > 0 && fromType > fromParent, 'Parent and Type controls must exist in intended order');
+const parentLabel = hierarchy.slice(fromParent, fromType);
+assert.match(parentLabel, /<select aria-describedby="hierarchy-parent-guidance"/);
+assert.ok(!parentLabel.includes('className="muted"'), 'Parent grid cell must not include variable-height helper text');
+assert.ok(parentLabel.endsWith('</label>'), 'Parent label must close before the next grid cell');
+const help = hierarchy.indexOf('<p id="hierarchy-parent-guidance"');
+const saveButton = hierarchy.indexOf('{save.isPending ? ui("Saving…") : ui("Save hierarchy")}</button></div>');
+assert.ok(help > saveButton, 'Helper must follow the closed hierarchy grid');
+assert.match(hierarchy, /Bins and legacy storage locations cannot be parents/);
+assert.match(hierarchy, /onClick=\{\(\) => save\.mutate\(\)\}/);
+assert.match(style, /\.capability-hierarchy-parent-guidance\s*\{/);
+console.log('FT172: hierarchy Parent/Location/Type/Code alignment contract PASS (8 checks).');

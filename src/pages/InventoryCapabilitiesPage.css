@@ -228,3 +228,12 @@
 .io-advanced-inventory-page .capability-tabs .button svg {
   color: currentColor;
 }
+
+/* FT172: keep all hierarchy input labels/selects on the same baseline.
+   Parent eligibility guidance must not increase the Parent grid cell height. */
+.io-advanced-inventory-page .capability-hierarchy-parent-guidance {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+}
