@@ -667,14 +667,15 @@ export default function AppLayout() {
   }, []);
 
   useLayoutEffect(() => {
-    // The Stock page resolves ?stock_id only after its asynchronous stock query
-    // has loaded and the selected row has rendered. The layout's delayed top
-    // resets (0/50/150/350 ms) must not race and undo that record navigation.
-    // This protection applies on EVERY route entry, not just the first click.
-    // All ordinary navigation and existing #hash anchor behavior stay intact.
+    // A deep-linked Stock position or Alerts queue target is revealed after its
+    // async query renders. Delayed generic page-top resets must not race that
+    // focused-row/queue reveal, including on F5 and repeat navigation.
+    const routeParams = new URLSearchParams(location.search);
     const hasDeferredStockTarget = location.pathname === '/stock'
-      && Boolean(new URLSearchParams(location.search).get('stock_id')?.trim());
-    if (hasDeferredStockTarget) return;
+      && Boolean(routeParams.get('stock_id')?.trim());
+    const hasDeferredAlertTarget = location.pathname === '/alerts'
+      && (Boolean(routeParams.get('alert_id')?.trim()) || routeParams.get('focus_queue') === 'true');
+    if (hasDeferredStockTarget || hasDeferredAlertTarget) return;
 
     const placeScroll = () => {
       if (!scrollToRouteAnchor(location.hash)) forcePageScrollTop();

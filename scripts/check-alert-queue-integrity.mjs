@@ -60,7 +60,7 @@ check(page.includes('const summary = useMemo(() => summarizeFilteredAlerts(filte
 check(page.includes('mergeFocusedAlert(filteredAlerts, focusedAlertQuery.data)'),'page merges focused alert without mutating query');
 check(page.includes('isFocusedAlertOutsideFilters(filteredAlerts, focusedAlertQuery.data)'),'page detects pinned external alert');
 check(page.includes('focusedOutsideFilters ? ('),'page makes external pin visible');
-check(page.includes('focusedAlertQuery.isError ? ('),'page surfaces missing/deleted link error');
+check(page.includes('focusedAlertQuery.isError && !requestedAlertIsRendered ? ('),'page surfaces an error only if focused alert is absent from the visible queue');
 check(page.includes('formatNullableAlertQuantity(value, unit,'),'page does not turn missing stock into zero');
 for(const label of ['Linked alert could not be loaded.','The linked alert is shown separately and is not included in the filtered totals.']){
  const start=translation.indexOf(`  ["${label}"`);

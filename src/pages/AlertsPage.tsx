@@ -444,11 +444,17 @@ export default function AlertsPage() {
   );
   const focusedOutsideFilters = isFocusedAlertOutsideFilters(filteredAlerts, focusedAlertQuery.data);
 
+  // The target may already be in the filtered queue even when its separate
+  // detail lookup fails or is delayed. Reveal it when the *rendered queue*
+  // contains the ID; don't rerun the scroll on background data refreshes.
+  const requestedAlertIsRendered = Boolean(requestedAlertId && alerts.some((alert) => alert.id === requestedAlertId));
   useEffect(() => {
-    if (!requestedAlertId || !focusedAlertQuery.data) return;
-    const target = document.getElementById(`alert-${requestedAlertId}`);
-    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [focusedAlertQuery.data, requestedAlertId]);
+    if (!requestedAlertIsRendered) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(`alert-${requestedAlertId}`)?.scrollIntoView({ behavior: 'auto', block: 'center' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [requestedAlertId, requestedAlertIsRendered]);
 
   useEffect(() => {
     if (!focusQueue || alertsQuery.isLoading) return;
@@ -650,7 +656,7 @@ export default function AlertsPage() {
           {alertsQuery.isFetching ? <span style={styles.refreshingText}>{ui('Refreshing…')}</span> : null}
         </div>
 
-        {requestedAlertId && focusedAlertQuery.isError ? (
+        {requestedAlertId && focusedAlertQuery.isError && !requestedAlertIsRendered ? (
           <div className="app-error-state" style={styles.messageBox} role="alert">
             <strong>{ui('Linked alert could not be loaded.')}</strong>
             <span>{mutationErrorMessage(focusedAlertQuery.error, ui('The alert request failed.'))}</span>
