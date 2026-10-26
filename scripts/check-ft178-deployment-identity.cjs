@@ -40,7 +40,7 @@ assert.equal(result.audit_round,publicVersion.audit_round);
 assert.deepEqual(Array.from(result.entrypoint_assets),['assets/index-NEWFE278.js']);
 assert.ok(result.built_at && Date.parse(result.built_at),'Build timestamp is present');
 const worker = fs.readFileSync(path.join(root,'public/service-worker.js'),'utf8');
-assert.match(worker,/inventory-operations-shell-v3/);
+assert.match(worker,/inventory-operations-shell-v4/);
 assert.match(worker,/keys\.filter\(\(key\) => key\.startsWith\(CACHE_PREFIX\) && key !== CACHE_NAME\)/);
 assert.match(worker,/url\.pathname === '\/deployment-version\.json'/);
 const vercel = JSON.parse(fs.readFileSync(path.join(root,'vercel.json'),'utf8'));
@@ -50,4 +50,4 @@ for (const route of ['/','/index.html','/products','/deployment-version.json','/
 const check = JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
 assert.match(check.scripts.prebuild,/check:ft178-deployment-identity/);
 assert.match(check.scripts.postbuild,/check:ft178-built-artifacts/);
-console.log(`FT178 inherited: Vite emitted ${publicVersion.frontend}/${publicVersion.audit_round}/${publicVersion.backend} identity + entrypoint JS PASS; HTML marker PASS; SW v3 and no-store headers PASS; build gates PASS`);
+console.log(`FT178 inherited: Vite emitted ${publicVersion.frontend}/${publicVersion.audit_round}/${publicVersion.backend} identity + entrypoint JS PASS; HTML marker PASS; SW v4 and no-store headers PASS; build gates PASS`);

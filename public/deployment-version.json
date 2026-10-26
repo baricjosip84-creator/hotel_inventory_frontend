@@ -1,8 +1,8 @@
 {
   "application": "Inventory Operations",
-  "frontend": "FE288",
+  "frontend": "FE289",
   "backend": "BE159",
-  "audit_round": "FT194",
+  "audit_round": "FT195",
   "prepared_date": "2026-10-26",
   "products_cost_controls_fix": "FT176 live PASS; FT183 content reconciliation; FT184/FT185 source performance fixes; FT189 five-language evidence-export catalog closure",
   "purpose": "FT194: robust Supplier Returns mount; remove TDZ-prone pending-state derived binding, use post-hook JSX safety predicate; deployment verification required",

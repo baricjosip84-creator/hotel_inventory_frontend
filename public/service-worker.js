@@ -1,7 +1,7 @@
-// FT178: v3 invalidates older inventory shell caches again after source upgrades.
-// Vite's /assets/* files are content-addressed; HTML, shell files and future
-// deployment metadata must be revalidated so a new release can become visible.
-const CACHE_NAME = 'inventory-operations-shell-v3';
+// FT195: v4 invalidates stale shell caches and fetches deployed assets first.
+// Offline fallback remains available, but an online client must never prefer an
+// old cached JavaScript bundle after a new production deployment.
+const CACHE_NAME = 'inventory-operations-shell-v4';
 const CACHE_PREFIX = 'inventory-operations-shell-';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg'];
 
@@ -46,17 +46,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Only fingerprinted Vite assets may use cache-first. Every other same-origin
-  // file is network-first so an old shell cannot keep a newer release hidden.
+  // FT195: even fingerprinted assets must use the network when available.
+  // Cache-first could replay the exact old bundle while deployments are ready.
+  // Keep the cache as OFFLINE fallback only; never serve it before trying network.
   if (url.pathname.startsWith('/assets/')) {
     event.respondWith(
-      caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-        if (response.ok && response.type === 'basic') {
-          const copy = response.clone();
-          event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)));
-        }
-        return response;
-      }))
+      fetch(request)
+        .then((response) => {
+          if (response.ok && response.type === 'basic') {
+            const copy = response.clone();
+            event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)));
+          }
+          return response;
+        })
+        .catch(async () => (await caches.match(request)) || Response.error())
     );
     return;
   }

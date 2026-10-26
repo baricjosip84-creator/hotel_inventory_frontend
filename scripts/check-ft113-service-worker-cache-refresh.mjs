@@ -10,7 +10,7 @@ let online = true;
 let oldCacheDeleted = false;
 const origin = 'https://inventory.example.test';
 const oldName = 'inventory-operations-shell-v1';
-const currentName = 'inventory-operations-shell-v2';
+const currentName = 'inventory-operations-shell-v4';
 const keyOf = (request) => typeof request === 'string' ? request : request.url;
 const responseOf = (value) => ({
   ok: true,
@@ -91,8 +91,8 @@ console.log('PASS 3: direct shell requests are network-first');
 
 one = await execute('fetch', req('/assets/app-fingerprint.js'));
 two = await execute('fetch', req('/assets/app-fingerprint.js'));
-assert.equal(one.body, two.body, 'fingerprinted assets can stay cache-first');
-console.log('PASS 4: fingerprinted assets keep efficient caching');
+assert.notEqual(one.body, two.body, 'online fingerprinted assets must revalidate before offline cache');
+console.log('PASS 4: fingerprinted assets are network-first with offline fallback');
 
 const beforeIdentity = networkCount;
 assert.equal(await execute('fetch', req('/deployment-version.json')), undefined);

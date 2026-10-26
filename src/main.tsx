@@ -33,8 +33,26 @@ root.render(
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' }).catch(() => {
-      // App remains usable online if service-worker registration is unavailable.
-    });
+    const wasControlled = Boolean(navigator.serviceWorker.controller);
+    const release = document.querySelector<HTMLMetaElement>('meta[name="inventory-frontend-release"]')?.content || 'unknown';
+    const refreshKey = `inventory-worker-refreshed:${release}`;
+    if (wasControlled) {
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        // Refresh once per release when a newly activated worker takes control.
+        // This prevents an old SPA bundle remaining in memory indefinitely.
+        try {
+          if (sessionStorage.getItem(refreshKey)) return;
+          sessionStorage.setItem(refreshKey, '1');
+        } catch {
+          // Private mode may restrict storage; the app remains usable.
+        }
+        window.location.reload();
+      }, { once: true });
+    }
+    navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' })
+      .then((registration) => registration.update())
+      .catch(() => {
+        // App remains usable online if service-worker registration is unavailable.
+      });
   });
 }
