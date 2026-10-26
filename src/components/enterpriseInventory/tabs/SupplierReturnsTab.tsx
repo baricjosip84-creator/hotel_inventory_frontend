@@ -355,9 +355,9 @@ export function SupplierReturnsTab() {
     },
   });
 
-  // FT193: read mutation pending state only after its hook has initialized.
-  // Computing this earlier throws a temporal-dead-zone ReferenceError when the tab mounts.
-  const addReturnLineDisabled = !canWrite || createReturnMutation.isPending || lineQuantityState !== 'ready';
+  // FT194: the Add return line control reads the mutation only inside JSX,
+  // after ALL hooks have initialized. Do not hoist pending-state access into an
+  // earlier render-time declaration: that crashed Supplier Returns in FE286.
 
   const lifecycleMutation = useMutation({
     mutationFn: async ({ item, action, reason }: ReturnLifecycleInput) => {
@@ -657,10 +657,10 @@ export function SupplierReturnsTab() {
             <button
               type="button"
               onClick={addDraftItem}
-              disabled={addReturnLineDisabled}
+              disabled={!canWrite || lineQuantityState !== 'ready' || createReturnMutation.isPending}
               aria-describedby="supplier-return-line-readiness"
               style={{
-                ...(addReturnLineDisabled ? styles.disabledButton : styles.primaryButton),
+                ...(!canWrite || lineQuantityState !== 'ready' || createReturnMutation.isPending ? styles.disabledButton : styles.primaryButton),
                 marginTop: 8,
               }}
             >

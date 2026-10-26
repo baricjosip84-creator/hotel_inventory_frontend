@@ -1,10 +1,10 @@
 {
   "application": "Inventory Operations",
-  "frontend": "FE287",
+  "frontend": "FE288",
   "backend": "BE159",
-  "audit_round": "FT193",
+  "audit_round": "FT194",
   "prepared_date": "2026-10-26",
   "products_cost_controls_fix": "FT176 live PASS; FT183 content reconciliation; FT184/FT185 source performance fixes; FT189 five-language evidence-export catalog closure",
-  "purpose": "FT193: prevent Supplier Returns initial render TDZ ReferenceError by reading mutation pending state after useMutation initialization",
-  "live_acceptance": "FT193 focused runtime regression passed; live acceptance after frontend deployment pending"
+  "purpose": "FT194: robust Supplier Returns mount; remove TDZ-prone pending-state derived binding, use post-hook JSX safety predicate; deployment verification required",
+  "live_acceptance": "Live Supplier Returns remains FAILED on old index-Dift2EoU.js bundle until new frontend successfully deploys; FE288 source regression PASS"
 }
