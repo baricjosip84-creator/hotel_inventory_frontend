@@ -1,0 +1,41 @@
+/* FT184: regression for priority fetching, disabled derivative queries, preserved exports. */
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+const ts=require('typescript');
+const root=path.resolve(__dirname,'..');
+const file=path.join(root,'src/pages/products/productCostGovernanceQueries.ts');
+const src=fs.readFileSync(file,'utf8');
+const ast=ts.createSourceFile(file,src,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
+assert.equal(ast.parseDiagnostics.length,0);
+const output=ts.transpileModule(src,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+let state='pending';let requests=[];let queries=[];
+const api=new Proxy({}, {get:(_,name)=>()=>Promise.resolve(name)});
+const useQuery=opt=>{
+  requests.push({key:opt.queryKey[0],enabled:opt.enabled});
+  if(opt.enabled)queries.push(opt.queryKey[0]);
+  const priority=opt.queryKey[0]==='product-cost-hardening-summary'||opt.queryKey[0]==='product-cost-report-summary';
+  return {isPending:priority&&state==='pending',isLoading:priority&&state==='pending',isError:priority&&state==='error',isSuccess:!priority||state==='success',refetch:()=>{}};
+};
+const modExports={};
+vm.runInNewContext(output,{exports:modExports,require:id=>id==='@tanstack/react-query'?{useQuery}:api},{timeout:4000});
+assert.equal(typeof modExports.useProductCostGovernanceQueries,'function');
+const run=(phase,enabled)=>{state=phase;requests=[];queries=[];const result=modExports.useProductCostGovernanceQueries(enabled);return {requests,queries,result};};
+let step=run('pending',true);
+assert.deepEqual(step.queries,['product-cost-hardening-summary','product-cost-report-summary'],'Only primary cost summaries start first');
+assert.equal(step.requests.length,17,'All query hooks retained');
+step=run('success',true);
+assert.equal(step.queries.length,10,'2 priority + 8 required visible/export summaries after settle');
+assert.equal(step.requests.filter(q=>q.enabled===false).length,7,'7 hidden status derivatives are not fetched');
+for (const key of ['product-cost-governance-audit-pack','product-cost-governance-review-pack','product-cost-governance-closure-summary','product-cost-governance-handoff-summary'])
+  assert.ok(step.queries.includes(key),'Existing exports must remain backed by queries: '+key);
+step=run('error',true);
+assert.equal(step.queries.length,10,'Supporting panels must not be blocked when one priority fails');
+step=run('pending',false);
+assert.equal(step.queries.length,0,'No cost queries without permission/tab active');
+assert.match(src,/staleTime: 15_000/);
+const panel=fs.readFileSync(path.join(root,'src/pages/products/ProductCostGovernanceSummaryPanel.tsx'),'utf8');
+assert.match(panel,/FT184 disabled panels/);
+assert.match(panel,/handleExportCostGovernanceHandoffCsv/);
+console.log('FT184 frontend: priority first, support after settle, hidden 7 disabled, exports retained, disabled tab/permission zero requests PASS');

@@ -1,10 +1,10 @@
 {
   "application": "Inventory Operations",
-  "frontend": "FE281",
-  "backend": "BE154",
-  "audit_round": "FT183",
+  "frontend": "FE282",
+  "backend": "BE155",
+  "audit_round": "FT184",
   "prepared_date": "2026-10-26",
-  "products_cost_controls_fix": "FT176 ui crash live PASS; FT183 original-audit content reconciliation with reversible legacy status suppression and queue source-label fix",
+  "products_cost_controls_fix": "FT176 live PASS; FT183 content reconciliation; FT184 prioritized summary requests, tenant-scoped hardening query, concurrent report composition",
   "purpose": "Required, versioned SOURCE release identity manifest: tracked by git, preserved by cleanup and source staging; build emits compiled identity and JS asset names.",
-  "live_acceptance": "FT176 Products crash PASS (screenshots 2026-10-26); FT183 content changes NOT YET LIVE VERIFIED"
+  "live_acceptance": "FT176 crash live PASS; FT184 performance SOURCE VERIFIED, live timing NOT YET VERIFIED"
 }

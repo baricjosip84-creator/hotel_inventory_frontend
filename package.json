@@ -4,15 +4,16 @@
   "version": "0.0.0",
   "inventorySourceIdentity": {
     "application": "Inventory Operations",
-    "frontend": "FE280",
-    "backend": "BE154",
-    "audit_round": "FT180",
-    "prepared_date": "2026-10-25"
+    "frontend": "FE282",
+    "backend": "BE155",
+    "audit_round": "FT184",
+    "prepared_date": "2026-10-26"
   },
   "author": "SMOOOZ",
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "check:ft184-cost-summary-scheduling": "node scripts/check-ft184-cost-summary-scheduling.cjs",
     "check:ft150-dashboard-stock-deep-link": "node scripts/check-ft150-dashboard-stock-deep-link.mjs",
     "check:ft152-ci-entry-order": "node scripts/check-ft152-ci-entry-order.mjs",
     "check:ft151-repeatable-stock-route-reveal": "node scripts/check-ft151-repeatable-stock-route-reveal.mjs",

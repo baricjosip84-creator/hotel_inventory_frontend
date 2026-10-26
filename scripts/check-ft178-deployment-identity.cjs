@@ -10,7 +10,7 @@ const root = path.resolve(__dirname, '..');
 const publicVersion = JSON.parse(fs.readFileSync(path.join(root, 'public/deployment-version.json'), 'utf8'));
 assert.match(publicVersion.frontend, /^FE\d+$/);
 assert.match(publicVersion.audit_round, /^FT\d+$/);
-assert.equal(publicVersion.backend, 'BE154');
+assert.equal(publicVersion.backend, 'BE155');
 const config = fs.readFileSync(path.join(root, 'vite.config.ts'), 'utf8');
 const ast = ts.createSourceFile('vite.config.ts', config, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 const fn = ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'deploymentVersionPlugin');

@@ -13,7 +13,7 @@ const manifest = JSON.parse(fs.readFileSync(path.join(root, publicPath), 'utf8')
 assert.match(manifest.frontend, /^FE\d+$/);
 // Earlier release asserted FT180 literally; preserve versioned metadata validation.
 assert.match(manifest.audit_round, /^FT\d+$/);
-assert.equal(manifest.backend, 'BE154');
+assert.equal(manifest.backend, 'BE155');
 const ignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
 assert.ok(!/^\s*public\/deployment-version\.json\s*$/m.test(ignore), 'Git must NOT ignore the version manifest');
 assert.match(ignore, /^dist\/$/m, 'Build output remains ignored');

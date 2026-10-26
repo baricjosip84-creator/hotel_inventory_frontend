@@ -126,7 +126,8 @@ export function ProductCostGovernanceSummaryPanel({
               {ui("Final read-only readiness check for the costing intelligence module, built from dashboard, report, and hardening outputs.")}
             </p>
           </div>
-          <button type="button" style={styles.secondaryButton} onClick={() => { costGovernanceQuery.refetch(); costGovernanceDetailsQuery.refetch(); costGovernanceAuditQuery.refetch(); costGovernanceSignoffQuery.refetch(); costGovernanceReviewQueueQuery.refetch(); costGovernanceReviewPackQuery.refetch(); costGovernanceFinalQuery.refetch(); costPerformanceQuery.refetch(); costSecurityAuditQuery.refetch(); }}>
+          <button type="button" style={styles.secondaryButton} onClick={() => { costGovernanceQuery.refetch(); costGovernanceDetailsQuery.refetch(); costGovernanceAuditQuery.refetch(); costGovernanceSignoffQuery.refetch(); costGovernanceReviewQueueQuery.refetch(); costGovernanceReviewPackQuery.refetch(); /* FT184 disabled panels (FT183) no longer reload on refresh. Original:
+            costGovernanceFinalQuery.refetch(); costPerformanceQuery.refetch(); costSecurityAuditQuery.refetch(); */ }}>
             {ui("Refresh Governance")}
           </button>
         </div>
