@@ -667,15 +667,19 @@ export default function AppLayout() {
   }, []);
 
   useLayoutEffect(() => {
-    // A deep-linked Stock position or Alerts queue target is revealed after its
+    // A deep-linked Stock, Alerts or Reservation detail target is revealed after its
     // async query renders. Delayed generic page-top resets must not race that
-    // focused-row/queue reveal, including on F5 and repeat navigation.
+    // focused record/queue reveal, including on F5 and repeat navigation.
+    // FT191: Requisitions -> linked Reservation had the same race as FT151 Stock.
+    // Preserve the prior generic scroll-reset behavior for ordinary navigation.
     const routeParams = new URLSearchParams(location.search);
     const hasDeferredStockTarget = location.pathname === '/stock'
       && Boolean(routeParams.get('stock_id')?.trim());
     const hasDeferredAlertTarget = location.pathname === '/alerts'
       && (Boolean(routeParams.get('alert_id')?.trim()) || routeParams.get('focus_queue') === 'true');
-    if (hasDeferredStockTarget || hasDeferredAlertTarget) return;
+    const hasDeferredReservationTarget = location.pathname === '/inventory-reservations'
+      && (Boolean(routeParams.get('reservationId')?.trim()) || Boolean(routeParams.get('reservation_id')?.trim()));
+    if (hasDeferredStockTarget || hasDeferredAlertTarget || hasDeferredReservationTarget) return;
 
     const placeScroll = () => {
       if (!scrollToRouteAnchor(location.hash)) forcePageScrollTop();

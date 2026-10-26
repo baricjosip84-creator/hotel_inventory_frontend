@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "inventorySourceIdentity": {
     "application": "Inventory Operations",
-    "frontend": "FE284",
-    "backend": "BE158",
-    "audit_round": "FT189",
+    "frontend": "FE285",
+    "backend": "BE159",
+    "audit_round": "FT191",
     "prepared_date": "2026-10-26"
   },
   "author": "SMOOOZ",
@@ -612,7 +612,8 @@
     "postbuild": "npm run check:ft178-built-artifacts",
     "check:ft179-release-identity-preservation": "node scripts/check-ft179-release-identity-preservation.cjs",
     "check:ft180-ci-source-tracking": "node scripts/check-ft180-ci-source-tracking.cjs",
-    "check:ft183-products-cost-content": "node scripts/check-ft183-products-cost-content.cjs"
+    "check:ft183-products-cost-content": "node scripts/check-ft183-products-cost-content.cjs",
+    "check:ft191-reservation-deep-link-timing": "node scripts/check-ft191-reservation-deep-link-timing.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

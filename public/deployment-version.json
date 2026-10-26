@@ -1,10 +1,10 @@
 {
   "application": "Inventory Operations",
-  "frontend": "FE284",
-  "backend": "BE158",
-  "audit_round": "FT189",
+  "frontend": "FE285",
+  "backend": "BE159",
+  "audit_round": "FT191",
   "prepared_date": "2026-10-26",
   "products_cost_controls_fix": "FT176 live PASS; FT183 content reconciliation; FT184/FT185 source performance fixes; FT189 five-language evidence-export catalog closure",
-  "purpose": "Tracked frontend release identity; FT189 adds two missing evidence-export translations required by CI",
-  "live_acceptance": "FT189 translation/CI closure source verified; live deployment and WFC-DEF-001 guidance acceptance pending"
+  "purpose": "FT191: linked reservation exact-record focus race closure on navigation from requisitions",
+  "live_acceptance": "FT191 source regression pending production confirmation of direct reservation detail focus"
 }

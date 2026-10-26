@@ -124,6 +124,8 @@ jobs:
 
       - name: Verify reservation and requisition URL selection, refresh and browser history
         run: npm run check:reservation-requisition-url-selection
+      - name: Prevent linked reservation detail focus being reset to page top (FT191)
+        run: npm run check:ft191-reservation-deep-link-timing
 
       - name: Verify filtered alert counts, pinned deep links and missing quantities
         run: npm run check:alert-queue-integrity
