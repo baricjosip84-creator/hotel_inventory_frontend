@@ -1,10 +1,10 @@
 {
   "application": "Inventory Operations",
-  "frontend": "FE286",
+  "frontend": "FE287",
   "backend": "BE159",
-  "audit_round": "FT192",
+  "audit_round": "FT193",
   "prepared_date": "2026-10-26",
   "products_cost_controls_fix": "FT176 live PASS; FT183 content reconciliation; FT184/FT185 source performance fixes; FT189 five-language evidence-export catalog closure",
-  "purpose": "FT192: linked Reservation exact record visibly first on selected deep links; focus guard does not suppress cancelled RAF",
-  "live_acceptance": "FT192 source regression passed; production view still requires screenshot"
+  "purpose": "FT193: prevent Supplier Returns initial render TDZ ReferenceError by reading mutation pending state after useMutation initialization",
+  "live_acceptance": "FT193 focused runtime regression passed; live acceptance after frontend deployment pending"
 }

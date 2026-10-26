@@ -256,7 +256,6 @@ export function SupplierReturnsTab() {
 
   const selectedLot = eligibleLots.find((lot) => lot.inventory_lot_id === selectedLotId) ?? null;
   const lineQuantityState = getSupplierReturnLineQuantityState(selectedLot, lineQuantity);
-  const addReturnLineDisabled = !canWrite || createReturnMutation.isPending || lineQuantityState !== 'ready';
   const draftTotal = draftItems.reduce((total, item) => {
     const unitCost = Number(item.lot.unit_cost ?? 0);
     return total + (Number.isFinite(unitCost) ? unitCost * item.quantity : 0);
@@ -355,6 +354,10 @@ export function SupplierReturnsTab() {
       setError(normalizeError(mutationError, ui('Failed to create supplier return.')));
     },
   });
+
+  // FT193: read mutation pending state only after its hook has initialized.
+  // Computing this earlier throws a temporal-dead-zone ReferenceError when the tab mounts.
+  const addReturnLineDisabled = !canWrite || createReturnMutation.isPending || lineQuantityState !== 'ready';
 
   const lifecycleMutation = useMutation({
     mutationFn: async ({ item, action, reason }: ReturnLifecycleInput) => {

@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "inventorySourceIdentity": {
     "application": "Inventory Operations",
-    "frontend": "FE286",
+    "frontend": "FE287",
     "backend": "BE159",
-    "audit_round": "FT192",
+    "audit_round": "FT193",
     "prepared_date": "2026-10-26"
   },
   "author": "SMOOOZ",
@@ -614,7 +614,8 @@
     "check:ft180-ci-source-tracking": "node scripts/check-ft180-ci-source-tracking.cjs",
     "check:ft183-products-cost-content": "node scripts/check-ft183-products-cost-content.cjs",
     "check:ft191-reservation-deep-link-timing": "node scripts/check-ft191-reservation-deep-link-timing.mjs",
-    "check:ft192-linked-reservation-visible": "node scripts/check-ft192-linked-reservation-visible.mjs"
+    "check:ft192-linked-reservation-visible": "node scripts/check-ft192-linked-reservation-visible.mjs",
+    "check:ft193-supplier-returns-initialization": "node scripts/check-ft193-supplier-returns-initialization.cjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

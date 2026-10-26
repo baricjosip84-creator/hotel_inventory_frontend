@@ -128,6 +128,8 @@ jobs:
         run: npm run check:ft191-reservation-deep-link-timing
       - name: Verify selected linked reservation is visible despite scroll races (FT192)
         run: npm run check:ft192-linked-reservation-visible
+      - name: Prevent Supplier Returns initialization crash (FT193)
+        run: npm run check:ft193-supplier-returns-initialization
 
       - name: Verify filtered alert counts, pinned deep links and missing quantities
         run: npm run check:alert-queue-integrity
