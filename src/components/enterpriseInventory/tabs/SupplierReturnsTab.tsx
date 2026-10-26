@@ -231,6 +231,51 @@ export function SupplierReturnsTab() {
     enabled: canWrite,
   });
 
+  // FT196: Initialize the Supplier Returns mutation before any render-time
+  // controls can refer to its pending state. This is a structural guarantee,
+  // independent of JSX evaluation order or minifier variable names.
+  const refreshReturnData = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['enterprise-supplier-returns'] }),
+      queryClient.invalidateQueries({ queryKey: ['enterprise-supplier-invoices'] }),
+      queryClient.invalidateQueries({ queryKey: ['enterprise-supplier-return-eligible-lots'] }),
+      queryClient.invalidateQueries({ queryKey: ['enterprise-stock-overview'] }),
+      queryClient.invalidateQueries({ queryKey: ['enterprise-stock-movements'] }),
+      queryClient.invalidateQueries({ queryKey: ['enterprise-notifications'] }),
+      queryClient.invalidateQueries({ queryKey: ['enterprise-audit'] }),
+    ]);
+  };
+
+  const createReturnMutation = useMutation({
+    mutationFn: () => postEnterpriseInventoryRequest<SupplierReturn>('/enterprise-inventory/supplier-returns', {
+      reason: returnReason.trim(),
+      notes: notes.trim() || null,
+      items: draftItems.map((item) => ({
+        inventory_lot_id: item.inventory_lot_id,
+        quantity: item.quantity,
+        serial_numbers: item.serial_numbers,
+        reason: item.reason.trim() || null,
+      })),
+    }, { skipMutationFeedback: true }),
+    onSuccess: async (created) => {
+      setDraftItems([]);
+      setSelectedLotId('');
+      setLineQuantity('');
+      setLineReason('');
+      setLineSerialNumbers('');
+      setReturnReason('');
+      setNotes('');
+      setError(null);
+      setMessage(ui('Supplier return {returnNumber} created as a draft.').replace('{returnNumber}', created.return_number || ''));
+      await refreshReturnData();
+    },
+    onError: (mutationError) => {
+      setMessage(null);
+      setError(normalizeError(mutationError, ui('Failed to create supplier return.')));
+    },
+  });
+
+
   const selectedSupplierId = draftItems[0]?.lot.supplier_id ?? null;
   const draftValuationCurrencies = useMemo(
     () => [...new Set(draftItems
@@ -313,47 +358,6 @@ export function SupplierReturnsTab() {
     && Number.isFinite(expectedCreditTaxNumber)
     && expectedCreditTaxNumber >= 0
   );
-
-  const refreshReturnData = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['enterprise-supplier-returns'] }),
-      queryClient.invalidateQueries({ queryKey: ['enterprise-supplier-invoices'] }),
-      queryClient.invalidateQueries({ queryKey: ['enterprise-supplier-return-eligible-lots'] }),
-      queryClient.invalidateQueries({ queryKey: ['enterprise-stock-overview'] }),
-      queryClient.invalidateQueries({ queryKey: ['enterprise-stock-movements'] }),
-      queryClient.invalidateQueries({ queryKey: ['enterprise-notifications'] }),
-      queryClient.invalidateQueries({ queryKey: ['enterprise-audit'] }),
-    ]);
-  };
-
-  const createReturnMutation = useMutation({
-    mutationFn: () => postEnterpriseInventoryRequest<SupplierReturn>('/enterprise-inventory/supplier-returns', {
-      reason: returnReason.trim(),
-      notes: notes.trim() || null,
-      items: draftItems.map((item) => ({
-        inventory_lot_id: item.inventory_lot_id,
-        quantity: item.quantity,
-        serial_numbers: item.serial_numbers,
-        reason: item.reason.trim() || null,
-      })),
-    }, { skipMutationFeedback: true }),
-    onSuccess: async (created) => {
-      setDraftItems([]);
-      setSelectedLotId('');
-      setLineQuantity('');
-      setLineReason('');
-      setLineSerialNumbers('');
-      setReturnReason('');
-      setNotes('');
-      setError(null);
-      setMessage(ui('Supplier return {returnNumber} created as a draft.').replace('{returnNumber}', created.return_number || ''));
-      await refreshReturnData();
-    },
-    onError: (mutationError) => {
-      setMessage(null);
-      setError(normalizeError(mutationError, ui('Failed to create supplier return.')));
-    },
-  });
 
   // FT194: the Add return line control reads the mutation only inside JSX,
   // after ALL hooks have initialized. Do not hoist pending-state access into an

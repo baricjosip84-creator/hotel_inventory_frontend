@@ -1,10 +1,10 @@
 {
   "application": "Inventory Operations",
-  "frontend": "FE289",
+  "frontend": "FE290",
   "backend": "BE159",
-  "audit_round": "FT195",
+  "audit_round": "FT196",
   "prepared_date": "2026-10-26",
   "products_cost_controls_fix": "FT176 live PASS; FT183 content reconciliation; FT184/FT185 source performance fixes; FT189 five-language evidence-export catalog closure",
-  "purpose": "FT194: robust Supplier Returns mount; remove TDZ-prone pending-state derived binding, use post-hook JSX safety predicate; deployment verification required",
-  "live_acceptance": "Live Supplier Returns remains FAILED on old index-Dift2EoU.js bundle until new frontend successfully deploys; FE288 source regression PASS"
+  "purpose": "FT196: initialize supplier-return mutation before any quantity/disabled render state; Vercel prebuild runs runtime mount regression",
+  "live_acceptance": "PENDING: require Vercel production build of FE290 and Supplier Returns open test; no live verification claimed"
 }
