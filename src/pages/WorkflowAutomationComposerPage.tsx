@@ -15,7 +15,7 @@ import {
   OperationalWorkspaceStatus
 } from '../components/ui/OperationalWorkspace';
 import './WorkflowAutomationComposerPage.css';
-import { actionableWorkflowSteps, isTerminalSourceStatus } from './workflowStateGuidance';
+import { actionableWorkflowSteps, executionNextStepForComposer, isTerminalSourceStatus } from './workflowStateGuidance';
 
 type WorkflowDomain =
   | 'execution'
@@ -769,6 +769,7 @@ export default function WorkflowAutomationComposerPage() {
                 const triggerStatus = blueprint.trigger_preview?.trigger_status || blueprint.trigger_preview?.contract_status;
                 const terminalSource = isTerminalSourceStatus(triggerStatus);
                 const suggestedSteps = actionableWorkflowSteps(blueprint.recommended_steps_preview || [], responsibilityAlreadyAssigned(blueprint), triggerStatus);
+                const stateAwareNextStep = executionNextStepForComposer(blueprint.source_action_domain, triggerStatus, responsibilityAlreadyAssigned(blueprint));
                 const visibleTitle = sourceTitle(blueprint, ui);
                 const duplicateTitle = blueprints.filter((candidate) => sourceTitle(candidate, ui) === visibleTitle).length > 1;
                 const sourceReference = shortSourceReference(blueprint);
@@ -818,7 +819,9 @@ export default function WorkflowAutomationComposerPage() {
                         <p className="card__subtext workflow-composer-page__blueprint-summary">
                           {terminalSource
                             ? ui('This source work is already closed. Review its recorded result; no new execution is suggested.')
-                            : localizedGuidance(
+                            : stateAwareNextStep
+                              ? ui(stateAwareNextStep)
+                              : localizedGuidance(
                                 blueprint.recommended_next_step_key,
                                 blueprint.recommended_next_step,
                                 'Follow the suggested steps and continue in the source workflow.',

@@ -1,0 +1,35 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const ts = require('typescript');
+const root = path.resolve(__dirname, '..');
+const file = path.join(root, 'src/pages/workflowStateGuidance.ts');
+const src = fs.readFileSync(file, 'utf8');
+const result = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }, reportDiagnostics: true });
+assert.equal((result.diagnostics || []).length, 0);
+const m = { exports: {} }; new Function('module','exports',result.outputText)(m,m.exports);
+const { executionNextStepForComposer: next, actionableWorkflowSteps, isTerminalSourceStatus } = m.exports;
+let checks=0;
+const verify = (actual, expected, label) => {assert.equal(actual,expected,label); checks++;};
+const owner='This task is assigned and in progress. Continue work through Execution Tasks.';
+verify(next('execution','in_progress',true),owner,'assigned in progress');
+verify(next('execution','in_progress',false),'This task is in progress without an owner. An authorized worker can take responsibility in Execution Tasks.','unassigned in progress');
+verify(next('execution','open',true),'This task already has an owner. Review or start it through Execution Tasks as appropriate.','already-assigned ready');
+verify(next('execution','open',false),'This task is unassigned. Arrange ownership through Execution Tasks before starting work.','unassigned ready');
+verify(next('execution','blocked',true),'This task already has an owner. Review its blocker in Execution Tasks before resuming.','assigned blocked');
+verify(next('execution','blocked',false),'This task is blocked and unassigned. Review the blocker and ownership in Execution Tasks.','unassigned blocked');
+for (const status of ['completed','cancelled','resolved']) verify(next('execution',status,true),null,'terminal '+status);
+verify(next('alerts','in_progress',true),null,'other domain remains unchanged');
+verify(next('execution','in_progress',true).includes('Assign,'),false,'never reassign already-owned work');
+const page=fs.readFileSync(path.join(root,'src/pages/WorkflowAutomationComposerPage.tsx'),'utf8');
+assert.ok(page.includes('executionNextStepForComposer(blueprint.source_action_domain, triggerStatus, responsibilityAlreadyAssigned(blueprint))'));
+assert.ok(page.includes('stateAwareNextStep\n                              ? ui(stateAwareNextStep)'));
+assert.ok(page.includes('localizedGuidance('));
+checks+=3;
+const catalog = fs.readFileSync(path.join(root,'src/i18n/tenantUiTranslations.ts'),'utf8');
+for(const v of ['This task is assigned and in progress. Continue work through Execution Tasks.','This task is in progress without an owner. An authorized worker can take responsibility in Execution Tasks.','This task already has an owner. Review its blocker in Execution Tasks before resuming.','This task is blocked and unassigned. Review the blocker and ownership in Execution Tasks.','This task already has an owner. Review or start it through Execution Tasks as appropriate.','This task is unassigned. Arrange ownership through Execution Tasks before starting work.']){assert.ok(catalog.includes(JSON.stringify(v)), 'translation row '+v);checks++}
+verify(actionableWorkflowSteps(['review_source_context','assign_human_owner'],true,'open').length,1,'detailed guidance remains assignment-aware');
+verify(isTerminalSourceStatus('completed'),true,'terminal guard preserved');
+for(const n of ['src/pages/workflowStateGuidance.ts','src/pages/WorkflowAutomationComposerPage.tsx','src/i18n/tenantUiTranslations.ts']){const p=path.join(root,n);const source=ts.createSourceFile(p,fs.readFileSync(p,'utf8'),ts.ScriptTarget.Latest,true,n.endsWith('tsx')?ts.ScriptKind.TSX:ts.ScriptKind.TS);verify(source.parseDiagnostics.length,0,'syntax '+n)}
+console.log(`PASS ${checks}/${checks}: FT188 state-aware next-action guidance`);

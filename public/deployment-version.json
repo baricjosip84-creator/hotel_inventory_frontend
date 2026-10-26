@@ -1,10 +1,10 @@
 {
   "application": "Inventory Operations",
-  "frontend": "FE282",
-  "backend": "BE155",
-  "audit_round": "FT184",
+  "frontend": "FE283",
+  "backend": "BE158",
+  "audit_round": "FT188",
   "prepared_date": "2026-10-26",
-  "products_cost_controls_fix": "FT176 live PASS; FT183 content reconciliation; FT184 prioritized summary requests, tenant-scoped hardening query, concurrent report composition",
+  "products_cost_controls_fix": "FT176 live PASS; FT183 content reconciliation; FT184/FT185 source performance fixes; FT188 Workflow Composer next-step guidance only",
   "purpose": "Required, versioned SOURCE release identity manifest: tracked by git, preserved by cleanup and source staging; build emits compiled identity and JS asset names.",
-  "live_acceptance": "FT176 crash live PASS; FT184 performance SOURCE VERIFIED, live timing NOT YET VERIFIED"
+  "live_acceptance": "FT176 crash LIVE PASS; FT187 take task LIVE PASS on button visibility; FT188 workflow guidance SOURCE VERIFIED, live acceptance pending"
 }
