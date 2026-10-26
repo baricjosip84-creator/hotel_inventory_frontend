@@ -72,6 +72,12 @@ type ProductCostGovernanceSummaryPanelProps = {
   handleOpenCostHistory: (product: GovernancePriorityProduct) => void;
 };
 
+// FT183 original-audit review: the underlying services and historical JSX remain intact.
+// These status-on-status read-only layers echo the core governance, sign-off and
+// hardening evidence, and are not separate operator actions. Leave disabled on
+// Products > Cost controls; change only after a reviewed business requirement.
+const SHOW_LEGACY_DERIVED_STATUS_LAYERS = false;
+
 export function ProductCostGovernanceSummaryPanel({
   costGovernanceQuery,
   costGovernanceDetailsQuery,
@@ -208,6 +214,11 @@ export function ProductCostGovernanceSummaryPanel({
               handlePrintCostGovernanceAudit={handlePrintCostGovernanceAudit}
             />
 
+            {/* FT183: preserve the previous operational/ownership/finalization reports in
+                source, but disable their overlapping status summaries in the
+                operator-facing Cost Controls view. No service or data is deleted. */}
+            {SHOW_LEGACY_DERIVED_STATUS_LAYERS && (
+              <>
             <ProductCostOperationsSummaryPanel
               costOperationsRunbookQuery={costOperationsRunbookQuery}
               costOperationsControlQuery={costOperationsControlQuery}
@@ -234,6 +245,25 @@ export function ProductCostGovernanceSummaryPanel({
               costPerformanceSummary={costPerformanceSummary}
               costSecurityAuditSummary={costSecurityAuditSummary}
             />
+
+              </>
+            )}
+
+            <div style={styles.riskListCard}>
+              <h4 style={styles.sectionTitle}>{ui('Supporting evidence exports')}</h4>
+              <p style={styles.panelSubtitle}>{ui('Review, closure and handoff CSV files remain available. The duplicated read-only status cards are not shown.')}</p>
+              <div style={styles.actionRow}>
+                <button type="button" style={styles.secondaryButton} onClick={handleExportCostGovernanceReviewPackCsv} disabled={!costGovernanceReviewPack?.review_export_rows?.length}>
+                  {ui('Export Review Pack CSV')}
+                </button>
+                <button type="button" style={styles.secondaryButton} onClick={handleExportCostGovernanceClosureCsv} disabled={!costGovernanceClosureSummary?.archive_rows?.length}>
+                  {ui('Export Closure CSV')}
+                </button>
+                <button type="button" style={styles.secondaryButton} onClick={handleExportCostGovernanceHandoffCsv} disabled={!costGovernanceHandoffSummary?.handoff_rows?.length}>
+                  {ui('Export Handoff CSV')}
+                </button>
+              </div>
+            </div>
 
             <ProductCostGovernanceDetailsPanel
               costGovernanceDetailsQuery={costGovernanceDetailsQuery}

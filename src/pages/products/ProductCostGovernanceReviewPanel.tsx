@@ -34,6 +34,21 @@ type ProductCostGovernanceReviewPanelProps = {
   handlePrintCostGovernanceAudit: () => void;
 };
 
+// FT183: The old review-pack and closure cards replay blocker and readiness
+// figures already visible in the governance summary and human review queue.
+// Keep their original render source below, but disable the duplicates.
+const SHOW_LEGACY_CLOSEOUT_CARDS = false;
+
+function reviewQueueDisplayLabel(raw: string): string {
+  // Backend remediation sources are technical identifiers, not operator labels.
+  const labels: Record<string, string> = {
+    governance_checklist: 'Governance checklist',
+    governance_next_action: 'Governance next action',
+    governance_detail: 'Governance detail'
+  };
+  return labels[raw] || (raw.includes('_') ? formatStatusLabel(raw) : raw);
+}
+
 export function ProductCostGovernanceReviewPanel({
   costGovernanceAuditQuery,
   costGovernanceSignoffQuery,
@@ -90,12 +105,15 @@ export function ProductCostGovernanceReviewPanel({
                       {(costGovernanceReviewQueue?.queue_items ?? []).length === 0 ? (
                         <div style={styles.rowSubtle}>{ui("No governance review queue items found.")}</div>
                       ) : (
-                        (costGovernanceReviewQueue?.queue_items ?? []).slice(0, 8).map((item, index) => (
+                        // The historical `.slice(0, 8)` cap is disabled: all server-returned
+                        // queue entries must be reviewable, not silently omitted.
+                        (costGovernanceReviewQueue?.queue_items ?? []).map((item, index) => (
                           <div key={`${item.queue_type}-${item.key}-${index}`} style={styles.riskListItem}>
                             <div>
-                              <div style={styles.rowTitle}>{item.label}</div>
+                              {/* Previous raw UI: <div style={styles.rowTitle}>{item.label}</div> */}
+                              <div style={styles.rowTitle}>{reviewQueueDisplayLabel(item.label)}</div>
                               <div style={styles.rowSubtle}>{item.detail}</div>
-                              <div style={styles.rowSubtle}>{ui("Owner:")} {item.owner_hint} {ui("• Evidence:")} {item.evidence}</div>
+                              <div style={styles.rowSubtle}>{ui("Owner:")} {item.owner_hint} {ui("• Evidence:")} {reviewQueueDisplayLabel(item.evidence)}</div>
                             </div>
                             <StatusBadge status={item.priority} />
                           </div>
@@ -123,6 +141,10 @@ export function ProductCostGovernanceReviewPanel({
               )}
             </div>
 
+            {/* FT183: keep both derived closeout panels in source for audit
+                traceability; omit their duplicate ready/not-ready cards by default. */}
+            {SHOW_LEGACY_CLOSEOUT_CARDS && (
+              <>
             <div style={styles.riskListCard}>
               <div style={styles.packageHeader}>
                 <div>
@@ -214,6 +236,9 @@ export function ProductCostGovernanceReviewPanel({
                 </>
               )}
             </div>
+              </>
+            )}
+
     </>
   );
 }

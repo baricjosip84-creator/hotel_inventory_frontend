@@ -88,7 +88,10 @@ export function ProductCostReportSummaryPanel({
                     <div style={styles.rowTitle}>{ui(formatStatusLabel(row.metric))}</div>
                     <div style={styles.rowSubtle}>{ui(formatStatusLabel(row.section))}</div>
                   </div>
-                  <strong>{ui(formatGovernanceValue(row.value, locale))}</strong>
+                  {/* FT183 former two-argument call (wrong parameter):
+                      <strong>{ui(formatGovernanceValue(row.value, locale))}</strong>
+                  */}
+                  <strong>{ui(formatGovernanceValue(row.value, undefined, locale))}</strong>
                 </div>
               ))}
             </div>
