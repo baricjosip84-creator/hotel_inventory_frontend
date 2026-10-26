@@ -126,6 +126,8 @@ jobs:
         run: npm run check:reservation-requisition-url-selection
       - name: Prevent linked reservation detail focus being reset to page top (FT191)
         run: npm run check:ft191-reservation-deep-link-timing
+      - name: Verify selected linked reservation is visible despite scroll races (FT192)
+        run: npm run check:ft192-linked-reservation-visible
 
       - name: Verify filtered alert counts, pinned deep links and missing quantities
         run: npm run check:alert-queue-integrity

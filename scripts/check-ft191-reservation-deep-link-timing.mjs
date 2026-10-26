@@ -69,9 +69,9 @@ test('Requisitions links to exact selected linked reservation ID', () =>
 test('Reservations reads both exact-ID query parameter variants', () =>
   assert.match(reservations, /selectedRecordId\(searchParams, 'reservationId', 'reservation_id'\)/));
 test('Reservations focus awaits matching async record and remains accessible', () => {
-  assert.match(reservations,/detailQuery\.data\.id !== selectedReservationId/);
-  assert.match(reservations,/reservationDetailRef\.current\?\.scrollIntoView/);
-  assert.match(reservations,/reservationDetailRef\.current\?\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(reservations,/detailQuery\.data\?\.id !== selectedReservationId/);
+  assert.match(reservations,/target\.scrollIntoView/);
+  assert.match(reservations,/target\.focus\(\{ preventScroll: true \}\)/);
 });
 test('Regression registered as npm run check:ft191-reservation-deep-link-timing', () =>
   assert.equal(packageMeta.scripts['check:ft191-reservation-deep-link-timing'], 'node scripts/check-ft191-reservation-deep-link-timing.mjs'));

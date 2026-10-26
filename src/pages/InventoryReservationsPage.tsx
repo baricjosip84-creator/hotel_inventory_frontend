@@ -633,16 +633,30 @@ export default function InventoryReservationsPage() {
   });
 
   useEffect(() => {
-    if (!selectedReservationId || detailQuery.isLoading || !detailQuery.data || detailQuery.data.id !== selectedReservationId) return;
+    if (!selectedReservationId || detailQuery.isLoading || detailQuery.data?.id !== selectedReservationId) return;
     if (lastFocusedReservationIdRef.current === selectedReservationId) return;
 
-    lastFocusedReservationIdRef.current = selectedReservationId;
-    const frame = window.requestAnimationFrame(() => {
-      reservationDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      reservationDetailRef.current?.focus({ preventScroll: true });
-    });
-
-    return () => window.cancelAnimationFrame(frame);
+    // FT192: The previous effect marked this record as focused *before* its RAF.
+    // When React Query committed another result and cancelled that RAF, the next
+    // effect would skip the reveal forever. Mark it only after a DOM scroll.
+    // An immediate jump also avoids a smooth-scroll animation being displaced by
+    // summary/queue sections rendering above the selected record.
+    let cancelled = false;
+    const reveal = () => {
+      if (cancelled || lastFocusedReservationIdRef.current === selectedReservationId) return;
+      const target = reservationDetailRef.current;
+      if (!target) return;
+      target.scrollIntoView({ behavior: 'auto', block: 'start' });
+      target.focus({ preventScroll: true });
+      lastFocusedReservationIdRef.current = selectedReservationId;
+    };
+    const frame = window.requestAnimationFrame(reveal);
+    const fallback = window.setTimeout(reveal, 120);
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(fallback);
+    };
   }, [detailQuery.data, detailQuery.isLoading, selectedReservationId]);
 
   const refreshReservationQueries = () => {
@@ -1195,7 +1209,15 @@ export default function InventoryReservationsPage() {
         id="reservation-detail"
         tabIndex={-1}
         aria-label={ui("Reservation detail")}
-        style={{ ...pageStyles.card, scrollMarginTop: '104px' }}
+        style={{
+          ...pageStyles.card,
+          scrollMarginTop: '104px',
+          // FT192: Put an explicitly selected record first in the workspace.
+          // This makes the linked record visible even if the browser/layout
+          // suppresses scroll or other sections above it finish loading late.
+          // The ordinary unselected Reservations page retains its old layout.
+          ...(selectedReservationId ? { order: -1 } : {})
+        }}
       >
         <OperationalSectionHeader
           iconPath="/inventory-reservations"
