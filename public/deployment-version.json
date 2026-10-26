@@ -1,0 +1,10 @@
+{
+  "application": "Inventory Operations",
+  "frontend": "FE280",
+  "backend": "BE154",
+  "audit_round": "FT180",
+  "prepared_date": "2026-10-25",
+  "products_cost_controls_fix": "FT176/FT177 component corrections preserved; FT179 identity and distribution closure; FT180 CI source Git-index closure",
+  "purpose": "Required, versioned SOURCE release identity manifest: tracked by git, preserved by cleanup and source staging; build emits compiled identity and JS asset names.",
+  "live_acceptance": "PENDING"
+}

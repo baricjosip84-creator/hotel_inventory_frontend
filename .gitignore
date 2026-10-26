@@ -38,5 +38,5 @@ artifacts/
 
 playwright-deployment-report/
 
-# Build-generated deployment identity
-public/deployment-version.json
+# Keep public/deployment-version.json in source control: Vite requires it at build time.
+# The compiled output in dist/ is already excluded above.
