@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "inventorySourceIdentity": {
     "application": "Inventory Operations",
-    "frontend": "FE287",
+    "frontend": "FE288",
     "backend": "BE159",
-    "audit_round": "FT193",
+    "audit_round": "FT194",
     "prepared_date": "2026-10-26"
   },
   "author": "SMOOOZ",

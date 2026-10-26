@@ -19,6 +19,17 @@ assert.ok(identity && /^FE\d+$/.test(identity.frontend) &&
   /^FT\d+$/.test(identity.audit_round) && /^BE\d+$/.test(identity.backend),
 'package.json must declare inventorySourceIdentity for CI and production builds');
 const identityPath = path.join(root, 'public', 'deployment-version.json');
+// FT194 release integrity: when the public manifest exists, the package's recovery
+// identity must describe the same build. Prevent a stale FE287 identity
+// from masquerading as the FE288 Supplier Returns correction.
+if (fs.existsSync(identityPath)) {
+  const releaseIdentity = JSON.parse(fs.readFileSync(identityPath, 'utf8'));
+  for (const field of ['frontend', 'backend', 'audit_round']) {
+    assert.equal(identity[field], releaseIdentity[field],
+      `Stale package inventorySourceIdentity.${field}: ${identity[field]} does not match public manifest ${releaseIdentity[field]}`);
+  }
+}
+
 if (!fs.existsSync(identityPath)) {
   fs.mkdirSync(path.dirname(identityPath), {recursive: true});
   fs.writeFileSync(identityPath, JSON.stringify({
