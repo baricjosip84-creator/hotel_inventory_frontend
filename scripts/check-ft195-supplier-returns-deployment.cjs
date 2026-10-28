@@ -8,8 +8,10 @@ const base = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(base, file), 'utf8');
 const info = JSON.parse(read('public/deployment-version.json'));
 const packageInfo = JSON.parse(read('package.json'));
-assert.match(info.frontend, /^FE(289|290|291)$/);
-assert.match(info.audit_round, /^FT(195|196|197)$/);
+assert.match(info.frontend, /^FE\d+$/);
+assert.ok(Number(info.frontend.slice(2)) >= 289, 'Supplier Returns guard requires FE289 or newer');
+assert.match(info.audit_round, /^FT\d+$/);
+assert.ok(Number(info.audit_round.slice(2)) >= 195, 'Supplier Returns guard requires FT195 or newer');
 assert.equal(packageInfo.inventorySourceIdentity.frontend, info.frontend);
 assert.equal(packageInfo.inventorySourceIdentity.audit_round, info.audit_round);
 const source = read('src/components/enterpriseInventory/tabs/SupplierReturnsTab.tsx');
@@ -32,4 +34,4 @@ for (const route of ['/', '/index.html', '/enterprise-inventory']) {
  assert.match(header?.value || '', /no-store/, `${route} must be served as fresh HTML`);
 }
 assert.equal(vercel.buildCommand, 'npm run build');
-console.log('FT195 PASS: TDZ fix kept, FE289/FT195 identity matches, asset fetch network-first and offline fallback retained, worker update enabled, HTML revalidation asserted.');
+console.log('FT195 PASS: TDZ fix kept, release identity matches, asset fetch network-first and offline fallback retained, worker update enabled, HTML revalidation asserted.');
