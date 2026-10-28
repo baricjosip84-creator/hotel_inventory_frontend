@@ -473,6 +473,11 @@ main[data-route-scroll-container]:has(> .io-outbound-page) {
   margin-top: 9px;
 }
 
+/* Keep stock-protection failures visible beside their order action. */
+.outbound-order-action-feedback {
+  margin-top: 12px;
+}
+
 .outbound-order-card--active {
   border-color: #bfdbfe;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.05);

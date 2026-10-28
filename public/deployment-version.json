@@ -1,10 +1,10 @@
 {
   "application": "Inventory Operations",
-  "frontend": "FE290",
+  "frontend": "FE291",
   "backend": "BE159",
-  "audit_round": "FT196",
-  "prepared_date": "2026-10-26",
+  "audit_round": "FT197",
+  "prepared_date": "2026-10-28",
   "products_cost_controls_fix": "FT176 live PASS; FT183 content reconciliation; FT184/FT185 source performance fixes; FT189 five-language evidence-export catalog closure",
-  "purpose": "FT196: initialize supplier-return mutation before any quantity/disabled render state; Vercel prebuild runs runtime mount regression",
-  "live_acceptance": "PENDING: require Vercel production build of FE290 and Supplier Returns open test; no live verification claimed"
+  "purpose": "FT197: Outbound Confirm & Reserve Stock validation now displays inline beside the triggering order action, not only at page top",
+  "live_acceptance": "PENDING: apply to the current production code baseline and retest; FE291 prepared from latest attached FE290 source, not verified against Git/Vercel app testing fixes 340"
 }

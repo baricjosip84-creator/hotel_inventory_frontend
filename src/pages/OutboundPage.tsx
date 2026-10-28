@@ -211,6 +211,7 @@ type MutationInput = {
   body?: unknown;
   version?: number;
   successMessage: string;
+  errorTargetOrderId?: string;
 };
 
 const emptyCustomer: CustomerForm = { name: '', email: '', phone: '', address: '', notes: '' };
@@ -448,6 +449,9 @@ export default function OutboundPage() {
   };
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  // Keep order-action validation next to the order that caused it. A page-top
+  // banner alone can be off-screen when the action was clicked below the fold.
+  const [orderActionError, setOrderActionError] = useState<{ orderId: string; text: string } | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab: OutboundTab = readOutboundRouteTab(searchParams, {
     customers: hasPermission(TENANT_PERMISSIONS.CUSTOMERS_READ) || hasPermission(TENANT_PERMISSIONS.CUSTOMERS_WRITE),
@@ -678,14 +682,27 @@ export default function OutboundPage() {
       body: JSON.stringify(body ?? {}),
       skipMutationFeedback: true // Outbound sets its action-specific result in onSuccess.
     }),
+    onMutate: () => {
+      setOrderActionError(null);
+    },
     onSuccess: async (_data, variables) => {
+      setOrderActionError(null);
       setError('');
       setMessage(variables.successMessage);
       await invalidate();
     },
-    onError: async (mutationError) => {
+    onError: async (mutationError, variables) => {
       setMessage('');
-      setError(mutationErrorMessage(mutationError, ui));
+      const detail = mutationErrorMessage(mutationError, ui);
+      if (variables.errorTargetOrderId) {
+        // Inline feedback remains visible beside Confirm & Reserve Stock, even
+        // if the full-page header is several screen heights away.
+        setError('');
+        setOrderActionError({ orderId: variables.errorTargetOrderId, text: detail });
+      } else {
+        setOrderActionError(null);
+        setError(mutationErrorMessage(mutationError, ui));
+      }
       if (isVersionConflictError(mutationError)) await invalidate();
     }
   });
@@ -1256,7 +1273,7 @@ export default function OutboundPage() {
                 <div className="outbound-actions-row outbound-order-action-buttons">
                   <button type="button" className="outbound-button" onClick={() => toggleOrderDetails(order.id)}>{selectedOrderId === order.id ? ui('Close Details') : ui('Open Details')}</button>
                   {order.status === 'draft' && canUpdate && canEditOrderForm ? <button type="button" className="outbound-button" onClick={() => beginOrderEdit(order)} disabled={mutation.isPending}>{ui('Edit Draft')}</button> : null}
-                  {order.status === 'draft' && canUpdate ? <button type="button" className="outbound-button-primary" onClick={() => mutation.mutate({ path: `/outbound/orders/${order.id}/confirm`, version: Number(order.version), successMessage: ui('{order} confirmed and stock reserved.').replace('{order}', order.order_number) })} disabled={mutation.isPending}>{ui('Confirm & Reserve Stock')}</button> : null}
+                  {order.status === 'draft' && canUpdate ? <button type="button" className="outbound-button-primary" onClick={() => mutation.mutate({ path: `/outbound/orders/${order.id}/confirm`, version: Number(order.version), successMessage: ui('{order} confirmed and stock reserved.').replace('{order}', order.order_number), errorTargetOrderId: order.id })} disabled={mutation.isPending}>{ui('Confirm & Reserve Stock')}</button> : null}
                   {['confirmed', 'partially_dispatched'].includes(order.status) && canUpdate ? <button type="button" className="outbound-button-primary" onClick={() => startPicking(order)} disabled={mutation.isPending}>{order.status === 'partially_dispatched' ? ui('Pick Remaining') : ui('Start Picking')}</button> : null}
                   {order.status === 'picking' && canUpdate && canStockRead ? <button type="button" className="outbound-button-primary" onClick={() => setPickOrderId(isPickingOpen ? '' : order.id)}>{isPickingOpen ? ui('Close Picking') : ui('Open Picking')}</button> : null}
                   {order.status === 'picking' && canUpdate && openPicked > 0 ? <button type="button" className="outbound-button-primary" onClick={() => mutation.mutate({ path: `/outbound/orders/${order.id}/mark-packed`, version: Number(order.version), successMessage: ui('{order} picked stock marked packed.').replace('{order}', order.order_number) }, { onSuccess: () => setPickOrderId('') })} disabled={mutation.isPending}>{ui('Mark Picked Stock Packed')}</button> : null}
@@ -1264,6 +1281,7 @@ export default function OutboundPage() {
                   {order.status === 'packed' && canDispatch && openPacked > 0 ? <button type="button" className="outbound-button-primary" onClick={() => { if (window.confirm(ui('Dispatch all currently packed stock? Inventory will be reduced for the packed quantities now.'))) mutation.mutate({ path: `/outbound/orders/${order.id}/dispatch`, version: Number(order.version), successMessage: ui('{order} packed stock dispatched.').replace('{order}', order.order_number) }); }} disabled={mutation.isPending}>{ui('Dispatch Packed Stock')}</button> : null}
                   {!['dispatched', 'cancelled'].includes(order.status) && canCancel ? <button type="button" className="outbound-button-danger" onClick={() => { setCancelOrderId(cancelOrderId === order.id ? '' : order.id); setCancelOrderReason(''); }} disabled={mutation.isPending}>{ui('Cancel')}{order.items.some((item) => toNumber(item.dispatched_quantity) > 0) ? ` ${ui('Remainder')}` : ''}</button> : null}
                 </div>
+                {orderActionError?.orderId === order.id ? <div className="outbound-alert outbound-alert--error outbound-order-action-feedback" role="alert">{orderActionError.text}</div> : null}
               </div>
               {cancelOrderId === order.id ? <div className="outbound-inline-action-form"><label className="outbound-field">{order.items.some((item) => toNumber(item.dispatched_quantity) > 0) ? ui('Reason for cancelling the undelivered remainder') : ui('Cancellation reason')}<textarea value={cancelOrderReason} onChange={(event) => setCancelOrderReason(event.target.value)} autoFocus /></label><div className="outbound-actions-row"><button type="button" className="outbound-button-danger" disabled={mutation.isPending || cancelOrderReason.trim().length < 3} onClick={() => { const alreadyDispatched = order.items.some((item) => toNumber(item.dispatched_quantity) > 0); mutation.mutate({ path: `/outbound/orders/${order.id}/cancel`, body: { reason: cancelOrderReason.trim() }, version: Number(order.version), successMessage: alreadyDispatched ? ui('{order} cancelled for the remaining undelivered quantity.').replace('{order}', order.order_number) : ui('{order} cancelled.').replace('{order}', order.order_number) }, { onSuccess: () => { if (pickOrderId === order.id) setPickOrderId(''); setCancelOrderId(''); setCancelOrderReason(''); } }); }}>{ui('Confirm')}</button><button type="button" className="outbound-button" onClick={() => { setCancelOrderId(''); setCancelOrderReason(''); }}>{ui('Close')}</button></div></div> : null}
             </article>;

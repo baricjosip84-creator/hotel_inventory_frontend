@@ -1,0 +1,23 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const ts = require('typescript');
+const root = path.resolve(__dirname, '..');
+const source = fs.readFileSync(path.join(root, 'src/pages/OutboundPage.tsx'), 'utf8');
+const style = fs.readFileSync(path.join(root, 'src/pages/OutboundPage.css'), 'utf8');
+let passed = 0;
+function test(title, predicate) { assert.ok(predicate, title); passed++; console.log(`PASS ${title}`); }
+const parsed = ts.createSourceFile('OutboundPage.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+test('Outbound TSX parses without syntax diagnostics', parsed.parseDiagnostics.length === 0);
+test('Per-order error state keeps the affected order ID', /const \[orderActionError, setOrderActionError\] = useState<\{ orderId: string; text: string \} \| null>\(null\)/.test(source));
+test('Mutation input supports optional origin order ID', /errorTargetOrderId\?: string/.test(source));
+test('Confirmation passes clicked order ID to error target', /\/outbound\/orders\/\$\{order\.id\}\/confirm[^\n]+errorTargetOrderId: order\.id/.test(source));
+test('Failure sets inline error for targeted order', /if \(variables\.errorTargetOrderId\) \{[\s\S]*?setOrderActionError\(\{ orderId: variables\.errorTargetOrderId, text: detail \}\)/.test(source));
+test('Targeted failure suppresses remote page-top banner', /if \(variables\.errorTargetOrderId\) \{\s*[\s\S]*?setError\(''\);\s*setOrderActionError/.test(source));
+test('Other mutations retain existing global error behavior', /setError\(mutationErrorMessage\(mutationError, ui\)\)/.test(source));
+test('State is reset when a new mutation begins and on success', /onMutate: \(\) => \{\s*setOrderActionError\(null\)/.test(source) && /onSuccess: async \(_data, variables\) => \{\s*setOrderActionError\(null\)/.test(source));
+test('Per-order error rendered beneath the clicked order action buttons', /\{orderActionError\?\.orderId === order\.id \? <div className="outbound-alert outbound-alert--error outbound-order-action-feedback" role="alert">\{orderActionError\.text\}<\/div> : null\}/.test(source));
+test('Feedback styles provide separation from button controls', /\.outbound-order-action-feedback\s*\{\s*margin-top: 12px;\s*\}/.test(style));
+test('Original version guard and endpoint remain intact', /If-Match-Version/.test(source) && /\/outbound\/orders\/\$\{order\.id\}\/confirm/.test(source));
+console.log(`${passed}/${passed} targeted checks passed`);

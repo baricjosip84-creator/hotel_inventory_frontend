@@ -15,9 +15,9 @@ assert.ok(src.indexOf(hook) < src.indexOf(state), 'FT196: initialize mutation be
 assert.ok(!src.includes('const addReturnLineDisabled'), 'Reintroduces FE286 early-use bug');
 const info = JSON.parse(fs.readFileSync(path.join(root, 'public/deployment-version.json')));
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json')));
-assert.equal(info.frontend, 'FE290');
-assert.equal(info.audit_round, 'FT196');
+assert.match(info.frontend, /^FE(290|291)$/);
+assert.match(info.audit_round, /^FT(196|197)$/);
 assert.equal(pkg.inventorySourceIdentity.frontend, info.frontend);
 assert.equal(pkg.inventorySourceIdentity.audit_round, info.audit_round);
 require('./check-ft194-supplier-returns-mount.cjs');
-console.log('FT196 PASS: Vercel prebuild verified early mutation initialization + source runtime mount + FE290 identity');
+console.log('FT196 PASS: Vercel prebuild verified early mutation initialization + source runtime mount + FE290/FE291 identity');
