@@ -684,10 +684,13 @@ export default function MobileExecutionPage() {
         </div>
       </section>
 
-      {canReadEvidence ? <section className="section mobile-execution-section">
+      {/* Keep the recovery entry point visible to every user. Permission failures
+          must be explicit rather than making the panel disappear entirely. */}
+      <section className="section mobile-execution-section">
         <details className="card mobile-execution-evidence-history" data-testid="mobile-execution-evidence-history">
-          <summary><strong>{ui('Attached evidence')}</strong> ({formatLocalizedNumber(recentEvidenceQuery.data?.length || 0, locale)})</summary>
+          <summary><strong>{ui('Attached evidence')}</strong>{canReadEvidence ? ` (${formatLocalizedNumber(recentEvidenceQuery.data?.length || 0, locale)})` : null}</summary>
           <div className="mobile-execution-evidence-history-body">
+            {!canReadEvidence ? <p role="alert" className="form-error">{ui('No permission')}</p> : !online ? <p className="card__subtext">{ui('Offline')}</p> : <>
             <button type="button" className="button button--secondary" disabled={!online || recentEvidenceQuery.isFetching}
               onClick={() => void recentEvidenceQuery.refetch()}>{ui('Refresh')}</button>
             {recentEvidenceQuery.isLoading ? <p>{ui('Loading task evidence…')}</p> : null}
@@ -704,9 +707,10 @@ export default function MobileExecutionPage() {
                 </div>
               </div>)}
             </div> : null}
+            </>}
           </div>
         </details>
-      </section> : null}
+      </section>
 
       {pending.length > 0 ? <section className="section mobile-execution-section"><div className="section__title mobile-execution-section-title">{ui('Queued offline actions')}<span className="mobile-execution-section-count">{formatLocalizedNumber(pending.length, locale)}</span></div><div className="mobile-execution-pending-list">{pending.map((operation) => <div className="card mobile-execution-pending-row" key={operation.operation_id}><div><div className="mobile-execution-pending-title">{ui(ACTION_LABELS[operation.action])} · {operation.task_label || ui('Execution task')}</div><div className="card__subtext">{ui('Queued:')} {formatDateTime(operation.created_at, locale, ui)}</div>{operation.note ? <div className="card__subtext"><strong>{ui('Reason:')}</strong> {operation.note}</div> : null}{operation.last_error ? <div className="form-error">{operation.last_error}</div> : null}</div><button className="button button--secondary" type="button" onClick={() => persistPending(pending.filter((item) => item.operation_id !== operation.operation_id))}>{ui('Remove queued action')}</button></div>)}</div></section> : null}
 
