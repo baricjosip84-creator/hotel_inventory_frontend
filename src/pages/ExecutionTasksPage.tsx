@@ -4,6 +4,7 @@ import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
 import { ApiError, apiRequest } from '../lib/api';
+import { downloadEnterpriseInventoryFile } from '../components/enterpriseInventory/EnterpriseInventoryRequests';
 import { selectedRecordId, withSelectedRecordId } from '../lib/recordSelectionParams';
 import { resolveExecutionTaskQueue } from '../lib/executionTaskQueueSelection';
 import { getCurrentTenantUserId } from '../lib/auth';
@@ -1386,6 +1387,8 @@ function TaskDetail({ task, currentUserId, auditRows, userLabel, locationLabel, 
         </div>
       </div>
 
+      <ExecutionTaskEvidence taskId={task.id} />
+
       <details className="execution-tasks-evidence execution-tasks-audit">
         <summary>{ui('Audit trail ({count})').replace('{count}', formatNumber(auditRows.length, locale))}</summary>
         {auditRows.length ? (
@@ -1400,6 +1403,83 @@ function TaskDetail({ task, currentUserId, auditRows, userLabel, locationLabel, 
         ) : <p>{ui("No audit events were returned for this task.")}</p>}
       </details>
     </section>
+  );
+}
+
+type ExecutionTaskEvidenceFile = {
+  id: string;
+  original_filename: string;
+  mime_type?: string | null;
+  file_size_bytes?: number | null;
+  can_download?: boolean;
+};
+
+// Mobile Execution uploads evidence to this same tenant-scoped execution_task record.
+// Display it here so an existing upload can be verified without creating another task.
+function ExecutionTaskEvidence({ taskId }: { taskId: string }) {
+  const { ui } = useAppTranslation();
+  const allowed = hasPermission(TENANT_PERMISSIONS.ATTACHMENTS_READ);
+  const [files, setFiles] = useState<ExecutionTaskEvidenceFile[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!allowed) { setFiles([]); setError(null); return; }
+    let cancelled = false;
+    setLoading(true);
+    setFiles([]);
+    setError(null);
+    void apiRequest<ExecutionTaskEvidenceFile[]>(
+      `/enterprise-inventory/attachments?entity_type=execution_task&entity_id=${encodeURIComponent(taskId)}`
+    ).then((result) => {
+      if (!cancelled) setFiles(result);
+    }).catch((failure: unknown) => {
+      if (!cancelled) setError(failure instanceof Error ? failure.message : ui('Could not load task evidence.'));
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [allowed, taskId, ui]);
+
+  const download = async (file: ExecutionTaskEvidenceFile) => {
+    if (downloadingId || file.can_download === false) return;
+    setError(null);
+    setDownloadingId(file.id);
+    try {
+      await downloadEnterpriseInventoryFile(
+        `/enterprise-inventory/attachments/${encodeURIComponent(file.id)}/download`,
+        file.original_filename
+      );
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : ui('Could not download task evidence.'));
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  return (
+    <div className="execution-tasks-detail-section" data-testid="execution-task-evidence">
+      <h4>{ui('Attached evidence')}</h4>
+      {!allowed ? <p>{ui('Attachment read permission is required to see task evidence.')}</p> : null}
+      {allowed && loading ? <p>{ui('Loading task evidence…')}</p> : null}
+      {allowed && error ? <p role="alert" className="execution-tasks-alert execution-tasks-alert--warning">{error}</p> : null}
+      {allowed && !loading && !error && files.length === 0 ? <p>{ui('No evidence attached to this task.')}</p> : null}
+      {allowed && files.length > 0 ? (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {files.map((file) => (
+            <li key={file.id} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginBottom: 8 }}>
+              <span>{file.original_filename}</span>
+              <button className="button button--secondary" type="button"
+                disabled={downloadingId !== null || file.can_download === false}
+                onClick={() => void download(file)}>
+                {downloadingId === file.id ? ui('Downloading…') : ui('Download')}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 
