@@ -2,6 +2,13 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // Execution task evidence retrieval: catalog keys required by tenant multilingual CI.
+  ["Could not load task evidence.", "Aufgabennachweise konnten nicht geladen werden.", "No se pudieron cargar las pruebas de la tarea.", "Impossible de charger les justificatifs de la tâche.", "Nije moguće učitati dokaze zadatka."] ,
+  ["Could not download task evidence.", "Aufgabennachweis konnte nicht heruntergeladen werden.", "No se pudo descargar la prueba de la tarea.", "Impossible de télécharger le justificatif de la tâche.", "Nije moguće preuzeti dokaz zadatka."] ,
+  ["Attached evidence", "Angehängte Nachweise", "Pruebas adjuntas", "Justificatifs joints", "Priloženi dokazi"] ,
+  ["Attachment read permission is required to see task evidence.", "Zum Anzeigen der Aufgabennachweise ist die Leseberechtigung für Anhänge erforderlich.", "Se requiere permiso de lectura de archivos adjuntos para ver las pruebas de la tarea.", "La permission de lecture des pièces jointes est nécessaire pour voir les justificatifs de la tâche.", "Za prikaz dokaza zadatka potrebna je dozvola za čitanje privitaka."] ,
+  ["Loading task evidence…", "Aufgabennachweise werden geladen…", "Cargando pruebas de la tarea…", "Chargement des justificatifs de la tâche…", "Učitavanje dokaza zadatka…"] ,
+  ["No evidence attached to this task.", "Dieser Aufgabe sind keine Nachweise angehängt.", "No hay pruebas adjuntas a esta tarea.", "Aucun justificatif n’est joint à cette tâche.", "Uz ovaj zadatak nisu priloženi dokazi."] ,
   // FT189: restore translations for the retained Cost Controls evidence-export section (FT183).
   ["Supporting evidence exports", "Exporte von unterstützenden Nachweisen", "Exportaciones de pruebas justificativas", "Exports des pièces justificatives", "Izvoz popratnih dokaza"],
   ["Review, closure and handoff CSV files remain available. The duplicated read-only status cards are not shown.", "CSV-Dateien für Prüfung, Abschluss und Übergabe bleiben verfügbar. Doppelte schreibgeschützte Statuskarten werden nicht angezeigt.", "Los archivos CSV de revisión, cierre y traspaso siguen disponibles. No se muestran las tarjetas de estado duplicadas de solo lectura.", "Les fichiers CSV de révision, de clôture et de transfert restent disponibles. Les cartes d’état en lecture seule faisant doublon ne sont pas affichées.", "CSV datoteke za pregled, zatvaranje i primopredaju ostaju dostupne. Duplicirane kartice statusa samo za čitanje nisu prikazane."],
