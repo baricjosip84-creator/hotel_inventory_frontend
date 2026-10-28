@@ -34,4 +34,5 @@ for (const route of ['/', '/index.html', '/enterprise-inventory']) {
  assert.match(header?.value || '', /no-store/, `${route} must be served as fresh HTML`);
 }
 assert.equal(vercel.buildCommand, 'npm run build');
+console.log(`FT195 version gate: ${info.frontend}/${info.audit_round} (forward-compatible, source identities matched)`);
 console.log('FT195 PASS: TDZ fix kept, release identity matches, asset fetch network-first and offline fallback retained, worker update enabled, HTML revalidation asserted.');

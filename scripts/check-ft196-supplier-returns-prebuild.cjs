@@ -21,5 +21,6 @@ assert.match(info.audit_round, /^FT\d+$/);
 assert.ok(Number(info.audit_round.slice(2)) >= 196, 'Supplier Returns guard requires FT196 or newer');
 assert.equal(pkg.inventorySourceIdentity.frontend, info.frontend);
 assert.equal(pkg.inventorySourceIdentity.audit_round, info.audit_round);
+console.log(`FT196 version gate: ${info.frontend}/${info.audit_round} (forward-compatible, source identities matched)`);
 require('./check-ft194-supplier-returns-mount.cjs');
 console.log('FT196 PASS: Vercel prebuild verified early mutation initialization + source runtime mount + cumulative release identity');
