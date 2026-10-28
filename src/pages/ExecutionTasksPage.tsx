@@ -430,6 +430,8 @@ export default function ExecutionTasksPage() {
   const managementRef = useRef<HTMLDetailsElement | null>(null);
   const queueRequestSequence = useRef(0);
   const taskOpenSequence = useRef(0);
+  // A queue response started before a task click must not replace the clicked detail.
+  const pendingClickedTaskId = useRef<string | null>(null);
 
   const canRead = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
   const canCreate = hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_CREATE);
@@ -605,9 +607,20 @@ export default function ExecutionTasksPage() {
       setHasNextPage(resolved.hasNextPage);
       setTasks(resolved.queue);
       setSummary(nextSummary);
-      setSelected((current) => requestedTaskId
-        ? resolved.selectedLinkedTask
-        : resolved.queue.find((task) => task.id === current?.id) || resolved.queue[0] || null);
+      setSelected((current) => {
+        // Ignore a response bound to the previous URL while a newer manual
+        // queue selection is being written to search parameters.
+        if (pendingClickedTaskId.current && pendingClickedTaskId.current !== requestedTaskId) {
+          return current;
+        }
+        const next = requestedTaskId
+          ? resolved.selectedLinkedTask
+          : resolved.queue.find((task) => task.id === current?.id) || resolved.queue[0] || null;
+        if (pendingClickedTaskId.current === requestedTaskId) {
+          pendingClickedTaskId.current = null;
+        }
+        return next;
+      });
       if (linkedTaskError) setError(linkedTaskError);
     } catch (requestError) {
       if (requestSequence === queueRequestSequence.current) setError(errorMessage(requestError, ui));
@@ -726,9 +739,13 @@ export default function ExecutionTasksPage() {
   };
 
   const selectTask = (task: ExecutionTask) => {
+    // Invalidate any older queue response before setting the exact selected
+    // task. Otherwise an overlapping refresh can restore a different detail.
+    queueRequestSequence.current += 1;
     taskOpenSequence.current += 1;
-    setSearchParams((previous) => withSelectedRecordId(previous, 'task_id', 'taskId', task.id));
+    pendingClickedTaskId.current = task.id;
     setSelected(task);
+    setSearchParams((previous) => withSelectedRecordId(previous, 'task_id', 'taskId', task.id));
     setActiveWorkspaceSection('detail');
     window.setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   };
