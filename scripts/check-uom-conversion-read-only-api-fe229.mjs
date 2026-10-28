@@ -30,7 +30,21 @@ visit(apiFn);
 check('actual shared feedback gate found', () => assert(gate));
 check('shared gate explicitly calls calculator classifier', () => assert.match(gate, /!isReadOnlyUnitConversionRequest\(path, method\)/));
 check('per-request skip option remains supported', () => assert.match(gate, /skipMutationFeedback/));
-const source = `${helper.getText(ast)}\nconst gate = ${gate}; this.feedbackGate = gate; this.classifier = isReadOnlyUnitConversionRequest;`;
+// The shared feedback gate also calls other read-only route classifiers.
+// Include every path/method classifier referenced by the real gate in the
+// isolated VM; otherwise this test fails with a ReferenceError when api.ts
+// gains another legitimate exemption (for example requisition readiness).
+const classifierNames = [...new Set(
+  [...gate.matchAll(/!\s*([A-Za-z_$][\w$]*)\(\s*path\s*,\s*method\s*\)/g)]
+    .map(match => match[1])
+)];
+const gateClassifiers = classifierNames.map(name => {
+  const declaration = ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === name);
+  assert(declaration, `shared feedback gate classifier ${name} is missing from api.ts`);
+  return declaration.getText(ast);
+});
+check('every shared feedback classifier is included in the VM', () => assert(classifierNames.includes('isReadOnlyUnitConversionRequest')));
+const source = `${gateClassifiers.join('\n')}\nconst gate = ${gate}; this.feedbackGate = gate; this.classifier = isReadOnlyUnitConversionRequest;`;
 const compiled = ts.transpileModule(source, { fileName: 'unit-feedback.ts', compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext}});
 check('classifier and feedback gate transpile', () => assert(!compiled.diagnostics?.some(d => d.category === ts.DiagnosticCategory.Error)));
 function execute(path, method = 'POST', skip = false) {
@@ -60,6 +74,10 @@ for (const id of ['abc','200','a-b-c']) {
   check(`calculator ${id} never displays generic toast`, () => assert.equal(execute(`/inventory-capabilities/products/${id}/uom/convert`).show,false));
   check(`real product ${id} retains generic toast`, () => assert.equal(execute(`/products/${id}/activate`).show,true));
 }
+check('requisition readiness preview suppresses generic toast', () => assert.equal(execute('/inventory-requisitions/REQ-000002/readiness').show,false));
+check('bulk requisition readiness suppresses generic toast', () => assert.equal(execute('/inventory-requisitions/bulk-readiness').show,false));
+check('real requisition fulfillment retains normal feedback', () => assert.equal(execute('/inventory-requisitions/REQ-000002/fulfill').show,true));
+check('mobile sync batch suppresses HTTP-level success toast', () => assert.equal(execute('/inventory-capabilities/mobile-sync').show,false));
 check('normal product create keeps toast', () => assert.equal(execute('/products').show,true));
 check('standard UoM creation keeps shared feedback if caller requests it', () => assert.equal(execute('/inventory-capabilities/products/abc/uom').show,true));
 check('request skip still suppresses other routes', () => assert.equal(execute('/products', 'POST', true).show,false));
