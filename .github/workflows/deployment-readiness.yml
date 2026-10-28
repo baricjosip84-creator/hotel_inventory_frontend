@@ -30,7 +30,7 @@ jobs:
   deployment-readiness:
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository)
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -44,6 +44,12 @@ jobs:
       DEPLOYMENT_REQUIRE_SENTRY_SOURCE_MAPS: ${{ vars.DEPLOYMENT_REQUIRE_SENTRY_SOURCE_MAPS || 'false' }}
       EXPECTED_FRONTEND_COMMIT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
       EXPECTED_BACKEND_COMMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_backend_commit || '' }}
+      # Optional deployment credentials from the production GitHub Environment.
+      # When present, this workflow publishes the exact validated source itself
+      # instead of relying on a separate Vercel Git integration to catch up.
+      VERCEL_TOKEN_PRESENT: ${{ secrets.VERCEL_TOKEN != '' }}
+      VERCEL_ORG_ID_PRESENT: ${{ secrets.VERCEL_ORG_ID != '' }}
+      VERCEL_PROJECT_ID_PRESENT: ${{ secrets.VERCEL_PROJECT_ID != '' }}
       E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
       E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
       E2E_PLATFORM_EMAIL: ${{ secrets.E2E_PLATFORM_EMAIL }}
@@ -72,6 +78,47 @@ jobs:
             test -n "$E2E_PLATFORM_EMAIL" || (echo "E2E_PLATFORM_EMAIL is required when platform auth smoke testing is enabled" && exit 1)
             test -n "$E2E_PLATFORM_PASSWORD" || (echo "E2E_PLATFORM_PASSWORD is required when platform auth smoke testing is enabled" && exit 1)
           fi
+
+      - name: Verify optional Vercel deployment credentials
+        if: ${{ github.event_name == 'workflow_run' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$VERCEL_TOKEN_PRESENT" == "true" || "$VERCEL_ORG_ID_PRESENT" == "true" || "$VERCEL_PROJECT_ID_PRESENT" == "true" ]]; then
+            test "$VERCEL_TOKEN_PRESENT" = "true" && test "$VERCEL_ORG_ID_PRESENT" = "true" && test "$VERCEL_PROJECT_ID_PRESENT" = "true" || {
+              echo "::error::VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID must all be set together" >&2
+              exit 1
+            }
+          else
+            echo "::notice::No explicit Vercel deployment credentials; relying on existing Vercel Git auto-deployment"
+          fi
+
+      - name: Deploy validated frontend commit to Vercel Production
+        if: ${{ github.event_name == 'workflow_run' && env.VERCEL_TOKEN_PRESENT == 'true' && env.VERCEL_ORG_ID_PRESENT == 'true' && env.VERCEL_PROJECT_ID_PRESENT == 'true' }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          test "$ACTUAL_SHA" = "$EXPECTED_FRONTEND_COMMIT" || {
+            echo "Refusing production deployment: checked-out commit differs from expected commit" >&2
+            exit 1
+          }
+          # Never roll back a newer main-branch deployment from an older run.
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | cut -f1)"
+          test "$REMOTE_MAIN" = "$EXPECTED_FRONTEND_COMMIT" || {
+            echo "Refusing to overwrite newer main ($REMOTE_MAIN) with stale run ($EXPECTED_FRONTEND_COMMIT)" >&2
+            exit 1
+          }
+          # Vite must write the SAME commit into deployment-version.json.
+          export VERCEL_GIT_COMMIT_SHA="$EXPECTED_FRONTEND_COMMIT"
+          export GITHUB_SHA="$EXPECTED_FRONTEND_COMMIT"
+          npx --yes vercel@latest pull --yes --environment=production --token "$VERCEL_TOKEN"
+          npx --yes vercel@latest build --prod --token "$VERCEL_TOKEN"
+          npx --yes vercel@latest deploy --prebuilt --prod --token "$VERCEL_TOKEN"
 
       - name: Wait for the exact production deployment
         run: npm run wait:production-deployment
