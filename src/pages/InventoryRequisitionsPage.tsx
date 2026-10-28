@@ -1756,7 +1756,8 @@ export default function InventoryRequisitionsPage() {
         default_fulfillment_note: fulfillAllRemaining ? (defaultFulfillmentNote.trim() || null) : null,
         items: fulfillAllRemaining ? [] : readinessPreviewLines
       }),
-      skipIdempotencyKey: true
+      skipIdempotencyKey: true,
+      skipMutationFeedback: true // Read-only readiness query; real fulfillment has its own success toast.
     })
   });
 
@@ -2347,7 +2348,8 @@ export default function InventoryRequisitionsPage() {
           default_fulfillment_note: bulkFulfillmentNote.trim() || null
         }))
       }),
-      skipIdempotencyKey: true
+      skipIdempotencyKey: true,
+      skipMutationFeedback: true // Read-only readiness query; real fulfillment has its own success toast.
     })
   });
   const bulkReadinessBlocksFulfillment = bulkReadinessQuery.data?.ready === false;

@@ -1,10 +1,10 @@
 {
   "application": "Inventory Operations",
-  "frontend": "FE291",
+  "frontend": "FE292",
   "backend": "BE159",
-  "audit_round": "FT197",
+  "audit_round": "FT198",
   "prepared_date": "2026-10-28",
   "products_cost_controls_fix": "FT176 live PASS; FT183 content reconciliation; FT184/FT185 source performance fixes; FT189 five-language evidence-export catalog closure",
-  "purpose": "FT197: Outbound Confirm & Reserve Stock validation now displays inline beside the triggering order action, not only at page top",
-  "live_acceptance": "PENDING: apply to the current production code baseline and retest; FE291 prepared from latest attached FE290 source, not verified against Git/Vercel app testing fixes 340"
+  "purpose": "FT198: precise reservation allocation success; silent requisition readiness previews; truthful Mobile Execution sync feedback; clear stale inline messages",
+  "live_acceptance": "FT197 inline stock error LIVE PASS (user screenshot 2026-10-28). FT198 source-only; live verification required after integration/deployment. FE292 derived from FE291 source; newer deployed code must be reconciled if different."
 }

@@ -458,7 +458,7 @@ export default function MobileExecutionPage() {
 
   const replayPending = async () => {
     if (!online || syncing || pending.length === 0 || !canRunAnyMobileAction) return;
-    setSyncing(true); setActionError(null); setMessage(null);
+    setSyncing(true); setActionError(null); setMessage(null); setEvidenceMessage(null);
     const queued = [...pending];
     const remaining: OfflineOperation[] = [];
     let applied = 0;
@@ -468,7 +468,8 @@ export default function MobileExecutionPage() {
         const operation = queued[index];
         try {
           const result = await apiRequest<MobileSyncResponse>('/inventory-capabilities/mobile-sync', {
-            method: 'POST', body: JSON.stringify({ device_id: getDeviceId(), request_id: operation.operation_id, operations: [operation] })
+            method: 'POST', body: JSON.stringify({ device_id: getDeviceId(), request_id: operation.operation_id, operations: [operation] }),
+            skipMutationFeedback: true // Row-level status, not HTTP success, determines sync outcome.
           });
           const row = result.results?.[0];
           if (row?.status === 'applied') { applied += 1; continue; }
@@ -500,7 +501,7 @@ export default function MobileExecutionPage() {
     const normalizedNote = note?.trim() || undefined;
     if (action === 'block' && !normalizedNote) { setActionError(ui('Enter a reason before blocking this task.')); return; }
     const operation: OfflineOperation = { operation_id: makeId('op'), task_id: task.id, task_label: task.title || null, action, note: normalizedNote, created_at: new Date().toISOString() };
-    setMessage(null); setActionError(null);
+    setMessage(null); setEvidenceMessage(null); setActionError(null);
     if (!navigator.onLine) {
       const persisted = persistPending([...pending, operation]);
       setMessage(persisted
@@ -512,7 +513,8 @@ export default function MobileExecutionPage() {
     setBusyTaskId(task.id);
     try {
       const result = await apiRequest<MobileSyncResponse>('/inventory-capabilities/mobile-sync', {
-        method: 'POST', body: JSON.stringify({ device_id: getDeviceId(), request_id: operation.operation_id, operations: [operation] })
+        method: 'POST', body: JSON.stringify({ device_id: getDeviceId(), request_id: operation.operation_id, operations: [operation] }),
+        skipMutationFeedback: true // Page displays 'Task assigned to you' after an applied row.
       });
       const first = result.results?.[0];
       if (first?.status === 'failed') { setActionError(first.error || ui('The task action could not be applied.')); return; }
@@ -531,13 +533,13 @@ export default function MobileExecutionPage() {
   };
 
   const beginEvidence = (task: MobileExecutionTask, mode: 'photo' | 'file') => {
-    setEvidenceTask(task); setEvidenceMessage(null); setActionError(null);
+    setEvidenceTask(task); setMessage(null); setEvidenceMessage(null); setActionError(null);
     window.setTimeout(() => (mode === 'photo' ? photoInputRef.current : evidenceInputRef.current)?.click(), 0);
   };
 
   const uploadEvidence = async (file: File | undefined) => {
     if (!file || !evidenceTask || !canUploadEvidence) return;
-    setEvidenceUploading(true); setActionError(null); setEvidenceMessage(null);
+    setEvidenceUploading(true); setMessage(null); setActionError(null); setEvidenceMessage(null);
     try {
       const params = new URLSearchParams({ entity_type: 'execution_task', entity_id: evidenceTask.id, original_filename: file.name, mime_type: file.type || 'application/octet-stream' });
       await apiRequest(`/enterprise-inventory/attachments/upload?${params.toString()}`, {

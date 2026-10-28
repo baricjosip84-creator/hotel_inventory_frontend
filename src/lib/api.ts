@@ -274,6 +274,21 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Linked reservation created successfully.';
   }
 
+  // Reservation lifecycle actions change reservation status/quantities, not a generic item.
+  // Match the exact resource/action path so create/update/other workflows are untouched.
+  const reservationLifecycleMatch = normalizedMethod === 'POST'
+    ? normalizedPathOnly.match(/^\/inventory-reservations\/[^/]+\/(activate|allocate|release|cancel|expire|fulfill)$/)
+    : null;
+  if (reservationLifecycleMatch) {
+    const action = reservationLifecycleMatch[1];
+    if (action === 'activate') return 'Reservation activated successfully.';
+    if (action === 'allocate') return 'Reservation allocated successfully.';
+    if (action === 'release') return 'Remaining reservation quantity released successfully.';
+    if (action === 'cancel') return 'Reservation cancelled successfully.';
+    if (action === 'expire') return 'Reservation expired successfully.';
+    return 'Reservation fulfilled successfully.';
+  }
+
   const requisitionWorkflowMatch = normalizedMethod === 'POST'
     ? normalizedPathOnly.match(/^\/inventory-requisitions\/[^/]+\/(submit|approve|reject|cancel|reopen)$/)
     : null;
@@ -1306,6 +1321,18 @@ function isReadOnlyUnitConversionRequest(path: string, method: string): boolean 
     /^\/inventory-capabilities\/products\/[^/]+\/uom\/convert\/?$/i.test(pathOnly);
 }
 
+/**
+ * Requisition readiness POST endpoints are query-only previews. They may run
+ * automatically after fulfillment/refetch; never announce a successful 'item
+ * creation' for these read-only recalculations. Actual fulfill POSTs still toast.
+ */
+function isReadOnlyRequisitionReadinessRequest(path: string, method: string): boolean {
+  if (method.toUpperCase() !== 'POST') return false;
+  const pathOnly = path.toLowerCase().split('?')[0];
+  return /^\/inventory-requisitions\/[^/]+\/readiness$/.test(pathOnly) ||
+    pathOnly === '/inventory-requisitions/bulk-readiness';
+}
+
 export async function apiRequest<T>(
   path: string,
   options: SafeMutationRequestInit = {}
@@ -1349,6 +1376,7 @@ export async function apiRequest<T>(
     isWriteRequest(requestOptions) &&
     !(options as SafeMutationRequestInit).skipMutationFeedback &&
     !isReadOnlyUnitConversionRequest(path, method) &&
+    !isReadOnlyRequisitionReadinessRequest(path, method) &&
     !isLoginRequest &&
     !isRefreshRequest &&
     !isCsrfRequest;
