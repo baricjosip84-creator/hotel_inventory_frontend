@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { downloadEnterpriseInventoryFile } from '../components/enterpriseInventory/EnterpriseInventoryRequests';
 import { showTenantActionSuccess } from '../lib/actionFeedback';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
@@ -68,6 +69,16 @@ type TaskEvidenceReceipt = {
   entity_type: string;
   entity_id: string;
   original_filename: string;
+};
+
+type RecentExecutionEvidence = {
+  id: string;
+  entity_id: string;
+  task_code: string;
+  task_title: string;
+  original_filename: string;
+  created_at: string;
+  can_download: boolean;
 };
 
 type MobileExecutionResponse = {
@@ -410,6 +421,34 @@ export default function MobileExecutionPage() {
   const canUploadEvidence = hasPermission(TENANT_PERMISSIONS.ATTACHMENTS_WRITE) && hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
   const canRunAction = (action: MobileAction) => action === 'complete' ? canCompleteTasks : canUpdateTasks;
   const canRunAnyMobileAction = canUpdateTasks || canCompleteTasks;
+  // Recent file history is one scoped, read-only request rather than N requests
+  // for individual queue cards. It also finds uploads on tasks off this page.
+  const canReadEvidence = hasPermission(TENANT_PERMISSIONS.ATTACHMENTS_READ)
+    && hasPermission(TENANT_PERMISSIONS.EXECUTION_TASKS_READ);
+  const recentEvidenceQuery = useQuery({
+    queryKey: ['mobile-execution-recent-evidence', storageKeys?.cache],
+    queryFn: () => apiRequest<RecentExecutionEvidence[]>('/enterprise-inventory/attachments/recent-execution-task'),
+    enabled: online && canReadEvidence,
+    staleTime: 0,
+    refetchOnMount: 'always'
+  });
+  const [evidenceDownloadId, setEvidenceDownloadId] = useState<string | null>(null);
+  const [evidenceReadError, setEvidenceReadError] = useState<string | null>(null);
+  const downloadRecentEvidence = async (item: RecentExecutionEvidence) => {
+    if (!item.can_download || evidenceDownloadId) return;
+    setEvidenceDownloadId(item.id); setEvidenceReadError(null);
+    try {
+      await downloadEnterpriseInventoryFile(
+        `/enterprise-inventory/attachments/${encodeURIComponent(item.id)}/download`,
+        item.original_filename
+      );
+    } catch (error) {
+      setEvidenceReadError(error instanceof Error ? error.message : ui('Could not download task evidence.'));
+    } finally {
+      setEvidenceDownloadId(null);
+    }
+  };
+
 
   const filterKey = `${assignmentScope}:${urgency}:${sourceType}:${page}`;
   const cacheKey = storageKeys ? `${storageKeys.cache}:${filterKey}` : null;
@@ -583,6 +622,7 @@ export default function MobileExecutionPage() {
           return;
         }
         setEvidenceMessage(`${ui('Evidence attached to the execution task successfully.')} ${targetTask.task_code || targetTask.title || targetTask.id} · ${file.name}`);
+        await recentEvidenceQuery.refetch();
       } catch {
         // The write may have committed even if the subsequent GET fails. Do
         // not encourage a duplicate upload or falsely announce verified success.
@@ -643,6 +683,30 @@ export default function MobileExecutionPage() {
           {actionError ? <p className="form-error">{actionError}</p> : null}
         </div>
       </section>
+
+      {canReadEvidence ? <section className="section mobile-execution-section">
+        <details className="card mobile-execution-evidence-history" data-testid="mobile-execution-evidence-history">
+          <summary><strong>{ui('Attached evidence')}</strong> ({formatLocalizedNumber(recentEvidenceQuery.data?.length || 0, locale)})</summary>
+          <div className="mobile-execution-evidence-history-body">
+            <button type="button" className="button button--secondary" disabled={!online || recentEvidenceQuery.isFetching}
+              onClick={() => void recentEvidenceQuery.refetch()}>{ui('Refresh')}</button>
+            {recentEvidenceQuery.isLoading ? <p>{ui('Loading task evidence…')}</p> : null}
+            {recentEvidenceQuery.error ? <p role="alert" className="form-error">{recentEvidenceQuery.error instanceof Error ? recentEvidenceQuery.error.message : ui('Could not load task evidence.')}</p> : null}
+            {evidenceReadError ? <p role="alert" className="form-error">{evidenceReadError}</p> : null}
+            {!recentEvidenceQuery.isLoading && !recentEvidenceQuery.error && !recentEvidenceQuery.data?.length ? <p>{ui('No attachments yet.')}</p> : null}
+            {recentEvidenceQuery.data?.length ? <div className="mobile-execution-evidence-history-list">
+              {recentEvidenceQuery.data.map(item => <div className="mobile-execution-evidence-history-row" key={item.id}>
+                <div><strong>{item.original_filename}</strong><p className="card__subtext">{item.task_code || item.task_title || item.entity_id} · {formatDateTime(item.created_at, locale, ui)}</p></div>
+                <div className="mobile-execution-task-actions">
+                  <Link className="button button--secondary" to={`/execution-tasks?task_id=${encodeURIComponent(item.entity_id)}`}>{ui('Open task details')}</Link>
+                  <button type="button" className="button button--secondary" disabled={!item.can_download || evidenceDownloadId !== null}
+                    onClick={() => void downloadRecentEvidence(item)}>{ui(evidenceDownloadId === item.id ? 'Downloading…' : 'Download')}</button>
+                </div>
+              </div>)}
+            </div> : null}
+          </div>
+        </details>
+      </section> : null}
 
       {pending.length > 0 ? <section className="section mobile-execution-section"><div className="section__title mobile-execution-section-title">{ui('Queued offline actions')}<span className="mobile-execution-section-count">{formatLocalizedNumber(pending.length, locale)}</span></div><div className="mobile-execution-pending-list">{pending.map((operation) => <div className="card mobile-execution-pending-row" key={operation.operation_id}><div><div className="mobile-execution-pending-title">{ui(ACTION_LABELS[operation.action])} · {operation.task_label || ui('Execution task')}</div><div className="card__subtext">{ui('Queued:')} {formatDateTime(operation.created_at, locale, ui)}</div>{operation.note ? <div className="card__subtext"><strong>{ui('Reason:')}</strong> {operation.note}</div> : null}{operation.last_error ? <div className="form-error">{operation.last_error}</div> : null}</div><button className="button button--secondary" type="button" onClick={() => persistPending(pending.filter((item) => item.operation_id !== operation.operation_id))}>{ui('Remove queued action')}</button></div>)}</div></section> : null}
 

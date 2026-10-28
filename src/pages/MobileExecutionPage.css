@@ -656,3 +656,12 @@
     width: 100%;
   }
 }
+
+/* Read-only Mobile Execution evidence recovery panel (task + filename + download). */
+.mobile-execution-evidence-history { padding: 16px; }
+.mobile-execution-evidence-history summary { cursor: pointer; }
+.mobile-execution-evidence-history-body { display: grid; gap: 12px; margin-top: 14px; }
+.mobile-execution-evidence-history-body > button { justify-self: start; }
+.mobile-execution-evidence-history-list { max-height: 420px; overflow-y: auto; }
+.mobile-execution-evidence-history-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border-color, #dfe5ef); }
+.mobile-execution-evidence-history-row p { margin: 4px 0 0; }
