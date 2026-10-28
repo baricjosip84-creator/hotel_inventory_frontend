@@ -2,6 +2,9 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // Evidence upload outcomes identify the selected task and avoid false success.
+  ["Upload received, but the file could not be verified on the selected task.", "Upload empfangen, aber die Datei konnte für die ausgewählte Aufgabe nicht bestätigt werden.", "Se recibió la carga, pero no se pudo verificar el archivo en la tarea seleccionada.", "Le fichier a été reçu, mais sa présence sur la tâche sélectionnée n’a pas pu être vérifiée.", "Prijenos je zaprimljen, ali datoteka nije potvrđena na odabranom zadatku."],
+  ["Upload received, but the file list could not be checked.", "Upload empfangen, aber die Dateiliste konnte nicht geprüft werden.", "Se recibió la carga, pero no se pudo comprobar la lista de archivos.", "Le fichier a été reçu, mais la liste des fichiers n’a pas pu être vérifiée.", "Prijenos je zaprimljen, ali popis datoteka nije moguće provjeriti."],
   // Execution task evidence retrieval: catalog keys required by tenant multilingual CI.
   ["Could not load task evidence.", "Aufgabennachweise konnten nicht geladen werden.", "No se pudieron cargar las pruebas de la tarea.", "Impossible de charger les justificatifs de la tâche.", "Nije moguće učitati dokaze zadatka."] ,
   ["Could not download task evidence.", "Aufgabennachweis konnte nicht heruntergeladen werden.", "No se pudo descargar la prueba de la tarea.", "Impossible de télécharger le justificatif de la tâche.", "Nije moguće preuzeti dokaz zadatka."] ,

@@ -61,6 +61,15 @@ type MobileExecutionTask = {
   };
 };
 
+// The upload endpoint returns the persisted attachment. Match its receipt and the
+// read-side list to the exact task before reporting success.
+type TaskEvidenceReceipt = {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  original_filename: string;
+};
+
 type MobileExecutionResponse = {
   generated_at?: string;
   current_user_id?: string | null;
@@ -550,13 +559,35 @@ export default function MobileExecutionPage() {
 
   const uploadEvidence = async (file: File | undefined) => {
     if (!file || !evidenceTask || !canUploadEvidence) return;
+    // Capture the selected task before starting the asynchronous upload. The
+    // mobile queue may refresh/change while the file picker or request is open.
+    const targetTask = evidenceTask;
     setEvidenceUploading(true); setMessage(null); setActionError(null); setEvidenceMessage(null);
     try {
-      const params = new URLSearchParams({ entity_type: 'execution_task', entity_id: evidenceTask.id, original_filename: file.name, mime_type: file.type || 'application/octet-stream' });
-      await apiRequest(`/enterprise-inventory/attachments/upload?${params.toString()}`, {
+      const params = new URLSearchParams({ entity_type: 'execution_task', entity_id: targetTask.id, original_filename: file.name, mime_type: file.type || 'application/octet-stream' });
+      const receipt = await apiRequest<TaskEvidenceReceipt>(`/enterprise-inventory/attachments/upload?${params.toString()}`, {
         method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file, skipMutationFeedback: true
       });
-      setEvidenceMessage(ui('Evidence attached to the execution task successfully.'));
+      // A 201 alone is not enough: the previously generic confirmation did not
+      // identify which one of several task cards received the attachment.
+      if (!receipt?.id || receipt.entity_type !== 'execution_task' || receipt.entity_id !== targetTask.id || receipt.original_filename !== file.name) {
+        setEvidenceMessage(`${ui('Upload received, but the file could not be verified on the selected task.')} ${targetTask.task_code || targetTask.title || targetTask.id}`);
+        return;
+      }
+      try {
+        const visible = await apiRequest<TaskEvidenceReceipt[]>(
+          `/enterprise-inventory/attachments?entity_type=execution_task&entity_id=${encodeURIComponent(targetTask.id)}`
+        );
+        if (!Array.isArray(visible) || !visible.some((item) => item.id === receipt.id && item.entity_id === targetTask.id)) {
+          setEvidenceMessage(`${ui('Upload received, but the file could not be verified on the selected task.')} ${targetTask.task_code || targetTask.title || targetTask.id}`);
+          return;
+        }
+        setEvidenceMessage(`${ui('Evidence attached to the execution task successfully.')} ${targetTask.task_code || targetTask.title || targetTask.id} · ${file.name}`);
+      } catch {
+        // The write may have committed even if the subsequent GET fails. Do
+        // not encourage a duplicate upload or falsely announce verified success.
+        setEvidenceMessage(`${ui('Upload received, but the file list could not be checked.')} ${targetTask.task_code || targetTask.title || targetTask.id}`);
+      }
     } catch (error) {
       setActionError(error instanceof Error ? error.message : ui('Evidence could not be attached.'));
     } finally {
