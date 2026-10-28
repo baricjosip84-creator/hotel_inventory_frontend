@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "inventorySourceIdentity": {
     "application": "Inventory Operations",
-    "frontend": "FE292",
+    "frontend": "FE293",
     "backend": "BE159",
-    "audit_round": "FT198",
+    "audit_round": "FT199",
     "prepared_date": "2026-10-28"
   },
   "author": "SMOOOZ",
@@ -620,7 +620,8 @@
     "check:ft195-supplier-returns-deployment": "node scripts/check-ft195-supplier-returns-deployment.cjs",
     "check:ft196-supplier-returns-prebuild": "node scripts/check-ft196-supplier-returns-prebuild.cjs",
     "check:ft198-mutation-feedback": "node scripts/check-ft198-mutation-feedback.cjs",
-    "check:ft197-outbound-inline-order-error": "node scripts/check-ft197-outbound-inline-order-error.cjs"
+    "check:ft197-outbound-inline-order-error": "node scripts/check-ft197-outbound-inline-order-error.cjs",
+    "check:ft199-page-owned-notifications": "node scripts/check-ft199-page-owned-notifications.cjs"
   },
   "dependencies": {
     "@sentry/react": "^10.67.0",

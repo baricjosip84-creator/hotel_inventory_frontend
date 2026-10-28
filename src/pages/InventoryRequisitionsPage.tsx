@@ -9,6 +9,7 @@ import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedCurrency, formatLocalizedDate, formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
 import { ApiError, apiMutationRequest, apiRequest } from '../lib/api';
+import { showTenantActionSuccess } from '../lib/actionFeedback';
 import { getRoleCapabilities } from '../lib/permissions';
 import { getCurrentTenantUserId } from '../lib/auth';
 import { scrollToFormSection } from '../lib/scrollToForm';
@@ -1853,6 +1854,7 @@ export default function InventoryRequisitionsPage() {
 
       return apiMutationRequest<{ requisition: InventoryRequisition }>(`/inventory-requisitions/${selected.id}/fulfill`, {
         method: 'POST',
+        skipMutationFeedback: true, // Success is announced once by the requisitions page.
         body: JSON.stringify({
           source_storage_location_id: effectiveFulfillmentLocationId || null,
           fulfill_all_remaining: fulfillAllRemaining,
@@ -1862,6 +1864,7 @@ export default function InventoryRequisitionsPage() {
       });
     },
     onSuccess: async (response) => {
+      showTenantActionSuccess(ui('Requisition fulfilled successfully.'));
       selectRequisition(response.requisition.id);
       setFulfillmentLines({});
       setFulfillmentLineNotes({});
@@ -1875,6 +1878,7 @@ export default function InventoryRequisitionsPage() {
   const bulkFulfillmentMutation = useMutation({
     mutationFn: () => apiMutationRequest<BulkFulfillmentResult>('/inventory-requisitions/bulk-fulfill', {
       method: 'POST',
+      skipMutationFeedback: true, // Bulk success is announced after a successful response.
       body: JSON.stringify({
         source_storage_location_id: bulkFulfillmentLocationId || null,
         fulfill_all_remaining: true,
@@ -1887,6 +1891,7 @@ export default function InventoryRequisitionsPage() {
       })
     }),
     onSuccess: async () => {
+      showTenantActionSuccess(ui('Requisitions fulfilled successfully.'));
       setBulkFulfillmentIds([]);
       setBulkFulfillmentLocationId('');
       setBulkFulfillmentNote('');

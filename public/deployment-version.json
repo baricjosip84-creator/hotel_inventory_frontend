@@ -1,10 +1,10 @@
 {
   "application": "Inventory Operations",
-  "frontend": "FE292",
+  "frontend": "FE293",
   "backend": "BE159",
-  "audit_round": "FT198",
+  "audit_round": "FT199",
   "prepared_date": "2026-10-28",
   "products_cost_controls_fix": "FT176 live PASS; FT183 content reconciliation; FT184/FT185 source performance fixes; FT189 five-language evidence-export catalog closure",
-  "purpose": "FT198: precise reservation allocation success; silent requisition readiness previews; truthful Mobile Execution sync feedback; clear stale inline messages",
-  "live_acceptance": "FT197 inline stock error LIVE PASS (user screenshot 2026-10-28). FT198 source-only; live verification required after integration/deployment. FE292 derived from FE291 source; newer deployed code must be reconciled if different."
+  "purpose": "FT199: page-owned precise single-action feedback for reservation mutations and requisition fulfillment, clear stale Mobile Execution queue notices; FT198 controls retained",
+  "live_acceptance": "FT197 confirmed LIVE PASS. FT198 allocation/release/mobile generic toast failures observed in browser 2026-10-28; FE293 corrections require integration and deployment before live verification."
 }

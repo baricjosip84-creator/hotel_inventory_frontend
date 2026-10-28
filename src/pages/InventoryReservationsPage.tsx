@@ -6,6 +6,7 @@ import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
 import { ApiError, apiMutationRequest, apiRequest } from '../lib/api';
+import { showTenantActionSuccess } from '../lib/actionFeedback';
 import { getCurrentTenantUserId } from '../lib/auth';
 import { getRoleCapabilities } from '../lib/permissions';
 import type { ProductItem } from '../types/inventory';
@@ -677,11 +678,13 @@ export default function InventoryReservationsPage() {
     mutationFn: async ({ id, version, draft: payloadDraft }: { id: string; version: number | string; draft: ReservationDraft }) => apiMutationRequest<InventoryReservation>(`/inventory-reservations/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'If-Match-Version': String(version) },
+      skipMutationFeedback: true, // Page owns the exact draft-update success notification.
       body: JSON.stringify(buildCreatePayload(payloadDraft))
     }),
     onSuccess: (reservation) => {
       setLocalError('');
       setFeedback(`${ui('Updated draft')} ${reservation.reservation_number}.`);
+      showTenantActionSuccess(ui('Reservation draft updated successfully.'));
       setEditDraft(null);
       handleSelectReservation(reservation.id);
       refreshReservationQueries();
@@ -691,12 +694,14 @@ export default function InventoryReservationsPage() {
   const createMutation = useMutation({
     mutationFn: async () => apiMutationRequest<InventoryReservation>('/inventory-reservations', {
       method: 'POST',
+      skipMutationFeedback: true, // Creation is announced by the owning page.
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(buildCreatePayload(draft))
     }),
     onSuccess: (reservation) => {
       setLocalError('');
       setFeedback(`${ui('Created')} ${reservation.reservation_number}.`);
+      showTenantActionSuccess(ui('Reservation created successfully.'));
       setDraft(defaultDraft());
       handleSelectReservation(reservation.id);
       refreshReservationQueries();
@@ -706,6 +711,7 @@ export default function InventoryReservationsPage() {
   const conflictResolutionMutation = useMutation({
     mutationFn: async ({ id, action }: { id: string; action: ConflictResolutionAction }) => apiMutationRequest<InventoryReservation>(`/inventory-reservations/${id}/resolve-conflict`, {
       method: 'POST',
+      skipMutationFeedback: true,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action,
@@ -717,6 +723,7 @@ export default function InventoryReservationsPage() {
     onSuccess: (reservation) => {
       setLocalError('');
       setFeedback(`${ui('Resolved conflict for')} ${reservation.reservation_number}; ${ui('status is now')} ${formatCode(reservation.status)}.`);
+      showTenantActionSuccess(ui('Reservation conflict resolved successfully.'));
       setActionNote('');
       refreshReservationQueries();
     }
@@ -725,12 +732,15 @@ export default function InventoryReservationsPage() {
   const expireDueMutation = useMutation({
     mutationFn: async () => apiMutationRequest<ExpireDueReservationsResult>('/inventory-reservations/expire-due', {
       method: 'POST',
+      skipMutationFeedback: true,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ expiration_note: actionNote || 'Expired from reservation workspace due-run.', limit: 100 })
     }),
     onSuccess: (result) => {
       setLocalError('');
       setFeedback(`${ui('Expired')} ${formatNumber(result.expired_count)} ${ui('due reservations; scanned')} ${formatNumber(result.scanned_count)}${result.failed_count ? `, ${ui('failed')} ${formatNumber(result.failed_count)}` : ''}.`);
+      // The run may scan zero rows or contain partial failures; never label that as a generic item creation.
+      showTenantActionSuccess(ui('Reservation expiration run completed.'));
       setActionNote('');
       refreshReservationQueries();
     }
@@ -753,13 +763,23 @@ export default function InventoryReservationsPage() {
 
       return apiMutationRequest<InventoryReservation>(`/inventory-reservations/${id}/${action}`, {
         method: 'POST',
+        skipMutationFeedback: true, // Prevent generic duplicate toast; announce the applied action below.
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
     },
-    onSuccess: (reservation) => {
+    onSuccess: (reservation, variables) => {
       setLocalError('');
       setFeedback(`${ui('Updated')} ${reservation.reservation_number} ${ui('to')} ${formatCode(reservation.status)}.`);
+      const successByAction: Record<typeof variables.action, string> = {
+        activate: 'Reservation activated successfully.',
+        allocate: 'Reservation allocated successfully.',
+        release: 'Remaining reservation quantity released successfully.',
+        cancel: 'Reservation cancelled successfully.',
+        expire: 'Reservation expired successfully.',
+        fulfill: 'Reservation fulfilled successfully.'
+      };
+      showTenantActionSuccess(ui(successByAction[variables.action]));
       setActionNote('');
       setFulfillmentQuantities({});
       refreshReservationQueries();
@@ -769,6 +789,7 @@ export default function InventoryReservationsPage() {
   const fulfillSelectedMutation = useMutation({
     mutationFn: async ({ id, items }: { id: string; items: Array<{ reservation_item_id: string; quantity: number }> }) => apiMutationRequest<InventoryReservation>(`/inventory-reservations/${id}/fulfill`, {
       method: 'POST',
+      skipMutationFeedback: true,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fulfillment_note: actionNote || 'Partially fulfilled from reservation workspace.',
@@ -778,6 +799,7 @@ export default function InventoryReservationsPage() {
     onSuccess: (reservation) => {
       setLocalError('');
       setFeedback(`${ui('Fulfilled selected quantities for')} ${reservation.reservation_number}; ${ui('status is now')} ${formatCode(reservation.status)}.`);
+      showTenantActionSuccess(ui('Reservation fulfilled successfully.'));
       setActionNote('');
       setFulfillmentQuantities({});
       refreshReservationQueries();

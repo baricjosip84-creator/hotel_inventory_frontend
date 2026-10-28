@@ -206,6 +206,11 @@ function tenantMutationSuccessMessage(path: string, method: string, body?: BodyI
     return 'Stock count applied successfully.';
   }
 
+  // A new execution task is not a generic inventory item.
+  if (normalizedMethod === 'POST' && normalizedPathOnly === '/execution-tasks') {
+    return 'Execution task created successfully.';
+  }
+
   // Batch140: cancelling an outbound customer order does not create an item.
   // Keep this scoped to the successful POST action only; an unsuccessful
   // cancellation never reaches the shared mutation-success feedback handler.
@@ -1333,6 +1338,16 @@ function isReadOnlyRequisitionReadinessRequest(path: string, method: string): bo
     pathOnly === '/inventory-requisitions/bulk-readiness';
 }
 
+/**
+ * The mobile-sync endpoint returns a per-operation applied/failed result even
+ * when the HTTP request itself succeeds. The page owns the outcome feedback;
+ * a generic HTTP-level success is misleading (and can duplicate its message).
+ */
+function isMobileSyncOperationBatchRequest(path: string, method: string): boolean {
+  return method.toUpperCase() === 'POST' &&
+    path.toLowerCase().split('?')[0] === '/inventory-capabilities/mobile-sync';
+}
+
 export async function apiRequest<T>(
   path: string,
   options: SafeMutationRequestInit = {}
@@ -1377,6 +1392,7 @@ export async function apiRequest<T>(
     !(options as SafeMutationRequestInit).skipMutationFeedback &&
     !isReadOnlyUnitConversionRequest(path, method) &&
     !isReadOnlyRequisitionReadinessRequest(path, method) &&
+    !isMobileSyncOperationBatchRequest(path, method) &&
     !isLoginRequest &&
     !isRefreshRequest &&
     !isCsrfRequest;

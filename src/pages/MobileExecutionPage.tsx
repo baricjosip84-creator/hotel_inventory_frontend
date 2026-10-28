@@ -366,6 +366,8 @@ export default function MobileExecutionPage() {
   const sourceType: 'all' | ExecutionTaskSourceType = ['all', 'manual', 'reservation', 'requisition', 'purchase_order', 'shipment', 'transfer', 'cycle_count', 'replenishment', 'execution_request'].includes(requestedSourceType) ? requestedSourceType as 'all' | ExecutionTaskSourceType : 'all';
   const page = Number.isInteger(requestedPage) && requestedPage >= 0 ? requestedPage : 0;
   const updateQueueContext = (key: 'scope' | 'urgency' | 'source', value: string, defaultValue: string) => {
+    // Old action/evidence outcomes must not survive an unrelated queue view change.
+    setMessage(null); setEvidenceMessage(null); setActionError(null);
     const next = new URLSearchParams(searchParams);
     if (!value || value === defaultValue) next.delete(key);
     else next.set(key, value);
@@ -373,6 +375,7 @@ export default function MobileExecutionPage() {
     setSearchParams(next, { replace: true });
   };
   const updateQueuePage = (nextPage: number) => {
+    setMessage(null); setEvidenceMessage(null); setActionError(null);
     const next = new URLSearchParams(searchParams);
     if (nextPage <= 0) next.delete('page');
     else next.set('page', String(nextPage));
