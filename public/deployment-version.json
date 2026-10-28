@@ -1,10 +1,10 @@
 {
   "application": "Inventory Operations",
-  "frontend": "FE293",
+  "frontend": "FE294",
   "backend": "BE159",
-  "audit_round": "FT199",
+  "audit_round": "FT200",
   "prepared_date": "2026-10-28",
   "products_cost_controls_fix": "FT176 live PASS; FT183 content reconciliation; FT184/FT185 source performance fixes; FT189 five-language evidence-export catalog closure",
-  "purpose": "FT199: page-owned precise single-action feedback for reservation mutations and requisition fulfillment, clear stale Mobile Execution queue notices; FT198 controls retained",
-  "live_acceptance": "FT197 confirmed LIVE PASS. FT198 allocation/release/mobile generic toast failures observed in browser 2026-10-28; FE293 corrections require integration and deployment before live verification."
+  "purpose": "FT200: Mobile Execution Take Task green viewport success toast after applied server row; preserve FE293/FT199 notification repairs and supplier returns prebuild hotfix",
+  "live_acceptance": "FT199 Execution Task creation live PASS; Take Task assignment functionality live PASS but previous inline message was hard to see. FT200 viewport toast source corrected, deployment and live toast retest pending."
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError, apiRequest } from '../lib/api';
+import { showTenantActionSuccess } from '../lib/actionFeedback';
 import { useAppTranslation } from '../i18n/I18nContext';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '../i18n/formatters';
 import type { AppLocale } from '../i18n/config';
@@ -522,7 +523,14 @@ export default function MobileExecutionPage() {
       const first = result.results?.[0];
       if (first?.status === 'failed') { setActionError(first.error || ui('The task action could not be applied.')); return; }
       if (first?.status !== 'applied') throw new Error('Mobile synchronization response did not confirm whether the action was applied.');
-      setMessage(action === 'take' ? ui('Task assigned to you.') : ui('Task action applied successfully.'));
+      // A Take Task confirmation must be visible in the standard green viewport
+      // toast, not only as subtle text high above the task queue. The HTTP-level
+      // toast stays suppressed: mobile-sync must report an applied row first.
+      if (action === 'take') {
+        showTenantActionSuccess(ui('Task assigned to you.'));
+      } else {
+        setMessage(ui('Task action applied successfully.'));
+      }
       if (action === 'block') { setBlockReasonTaskId(null); setBlockReason(''); }
       await mobileExecutionQuery.refetch();
     } catch (error) {

@@ -50,7 +50,7 @@ verify('execution task creation has specific success mapping',api.includes("retu
 verify('five-language task creation catalog',tr.includes('["Execution task created successfully.",'));
 verify('mobile queue switch clears stale feedback',segment(mob,'const updateQueueContext','const updateQueuePage').includes('setMessage(null); setEvidenceMessage(null); setActionError(null);'));
 verify('mobile paging clears stale feedback',segment(mob,'const updateQueuePage','const [online').includes('setMessage(null); setEvidenceMessage(null); setActionError(null);'));
-verify('mobile take remains single inline outcome',mob.includes("setMessage(action === 'take' ? ui('Task assigned to you.') : ui('Task action applied successfully.'))"));
+verify('mobile take uses the shared viewport success toast only on applied sync',mob.includes("if (action === 'take') {\n        showTenantActionSuccess(ui('Task assigned to you.'));") && !mob.includes("setMessage(action === 'take'"));
 for(const key of ['Reservation created successfully.','Reservation draft updated successfully.','Reservation conflict resolved successfully.','Reservation expiration run completed.'])verify('5-language catalog '+key,tr.includes(`["${key}",`));
 // Exercise the actual TypeScript mapping functions, not just source text matches.
 function isolateFunction(source, name){
