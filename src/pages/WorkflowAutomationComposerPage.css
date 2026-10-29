@@ -689,3 +689,65 @@
     flex-direction: column;
   }
 }
+
+
+/* WFC-UX-002 — compact scan-first layout; all details remain accessible. */
+.workflow-composer-page__blueprint-card {
+  gap: 9px;
+  padding: 12px 14px;
+}
+.workflow-composer-page__blueprint-title {
+  margin-top: 4px;
+  font-size: 15px;
+}
+.workflow-composer-page__quick-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(180px, 1fr);
+  gap: 8px;
+}
+.workflow-composer-page__quick-action,
+.workflow-composer-page__quick-owner {
+  display: grid;
+  gap: 3px;
+  align-content: start;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #f8fafc;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.workflow-composer-page__quick-summary strong {
+  color: #64748b;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+.workflow-composer-page__quick-summary span { color: #0f172a; }
+.workflow-composer-page__guidance-details-body .workflow-composer-page__situation-grid {
+  margin-top: 0;
+}
+.workflow-composer-page__supplementary-details {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+.workflow-composer-page__supplementary-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 800;
+  color: #0f172a;
+}
+.workflow-composer-page__supplementary-details[open] > summary {
+  margin-bottom: 12px;
+}
+@media (max-width: 720px) {
+  .workflow-composer-page__quick-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
