@@ -1311,9 +1311,11 @@ function TaskActions({ task, currentUserId, saving, canAssign, canUpdate, canCom
 }) {
   const { ui } = useAppTranslation();
   const terminal = task.status === 'completed' || task.status === 'cancelled';
-  const assignedToAnotherUser = Boolean(task.assigned_to && task.assigned_to !== currentUserId);
+  // FT202: Only the assigned worker may start/complete. Unassigned work must
+  // be taken first (Mobile Execution -> Take Task) or formally assigned.
+  const isCurrentAssignee = Boolean(currentUserId && task.assigned_to === currentUserId);
   const sourceReady = executionTaskSourceReady(task);
-  const canWorkTask = canUpdate && canComplete && !assignedToAnotherUser;
+  const canWorkTask = canUpdate && canComplete && isCurrentAssignee;
   return <div className="execution-tasks-actions execution-tasks-actions--compact">
     {canUpdate && task.status === 'draft' ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => onDirectAction('ready')}>{ui("Mark ready")}</button> : null}
     {canAssign && ['ready', 'assigned', 'blocked'].includes(task.status) ? <button type="button" className="btn btn-secondary" disabled={saving} onClick={() => onDialogAction('assign')}>{ui("Assign")}</button> : null}
