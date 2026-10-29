@@ -2,6 +2,22 @@ import type { AppLocale } from './config';
 export type TenantUiCatalog = Record<string, string>;
 type TranslationRow = readonly [string, string, string, string, string];
 const rows: readonly TranslationRow[] = [
+  // Requisition audit and approval threshold labels: five-language closure.
+  ["Standard approval threshold", "Standardgenehmigungsschwelle", "Umbral de aprobación estándar", "Seuil d’approbation standard", "Standardni prag odobrenja"],
+  ["Elevated approval threshold", "Erhöhte Genehmigungsschwelle", "Umbral de aprobación elevado", "Seuil d’approbation élevé", "Povišeni prag odobrenja"],
+  ["Executive approval threshold", "Genehmigungsschwelle für die Geschäftsleitung", "Umbral de aprobación ejecutiva", "Seuil d’approbation de la direction", "Izvršni prag odobrenja"],
+  ["Previous status", "Vorheriger Status", "Estado anterior", "Statut précédent", "Prethodni status"],
+  ["Next status", "Nächster Status", "Estado siguiente", "Statut suivant", "Sljedeći status"],
+  ["Approval threshold level", "Genehmigungsschwellenstufe", "Nivel del umbral de aprobación", "Niveau du seuil d’approbation", "Razina praga odobrenja"],
+  ["Approval threshold reason", "Grund für die Genehmigungsschwelle", "Motivo del umbral de aprobación", "Motif du seuil d’approbation", "Razlog praga odobrenja"],
+  ["Approval threshold next level", "Nächste Genehmigungsschwellenstufe", "Siguiente nivel de aprobación", "Niveau d’approbation suivant", "Sljedeća razina praga odobrenja"],
+  ["Approval threshold value gap", "Abstand zur Genehmigungsschwelle", "Diferencia hasta el umbral de aprobación", "Écart jusqu’au seuil d’approbation", "Razlika do praga odobrenja"],
+  ["Remaining estimated value", "Verbleibender Schätzwert", "Valor estimado restante", "Valeur estimée restante", "Preostala procijenjena vrijednost"],
+  ["Threshold notes enforced", "Notizpflicht für Schwellenwerte", "Notas obligatorias por umbral", "Notes obligatoires pour le seuil", "Obvezne bilješke za prag"],
+  ["Fulfilled line count", "Anzahl erfüllter Positionen", "Número de líneas cumplidas", "Nombre de lignes exécutées", "Broj ispunjenih stavki"],
+  ["Fulfilled quantity total", "Erfüllte Gesamtmenge", "Cantidad total cumplida", "Quantité totale exécutée", "Ukupna ispunjena količina"],
+  ["Item count", "Anzahl Positionen", "Número de artículos", "Nombre d’articles", "Broj stavki"],
+  ["Approval notes", "Genehmigungsnotizen", "Notas de aprobación", "Notes d’approbation", "Bilješke odobrenja"],
   // Evidence upload outcomes identify the selected task and avoid false success.
   ["Upload received, but the file could not be verified on the selected task.", "Upload empfangen, aber die Datei konnte für die ausgewählte Aufgabe nicht bestätigt werden.", "Se recibió la carga, pero no se pudo verificar el archivo en la tarea seleccionada.", "Le fichier a été reçu, mais sa présence sur la tâche sélectionnée n’a pas pu être vérifiée.", "Prijenos je zaprimljen, ali datoteka nije potvrđena na odabranom zadatku."],
   ["Upload received, but the file list could not be checked.", "Upload empfangen, aber die Dateiliste konnte nicht geprüft werden.", "Se recibió la carga, pero no se pudo comprobar la lista de archivos.", "Le fichier a été reçu, mais la liste des fichiers n’a pas pu être vérifiée.", "Prijenos je zaprimljen, ali popis datoteka nije moguće provjeriti."],

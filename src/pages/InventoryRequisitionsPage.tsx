@@ -1321,10 +1321,11 @@ function statusStyle(status: RequisitionStatus): CSSProperties {
 
 
 function activityLabel(action: string): string {
-  return action.replace(/^inventory_requisition\./, '').replace(/_/g, ' ');
+  const label = action.replace(/^inventory_requisition\./, '').replace(/_/g, ' ');
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-function metadataText(metadata: Record<string, unknown> | null | undefined): string {
+function metadataText(metadata: Record<string, unknown> | null | undefined, ui: UiFn): string {
   if (!metadata) return '';
   const interestingKeys = [
     'previous_status',
@@ -1390,9 +1391,37 @@ function metadataText(metadata: Record<string, unknown> | null | undefined): str
     'fulfilled_quantity_total',
     'item_count'
   ];
+  // Audit values are backend codes, not translated labels. Keep raw free-text notes
+  // intact; translate only known status/threshold codes and their field names.
+  const keyLabels: Record<string, string> = {
+    previous_status: 'Previous status', next_status: 'Next status', status: 'Status',
+    approval_notes: 'Approval notes', rejection_reason: 'Rejection reason',
+    approval_threshold_level: 'Approval threshold level',
+    approval_threshold_reason: 'Approval threshold reason',
+    approval_threshold_next_level: 'Approval threshold next level',
+    approval_threshold_value_gap: 'Approval threshold value gap',
+    remaining_estimated_value_total: 'Remaining estimated value',
+    high_value_threshold: 'High value threshold',
+    executive_value_threshold: 'Executive value threshold',
+    threshold_notes_enforced: 'Threshold notes enforced',
+    fulfilled_line_count: 'Fulfilled line count',
+    fulfilled_quantity_total: 'Fulfilled quantity total',
+    item_count: 'Item count'
+  };
+  const auditValue = (key: string, value: unknown): string => {
+    if (typeof value === 'boolean') return ui(value ? 'Yes' : 'No');
+    if (key === 'approval_threshold_level' || key === 'approval_threshold_next_level') {
+      return approvalThresholdDisplay(String(value), ui) || localizedCodeLabel(String(value), ui);
+    }
+    if (key === 'approval_threshold_reason') return approvalThresholdReasonDisplay(String(value), ui);
+    if (key === 'previous_status' || key === 'next_status' || key === 'status') {
+      return localizedCodeLabel(String(value), ui);
+    }
+    return String(value);
+  };
   return interestingKeys
     .filter((key) => metadata[key] !== undefined && metadata[key] !== null && metadata[key] !== '')
-    .map((key) => `${key.replace(/_/g, ' ')}: ${String(metadata[key])}`)
+    .map((key) => `${ui(keyLabels[key] || key.replace(/_/g, ' '))}: ${auditValue(key, metadata[key])}`)
     .join(' · ');
 }
 
@@ -4162,7 +4191,7 @@ export default function InventoryRequisitionsPage() {
                     <div key={entry.id} style={styles.timelineItem}>
                       <strong style={styles.timelineTitle}>{ui(activityLabel(entry.action))}</strong>
                       <span style={styles.muted}>{formatDateTime(entry.created_at)} · {entry.user_name || ui('System')}</span>
-                      {metadataText(entry.metadata) && <span style={styles.muted}>{metadataText(entry.metadata)}</span>}
+                      {metadataText(entry.metadata, ui) && <span style={styles.muted}>{metadataText(entry.metadata, ui)}</span>}
                     </div>
                   ))}
                 </div>
