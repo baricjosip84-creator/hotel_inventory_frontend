@@ -3793,31 +3793,31 @@ export default function InventoryRequisitionsPage() {
                   onClick={() => selectRequisition(item.id)}
                 >
                   <span style={styles.listTitle}>{item.requisition_number}</span>
-                  {causesSidebarAttention ? <SidebarAttentionMarker label={ui('Attention required')} /> : null}
-                  <span style={statusStyle(item.status)}>{requisitionStatusLabel(item.status)}</span>
-                  <span style={styles.muted}>{item.requesting_department} · {localizedCodeLabel(item.priority, ui)}</span>
+                  {causesSidebarAttention ? <span style={styles.queueFullWidth}><SidebarAttentionMarker label={ui('Attention required')} /></span> : null}
+                  <span style={{ ...statusStyle(item.status), gridColumn: '2', gridRow: '1', justifySelf: 'end', alignSelf: 'start', whiteSpace: 'nowrap' }}>{requisitionStatusLabel(item.status)}</span>
+                  <span style={styles.queueMutedDetail}>{item.requesting_department} · {localizedCodeLabel(item.priority, ui)}</span>
                   {item.sla_state && (
-                    <span style={styles.warningText}>
+                    <span style={styles.queueWarningDetail}>
                       {slaStateLabel(item.sla_state)}{slaStateDetail(item) ? ` · ${slaStateDetail(item)}` : ''}
                     </span>
                   )}
                   {item.approval_threshold_level && (
-                    <span style={item.approval_threshold_level === 'standard' ? styles.muted : styles.warningText}>
+                    <span style={item.approval_threshold_level === 'standard' ? styles.queueMutedDetail : styles.queueWarningDetail}>
                       {approvalThresholdLabel(item.approval_threshold_level)}{item.approval_threshold_reason ? ` · ${approvalThresholdReasonLabel(item.approval_threshold_reason)}` : ''}{item.approval_threshold_next_level ? ` · ${formatNumber(item.approval_threshold_value_gap)} ${ui('to')} ${approvalThresholdLabel(item.approval_threshold_next_level)}` : ''}
                     </span>
                   )}
                   {formatApprovalThresholdQueueNoteDepth(item, ui, locale) && (
-                    <span style={item.approval_threshold_note_depth_state === 'complete' ? styles.muted : styles.warningText}>
+                    <span style={item.approval_threshold_note_depth_state === 'complete' ? styles.queueMutedDetail : styles.queueWarningDetail}>
                       {formatApprovalThresholdQueueNoteDepth(item, ui, locale)}
                     </span>
                   )}
-                  <span style={styles.muted}>{formatNumber(item.fulfilled_quantity_total)} / {formatNumber(item.requested_quantity_total)} {ui('fulfilled')}</span>
+                  <span style={styles.queueMutedDetail}>{formatNumber(item.fulfilled_quantity_total)} / {formatNumber(item.requested_quantity_total)} {ui('fulfilled')}</span>
                   {item.partial_fulfillment_state && (
-                    <span style={item.partial_fulfillment_state === 'stale_partial' ? styles.warningText : styles.muted}>
+                    <span style={item.partial_fulfillment_state === 'stale_partial' ? styles.queueWarningDetail : styles.queueMutedDetail}>
                       {ui('Partial fulfillment:')} {item.partial_fulfillment_state === 'stale_partial' ? ui('stale') : ui('active')}{item.partial_fulfillment_age_days !== null && item.partial_fulfillment_age_days !== undefined ? ` · ${formatNumber(item.partial_fulfillment_age_days)}${ui('d')}` : ''}
                     </span>
                   )}
-                  <span style={styles.muted}>{ui('Est. remaining value:')} {formatMoney(item.remaining_estimated_value_total)}</span>
+                  <span style={styles.queueMutedDetail}>{ui('Est. remaining value:')} {formatMoney(item.remaining_estimated_value_total)}</span>
                 </button>
               </div>
             );
@@ -4335,7 +4335,7 @@ const styles: Record<string, CSSProperties> = {
   secondaryButton: { border: '1px solid #cbd5e1', borderRadius: 8, padding: '10px 14px', background: '#fff', color: '#0f172a', fontWeight: 700, cursor: 'pointer' },
   secondaryButtonSmall: { border: '1px solid #cbd5e1', borderRadius: 9, padding: '7px 10px', background: '#fff', color: '#0f172a', fontWeight: 700, cursor: 'pointer' },
   dangerButton: { border: '1px solid #ef4444', borderRadius: 8, padding: '10px 14px', background: '#ef4444', color: '#fff', fontWeight: 700, cursor: 'pointer' },
-  queueItemRow: { display: 'grid', gridTemplateColumns: '32px 1fr', gap: 8, alignItems: 'stretch', marginBottom: 8 },
+  queueItemRow: { display: 'grid', gridTemplateColumns: '32px minmax(0, 1fr)', gap: 8, alignItems: 'stretch', marginBottom: 8, minWidth: 0 },
   bulkResultList: { marginTop: 10, display: 'grid', gap: 8 },
   bulkResultRow: { border: '1px solid #bbf7d0', background: '#f0fdf4', borderRadius: 10, padding: 8, display: 'grid', gap: 3 },
   bulkReadinessResultList: { marginTop: 10, display: 'grid', gap: 8 },
@@ -4343,9 +4343,12 @@ const styles: Record<string, CSSProperties> = {
   bulkReadinessResultBlocked: { border: '1px solid #fecaca', background: '#fff1f2', borderRadius: 10, padding: 8, display: 'grid', gap: 3 },
   bulkSelectLabel: { border: '1px solid #e5e7eb', background: '#fff', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
   bulkSelectLabelDisabled: { border: '1px solid #e5e7eb', background: '#f8fafc', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'not-allowed', opacity: 0.6 },
-  listItem: { width: '100%', border: '1px solid #e5e7eb', background: '#fff', borderRadius: 12, padding: 12, display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, textAlign: 'left', marginBottom: 0, cursor: 'pointer' },
-  selectedListItem: { width: '100%', border: '1px solid #93c5fd', background: '#eff6ff', borderRadius: 12, padding: 12, display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, textAlign: 'left', marginBottom: 0, cursor: 'pointer' },
-  listTitle: { fontWeight: 800 },
+  listItem: { width: '100%', border: '1px solid #e5e7eb', background: '#fff', borderRadius: 12, padding: 12, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) max-content', gap: '5px 8px', textAlign: 'left', marginBottom: 0, cursor: 'pointer', minWidth: 0, alignItems: 'start' },
+  selectedListItem: { width: '100%', border: '1px solid #93c5fd', background: '#eff6ff', borderRadius: 12, padding: 12, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) max-content', gap: '5px 8px', textAlign: 'left', marginBottom: 0, cursor: 'pointer', minWidth: 0, alignItems: 'start' },
+  listTitle: { fontWeight: 800, gridColumn: '1', gridRow: '1', whiteSpace: 'nowrap', minWidth: 0 },
+  queueFullWidth: { gridColumn: '1 / -1', minWidth: 0 },
+  queueMutedDetail: { color: '#64748b', fontSize: 13, gridColumn: '1 / -1', minWidth: 0, overflowWrap: 'break-word' },
+  queueWarningDetail: { color: '#92400e', fontSize: 13, gridColumn: '1 / -1', minWidth: 0, overflowWrap: 'break-word' },
   neutralBadge: { display: 'inline-flex', alignItems: 'center', borderRadius: 999, padding: '3px 8px', background: '#f1f5f9', color: '#334155', fontSize: 12, fontWeight: 700 },
   warningBadge: { display: 'inline-flex', alignItems: 'center', borderRadius: 999, padding: '3px 8px', background: '#fef3c7', color: '#92400e', fontSize: 12, fontWeight: 700 },
   activeBadge: { display: 'inline-flex', alignItems: 'center', borderRadius: 999, padding: '3px 8px', background: '#dbeafe', color: '#1d4ed8', fontSize: 12, fontWeight: 700 },
