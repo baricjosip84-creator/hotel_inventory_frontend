@@ -1207,18 +1207,26 @@ function approvalThresholdDisplay(level: string | null | undefined, ui: UiFn): s
   const labels: Record<string, string> = {
     executive_value: 'Executive approval threshold',
     elevated: 'Elevated approval threshold',
-    standard: 'Standard approval threshold'
+    standard: 'Standard approval threshold',
+    high_value: 'High value threshold',
+    high_priority: 'High priority threshold'
   };
   return labels[String(level || '')] ? ui(labels[String(level || '')]) : '';
 }
 
 function approvalThresholdReasonDisplay(reason: string | null | undefined, ui: UiFn): string {
+  // Older records can contain English phrases instead of the current enum codes.
+  // Translate recognized system values only; never alter user-authored notes.
+  const code = String(reason || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
   const labels: Record<string, string> = {
-    executive_value: 'Executive value threshold', high_value: 'High value threshold',
-    high_priority: 'High priority threshold', standard: 'Standard approval'
+    executive_value: 'Executive value threshold', executive_value_threshold: 'Executive value threshold',
+    high_value: 'High value threshold', high_value_threshold: 'High value threshold',
+    high_priority: 'High priority threshold', high_priority_threshold: 'High priority threshold',
+    standard: 'Standard approval', standard_approval: 'Standard approval',
+    standard_approval_threshold: 'Standard approval',
+    elevated: 'Elevated approval threshold', elevated_approval_threshold: 'Elevated approval threshold'
   };
-  if (labels[String(reason || '')]) return ui(labels[String(reason || '')]);
-  return reason ? reason.replace(/_/g, ' ') : '';
+  return labels[code] ? ui(labels[code]) : reason ? ui(String(reason).replace(/_/g, ' ')) : '';
 }
 
 const APPROVAL_THRESHOLD_NOTE_MIN_LENGTH = 12;
@@ -1404,9 +1412,55 @@ function metadataText(metadata: Record<string, unknown> | null | undefined, ui: 
     high_value_threshold: 'High value threshold',
     executive_value_threshold: 'Executive value threshold',
     threshold_notes_enforced: 'Threshold notes enforced',
+    threshold_governed_creation: 'Threshold rules on creation',
+    threshold_governed_update: 'Threshold rules on update',
+    threshold_governed_submission: 'Threshold rules on submission',
+    threshold_governed_approval: 'Threshold rules on approval',
+    threshold_governed_rejection: 'Threshold rules on rejection',
+    threshold_governed_cancellation: 'Threshold rules on cancellation',
+    threshold_governed_reopen: 'Threshold rules on reopening',
+    threshold_governed_fulfillment: 'Threshold rules on fulfillment',
+    threshold_governed_comment: 'Threshold rules on comments',
+    threshold_draft_note_min_length: 'Minimum draft note length',
+    draft_note_length: 'Draft note length',
+    draft_note_meets_minimum: 'Draft note meets minimum',
+    threshold_draft_line_note_min_length: 'Minimum draft line note length',
+    draft_line_note_lengths: 'Draft line note lengths',
+    draft_line_note_below_minimum_count: 'Draft lines below minimum',
+    draft_line_notes_meet_minimum: 'Draft line notes meet minimum',
+    threshold_submission_note_min_length: 'Minimum submission note length',
+    submission_note_length: 'Submission note length',
+    submission_note_meets_minimum: 'Submission note meets minimum',
+    threshold_submission_line_note_min_length: 'Minimum submission line note length',
+    submission_line_note_lengths: 'Submission line note lengths',
+    submission_line_note_below_minimum_count: 'Submission lines below minimum',
+    submission_line_notes_meet_minimum: 'Submission line notes meet minimum',
     fulfilled_line_count: 'Fulfilled line count',
     fulfilled_quantity_total: 'Fulfilled quantity total',
-    item_count: 'Item count'
+    item_count: 'Item count',
+    threshold_approval_note_min_length: 'Minimum approval note length',
+    threshold_note_min_length: 'Minimum threshold note length',
+    approval_note_length: 'Approval note length',
+    approval_note_meets_minimum: 'Approval note meets minimum',
+    threshold_rejection_reason_min_length: 'Minimum rejection reason length',
+    rejection_reason_length: 'Rejection reason length',
+    rejection_reason_meets_minimum: 'Rejection reason meets minimum',
+    threshold_cancellation_reason_min_length: 'Minimum cancellation reason length',
+    cancellation_reason_length: 'Cancellation reason length',
+    cancellation_reason_meets_minimum: 'Cancellation reason meets minimum',
+    threshold_reopen_reason_min_length: 'Minimum reopening reason length',
+    reopen_reason_length: 'Reopening reason length',
+    reopen_reason_meets_minimum: 'Reopening reason meets minimum',
+    threshold_fulfillment_line_note_min_length: 'Minimum fulfillment line note length',
+    fulfillment_line_note_lengths: 'Fulfillment line note lengths',
+    fulfillment_line_note_below_minimum_count: 'Fulfillment lines below minimum',
+    fulfillment_line_notes_meet_minimum: 'Fulfillment line notes meet minimum',
+    threshold_comment_note_min_length: 'Minimum comment note length',
+    comment_note_length: 'Comment note length',
+    comment_note_meets_minimum: 'Comment note meets minimum',
+    cancellation_reason: 'Cancellation reason',
+    reopen_reason: 'Reopening reason',
+    comment: 'Comment'
   };
   const auditValue = (key: string, value: unknown): string => {
     if (typeof value === 'boolean') return ui(value ? 'Yes' : 'No');
