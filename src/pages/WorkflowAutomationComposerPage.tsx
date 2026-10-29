@@ -15,7 +15,7 @@ import {
   OperationalWorkspaceStatus
 } from '../components/ui/OperationalWorkspace';
 import './WorkflowAutomationComposerPage.css';
-import { actionableWorkflowSteps, executionNextStepForComposer, isTerminalSourceStatus } from './workflowStateGuidance';
+import { actionableWorkflowSteps, dropSourceManagedAssignmentStep, executionNextStepForComposer, isTerminalSourceStatus } from './workflowStateGuidance';
 
 type WorkflowDomain =
   | 'execution'
@@ -728,6 +728,16 @@ export default function WorkflowAutomationComposerPage() {
             </button>
           </div>
 
+          <div className="workflow-composer-page__intro">
+            <span className="workflow-composer-page__intro-icon"><TenantNavIcon path="/workspace" size={17} /></span>
+            <div>
+              <strong>{ui("How to use this page")}</strong>
+              <p className="card__subtext">
+                {ui("Review a suggested plan, then open its source page and use only the actions available to your role. Nothing is published or executed here.")}
+              </p>
+            </div>
+          </div>
+
           {composerQuery.isLoading && !hasSnapshot ? (
             <div className="workflow-composer-page__state" role="status">
               <span className="workflow-composer-page__intro-icon"><TenantNavIcon path="/workflow-composer" size={17} /></span>
@@ -758,7 +768,12 @@ export default function WorkflowAutomationComposerPage() {
                 const approvalSteps = blueprint.approval_chain_preview || [];
                 const triggerStatus = blueprint.trigger_preview?.trigger_status || blueprint.trigger_preview?.contract_status;
                 const terminalSource = isTerminalSourceStatus(triggerStatus);
-                const suggestedSteps = actionableWorkflowSteps(blueprint.recommended_steps_preview || [], responsibilityAlreadyAssigned(blueprint), triggerStatus);
+                // Backend-owned `source_workflow` responsibility means this plan cannot
+                // assign its own owner. Keep the explicit unassigned/owner cases unchanged.
+                const suggestedSteps = dropSourceManagedAssignmentStep(
+                  actionableWorkflowSteps(blueprint.recommended_steps_preview || [], responsibilityAlreadyAssigned(blueprint), triggerStatus),
+                  blueprint.responsibility?.assignment_state
+                );
                 const stateAwareNextStep = executionNextStepForComposer(blueprint.source_action_domain, triggerStatus, responsibilityAlreadyAssigned(blueprint));
                 const visibleTitle = sourceTitle(blueprint, ui);
                 const duplicateTitle = blueprints.filter((candidate) => sourceTitle(candidate, ui) === visibleTitle).length > 1;
@@ -799,34 +814,7 @@ export default function WorkflowAutomationComposerPage() {
                       <span className={urgencyClass(urgencyValue)}>{canonicalLabel(urgencyValue, ui)}</span>
                     </div>
 
-                    {/* WFC-UX-002: readable action + owner without expanding every repeated plan. */}
-                    <div className="workflow-composer-page__quick-summary">
-                      <div className="workflow-composer-page__quick-action">
-                        <strong>{ui("What should happen next")}</strong>
-                        <span>{terminalSource
-                          ? ui('This source work is already closed. Review its recorded result; no new execution is suggested.')
-                          : stateAwareNextStep
-                            ? ui(stateAwareNextStep)
-                            : localizedGuidance(
-                              blueprint.recommended_next_step_key,
-                              blueprint.recommended_next_step,
-                              'Follow the suggested steps and continue in the source workflow.',
-                              ui
-                            )}</span>
-                      </div>
-                      <div className="workflow-composer-page__quick-owner">
-                        <strong>{ui("Responsibility")}</strong>
-                        <span>{responsibilityText(blueprint, ui)}</span>
-                      </div>
-                    </div>
-
-                    <details className="workflow-composer-page__guidance-details">
-                      <summary>
-                        <span className="workflow-composer-page__plan-icon"><TenantNavIcon path="/workflow-composer" size={14} /></span>
-                        <span><strong>{ui("Plan guidance")}</strong><small>{ui("Steps, review path, and where the work happens")}</small></span>
-                      </summary>
-                      <div className="workflow-composer-page__guidance-details-body">
-                        <div className="workflow-composer-page__situation-grid">
+                    <div className="workflow-composer-page__situation-grid">
                       <div className="workflow-composer-page__situation-panel">
                         <div className="workflow-composer-page__context-label">{ui("What happened")}</div>
                         <p className="card__subtext workflow-composer-page__blueprint-summary">{sourceDescription(blueprint, ui)}</p>
@@ -875,7 +863,12 @@ export default function WorkflowAutomationComposerPage() {
                       {ui("Plan updated")} {formatDateTime(blueprint.updated_at || blueprint.created_at, locale, ui)}
                     </p>
 
-
+                    <details className="workflow-composer-page__guidance-details">
+                      <summary>
+                        <span className="workflow-composer-page__plan-icon"><TenantNavIcon path="/workflow-composer" size={14} /></span>
+                        <span><strong>{ui("Plan guidance")}</strong><small>{ui("Steps, review path, and where the work happens")}</small></span>
+                      </summary>
+                      <div className="workflow-composer-page__guidance-details-body">
                         <div className="workflow-composer-page__plan-grid">
                           <div className="workflow-composer-page__plan-panel">
                             <div className="workflow-composer-page__plan-title"><span className="workflow-composer-page__plan-icon"><TenantNavIcon path="/workflow-composer" size={14} /></span>{ui("Suggested steps")}</div>
@@ -968,9 +961,8 @@ export default function WorkflowAutomationComposerPage() {
 
       {!hasSnapshot ? null : (
         <section className="section workflow-composer-page__section">
-          <details className="workflow-composer-page__supplementary-details">
-            <summary><span className="workflow-composer-page__section-icon"><TenantNavIcon path="/intelligence-review" size={16} /></span><span>{ui("How to understand the plans")}</span></summary>
-            <div className="workflow-composer-page__guidance-grid">
+          <div className="section__title workflow-composer-page__section-title"><span className="workflow-composer-page__section-icon"><TenantNavIcon path="/intelligence-review" size={16} /></span><span>{ui("How to understand the plans")}</span></div>
+          <div className="workflow-composer-page__guidance-grid">
             <div className="card workflow-composer-page__guidance-card">
               <span className="workflow-composer-page__icon workflow-composer-page__icon--blue"><TenantNavIcon path={workflowDomainIconPath(blueprints[0]?.workflow_domain)} size={17} /></span>
               <div className="workflow-composer-page__guidance-copy"><div className="card__label">{ui("Start with")}</div>
@@ -995,15 +987,13 @@ export default function WorkflowAutomationComposerPage() {
               <p className="card__subtext">{localizedGuidance(guidance.integration_routing_guidance_key, guidance.integration_routing_guidance, 'External integrations are not run from this page.', ui)}</p></div>
             </div>
           </div>
-          </details>
         </section>
       )}
 
       {!hasSnapshot ? null : (
         <section className="section workflow-composer-page__section">
-          <details className="workflow-composer-page__supplementary-details">
-            <summary><span className="workflow-composer-page__section-icon"><TenantNavIcon path="/reliability-command" size={16} /></span><span>{ui("Safety and control")}</span></summary>
-            <div className="workflow-composer-page__safety-grid">
+          <div className="section__title workflow-composer-page__section-title"><span className="workflow-composer-page__section-icon"><TenantNavIcon path="/reliability-command" size={16} /></span><span>{ui("Safety and control")}</span></div>
+          <div className="workflow-composer-page__safety-grid">
             {USER_SAFETY_ITEMS.map((item) => (
               <div className="card workflow-composer-page__safety-card" key={item.title}>
                 <span className="workflow-composer-page__icon workflow-composer-page__icon--green"><TenantNavIcon path={item.iconPath} size={17} /></span>
@@ -1035,7 +1025,6 @@ export default function WorkflowAutomationComposerPage() {
             </details>
           ) : null}
           */}
-          </details>
         </section>
       )}
     </div>

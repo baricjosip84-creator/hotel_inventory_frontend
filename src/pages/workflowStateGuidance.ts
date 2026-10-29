@@ -18,6 +18,18 @@ export function actionableWorkflowSteps(
   });
 }
 
+/** WFC-DEF-001: an explicit source-owned responsibility is not a request
+ * to assign another owner in Workflow Composer. Do not apply this fallback to
+ * missing, unassigned, pending, offered, or unknown assignment states.
+ */
+export function dropSourceManagedAssignmentStep(
+  steps: readonly string[],
+  assignmentState: string | null | undefined
+): string[] {
+  if (String(assignmentState || '').trim().toLowerCase() !== 'source_workflow') return [...steps];
+  return steps.filter((step) => step !== 'assign_human_owner');
+}
+
 /** FT188 / WFC-DEF-001: read-only, state-specific next action for execution plans.
  * The original backend sentence remains available for non-execution plans.
  * Do not claim a task has an owner unless the responsibility field proves it.
