@@ -17,7 +17,25 @@ for(const [name,endpoint,inline] of [
  check(fragment.includes('skipMutationFeedback: true'),`${name}: generic toast suppressed`);
  check(file.includes(inline),`${name}: specific inline success remains`);
 }
-check(file.includes('onError: (err) => setWebhookActionError(messageFrom(err, ui("Unable to queue webhook test."), ui))'),'Error feedback preserved');
-check(file.includes('onError: (err) => setWebhookActionError(messageFrom(err, ui("Unable to rotate webhook secret."), ui))'),'Rotation error preserved');
-check(file.includes('onError: (err) => setWebhookActionError(messageFrom(err, ui("Unable to create webhook."), ui))'),'Creation error preserved');
+// Inspect the actual onError callbacks, not a single obsolete one-line formatting.
+// Each webhook failure must update both the nearby error and the visible toast.
+const errorCallbacks = [];
+const visit = (node) => {
+  if (ts.isPropertyAssignment(node) && node.name.getText(ast) === 'onError') {
+    errorCallbacks.push(node.initializer.getText(ast));
+  }
+  ts.forEachChild(node, visit);
+};
+visit(ast);
+for (const [fallback, label] of [
+  ['Unable to queue webhook test.', 'Error feedback preserved'],
+  ['Unable to rotate webhook secret.', 'Rotation error preserved'],
+  ['Unable to create webhook.', 'Creation error preserved']
+]) {
+  const callback = errorCallbacks.find((body) => body.includes(`ui("${fallback}")`));
+  check(Boolean(callback
+    && /messageFrom\s*\(\s*err\s*,/.test(callback)
+    && /setWebhookActionError\s*\(\s*message\s*\)/.test(callback)
+    && /showTenantActionError\s*\(\s*message\s*\)/.test(callback)), label);
+}
 console.log(`Integration webhook action feedback: ${count}/${count} passed`);
