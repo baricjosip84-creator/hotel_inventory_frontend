@@ -551,7 +551,7 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
     onError: (err) => setConnectionError(messageFrom(err, ui("Unable to update connection status."), ui))
   });
   const createWebhook = useMutation({
-    onMutate: () => { setWebhookMessage(null); setWebhookActionError(null); },
+    onMutate: () => { setWebhookMessage(null); setWebhookActionError(null); setRevealedWebhookSecret(null); },
     mutationFn: () => apiRequest<WebhookSubscription & { signing_secret: string }>('/inventory-capabilities/webhooks', {
       method: 'POST',
       skipMutationFeedback: true,
@@ -566,23 +566,45 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
       setWebhookName('');
       setWebhookUrl('');
       setWebhookEvents([]);
-      setWebhookMessage(ui("Webhook created. Events will be queued automatically from the inventory audit trail."));
+      const message = ui("Webhook created. Events will be queued automatically from the inventory audit trail.");
+      setWebhookMessage(message); showTenantActionSuccess(message);
       setWebhookActionError(null); setError(null);
       void qc.invalidateQueries({ queryKey: ['inventory-webhooks'] });
     },
-    onError: (err) => setWebhookActionError(messageFrom(err, ui("Unable to create webhook."), ui))
+    onError: (err) => {
+      const message = messageFrom(err, ui("Unable to create webhook."), ui);
+      setWebhookActionError(message);
+      showTenantActionError(message);
+    }
   });
   const changeWebhookStatus = useMutation({
     onMutate: () => { setWebhookMessage(null); setWebhookActionError(null); },
     mutationFn: ({ row, status }: { row: WebhookSubscription; status: 'configured' | 'disabled' }) => apiRequest(`/inventory-capabilities/webhooks/${row.id}`, { method: 'PATCH', skipMutationFeedback: true, body: JSON.stringify({ status }), version: row.version }),
-    onSuccess: (_data, { status }) => { setWebhookMessage(ui(status === 'disabled' ? "Webhook disabled." : "Webhook enabled.")); setWebhookActionError(null); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-webhooks'] }); },
-    onError: (err) => setWebhookActionError(messageFrom(err, ui("Unable to update webhook."), ui))
+    onSuccess: (_data, { status }) => {
+      const message = ui(status === 'disabled' ? "Webhook disabled." : "Webhook enabled.");
+      setWebhookMessage(message); showTenantActionSuccess(message);
+      setWebhookActionError(null); setError(null);
+      void qc.invalidateQueries({ queryKey: ['inventory-webhooks'] });
+    },
+    onError: (err) => {
+      const message = messageFrom(err, ui("Unable to update webhook."), ui);
+      setWebhookActionError(message); showTenantActionError(message);
+    }
   });
   const rotateWebhook = useMutation({
     onMutate: () => { setWebhookMessage(null); setWebhookActionError(null); },
     mutationFn: (row: WebhookSubscription) => apiRequest<WebhookSubscription & { signing_secret: string }>(`/inventory-capabilities/webhooks/${row.id}/rotate-secret`, { method: 'POST', skipMutationFeedback: true, body: JSON.stringify({}), version: row.version }),
-    onSuccess: (data) => { setRevealedWebhookSecret(data.signing_secret); setWebhookMessage(ui("Webhook secret rotated. Copy the new secret now.")); setWebhookActionError(null); setError(null); void qc.invalidateQueries({ queryKey: ['inventory-webhooks'] }); },
-    onError: (err) => setWebhookActionError(messageFrom(err, ui("Unable to rotate webhook secret."), ui))
+    onSuccess: (data) => {
+      setRevealedWebhookSecret(data.signing_secret);
+      const message = ui("Webhook secret rotated. Copy the new secret now.");
+      setWebhookMessage(message); showTenantActionSuccess(message);
+      setWebhookActionError(null); setError(null);
+      void qc.invalidateQueries({ queryKey: ['inventory-webhooks'] });
+    },
+    onError: (err) => {
+      const message = messageFrom(err, ui("Unable to rotate webhook secret."), ui);
+      setWebhookActionError(message); showTenantActionError(message);
+    }
   });
   const loadMoreWebhooks = useMutation({
     mutationFn: (cursor: string) => apiRequest<PagedResponse<WebhookSubscription>>(`/inventory-capabilities/webhooks?paged=true&limit=100&cursor=${encodeURIComponent(cursor)}`),
@@ -600,8 +622,16 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
   const testWebhook = useMutation({
     onMutate: () => { setWebhookMessage(null); setWebhookActionError(null); },
     mutationFn: (id: string) => apiRequest<{ delivery_id: string; queued: boolean }>(`/inventory-capabilities/webhooks/${id}/test`, { method: 'POST', skipMutationFeedback: true, body: JSON.stringify({}) }),
-    onSuccess: () => { setWebhookMessage(ui("Test webhook queued. Delivery status will appear below.")); setWebhookActionError(null); setError(null); setTimeout(() => void qc.invalidateQueries({ queryKey: ['inventory-webhook-deliveries'] }), 750); },
-    onError: (err) => setWebhookActionError(messageFrom(err, ui("Unable to queue webhook test."), ui))
+    onSuccess: () => {
+      const message = ui("Test webhook queued. Delivery status will appear below.");
+      setWebhookMessage(message); showTenantActionSuccess(message);
+      setWebhookActionError(null); setError(null);
+      setTimeout(() => void qc.invalidateQueries({ queryKey: ['inventory-webhook-deliveries'] }), 750);
+    },
+    onError: (err) => {
+      const message = messageFrom(err, ui("Unable to queue webhook test."), ui);
+      setWebhookActionError(message); showTenantActionError(message);
+    }
   });
 
   return (
@@ -642,15 +672,15 @@ function IntegrationsPanel({ canWrite }: { canWrite: boolean }) {
         <div className="card__label">{ui("Automatic outbound notifications")}</div>
         <h3>{ui("Webhooks")}</h3>
         <p className="card__subtext">{ui("Another system can give this app an HTTPS address. Choose which inventory events it should receive. “All listed events” means every event shown in this picker, not internal audit activity.")}</p>
-        {revealedWebhookSecret ? <div className="form-success"><strong>{ui("Copy this signing secret now. It is only shown once:")}</strong><br /><code style={{ wordBreak: 'break-all' }}>{revealedWebhookSecret}</code></div> : null}
-        {webhookMessage ? <div className="form-success">{webhookMessage}</div> : null}
-        {webhookActionError ? <div className="form-error">{webhookActionError}</div> : null}
         <form onSubmit={(e) => { e.preventDefault(); createWebhook.mutate(); }} style={formGridStyle}>
           <label>{ui("Name")}<input value={webhookName} onChange={(e) => setWebhookName(e.target.value)} placeholder={ui("Head office events")} disabled={!canWrite} /></label>
           <label>{ui("HTTPS destination")}<input value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} placeholder="https://example.com/inventory-webhook" disabled={!canWrite} /></label>
           <fieldset style={{ gridColumn: '1 / -1', border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: '#f8fafc' }} disabled={!canWrite || webhookEventCatalog.isLoading || webhookEventCatalog.isError}><legend>{ui("Events")}</legend><div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', maxHeight: 220, overflowY: 'auto' }}>{(webhookEventCatalog.data?.items || []).map(({ event_type, group, label }) => <label key={event_type} title={event_type} style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={webhookEvents.includes(event_type)} onChange={(event) => setWebhookEvents((current) => event.target.checked ? (event_type === '*' ? ['*'] : Array.from(new Set(current.filter((value) => value !== '*').concat(event_type)))) : current.filter((value) => value !== event_type))} />{event_type === '*' ? ui("All listed events") : <span><strong>{ui(group)}</strong> — {ui(label)}</span>}</label>)}</div></fieldset>
           <div style={{ alignSelf: 'end' }}><button className="button" disabled={!canWrite || !webhooks.isSuccess || !webhookEventCatalog.isSuccess || !webhookName.trim() || !webhookUrl.trim() || webhookEvents.length === 0 || createWebhook.isPending || loadMoreWebhooks.isPending || changeWebhookStatus.isPending || rotateWebhook.isPending}>{ui("Create webhook")}</button></div>
         </form>
+        {webhookMessage ? <div className="form-success" role="status">{webhookMessage}</div> : null}
+        {webhookActionError ? <div className="form-error" role="alert">{webhookActionError}</div> : null}
+        {revealedWebhookSecret ? <div className="form-success"><strong>{ui("Copy this signing secret now. It is only shown once:")}</strong><br /><code style={{ wordBreak: 'break-all' }}>{revealedWebhookSecret}</code></div> : null}
         {webhookEventCatalog.isError ? <div className="form-error">{ui("Unable to load webhook event choices.")}</div> : null}
         <div style={tableWrapStyle}><table><thead><tr><th>{ui("Name")}</th><th>{ui("Destination")}</th><th>{ui("Events")}</th><th>{ui("Status")}</th><th>{ui("Actions")}</th></tr></thead><tbody>
           {!webhooks.isLoading && !webhooks.isError && !webhookRows.length ? <EmptyTableRow colSpan={5} message={ui("No webhooks are configured yet.")} /> : null}{webhookRows.map((row) => <tr key={row.id}><td>{row.display_name}</td><td style={{ maxWidth: 320, wordBreak: 'break-all' }}>{row.destination_reference}</td><td>{row.event_types.map(displayWebhookEvent).join(', ')}</td><td>{displayCanonicalLabel(row.status, ui)}</td><td><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{canWrite ? <><button className="button button--secondary" type="button" disabled={testWebhook.isPending || rotateWebhook.isPending || changeWebhookStatus.isPending || loadMoreWebhooks.isPending || createWebhook.isPending} onClick={() => testWebhook.mutate(row.id)}>{testWebhook.isPending ? ui("Testing…") : ui("Test")}</button><button className="button button--secondary" type="button" disabled={testWebhook.isPending || rotateWebhook.isPending || changeWebhookStatus.isPending || loadMoreWebhooks.isPending || createWebhook.isPending} onClick={() => rotateWebhook.mutate(row)}>{rotateWebhook.isPending ? ui("Rotating…") : ui("Rotate secret")}</button><button className="button button--secondary" type="button" disabled={testWebhook.isPending || rotateWebhook.isPending || changeWebhookStatus.isPending || loadMoreWebhooks.isPending || createWebhook.isPending} onClick={() => changeWebhookStatus.mutate({ row, status: row.status === 'configured' ? 'disabled' : 'configured' })}>{changeWebhookStatus.isPending ? ui("Saving…") : row.status === 'configured' ? ui("Disable") : ui("Enable")}</button></> : null}</div></td></tr>)}
