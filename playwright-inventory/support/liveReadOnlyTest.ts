@@ -31,8 +31,13 @@ export const test = base.extend({
       await route.continue();
     });
 
+    // addInitScript runs on EVERY navigation and reload, not just first open.
+    // Seed a predictable default only for a new browser context. Never erase
+    // the user's chosen language during the persistence smoke test.
     await page.addInitScript(() => {
-      localStorage.setItem('inventory_locale', 'en-GB');
+      if (localStorage.getItem('inventory_locale') === null) {
+        localStorage.setItem('inventory_locale', 'en-GB');
+      }
     });
     await use(page);
 

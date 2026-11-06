@@ -1801,3 +1801,12 @@ NOT DONE: no npm, TypeScript compilation, Playwright discovery/execution, browse
 - No test scenarios, app sources, credentials, original specs or workflow settings were changed. The six live smoke checks still require explicit `READONLY` and remain unauthenticated.
 - No live PASS claimed; requires GitHub Actions rerun. Main 9,900 spec tests remain unrun; 417 blocked, 272 partial, PLCR-084 unchanged.
 - Source of truth becomes Batch 187 FULL, based on checksum-verified Batch 186 FULL. Update only `playwright-inventory/support/liveReadOnlyTest.ts` in the existing GitHub repo to apply the functional fix.
+
+
+## Batch 188 — Language persistence CI fixture correction (6 November 2026)
+- GitHub Actions screenshot: first B187 live smoke rerun gave 5 PASS / 1 FAIL. The single failure was LIVE-TLOG-005 at `login.smoke.spec.ts` line 44 after `page.reload()`: expected HTML lang `hr-HR`.
+- Verified in B187 source: `support/liveReadOnlyTest.ts` used `page.addInitScript(() => localStorage.setItem('inventory_locale','en-GB'))` unconditionally. Playwright executes initialization scripts on every page load, including reload; the test's Croatian choice was overwritten back to English before the React locale provider read storage.
+- Fix: initialize `inventory_locale` to `en-GB` only if the key is absent. Keep the stored `hr-HR` value when reloading. The test itself (`LIVE-TLOG-005`), all 9,900 authored scenarios, original frontend/backend source and GitHub workflow are unchanged.
+- Live-readonly mutation guard remains active: every non-GET/HEAD/OPTIONS request is aborted; any completed non-readonly request is still a failure. No backend or user data changes introduced.
+- Static check and isolated browser-storage simulation PASS. Actual GitHub rerun after this fix is NOT YET DONE. User only needs to replace `playwright-inventory/support/liveReadOnlyTest.ts` and commit, then rerun `Inventory - live Vercel read-only checks` with `READONLY`.
+- No evidence of an application language defect from this failure. Original 417 blocked obligations, 272 partial features, PLCR-084 remain open. Continue only from B188 FULL.

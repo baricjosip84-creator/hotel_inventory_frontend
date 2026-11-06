@@ -43,3 +43,13 @@ The first **live-smoke** CI run executed six public login checks but reported si
 **Existing GitHub frontend repository:** replace only `playwright-inventory/support/liveReadOnlyTest.ts` with the Batch 187 copy. Commit. Run GitHub → Actions → Inventory - live Vercel read-only checks → Run workflow → `READONLY`. Do not re-upload all 9,900 tests.
 
 A successful CI run has NOT been observed in this package. If another assertion fails after this change, inspect its exact failed step and treat it as a separate diagnosis.
+
+## Batch 188 — Confirmed language-reload fixture issue
+
+GitHub Actions run after B187: 5 PASS / 1 FAIL. LIVE-TLOG-005 failed immediately after page reload at the `lang=hr-HR` assertion.
+
+**Confirmed source cause:** `page.addInitScript` seeds `inventory_locale='en-GB'` for **each document navigation**, inadvertently resetting the language chosen by the test before its reload. B188 seeds English only if storage has no locale yet. The existing `I18nProvider` in the immutable original frontend already persists selections to this same localStorage key.
+
+For the already uploaded frontend GitHub repository, replace **only** `playwright-inventory/support/liveReadOnlyTest.ts`. Commit, then select Actions → Inventory - live Vercel read-only checks → Run workflow, enter `READONLY`. No Vercel/Render changes and no test credentials needed for these six public checks.
+
+B188 was statically checked and verified against source, **not** executed in GitHub Actions yet. Do not claim 6/6 PASS until an actual live run shows it.
