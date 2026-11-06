@@ -1497,3 +1497,11 @@ NOT DONE: no npm, TypeScript compilation, Playwright discovery/execution, browse
 - Live tests require explicit READONLY workflow input; reject all non-GET/HEAD/OPTIONS network traffic. No secrets, backend writes or inventory changes are intended; if an unexpected write is attempted the test fails.
 - Not a full-suite production enablement. All 417 blocked/272 partial/PLCR-084 remain open; all 9,900 prior declarations remain UNRUN. Runtime GitHub Actions result is not yet available.
 - Source of truth for further changes: B186 FULL. Real Vercel URL must be confirmed before first run, and GitHub repository root must contain `playwright-inventory/` as documented.
+
+
+## Batch 187 — Repair first live-readonly CI run (6 November 2026)
+- User's GitHub Actions live-smoke run reached Playwright; all six checks failed on `support/liveReadOnlyTest.ts` shared teardown assertion (`expect(prohibited).toEqual([])`), not on independently confirmed application defects.
+- Corrected the false failure: background non-GET/HEAD/OPTIONS requests are still **aborted** before network delivery, but successfully aborted attempts no longer fail a browser-only check. A separate `requestfinished` safety detector fails if a disallowed HTTP request completes.
+- No test scenarios, app sources, credentials, original specs or workflow settings were changed. The six live smoke checks still require explicit `READONLY` and remain unauthenticated.
+- No live PASS claimed; requires GitHub Actions rerun. Main 9,900 spec tests remain unrun; 417 blocked, 272 partial, PLCR-084 unchanged.
+- Source of truth becomes Batch 187 FULL, based on checksum-verified Batch 186 FULL. Update only `playwright-inventory/support/liveReadOnlyTest.ts` in the existing GitHub repo to apply the functional fix.

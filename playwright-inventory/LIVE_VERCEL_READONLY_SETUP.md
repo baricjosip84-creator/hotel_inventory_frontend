@@ -1,4 +1,4 @@
-# LIVE VERCEL (READ-ONLY) — Batch 186
+# LIVE VERCEL (READ-ONLY) — Batch 187
 
 **Purpose:** Start browser validation using the user's existing Vercel deployment and existing GitHub Actions setup, WITHOUT running mutation tests on live tenant data.
 
@@ -17,7 +17,7 @@
 ## Safety boundaries
 
 - This GitHub workflow runs **only six specially guarded public login-screen smoke tests** (`playwright-inventory/live-readonly/login.smoke.spec.ts`), not the 9,900 generated tests.
-- All outgoing browser HTTP methods other than GET, HEAD, OPTIONS are blocked BEFORE they reach any server. Any attempted mutation causes a FAIL.
+- All outgoing browser HTTP methods other than GET, HEAD, OPTIONS are blocked BEFORE they reach any server. Non-read-only HTTP requests are aborted before reaching the server; an attempted but successfully blocked request is logged, not counted as a test failure. Any unsafe request that completes still fails the test.
 - No credentials, secret values or customer data are required. These checks cannot verify authenticated workflows, backend permissions, inventory writes, persistence, tenant isolation or all 9,900 tests.
 - The original `playwright.config.ts`, `support/environment.ts`, all 152 existing page specs and all original 9,900 authored scenarios remain unchanged. Original production protections remain active.
 - The Vercel target is an EXACT origin allowlist in `playwright.live-readonly.config.ts`, with explicit `PW_LIVE_READONLY=YES` approval. Changing the URL or selecting any other config without review is not supported.
@@ -33,3 +33,13 @@ npm run test:live-readonly:list
 ```
 
 To run the six guarded tests locally, first ensure the domain above is correct, then use `npm run test:live-readonly`; the GitHub Actions workflow is the intended default.
+
+## Batch 187 — Fix after the first GitHub Actions run (6 November 2026)
+
+The first **live-smoke** CI run executed six public login checks but reported six failures from the shared teardown assertion in `support/liveReadOnlyTest.ts`. That old assertion required *zero attempted* non-GET/HEAD/OPTIONS requests even when every such request was safely aborted. A modern frontend can try background POST requests during ordinary navigation.
+
+**Correction:** The guard still calls `route.abort('blockedbyclient')` on every non-read-only HTTP method before the network. Only *completed* unsafe requests trigger the teardown failure. Successfully blocked attempts are summarized in the CI log without request URL, body or secrets.
+
+**Existing GitHub frontend repository:** replace only `playwright-inventory/support/liveReadOnlyTest.ts` with the Batch 187 copy. Commit. Run GitHub → Actions → Inventory - live Vercel read-only checks → Run workflow → `READONLY`. Do not re-upload all 9,900 tests.
+
+A successful CI run has NOT been observed in this package. If another assertion fails after this change, inspect its exact failed step and treat it as a separate diagnosis.
