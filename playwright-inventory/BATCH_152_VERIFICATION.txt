@@ -1,0 +1,10 @@
+STATIC VERIFICATION ONLY — B152
+BATCH 152 — 2026-11-06 — PHASE 1 SOURCE-ONLY AUTHORING
+Parent: INVENTORY_PLAYWRIGHT_BATCH_151_FULL.zip SHA256 9b1dbcf7192132299595d4ba6baad1e38880e9f0d86bd31d8c512df96414c6b1
+Original frontend SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; backend SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4 (unchanged).
+8 new source-backed Platform Users browser declarations: PUSR-088–095.
+17 manually adjudicated legacy skipped obligations (incl PPER-041, five PUSR and 11 PSHL); all remain skipped pending external/backend evidence.
+Totals: 9,241 authored scenario IDs; 357 labelled skipped, 24 conditional skips; 417 BLOCKED; 1 NEEDS_EXPECTATION PLCR-084; 9,659 coverage ledger rows; 9,951 feature inventory rows; 152 specs; 137/137 routes inventoried.
+No TypeScript compilation, npm, Playwright, browser, backend, SQL, CI, deployments or production access.
+Release 153 must continue from B152 FULL and retain unresolved issues; see Phase 1 readiness and manual source review.
+Authored unique IDs=9241, labelled skips=357, conditional skips=24, ledger=9659, feature inventory=9951, spec files=152. ZIP hash and immutable-file checks performed during packaging; these are NOT Playwright/TypeScript results.

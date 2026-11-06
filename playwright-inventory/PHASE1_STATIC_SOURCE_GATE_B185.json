@@ -1,0 +1,1433 @@
+{
+  "phase": "Phase 1 source authoring freeze / static readiness; NOT browser acceptance",
+  "tests_compiled": 0,
+  "tests_discovered": 0,
+  "tests_executed": 0,
+  "immutable_fe_sha256": "864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112",
+  "immutable_be_sha256": "e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4",
+  "spec_files": 152,
+  "authored_declarations": 9900,
+  "labelled_skip_declarations": 357,
+  "supplemental_skip_calls": 24,
+  "ledger_rows": 10318,
+  "ledger_statuses": {
+    "GENERATED_UNRUN": 9900,
+    "NEEDS_EXPECTATION": 1,
+    "BLOCKED": 417
+  },
+  "feature_rows": 10610,
+  "partial_feature_records": 272,
+  "unique_routes": 137,
+  "routes_with_source_authored_scenarios": 137,
+  "unique_source_reference_paths": 543,
+  "missing_source_reference_paths": [],
+  "missing_local_imports": [],
+  "blocked_proof_boundaries": {
+    "FRONTEND_SOURCE_HARDENING": 17,
+    "PRODUCT_EXPECTATION_OR_ROLE_CONTRACT": 4,
+    "BROWSER_ACCESSIBILITY_PERFORMANCE_ACCEPTANCE": 9,
+    "AUTHENTIC_BACKEND_DATABASE_OR_SECURITY_ACCEPTANCE": 73,
+    "INDEPENDENT_PROVIDER_OR_OWNER_EVIDENCE": 24,
+    "EXTERNAL_OPERATIONAL_SIGNOFF": 290
+  },
+  "supplemental_skip_classifications": {
+    "UNCONDITIONAL_IN_TEST_SKIP": 21,
+    "ROLE_DEPENDENT_CONDITIONAL_SKIP": 3
+  },
+  "phase1_deferrals_not_closed": {
+    "blocked_obligations": 417,
+    "partial_features": 272,
+    "labelled_skips": 357,
+    "supplemental_skips": 24,
+    "expectation_decision": "PLCR-084"
+  },
+  "route_matrix": [
+    {
+      "route": "/action-center",
+      "features": 45,
+      "linked_generated": 45,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Action Center"
+      ]
+    },
+    {
+      "route": "/adaptive-policy-engine",
+      "features": 51,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 30,
+      "pages": [
+        "Adaptive Policy Engine"
+      ]
+    },
+    {
+      "route": "/admin-system",
+      "features": 50,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Admin System"
+      ]
+    },
+    {
+      "route": "/ai-copilot",
+      "features": 51,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "AI Copilot"
+      ]
+    },
+    {
+      "route": "/alerts",
+      "features": 88,
+      "linked_generated": 88,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Alerts"
+      ]
+    },
+    {
+      "route": "/audit",
+      "features": 72,
+      "linked_generated": 72,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Tenant Audit"
+      ]
+    },
+    {
+      "route": "/automation-schedules",
+      "features": 50,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Automation Schedules"
+      ]
+    },
+    {
+      "route": "/collaboration",
+      "features": 52,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 50,
+      "pages": [
+        "Enterprise Collaboration"
+      ]
+    },
+    {
+      "route": "/cross-domain-optimization",
+      "features": 52,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 50,
+      "pages": [
+        "Cross-Domain Optimization"
+      ]
+    },
+    {
+      "route": "/dashboard",
+      "features": 54,
+      "linked_generated": 54,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Dashboard"
+      ]
+    },
+    {
+      "route": "/decision-learning-feedback",
+      "features": 51,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Learning Feedback"
+      ]
+    },
+    {
+      "route": "/digital-twin",
+      "features": 52,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 50,
+      "pages": [
+        "Digital Twin"
+      ]
+    },
+    {
+      "route": "/enterprise-inventory",
+      "features": 89,
+      "linked_generated": 89,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Enterprise Inventory"
+      ]
+    },
+    {
+      "route": "/execution-requests",
+      "features": 50,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Execution Requests"
+      ]
+    },
+    {
+      "route": "/execution-tasks",
+      "features": 50,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Execution Tasks"
+      ]
+    },
+    {
+      "route": "/insights",
+      "features": 50,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Insights"
+      ]
+    },
+    {
+      "route": "/intelligence-review",
+      "features": 61,
+      "linked_generated": 60,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Intelligence Review"
+      ]
+    },
+    {
+      "route": "/inventory-capabilities",
+      "features": 164,
+      "linked_generated": 161,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Inventory Capabilities",
+        "InventoryCapabilitiesPage"
+      ]
+    },
+    {
+      "route": "/inventory-requisitions",
+      "features": 50,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Inventory Requisitions"
+      ]
+    },
+    {
+      "route": "/inventory-reservations",
+      "features": 50,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Inventory Reservations"
+      ]
+    },
+    {
+      "route": "/inventory-usage",
+      "features": 50,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Inventory Usage"
+      ]
+    },
+    {
+      "route": "/login",
+      "features": 9,
+      "linked_generated": 9,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Tenant Login"
+      ]
+    },
+    {
+      "route": "/mobile-execution",
+      "features": 48,
+      "linked_generated": 48,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Mobile Execution"
+      ]
+    },
+    {
+      "route": "/outbound",
+      "features": 50,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Outbound"
+      ]
+    },
+    {
+      "route": "/permissions",
+      "features": 78,
+      "linked_generated": 78,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Tenant Permissions",
+        "Tenant Roles & Permissions"
+      ]
+    },
+    {
+      "route": "/platform/access-reviews",
+      "features": 98,
+      "linked_generated": 93,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Access Reviews"
+      ]
+    },
+    {
+      "route": "/platform/announcements",
+      "features": 88,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Announcements"
+      ]
+    },
+    {
+      "route": "/platform/api-client-governance",
+      "features": 75,
+      "linked_generated": 70,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform API Client Governance"
+      ]
+    },
+    {
+      "route": "/platform/api-keys",
+      "features": 85,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform API Keys"
+      ]
+    },
+    {
+      "route": "/platform/audit",
+      "features": 99,
+      "linked_generated": 91,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Audit"
+      ]
+    },
+    {
+      "route": "/platform/audit-retention",
+      "features": 90,
+      "linked_generated": 82,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Audit Retention"
+      ]
+    },
+    {
+      "route": "/platform/backup-restore-validation",
+      "features": 80,
+      "linked_generated": 68,
+      "blocked_features": 12,
+      "partial_features": 0,
+      "pages": [
+        "Platform Backup Restore Validation"
+      ]
+    },
+    {
+      "route": "/platform/billing",
+      "features": 88,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Billing"
+      ]
+    },
+    {
+      "route": "/platform/billing-subscription-activation",
+      "features": 88,
+      "linked_generated": 52,
+      "blocked_features": 28,
+      "partial_features": 0,
+      "pages": [
+        "Platform Billing Subscription Activation"
+      ]
+    },
+    {
+      "route": "/platform/capacity-planning",
+      "features": 85,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 39,
+      "pages": [
+        "Platform Capacity Planning"
+      ]
+    },
+    {
+      "route": "/platform/change-management",
+      "features": 105,
+      "linked_generated": 100,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Change Management"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-acceptance-packet",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Acceptance Packet"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-additional-growth-authorization",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Additional Growth Authorization"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-additional-growth-observation",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Additional Growth Observation"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-certificate",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Certificate"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-day-command-center",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Day Command Center"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-durable-closure-certification",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Durable Closure Certification"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-evidence-retention-seal",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Evidence Retention Seal"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-expansion-health-observation",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Expansion Health Observation"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-final-evidence-archive",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Final Evidence Archive"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-go-no-go-register",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Go/No-Go Register"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-incident-closure",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Incident Closure"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-incident-triage",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Incident Triage"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-post-launch-observation",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Post-Launch Observation"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-prevention-verification",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Prevention Verification"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-readiness",
+      "features": 96,
+      "linked_generated": 88,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Readiness"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-retention-renewal-acceptance-docket",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Retention Renewal Acceptance Docket"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-retention-renewal-archive-seal",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Retention Renewal Archive Seal"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-retention-renewal-certification",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Retention Renewal Certification"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-retention-renewal-cycle-reset",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Retention Renewal Cycle Reset"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-retention-renewal-final-seal",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Retention Renewal Final Seal"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-retention-renewal-review",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Retention Renewal Review"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-rollout-expansion-authorization",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Rollout Expansion Authorization"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-smoke-test-checklist",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Smoke Test Checklist"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-steady-state-exception-closure",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Steady-State Exception Closure"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-steady-state-exception-review",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Steady-State Exception Review"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-steady-state-operations-cadence",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Steady-State Operations Cadence"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-steady-state-recurrence-audit",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Steady-State Recurrence Audit"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-steady-state-recurrence-resolution",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Steady-State Recurrence Resolution"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-steady-state-resolution-verification",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Steady-State Resolution Verification"
+      ]
+    },
+    {
+      "route": "/platform/commercial-launch-steady-state-transition",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Commercial Launch Steady-State Transition"
+      ]
+    },
+    {
+      "route": "/platform/commercial-readiness-verification-program",
+      "features": 96,
+      "linked_generated": 88,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Commercial Readiness Verification Program",
+        "Platform Commercial Readiness Verification Program"
+      ]
+    },
+    {
+      "route": "/platform/compliance-documents",
+      "features": 85,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Compliance Documents"
+      ]
+    },
+    {
+      "route": "/platform/compliance-export",
+      "features": 91,
+      "linked_generated": 86,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Compliance Export"
+      ]
+    },
+    {
+      "route": "/platform/customer-onboarding-checklist",
+      "features": 90,
+      "linked_generated": 82,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Customer Onboarding Checklist",
+        "Platform Customer Onboarding Checklist"
+      ]
+    },
+    {
+      "route": "/platform/customer-success-admin",
+      "features": 88,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Customer Success Admin"
+      ]
+    },
+    {
+      "route": "/platform/dashboard",
+      "features": 35,
+      "linked_generated": 35,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Dashboard"
+      ]
+    },
+    {
+      "route": "/platform/data-retention",
+      "features": 86,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Data Retention"
+      ]
+    },
+    {
+      "route": "/platform/deployment-validation",
+      "features": 80,
+      "linked_generated": 68,
+      "blocked_features": 12,
+      "partial_features": 0,
+      "pages": [
+        "Platform Deployment Validation"
+      ]
+    },
+    {
+      "route": "/platform/documentation-completeness",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Documentation Completeness"
+      ]
+    },
+    {
+      "route": "/platform/enterprise-identity",
+      "features": 98,
+      "linked_generated": 90,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Enterprise Identity",
+        "Platform Enterprise Identity",
+        "Platform Enterprise Identity Governance"
+      ]
+    },
+    {
+      "route": "/platform/incidents",
+      "features": 107,
+      "linked_generated": 99,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Incidents"
+      ]
+    },
+    {
+      "route": "/platform/integration-monitoring",
+      "features": 95,
+      "linked_generated": 90,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Integration Monitoring"
+      ]
+    },
+    {
+      "route": "/platform/legal-compliance-reporting",
+      "features": 111,
+      "linked_generated": 105,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Legal Compliance Reporting"
+      ]
+    },
+    {
+      "route": "/platform/license-plan-enforcement",
+      "features": 100,
+      "linked_generated": 92,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform License & Plan Enforcement"
+      ]
+    },
+    {
+      "route": "/platform/login",
+      "features": 15,
+      "linked_generated": 15,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Login"
+      ]
+    },
+    {
+      "route": "/platform/maintenance",
+      "features": 88,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Maintenance"
+      ]
+    },
+    {
+      "route": "/platform/notifications",
+      "features": 110,
+      "linked_generated": 102,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Notifications"
+      ]
+    },
+    {
+      "route": "/platform/operational-jobs",
+      "features": 85,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Operational Jobs"
+      ]
+    },
+    {
+      "route": "/platform/permission-audit",
+      "features": 109,
+      "linked_generated": 104,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Permission Audit",
+        "Platform Permission Audit — Phase 2"
+      ]
+    },
+    {
+      "route": "/platform/permissions",
+      "features": 102,
+      "linked_generated": 94,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Permissions"
+      ]
+    },
+    {
+      "route": "/platform/pilot-customer-readiness",
+      "features": 80,
+      "linked_generated": 70,
+      "blocked_features": 10,
+      "partial_features": 0,
+      "pages": [
+        "Platform Pilot Customer Readiness"
+      ]
+    },
+    {
+      "route": "/platform/privacy-requests",
+      "features": 91,
+      "linked_generated": 86,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Privacy Requests"
+      ]
+    },
+    {
+      "route": "/platform/production-monitoring-readiness",
+      "features": 80,
+      "linked_generated": 68,
+      "blocked_features": 12,
+      "partial_features": 0,
+      "pages": [
+        "Platform Production Monitoring Readiness"
+      ]
+    },
+    {
+      "route": "/platform/provisioning",
+      "features": 67,
+      "linked_generated": 64,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Provisioning"
+      ]
+    },
+    {
+      "route": "/platform/provisioning-presets",
+      "features": 73,
+      "linked_generated": 70,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Provisioning Presets"
+      ]
+    },
+    {
+      "route": "/platform/releases",
+      "features": 85,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Releases"
+      ]
+    },
+    {
+      "route": "/platform/risk-register",
+      "features": 85,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Risk Register"
+      ]
+    },
+    {
+      "route": "/platform/runbooks",
+      "features": 125,
+      "linked_generated": 120,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Runbooks"
+      ]
+    },
+    {
+      "route": "/platform/security",
+      "features": 114,
+      "linked_generated": 106,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform My Security"
+      ]
+    },
+    {
+      "route": "/platform/service-dependencies",
+      "features": 86,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Service Dependencies"
+      ]
+    },
+    {
+      "route": "/platform/sessions",
+      "features": 101,
+      "linked_generated": 93,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Sessions"
+      ]
+    },
+    {
+      "route": "/platform/subscription-readiness",
+      "features": 88,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Subscription Readiness"
+      ]
+    },
+    {
+      "route": "/platform/support-operations-cockpit",
+      "features": 80,
+      "linked_generated": 57,
+      "blocked_features": 23,
+      "partial_features": 0,
+      "pages": [
+        "Platform Support Operations Cockpit"
+      ]
+    },
+    {
+      "route": "/platform/support-sessions",
+      "features": 98,
+      "linked_generated": 88,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Support Sessions"
+      ]
+    },
+    {
+      "route": "/platform/system-health",
+      "features": 88,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform System Health"
+      ]
+    },
+    {
+      "route": "/platform/tenant-communications",
+      "features": 84,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Tenant Communications"
+      ]
+    },
+    {
+      "route": "/platform/tenant-contacts",
+      "features": 64,
+      "linked_generated": 60,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Tenant Contacts"
+      ]
+    },
+    {
+      "route": "/platform/tenant-exports",
+      "features": 63,
+      "linked_generated": 60,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Tenant Exports"
+      ]
+    },
+    {
+      "route": "/platform/tenant-health",
+      "features": 75,
+      "linked_generated": 70,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Tenant Health"
+      ]
+    },
+    {
+      "route": "/platform/tenant-lifecycle",
+      "features": 75,
+      "linked_generated": 70,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Tenant Lifecycle"
+      ]
+    },
+    {
+      "route": "/platform/tenant-notes",
+      "features": 64,
+      "linked_generated": 60,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Tenant Notes"
+      ]
+    },
+    {
+      "route": "/platform/tenant-offboarding",
+      "features": 90,
+      "linked_generated": 82,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Tenant Offboarding"
+      ]
+    },
+    {
+      "route": "/platform/tenant-provisioning-hardening",
+      "features": 88,
+      "linked_generated": 60,
+      "blocked_features": 20,
+      "partial_features": 0,
+      "pages": [
+        "Platform Tenant Provisioning Hardening"
+      ]
+    },
+    {
+      "route": "/platform/tenant-sla",
+      "features": 85,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Tenant SLA"
+      ]
+    },
+    {
+      "route": "/platform/tenant-tasks",
+      "features": 80,
+      "linked_generated": 75,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Tenant Tasks"
+      ]
+    },
+    {
+      "route": "/platform/tenant-timeline",
+      "features": 70,
+      "linked_generated": 65,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Tenant Timeline"
+      ]
+    },
+    {
+      "route": "/platform/tenants",
+      "features": 85,
+      "linked_generated": 85,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Tenants"
+      ]
+    },
+    {
+      "route": "/platform/users",
+      "features": 127,
+      "linked_generated": 119,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Users"
+      ]
+    },
+    {
+      "route": "/platform/vendors",
+      "features": 85,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Vendors"
+      ]
+    },
+    {
+      "route": "/platform/webhooks",
+      "features": 85,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Platform Webhooks"
+      ]
+    },
+    {
+      "route": "/probabilistic-forecasting",
+      "features": 92,
+      "linked_generated": 90,
+      "blocked_features": 0,
+      "partial_features": 50,
+      "pages": [
+        "Probabilistic Forecasting"
+      ]
+    },
+    {
+      "route": "/procurement-recommendations",
+      "features": 50,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Procurement Recommendations"
+      ]
+    },
+    {
+      "route": "/products",
+      "features": 47,
+      "linked_generated": 19,
+      "blocked_features": 0,
+      "partial_features": 3,
+      "pages": [
+        "Products"
+      ]
+    },
+    {
+      "route": "/purchase-orders",
+      "features": 80,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Purchase Orders"
+      ]
+    },
+    {
+      "route": "/real-time-operations-feed",
+      "features": 81,
+      "linked_generated": 81,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Operations Feed"
+      ]
+    },
+    {
+      "route": "/reliability-command",
+      "features": 82,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Reliability Command"
+      ]
+    },
+    {
+      "route": "/replenishment-planning",
+      "features": 50,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Replenishment Planning"
+      ]
+    },
+    {
+      "route": "/reports",
+      "features": 50,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Reports"
+      ]
+    },
+    {
+      "route": "/scanner",
+      "features": 50,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Scanner"
+      ]
+    },
+    {
+      "route": "/sessions",
+      "features": 77,
+      "linked_generated": 77,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Sessions"
+      ]
+    },
+    {
+      "route": "/shipments",
+      "features": 76,
+      "linked_generated": 76,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Inbound Shipments",
+        "Shipments"
+      ]
+    },
+    {
+      "route": "/stock",
+      "features": 73,
+      "linked_generated": 70,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Stock"
+      ]
+    },
+    {
+      "route": "/stock-movements",
+      "features": 78,
+      "linked_generated": 78,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Stock Movements"
+      ]
+    },
+    {
+      "route": "/stock-transfers",
+      "features": 80,
+      "linked_generated": 80,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Stock Transfers"
+      ]
+    },
+    {
+      "route": "/storage-locations",
+      "features": 63,
+      "linked_generated": 63,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Storage Locations",
+        "StorageLocationsPage"
+      ]
+    },
+    {
+      "route": "/suppliers",
+      "features": 70,
+      "linked_generated": 70,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Suppliers"
+      ]
+    },
+    {
+      "route": "/system-context",
+      "features": 85,
+      "linked_generated": 85,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "System Context"
+      ]
+    },
+    {
+      "route": "/tenant-settings",
+      "features": 71,
+      "linked_generated": 71,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Tenant Settings"
+      ]
+    },
+    {
+      "route": "/users",
+      "features": 76,
+      "linked_generated": 76,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Users"
+      ]
+    },
+    {
+      "route": "/workflow-composer",
+      "features": 52,
+      "linked_generated": 52,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Workflow Composer"
+      ]
+    },
+    {
+      "route": "/workspace",
+      "features": 51,
+      "linked_generated": 50,
+      "blocked_features": 0,
+      "partial_features": 0,
+      "pages": [
+        "Workspace"
+      ]
+    }
+  ],
+  "limitations": [
+    "No TypeScript parser/compilation or Playwright test discovery",
+    "No browser, backend, database, permission or multitenant validation",
+    "Source path existence is not statement-by-statement behavioral proof",
+    "137/137 route coverage is not proof of exhaustive functionality"
+  ],
+  "gate": "PASS",
+  "errors": []
+}

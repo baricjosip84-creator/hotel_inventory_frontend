@@ -1,0 +1,31 @@
+# Batch 172 — Supplier browser assertion source review (not executed)
+
+- Verified Batch 171 FULL SHA-256; immutable frontend/backend ZIPs SHA-256 and CRC.
+- Added 22 distinct non-skipped `TSUP-049`–`TSUP-070` declarations in *existing* `tests/tenant/suppliers/suppliers.spec.ts`, preserving all earlier test declarations.
+- Verified observable source paths in original `frontend/src/pages/SuppliersPage.tsx`; backend entrypoint reference `backend/src/routes/suppliers.js`. Scenario-specific lines and fixture limits are in the CSV.
+- Focus: exact mailto targets, normalized/ordered search, contact/phone matching, maximum form attributes, nullable edits, stale record removal, supplier performance fallbacks, legacy SLA payloads, orphan SLA references, overdue date placeholders, archive dependency warnings, and targeted refresh error feedback.
+- Browser-only intercepted GET and PATCH assertions are **not** real backend, tenant-isolation, storage, concurrency, permission, shipment, or supplier-integrity proof.
+- No TypeScript compilation, Playwright discovery, test run, real browser or application start was performed.
+
+- **TSUP-049** — supplier email renders a mailto link without a navigation side effect (SuppliersPage.tsx:860-866).
+- **TSUP-050** — case-insensitive supplier name search preserves matching rows (SuppliersPage.tsx:223-241,431-444).
+- **TSUP-051** — contact-notes search matches a supplier independently of name and email (SuppliersPage.tsx:223-241).
+- **TSUP-052** — phone substring search matches supplier contact details (SuppliersPage.tsx:223-241).
+- **TSUP-053** — whitespace-only supplier search does not constrain directory or retain URL search (SuppliersPage.tsx:431-444,529-542).
+- **TSUP-054** — supplier name-prefix matches sort ahead of name-substring matches (SuppliersPage.tsx:223-241,431-444).
+- **TSUP-055** — supplier form inputs expose all source-defined maximum lengths (SuppliersPage.tsx:970-1026).
+- **TSUP-056** — clearing optional values in an update sends null rather than empty strings (SuppliersPage.tsx:102-118,632-650).
+- **TSUP-057** — cancelling an edit after a failed PATCH clears its stale error (SuppliersPage.tsx:371-383,653-658).
+- **TSUP-058** — disappearing supplier during refresh closes an in-progress edit (SuppliersPage.tsx:564-582).
+- **TSUP-059** — disappearing supplier during refresh closes a stale performance panel (SuppliersPage.tsx:550-562).
+- **TSUP-060** — missing supplier identity in performance view is explicitly marked not recorded (SuppliersPage.tsx:1060-1095).
+- **TSUP-061** — numeric-string shipment metrics are converted to numbers for display (SuppliersPage.tsx:149-155,509-516,1115-1151).
+- **TSUP-062** — malformed supplier metric values degrade to the zero-shipment empty state (SuppliersPage.tsx:149-155,509-516,1154-1159).
+- **TSUP-063** — legacy flat-array SLA payload still renders delivery follow-up rows (SuppliersPage.tsx:158-162,428-429,876-886).
+- **TSUP-064** — row-level days-late evidence counts as one late shipment without aggregate (SuppliersPage.tsx:165-195,457-469,876-886).
+- **TSUP-065** — an orphaned SLA supplier never exposes a performance navigation action (SuppliersPage.tsx:1221-1244).
+- **TSUP-066** — missing overdue dates render explicit dashes instead of invented dates (SuppliersPage.tsx:139-146,1208-1232).
+- **TSUP-067** — the displayed filtered count differentiates search results from all suppliers (SuppliersPage.tsx:788-795).
+- **TSUP-068** — supplier archive dialog describes outstanding dependency safeguards (SuppliersPage.tsx:660-677).
+- **TSUP-069** — explicit failed supplier refresh shows scoped error rather than success (SuppliersPage.tsx:293-333,750-761).
+- **TSUP-070** — explicit failed delivery refresh shows scoped error rather than success (SuppliersPage.tsx:293-333,1180-1189).

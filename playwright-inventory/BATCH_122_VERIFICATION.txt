@@ -1,0 +1,10 @@
+BATCH 122 — STATIC SOURCE VERIFICATION — 2026-11-05 — STRICT PHASE 1 ONLY.
+PARENT INVENTORY_PLAYWRIGHT_BATCH_121_FULL.zip SHA256 df53c20c55352c89bc52df5a9ba536eb250d88e944376453d8c0faa7c2211980, 278 members CRC PASS; all unaffected members byte-for-byte preserved.
+ORIGINAL FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112 AND BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; source-read original Step 221/222 UI, router, backend permissions and no-observation-persistence rules. Original application unchanged.
+NEW PCCD-056..070 (15), PPLO-001..055 (55): 70 unique added; all 7,436 prior scenario IDs retained; zero new skips.
+LEDGER ROWS 7709: GENERATED_UNRUN=7506 BLOCKED=177 NOT_STARTED=25 NEEDS_EXPECTATION=1 (PLCR-084). INVENTORY 8001; SPEC FILES 129.
+HISTORIC SKIPS: 360 scenario-labelled test.skip, 384 total skip call sites, not executable or passed.
+SOURCE MAPPING: Step 222 12 required platform grants, 8 source observation checks, 14 external fields, 4 allowed status labels, read-only GET. No launch/observation persistence, external approvals or production success.
+PCCD-071..080 BLOCKED real launch/provider/DB/support/operator/rollback/owner/observation evidence. PPLO-056..080 reserved NOT_STARTED.
+STATIC VERIFIED: original archive hashes, route order, FE selectors, backend evidence rules, unique IDs vs ledger, fixture imports, seven trackers, unchanged original full archive members, ZIP CRC.
+NOT RUN: TypeScript compiler, Playwright test runner or discovery, npm commands, browser, server, API, SQL/DB, CI, provider, production or deployment; no live launch/observation or owner signoff.

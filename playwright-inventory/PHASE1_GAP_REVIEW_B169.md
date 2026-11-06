@@ -1,0 +1,6 @@
+# Batch 169 — Remaining gaps (kept OPEN)
+
+1. **Synthetic fixture ID vs backend UUID**: Tenant Settings `openSettings()` uses `pw-tenant-settings-01`. Backend `validations/tenants.validation.js` requires a UUID (v1/v3/v4/v5) for `PUT /tenants/:id`. All new mutation checks intercept requests; they do not demonstrate backend acceptance. Do **not** change the immutable backend or existing test IDs just to make this appear verified. For real acceptance, provision a valid UUID disposable tenant and run separately authorized integration tests.
+2. **Backend write locks and financial evidence**: The frontend renders write-lock/legacy currency states and the mocked handlers return synthetic responses. No actual transaction-lock, ledger, authorization or currency consistency property has been demonstrated.
+3. **Unresolved existing work**: 417 `BLOCKED` ledger obligations, 272 source-traced partial features still awaiting acceptance, 357 scenario-labelled skips, 21 unconditional and 3 conditional in-test skip calls, and `PLCR-084` `NEEDS_EXPECTATION` all preserved.
+4. **Phase 1 execution prohibition**: No TypeScript compiler, Playwright discovery/execution, browser or app startup, real SQL, CI, installs or deployment used. Static source assertions are not proof of runtime success.

@@ -1,0 +1,10 @@
+BATCH 62 — 2026-11-04 — PHASE 1 GENERATION ONLY; ZERO browser tests, compilations or builds executed.
+PARENT Batch 061 FULL SHA256 5278ed46b10d98b05dddb873c16d005d23c2dbe1e3dfc92ff0dafad1ef99b183; original FE 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112, original BE e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4, ZIP CRC PASS.
+GENERATED 50 new scenarios: PTTASK-051…075 (25) appended unchanged after previous declarations, and PTLINE-001…025 (25) new page-owned tests with support/tenantTimelineFixture.ts.
+Platform Tenant Tasks now 75/75 currently inventoried, Platform Tenant Timeline 25/65 provisional; PTLINE-026…065 (40) NOT_STARTED.
+TOTAL: 3,049 GENERATED_UNRUN / 3,089 currently discovered; 40 NOT_STARTED; 68 spec files, 57/137 pages inventoried (46 tenant + 11 platform), 80 untouched platform pages; page/function inventory 3,083 rows, including 52 NOT_BROWSER_TESTABLE.
+SCOPE: Tasks selector/summary/users load+refresh errors, stale snapshots, disabled mutation/pagination, reopened completion evidence, conflicts, scoped/permission links. Timeline URL validation, source permissions, redacted actors, local search, evidence links, pagination.
+LIMITS: Synthetic API records/tokens do not validate real server permission enforcement, database persistence, audits, tenant isolation, actor privacy in live API, or external outcomes.
+NEXT Batch 63: PTLINE-026…065, then next real Platform route following /platform/tenant-timeline. The full 137-route inventory is NOT complete.
+PROHIBITED IN PHASE 1: Playwright execution, TS compile/lint, npm installs/builds/tests, browser/server/DB/CI/deployment/live data, original FE/BE modifications. All scenarios remain GENERATED_UNRUN.
+STATIC VALIDATION: compare 67 earlier spec files byte-for-byte, all generated IDs against ledger, full/delta contents and SHA256 in separate manifest. No browser/TypeScript execution.

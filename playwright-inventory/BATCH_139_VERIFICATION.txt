@@ -1,0 +1,9 @@
+BATCH 139 STATIC SOURCE VERIFICATION — 2026-11-05 — NO COMPILATION OR EXECUTION
+PARENT INVENTORY_PLAYWRIGHT_BATCH_138_FULL.zip SHA256 f9684a439e8c09f351813d46bc5a634382d68e93b5e67b71f211ef5ab481bb77, 329 members CRC PASS. Unrelated parent members preserved byte-for-byte.
+ORIGINAL FRONTEND SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BACKEND SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4. Step 239 backend nine domains, four external retention-seal fields, three manual controls, twelve required permission guards; original page seven summary stats, twelve source-posture links, thirteen persistence boundaries; original router checked.
+NEW IDs PFEA-056..070 (15); PERS-001..055 (55). All 8,626 prior authored IDs preserved; zero new test.skip.
+LEDGER 9069 GENERATED_UNRUN=8696 BLOCKED=347 NOT_STARTED=25 NEEDS_EXPECTATION=1 PLCR-084; INVENTORY 9361; SPEC FILES 146.
+HISTORIC SKIPS 360 ID-labelled / 384 skip calls — not executable coverage.
+PFEA-071..080 BLOCKED real archive custody/owner/restore/release/financial evidence; PERS-056..080 RESERVED. Synthetic GET tests cover UI only, NOT actual retained records or accepted seal.
+STATIC CHECKS: parent ZIP CRC, source router/endpoint/frontend, selector evidence, fixture import paths, ID uniqueness, exact ledger parity, parent-byte preservation and ZIP integrity.
+NOT RUN: npm, TypeScript compilation, Playwright runner/discovery, browser, app/API/DB/CI, provider, production, actual archive, retention acceptance or deployment.

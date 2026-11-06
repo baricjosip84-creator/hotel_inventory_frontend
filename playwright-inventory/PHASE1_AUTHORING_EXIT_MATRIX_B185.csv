@@ -1,0 +1,138 @@
+original_route,inventoried_features,feature_ids_linked_to_authored_tests,blocked_features,source_traced_partial_features,pages,static_status,runtime_status
+/action-center,45,45,0,0,Action Center,SOURCE_AUTHORED,UNRUN
+/adaptive-policy-engine,51,50,0,30,Adaptive Policy Engine,SOURCE_AUTHORED,UNRUN
+/admin-system,50,50,0,0,Admin System,SOURCE_AUTHORED,UNRUN
+/ai-copilot,51,50,0,0,AI Copilot,SOURCE_AUTHORED,UNRUN
+/alerts,88,88,0,0,Alerts,SOURCE_AUTHORED,UNRUN
+/audit,72,72,0,0,Tenant Audit,SOURCE_AUTHORED,UNRUN
+/automation-schedules,50,50,0,0,Automation Schedules,SOURCE_AUTHORED,UNRUN
+/collaboration,52,50,0,50,Enterprise Collaboration,SOURCE_AUTHORED,UNRUN
+/cross-domain-optimization,52,50,0,50,Cross-Domain Optimization,SOURCE_AUTHORED,UNRUN
+/dashboard,54,54,0,0,Dashboard,SOURCE_AUTHORED,UNRUN
+/decision-learning-feedback,51,50,0,0,Learning Feedback,SOURCE_AUTHORED,UNRUN
+/digital-twin,52,50,0,50,Digital Twin,SOURCE_AUTHORED,UNRUN
+/enterprise-inventory,89,89,0,0,Enterprise Inventory,SOURCE_AUTHORED,UNRUN
+/execution-requests,50,50,0,0,Execution Requests,SOURCE_AUTHORED,UNRUN
+/execution-tasks,50,50,0,0,Execution Tasks,SOURCE_AUTHORED,UNRUN
+/insights,50,50,0,0,Insights,SOURCE_AUTHORED,UNRUN
+/intelligence-review,61,60,0,0,Intelligence Review,SOURCE_AUTHORED,UNRUN
+/inventory-capabilities,164,161,0,0,Inventory Capabilities | InventoryCapabilitiesPage,SOURCE_AUTHORED,UNRUN
+/inventory-requisitions,50,50,0,0,Inventory Requisitions,SOURCE_AUTHORED,UNRUN
+/inventory-reservations,50,50,0,0,Inventory Reservations,SOURCE_AUTHORED,UNRUN
+/inventory-usage,50,50,0,0,Inventory Usage,SOURCE_AUTHORED,UNRUN
+/login,9,9,0,0,Tenant Login,SOURCE_AUTHORED,UNRUN
+/mobile-execution,48,48,0,0,Mobile Execution,SOURCE_AUTHORED,UNRUN
+/outbound,50,50,0,0,Outbound,SOURCE_AUTHORED,UNRUN
+/permissions,78,78,0,0,Tenant Permissions | Tenant Roles & Permissions,SOURCE_AUTHORED,UNRUN
+/platform/access-reviews,98,93,0,0,Platform Access Reviews,SOURCE_AUTHORED,UNRUN
+/platform/announcements,88,80,0,0,Platform Announcements,SOURCE_AUTHORED,UNRUN
+/platform/api-client-governance,75,70,0,0,Platform API Client Governance,SOURCE_AUTHORED,UNRUN
+/platform/api-keys,85,80,0,0,Platform API Keys,SOURCE_AUTHORED,UNRUN
+/platform/audit,99,91,0,0,Platform Audit,SOURCE_AUTHORED,UNRUN
+/platform/audit-retention,90,82,0,0,Platform Audit Retention,SOURCE_AUTHORED,UNRUN
+/platform/backup-restore-validation,80,68,12,0,Platform Backup Restore Validation,SOURCE_AUTHORED,UNRUN
+/platform/billing,88,80,0,0,Platform Billing,SOURCE_AUTHORED,UNRUN
+/platform/billing-subscription-activation,88,52,28,0,Platform Billing Subscription Activation,SOURCE_AUTHORED,UNRUN
+/platform/capacity-planning,85,80,0,39,Platform Capacity Planning,SOURCE_AUTHORED,UNRUN
+/platform/change-management,105,100,0,0,Platform Change Management,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-acceptance-packet,80,70,10,0,Platform Commercial Launch Acceptance Packet,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-additional-growth-authorization,80,70,10,0,Platform Commercial Launch Additional Growth Authorization,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-additional-growth-observation,80,70,10,0,Platform Commercial Launch Additional Growth Observation,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-certificate,80,70,10,0,Platform Commercial Launch Certificate,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-day-command-center,80,70,10,0,Platform Commercial Launch Day Command Center,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-durable-closure-certification,80,70,10,0,Platform Commercial Launch Durable Closure Certification,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-evidence-retention-seal,80,70,10,0,Platform Commercial Launch Evidence Retention Seal,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-expansion-health-observation,80,70,10,0,Platform Commercial Launch Expansion Health Observation,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-final-evidence-archive,80,70,10,0,Platform Commercial Launch Final Evidence Archive,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-go-no-go-register,80,70,10,0,Platform Commercial Launch Go/No-Go Register,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-incident-closure,80,70,10,0,Platform Commercial Launch Incident Closure,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-incident-triage,80,70,10,0,Platform Commercial Launch Incident Triage,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-post-launch-observation,80,70,10,0,Platform Commercial Launch Post-Launch Observation,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-prevention-verification,80,70,10,0,Platform Commercial Launch Prevention Verification,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-readiness,96,88,0,0,Platform Commercial Launch Readiness,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-retention-renewal-acceptance-docket,80,70,10,0,Platform Commercial Launch Retention Renewal Acceptance Docket,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-retention-renewal-archive-seal,80,70,10,0,Platform Commercial Launch Retention Renewal Archive Seal,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-retention-renewal-certification,80,70,10,0,Platform Commercial Launch Retention Renewal Certification,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-retention-renewal-cycle-reset,80,70,10,0,Platform Commercial Launch Retention Renewal Cycle Reset,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-retention-renewal-final-seal,80,70,10,0,Platform Commercial Launch Retention Renewal Final Seal,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-retention-renewal-review,80,70,10,0,Platform Commercial Launch Retention Renewal Review,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-rollout-expansion-authorization,80,70,10,0,Platform Commercial Launch Rollout Expansion Authorization,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-smoke-test-checklist,80,70,10,0,Platform Commercial Launch Smoke Test Checklist,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-steady-state-exception-closure,80,70,10,0,Platform Commercial Launch Steady-State Exception Closure,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-steady-state-exception-review,80,70,10,0,Platform Commercial Launch Steady-State Exception Review,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-steady-state-operations-cadence,80,70,10,0,Platform Commercial Launch Steady-State Operations Cadence,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-steady-state-recurrence-audit,80,70,10,0,Platform Commercial Launch Steady-State Recurrence Audit,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-steady-state-recurrence-resolution,80,70,10,0,Platform Commercial Launch Steady-State Recurrence Resolution,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-steady-state-resolution-verification,80,70,10,0,Platform Commercial Launch Steady-State Resolution Verification,SOURCE_AUTHORED,UNRUN
+/platform/commercial-launch-steady-state-transition,80,70,10,0,Platform Commercial Launch Steady-State Transition,SOURCE_AUTHORED,UNRUN
+/platform/commercial-readiness-verification-program,96,88,0,0,Commercial Readiness Verification Program | Platform Commercial Readiness Verification Program,SOURCE_AUTHORED,UNRUN
+/platform/compliance-documents,85,80,0,0,Platform Compliance Documents,SOURCE_AUTHORED,UNRUN
+/platform/compliance-export,91,86,0,0,Platform Compliance Export,SOURCE_AUTHORED,UNRUN
+/platform/customer-onboarding-checklist,90,82,0,0,Customer Onboarding Checklist | Platform Customer Onboarding Checklist,SOURCE_AUTHORED,UNRUN
+/platform/customer-success-admin,88,80,0,0,Platform Customer Success Admin,SOURCE_AUTHORED,UNRUN
+/platform/dashboard,35,35,0,0,Platform Dashboard,SOURCE_AUTHORED,UNRUN
+/platform/data-retention,86,80,0,0,Platform Data Retention,SOURCE_AUTHORED,UNRUN
+/platform/deployment-validation,80,68,12,0,Platform Deployment Validation,SOURCE_AUTHORED,UNRUN
+/platform/documentation-completeness,80,70,10,0,Platform Documentation Completeness,SOURCE_AUTHORED,UNRUN
+/platform/enterprise-identity,98,90,0,0,Enterprise Identity | Platform Enterprise Identity | Platform Enterprise Identity Governance,SOURCE_AUTHORED,UNRUN
+/platform/incidents,107,99,0,0,Platform Incidents,SOURCE_AUTHORED,UNRUN
+/platform/integration-monitoring,95,90,0,0,Platform Integration Monitoring,SOURCE_AUTHORED,UNRUN
+/platform/legal-compliance-reporting,111,105,0,0,Platform Legal Compliance Reporting,SOURCE_AUTHORED,UNRUN
+/platform/license-plan-enforcement,100,92,0,0,Platform License & Plan Enforcement,SOURCE_AUTHORED,UNRUN
+/platform/login,15,15,0,0,Platform Login,SOURCE_AUTHORED,UNRUN
+/platform/maintenance,88,80,0,0,Platform Maintenance,SOURCE_AUTHORED,UNRUN
+/platform/notifications,110,102,0,0,Platform Notifications,SOURCE_AUTHORED,UNRUN
+/platform/operational-jobs,85,80,0,0,Platform Operational Jobs,SOURCE_AUTHORED,UNRUN
+/platform/permission-audit,109,104,0,0,Platform Permission Audit | Platform Permission Audit — Phase 2,SOURCE_AUTHORED,UNRUN
+/platform/permissions,102,94,0,0,Platform Permissions,SOURCE_AUTHORED,UNRUN
+/platform/pilot-customer-readiness,80,70,10,0,Platform Pilot Customer Readiness,SOURCE_AUTHORED,UNRUN
+/platform/privacy-requests,91,86,0,0,Platform Privacy Requests,SOURCE_AUTHORED,UNRUN
+/platform/production-monitoring-readiness,80,68,12,0,Platform Production Monitoring Readiness,SOURCE_AUTHORED,UNRUN
+/platform/provisioning,67,64,0,0,Platform Provisioning,SOURCE_AUTHORED,UNRUN
+/platform/provisioning-presets,73,70,0,0,Platform Provisioning Presets,SOURCE_AUTHORED,UNRUN
+/platform/releases,85,80,0,0,Platform Releases,SOURCE_AUTHORED,UNRUN
+/platform/risk-register,85,80,0,0,Platform Risk Register,SOURCE_AUTHORED,UNRUN
+/platform/runbooks,125,120,0,0,Platform Runbooks,SOURCE_AUTHORED,UNRUN
+/platform/security,114,106,0,0,Platform My Security,SOURCE_AUTHORED,UNRUN
+/platform/service-dependencies,86,80,0,0,Platform Service Dependencies,SOURCE_AUTHORED,UNRUN
+/platform/sessions,101,93,0,0,Platform Sessions,SOURCE_AUTHORED,UNRUN
+/platform/subscription-readiness,88,80,0,0,Platform Subscription Readiness,SOURCE_AUTHORED,UNRUN
+/platform/support-operations-cockpit,80,57,23,0,Platform Support Operations Cockpit,SOURCE_AUTHORED,UNRUN
+/platform/support-sessions,98,88,0,0,Platform Support Sessions,SOURCE_AUTHORED,UNRUN
+/platform/system-health,88,80,0,0,Platform System Health,SOURCE_AUTHORED,UNRUN
+/platform/tenant-communications,84,80,0,0,Platform Tenant Communications,SOURCE_AUTHORED,UNRUN
+/platform/tenant-contacts,64,60,0,0,Platform Tenant Contacts,SOURCE_AUTHORED,UNRUN
+/platform/tenant-exports,63,60,0,0,Platform Tenant Exports,SOURCE_AUTHORED,UNRUN
+/platform/tenant-health,75,70,0,0,Platform Tenant Health,SOURCE_AUTHORED,UNRUN
+/platform/tenant-lifecycle,75,70,0,0,Platform Tenant Lifecycle,SOURCE_AUTHORED,UNRUN
+/platform/tenant-notes,64,60,0,0,Platform Tenant Notes,SOURCE_AUTHORED,UNRUN
+/platform/tenant-offboarding,90,82,0,0,Platform Tenant Offboarding,SOURCE_AUTHORED,UNRUN
+/platform/tenant-provisioning-hardening,88,60,20,0,Platform Tenant Provisioning Hardening,SOURCE_AUTHORED,UNRUN
+/platform/tenant-sla,85,80,0,0,Platform Tenant SLA,SOURCE_AUTHORED,UNRUN
+/platform/tenant-tasks,80,75,0,0,Platform Tenant Tasks,SOURCE_AUTHORED,UNRUN
+/platform/tenant-timeline,70,65,0,0,Platform Tenant Timeline,SOURCE_AUTHORED,UNRUN
+/platform/tenants,85,85,0,0,Platform Tenants,SOURCE_AUTHORED,UNRUN
+/platform/users,127,119,0,0,Platform Users,SOURCE_AUTHORED,UNRUN
+/platform/vendors,85,80,0,0,Platform Vendors,SOURCE_AUTHORED,UNRUN
+/platform/webhooks,85,80,0,0,Platform Webhooks,SOURCE_AUTHORED,UNRUN
+/probabilistic-forecasting,92,90,0,50,Probabilistic Forecasting,SOURCE_AUTHORED,UNRUN
+/procurement-recommendations,50,50,0,0,Procurement Recommendations,SOURCE_AUTHORED,UNRUN
+/products,47,19,0,3,Products,SOURCE_AUTHORED,UNRUN
+/purchase-orders,80,80,0,0,Purchase Orders,SOURCE_AUTHORED,UNRUN
+/real-time-operations-feed,81,81,0,0,Operations Feed,SOURCE_AUTHORED,UNRUN
+/reliability-command,82,80,0,0,Reliability Command,SOURCE_AUTHORED,UNRUN
+/replenishment-planning,50,50,0,0,Replenishment Planning,SOURCE_AUTHORED,UNRUN
+/reports,50,50,0,0,Reports,SOURCE_AUTHORED,UNRUN
+/scanner,50,50,0,0,Scanner,SOURCE_AUTHORED,UNRUN
+/sessions,77,77,0,0,Sessions,SOURCE_AUTHORED,UNRUN
+/shipments,76,76,0,0,Inbound Shipments | Shipments,SOURCE_AUTHORED,UNRUN
+/stock,73,70,0,0,Stock,SOURCE_AUTHORED,UNRUN
+/stock-movements,78,78,0,0,Stock Movements,SOURCE_AUTHORED,UNRUN
+/stock-transfers,80,80,0,0,Stock Transfers,SOURCE_AUTHORED,UNRUN
+/storage-locations,63,63,0,0,Storage Locations | StorageLocationsPage,SOURCE_AUTHORED,UNRUN
+/suppliers,70,70,0,0,Suppliers,SOURCE_AUTHORED,UNRUN
+/system-context,85,85,0,0,System Context,SOURCE_AUTHORED,UNRUN
+/tenant-settings,71,71,0,0,Tenant Settings,SOURCE_AUTHORED,UNRUN
+/users,76,76,0,0,Users,SOURCE_AUTHORED,UNRUN
+/workflow-composer,52,52,0,0,Workflow Composer,SOURCE_AUTHORED,UNRUN
+/workspace,51,50,0,0,Workspace,SOURCE_AUTHORED,UNRUN

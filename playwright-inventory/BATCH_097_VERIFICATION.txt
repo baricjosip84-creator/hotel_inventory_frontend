@@ -1,0 +1,11 @@
+BATCH 097 — STATIC SOURCE-TRACED VERIFICATION (2026-11-05)
+STRICT PHASE 1: ZERO tests compiled or executed. No Playwright, npm, TS compiler, browser, API, backend, DB, CI, external or deployment checks.
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_096_FULL.zip SHA256 fde813aff65dff04edf71e8e0914be437d09f713c604f74765f3d50e37ce2a92; parent CRC PASS.
+ORIGINAL SOURCES: unchanged hotel-inventory-frontend - Copy.zip and hotel-inventory-backend - Copy.zip.
+NEW: PPER-042..080 (39) + PSES-001..041 (41); PPER 80/80, PSES 41/80 and PSES-042..080 reserved for Batch 98.
+EXPLICIT PHASE 2 / SOURCE-HARDENING SKIPS: PPER-062, PPER-071..080 (11), PSES-041 (1), previous skips remain untouched.
+CUMULATIVE: 5,669 generated unique IDs of 5,709 discovered; NOT_STARTED PSES-042..080 only; NEEDS_EXPECTATION PLCR-084 only; 104 spec files; 89/137 routes; 5,895 function inventory rows incl 244 NOT_BROWSER_TESTABLE.
+SOURCE LIMITATIONS: Synthetic Platform Sessions GET/POST does not establish real authorization, revocation of stolen/copy tokens, DB locking, audit event durability, IP geolocation or human/device identity. PPER-062 is a source-hardening skip because malformed policy response may render an empty role matrix, not the desired blocking error.
+PREVIOUS OPEN ITEMS: PLCR-084, Access Reviews All statuses, malformed-response issues, PPRIV-072, announcement cancellation reason normalization, role editor caller-write-permission UI gating.
+NEXT: Batch 98 PSES-042..080 then inspect /platform/billing; 40 historically skipped routes must not be lost.
+All static verification uses Python text/CSV/ZIP inspection only. No tests compiled or executed.

@@ -1,0 +1,9 @@
+BATCH 170 — STATIC AUTHORING VERIFICATION — 2026-11-06
+Parent Batch 169 FULL SHA256 470c9c5fb213d0a5a96d135e78c6a713a9afeb8f2148aec6c3bbca2c4bc477ee: MATCH / ZIP CRC PASS
+Immutable FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112: MATCH / ZIP CRC PASS
+Immutable BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4: MATCH / ZIP CRC PASS
+23 new TSL-041..063 declarations; 9,462 prior unique scenario IDs preserved, 151 other specs unchanged.
+Cumulative: 9,485 authored unique, 357 labelled test.skip, 9,128 not labelled; 9,903 ledger IDs, 10,195 features, 152 specs.
+417 blocked, 272 partial, PLCR-084 unresolved, 21 unconditional and 3 conditional in-test skips remain open.
+No original application modifications or TypeScript/Playwright/browser/backend/SQL/CI execution.
+Only static source/ledger/ZIP integrity verified; executable behavior remains unverified.

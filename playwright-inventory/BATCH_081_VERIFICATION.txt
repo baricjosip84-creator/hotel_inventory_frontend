@@ -1,0 +1,13 @@
+BATCH 081 — STATIC FILE REVIEW; NOT RUNTIME VALIDATION
+BATCH 81 — 2026-11-05 — PHASE 1 CODE GENERATION ONLY; NO COMPILE / NO EXECUTION.
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_080_FULL.zip SHA256 f709696ca6d0a74c3e8a8402d3cf2f31b363ea8d590b061191cf23def5e6d792 CRC PASS. Original FE 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112 and BE e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4 read-only source.
+NEW SCENARIOS: PJO-042..080 (39) appended without changing PJO-001..041; PREL-001..041 (41) with independent releases.spec.ts and support/platformReleasesFixture.ts.
+Operational Jobs: actions cover real source UI create/PATCH validation, actor linkage redaction, manual run evidence, history pagination, claim/complete/release, retry/archive, expired/stale claims, worker run-once and heartbeat checks. Existing synthetic job-run history fixture now redacts trigger email when platform.users.read absent.
+Releases: original frontend/src/pages/PlatformReleasesPage.tsx, original router/permissions and backend releases.js/service read; application registry and lifecycle state do NOT certify actual deployment, rollback or customer outcomes.
+CUMULATIVE: 4,389 GENERATED_UNRUN / 4,429 discovered; 39 PREL-042..080 NOT_STARTED; 1 PLCR-084 NEEDS_EXPECTATION; 88 spec files, 73/137 routes inventoried; 64 unstarted routes (40 historically skipped), 4,504 feature records including 133 backend/external Phase 2 obligations.
+OPEN: PLCR-084 original frontend does not disable its evidence source picker during fetching, contrary to proposed test expectation. Remains explicitly unresolved.
+NEXT BATCH 82: PREL-042..080; then /platform/access-reviews, router order. Never forget 40 prior unstarted Platform routes.
+No Playwright, TS, npm, browser, frontend/backend, DB/worker, CI, deployment, or external actions were executed. Static file integrity checks ONLY.
+Reconciliation: 4389 unique test() scenario IDs; ledger GENERATED_UNRUN set identical; 39 pending PREL declarations intentionally absent; one PLCR-084 expectation mismatch.
+Source review: original UI component/permissions/router and API route/service; synthetic fixture is NOT backend or user-auth testing.
+All 4,309 previous declarations retained; no prior spec altered except exact append-only operational-jobs file. Existing history fixture changed only to deny actor email in synthetic run listing.

@@ -1,0 +1,10 @@
+BATCH 125 STATIC SOURCE VERIFICATION — 2026-11-05 — NO COMPILE/TEST/APP RUN.
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_124_FULL.zip SHA256 ea886173c85a3d2411b313ddbf84e2a6c13d75118d4a284941363559ada014be; 287 members CRC PASS; unrelated old member bytes preserved.
+ORIGINAL FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; exact Step 225 backend fields, decisions, permissions, selectors and router order statically inspected.
+NEW IDs: 15 PICL-056..070 and 55 PCPV-001..055; previous 7,646 preserved, 70 new unique, no new skips.
+LEDGER 7949: GENERATED_UNRUN 7716, BLOCKED 207, NOT_STARTED 25, NEEDS_EXPECTATION 1 PLCR-084; INVENTORY 8241; SPEC_FILES 132.
+HISTORICAL SKIPS: 360 scenario-labelled test.skip and 384 total skip call sites remain non-executable, NOT passed.
+STEP 225: eight read-only prevention evidence rows, ten external fields, five decision templates, ten counters, source links; no real preventive action or launch-expansion authorization.
+PICL-071..080 BLOCKED external incident closure evidence; PCPV-056..080 NOT_STARTED.
+STATIC VERIFIED: ZIP CRC, original source fingerprints, router ordering, twelve route grants, FE selectors, fixture file imports, unchanged parent members, complete unique ID/ledger and feature inventory reconciliation and seven tracking files.
+NOT RUN: npm, TypeScript compilation, Playwright discovery/execution, browser, original frontend/backend/DB, API/provider/production, CI or deployment.

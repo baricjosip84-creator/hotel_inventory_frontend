@@ -1,0 +1,12 @@
+BATCH 174 — STRICT PHASE 1 STATIC VERIFICATION (NOT RUN)
+Authoritative parent Batch 173 FULL SHA256 478b5aaef0bdd1dab4502f7d2137049e96c7571383a9de88e17150a0c5b2f59a
+Immutable original FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112
+Immutable original BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4
+Original three ZIP CRC checks PASS
+28 added new source-traced TSMV-051..TSMV-078 Playwright declarations; all 9,556 previous IDs preserved.
+9,584 unique authored declarations; 357 scenario-labelled skips; 9,227 non-labelled-skipped unrun; 152 unchanged page-specific file count.
+10,002 coverage ledger unique IDs (9,584 GENERATED_UNRUN + 417 BLOCKED + 1 NEEDS_EXPECTATION).
+10,294 unique feature inventory IDs; 272 partial features still pending acceptance.
+Other 151 spec files are byte-identical to Batch 173; existing TSMV-001..050 declarations remain intact.
+417 blocked, 21 unconditional in-test skips and 3 conditional skips, and PLCR-084 remain open.
+No TypeScript/Playwright compilation or browser discovery/execution, app or backend start, network production tests, SQL, dependency installation, CI or deployment.

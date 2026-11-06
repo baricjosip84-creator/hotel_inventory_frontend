@@ -1,0 +1,5 @@
+BATCH 163 STATIC VERIFICATION, NOT COMPILED OR EXECUTED
+Parent baseline SHA256 4af8c64153ebb7b2b1ec68e2b8ad1652666cf803add58e2150dd1b8c9d042d8d; original FE 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; original BE e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4
+Added 27 unique source-backed scenario IDs; generated, unrun. Existing scenario ids and all skips/blocked obligations preserved.
+New totals: 9,308 scenario declarations; 9,726 ledger IDs; 10,018 feature records; 152 spec files; 417 blockers; PLCR-084 open.
+ZIP delta overlay against parent and static ledger/spec parity checked after packaging.

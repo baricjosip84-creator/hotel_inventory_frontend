@@ -1,0 +1,16 @@
+{
+  "name": "hotel-inventory-page-organized-playwright",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Independent browser tests for the user-supplied Inventory Management App; Phase 1 generated only, NEVER executed.",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:list": "playwright test --list",
+    "test:live-readonly:list": "playwright test --config=playwright.live-readonly.config.ts --list",
+    "test:live-readonly": "playwright test --config=playwright.live-readonly.config.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,12 @@
+BATCH 089 — STATIC VERIFICATION ONLY — 2026-11-05
+Strict PHASE 1: NO Playwright, TypeScript compilation, npm, browser, frontend/backend, DB, CI, deployment, external incident or tenant-offboarding actions.
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_088_FULL.zip SHA256 48b254e0f67c4b91fa08ff7a64b17a5732576de90ca8806d45fe00057b9462d1; ZIP CRC verified.
+Original FE ZIP SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; original BE ZIP SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; source archives used read-only.
+EXACTLY 80 additions: PTOFF-042..080 (39), PINC-001..041 (41). All 4,949 previous test IDs remain; all older specs byte-identical apart from appended offboarding cases.
+CUMULATIVE: 5,029 unique declarations, 5,069 ledger rows (5,029 GENERATED_UNRUN, 39 PINC-042..080 NOT_STARTED, 1 PLCR-084 NEEDS_EXPECTATION). 96 spec files. Feature inventory 5,191 rows incl 180 NOT_BROWSER_TESTABLE. 81/137 routes inventoried, 56 without own suites, including 40 earlier skipped.
+Source references: original frontend/src/pages/PlatformTenantOffboardingPage.tsx and PlatformIncidentsPage.tsx, original router/permissions, backend/src/routes/platform/tenantOffboarding.js and incidents.js, services/platformTenantOffboardingService.js and platformIncidentsService.js.
+OFFBOARDING explicit runtime skips PTOFF-048..051 and PTOFF-074..080: real backend, PostgreSQL, tenant isolation, legal holds and external lifecycle proof never claimed by intercepts.
+INCIDENTS synthetic list/detail/create/edit/update/resolve/cancel fixture; no independent proof of external service restoration, real tenant context sanitization or audit durability.
+OPEN: PLCR-084, Access Reviews All statuses, malformed Permission Audit/Compliance Export response guards, PPRIV-072 native date validation.
+STATIC CHECKS: source ZIP hashes, parent ZIP CRC, previous test ID preservation and byte preservation, unique ID / ledger reconciliation, referenced helper and local import resolution, full/delta ZIP CRC and SHA256.
+Runtime validity and frontend/backend integration NOT verified. Next Batch 90 PINC-042..080 then /platform/maintenance.

@@ -1,0 +1,8 @@
+BATCH 164 — STATIC SOURCE PACKAGE VERIFICATION, NOT COMPILED OR EXECUTED
+Parent ZIP SHA256: e9ff075c975597f371224b281fe704ffbd1e3f060d7cd13ffcae39183bdca5f2
+Original frontend ZIP SHA256: 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112
+Original backend ZIP SHA256: e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4
+New source-backed scenarios: 25 (PPAUD 12, PSES 13); all unique, appended to existing page-specific specs.
+Expected static totals: 9,333 declarations, 9,751 ledger rows, 10,043 feature IDs, 152 specs.
+Statuses open: 417 BLOCKED, PLCR-084 NEEDS_EXPECTATION, 272 partial feature records, 357 labelled skip declarations, 21 unconditional and 3 conditional in-test skip guards.
+No tests compiled/discovered/executed, no browser/SQL/backend/frontend/CI/deployment accessed or changed.

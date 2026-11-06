@@ -1,0 +1,9 @@
+BATCH 092 — SOURCE-TRACED GENERATION AND STATIC VERIFICATION ONLY — 2026-11-05
+PARENT full ZIP SHA256: 923ba6c05d8d9610211b6cd86fe689f9e9f146382f0d43019f663c26a3c4ff16; CRC PASS. Original FE/BE ZIP hashes checked unchanged.
+NEW: 39 PANN-042..080 plus 41 PSHL-001..041; 11 new PANN test.skip declarations for independent Phase 2 proof.
+PANN-040 expectation surgically corrected: existing ID unchanged, raw cancellation reason forwarded by frontend; no server normalization claim.
+OLD IDs PRESERVED: 5,189. CUMULATIVE: 5,269 generated of 5,309 discovered; 39 PSHL reserved + PLCR-084 NEEDS_EXPECTATION.
+99 spec files; 84/137 routes; 53 unstarted including 40 historical. 5,455 feature rows including 204 NOT_BROWSER_TESTABLE obligations.
+NO npm, TS compile, Playwright, browser, CI, backend, PostgreSQL, external integration or real customer testing.
+KNOWN OPEN: PLCR-084; Access Reviews All statuses; malformed responses; PPRIV-072; backend cancellation normalization.
+NEXT: Batch 93 PSHL-042..080 and assess /platform/audit for existing coverage before generating.

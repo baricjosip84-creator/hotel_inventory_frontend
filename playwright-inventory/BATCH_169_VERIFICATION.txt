@@ -1,0 +1,14 @@
+BATCH 169 — STATIC SOURCE AND DATA INTEGRITY VERIFICATION — 2026-11-06
+Authoritative parent Batch 168 ZIP SHA-256 df967a60657cf0cec251b0c62c38c8bf0a3ae7851fc4b3b88b0962209001ce21: MATCH; ZIP CRC PASS
+Original immutable frontend ZIP SHA-256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112: MATCH; ZIP CRC PASS
+Original immutable backend ZIP SHA-256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4: MATCH; ZIP CRC PASS
+New 26 source-backed declarations TSET-046..071 in existing Tenant Settings .spec.ts.
+Prior 9,436 scenario IDs preserved; remaining 151 spec files byte-identical to parent.
+Cumulative authored 9,462 unique declarations, including 357 labelled test.skip; 9,105 unlabelled/skipped-by-title unrun.
+Cumulative COVERAGE_LEDGER.csv 9,880 unique IDs = 9,462 GENERATED_UNRUN + 417 BLOCKED + 1 NEEDS_EXPECTATION (PLCR-084).
+PAGE_FUNCTION_INVENTORY.csv 10,172 unique stable feature IDs, including 272 SOURCE_TRACED_PARTIAL still open.
+152 spec files; 137/137 inventoried original routes.
+Source anchors and backend validation read directly from immutable FE/BE ZIPs. Original application source unchanged.
+All seven tracking records updated; no prior statuses weakened.
+PHASE 1 ONLY: No TypeScript compile, Playwright discovery/run, browser, server, real API, SQL, CI, npm, production or dependency install.
+Static checks cannot establish runtime behavior. See PHASE1_GAP_REVIEW_B169.md.

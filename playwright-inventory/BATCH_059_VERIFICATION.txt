@@ -1,0 +1,11 @@
+BATCH 59 STATIC VERIFICATION — 2026-11-04
+Parent B58 FULL: SHA256 b5581f5ee52f02f68751abe1e9b8272e0ce6232e5d647aa8f2bbae77e1dae508; ZIP CRC PASS
+Original frontend SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112
+Original backend  SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4
+Added: PTNOTE-051…060 (10); PTCOMM-001…040 (40) = 50 declarations, all GENERATED_UNRUN.
+Prior Batch 58: 2,859 unique test IDs preserved. All 64 other old spec files byte-for-byte unchanged; Tenant Notes file append-only.
+Total spec files: 66. Unique generated IDs: 2,909 (matches GENERATED_UNRUN ledger); pending 40 NOT_STARTED; discovered 2,949, provisional.
+Routed page count: 55/137 begun; 82 platform routes not started. Feature inventory: 2,933 rows including 42 NOT_BROWSER_TESTABLE.
+All seven primary trackers reconciled. ZIP CRC and SHA256 manifest checked in packaging.
+Not run: npm, TypeScript compilation, Playwright/browser, application/backend/DB/CI/deployments.
+Next: Batch 60 PTCOMM-041–080 then next platform route.

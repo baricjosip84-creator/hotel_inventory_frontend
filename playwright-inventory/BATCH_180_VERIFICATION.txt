@@ -1,0 +1,13 @@
+BATCH 180 — STATIC SOURCE AND PACKAGE VERIFICATION (6 November 2026)
+Authoritative parent B179 FULL SHA-256 50ab930d64f923de34967f2a8f693d6bb4d2e13b4f8a48b2aac69fe4d67f0bbe: PASS
+Immutable frontend original SHA-256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112: PASS
+Immutable backend original SHA-256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4: PASS
+Original FE/BE/parent archive CRC and file integrity: PASS
+Exact immutable AlertsPage.tsx bytes in original FE ZIP vs inspected source: PASS
+35/35 TALERT-054..088 new declarations anchored individually to unchanged AlertsPage.tsx: PASS
+All 9,725 previous declarations preserved; 9,760 unique IDs across 152 unchanged-count specs: PASS
+Ledger: 10,178 unique, statuses GENERATED_UNRUN 9,760, BLOCKED 417, NEEDS_EXPECTATION 1: PASS
+Features: 10,470 unique, old 272 SOURCE_TRACED_PARTIAL still open: PASS
+All 7 trackers updated; BATCH_CHANGELOG exact prior content prefix retained: PASS
+Original 357 scenario-labelled skips, 21 unconditional + 3 conditional in-test skips preserved via prior-spec prefix and all other specs byte identity.
+NO Playwright/TypeScript compile, discovery or execution; NO browser, actual app, DB, network, CI, dependency install, deployment, real tenant/permission acceptance.

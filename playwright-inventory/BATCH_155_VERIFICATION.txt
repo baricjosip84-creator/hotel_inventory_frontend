@@ -1,0 +1,9 @@
+B155 STATIC VERIFICATION ONLY (NOT PLAYWRIGHT EXECUTION)
+BATCH 155 — 2026-11-06 — PHASE 1 STATIC AUTHORING ONLY
+Parent B154 FULL SHA256 0223711e2d6bca62ff5f87d54c64b7b5d63e7857101f86fe6682febeff5bb33c
+Immutable original FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4
+New declarations: PCOB-081, PCOB-082, PCRVP-087, PCRVP-088, PEID-089, PEID-090; 69 deferred scenarios source-anchored; 0 skipped cases promoted; 0 tests executed.
+Unique scenario IDs 9259; non-skipped 8902; 357 labelled skips; 24 conditional skips; 417 blocked; PLCR-084 still NEEDS_EXPECTATION; ledger 9677, feature inventory 9969, 152 spec files, 137/137 routes inventoried.
+Source-anchored skip reviews 203; heuristic skips remaining 154.
+NO npm, TypeScript/Playwright compilation, test runner, app/backend/browser/SQL execution, production access, original app code edits, GitHub, or deployment.
+Next B156: continue source-anchored review of the remaining heuristic skips; work on genuine observable browser regressions only; do not silently close source/backend/external obligations.

@@ -1,0 +1,13 @@
+BATCH 179 — SOURCE-ONLY STATIC VERIFICATION (6 November 2026)
+Parent B178 FULL SHA-256 cad18059645ae1b477393ac8566dc8383ec13098a80cc03a601385f7045889c2 PASS
+Original FE SHA-256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112 PASS
+Original BE SHA-256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4 PASS
+Original FE/BE and parent B178 ZIP CRC PASS
+35/35 test declarations TDASH-044..078; all 9690 older declarations retained; 9725 unique IDs.
+35/35 Dashboard source anchors matched to immutable frontend; no original FE/BE code edited.
+Ledger: 10143 distinct IDs; 9725 GENERATED_UNRUN; 417 BLOCKED; PLCR-084 NEEDS_EXPECTATION.
+Feature inventory: 10435 distinct stable IDs; 272 SOURCE_TRACED_PARTIAL still unaccepted.
+357 scenario-labelled skips unchanged; 21 unconditional and 3 permission-dependent in-test skips unchanged by preserving all original specs.
+Spec files 152; seven cumulative trackers updated; append-only batch changelog preserved as prefix.
+Expected delta: 13 file members (7 trackers, 1 appended existing spec, 5 new internal review/verification files).
+NO Playwright/TS compile, discovery, browser/runtime, backend/DB/authorization/integration, CI, dependency installation, deployment, or production acceptance.

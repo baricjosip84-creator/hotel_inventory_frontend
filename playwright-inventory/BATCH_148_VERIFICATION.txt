@@ -1,0 +1,15 @@
+BATCH 148 / 2026-11-06 / STRICT PHASE 1 SOURCE-BACKED SECURITY/SUPPORT/IDENTITY GAP FOLLOW-UP
+PARENT INVENTORY_PLAYWRIGHT_BATCH_147_FULL.zip SHA256 6a63f03c31e8bcc1b30afe89adcd219d7015f69cac56f982a82f479e968b3493. Original FE/BE read-only.
+NEW 24 DECLARATIONS: PSEC-081..088 (8), PSSUP-081..088 (8), PEID-081..088 (8). Converted PSSUP-075 test.skip to real mocked UI assertion (NOT RUN).
+Four deferred scenarios PSEC-064, PSSUP-076, PEID-055/058 received concrete source-grounded acceptance criteria but remain skipped.
+COUNTS: 9,179 unique GENERATED_UNRUN; 8,820 non-skipped; 359 ID-labelled skipped; 24 conditional skip calls; 417 BLOCKED; 0 NOT_STARTED; 1 NEEDS_EXPECTATION PLCR-084. TOTAL ledger 9,597; features 9,889 (350 NOT_BROWSER_TESTABLE); 152 specs; original router inventoried 137/137.
+B148 LINE-ACCURATE AUDIT: 383 test.skip calls. See PHASE1_DEFERRED_SCENARIO_AUDIT_B148.csv and PHASE1_GAP_REVIEW_B148.md.
+KNOWN UNRESOLVED: PSEC-064, PSSUP-076, PEID-055, PEID-058, PNOT-061, PLEN-059/060, PPER-062, PPRIV-072, PLCR-084. No application defect repaired.
+PROHIBITED: npm, TS, Playwright discovery/compile/execute/browser, app/backend/API/DB/CI/provider/production, external signing, deployment.
+NEXT: Batch 149 review other source-gap skips in security-critical frontend and permission/pagination paths.
+
+STATIC CHECKS: 9,155/9,155 parent GENERATED_UNRUN IDs preserved, +24 unique; 1 previously skipped declaration converted to non-skipped without changing its ID.
+LEDGER: 9,179 GENERATED_UNRUN +417 BLOCKED+1 NEEDS_EXPECTATION=9,597. FEATURES: 9,889. 152 .spec.ts. Skip calls 359 labelled+24 conditional=383.
+SOURCE REVIEWED: src/pages/PlatformSecurityPage.tsx, PlatformSupportSessionsPage.tsx, PlatformEnterpriseIdentityGovernancePage.tsx and existing fixtures.
+ALL PREVIOUS DEFERRED OBLIGATIONS PRESERVED EXCEPT PSSUP-075 CONVERTED AFTER SOURCE CONFIRMATION.
+NOT a TypeScript, Playwright, browser or application test result.

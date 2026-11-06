@@ -1,0 +1,11 @@
+BATCH 166 — STATIC VERIFICATION — PHASE 1, 2026-11-06
+Source: verified Batch 165 FULL SHA256 06f8d43bc1405bb7823dca1f87034229e319aa4bd72e77cc14ac2a61b543fa00.
+Original FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; original BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; immutable.
+New: PUSR-096..119 (24 source-backed declarations) in existing platform/users/users.spec.ts. No prior declarations removed or modified.
+CUMULATIVE: 9,382 unique authored IDs, 9,025 non-skipped unrun, 357 labelled test.skip, 152 Playwright spec files, 137/137 original router entries inventoried.
+COVERAGE LEDGER: 9,800 unique IDs: 9,382 GENERATED_UNRUN, 417 BLOCKED, 1 NEEDS_EXPECTATION (PLCR-084). All actual spec IDs exactly match GENERATED_UNRUN ledger IDs.
+FEATURE INVENTORY: 10,092 unique IDs, 272 SOURCE_TRACED_PARTIAL remain open.
+REVIEW: 24 individually anchored FE assertions cross-checked with immutable FE and backend route, synthetic fixture only. No permission, backend or DB behavior proven.
+SKIPS: 21 unconditional + 3 role-dependent in-test calls; scenario-labelled 357 unchanged.
+NO compilation, Playwright discovery, execution, browser, app startup, SQL, provider calls, dependencies, CI or deployment.
+ARCHIVE VERIFICATION / PARENT-DELTA RECONSTRUCTION: performed during package generation (see external release manifest).

@@ -1,0 +1,3 @@
+BATCH 178 — SOURCE ONLY STATIC VERIFICATION
+Verification details will be supplied with signed archive report.
+No TS compile, Playwright discovery, browser or test execution.

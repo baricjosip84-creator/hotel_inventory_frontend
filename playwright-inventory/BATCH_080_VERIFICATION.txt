@@ -1,0 +1,11 @@
+BATCH 080 — STATIC VERIFICATION (NOT RUNTIME) — 2026-11-05
+Parent B079 source: INVENTORY_PLAYWRIGHT_BATCH_079_FULL.zip SHA256 29fa95dcf7998d1e413824888a03ec0d108252281a92e3b5b781d500dff81df5; CRC checked
+Original FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; original BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; both read-only
+Added PCAP-042..080: 39 declarations; appended only; existing PCAP-001..041 preserved as unchanged prefix
+Added PJO-001..041: 41 new declarations; 1 independent page spec + 1 fixture
+Totals: 4309 unique scenario declarations; 4309 GENERATED_UNRUN; 39 NOT_STARTED PJO-042..080; 1 NEEDS_EXPECTATION PLCR-084; total 4349 discovered
+87 .spec.ts files, 72/137 pages inventoried, 65 not yet inventoried, 4419 page-function records, 128 backend-only records
+All 4,229 previous IDs preserved. No duplicate IDs; each generated ledger ID matches one text declaration; original specs unchanged except append-only capacity.
+No Playwright, TypeScript, npm, browser, application, backend, database, worker, CI or live tests executed; static review only.
+Source discrepancy PLCR-084 preserved. Real scheduler claims, handler side effects, tenant/user permissions and SQL consistency remain Phase 2.
+Next PJO-042..080; then /platform/releases. Seven trackers updated.

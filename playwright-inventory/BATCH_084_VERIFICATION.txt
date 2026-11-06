@@ -1,0 +1,11 @@
+BATCH 084 — STATIC VERIFICATION ONLY — 2026-11-05
+PHASE 1: ZERO Playwright/browser tests, TypeScript compilation, npm, app, backend, database, CI, remote deployment or external integrations executed.
+PARENT FULL SHA256 d3e086cd24602442e1eabada2074a4af397be2fe2d3e73d2981f38c1d5b50b0b, CRC PASS. FE 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112, BE e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4, both read-only unchanged.
+NEW DECLARATIONS exactly 80: PPAUD-042..080 39; PCDOC-001..041 41. 4,629 unique IDs in 91 specification files. 4,549 historical scenario IDs preserved; 89 unrelated preexisting specs byte-identical.
+LEDGER 4,669 discovered = 4,629 GENERATED_UNRUN + 39 PCDOC-042..080 NOT_STARTED + PLCR-084 NEEDS_EXPECTATION. Feature inventory 4,759 rows / 148 NOT_BROWSER_TESTABLE. 76/137 inventoried routes; 61 not yet detailed (40 earlier skipped).
+RUNTIME SKIPS: PPAUD-049 malformed response (source hardening), PPAUD-077 Joi backend, PPAUD-079 authenticated two-tenant, PPAUD-080 SQL/external evidence. Counted as authored but do NOT claim runnable passes.
+SOURCE REVIEWED frontend PlatformComplianceDocumentsPage.tsx, frontend router.tsx and permissions, backend complianceDocuments.js and platformComplianceDocumentsService.js, permission audit sources and original ZIPs.
+BOUNDARIES Synthetic JWT and route mocks DO NOT PROVE real server RBAC, legal acceptance, audit durability, physical document validity, encryption, external URL availability, real platform user sessions or cross-tenant isolation.
+OPEN PLCR-084 impossible fetch-disabled selector expectation; Access Reviews All statuses fallback; malformed Audit data guard.
+STATIC GATES no missing imports, 91 specs, no duplicate IDs, generated ledger exact, 4,549 old IDs preserved, all 89 unrelated specs byte-identical, ZIP CRC and hashes verified. No tests compiled/run.
+NEXT Batch 85 PCDOC-042..080, then original router /platform/compliance-export.

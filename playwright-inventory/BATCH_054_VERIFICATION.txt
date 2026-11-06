@@ -1,0 +1,11 @@
+BATCH 54 STATIC PACKAGING / SOURCE RECONCILIATION — 2026-11-03
+Original FE SHA256: 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112
+Original BE SHA256: e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4
+Parent FULL SHA256: dbf911bde8c9f3c92020b2445d2746e195615a2701c505b3c60c164a5e79c69b
+Parent archive entries: 81; CRC checked; original .spec.ts scenario titles/IDs retained.
+New IDs: PPRO-051...064 (14); PPSET-001...036 (36); total 50.
+Cumulative generated IDs: 2655 unique; ledger GENERATED_UNRUN exactly matches specs.
+Currently discovered scenarios: 2689; NOT_STARTED PPSET-037...070 = 34.
+Spec files: 61. Routed pages with dedicated scenarios: 51/137; 86 platform pages remain unstarted.
+Feature inventory: 2658 records; NOT_BROWSER_TESTABLE 27.
+Excluded: runtime Playwright execution, TypeScript compilation, build, npm, app/browser/backend/DB/CI/deploy, live customers. All tests UNRUN.

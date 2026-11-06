@@ -1,0 +1,13 @@
+INVENTORY PLAYWRIGHT BATCH 175 — EXACT CONTINUATION HANDOFF
+Date: 2026-11-06
+
+Source of truth: INVENTORY_PLAYWRIGHT_BATCH_175_FULL.zip (see SHA-256 manifest).
+Previous source: INVENTORY_PLAYWRIGHT_BATCH_174_FULL.zip hash 00b796e9c459ae28ad3458d5e4614b76e2cf67b345ebbdd9bfcb0de06b219e41.
+
+Current cumulative: 9,614 authored scenarios, 9,257 not scenario-labelled skipped, 357 labelled skips; 21 unconditional and 3 permission-conditional in-test skips; 152 spec files; original 137/137 routes; 10,032 unique ledger records; 10,324 unique feature records. All 417 blocked obligations, 272 partial feature records, and PLCR-084 still outstanding. Zero tests compiled or run.
+
+Batch 175 adds TSTR-051..TSTR-080 in tests/tenant/stock-transfers/stock-transfers.spec.ts with matching permanent records in coverage ledger and feature inventory. New audit reports: PHASE1_BROWSER_ASSERTION_SOURCE_REVIEW_B175.csv, PHASE1_BROWSER_ASSERTION_SOURCE_REVIEW_B175.md, PHASE1_GAP_REVIEW_B175.md, PHASE1_COMPLETION_READINESS_B175.md.
+
+STRICT PHASE 1 ONLY: do not compile/run Playwright tests, start app, use a real browser/live APIs, run SQL, install dependencies, edit immutable FE/BE, change CI, or deploy. Continue actual distinct coverage from Batch 175; do not restart earlier batches or claim that generated declarations prove functional acceptance.
+
+Canonical original FE SHA-256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BE e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4. Original ZIPs remain separate immutable references in the Batch 155 continuation pack.

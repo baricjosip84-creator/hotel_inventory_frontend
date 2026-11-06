@@ -1,0 +1,10 @@
+BATCH 165 — STATIC VERIFICATION — PHASE 1, 2026-11-06
+Source of truth: verified Batch 164 FULL. Original FE and BE SHA256 matched handoff.
+PARV-081..093 (13) and PSEC-095..106 (12) authored in page-specific specs.
+All 9,333 original scenario IDs preserved; 25 new unique IDs, 9,358 total.
+9,776 coverage ledger IDs including 417 BLOCKED and PLCR-084 NEEDS_EXPECTATION.
+10,068 feature inventory rows; 272 partial acceptance items remain.
+357 scenario-labelled test.skip preserved. No prior declaration edited or deleted.
+ZIP CRC, byte-exact parent+delta overlay and asset hashes checked during release packaging.
+None of the Playwright tests was compiled, discovered, executed or run in a browser.
+Backend/FE never started, original code untouched; no SQL, CI or deploy.

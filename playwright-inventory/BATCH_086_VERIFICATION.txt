@@ -1,0 +1,10 @@
+BATCH 086 — STATIC VERIFICATION ONLY — 2026-11-05
+PHASE 1: NO Playwright/browser tests, TypeScript compilation, npm, application, backend, database, CI, deployment, real tenants or external legal workflow executed.
+PARENT FULL SHA256 24f426e5ce9ec640e244483aee10e5b00e64d1e6d631153aa6ad56278f762814; CRC PASS. ORIGINAL FE 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112 / BE e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4, unchanged.
+NEW 80 declarations: PCEXP-042..080 (39) and PPRIV-001..041 (41); 4,789 unique generated IDs across 93 specs; prior 4,709 all retained and 91 unaffected spec files byte-identical.
+LEDGER 4,829 discovered = 4,789 GENERATED_UNRUN + 39 PPRIV-042..080 NOT_STARTED + PLCR-084 NEEDS_EXPECTATION. FEATURE INVENTORY 4,929 rows incl 158 NOT_BROWSER_TESTABLE; route inventory 78/137, 59 unstarted incl 40 historically skipped.
+Explicit skips PCEXP-072..080: malformed-response hardening, backend Joi/RBAC, real SQL, separate tenants, real privacy workflow, external legal/document/recipient evidence. Other prior skips preserved.
+SOURCE: original Compliance Export, Privacy Requests frontend pages + router/permissions and matching backend routes/services; synthetic fixture is source-grounded but no runtime verified behavior, legal compliance or tenant isolation.
+OPEN PLCR-084, Access Reviews All statuses fallback, Permission Audit schema guard, Compliance Export schema guard; Phase 2 backend/tenant/external obligations.
+STATIC GATES: ZIP CRC, all declared test IDs unique; CSV ledger exact reconciliation; all prior IDs preserved, 91 old unrelated specs byte-identical; relative imports resolve; no accidental application source changes.
+NEXT Batch 87 PPRIV-042..080 then /platform/data-retention. No tests compiled/run.

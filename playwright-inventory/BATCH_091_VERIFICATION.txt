@@ -1,0 +1,10 @@
+BATCH 091 — SOURCE-TRACED GENERATION / STATIC VERIFICATION ONLY — 2026-11-05
+PARENT full ZIP: 5f2b936dab9a32358d8284efcb74ed7d69aad596f72bd4724d5504a616f29019 (CRC PASS).
+ORIGINAL frontend/back-end archives: preserved, not edited; compare source hash in SHA256 manifest.
+ADDED: 39 PMNT-042..080 declarations + 41 PANN-001..041 declarations = 80 new.
+PREVIOUS 5,109 IDs preserved. CUMULATIVE: 5,189 generated of 5,229 discovered; 39 PANN reserved + PLCR-084 NEEDS_EXPECTATION.
+98 Playwright spec files. 83/137 routes inventoried, 54 unstarted incl historical 40. 5,367 feature rows, 196 NOT_BROWSER_TESTABLE.
+PMNT-070..080 explicit test.skip for live PostgreSQL/write-lock enforcement, independent tenant permission, external work and notification evidence.
+No Playwright, npm, TypeScript, browsers, server, DB, external delivery, CI or deployment invoked. Static source inspection/ZIP, coverage and import-reference checks only.
+Known open: PLCR-084; Access Reviews All statuses filter, malformed responses, PPRIV-072 date native validation.
+NEXT: Batch 92 PANN-042..080, then /platform/system-health.

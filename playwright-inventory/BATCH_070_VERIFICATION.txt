@@ -1,0 +1,14 @@
+BATCH 70 — 2026-11-04 — PHASE 1 GENERATED_UNRUN ONLY; ZERO Playwright/TypeScript/npm/browser/app/backend/DB/CI/deployment execution.
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_069_FULL.zip SHA256 7a7f01a71398d14d9a8cad44a2b2136f6e020e2010dc4c83596a103b8ad656a9; 122-entry CRC PASS.
+ORIGINAL SOURCE ARCHIVES (UNCHANGED): FE 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BE e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4.
+NEW: 30 PRCHG-071..100 appended to tests/platform/change-management/change-management.spec.ts. Platform Change Management now 100/100 currently inventoried.
+NEW: 40 PAKEY-001..040 in tests/platform/api-keys/api-keys.spec.ts and synthetic fixture support/platformApiKeysFixture.ts; 40 PAKEY-041..080 planned NOT_STARTED. API Keys page is partially inventoried, provisional 40/80.
+SOURCE INSPECTED: PlatformChangeManagementPage.tsx, PlatformApiKeysPage.tsx, frontend router/platformPermissions.ts, backend routes/platform/apiKeys.js, services/platformApiKeysService.js, prior Change Management service/routes.
+CURRENT: 3,569 GENERATED_UNRUN / 3,609 discovered; 40 NOT_STARTED PAKEY-041..080; 75 spec files; 63/137 routed pages under review; 74 platform routes not started; 82 NOT_BROWSER_TESTABLE rows in 3,633 feature records.
+PREVIOUS DECLARATIONS: 3,499 IDs preserved (PRCHG-001..070 unchanged); 73 unrelated prior spec files byte-for-byte unchanged; Change Management spec append-only.
+SOURCE FACTS: Change shared action-note allows 5,000 chars but approval reasons backend <=1,000; browser datetime clear submits null. API Keys are tenant-bound; secret shown once after create/rotate; legacy scopes flagged; registry 50 rows/page; URL filters validated; read, write, tenant, audit, user permissions independently gate views/actions.
+LIMITS: Synthetic browser transport does NOT establish actual IP allowlist enforcement, secret revocation, database transactions, cross-tenant isolation, audit durability, authorization or external API connectivity; these are tracked separately. All code UNCOMPILED and UNRUN.
+NEXT BATCH 71: PAKEY-041..080, then next original platform router route /platform/api-client-governance. Preserve previous declarations, update all seven trackers, deliver FULL+CHANGED ZIPs; Phase 1 only.
+SEVEN TRACKERS UPDATED: DEVELOPMENT_PLAN.md, PAGE_FUNCTION_INVENTORY.csv, COVERAGE_LEDGER.csv, PROGRESS.txt, SOURCE_BASELINE.txt, BATCH_CHANGELOG.txt, HANDOFF.txt.
+
+STATIC CHECKS: source archive SHA256 and parent ZIP CRC/hash, 3,499 previous scenario declarations preserved, 73 unrelated old specs byte-for-byte unchanged, 30 appended change scenarios and 40 separate API-key scenarios with unique IDs, 75 spec files; ledger / inventory reconciled. Browser/Playwright/TypeScript/runtime NOT executed.

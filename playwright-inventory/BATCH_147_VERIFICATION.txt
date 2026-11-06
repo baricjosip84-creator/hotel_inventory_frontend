@@ -1,0 +1,11 @@
+BATCH 147 / 2026-11-06 / STRICT PHASE 1 SOURCE-GROUNDED GAP FOLLOW-UP
+AUTHORITATIVE PARENT: INVENTORY_PLAYWRIGHT_BATCH_146_FULL.zip SHA256 b5aaa8770af970dd620e5e0e003d287490e71e7c0169f28eef059b36ae6e9d00; original FE/BE inspected unchanged.
+ADDED 24 unique non-skipped source-backed declarations: PNOT-081..086; PLEN-081..086; PPER-081..086; PPRIV-081..086. None compiled or executed.
+EXPANDED 5 deferred placeholders without unskipping: PNOT-061; PLEN-059/060; PPER-062; PPRIV-072. These are NOT closed or executable. PLCR-084 remains NEEDS_EXPECTATION.
+CUMULATIVE: 9,155 GENERATED_UNRUN IDs (8,795 non-skipped; 360 skipped), 417 BLOCKED, 0 NOT_STARTED, 1 NEEDS_EXPECTATION; 9,573 ledger rows; 9,865 feature rows (350 NOT_BROWSER_TESTABLE); 152 specs; 137/137 original router entries inventoried (not fully browser-tested).
+B147 LINE-ACCURATE SKIP AUDIT: 384 calls, 360 ID-labelled + 24 conditional, all preserved. See PHASE1_DEFERRED_SCENARIO_AUDIT_B147.csv and PHASE1_GAP_REVIEW_B147.md.
+NEXT: Batch 148 — source audit remaining high-impact skips in Security, Support Sessions and Enterprise Identity; assess missing frontend behavior rather than inventing successful tests.
+PROHIBITED: npm, TypeScript, Playwright runner/discovery/browser, application/API/DB/CI/provider/production, deployment, external certifications, customer/owner sign-off.
+SOURCE STATIC CHECKS: old IDs preserved=9131/9131; new unique=24; active authored=8795; skip-labelled=360; conditional skip calls=24; specs=152.
+CSV RECONCILIATION: generated 9155; blocked 417; unresolved 1; total 9573. Feature total 9865; NOT_BROWSER_TESTABLE 350.
+PARENT ZIP HASH VERIFIED AND CRC=PASS. STRICT NO RUNTIME/TS/PLAYWRIGHT/TEST COMPILATION.

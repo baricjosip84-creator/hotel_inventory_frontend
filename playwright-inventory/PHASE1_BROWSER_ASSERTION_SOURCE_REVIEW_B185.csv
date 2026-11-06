@@ -1,0 +1,11 @@
+area,old_synthetic_id,new_synthetic_id,source_validation_anchor,reason,verification_scope
+Cross-Domain Optimization,pw-objective-16,90a00001-0000-4000-8000-000000000016,backend/src/validations/decisionIntelligence.validation.js:984-999,Objective fixture UUID shape,Static regex/UUIDv4 check only; no HTTP/backend acceptance
+Cross-Domain Optimization,pw-option-16,90a00002-0000-4000-8000-000000000016,backend/src/validations/decisionIntelligence.validation.js:984-999,Option fixture UUID shape,Static regex/UUIDv4 check only; no HTTP/backend acceptance
+Cross-Domain Optimization,pw-tradeoff-16,90a00003-0000-4000-8000-000000000016,backend/src/validations/decisionIntelligence.validation.js:984-999,Tradeoff path UUID shape,Static regex/UUIDv4 check only; no HTTP/backend acceptance
+Cross-Domain Optimization,pw-result-16,90a00004-0000-4000-8000-000000000016,backend/src/validations/decisionIntelligence.validation.js:984-999,Result fixture UUID shape,Static regex/UUIDv4 check only; no HTTP/backend acceptance
+Cross-Domain Optimization,pw-owner-1,90a00005-0000-4000-8000-000000000016,backend/src/validations/decisionIntelligence.validation.js:984-999,Ownership POST body UUID shape,Static regex/UUIDv4 check only; no HTTP/backend acceptance
+Cross-Domain Optimization,pw-other-option,90a00006-0000-4000-8000-000000000016,backend/src/validations/decisionIntelligence.validation.js:984-999,Selected-option ID UUID shape,Static regex/UUIDv4 check only; no HTTP/backend acceptance
+Cross-Domain Optimization,pw-choice-new,90a00007-0000-4000-8000-000000000016,backend/src/validations/decisionIntelligence.validation.js:984-999,Choose-option POST body UUID shape,Static regex/UUIDv4 check only; no HTTP/backend acceptance
+Digital Twin,pw-node-1,dt_000000000000000000000001,backend/src/validations/operationalActionCenter.validation.js:234,Focus node key pattern,Static regex/UUIDv4 check only; no HTTP/backend acceptance
+Digital Twin,pw-node-2,dt_000000000000000000000002,backend/src/validations/operationalActionCenter.validation.js:234,Connected node key pattern,Static regex/UUIDv4 check only; no HTTP/backend acceptance
+Digital Twin,pw-node-51,dt_000000000000000000000051,backend/src/validations/operationalActionCenter.validation.js:234,Paginated node key pattern,Static regex/UUIDv4 check only; no HTTP/backend acceptance

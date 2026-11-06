@@ -1,0 +1,10 @@
+BATCH 127 STATIC SOURCE VERIFICATION — 2026-11-05 — NO COMPILE/TEST/APP RUN.
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_126_FULL.zip SHA256 b3a3aa7509d374d7ee1e384918ea3d303045d148f0e18735cdf7337efa5b3840, 293 entries CRC PASS; unrelated prior members immutable.
+ORIGINAL FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; Step 227 source fields, status, decisions, 12 grants, FE selectors, router order statically reviewed.
+NEW IDs: 15 PCREA-056..070 + 55 PCEHO-001..055; prior 7,786 IDs preserved, new IDs unique, zero new skips.
+LEDGER 8109: GENERATED_UNRUN=7856, BLOCKED=227, NOT_STARTED=25, NEEDS_EXPECTATION=1 PLCR-084; INVENTORY 8401; SPECS 134.
+HISTORICAL SKIPS: 360 labelled test.skip; 384 total test.skip call sites. NONEXECUTABLE, NOT passed.
+STEP 227: 8 read-only templates, 13 required external observation fields, 5 recommendation values, 12 counters, 12 backend grants. No real cohort health observed.
+PCREA-071..080 remain BLOCKED external authorization evidence; PCEHO-056..080 NOT_STARTED; prior discrepancies unaltered.
+STATIC VERIFIED: archive CRC; hashes; router, FE selectors, backend permission count; fixture imports; unchanged parent members; unique IDs and ledgers; seven tracking files.
+NOT RUN: npm, TypeScript compilation, Playwright discovery/execution, browser, original frontend/backend/DB, API/provider/production, CI, deployment or real cohort changes.

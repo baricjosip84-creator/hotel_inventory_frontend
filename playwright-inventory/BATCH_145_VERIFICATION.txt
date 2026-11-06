@@ -1,0 +1,10 @@
+BATCH 145 STATIC SOURCE VERIFICATION — 2026-11-05 — NO COMPILATION OR EXECUTION
+PARENT INVENTORY_PLAYWRIGHT_BATCH_144_FULL.zip SHA256 101dc6fc300bd354f3ef9e7220e21f4cbc55535192d335cbd5f73bf6b5443fb3, 347 members CRC PASS. All unrelated parent members preserved byte-for-byte.
+ORIGINAL FRONTEND SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BACKEND SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4. Step 245 nine source domains, four next-cycle evidence fields each, three manual controls and twelve permission guards. React page seven summary cards, eighteen upstream posture links, nineteen persistence boundaries; original router verified.
+NEW IDs PRRAS-056..070 (15); PRRCR-001..055 (55). All 9,046 previous authored IDs preserved; zero new test.skip.
+LEDGER 9549 GENERATED_UNRUN=9116 BLOCKED=407 NOT_STARTED=25 NEEDS_EXPECTATION=1 PLCR-084; FEATURE INVENTORY 9841; SPEC FILES 152.
+HISTORICAL SKIPS 360 ID-labelled / 384 skip calls, not executable coverage.
+PRRAS-071..080 BLOCKED external archive-seal evidence and owner acceptance; PRRCR-056..080 RESERVED. Intercepted synthetic GET tests UI only; NOT real archive, retention compliance, archive seal, next-cycle owner assignment, cadence or reset.
+STATIC CHECKS: parent ZIP CRC, source router/route/service/frontend selectors, relative import targets, ID uniqueness, ledger parity, unchanged parent bytes, full/diff ZIP CRC.
+ROUTE INVENTORY 137/137 ORIGINAL ROUTER ENTRIES; DO NOT CONFLATE WITH FULL TEST COVERAGE, WHICH REMAINS INCOMPLETE FOR EARLIER PAGES.
+NOT RUN: npm, TypeScript, Playwright runner/discovery, browser, original application/API/DB/CI/provider/production, actual archive seal/owner approval/cycle reset or deployment.

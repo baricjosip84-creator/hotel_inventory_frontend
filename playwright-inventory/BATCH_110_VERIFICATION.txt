@@ -1,0 +1,14 @@
+BATCH 110 STATIC SOURCE/ARCHIVE VERIFICATION — 2026-11-05
+PARENT_SHA256: 42b70fd28bb443b90b2141a988b39fadbb0ca20f97c6b268582d0081fba6e8bf
+PARENT_ZIP_CRC: PASS (inspected)
+PARENT_ID_COUNT: 6629; NEW_ID_COUNT: 60; CUMULATIVE_DECLARATIONS: 6689 UNIQUE: 6689
+NEW_IDS: PTPH-042..080 except PTPH-048,PTPH-049,PTPH-050,PTPH-056,PTPH-060,PTPH-066,PTPH-067,PTPH-068,PTPH-069,PTPH-070,PTPH-071,PTPH-072,PTPH-073,PTPH-074,PTPH-075,PTPH-076,PTPH-077,PTPH-078,PTPH-079,PTPH-080; PBSA-001..041
+PTPH_BLOCKED: PTPH-048,PTPH-049,PTPH-050,PTPH-056,PTPH-060,PTPH-066,PTPH-067,PTPH-068,PTPH-069,PTPH-070,PTPH-071,PTPH-072,PTPH-073,PTPH-074,PTPH-075,PTPH-076,PTPH-077,PTPH-078,PTPH-079,PTPH-080
+CURRENT_STATUSES: {"BLOCKED": 20, "GENERATED_UNRUN": 6689, "NEEDS_EXPECTATION": 1, "NOT_STARTED": 39}
+SPEC_FILES: 117; FEATURES: 7041; NBT: 350
+PAGE_DISCOVERY: 102/137; NEXT: PBSA-042; NOT_STARTED: PBSA-042..080.
+Source read: router.tsx, platformPermissions.ts, PlatformProtectedRoute.tsx, provisioning page/CSS/BE route+service, billing activation page/CSS/BE route+service.
+Prior declarations preserved: YES (checked set and static cumulative records).
+NO Playwright, npm, TypeScript compiler, browser, backend, DB, CI, production, real payment provider, deployment or network calls.
+Only static regex/CSV/ZIP/source checks. No test results claimed.
+IMPORTANT: Historic suite contains test.skip declarations; do not equate GENERATED_UNRUN with executable coverage.

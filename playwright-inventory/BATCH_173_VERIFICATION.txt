@@ -1,0 +1,8 @@
+BATCH 173 — STRICT PHASE 1 STATIC PROJECT RECORD
+Authoritative parent: INVENTORY_PLAYWRIGHT_BATCH_172_FULL.zip SHA256 48fab3629c0d97f77e93305828317cf9bb336c18f731b333542d6729214cb115
+Immutable original FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112
+Immutable original BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4
+Added 27 TSES-051..TSES-077 non-skipped source-anchored scenarios to existing Tenant Sessions spec.
+9,556 total authored, 9,199 non-labelled-skipped, 357 labelled skips; 152 spec files.
+9,974 coverage ledger IDs and 10,266 feature inventory IDs. All 417 BLOCKED and PLCR-084 unresolved; 272 partial features open.
+No TypeScript/Playwright compilation, test discovery, browser or application launch, live API, DB/SQL, CI or production.

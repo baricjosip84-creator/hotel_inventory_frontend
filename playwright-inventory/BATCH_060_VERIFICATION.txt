@@ -1,0 +1,9 @@
+BATCH 60 — 2026-11-04 — PHASE 1 TEST GENERATION ONLY; ZERO tests run or compiled.
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_059_FULL.zip SHA256 8c70504241db9109d6e8defae8661f98792d10a6fdae112b07a01b0360825673; ZIP CRC PASS; source frontend 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112, backend e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4, both unchanged.
+GENERATED: 40 remaining PTCOMM-041…080 in tests/platform/tenant-communications/tenant-communications.spec.ts. All 2,909 old test IDs remain unchanged and prior source/test specifications byte-identical as prefixes. No new unrelated page or application feature.
+SCOPE: synthetic create/edit request fields, data readback, form guards, server-failure feedback, follow-up resolution, archive confirmation and restore, pending controls, read-only permission gates, stale snapshot, scoped links, pagination has_more.
+COUNTS: 2,949 GENERATED_UNRUN / 2,949 currently discovered; zero NOT_STARTED within currently inventoried features; 66 Playwright spec files; 2,933 feature rows (including 42 NOT_BROWSER_TESTABLE); 55/137 routed pages begun (46 tenant + 9 platform); 82 platform pages still have NO dedicated scenarios. Whole-app coverage remains incomplete and earlier page inventories may grow.
+LIMITS: Only code generation and static archive/ID verification. No Playwright, TypeScript compilation, npm/build, browser, real app/backend, database/CI/deployment, real customer tenants, or genuine delivery/auth tests. All scenarios stay GENERATED_UNRUN.
+NEXT EXACT: Batch 61 start next real platform router page `/platform/tenant-tasks`, review frontend/src/pages/PlatformTenantTasksPage.tsx and matching backend routes. Do not skip tenant-timeline or further platform pages.
+
+STATIC VERIFICATION: Source checksum match PASS; parent ZIP CRC PASS; prior 66 .spec.ts byte-identical or append-only; 40 permanent new IDs; no compile/test run.

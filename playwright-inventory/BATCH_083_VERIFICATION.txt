@@ -1,0 +1,11 @@
+BATCH 083 — STATIC VERIFICATION ONLY — 2026-11-05
+PHASE 1: NO npm, TypeScript compilation, Playwright/browser execution, application/backend/database/worker, CI, deployment, production or external account requests. No runtime assertions validated.
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_082_FULL.zip SHA256 9abde5ef01240b317850fcd9e429d1f40645873b9b239ef9e98c1b10ad7d0378; parent ZIP CRC PASS.
+ORIGINAL FRONTEND ZIP SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BACKEND e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; untouched.
+DECLARATIONS: 4,549 unique test IDs in 90 spec files; ledger GENERATED_UNRUN EXACT MATCH, all 4,469 prior declarations retained. Exactly 80 new (PARV-042..080 39; PPAUD-001..041 41).
+COUNTS: 4,589 ledger scenarios = 4,549 generated/unrun + 39 PPAUD-042..080 NOT_STARTED + 1 PLCR-084 NEEDS_EXPECTATION; 4,674 feature inventory rows, 143 NOT_BROWSER_TESTABLE; 75/137 routes inventoried; 62 unstarted (incl 40 earlier skipped).
+SOURCE CHECKS: original frontend PlatformAccessReviewsPage.tsx, PlatformPermissionAuditPage.tsx, router.tsx and platformPermissions.ts; backend platform accessReviews.js and permissionAudit.js and corresponding services. All read-only.
+BOUNDARIES: artificial JWT/request mocking does NOT certify actual platform RBAC, network PII withholding, server Joi validation, durable PostgreSQL, cross-tenant security, live session/keys or external access removal.
+OPEN: PLCR-084 contradicts source; Access Reviews All statuses control defaults back to open. No fabricated closure.
+STATIC GATES: no duplicate scenario IDs; 4,469 previous IDs preserved; 88 unrelated existing specs byte-for-byte unchanged; only Access Reviews spec appended, plus new Permission Audit spec and fixture. All relative spec imports exist. ZIP CRC/manifest checks to follow.
+NEXT EXACT BATCH 84: PPAUD-042..080, then /platform/compliance-documents. 0 tests compiled or executed.

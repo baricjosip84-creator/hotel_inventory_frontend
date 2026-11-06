@@ -1,0 +1,11 @@
+BATCH 087 — STATIC VERIFICATION ONLY — 2026-11-05
+PHASE 1: NO Playwright/browser tests, TypeScript compilation, npm, application, backend, database, CI, deployment, real tenants, data deletion or external legal workflow executed.
+PARENT FULL SHA256 197af1844fb1f4e70282288c64577453065f62d7dccab2b262cee64436766227; ZIP CRC PASS. ORIGINAL FE 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112 / BE e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4, unchanged.
+NEW 80 scenario declarations: PPRIV-042..080 (39) and PDRET-001..041 (41). 4,869 unique generated IDs across 94 specs, prior 4,789 all retained; only Privacy Requests old spec intentionally appended; 92 other old specs byte-identical.
+LEDGER 4,909 discovered = 4,869 GENERATED_UNRUN + 39 PDRET-042..080 NOT_STARTED + PLCR-084 NEEDS_EXPECTATION. FEATURE INVENTORY 5,015 incl 164 NOT_BROWSER_TESTABLE. ROUTES 79/137 begun, 58 unstarted incl the original skipped 40.
+NEW PPRIV EXPLICIT SKIPS: PPRIV-072..080; 072 marks native date input/no independent invalid-date feedback; 073..080 require real backend, database, distinct principals, legal/external delivery acceptance.
+PRIVACY DECLARATIONS: Confirm/prompt behavior, verify/status/close mutations, permission redaction, filtered list pagination, stale errors, closure evidence. Source-grounded, synthetic-only.
+RETENTION DECLARATIONS: UI permissions, source completeness, 50-limit paging, URL filters, policy PATCH, confirm/prompt dedicated hold POST, no purge/external deletion inference. Source-grounded, synthetic-only.
+OPEN DISCREPANCIES: PLCR-084, Access Reviews All statuses, Permission Audit malformed response, Compliance Export malformed response, PPRIV-072 date UX. Backend legal-hold atomicity, real tenants, backup deletion, legal and external proof separately required.
+STATIC GATES: parent ZIP CRC, ID regex/ledger reconciliation, 93 prior specs checked (only one intentionally changed), relative imports and ZIP CRC/manifest. All tests remain UNRUN; do not report browser validation.
+NEXT Batch 88 PDRET-042..080, then /platform/tenant-offboarding; do not skip 40 earlier platform routes.

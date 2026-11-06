@@ -1,0 +1,12 @@
+BATCH 53 — 2026-11-03 — PHASE 1 GENERATION ONLY. No tests compiled, executed, or browser-validated.
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_052_FULL.zip SHA256 97242a825b7f2035471ad00cfa148ec69206abac32f5da9ec82358dbe8ab5876 (78 files, CRC PASS; all 2,555 prior test declarations retained byte-for-byte).
+ORIGINAL FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; ORIGINAL BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4 (unchanged read-only sources).
+PAGE: /platform/provisioning (PlatformProvisioningPage.tsx), backend src/routes/platform/provisioning.js and provisioning service.
+NEW: 50 page-owned Playwright cases PPRO-001…050, with 14 newly discovered NOT_STARTED PPRO-051…064. New reusable synthetic provisioning fixture, no live credentials or real writes.
+SOURCE AREAS: published presets and tenant data refresh, URL preset/tenant selection, create permissions and name/admin validation, confirmation cancellation, POST payloads/error/success, preview evidence, lifecycle block, apply options and access gates.
+CUMULATIVE: 2,605 GENERATED_UNRUN / 2,619 currently discovered; 14 NOT_STARTED; 0 tests executed. 60 .spec.ts files. 2,585 page/feature rows including 24 explicit NOT_BROWSER_TESTABLE rows. 50/137 routed pages have dedicated tests; 87 platform routes still have no dedicated suite.
+CAVEAT: Source-defined front-end behavior and synthetic transport assertions only; real DB atomicity, locks, authorization, external proof and account lifecycle not verified. Source has browser confirmation dialogs for both Create and Apply, unlike some other pages. Page inventory provisional.
+NEXT EXACT: Batch 54 PPRO-051…064 (apply success/error, stale/retry and link states), then /platform/provisioning-presets. Do NOT mark /platform/provisioning complete yet. Continue coverage for all remaining 87 platform routes.
+STRICT: No Playwright, npm, TS compiler, live browser, app/backend/DB/CI/deployment, real accounts, customer data or application code modification. All generated statuses stay GENERATED_UNRUN.
+
+Static verification only: unique IDs and full ledger reconciliation, original 2,555 spec test declarations byte-identical, parent/source SHA-256 check, ZIP CRC/member integrity and full/delta diff. No TypeScript compilation or Playwright tests run.

@@ -1,0 +1,11 @@
+BATCH 167 — STATIC SOURCE VERIFICATION (2026-11-06) — NO TEST RUN
+Parent Batch 166 FULL SHA-256: e9a48036cbb3e182fb69217f29253c31b7347bc4138f097ffd858eeb5a2889f4 (matched); CRC PASS.
+Original FE 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112 (matched); BE e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4 (matched); both immutable.
+New TUSR-051..076 (26) in existing page-specific Tenant Users lifecycle spec; synthetic row and error payload overrides only.
+Total 9,408 unique source declarations; 9,051 non-labelled skips unrun, 357 scenario-labelled test.skip; 152 spec files; original router entries 137/137.
+Coverage ledger 9,826 unique IDs, exact equality with GENERATED_UNRUN declaration set; BLOCKED 417, NEEDS_EXPECTATION PLCR-084.
+Feature inventory 10,118 unique IDs, SOURCE_TRACED_PARTIAL 272 unchanged.
+21 in-test unconditional and 3 role-dependent skip guards unchanged.
+All original 9,382 declarations unchanged in source, all earlier spec files except Tenant Users lifecycle byte-identical.
+Source review: 26 anchored FE UI/request expectations compared with route permission and Joi validation; no runtime/backend acceptance claimed.
+No compilation, Playwright discovery/execution, browser, app startup, network API, SQL, cloud production, dependencies, CI, deployment or original source edits.

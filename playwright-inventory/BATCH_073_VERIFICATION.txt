@@ -1,0 +1,13 @@
+INVENTORY PLAYWRIGHT GENERATION — BATCH 073 STATIC VERIFICATION — 2026-11-04
+PHASE 1 ONLY; NO TypeScript compilation, browser, Playwright, npm, application, database, backend, CI or deployment execution.
+Parent B072 FULL SHA256: 16cd2ea468bf1c69b5cd972cdf5b9b2cb1e0b709ba096edd2bc49d643f8b660a
+Original FE source ZIP SHA256: 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112
+Original BE source ZIP SHA256: e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4
+New PIM declarations: PIM-031..PIM-090 = 60 consecutive unique IDs.
+Parent preserved: 79/79 previous .spec.ts files unchanged; 3,709/3,709 previous test IDs preserved.
+Cumulative: 3,769 unique spec IDs = 3,769 GENERATED_UNRUN ledger; 0 NOT_STARTED among inventoried cases.
+Page inventory: 3,803 entries, 92 NOT_BROWSER_TESTABLE; 65/137 routed pages inventoried, 72 unstarted platform pages.
+Total specs: 80. New spec only; no original app code modified.
+Source: PlatformIntegrationMonitoringPage.tsx; PlatformProtectedRoute.tsx; router.tsx; backend integrationMonitoring.js.
+Router permission correction for PIM-071/PIM-080 and notification-cache limitation for PIM-086 recorded.
+NEXT BATCH 74: /platform/legal-compliance-reporting. This is NOT completed whole-app coverage and NOT runnable acceptance proof.

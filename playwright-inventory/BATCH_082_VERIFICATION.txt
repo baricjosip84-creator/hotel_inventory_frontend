@@ -1,0 +1,11 @@
+BATCH 082 — STATIC VERIFICATION ONLY — 2026-11-05
+PHASE 1 restriction: NO npm, TypeScript compilation, Playwright/browser execution, local application/backend/database/worker, CI, deployment or external account requests. No runtime assertions validated.
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_081_FULL.zip SHA256 4a968ec6259fb245b631de6045ac50fd95df83ec961d35de6ea6cf6d5c903b43; parent archive CRC PASS.
+SOURCE: original frontend ZIP SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; backend ZIP SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4 (both unchanged).
+DECLARATIONS: 4,469 distinct test() IDs in 89 spec files; coverage ledger GENERATED_UNRUN set EXACT MATCH; 80 new (PREL-042..080 39; PARV-001..041 41). PREL-001..041 preserved. PARV-042..080 39 NOT_STARTED; PLCR-084 NEEDS_EXPECTATION.
+COUNTS: 4,509 total ledger scenarios (4,469 generated/unrun; 39 pending; 1 mismatch). 4,589 feature inventory rows (138 NOT_BROWSER_TESTABLE). 74/137 routed pages inventoried. 63 routes remain including 40 earlier platform pages.
+SOURCE CHECKS: original PlatformReleasesPage.tsx, PlatformAccessReviewsPage.tsx, router.tsx, platformPermissions.ts, backend releases/accessReviews routes/services and relevant SQL migration filenames inspected read-only.
+BOUNDARIES: Mocked user permissions, request interceptions and client HTML cannot prove real backend authorization, durable PostgreSQL audit or review snapshots, deployment success, rollback or real privilege revocation.
+OPEN: PLCR-084 source selector disabled-on-fetch planned expectation conflicts with original frontend. Access Reviews All statuses option clears URL but empty parsed value defaults to open; note to re-evaluate.
+STATIC GATES: all 4,389 prior scenario IDs retained; all 87 previous spec files intact except append-only releases spec; no files removed; 2 new suite files; 8 prior files modified (seven trackers + releases spec); 89 spec relative import paths resolve to existing files; CRC and SHA archive checks to follow.
+NEXT BATCH 83: PARV-042..080 followed by /platform/permission-audit in actual router sequence. NO test execution until explicitly permitted.

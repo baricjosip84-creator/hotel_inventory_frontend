@@ -1,0 +1,9 @@
+BATCH 117 — STATIC VERIFICATION; STRICT PHASE 1 — 2026-11-05.
+PARENT INVENTORY_PLAYWRIGHT_BATCH_116_FULL.zip SHA256 6e90c497dbf10718f7e33a292a93dc6a8a735eb21373bb33e2b7039d3c779f98; 263 members CRC PASS; all 263 files accounted for; only allowlisted additions/changes.
+ORIGINAL FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112 ORIGINAL BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; original router, UI pages, backend routes/services re-inspected; no changes.
+AUTHORED 70 additional scenario declarations: PPLT-056..070 (15), PCLC-001..055 (55); all 7,086 previous scenario IDs preserved, 7,156 total unique declarations.
+LEDGER rows=7309: 7156 GENERATED_UNRUN, 127 BLOCKED, 25 NOT_STARTED, 1 NEEDS_EXPECTATION (PLCR-084). Feature inventory=7601 rows.
+SPEC files=124, historical skip calls=384 including 360 labelled scenarios. No skips added, no skip counted as executable.
+SOURCE REVIEW: original router Pilot > Certificate > Acceptance Packet. Step 217 Certificate service: exactly 10 evidence domains, 11 required permission checks, 300 tenant review cap, static registry not certification, no mutation. UI selectors and evidence-link mappings verified against source.
+SCOPE: synthetic GET/browser-facing assertions only. 10 blocked pilot cases require independent pilot/operator/customer/real tenant monitoring/signoff; certificate not issued or production ready.
+NO Playwright/TS/npm compilation or execution; no browser, API/backend/SQL/CI, deployment, production or app-source modification.

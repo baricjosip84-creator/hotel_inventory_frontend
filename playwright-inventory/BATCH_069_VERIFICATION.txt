@@ -1,0 +1,14 @@
+BATCH 69 — 2026-11-04 — PHASE 1 GENERATION ONLY; ZERO Playwright/TypeScript/npm/browser/app/backend/DB/CI/deployment execution.
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_068_FULL.zip SHA256 18607ca2916cd31456d9bde80ca68a247ddf10d8a114a3da77635cd3dc033cd6; parent 119-entry CRC PASS.
+ORIGINAL APPLICATION SOURCE ZIPs unchanged: FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4.
+SOURCE: PlatformChangeManagementPage.tsx, frontend router/platform permissions, backend routes/platform/changeManagement.js and services/platformChangeManagementService.js.
+NEW: 70 source-grounded PRCHG-001..070 declarations in tests/platform/change-management/change-management.spec.ts and isolated support/platformChangeManagementFixture.ts.
+CURRENT: 3,499 GENERATED_UNRUN / 3,529 currently discovered; 30 NOT_STARTED PRCHG-071..100. 74 spec files. 62/137 routed pages inventoried; 75 platform pages not started. All 3,429 earlier declarations/73 spec files preserved byte-for-byte.
+PAGE_FUNCTION_INVENTORY: 3,548 rows including 77 explicit NOT_BROWSER_TESTABLE backend/integration duties (five new).
+GROUNDING: change UI uses 50-row server pagination, URL filter strictness, independent summary and list queries, role-scoped tenant/maintenance/runbook/operator evidence, mutable draft and governance transitions, native confirmation dialogs and API failure feedback.
+SOURCE DISCREPANCY: the shared Reason / execution note input uses maxLength=5000, while backend approve/reject/cancel reasonBody validates max 1000; record pending boundary case PRCHG-091, not assumed client-side rejection.
+CAVEAT: synthetic JWT/mock HTTP tests do NOT verify actual backend authorization, reference ownership, separation of approving/executing operators, database transactions, audit durability, external deployment or customer acceptance. All test code UNCOMPILED and UNRUN.
+NEXT BATCH 70: PRCHG-071..100, complete currently inventoried Platform Change Management, then next original router route /platform/api-keys. Preserve all prior tests; keep Phase 1 only.
+SEVEN TRACKERS UPDATED: DEVELOPMENT_PLAN.md; PAGE_FUNCTION_INVENTORY.csv; COVERAGE_LEDGER.csv; PROGRESS.txt; SOURCE_BASELINE.txt; BATCH_CHANGELOG.txt; HANDOFF.txt.
+
+STATIC VERIFIED: parent CRC; SHA256 FE/BE and parent; 73 older spec byte hashes unchanged; 70 new unique scenario IDs; 100 Change Management ledger records; counts, no duplicates; FULL/delta ZIP CRC after assembly. Test runtime/typecheck NOT performed.

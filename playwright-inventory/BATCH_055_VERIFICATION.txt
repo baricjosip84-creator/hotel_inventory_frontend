@@ -1,0 +1,10 @@
+BATCH 55 — 2026-11-04 — PHASE 1 GENERATION ONLY; ALL TESTS UNRUN.
+AUTHORITATIVE PARENT: INVENTORY_PLAYWRIGHT_BATCH_054_FULL.zip SHA256 e909ed5f43f779463fee5989a9edb6276fb6a55d7972e80b905e4913ed1a6398; original 84 archive files CRC verified and all 2,655 pre-existing test IDs, titles and spec paths preserved.
+ORIGINAL SOURCE ZIPs unchanged: FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4.
+NEW: PPSET-037…070 (34) and PTEXP-001…016 (16), total 50 page-owned browser scenario declarations. New synthetic tenant-export fixture; only HTTP UI contract / download event tested when later executed.
+CURRENT: 2,705 GENERATED_UNRUN / 2,749 discovered; 44 NOT_STARTED PTEXP-017…060, 0 executed or compiled, 0 confirmed browser passes, 62 specs, 52/137 routed pages inventoried, 85 unstarted platform routes.
+PAGE STATUS: Provisioning Presets 70/70 provisionally generated; Tenant Exports 16/60 provisionally inventoried. NEXT EXACT BATCH 56: PTEXP-017 onward, then `/platform/tenant-contacts` in router order. Do not skip remaining platform pages.
+SOURCE-DEFINED: Browser confirmation for archive mutation; default full mode, limit 5000, 1..50000 integer constraints; no archive if incomplete preview. Download uses Blob and client-side anchor. No real backend export/audit receipt or database isolation proven.
+NO npm, Playwright, TS compilation, browser/DB/backend/app/CI/deployment/live accounts/real writes; application source archives read-only.
+
+STATIC CHECKS: ZIP integrity, SHA256, 2705 unique test IDs, all old declarations preserved, exact status parity with ledger, 44 outstanding, 2721 feature inventory rows. No runtime checks performed.

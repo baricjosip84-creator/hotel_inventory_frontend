@@ -1,0 +1,24 @@
+INVENTORY PLAYWRIGHT BATCH 175 — STATIC VERIFICATION REPORT
+Date: 2026-11-06
+Parent FULL SHA256: 00b796e9c459ae28ad3458d5e4614b76e2cf67b345ebbdd9bfcb0de06b219e41
+Original immutable frontend ZIP SHA256: 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112
+Original immutable backend ZIP SHA256: e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4
+
+STATIC CHECKS (NOT PLAYWRIGHT TEST EXECUTION)
+- Parent ZIP CRC: PASS
+- Parent file preservation: PASS, 483/483 entries retained by exact content unless intentionally modified
+- Modified files: 8 (existing one page spec + all seven cumulative tracking files)
+- Added files: 7 (4 source review/readiness reports + 3 internal release records)
+- All 151 other spec files: BYTE-FOR-BYTE UNCHANGED
+- Previous 9,584 scenario IDs: PRESERVED
+- New IDs: TSTR-051 through TSTR-080, 30 unique identifiers
+- Authored declarations: 9,614; uniqueness PASS
+- Labelled skips: 357, unchanged
+- Additional in-test skip calls: 21 unconditional, 3 permission-conditional, unchanged (not re-executed)
+- Coverage ledger: 10,032 records, unique IDs; generated=9,614; blocked=417; needs expectation=1
+- Feature inventory: 10,324 unique IDs; partial=272, unchanged
+- Original route inventory: 137/137 as previously recorded, no new original routes claimed
+- New scenario source anchors: frontend/src/pages/StockTransfersPage.tsx, backend/src/routes/stockTransfers.js checked
+- No browser/Playwright test discovery, compilation or execution; NO real backend/DB acceptance performed
+
+No app/frontend/backend code changed. Static checks do not prove that authored scenarios pass in a browser.

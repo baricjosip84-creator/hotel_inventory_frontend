@@ -1,0 +1,10 @@
+BATCH 146 STATIC VERIFICATION — 2026-11-05 — PHASE 1 ONLY
+PARENT INVENTORY_PLAYWRIGHT_BATCH_145_FULL.zip SHA256 05859f2b5de6eff1ba1d594b0e7171839b429a4041997ea00336d7ed42082b44, 350 members CRC PASS; unrelated parent bytes preserved.
+ORIGINAL FE 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BE e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; unchanged.
+NEW PRRCR-056..070 = 15 source-backed intercepted-GET UI declarations. PRRCR-071..080 = 10 EXTERNAL-EVIDENCE BLOCKED (NOT AUTHORED).
+ALL 9,116 prior scenario IDs preserved; 9,131 authored IDs total, 152 specs; 0 new test.skip; 360 historical scenario-labelled test.skip remain non-executable; 24 conditional test.skip calls distinct.
+LEDGER rows=9549 GENERATED_UNRUN=9131 BLOCKED=417 NEEDS_EXPECTATION=1 NOT_STARTED=0 (do NOT infer coverage complete). FEATURE INVENTORY rows=9841 NOT_BROWSER_TESTABLE=350.
+PRELIMINARY SKIP AUDIT 384 calls in 24 spec files, including 360 scenario-labelled skips, stored in PHASE1_DEFERRED_SCENARIO_AUDIT_B146.csv; report PHASE1_GAP_REVIEW_B146.md.
+ORG ROUTE INVENTORY 137/137; does NOT imply total browser coverage. Unresolved PLCR-084, PPER-062, PPRIV-072, PNOT-061, PLEN-059/060 and older external source defects maintained.
+STATIC CHECKS: parent CRC/hash, original source contracts, import path presence, scenario-ID uniqueness, cumulative ledger parity, full/changed ZIP CRC and byte exact diff, audit counts and route presence.
+NO TypeScript compile, Playwright runner, browser, npm, original application/API/DB/CI/provider/production, actual external archive or real owner certification or deployment.

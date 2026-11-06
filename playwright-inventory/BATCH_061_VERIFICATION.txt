@@ -1,0 +1,10 @@
+BATCH 61 — 2026-11-04 — PHASE 1 GENERATION ONLY; ZERO tests executed, compiled or browser-verified.
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_060_FULL.zip SHA256 075d8a7107ffc2e60b6ce2b6e3b2ef97a4f00e224f781100d4e98e88d86b00be; ZIP CRC PASS; unchanged original frontend 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112, backend e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4.
+NEW: PTTASK-001…050 (50 page-owned scenarios) and isolated support/tenantTasksFixture.ts for /platform/tenant-tasks. 25 additional source-identified scenarios PTTASK-051…075 are NOT_STARTED and 5 non-browser obligations are recorded separately.
+CURRENT: 2,999 GENERATED_UNRUN / 3,024 discovered; 25 NOT_STARTED; 67 .spec.ts files; 3,013 page/feature inventory rows including 47 NOT_BROWSER_TESTABLE; 56/137 routes inventoried (46 tenant + 10 platform); 81 platform routes with no dedicated suite.
+SCOPE: URL filter guards, 100-row paging and global summary, permissions and operator identity redaction, task create/edit synthetic readback, explicit confirmation for complete/permanent delete, initial list error/retry.
+LIMIT: Synthetic browser behavior does NOT prove platform ACL, actual persistent DB changes, tenant isolation, customer completion, audit event durability or cross-surface readiness.
+NEXT EXACT BATCH 62: Complete PTTASK-051…075 in tests/platform/tenant-tasks/tenant-tasks.spec.ts, covering initial/stale selector/summary/users errors, pending/pagination edge cases, edit/assignment edge cases, request conflicts and scoped links; then continue the actual next router page /platform/tenant-timeline.
+STRICT: No npm, TypeScript compilation, Playwright/browser/test execution, frontend/backend app/DB/CI/deployment, or real accounts/tenants. Every generated ID remains GENERATED_UNRUN.
+
+STATIC VERIFICATION: Parent archive and source ZIP SHA256 checked; unique scenario IDs/ledger, 66 prior spec bytes, cumulative vs changed-file ZIP manifest to be checked separately. No runtime execution.

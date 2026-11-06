@@ -1,0 +1,14 @@
+BATCH 066 — STATIC SOURCE AND ZIP VERIFICATION (2026-11-04) — PHASE 1 ONLY
+Parent cumulative B65 SHA256: 3041ab9a9717c69116126d1c1d794a94b542da1728e182eef376460478d392c9
+Original frontend SHA256: 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112
+Original backend SHA256: e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4
+B65 parent ZIP CRC: PASS
+Previous scenario declarations preserved: 3244 / 3244
+New test declarations: 65 (PSLA-016..PSLA-080)
+Current generated scenario IDs: 3309 unique
+COVERAGE_LEDGER.csv: 3309 GENERATED_UNRUN, 0 NOT_STARTED
+PAGE_FUNCTION_INVENTORY.csv: 3318 records; 67 NOT_BROWSER_TESTABLE
+Spec files: 71, same count as parent (only SLA spec extended)
+Original FE/BE files unchanged
+No application code changed; no Playwright/npm/tsc/browser/DB/CI/deployment runs.
+NEXT: Batch 67 /platform/runbooks

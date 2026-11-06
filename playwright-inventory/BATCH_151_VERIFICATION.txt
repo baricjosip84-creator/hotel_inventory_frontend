@@ -1,0 +1,12 @@
+BATCH 151 — STRICT STATIC VERIFICATION
+BATCH 151 — 2026-11-06 — PHASE 1 STATIC SOURCE AUTHORING ONLY
+AUTHORITATIVE PARENT: INVENTORY_PLAYWRIGHT_BATCH_150_FULL.zip SHA256 3e98b260de324548a0a3c996d7850e1a477a02f3b24874abbb498aaae2b470cc CRC PASS.
+Original frontend SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; original backend SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; neither modified.
+NEW: 12 browser declarations PCLR-081–086 + PCRVP-081–086; CONVERTED 2 historic skip placeholders to source-supported route-guard browser assertions PCLR-042 and PCRVP-042; all 9,221 old GENERATED_UNRUN scenario IDs preserved.
+9,233 GENERATED_UNRUN (357 labelled test.skip); 417 BLOCKED; 1 NEEDS_EXPECTATION PLCR-084; 0 NOT_STARTED; 9,651 ledger rows. 9,943 feature rows (350 NOT_BROWSER_TESTABLE); 152 specs, 137/137 router entries inventoried.
+SKIP AUDIT: 357 label skips + 24 conditional calls = 381; all still unexecuted. Categorization is heuristic and NOT signed-off.
+PHASE 1 COMPLETION READINESS: NOT READY. Real-world evidence, source hardening, skip decisions, one conflict, and Phase 2 run/compile still open.
+NEXT B152: manually review high-impact unresolved source/skip candidates, preserve scope and no artificial coverage counts. No original app modifications.
+PROHIBITED: npm, Node, TS compilation, Playwright, browser/app/backend/SQL/API/CI execution, network production access or deployment.
+
+STATIC: test source ID count 9,233 (unique); coverage ledger 9,651 (9,233 GENERATED_UNRUN/417 BLOCKED/1 NEEDS_EXPECTATION), feature ledger 9,943, 152 specs, skip calls 381. Parent file preservation and ZIP CRC verified separately. No runtime verification performed.

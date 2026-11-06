@@ -1,0 +1,12 @@
+BATCH 149 — STATIC SOURCE VERIFICATION (2026-11-06)
+PARENT FULL: INVENTORY_PLAYWRIGHT_BATCH_148_FULL.zip
+PARENT SHA256: 6425ec4f9a25733fe568dccd93fec80a73a2ce232aae4872899a9b15b6354670 (verified)
+ORIGINAL FE SHA256: 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112 (read-only)
+ORIGINAL BE SHA256: e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4 (read-only)
+NEW TEST DECLARATIONS: 21 PPAUD-081..087, PAUD-081..087, PUSR-081..087
+LEDGER: 9200 GENERATED_UNRUN; 417 BLOCKED; 1 NEEDS_EXPECTATION; 0 NOT_STARTED; TOTAL 9618.
+FEATURE INVENTORY: 9910; 350 NOT_BROWSER_TESTABLE.
+HISTORICAL SKIP AUDIT: 383 calls = 359 labelled skips + 24 conditional skips. All preserved.
+SPEC FILES: 152; ORIGINAL ROUTES INVENTORIED: 137/137.
+STRICT PHASE 1: no Playwright/TypeScript/npm, no browser, no application/backend/API/SQL/CI/deployment; assertions are not verified runtime results.
+NEXT BATCH 150: review remaining skipped/security/pagination/permission source defects; PLCR-084 and malformed responses stay unresolved.

@@ -1,0 +1,14 @@
+BATCH 112 — STATIC VERIFICATION REPORT — 2026-11-05
+Strict Phase 1: no tests compiled, run or browser-validated, no app/backend/SQL/cloud/CI executed.
+Verified parent archive SHA256: 7a216b41ba8858421ea5bf6fb75224fe7f78d41bc65a7bca9e4977296f44116d
+Original frontend ZIP SHA256: 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112
+Original backend ZIP SHA256: e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4
+Parent entries: 248; previous test declarations 6750, preserved IDs 6750.
+New scenario declarations 57 (7 PSOC and 50 PPMR); total unique scenario declarations 6807; total distinct specs 119.
+Ledger rows 6909 = GENERATED_UNRUN 6807 + BLOCKED 71 + NOT_STARTED 30 + NEEDS_EXPECTATION 1.
+PSOC 57/80 generated with 23 blocked; PPMR 50/80 generated, 30 NOT_STARTED.
+Page inventory 104/137, feature rows 7201. No existing scenario declaration ID lost; no duplicate IDs.
+Existing baseline skipped scenario IDs: 360; total test.skip call sites 384; none new. Skips are NOT runnable evidence.
+Original code untouched. 0 test executions, 0 TypeScript/npm compilations, 0 browser sessions, 0 backend/DB/SQL or CI operations.
+Source-based UI fixture cannot independently establish backend validation, SQL control computation, real alert delivery, two-principal tenant isolation or customer sign-off.
+Static archive member comparison: all parent members unchanged except intentional tracker and PSOC spec modifications; two new TS files and this report.

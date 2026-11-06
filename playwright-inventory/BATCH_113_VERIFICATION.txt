@@ -1,0 +1,12 @@
+BATCH 113 — STATIC VERIFICATION — 2026-11-05 — NO TEST RUN/COMPILE.
+Verified parent FULL: INVENTORY_PLAYWRIGHT_BATCH_112_FULL.zip SHA256 12d87ff7de6396e15bfce66b756e7525f54bb7aeaf6fd786f2818d0ceae9dc02; parent archive CRC PASS.
+Original FE ZIP SHA256: 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112
+Original BE ZIP SHA256: e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4
+Parent files preserved: 251. New declarations: 68 = 18 PPMR-051..068 + 50 PBRV-001..050; all 6807 old IDs preserved.
+Cumulative unique scenario declarations: 6875. Spec files: 120. Ledger entries: 6989 = 6875 GENERATED_UNRUN + 83 BLOCKED + 30 NOT_STARTED + 1 NEEDS_EXPECTATION.
+Production Monitoring: 68/80 authored; 12/80 blocked with source references. Backup Restore: 50/80 authored; 30/80 NOT_STARTED.
+Routes inventoried: 105/137 (32 unstarted). Feature inventory rows: 7281.
+Original 360 scenario-labelled skipped declarations preserved; 384 total test.skip call sites; 0 new skip declarations.
+New spec import paths checked by static filesystem reading. Frontend selectors and backend route permission names cross-checked against original source.
+All parent archive files preserved byte-for-byte unless among seven tracker updates or PPMR spec. New backup spec, fixture, and this verification file.
+No Playwright runs, npm install/build/test, TypeScript compile or test discovery, browser/app/backend/SQL/CI/external/deployment performed. Fixture is not independent proof of server or production recovery.

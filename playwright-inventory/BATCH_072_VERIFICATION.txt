@@ -1,0 +1,12 @@
+INVENTORY PLAYWRIGHT GENERATION — BATCH 072 STATIC VERIFICATION — 2026-11-04
+NO Playwright run, no TypeScript compile, no npm, browser, backend, database, CI or live use.
+Parent B071 FULL SHA256 570889caa625ea1b5d9ab84248f09cb97c0da4d4aaabefc43b45ceba6acbd8e0
+Original FE ZIP SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112
+Original BE ZIP SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4
+Preservation: 77/77 previous spec files byte-for-byte intact and 3639/3639 prior generated IDs still present.
+New tests: 40 PACG-031..070 and 30 PIM-001..030; 3709 IDs unique = 3709 ledger GENERATED_UNRUN.
+Pending: 60 PIM-031..090 NOT_STARTED; 3769 ledger records; 79 spec files; 65/137 pages inventoried.
+Page-feature ledger: 3803 rows, 92 NOT_BROWSER_TESTABLE obligations.
+New source files: PlatformApiClientGovernancePage.tsx, PlatformIntegrationMonitoringPage.tsx, API governance and monitoring backend routes.
+No source application code changed, synthetic responses are not real verification.
+Next B073: PIM-031..090.

@@ -1,0 +1,9 @@
+B154 — STATIC SOURCE INSPECTION/ARCHIVE RECONCILIATION (NOT TEST EXECUTION)
+BATCH 154 — 2026-11-06 — PHASE 1 STATIC AUTHORING ONLY
+Parent: B153 FULL SHA256 609703b92f24751e20ff1eb16a1d37e1fe5a7a468bd1db1e16935429065e138b
+Original FE sha256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BE sha256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4 immutable.
+6 new browser-source declarations PCLR-087/088 PARET-081/082 PTOFF-081/082; 62 skipped cases source-reviewed and classified; 0 unskipped, 0 test executions.
+Authoring: 9253 unique IDs; 357 labelled skips; 24 conditional skips; 417 BLOCKED; 1 NEEDS_EXPECTATION PLCR-084; ledger 9671; features 9963; 152 spec files; 137/137 original routes inventoried.
+No npm, Playwright, TypeScript compilation, browser, backend, SQL, CI, live production, original app modifications or deployment.
+Next Batch 155: continue remaining heuristic skip-source review, ensure no unsupported coverage promotion; review other high-value domain gaps.
+Unique scenario IDs=9253; non-skipped=8896; labelled skips=357; conditional skips=24; 62 source-backed reviews.

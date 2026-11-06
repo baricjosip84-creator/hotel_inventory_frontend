@@ -1,0 +1,9 @@
+BATCH 128 STATIC SOURCE VERIFICATION — 2026-11-05 — NO COMPILE, TEST OR APP RUN.
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_127_FULL.zip SHA256 01c737df9fef339b6ac8f2fac4b050dd93dae50a95aa5563259bdc099a902af3, 296 members CRC PASS, unchanged unrelated parent bytes.
+ORIGINAL FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; Step 228 eight domain requirements, four controls per domain, 4-5 evidence fields, 12 grants, router and FE selectors reviewed.
+NEW IDs: 15 PCEHO-056..070 + 55 PCAGA-001..055; previous 7,856 preserved; no new skips.
+LEDGER 8189: GENERATED_UNRUN=7926, BLOCKED=237, NOT_STARTED=25, NEEDS_EXPECTATION=1 PLCR-084; INVENTORY 8481; SPECS 135.
+HISTORICAL NONEXECUTABLE SKIPS: 360 labelled test.skip and 384 total skip sites. No tests passed claim.
+PCEHO-071..080 BLOCKED: real health/authorization/rollout signoff, provider and customer proof. PCAGA-056..080 reserved NOT_STARTED.
+STATIC CHECKED: ZIP CRC, original source/router, 12 permissions, fixture-relative imports, unique scenario IDs, parent preservation, seven cumulative tracking files.
+NOT RUN: npm, TS compilation, Playwright runner/discovery, browser, frontend/backend/app, live API, provider, database, CI, production, deployments or authorization decisions.

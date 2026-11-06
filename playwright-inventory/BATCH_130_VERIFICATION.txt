@@ -1,0 +1,9 @@
+BATCH 130 STATIC SOURCE VERIFICATION — 2026-11-05 — NO COMPILATION OR EXECUTION.
+PARENT INVENTORY_PLAYWRIGHT_BATCH_129_FULL.zip, SHA256 17aa4a654f45cb3823abd89198aa1a37367feabc58ef2e56291954a5b9656b2d, 302 members, CRC PASS, all unrelated parent files byte-for-byte unchanged.
+ORIGINAL FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112, BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; original Step 230 8 domains, 4 controls/4 evidence each, 12 platform grants, router and displayed React classes inspected.
+NEW IDs 15 PCAGO-056..070 + 55 PSST-001..055; prior 7,996 intact; no new test.skip.
+LEDGER 8349 GENERATED_UNRUN=8066 BLOCKED=257 NOT_STARTED=25 NEEDS_EXPECTATION=1 PLCR-084; INVENTORY 8641; SPEC FILES 137.
+HISTORICAL SKIPS: 360 scenario-labelled test.skip sites and 384 total skip sites. These are not runnable/passing coverage.
+PCAGO-071..080 blocked pending external live monitoring/customer/owner/rollout confirmation. PSST-056..080 reserved NOT_STARTED. Synthetic waiting test is presentation only; not proof of upstream service reachability.
+STATIC CHECKS: ZIP CRC, original router/FE/BE, 12 permission middleware checks, source UI selectors, fixture relative imports, unique scenario IDs, parent byte preservation, all seven cumulative trackers.
+NOT RUN: npm, TypeScript, Playwright test discovery/runner, browser, frontend/backend/app/API/DB/CI/provider/production, actual acceptance or deployment.

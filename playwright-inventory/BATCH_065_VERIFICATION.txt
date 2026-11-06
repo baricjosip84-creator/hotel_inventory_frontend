@@ -1,0 +1,19 @@
+BATCH 065 — SOURCE/STATIC PACKAGE VERIFICATION ONLY (2026-11-04)
+Parent FULL: INVENTORY_PLAYWRIGHT_BATCH_064_FULL.zip
+Parent SHA256: a5baa2b2aa9e164cf7e5b3c1ab7700fda9fa051c52f1d6743c200f2a5eaf56ff
+Parent integrity: ZIP CRC PASS
+Frontend original SHA256: 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112
+Backend original SHA256: e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4
+Previous declarations: 3174 unique IDs preserved
+Current declarations: 3244 unique IDs
+New declarations: 70 = PTLIFE-016..070 + PSLA-001..015
+Existing spec files: 70; unchanged other than append-only Lifecycle spec: 69
+New spec files: 1; total 71
+COVERAGE_LEDGER.csv: 3309 discovered rows, 3244 GENERATED_UNRUN, 65 NOT_STARTED
+PAGE_FUNCTION_INVENTORY.csv: 3318 records including 67 NOT_BROWSER_TESTABLE duties
+Routes under detailed inventory: 60/137; platform routes untouched 77
+Source: actual PlatformTenantLifecyclePage.tsx, PlatformTenantSlaPage.tsx, platform tenant lifecycle/SLA backend routes and services.
+Phase 1 ONLY: No TypeScript compilation, npm, browser, Playwright, backend/DB, production, CI, or deployment.
+Static tests are NOT execution evidence. No scenario is marked PASS.
+Phase 2 risk: PTLIFE-067 may meet previously recorded platform guard redirect loop; needs authorized browser check.
+Next Batch 66: PSLA-016..080, then next actual platform route.

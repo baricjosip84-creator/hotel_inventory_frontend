@@ -1,0 +1,9 @@
+BATCH 131 STATIC SOURCE VERIFICATION — 2026-11-05 — NO COMPILATION OR EXECUTION.
+PARENT INVENTORY_PLAYWRIGHT_BATCH_130_FULL.zip, SHA256 124a4040eed47398a514abddd21b6dc0fda1ac74c9c1f7554d1d762d93ac6000, 305 members, CRC PASS; all unrelated parent bytes unchanged.
+ORIGINAL FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; original Step 231 nine domains, 4 evidence fields/3 controls, 12 permission middleware, router, UI classes inspected.
+NEW IDs 15 PSST-056..070 plus 55 PSSOC-001..055; all prior 8,066 preserved; no new test.skip.
+LEDGER 8429 GENERATED_UNRUN=8136 BLOCKED=267 NOT_STARTED=25 NEEDS_EXPECTATION=1 PLCR-084; INVENTORY 8721; SPEC FILES 138.
+HISTORICAL SKIPS: 360 scenario-labelled and 384 total skip calls. Skips are not runnable/passing coverage.
+PSST-071..080 blocked for external owner/operations/production acceptance. PSSOC-056..080 reserved NOT_STARTED. Synthetic waiting variant tests presentation only, not proof of backend reachability.
+STATIC CHECKS: ZIP CRC, original router FE/BE, permission middleware, UI selectors, relative fixture imports, unique IDs, parent byte preservation, seven cumulative trackers.
+NOT RUN: npm, TypeScript, Playwright test discovery/runner, browser, frontend/backend/app/API/DB/CI/provider/production, actual owner acceptance or deployment.

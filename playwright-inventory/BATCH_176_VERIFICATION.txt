@@ -1,0 +1,6 @@
+BATCH 176 PHASE 1 STATIC VERIFICATION
+Parent source SHA256 verified; original FE/BE ZIP SHA256 verified; source archives not edited.
+20 new TST-051..TST-070 declarations, all 9614 prior declarations preserved; 152 spec files.
+9634 authored, 357 labelled skips, 10052 unique ledger IDs (9634 GENERATED_UNRUN + 417 BLOCKED + PLCR-084), 10344 unique feature records (272 partials).
+Original 137 router entries inventoried from previous tracking; not re-verified by running router.
+Test compilation, discovery, execution, browser, app, live API, DB, CI and deploy NOT PERFORMED.

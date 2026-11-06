@@ -1,0 +1,11 @@
+BATCH 085 — STATIC VERIFICATION ONLY — 2026-11-05
+PHASE 1: NO Playwright/browser tests, TypeScript compilation, npm, application, backend, PostgreSQL, CI, deployment, external system or authenticated acceptance executed.
+PARENT FULL SHA256 12c44703176f84863a9aca157d5788b2c5dc0a9106db107a4d751cdafc66372c, ZIP CRC PASS. ORIGINAL FE 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112 / ORIGINAL BE e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4, unchanged.
+NEW 80 declarations: PCDOC-042..080 = 39, PCEXP-001..041 = 41. 4,709 unique generated IDs across 92 specs; previous 4,629 IDs retained and 90 unaffected specs byte-identical.
+LEDGER: 4,749 discovered = 4,709 GENERATED_UNRUN + 39 PCEXP-042..080 NOT_STARTED + PLCR-084 NEEDS_EXPECTATION. PAGE INVENTORY: 4,844 rows, 153 NOT_BROWSER_TESTABLE, 77/137 inventoried routes, 60 unstarted incl 40 prior missed routes.
+SKIPS PCDOC-045,076,077,078,079,080 pending actual principal/SQL/external acceptance (in addition to prior PPAUD skips). These are written, not runnable passing tests.
+SOURCE REVIEWED original Frontend PlatformComplianceDocumentsPage.tsx / PlatformComplianceExportPage.tsx / router/permissions; Backend complianceDocuments.js, platformComplianceDocumentsService.js, complianceExport.js, platformComplianceExportPackageService.js.
+SOURCE BOUNDARY compliance export is read-only application evidence; mocked route intercepts do NOT establish legal efficacy, certified package output, recipient delivery, source RBAC or real PostgreSQL transaction/tenant isolation.
+OPEN PLCR-084 source contradiction, Access Reviews All statuses fallback, malformed Permission Audit response guard; retain Phase 2 backend/multi-tenant obligations.
+STATIC GATES: all spec imports resolve, 92 specs, zero duplicate scenario IDs, ledger exactly matches generated declarations, all previous IDs unchanged, ZIP CRC and byte-for-byte archive verification. No test compiled or run.
+NEXT Batch 86 PCEXP-042..080 then /platform/privacy-requests; do not overlook 40 prior missed routes.

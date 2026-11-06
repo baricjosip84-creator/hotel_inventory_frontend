@@ -1,0 +1,12 @@
+BATCH 096 — SOURCE-TRACED STATIC VERIFICATION (2026-11-05)
+STRICT PHASE 1: ZERO tests compiled or executed. No Playwright/npm/TypeScript/compiler/browser/API/backend/DB/CI/external/deployment execution.
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_095_FULL.zip SHA256 26c4aaaf9f48fef9e08336cf2f1e18612c2e2559bd5340cb9e2aab7b9154fae1
+SOURCE: original frontend ZIP SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; backend ZIP SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4.
+NEW: PUSR-042..080 (39) + PPER-001..041 (41). PUSR 80/80; PPER 41/80 with 042..080 reserved.
+EXPLICIT Phase 2 SKIPS: PUSR-070..080 (11); PPER-040..041 (2). Existing skips untouched.
+CUMULATIVE: 5,589 generated IDs of 5,629 discovered; NOT_STARTED PPER-042..080 only; NEEDS_EXPECTATION PLCR-084 only; 103 spec files; 88/137 route inventory; 5,807 feature inventory entries, 236 NOT_BROWSER_TESTABLE.
+SYNTHETIC LIMIT: no real authorization, credential hashes, session revocation, database policy persistence or external authority/evidence is proven by intercepted UI tests.
+NEW SOURCE DISCREPANCY: caller lacking platform.role_permissions.write still sees role.editable-driven UI controls; backend endpoint protects mutation. Not falsely marked UI PASS.
+OTHER OPEN: Access Reviews All statuses; malformed response handling; PPRIV-072; backend announcement cancellation normalization; all historical Phase 2 cases.
+NEXT BATCH 97: PPER-042..080 then check /platform/sessions for existing coverage; historical 40 routes still to inspect.
+All validations performed statically with Python/text/ZIP only; no TypeScript or Playwright build/test.

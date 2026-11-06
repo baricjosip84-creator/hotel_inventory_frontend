@@ -1,0 +1,9 @@
+BATCH 136 STATIC SOURCE VERIFICATION — 2026-11-05 — NO COMPILATION OR EXECUTION.
+PARENT INVENTORY_PLAYWRIGHT_BATCH_135_FULL.zip, SHA256 e53a6866edec70fe8819f3b8e4a083ceb036c75e09ce78b41c500e10c6eabf0b, 320 members, CRC PASS. All unrelated parent files preserved byte-for-byte.
+ORIGINAL FRONTEND SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BACKEND SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4. Step 236 original backend nine domains, four external fields/three controls, 12 required guards; original React seven stats, nine upstream posture links, ten persistence boundaries and router inspected.
+NEW IDS PSRR-056..070 (15); PSRV-001..055 (55). All 8,416 old authored IDs preserved; no new test.skip.
+LEDGER 8829 GENERATED_UNRUN=8486 BLOCKED=317 NOT_STARTED=25 NEEDS_EXPECTATION=1 PLCR-084; INVENTORY 9121; SPEC FILES 143.
+HISTORICAL SKIPS 360 ID-labelled / 384 total skip calls — NOT executable or passing browser coverage.
+PSRR-071..080 blocked for real recurrence resolution and owner evidence. PSRV-056..080 reserved NOT_STARTED. Mocked GET tests assess presentation only, NOT actual resolution verification or certification.
+STATIC CHECKS: parent ZIP CRC, source router/backend/frontend, selectors, fixture imports, ID uniqueness, ledger parity, byte-preserved parent files, ZIP CRC and SHA256.
+NOT RUN: npm, TypeScript, Playwright runner/discovery, browsers, backend/frontend/app/API/DB/CI, provider, production, recurrence retests, signoff or deployment.

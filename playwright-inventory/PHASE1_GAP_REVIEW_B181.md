@@ -1,0 +1,9 @@
+# Batch 181 — Operations Feed static-source gaps (not runtime acceptance)
+
+- Added 35 scenarios for text fallback and precedence, recommendation/guidance fallback, searchable event metadata, updated-vs-observed timestamps, malformed timestamps, status and urgency presentation, payload redaction, delivery attempt grammar, source-url safety guards, and legacy alias routing.
+- **Potential source UX inconsistency:** the time filter correctly uses `Math.max(observed_at, updated_at)` and discards invalid times, but the *Observed* badge uses `observed_at || updated_at`, which can show an old or malformed observed timestamp even when a newer updated timestamp was the basis for inclusion. Confirm desired semantics with product owner before asserting timestamp freshness of displayed badge.
+- **Source security limitation:** `sourceSurfaceToAppPath` rejects fragments, CR/LF, absolute/protocol-relative paths, backslashes, overly long values and routes outside an allowlist. These are frontend defenses for synthetic fixture URLs; they do not establish backend origin verification or guarantee that destination pages enforce permissions.
+- **Translation assumption:** English labels and messages in these source-traced declarations depend on the existing default tenant test locale; bilingual label correctness has not been exercised.
+- **Fixture/data warning:** synthetic event fields and malformed backend shapes are branch probes; the backend may never emit some combinations. The right semantics require actual integration and product acceptance during Phase 2.
+- **Outstanding unchanged:** 417 BLOCKED obligations, 272 SOURCE_TRACED_PARTIAL features, PLCR-084 unresolved, 357 labelled skips, 21 unconditional + 3 permission-dependent supplemental in-test skips. Source tracing does not close them.
+- **Not performed:** TS/Playwright compile, test discovery/execution, browser, backend, API, real DB, CI, deployment, role/tenant isolation acceptance.

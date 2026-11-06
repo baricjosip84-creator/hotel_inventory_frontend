@@ -1,0 +1,10 @@
+BATCH 150 — STATIC SOURCE & PACKAGE VERIFICATION (2026-11-06)
+Parent: INVENTORY_PLAYWRIGHT_BATCH_149_FULL.zip; SHA256 827ebac4a8ed480f96341f24eed2af4f8d952e1c85c1a4595aaf6cd876eca3e8 VERIFIED; CRC PASS.
+Original frontend SHA256: 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112 VERIFIED; read-only.
+Original backend SHA256: e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4 VERIFIED; read-only.
+Authoring: 21 unique non-skipped scenarios (PLCR 6, PCEXP 6, PPAUD 5, PAUD 4). All 9,200 old generated IDs preserved.
+Ledger total 9,639: 9,221 GENERATED_UNRUN; 417 BLOCKED; 1 NEEDS_EXPECTATION PLCR-084; 0 NOT_STARTED.
+Features 9,931 (350 NOT_BROWSER_TESTABLE); 152 spec files; 137/137 original router entries inventoried.
+359 historical ID-labelled `test.skip`; 24 conditional `test.skip`; 383 skip calls; 0 Playwright runs/compilations.
+Original application ZIPs unchanged; PLCR-084 remains unresolved and explicitly documented, no false test.
+New tests are authored synthetic code, not verified successful at runtime. Phase 1 only.

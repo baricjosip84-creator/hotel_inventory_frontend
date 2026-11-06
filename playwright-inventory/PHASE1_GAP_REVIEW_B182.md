@@ -1,0 +1,8 @@
+# Batch 182 — Reliability Command source review and remaining gaps (not runtime acceptance)
+
+- **New source-traced coverage:** 30 fixture-driven scenarios for boolean/decimal/canonical/empty evidence, dimension and risk fallbacks, stage guidance and item count, explicit zero, safety flags, label/code formatting, and trusted source-link labels.
+- **App-source inconsistency / acceptance question:** the generated manual-review stage opens by default only when the first stage has a truthy `item_count`, even if the `items` array is populated. The visible count itself prioritizes explicit `item_count` over `items.length`. Source-contract owners should decide whether a mismatched `item_count: 0, items:[...]` should remain closed and show 0 or be reconciled. TRC-079 documents current observed source behavior; it is not product acceptance.
+- **Data-contract note:** synthetic malformed and incomplete backend fields exercise frontend fallback branches; these states may not be emitted in valid backend responses. They do not constitute a verified backend contract.
+- **Reliability safety:** a displayed `Yes`/`No` or source link is only frontend presentation from mocked GET JSON and is *not* evidence of non-mutation, security, source workflow permission acceptance, or deployment safety.
+- **Other open:** 417 BLOCKED, 272 SOURCE_TRACED_PARTIAL, PLCR-084; 357 labelled skips and 21 unconditional + 3 permission-dependent in-test skips. These remain unchanged.
+- **Not performed:** TypeScript/Playwright compilation, discovery/execution, real browser, API/backend, database, actual tenant permissions/tenant isolation, CI, deployment, production readiness or original app changes.

@@ -1,0 +1,8 @@
+INVENTORY PLAYWRIGHT BATCH 172 — STATIC VERIFICATION
+Verified parent: `25f7f4f488612da859f16ba26d18d31b57861f7a94f0ce4c318986f3cef231b2`
+Verified immutable frontend: `864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112`
+Verified immutable backend: `e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4`
+22 unique TSUP-049..070 scenarios added to existing Suppliers spec; 9,507 parent declarations preserved.
+9,529 authored, 9,172 active unrun, 357 labelled skips; ledger 9,947 and inventory 10,239; 152 specs.
+417 BLOCKED; 272 PARTIAL; PLCR-084 unresolved. No statuses changed.
+NO TypeScript compilation, Playwright discovery/execution, browser, DB, real APIs, installation or deploy.

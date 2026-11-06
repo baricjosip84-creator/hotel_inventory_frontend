@@ -1,0 +1,6 @@
+INVENTORY PLAYWRIGHT BATCH 175 — CHANGELOG
+Date: 2026-11-06
+Parent: Batch 174 FULL (00b796e9c459ae28ad3458d5e4614b76e2cf67b345ebbdd9bfcb0de06b219e41)
+
+Added 30 Tenant Stock Transfers scenarios TSTR-051 through TSTR-080 to existing spec. Extended existing synthetic fixture for source location eligibility/options failures and export failure. All 9,584 prior declarations and IDs preserved; seven cumulative tracking records updated. Four source/acceptance review reports added.
+No original FE/BE source was modified; no compile or run performed. All 417 blockers and PLCR-084 remain open.

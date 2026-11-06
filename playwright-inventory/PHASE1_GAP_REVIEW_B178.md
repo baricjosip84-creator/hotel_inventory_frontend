@@ -1,0 +1,9 @@
+# Batch 178 — Source gaps and Phase 1 caveats
+
+- **Distinct source-backed coverage:** Additional Purchase Orders registry parsing, fallback sorting, numeric/list aggregation, priority attention, URL filter chips, preset clearing, and pagination reset behavior. No writes or backend filtering are established by the intercept fixtures.
+- **Unknown supplier filter deep link:** `filters.supplierId` may hold a historical ID not present in current supplier dropdown options. The chip safely displays the raw ID (`PurchaseOrdersPage.tsx:1280`), but HTML `<select>` only renders known options (`PurchaseOrdersPage.tsx:2515`); UI reconciliation needs later runtime/product acceptance. `TPO-075` asserts chip + URL only, not unsupported select value.
+- **Attention shortcut inconsistency:** `summary.openReceiving` counts both `receive_open_shipment` and `finalize_open_shipment` (`PurchaseOrdersPage.tsx:1240`), but the Receive shortcut filters `next_action_status=receive_open_shipment` only (`PurchaseOrdersPage.tsx:2452`); finalization-needing orders can be counted in the button yet excluded from its result. B178 deliberately checks exact current source behavior; **product decision/fix needed**.
+- **Backend filtering:** `openPurchaseOrders` supplies the same synthetic GET rows regardless of query. Tests assert wire query and frontend state only, not that the service honors server filters or permissions.
+- **Legacy data:** Missing prices, percentages, and expected dates are synthetic response evidence. This does not prove such rows can exist in a valid production database.
+- **Phase 1 unresolved:** 417 blocked obligations, 272 partial acceptance features, PLCR-084, 357 scenario skips and supplemental 21+3 in-test skips are not closed or promoted.
+- **Not run:** No test compilation, Playwright discovery/execution, browser, frontend/backend startup, production, SQL, CI/deployment, dependency installation, or mutation of original application code.

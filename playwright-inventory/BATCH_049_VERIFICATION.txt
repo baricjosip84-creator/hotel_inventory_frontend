@@ -1,0 +1,12 @@
+BATCH 49 — 2026-11-03 — PHASE 1 ONLY; TESTS GENERATED, NOT COMPILED OR RUN
+SOURCE: INVENTORY_PLAYWRIGHT_BATCH_048_FULL.zip SHA256 1991d3987922f4e9348d1fcba306b530e4c1b32053d42b8edc90050e85e3333e CRC PASS.
+ORIGINAL FRONTEND: hotel-inventory-frontend - Copy.zip SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112
+ORIGINAL BACKEND: hotel-inventory-backend - Copy.zip SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4
+NEW: TICAP-092..141 (50 tests) in tests/tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts; every one of 2350 prior generated test declarations preserved as identical bytes. Added 41 source-traced feature records and planned 20 further outstanding browser cases TICAP-142..161.
+COUNTS: 2400 GENERATED_UNRUN / 2420 currently discovered; 20 NOT_STARTED; 56 Playwright spec files; 2383 feature rows; 46/137 routes reviewed, 91 platform administration routes remain unreviewed; no global complete coverage claim.
+IMPORTANT SOURCE DISCREPANCY: TICAP-094 earlier title claimed a separate confirmation. Original LandedCostPanel uses a direct Finalize button after preview without window.confirm; test and ledger now assert the actual click and preview fingerprint, and do NOT assert a nonexistent modal. Consider separate confirmation UX review before Phase 2.
+BOM execution DOES use window.confirm; TICAP-138 dismisses synthetic confirmation and TICAP-139 accepts it; all POSTs are intercepted and do not prove inventory changes or financial safety.
+NEXT EXACT: TICAP-142, continue remaining source-inventoried Inventory Capabilities behaviors through TICAP-161; then re-audit tenant coverage, and proceed to 91 platform routes.
+NO npm, TypeScript compilation, Playwright, browser, live app/backend/database, external webhooks, CI or deployment was used. Role PW_ICAP_MOBILE_NO_SHIPMENTS requires independent disposable user credentials in future Phase 2 and permissions: operational_action_center.read and execution_tasks.read, without shipments.read.
+
+Static verification checks: original FE/BE hashes, previous FULL hash and ZIP CRC; all previous 55 spec files byte-for-byte unchanged; 2350 unique prior scenario IDs, 50 unique new TICAP-092..141, ledger scenario/ID parity and 20 explicit NOT_STARTED follow-ups; completed FULL and CHANGED archive CRC checks. No tests compiled or run.

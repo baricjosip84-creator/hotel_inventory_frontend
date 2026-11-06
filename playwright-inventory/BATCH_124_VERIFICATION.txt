@@ -1,0 +1,10 @@
+BATCH 124 STATIC SOURCE VERIFICATION — 2026-11-05 — NO COMPILE/TEST/APP RUN.
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_123_FULL.zip SHA256 6c247c1978df071d158833e251610c89c8c30dfab3ea3ba70fa28308b070c000; 284 members CRC PASS; all unrelated member bytes preserved.
+ORIGINAL FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112, BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; backend route 12 permission middleware, exact Step 224 closure constants and source router order inspected.
+NEW IDs: 15 PITR-056..070 and 55 PICL-001..055; previous 7,576 preserved; 70 new unique IDs, no skips added.
+LEDGER 7869: GENERATED_UNRUN 7646, BLOCKED 197, NOT_STARTED 25, NEEDS_EXPECTATION 1 PLCR-084; INVENTORY 8161; SPEC_FILES 131.
+HISTORIC non-executable SKIPS: 360 scenario-labelled test.skip, 384 skip call sites; not passed.
+STEP 224: eight closure rows from triage, ten external fields, five handoff choices, three requirements/domain, nine metrics, source-drilldowns and no actual closure persistence.
+PITR-071..080 BLOCKED real incidents/owner/provider/customer production acceptance; PICL-056..080 NOT_STARTED.
+STATIC VERIFIED: ZIP CRC, source hashes, router source order, BE grants, FE selectors, fixture local imports, all previous member byte preservation, new/old test-ID ledger equality, inventory reconciliation, seven trackers, archive entries.
+NOT RUN: npm, TypeScript compilation, Playwright discovery/execution, browser, original FE/BE/DB, APIs or provider, production, CI or deployment.

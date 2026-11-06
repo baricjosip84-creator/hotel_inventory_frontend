@@ -1,0 +1,11 @@
+BATCH 095 — SOURCE-TRACED STATIC VERIFICATION (2026-11-05)
+STRICT PHASE 1: ZERO tests compiled or executed; ZERO browsers, real APIs, backend, DB, external systems or deployment checks run.
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_094_FULL.zip SHA256 7742a6553b5317672674915771d4e62f64d426e86e69e60e26d5ba1a8a01b17f
+ORIGINAL SOURCES: hotel-inventory-frontend - Copy.zip (SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112); hotel-inventory-backend - Copy.zip (SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4).
+NEW: PARET-042..080 and PUSR-001..041. 39+41=80.
+PARET: 80/80 declarations, with 17 test.skip (064..080), cannot prove SQL, authorization, backups, delivery or legal compliance.
+PUSR: 41/80 authored, remaining 042..080 reserved. Platform Users did not have a prior dedicated spec.
+CUMULATIVE: 5,509 unique test declarations of 5,549 discovered scenarios; NOT_STARTED PUSR-042..080 only; NEEDS_EXPECTATION PLCR-084 only. 102 spec files. 87/137 route inventory. Feature inventory 5,719 entries incl 228 non-browser testable obligations.
+OPEN AND NON-VERIFIED: PLCR-084, Access Reviews All statuses discrepancy, malformed responses, PPRIV-072 native date validation, backend announcement cancellation normalization; all explicit Phase 2 obligations from earlier batches.
+NEXT BATCH 96: PUSR-042..080 then check /platform/permissions and source-driven coverage. Historical 40 platform routes still unreviewed.
+Validation is static file and ledger checks only; no TypeScript compiler, Playwright, npm, JavaScript runtime or live UI check.

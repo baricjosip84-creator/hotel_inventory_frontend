@@ -1,0 +1,10 @@
+BATCH 094 — SOURCE-TRACED STATIC GENERATION VERIFICATION — 2026-11-05
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_093_FULL.zip SHA256 be955844ec288cdcf510bb043fe7275c127d36a8afd855388726659a12987e8b; CRC verified.
+ORIGINAL FE: 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BE e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; unchanged.
+ADDED: 39 PAUD-042..080 and 41 PARET-001..041; total 80 distinct declarations, all earlier 5349 IDs preserved.
+CURRENT: 5429 GENERATED_UNRUN; 39 NOT_STARTED PARET-042..080; 1 NEEDS_EXPECTATION PLCR-084; 5469 discovered. 101 spec files, 86/137 routes inspected, 51 routes remain incl 40 historical gaps. 5631 function inventory rows; 220 NOT_BROWSER_TESTABLE.
+PAUD: 14 explicit runtime skips (059,060,068,070..080) are not browser passes. Synthetic CSV/authorization checks not proof of real bytes/SQL/tenant isolation.
+PARET: read-only governance, legal hold, threshold, archive count and permission-limited synthetic response; application policy NOT statutory compliance, deletion, delivery, backup, or external evidence. No existing /platform/audit-retention spec was present in Batch 93.
+OPEN: PLCR-084; Access Reviews All statuses; malformed response hardening; PPRIV-072; backend cancellation reason normalization; historical explicit Phase 2 skips.
+NEXT: Batch 95 from PARET-042..080 then inspect /platform/users before generating additional scenarios.
+No npm/tsc/Playwright/browser/backend/database/CI/liveness testing or compile executed.

@@ -1,0 +1,10 @@
+BATCH 098 — STATIC SOURCE-TRACED VERIFICATION (2026-11-05)
+STRICT PHASE 1: ZERO compiled or executed tests (Playwright, npm, TS, browser, server, SQL, CI, external).
+PARENT B097 FULL sha256 ef3aec32a733e0ecef6d1d5d7dc2c035ab9f966e878c8b791a0ce367c604da73 verified ZIP CRC. Original frontend/backend ZIPs preserved unchanged.
+NEW PSES-042..080 (39) + PBL-001..041 (41); PSES 80/80, PBL 41/80. New billing fixture and spec.
+SOURCE HARDENING: PSES-042 fractional offsets sent to server; PSES-044 offset greater than total can invert shown range; both explicit skips.
+PHASE 2: PSES-071..080 real auth/SQL/revocation token skips; PBL-041 provider signature/settlement skip. Existing explicit Phase 2 skips unchanged.
+CUMULATIVE: 5,749 unique generated declarations / 5,789 discovered; 39 PBL-042..080 NOT_STARTED; PLCR-084 NEEDS_EXPECTATION; 105 specs; 90/137 routes inventoried, 47 unstarted including 40 historic; 5,983 function rows, 252 NBT.
+OPEN: PLCR-084, PPER-062, Access Reviews All statuses, malformed response behavior, PPRIV-072, announcement normalization, Permissions write-visibility, and Sessions offset gaps.
+NO real evidence for financial settlement, signed provider webhook, token invalidation, PostgreSQL consistency, identity, tenant isolation, or live permission enforcement.
+NEXT B099: PBL-042..080 then inspect router successor. No compilation/execution.

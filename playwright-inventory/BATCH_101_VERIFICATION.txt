@@ -1,0 +1,13 @@
+BATCH 101 — STATIC VERIFICATION — 2026-11-05
+PHASE 1 STRICT: 0 tests compiled, run, browser-executed or validated against real API, database, CI, provider or external system.
+PARENT: BATCH 100 FULL SHA256 99af9f790a8ae54b24cfe5fd1b240734f02816e155763eab644d7a08610110fc; ZIP CRC PASS.
+ORIGINAL FRONTEND SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; ORIGINAL BACKEND SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4. Both original app source archives unchanged.
+5,909 PREVIOUS test scenario declarations preserved. +80 unique: PLEN-042..080 (39), PCSA-001..041 (41).
+5,989 GENERATED_UNRUN declarations, 6,029 discovered coverage ledger entries, PCSA-042..080 NOT_STARTED (39), PLCR-084 NEEDS_EXPECTATION (1).
+108 spec files; 93/137 routes reviewed; 44 not reviewed, including 40 historically skipped routes.
+6,247 PAGE_FUNCTION_INVENTORY rows, including 276 NOT_BROWSER_TESTABLE obligations.
+EXISTING LICENSE FIXTURE HARDENING: null array values normalize safely in synthetic summary calculation (PLEN-053).
+NEW SKIPS (14): PLEN-059/060 (frontend offset discrepancy), PLEN-070..080 (11 real SQL/security/guard/commercial obligations), PCSA-041 (real customer/source proof).
+REVIEWED ROUTES: /platform/license-plan-enforcement and /platform/customer-success-admin. Next /platform/enterprise-identity.
+NO app code modified. Fake API fixture cannot verify real entitlement, payment settlement, tenant isolation, recorded communications, customer satisfaction, source integrity or GDPR compliance.
+CHECKS: file-level preservation, ID uniqueness, ledger equivalence, ZIP member and CRC integrity, SHA256 checks only. No transpilation, linting, Playwright runs or application builds.

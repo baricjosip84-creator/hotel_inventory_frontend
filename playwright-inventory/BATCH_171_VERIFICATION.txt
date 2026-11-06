@@ -1,0 +1,8 @@
+INVENTORY PLAYWRIGHT BATCH 171 — STATIC SOURCE/ARCHIVE VERIFICATION
+Parent Batch 170 sha256 56a651b2cc03b6f5eddaffa0a5440a5d89ce5dce2c8c378bf928ac9414ba4514 MATCH, ZIP CRC PASS.
+Immutable FE sha256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112 MATCH, ZIP CRC PASS.
+Immutable BE sha256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4 MATCH, ZIP CRC PASS.
+22 source-anchored unique TAUD-051..072 declarations; old 9,485 unique IDs preserved.
+Cumulative 9,507 authored, 9,150 non-labelled skipped, 357 labelled skips; 152 specs; ledger 9,925; features 10,217.
+417 BLOCKED; 272 partial; PLCR-084 unresolved. No statuses changed.
+PHASE 1 ONLY. No TypeScript/Playwright compile, discovery or execution, browser, real API or DB.

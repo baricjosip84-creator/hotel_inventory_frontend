@@ -1,0 +1,48 @@
+name: Inventory - live Vercel read-only checks
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type READONLY to run browser-only GET checks on the real Vercel site'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    if: ${{ github.event.inputs.confirmation == 'READONLY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: playwright-inventory
+    env:
+      PW_LIVE_READONLY: 'YES'
+      PW_BASE_URL: 'https://hotel-inventory-frontend-mauve.vercel.app'
+    steps:
+      - name: Checkout test repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Discover only live read-only smoke tests
+        run: npm run test:live-readonly:list
+      - name: Run live read-only smoke tests
+        run: npm run test:live-readonly
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: inventory-live-readonly-report
+          path: |
+            playwright-inventory/live-readonly-report/
+            playwright-inventory/test-results/
+          retention-days: 7

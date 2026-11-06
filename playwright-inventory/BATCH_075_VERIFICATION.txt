@@ -1,0 +1,12 @@
+BATCH 075 — STATIC PACKAGE & LEDGER RECONCILIATION ONLY (2026-11-04)
+Parent FULL B074: SHA256 aea02c41b73b116a804725b27fddf6683c4354718fc310f73b70dd3ca1301158; 137 entries; ZIP CRC verified.
+Original frontend ZIP SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112, original backend ZIP SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; both byte-unchanged.
+New declarations: 70, consisting of PLCR-071..083 (13), PLCR-085..100 (16), PWH-001..041 (41).
+Previously existing declarations preserved: 3839/3839 unique IDs; no other existing spec changed. Cumulative: 3909 unique test() declarations across 82 .spec.ts files.
+Coverage ledger: 3949 distinct scenario IDs = 3909 GENERATED_UNRUN + 39 NOT_STARTED PWH-042..080 + 1 NEEDS_EXPECTATION PLCR-084.
+PLCR-084 is an honest unsupported original assumption: Evidence source <select> has no disabled prop during query.isFetching. Do not invent an assertion or mark generated.
+Feature inventory: 3993 distinct rows including 102 NOT_BROWSER_TESTABLE backend/external obligations.
+67 of 137 router pages now inventoried; 70 platform routes not yet begun, including 40 earlier skipped routes.
+Spec relative imports inspected as path existence checks only. ZIP CRC and payload lists inspected without executing tests. No Playwright, TypeScript compiler, npm, browser, frontend/backend, DB, CI, external receiver or deployment invoked.
+Real webhook delivery, secret HMAC, cryptographic security, cross-tenant server ACL, source database semantics and legal validity remain unverified.
+Next: B076 PWH-042 then PWH-043..080, followed by /platform/vendors; PLCR-084 remains NEEDS_EXPECTATION.

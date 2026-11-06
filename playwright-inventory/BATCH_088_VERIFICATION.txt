@@ -1,0 +1,10 @@
+BATCH 088 — STATIC VERIFICATION ONLY — 2026-11-05
+PHASE 1 only: no Playwright/browser, TS compilation, npm, app/backend/DB/CI/deployment, real tenants, external legal/offboarding or deletion workflow executed.
+PARENT FULL SHA256 27e38d888011fe874c2110a05ed510a3609daf9e0becd7b83456e3079a3c637c (ZIP CRC confirmed); original FE 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; original BE e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4 unchanged.
+NEW exactly 80: PDRET-042..080 (39) and PTOFF-001..041 (41). All 4,869 previous declaration IDs preserved. 95 specs total; 4,949 unique generated IDs.
+LEDGER 4,989 discovered = 4,949 GENERATED_UNRUN + 39 NOT_STARTED PTOFF-042..080 + 1 PLCR-084 NEEDS_EXPECTATION. Feature inventory 5,103 incl 172 NOT_BROWSER_TESTABLE. Routes 80/137; 57 unstarted including 40 earlier platform routes.
+OFFBOARDING source: original frontend PlatformTenantOffboardingPage.tsx, router, permissions; original backend tenantOffboarding.js and platformTenantOffboardingService.js. Synthetic GET/POST/PATCH and separate evidence read only; no assertion of external closure.
+RETENTION explicit skips: PDRET-070..074 and 079..080. Previously open discrepancies (PLCR-084, Access Reviews, Permission Audit, Compliance Export, PPRIV-072) remain open.
+STATIC CHECKS: source ZIP SHA256, zip CRC, prior spec content preservation, unique scenario IDs and exact coverage-ledger match, local import resolution, and full/delta ZIP integrity. Runtime validity NOT proven.
+NEXT Batch 89 PTOFF-042..080 then /platform/incidents. Do not lose earlier skipped routes.
+RECONCILIATION CHECK: full parent archive 176 files, 94 prior specs; 95 current specs, 4949 unique IDs, all 4869 original IDs preserved. 4,989 ledger rows, 39 pending + 1 unresolved. Changed file count 11. No test runtime checks.

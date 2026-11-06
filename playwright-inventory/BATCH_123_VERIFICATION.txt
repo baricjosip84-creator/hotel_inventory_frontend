@@ -1,0 +1,10 @@
+BATCH 123 — STATIC SOURCE VERIFICATION — 2026-11-05 — STRICT PHASE 1 ONLY.
+PARENT INVENTORY_PLAYWRIGHT_BATCH_122_FULL.zip SHA256 c0d45faaeed80080e7751cf2e1a3f0caf97cb8205e01e05cbbca3a6b0281a8b1; 281 members ZIP CRC PASS, all unrelated members unchanged byte-for-byte.
+IMMUTABLE ORIGINAL FE SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BE SHA256 e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; source-read original Step 222/223 React, router, backend grants and no triage persistence.
+NEW PPLO-056..070 (15), PITR-001..055 (55): 70 unique authored IDs, all 7,506 previous IDs retained; no new skips.
+LEDGER ROWS 7789: GENERATED_UNRUN=7576 BLOCKED=187 NOT_STARTED=25 NEEDS_EXPECTATION=1 (PLCR-084). INVENTORY 8081; SPEC FILES 130.
+HISTORIC SKIPS: 360 scenario-labelled test.skip; 384 total skip call sites, not runnable or passed.
+SOURCE MAPPING: Step 223 12 grants, 8 triage domains, 9 external fields, 6 severity options, 8 summary metrics, read-only GET. No external observation records, triage persistence, incident mutation or real production launch proof.
+PPLO-071..080 BLOCKED actual production launch, health, customer/support/payment/incident/rollback/adoption/handoff and acceptance evidence. PITR-056..080 NOT_STARTED.
+STATIC VERIFIED: archive CRC, original FE/BE hashes, FE selectors, backend permission contract, source router order, fixture imports, previous member preservation, scenario ID set vs ledger, inventory reconciliation, seven tracking files, full/diff archive contents.
+NOT DONE: TypeScript compilation, Playwright discovery or execution, npm commands, browser, running server, API, SQL/DB, CI, provider/production, deployment, owner sign-off or live incident handling.

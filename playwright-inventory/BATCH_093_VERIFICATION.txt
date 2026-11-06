@@ -1,0 +1,9 @@
+BATCH 093 — SOURCE-TRACED STATIC GENERATION VERIFICATION — 2026-11-05
+PARENT: INVENTORY_PLAYWRIGHT_BATCH_092_FULL.zip SHA256 5518454f1905670dd8ccdd1e8316cecf7b9bb59403caaf87856c7a08b6ba2942; CRC verified.
+ORIGINAL FE ZIP SHA256 864b8dc06350473be433d19dd72a35175eef0b4ffdf9f87443e8887e68f5f112; BE ZIP e6bf02aa1b1eb9cb834a5010c4a38ef08f4f17d0afd57b75d40d24395d8c2ac4; source archives read-only.
+ADDED: 39 PSHL-042..080; 41 PAUD-001..041; total 80 distinct declarations. PSHL-066/067, 070..080 explicitly test.skip (13). All 5,269 existing IDs preserved.
+CUMULATIVE: 5,349 GENERATED_UNRUN, 39 NOT_STARTED PAUD-042..080, 1 NEEDS_EXPECTATION PLCR-084. 5,389 discovered, 100 spec files, 85/137 routes inspected, 52 unstarted incl 40 historically skipped, 5,543 function inventory rows.
+NEW AUDIT: source and identities separately permission-gated; no earlier /platform/audit suite exists. Synthetic UI/HTTP tests only; no proof of immutable database, record security or delivered CSV contents. Existing Permission Audit and Tenant Audit unchanged.
+UNRESOLVED: PLCR-084; Access Reviews All statuses; malformed responses; PPRIV-072; backend cancellation normalization; all historical Phase 2 skips.
+NEXT: Batch 94 from PAUD-042, complete through 080, inspect /platform/audit-retention and avoid duplication.
+NO npm, Playwright, TypeScript compile, browser, backend, PostgreSQL, CI, external service or deployed application testing. All statuses GENERATED_UNRUN (or explicitly deferred).
