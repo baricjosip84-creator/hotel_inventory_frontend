@@ -53,7 +53,7 @@ const test = base.extend({
 
 test('LIVE-AUTH-TENANT-001: login then read Dashboard, Products and Stock', async ({ page }) => {
   // More read-only pages are exercised in this single authenticated browser journey.
-  test.setTimeout(240_000);
+  test.setTimeout(360_000);
   const email = process.env.PW_TENANT_EMAIL;
   const password = process.env.PW_TENANT_PASSWORD;
   // Don't display secret names alongside their values or copy them to artifacts.
@@ -220,6 +220,75 @@ test('LIVE-AUTH-TENANT-001: login then read Dashboard, Products and Stock', asyn
     await search.fill('pw-no-purchase-order-match-zz987654321');
     await expect(registry.getByText('No purchase orders found.', { exact: true })).toBeVisible({ timeout: 25_000 });
     await registry.getByRole('button', { name: 'Clear filters', exact: true }).click();
+    await expect(search).toHaveValue('');
+    await expect(status).toHaveValue('');
+  });
+
+
+  await test.step('Storage Locations: search URL and clear filters (no changes)', async () => {
+    await page.goto('/storage-locations');
+    await expect(page).toHaveURL(/\/storage-locations(?:[?#]|$)/, { timeout: 25_000 });
+    const locations = page.locator('.io-storage-locations-page');
+    await expect(locations.getByRole('heading', { name: 'Storage location workspace', exact: true })).toBeVisible({ timeout: 25_000 });
+    await expect(locations.getByRole('heading', { name: 'Storage Location List', exact: true })).toBeVisible({ timeout: 25_000 });
+    const search = locations.locator('#storage-location-search');
+    const clear = locations.getByRole('button', { name: 'Clear Filters', exact: true });
+    await expect(search).toBeVisible();
+    await expect(clear).toBeVisible();
+    const token = 'pw-no-location-match-zz987654321';
+    await search.fill(token);
+    await expect(search).toHaveValue(token);
+    await expect.poll(() => new URL(page.url()).searchParams.get('search')).toBe(token);
+    await expect(clear).toBeEnabled();
+    await clear.click();
+    await expect(search).toHaveValue('');
+    await expect.poll(() => new URL(page.url()).searchParams.get('search')).toBeNull();
+    await expect(clear).toBeDisabled();
+  });
+
+  await test.step('Alerts: filter severity and search, then reset (no alert actions)', async () => {
+    await page.goto('/alerts');
+    await expect(page).toHaveURL(/\/alerts(?:[?#]|$)/, { timeout: 25_000 });
+    const alerts = page.locator('.alerts-page');
+    await expect(alerts.getByRole('heading', { name: 'Alert workspace', exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(alerts.getByRole('heading', { name: 'Filter the alert queue', exact: true })).toBeVisible();
+    const form = alerts.locator('form').first();
+    const search = form.getByPlaceholder('Message, type, or product', { exact: true });
+    const severity = form.getByLabel('Severity', { exact: true });
+    const token = 'pw-no-alert-match-zz987654321';
+    await expect(search).toBeVisible();
+    await severity.selectOption('critical');
+    await search.fill(token);
+    await form.getByRole('button', { name: 'Apply filters', exact: true }).click();
+    await expect.poll(() => new URL(page.url()).searchParams.get('severity')).toBe('critical');
+    await expect.poll(() => new URL(page.url()).searchParams.get('search')).toBe(token);
+    await expect(severity).toHaveValue('critical');
+    await form.getByRole('button', { name: 'Clear filters', exact: true }).click();
+    await expect(search).toHaveValue('');
+    await expect(severity).toHaveValue('');
+    await expect.poll(() => new URL(page.url()).searchParams.get('severity')).toBeNull();
+    await expect.poll(() => new URL(page.url()).searchParams.get('search')).toBeNull();
+  });
+
+  await test.step('Shipments: read-only search and status filter, then reset', async () => {
+    await page.goto('/shipments');
+    await expect(page).toHaveURL(/\/shipments(?:[?#]|$)/, { timeout: 25_000 });
+    const shipments = page.locator('.io-shipments-page');
+    await expect(shipments.getByRole('heading', { name: 'Inbound shipments', exact: true })).toBeVisible({ timeout: 30_000 });
+    const list = shipments.locator('#shipments-list');
+    await expect(list.getByRole('heading', { name: 'Shipment List', exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(shipments.getByText('Shipment list could not be loaded.', { exact: false })).toHaveCount(0);
+    const search = list.getByPlaceholder('Search by shipment reference, linked PO, supplier, shipment ID, status...', { exact: true });
+    const status = list.locator('select').first();
+    await expect(search).toBeVisible();
+    await status.selectOption('pending');
+    await expect(status).toHaveValue('pending');
+    const token = 'pw-no-shipment-match-zz987654321';
+    await search.fill(token);
+    await expect(search).toHaveValue(token);
+    await expect(list.getByText('No shipments match the current filter.', { exact: true })).toBeVisible({ timeout: 25_000 });
+    await search.fill('');
+    await status.selectOption('');
     await expect(search).toHaveValue('');
     await expect(status).toHaveValue('');
   });
