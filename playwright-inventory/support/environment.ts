@@ -3,6 +3,8 @@
  * frontend/API + test tenant. Config values are supplied at execution time.
  * No real secrets or production endpoints are embedded in this project.
  */
+import approvedManifest from '../original-suite-approved.json';
+
 export function targetBaseURL(): string {
   const value = process.env.PW_BASE_URL || 'http://127.0.0.1:5173';
   const parsed = new URL(value);
@@ -26,7 +28,8 @@ export function requireDisposableTenantCredentials(): { email: string; password:
   // can reach real tenant data. A live/prod tenant must never be used.
   const approvedLiveOrigin = 'https://hotel-inventory-frontend-mauve.vercel.app';
   const group = process.env.PW_ORIGINAL_SUITE_GROUP;
-  const liveReviewedGroup = ['PRODUCTS', 'STOCK', 'SUPPLIERS', 'PURCHASE_ORDERS'].includes(group || '');
+  const liveReviewedGroup = Boolean(group && Object.prototype.hasOwnProperty.call(approvedManifest.approved_groups, group)
+    && (approvedManifest.approved_groups as Record<string, { secret: boolean }>)[group].secret === true);
   const liveApproved = process.env.PW_LIVE_ORIGINAL_READONLY === 'YES'
     && liveReviewedGroup && process.env.PW_BASE_URL === approvedLiveOrigin;
   if (!liveApproved && process.env.PW_TEST_ENVIRONMENT !== 'disposable') {
