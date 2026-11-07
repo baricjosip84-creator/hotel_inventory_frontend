@@ -20,7 +20,7 @@ const expected = new Map([
 assert.equal(group.entries.reduce((n,e)=>n+e.ids.length,0),120);
 const oldIds = new Set();
 for (const [name, oldGroup] of Object.entries(manifest.approved_groups)) {
-  if (name === 'BULK_SAFE_03') continue;
+  if (name === 'BULK_SAFE_03' || name === 'BULK_SAFE_03_RECHECK') continue;
   for (const entry of oldGroup.entries ?? [oldGroup]) for (const id of entry.ids) oldIds.add(id);
 }
 const newIds = new Set();
@@ -57,7 +57,7 @@ for (const entry of group.entries) {
 }
 assert.equal(newIds.size,120);
 const config = fs.readFileSync(path.join(root,'playwright.live-original.config.ts'),'utf8');
-assert(config.includes("'BULK_SAFE_03','BULK_SAFE_02_RECHECK_2','BULK_SAFE_02_RECHECK_3'].includes(GROUP) ? 1"),'Batch 210 must be single worker to avoid login-rate limits');
+assert(config.includes("'BULK_SAFE_03','BULK_SAFE_03_RECHECK','BULK_SAFE_02_RECHECK_2','BULK_SAFE_02_RECHECK_3'].includes(GROUP) ? 1"),'Batch 210 must be single worker to avoid login-rate limits');
 assert(config.includes('maxFailures: GROUP ===') && config.includes(' : undefined'),'Do not hide failures with an early cutoff');
 const env = fs.readFileSync(path.join(root,'support/environment.ts'),'utf8');
 assert(env.includes('liveReviewedGroup'),'Credential gate must check manifest');

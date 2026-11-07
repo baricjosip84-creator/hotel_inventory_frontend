@@ -13,7 +13,30 @@ const FRONTEND_ORIGIN = 'https://hotel-inventory-frontend-mauve.vercel.app';
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const BULK_GROUP_PREFIX = 'BULK_SAFE_';
 type AuthState = Awaited<ReturnType<BrowserContext['storageState']>>;
-type WorkerSession = { snapshot: AuthState; renew: () => Promise<void> };
+type WorkerSession = { snapshot: AuthState; renew: () => Promise<void>; absorb: (observed: AuthState) => void };
+
+// The application's refresh-cookie and access-token pair can rotate during GETs.
+// Copy *only authentication state* back to the worker after a test, not its
+// locally mocked permissions, filters, other localStorage or test data.
+function transplantAuthentication(baseline: AuthState, observed: AuthState): AuthState | null {
+  const token = observed.origins.find(o => o.origin === FRONTEND_ORIGIN)?.localStorage
+    .find(x => x.name === 'inventory_access_token')?.value;
+  if (!token) return null;
+  try { if (tokenExpiresSoon(observed)) return null; } catch { return null; }
+  const origins = baseline.origins.map(origin => origin.origin !== FRONTEND_ORIGIN ? origin : {
+    ...origin, localStorage: origin.localStorage.map(entry => entry.name === 'inventory_access_token'
+      ? { ...entry, value: token } : entry)
+  });
+  // Only retain cookies belonging to the explicitly approved frontend/backend.
+  const trustedCookie = (domain: string) =>
+    /(?:^|\.)onrender\.com$/i.test(domain.replace(/^\./, '')) ||
+    domain.replace(/^\./, '').toLowerCase() === new URL(FRONTEND_ORIGIN).hostname;
+  const cookies = [
+    ...baseline.cookies.filter(cookie => !trustedCookie(cookie.domain)),
+    ...observed.cookies.filter(cookie => trustedCookie(cookie.domain))
+  ];
+  return { cookies, origins };
+}
 function tokenExpiresSoon(state: AuthState): boolean {
   const token = state.origins.find(x => x.origin === FRONTEND_ORIGIN)?.localStorage
     .find(x => x.name === 'inventory_access_token')?.value;
@@ -47,7 +70,7 @@ function approvedLogin(method: string, rawUrl: string): boolean {
 export const test = base.extend<{}, { bulkSession: WorkerSession }>({
   bulkSession: [async ({ browser }, use) => {
     if (!bulkEnabled()) {
-      await use({ snapshot: { cookies: [], origins: [] }, renew: async () => {} });
+      await use({ snapshot: { cookies: [], origins: [] }, renew: async () => {}, absorb: () => {} });
       return;
     }
     if (process.env.PW_BASE_URL !== FRONTEND_ORIGIN) {
@@ -78,9 +101,14 @@ export const test = base.extend<{}, { bulkSession: WorkerSession }>({
         return state;
       } finally { await context.close(); }
     };
-    const session: WorkerSession = { snapshot: await authenticate(), renew: async () => {
-      session.snapshot = await authenticate();
-    }};
+    const session: WorkerSession = {
+      snapshot: await authenticate(),
+      renew: async () => { session.snapshot = await authenticate(); },
+      absorb: (observed) => {
+        const fresh = transplantAuthentication(session.snapshot, observed);
+        if (fresh) session.snapshot = fresh;
+      }
+    };
     await use(session);
   }, { scope: 'worker' }],
   storageState: async ({ bulkSession }, use) => {
@@ -93,7 +121,7 @@ export const test = base.extend<{}, { bulkSession: WorkerSession }>({
     if (tokenExpiresSoon(bulkSession.snapshot)) await bulkSession.renew();
     await use(bulkSession.snapshot);
   },
-  page: async ({ page }, use) => {
+  page: async ({ page, bulkSession }, use) => {
     if (process.env.PW_LIVE_ORIGINAL_READONLY !== 'YES') {
       await use(page); // existing disposable/local tests unchanged
       return;
@@ -147,6 +175,13 @@ export const test = base.extend<{}, { bulkSession: WorkerSession }>({
       }, options);
     }) as typeof page.route;
     await use(page);
+    // Preserve rotated auth tokens/cookies across *isolated* test contexts.
+    // This prevents an expired/stale refresh cookie from forcing repeated logins
+    // after ~10-15 minutes while never carrying test-local permission overrides.
+    if (bulkEnabled()) {
+      try { bulkSession.absorb(await page.context().storageState()); }
+      catch { /* Closed pages must not turn a valid test into an auth teardown failure. */ }
+    }
     // Stronger assertion: no non-auth write reached a completed HTTP response.
     // Blocked attempts are never sent and cannot mutate production records.
     expect(unexpectedlyCompletedWrites, 'An unauthorized live write reached a server response').toEqual([]);

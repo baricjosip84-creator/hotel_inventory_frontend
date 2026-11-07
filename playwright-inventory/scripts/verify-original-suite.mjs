@@ -61,8 +61,10 @@ const bulkGroups = [...seenApprovedByGroup.entries()].filter(([name])=>name.star
 for (const [bulkName, bulkIds] of bulkGroups) {
   const otherIds = new Set([...seenApprovedByGroup.entries()]
     .filter(([name]) => name !== bulkName && !(
-      (new Set([originalGroup,retryGroup,secondRetryGroup,thirdRetryGroup]).has(name) &&
-       new Set([originalGroup,retryGroup,secondRetryGroup,thirdRetryGroup]).has(bulkName))
+      ((new Set([originalGroup,retryGroup,secondRetryGroup,thirdRetryGroup]).has(name) &&
+        new Set([originalGroup,retryGroup,secondRetryGroup,thirdRetryGroup]).has(bulkName)) ||
+       (new Set(['BULK_SAFE_03','BULK_SAFE_03_RECHECK']).has(name) &&
+        new Set(['BULK_SAFE_03','BULK_SAFE_03_RECHECK']).has(bulkName)))
     )).flatMap(([,ids])=>[...ids]));
   for (const id of bulkIds) assert(!otherIds.has(id), `Bulk cannot reuse another group's ID: ${bulkName}/${id}`);
 }
@@ -132,6 +134,20 @@ if (seenApprovedByGroup.has(thirdRetryGroup)) {
   assert(config.includes("'BULK_SAFE_02_RECHECK_3'].includes(GROUP) ? 1"),
     'Batch 209 must run single-worker to avoid rapid parallel logins');
   console.log('PASS: Batch 209 rechecks exactly 14 unverified IDs, holds two permission cases; all 23 latest passes excluded.');
+}
+if (seenApprovedByGroup.has('BULK_SAFE_03_RECHECK')) {
+  const source = manifest.batch_210_last_execution;
+  const held = new Set(Object.keys(manifest.batch_211_held_unverified));
+  const passed = new Set(source.passed_ids);
+  const failed = new Set(source.failed_ids);
+  const replay = seenApprovedByGroup.get('BULK_SAFE_03_RECHECK');
+  assert.equal(source.total, 120);assert.equal(passed.size,88);assert.equal(failed.size,32);
+  assert.deepEqual(new Set([...passed,...failed]),seenApprovedByGroup.get('BULK_SAFE_03'));
+  assert.deepEqual(held,new Set(['TRC-009','TRC-048']));
+  assert.equal(replay.size,30);
+  assert.deepEqual(replay,new Set([...failed].filter(id=>!held.has(id))));
+  assert([...replay].every(id=>!passed.has(id)), 'Must not repeat Batch 210 passes');
+  console.log('PASS: Batch 211 exactly 30 failed-only reruns, 88 successes preserved, 2 behavior cases held.');
 }
 const bulkIds = seenApprovedByGroup.get('BULK_SAFE_01');
 const nextBulkIds = seenApprovedByGroup.get('BULK_SAFE_02');

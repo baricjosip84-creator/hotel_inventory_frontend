@@ -57,17 +57,17 @@ test.describe('Reliability Command — advisory posture and read-only review (Ba
  test('TRC-006 Readiness selection sends degraded backend threshold and persists in URL',async({page})=>{
   await openReliability(page);let url='';await page.route(reliabilityEndpoint,route=>{url=route.request().url();return fulfillJson(route,reliabilityData());});
   await reliabilityFilters(page).getByLabel('Risk readiness threshold').selectOption('degraded');
-  await expect.poll(()=>new URL(url).searchParams.get('min_readiness')).toBe('degraded');await expect(page).toHaveURL(/readiness=degraded/);
+  await expect.poll(()=>url ? new URL(url).searchParams.get('min_readiness') : null).toBe('degraded');await expect(page).toHaveURL(/readiness=degraded/);
  });
  test('TRC-007 Severity high selection adds min_severity and preserves readiness',async({page})=>{
   await openReliability(page);let url='';await page.route(reliabilityEndpoint,route=>{url=route.request().url();return fulfillJson(route,reliabilityData());});
   await reliabilityFilters(page).getByLabel('Risk severity threshold').selectOption('high');
-  await expect.poll(()=>new URL(url).searchParams.get('min_severity')).toBe('high');expect(new URL(url).searchParams.get('min_readiness')).toBe('watch');
+  await expect.poll(()=>url ? new URL(url).searchParams.get('min_severity') : null).toBe('high');expect(new URL(url).searchParams.get('min_readiness')).toBe('watch');
  });
  test('TRC-008 Maximum review items selector sends bounded limit=3',async({page})=>{
   await openReliability(page);let url='';await page.route(reliabilityEndpoint,route=>{url=route.request().url();return fulfillJson(route,reliabilityData({filters:{limit:3,min_readiness:'watch'}}));});
   await reliabilityFilters(page).getByLabel('Maximum review items').selectOption('3');
-  await expect.poll(()=>new URL(url).searchParams.get('limit')).toBe('3');await expect(reliabilityFilters(page)).toContainText('Up to 3 items per review stage');
+  await expect.poll(()=>url ? new URL(url).searchParams.get('limit') : null).toBe('3');await expect(reliabilityFilters(page)).toContainText('Up to 3 items per review stage');
  });
  test('TRC-009 Clear filters resets all choices and removes Clear filters control',async({page})=>{
   await openReliability(page);await reliabilityFilters(page).getByLabel('Risk readiness threshold').selectOption('critical');

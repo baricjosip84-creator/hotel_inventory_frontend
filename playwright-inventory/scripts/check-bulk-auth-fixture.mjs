@@ -50,12 +50,21 @@ async function runWorker() {
 const makeRequest=(method, path)=>({method:()=>method,url:()=>FRONTEND+path});
 async function runGuard(callback) {
   const contextHandlers=[];const pageHandlers=[];const finished=[];
+  let absorbed = false;
+  const rotated = snapshot('mock-page-rotation');
   const page={
-    context:()=>({route:async(pattern,cb)=>{assert.equal(pattern,'**/*');contextHandlers.push(cb)}}),
+    context:()=>({
+      route:async(pattern,cb)=>{assert.equal(pattern,'**/*');contextHandlers.push(cb)},
+      storageState:async()=>rotated
+    }),
     on:(event,handler)=>{if(event==='requestfinished')finished.push(handler)},
     route:async(_pattern,cb)=>pageHandlers.push(cb)
   };
-  await fixture.test.page({page},async guarded=>callback({guarded,contextHandlers,pageHandlers,finished}));
+  await fixture.test.page({page,bulkSession:{absorb:state=>{
+    assert.equal(state.cookies[0].value,'cookie-mock-page-rotation');
+    absorbed = true;
+  }}},async guarded=>callback({guarded,contextHandlers,pageHandlers,finished}));
+  assert(absorbed,'Page teardown must feed refreshed auth state back to the worker');
 }
 try {
   process.env.PW_LIVE_ORIGINAL_READONLY='YES';process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_02_RECHECK';process.env.PW_BASE_URL=FRONTEND;
@@ -63,6 +72,19 @@ try {
   for(let i=0;i<3;i++)workers.push(await runWorker());
   assert.equal(calls.logins,3,'One login for each of 3 workers');
   assert.equal(new Set(workers.map(x=>`cookie-${x.id}`)).size,3,'Unique worker identities');
+  // Refresh-cookie rotation from a finished test must persist to the next
+  // isolated context without leaking temporary role or permission mutations.
+  const rotatedSnapshot=snapshot('rotated-101');
+  rotatedSnapshot.origins[0].localStorage.push({name:'inventory_tenant_effective_permissions',value:'UNTRUSTED_TEST_OVERRIDE'});
+  workers[0].session.absorb(rotatedSnapshot);
+  assert.equal(workers[0].session.snapshot.cookies[0].value,'cookie-rotated-101');
+  assert.equal(workers[0].session.snapshot.origins[0].localStorage.some(x=>x.value==='UNTRUSTED_TEST_OVERRIDE'),false,
+    'Temporary permission override must not propagate to next test');
+  const alreadyStale=snapshot('stale-101');
+  alreadyStale.origins[0].localStorage[0].value=jwt(5);
+  workers[0].session.absorb(alreadyStale);
+  assert.equal(workers[0].session.snapshot.cookies[0].value,'cookie-rotated-101',
+    'Stale observed auth must never overwrite the last healthy worker session');
   // A genuinely near-expired worker renews only its own cookie/session.
   workers[0].session.snapshot.origins[0].localStorage[0].value=jwt(10);
   await fixture.test.storageState({bulkSession:workers[0].session},async state=>{
@@ -105,7 +127,7 @@ try {
   process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_02_RECHECK';
   process.env.PW_BASE_URL='https://wrong.example.invalid';
   await assert.rejects(fixture.test.bulkSession[0]({browser},async()=>{}),/exact reviewed production origin/);
-  console.log('PASS: Three independent worker login/refresh sessions; 25 restored contexts per worker; expiry renews only one.');
+  console.log('PASS: Three independent worker logins; rotated cookies carried between contexts, expired auth and permission overrides rejected.');
   console.log('PASS: Production startup POST aborted but not misreported as a completed write.');
   console.log('PASS: Synthetic POST fulfillment tracked; page-route write continuation aborted; unmocked completed write fails.');
   console.log('PASS: Dashboard helper and wrong-origin / legacy nonbulk behavior.');

@@ -76,7 +76,7 @@ async function openFeed(page: Page, url = '/real-time-operations-feed') {
   test.beforeEach(async ({page}) => { await openFeed(page); });
 
   test('TFEED-001 overview identifies read-only guidance and links to Action Center',async ({page}) => {
-    await expect(page.getByRole('heading',{name:'Operations Feed'})).toBeVisible();
+    await expect(page.getByRole('heading',{name:'Operations Feed',level:1})).toBeVisible();
     await expect(page.locator('.operations-feed-page')).toContainText('Guidance only');
     await expect(page.getByRole('link',{name:'Open Action Center'})).toHaveAttribute('href','/action-center');
     await expect(page.getByText('Safe to review without editing')).toBeVisible();
@@ -130,7 +130,7 @@ async function openFeed(page: Page, url = '/real-time-operations-feed') {
     await expect(page.getByLabel('Urgency')).toHaveValue('medium');
     await expect(page.getByLabel('Search current feed')).toHaveValue('webhook');
     await expect(page.getByLabel('Time')).toHaveValue('24h');
-    await expect(page.getByLabel('View')).toHaveValue('new');
+    await expect(page.locator('.operations-feed-page__select').filter({has:page.locator('option[value="new"]')})).toHaveValue('new');
     await page.reload();
     await expect(page.getByLabel('Search current feed')).toHaveValue('webhook');
   });
@@ -140,7 +140,7 @@ async function openFeed(page: Page, url = '/real-time-operations-feed') {
     await expect(page.getByLabel('Work area')).toHaveValue('all');
     await expect(page.getByLabel('Urgency')).toHaveValue('all');
     await expect(page.getByLabel('Time')).toHaveValue('all');
-    await expect(page.getByLabel('View')).toHaveValue('all');
+    await expect(page.locator('.operations-feed-page__select').filter({has:page.locator('option[value="new"]')})).toHaveValue('all');
   });
 
   test('TFEED-008 title search narrows timeline without losing unrelated backend data',async ({page}) => {
@@ -224,7 +224,7 @@ async function openFeed(page: Page, url = '/real-time-operations-feed') {
     expect(key).toBeTruthy();
     await page.evaluate(({key,value})=>localStorage.setItem(key,value),{key:key!,value:priorIso(10)});
     await page.goto('/real-time-operations-feed?view=new');
-    await expect(page.getByLabel('View')).toHaveValue('new');
+    await expect(page.locator('.operations-feed-page__select').filter({has:page.locator('option[value="new"]')})).toHaveValue('new');
     await expect(feedCards(page)).toHaveCount(3);
     await expect(feedCard(page,'pw-feed-alert-001').locator('.operations-feed-page__badge--new')).toContainText('New');
     await expect(feedCard(page,'pw-feed-delivery-003')).toHaveCount(0);
@@ -325,7 +325,7 @@ async function openFeed(page: Page, url = '/real-time-operations-feed') {
     await page.route('**/operational-action-center/realtime-event-coordination-summary?*',route =>
       fulfillJson(route,{error:'Synthetic service unavailable',message:'Synthetic service unavailable'},503));
     await page.getByRole('button',{name:'Refresh feed'}).click();
-    await expect(page.getByText('Refresh failed')).toBeVisible();
+    await expect(page.locator('.operations-feed-page__state-title').filter({hasText:'Refresh failed'})).toBeVisible();
     await expect(page.getByText('Showing the last available operations-feed snapshot. Try refreshing again before acting on time-sensitive information.')).toBeVisible();
     await expect(feedCards(page)).toHaveCount(5);
   });
