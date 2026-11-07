@@ -93,6 +93,23 @@
       ],
       "secret": true,
       "sha256": "2d44ea1fc7fe93613b54187165354652416b9b541d2ad221ae6d7911abb95567"
+    },
+    "SHIPMENTS": {
+      "file": "tenant/shipments/shipments.spec.ts",
+      "ids": [
+        "TSH-001",
+        "TSH-002",
+        "TSH-003",
+        "TSH-004",
+        "TSH-005",
+        "TSH-006",
+        "TSH-007",
+        "TSH-008",
+        "TSH-009",
+        "TSH-010"
+      ],
+      "secret": true,
+      "sha256": "4ab7b3f97e0f5e31f536dfa77a1c23e0a90f263f2b2d780bed0f6d8536a58d91"
     }
   },
   "status": "Source-reviewed allowlist: frontend/UI + mocked GETs only; backend effects unverified"

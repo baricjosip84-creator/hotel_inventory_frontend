@@ -89,6 +89,20 @@ const workflowBody = fs.readFileSync(path.join(root, '../.github/workflows/inven
 for (const key of ['PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}', 'PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}']) {
   assert(workflowBody.includes(key), `Workflow is missing required credential mapping: ${key.split(':')[0]}`);
 }
+// Prevent dispatch-menu drift: every selectable live group must exist in the reviewed manifest.
+const optionsSection = workflowBody.match(/^\s{8}options:\s*$([\s\S]*?)(?=^\s{6}confirmation:)/m);
+assert(optionsSection, 'Live workflow group choice options are missing');
+const declared = [...optionsSection[1].matchAll(/^\s{10}-\s+([A-Z_]+)\s*$/gm)].map(match => match[1]);
+assert.deepEqual(declared, ['DISCOVER_ALL', ...Object.keys(manifest.approved_groups)], 'Workflow group menu and reviewed manifest disagree');
+assert.equal(new Set(declared).size, declared.length, 'Duplicate live group choice');
+for (const [name, entry] of Object.entries(manifest.approved_groups)) {
+  const body = fs.readFileSync(path.join(testRoot, entry.file), 'utf8');
+  for (const id of entry.ids) {
+    const matches = body.match(new RegExp(`\\btest\\s*\\(\\s*['"]${id}\\b`, 'g')) ?? [];
+    assert.equal(matches.length, 1, `Approved ID must map to exactly one original test: ${name}/${id}`);
+  }
+}
+console.log(`PASS: Workflow dispatch options, manifest, and original test IDs match (${declared.length - 1} runnable groups).`);
 console.log(`PASS: credential-gate runtime preflight for ${preflightCount} reviewed groups; unknown groups/wrong origin/missing flags/missing credentials denied.`);
 console.log(`PASS: ${found.length} original scenarios from ${specs.length} spec files; ${Object.values(manifest.approved_groups).reduce((n,g)=>n+g.ids.length,0)} reviewed runtime IDs in ${Object.keys(manifest.approved_groups).length} groups.`);
 console.log('No original scenario declarations added or removed. No live credentials read by this check.');

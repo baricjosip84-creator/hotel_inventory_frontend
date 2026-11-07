@@ -16,6 +16,7 @@ on:
           - SUPPLIERS
           - PURCHASE_ORDERS
           - STOCK_MOVEMENTS
+          - SHIPMENTS
       confirmation:
         description: 'Type ORIGINALTESTS to run the selected group'
         required: true
