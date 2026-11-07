@@ -85,7 +85,7 @@ test.describe('Purchase Orders — registry, source-backed query and read-only n
  });
  test('TPO-007 Supplier filter sends exact synthetic supplier ID',async({page})=>{
   const seen=await openPurchaseOrders(page,{rows:[poRow]});
-  await filterSection(page).getByLabel('Supplier').selectOption('pw-supplier-1');
+  await filterSection(page).getByRole('combobox',{name:'Supplier',exact:true}).selectOption('pw-supplier-1');
   await expect.poll(()=>requestedFilter(seen,'supplier_id','pw-supplier-1')).toBe(true);
  });
  test('TPO-008 Search trims whitespace in query and preserves search in URL',async({page})=>{
@@ -127,10 +127,10 @@ test.describe('Purchase Orders — registry, source-backed query and read-only n
  });
  test('TPO-015 Clear filters drops status and supplier while retaining registry',async({page})=>{
   await openPurchaseOrders(page,{rows:[poRow]});await filterSection(page).getByLabel('Status').selectOption('draft');
-  await filterSection(page).getByLabel('Supplier').selectOption('pw-supplier-1');
+  await filterSection(page).getByRole('combobox',{name:'Supplier',exact:true}).selectOption('pw-supplier-1');
   await page.locator('.purchase-orders-header-actions').getByRole('button',{name:'Clear filters'}).click();
   await expect(filterSection(page).getByLabel('Status')).toHaveValue('');
-  await expect(filterSection(page).getByLabel('Supplier')).toHaveValue('');
+  await expect(filterSection(page).getByRole('combobox',{name:'Supplier',exact:true})).toHaveValue('');
   await expect(page).not.toHaveURL(/status=draft|supplier_id=/);
  });
  test('TPO-016 Sort control updates URL without pretending the backend sorted it',async({page})=>{
@@ -306,7 +306,7 @@ test.describe('Purchase Orders — source-backed list and query edge coverage (B
  test('TPO-073 Removing one active filter chip leaves a second filter intact',async({page})=>{
   const seen=await openPurchaseOrders(page,{rows:[b178Po(1)]});
   await filterSection(page).getByLabel('Status').selectOption('draft');
-  await filterSection(page).getByLabel('Supplier').selectOption('pw-supplier-1');
+  await filterSection(page).getByRole('combobox',{name:'Supplier',exact:true}).selectOption('pw-supplier-1');
   await b178ChipBar(page).getByRole('button',{name:/Supplier: Synthetic Supply Ltd/}).click();
   await expect.poll(()=>registryRequests(seen).some(r=>{
    const p=new URL(r.url).searchParams;return p.get('status')==='draft'&&!p.has('supplier_id');

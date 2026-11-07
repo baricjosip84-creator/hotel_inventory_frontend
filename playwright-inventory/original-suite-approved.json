@@ -75,7 +75,7 @@
         "TPO-008"
       ],
       "secret": true,
-      "sha256": "d7424f66cb6ce90b454ce42223eb4a06bd123f0c5996fc5096204bafcde77611"
+      "sha256": "648636b61d559b50492441eafbd4bbd3490bd92de1e24ee577b911ca54b535a0"
     }
   },
   "status": "Source-reviewed allowlist: frontend/UI + mocked GETs only; backend effects unverified"
