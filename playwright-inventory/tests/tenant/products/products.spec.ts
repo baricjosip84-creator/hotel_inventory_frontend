@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '../../../support/liveOriginalSafeTest';
+import { test, expect, type Page, type Route } from '../../../support/liveOriginalSafeTest';
 import { fulfillJson, loginAsTenant } from '../../../support/tenantSession';
 
 // First Products-page batch. Source:
@@ -34,13 +34,18 @@ const testSuppliers = [
   { id: 'pw-supplier-02', name: 'Synthetic Supplier B', tenant_id: 'pw-tenant' }
 ];
 
+// A glob like '**/products' also matches the frontend DOCUMENT navigation to
+// /products. Only mock background API reads; never replace the app HTML with JSON.
+const isApiGet = (route: Route) => route.request().method() === 'GET'
+  && (route.request().resourceType() === 'fetch' || route.request().resourceType() === 'xhr');
+
 async function fixtureProducts(page: Page) {
   await page.route('**/products', (route) => {
-    if (route.request().method() !== 'GET') return route.continue();
+    if (!isApiGet(route)) return route.continue();
     return fulfillJson(route, testProducts);
   });
   await page.route('**/products?*', (route) => {
-    if (route.request().method() !== 'GET') return route.continue();
+    if (!isApiGet(route)) return route.continue();
     const url = new URL(route.request().url());
     const category = url.searchParams.get('category');
     const supplier = url.searchParams.get('supplier_id');
@@ -57,9 +62,9 @@ async function fixtureProducts(page: Page) {
     if (costVariance) rows = rows.filter((p) => p.cost_variance_status === costVariance);
     return fulfillJson(route, rows);
   });
-  await page.route('**/suppliers', (route) => route.request().method() === 'GET'
+  await page.route('**/suppliers', (route) => isApiGet(route)
     ? fulfillJson(route, testSuppliers) : route.continue());
-  await page.route('**/products/archived', (route) => route.request().method() === 'GET'
+  await page.route('**/products/archived', (route) => isApiGet(route)
     ? fulfillJson(route, []) : route.continue());
 }
 

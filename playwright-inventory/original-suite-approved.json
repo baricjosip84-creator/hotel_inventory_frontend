@@ -31,7 +31,7 @@
         "TPROD-006"
       ],
       "secret": true,
-      "sha256": "64707acad3d5f4eb550ed1e7760616422727275243506f477e545486dc8ff7a7"
+      "sha256": "062ab36f44ca193d1a3d342c81cdd5f0f3ca14923f0929d15242230e30223962"
     },
     "STOCK": {
       "file": "tenant/stock/stock.spec.ts",
