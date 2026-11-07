@@ -44,19 +44,22 @@ for (const [group, entry] of Object.entries(manifest.approved_groups)) {
       assert(!idsInGroup.has(id), `Duplicate approved ID in group ${group}: ${id}`);
       idsInGroup.add(id);
     }
-    if (group === 'BULK_SAFE_01') {
+    if (group.startsWith('BULK_SAFE_')) {
       assert(body.toString().includes("'../../../support/liveOriginalSafeTest'"), `Bulk source lacks read-only network guard: ${part.file}`);
       assert(!part.ids.some(id => !/^[A-Z0-9]+-\d{3}$/.test(id)), `Invalid original ID in ${part.file}`);
     }
   }
   seenApprovedByGroup.set(group, idsInGroup);
 }
-// Do not hide previously executed tests inside the new bulk list.
-const bulkIds = seenApprovedByGroup.get('BULK_SAFE_01');
-if (bulkIds) {
-  const otherIds = new Set([...seenApprovedByGroup.entries()].filter(([name])=>name!=='BULK_SAFE_01').flatMap(([,ids])=>[...ids]));
-  for (const id of bulkIds) assert(!otherIds.has(id), `Bulk must contain only new original test IDs: ${id}`);
+// All bulk groups must be disjoint from every other previously approved group.
+const bulkGroups = [...seenApprovedByGroup.entries()].filter(([name])=>name.startsWith('BULK_SAFE_'));
+for (const [bulkName, bulkIds] of bulkGroups) {
+  const otherIds = new Set([...seenApprovedByGroup.entries()]
+    .filter(([name]) => name !== bulkName).flatMap(([,ids])=>[...ids]));
+  for (const id of bulkIds) assert(!otherIds.has(id), `Bulk cannot reuse a previously approved ID: ${bulkName}/${id}`);
 }
+const bulkIds = seenApprovedByGroup.get('BULK_SAFE_01');
+const nextBulkIds = seenApprovedByGroup.get('BULK_SAFE_02');
 // Preflight the real tenant-credential gate (no browser, network, or real credentials).
 // The same verified manifest controls which groups may authenticate on the approved live origin.
 // This catches manifest / credential-helper drift before the browser starts.
@@ -136,7 +139,7 @@ assert(workflowBody.includes('playwright.live-original.config.ts'));
 assert(workflowBody.includes("if: ${{ inputs.group != 'DISCOVER_ALL' }}"));
 // Batch 204 regressions: bulk must reuse worker-authenticated storage state and
 // API mocks must never replace document navigation with synthetic JSON.
-if (bulkIds) {
+if (bulkIds || nextBulkIds) {
   const adapter = fs.readFileSync(path.join(root, 'support/liveOriginalSafeTest.ts'), 'utf8');
   const session = fs.readFileSync(path.join(root, 'support/tenantSession.ts'), 'utf8');
   const products = fs.readFileSync(path.join(testRoot, 'tenant/products/products.spec.ts'), 'utf8');
@@ -145,7 +148,7 @@ if (bulkIds) {
     'Bulk authentication must be worker-scoped and restored per test');
   assert(adapter.includes("request.url()") && adapter.includes('approvedLogin(method,'),
     'Bulk login bootstrap must retain its network write protection');
-  assert(session.includes("PW_ORIGINAL_SUITE_GROUP === 'BULK_SAFE_01'") &&
+  assert(session.includes(".startsWith('BULK_SAFE_')") &&
     session.includes('requireDisposableTenantCredentials();'),
     'Bulk must not repeat login and must keep credential safety check');
   assert(products.includes("await page.route('**/products', (route) => isApiGet(route)"),
@@ -154,7 +157,8 @@ if (bulkIds) {
     'Supplier empty/error mocks must not intercept HTML navigation');
 }
 // The bulk selected spec files must all use the same non-write fixture adapter.
-if (bulkIds) assert.equal(bulkIds.size, 155, 'Batch 203 bulk must contain exactly 155 new IDs');
+if (bulkIds) assert.equal(bulkIds.size, 155, 'Batch 203/204 bulk must retain 155 original IDs');
+if (nextBulkIds) assert.equal(nextBulkIds.size, 250, 'Batch 205 bulk must retain 250 new original IDs');
 console.log(`PASS: Workflow dispatch options, manifest, and original test IDs match (${declared.length - 1} runnable groups).`);
 console.log(`PASS: credential-gate runtime preflight for ${preflightCount} reviewed groups; unknown groups/wrong origin/missing flags/missing credentials denied.`);
 console.log(`PASS: ${found.length} original scenarios from ${specs.length} spec files; ${allApproved.reduce((n,g)=>n+g.ids.length,0)} approved runtime ID memberships in ${Object.keys(manifest.approved_groups).length} groups.`);

@@ -18,6 +18,7 @@ on:
           - STOCK_MOVEMENTS
           - SHIPMENTS
           - BULK_SAFE_01
+          - BULK_SAFE_02
       confirmation:
         description: 'Type ORIGINALTESTS to run the selected group'
         required: true

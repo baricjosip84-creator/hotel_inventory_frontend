@@ -3,14 +3,14 @@ import { requireDisposableTenantCredentials } from './environment';
 export type { Page, Route } from '@playwright/test';
 
 /**
- * Live suite safety adapter, including the source-reviewed BULK_SAFE_01 batch.
+ * Live suite safety adapter, including source-reviewed BULK_SAFE_* batches.
  * Keep one real tenant login per worker, not one login per test; no auth
  * snapshots are written to disk or uploaded as GitHub artifacts.
  * Fresh Playwright contexts per test still isolate all test-local state.
  */
 const FRONTEND_ORIGIN = 'https://hotel-inventory-frontend-mauve.vercel.app';
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-const BULK_GROUP = 'BULK_SAFE_01';
+const BULK_GROUP_PREFIX = 'BULK_SAFE_';
 type AuthState = Awaited<ReturnType<BrowserContext['storageState']>>;
 type WorkerSession = { snapshot: AuthState; renew: () => Promise<void> };
 function tokenExpiresSoon(state: AuthState): boolean {
@@ -30,7 +30,7 @@ function tokenExpiresSoon(state: AuthState): boolean {
   return expiry <= Date.now() / 1000 + 30;
 }
 const bulkEnabled = () => process.env.PW_LIVE_ORIGINAL_READONLY === 'YES'
-  && process.env.PW_ORIGINAL_SUITE_GROUP === BULK_GROUP;
+  && (process.env.PW_ORIGINAL_SUITE_GROUP ?? '').startsWith(BULK_GROUP_PREFIX);
 
 function approvedLogin(method: string, rawUrl: string): boolean {
   if (method !== 'POST') return false;
