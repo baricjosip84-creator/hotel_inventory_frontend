@@ -7,119 +7,108 @@ const require = createRequire(import.meta.url);
 const ts = require('typescript');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FRONTEND = 'https://hotel-inventory-frontend-mauve.vercel.app';
-const keys = ['PW_LIVE_ORIGINAL_READONLY','PW_ORIGINAL_SUITE_GROUP','PW_BASE_URL','PW_BULK_SHARED_AUTH_STATE'];
-const original = Object.fromEntries(keys.map(key => [key, process.env[key]]));
-const calls = { logins: 0, contexts: 0, closed: 0, browserClosed: 0, loginNavigations: 0, locale: 0, blocked: 0, fulfilled: 0 };
-const jwt = (seconds = 3600) => `simulation.${Buffer.from(JSON.stringify({exp:Math.floor(Date.now()/1000)+seconds})).toString('base64url')}.signature`;
-const snapshot = () => ({cookies:[],origins:[{origin:FRONTEND,localStorage:[{name:'inventory_access_token',value:jwt()}]}]});
-const mockExpect = (value) => ({toBeVisible: async () => {}, toEqual: wanted => assert.deepEqual(value,wanted)});
-const playwright = { expect: mockExpect, test: {extend: fixtures => fixtures}, chromium: {launch: async () => browser} };
-const environment = { requireDisposableTenantCredentials: () => ({email:'stub@example.invalid',password:'NOT_A_REAL_PASSWORD'}) };
-const loaded = {};
+const keys = ['PW_LIVE_ORIGINAL_READONLY','PW_ORIGINAL_SUITE_GROUP','PW_BASE_URL'];
+const original = Object.fromEntries(keys.map(key => [key,process.env[key]]));
+const calls = {logins:0, contexts:0, blocked:0, continued:0, mockFulfilled:0};
+const jwt = (sec = 3600) => `pw.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now()/1000)+sec })).toString('base64url')}.signature`;
+const snapshot = id => ({cookies:[{name:'refresh',value:`cookie-${id}`,domain:'hotel-inventory-frontend-mauve.vercel.app',path:'/',expires:-1,httpOnly:true,secure:true,sameSite:'Lax'}],origins:[{origin:FRONTEND,localStorage:[{name:'inventory_access_token',value:jwt()}]}]});
+const expectMock = value => ({toBeVisible:async()=>{},toEqual:wanted=>assert.deepEqual(value,wanted)});
+const playwright = {expect:expectMock,test:{extend:fixtures=>fixtures}};
+const environment = {requireDisposableTenantCredentials:()=>({email:'stub@example.invalid',password:'NOT_A_REAL_PASSWORD'})};
 function load(rel) {
-  if (loaded[rel]) return loaded[rel];
-  const file = path.join(root,rel);
-  const res = ts.transpileModule(fs.readFileSync(file,'utf8'),{fileName:file,compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true},reportDiagnostics:true});
-  assert.equal((res.diagnostics??[]).filter(d=>d.category===ts.DiagnosticCategory.Error).length,0,`Cannot transpile ${rel}`);
-  const m = new Module(file); m.filename=file; m.paths=Module._nodeModulePaths(path.dirname(file));
-  m.require=(id)=> {
-    if(id==='@playwright/test')return playwright;
-    if(id==='./environment')return environment;
-    if(id==='./liveOriginalSafeTest')return load('support/liveOriginalSafeTest.ts');
-    if(id.startsWith('.')) throw Error(`Unexpected local import in ${rel}: ${id}`);
-    return require(id);
-  };
-  m._compile(res.outputText,file);loaded[rel]=m.exports;return loaded[rel];
+  const file=path.join(root,rel);
+  const res=ts.transpileModule(fs.readFileSync(file,'utf8'),{fileName:file,compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true},reportDiagnostics:true});
+  assert.equal((res.diagnostics??[]).filter(x=>x.category===ts.DiagnosticCategory.Error).length,0,`Cannot transpile ${rel}`);
+  const m=new Module(file);m.filename=file;m.paths=Module._nodeModulePaths(path.dirname(file));
+  m.require=(id)=>id==='@playwright/test'?playwright:id==='./environment'?environment:require(id);
+  m._compile(res.outputText,file);return m.exports;
 }
-const browser = {
-  newContext: async options => {
-    calls.contexts++; assert.equal(options.baseURL,FRONTEND);assert.equal(options.serviceWorkers,'block');
-    return {
-      route: async (pattern,handler) => { assert.equal(pattern,'**/*'); assert.equal(typeof handler,'function'); },
-      newPage: async () => ({
-        addInitScript: async()=>{calls.locale++},goto:async url=>assert.equal(url,'/login'),
-        locator:()=>({fill:async()=>{}, click:async()=>{calls.logins++}}), getByRole:()=>({})
-      }),
-      storageState: async()=>snapshot(), close:async()=>{calls.closed++}
-    };
-  },close:async()=>{calls.browserClosed++}
-};
-const fixture = load('support/liveOriginalSafeTest.ts');
-const tenantSession=load('support/tenantSession.ts');
-const globalSetup=load('support/bulkSharedAuthSetup.ts').default;
-try {
-  process.env.PW_LIVE_ORIGINAL_READONLY='YES';
-  process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_02';
-  process.env.PW_BASE_URL=FRONTEND;
-  delete process.env.PW_BULK_SHARED_AUTH_STATE;
-  await assert.rejects(fixture.test.bulkSession[0]({browser},async()=>{}),/Missing bulk auth setup/);
-  assert.equal(calls.logins,0);
-  await globalSetup();
-  assert.equal(calls.logins,1,'Exactly ONE bootstrap login per entire GitHub job');
-  assert.equal(calls.browserClosed,1);
-  const captured=JSON.parse(process.env.PW_BULK_SHARED_AUTH_STATE);
-  assert.equal(captured.origins[0].origin,FRONTEND);
-  let restored=0;
-  for(let worker=0;worker<11;worker++) {
-    await fixture.test.bulkSession[0]({browser}, async session => {
-      for(let i=0;i<25;i++) {
-        await fixture.test.storageState({bulkSession:session},async state=>{
-          assert.equal(state.origins[0].origin,FRONTEND);restored++;
-        });
-      }
-      // Worker exits/fails: creating a replacement worker MUST NOT log in again.
-    });
-  }
-  assert.equal(restored,275);
-  assert.equal(calls.logins,1,'Worker restarts must not trigger new logins or rate limits');
-  // Unlike a restart, a genuinely near-expired token must renew once safely.
-  await fixture.test.bulkSession[0]({browser},async session=>{
-    session.snapshot.origins[0].localStorage[0].value=jwt(10);
-    await fixture.test.storageState({bulkSession:session},async state=>{
-      assert.notEqual(state.origins[0].localStorage[0].value,session.snapshot.origins[0].localStorage[0].value+'-stale');
-      const token=state.origins[0].localStorage[0].value;
-      assert(token!==null && token.split('.').length===3);
-    });
-  });
-  assert.equal(calls.logins,2,'A genuinely expiring token should renew once');
-  let navigated = '';
-  await tenantSession.loginAsTenant({addInitScript:async()=>{},goto:async url=>{navigated=url;calls.loginNavigations++;},getByRole:()=>({})});
-  assert.equal(navigated,'/dashboard','Restored bulk login must still open the dashboard');
-  const contextHandlers=[];const pageHandlers=[];
-  const page={
-    context:()=>({route:async (_pattern,cb)=>contextHandlers.push(cb)}),
-    route:async (_pattern,cb)=>pageHandlers.push(cb)
+const fixture=load('support/liveOriginalSafeTest.ts');
+const testHelpers=load('support/tenantSession.ts');
+const browser={newContext:async options=>{
+  calls.contexts++;assert.equal(options.baseURL,FRONTEND);assert.equal(options.serviceWorkers,'block');
+  const id=calls.contexts;
+  return {
+    route:async (pattern,cb)=>{ assert.equal(pattern,'**/*'); assert.equal(typeof cb,'function'); },
+    newPage:async ()=>({
+      addInitScript:async()=>{},goto:async url=>assert.equal(url,'/login'),
+      locator:()=>({fill:async()=>{},click:async()=>{calls.logins++}}),getByRole:()=>({})
+    }),
+    storageState:async()=>snapshot(id),close:async()=>{}
   };
-  await fixture.test.page({page}, async guardedPage=>{
-    // User-defined mocked POST: Playwright runs page handlers before context handlers.
-    await guardedPage.route('**/inventory-imports/preview', async route => route.fulfill({status:200,body:'{}'}));
-    const syntheticWrite={request:()=>({method:()=> 'POST',url:()=> FRONTEND+'/api/inventory-imports/preview'}),fulfill:async()=>{calls.fulfilled++}};
-    await pageHandlers[0](syntheticWrite);
-    assert.equal(calls.fulfilled,1,'Synthetic write should be fulfilled locally');
-    assert.equal(calls.blocked,0,'Mocks must not be mistaken for live writes');
-    const unmocked = {request:()=>({method:()=> 'POST',url:()=> FRONTEND+'/api/inventory-imports/commit'}),abort:async()=>{calls.blocked++}};
-    await contextHandlers[0](unmocked);
-    assert.equal(calls.blocked,1,'Unmocked write must be blocked at network boundary');
-  }).then(()=>{throw Error('Unmocked POST must make test fail closed')},error=>assert.match(error.message,/Expected values|Unmocked production write attempted/));
-  // A page-level route that calls continue on a write must be blocked too.
-  const ctx=[],handlers=[];
-  const page2={context:()=>({route:async(_pattern,cb)=>ctx.push(cb)}),route:async(_pattern,cb)=>handlers.push(cb)};
-  await fixture.test.page({page:page2},async guarded=>{
-    await guarded.route('**/*',route=>route.continue());
-    await assert.rejects(handlers[0]({request:()=>({method:()=> 'PATCH',url:()=> FRONTEND+'/api/stock'}),abort:async()=>{calls.blocked++}}),/unmocked write/);
-  }).then(()=>{throw Error('page.route write continuation should fail test')},error=>assert.match(error.message,/Expected values|Unmocked production write attempted/));
-  // Existing single-page groups retain original flow.
-  process.env.PW_ORIGINAL_SUITE_GROUP='PRODUCTS';
+}};
+async function runWorker() {
+  let stored;
   await fixture.test.bulkSession[0]({browser},async session=>{
-    assert.deepEqual(session.snapshot,{cookies:[],origins:[]});
+    for(let i=0;i<25;i++) await fixture.test.storageState({bulkSession:session},async state=>{
+      assert.equal(state.cookies[0].value,`cookie-${stored?.id ?? calls.contexts}`);
+    });
+    stored={id:calls.contexts,session};
   });
-  assert.equal(calls.logins,2);
-  process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_02';
-  process.env.PW_BASE_URL='https://invalid.example.invalid';
+  return stored;
+}
+const makeRequest=(method, path)=>({method:()=>method,url:()=>FRONTEND+path});
+async function runGuard(callback) {
+  const contextHandlers=[];const pageHandlers=[];const finished=[];
+  const page={
+    context:()=>({route:async(pattern,cb)=>{assert.equal(pattern,'**/*');contextHandlers.push(cb)}}),
+    on:(event,handler)=>{if(event==='requestfinished')finished.push(handler)},
+    route:async(_pattern,cb)=>pageHandlers.push(cb)
+  };
+  await fixture.test.page({page},async guarded=>callback({guarded,contextHandlers,pageHandlers,finished}));
+}
+try {
+  process.env.PW_LIVE_ORIGINAL_READONLY='YES';process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_02_RECHECK';process.env.PW_BASE_URL=FRONTEND;
+  const workers=[];
+  for(let i=0;i<3;i++)workers.push(await runWorker());
+  assert.equal(calls.logins,3,'One login for each of 3 workers');
+  assert.equal(new Set(workers.map(x=>`cookie-${x.id}`)).size,3,'Unique worker identities');
+  // A genuinely near-expired worker renews only its own cookie/session.
+  workers[0].session.snapshot.origins[0].localStorage[0].value=jwt(10);
+  await fixture.test.storageState({bulkSession:workers[0].session},async state=>{
+    assert(state.origins[0].localStorage[0].value!==jwt(10));
+  });
+  assert.equal(calls.logins,4,'Only expiring worker renews');
+  // Simulate an application-startup POST. It MUST be blocked before live network;
+  // an aborted request is not a completed mutation or a test failure.
+  await runGuard(async({contextHandlers})=>{
+    const req=makeRequest('POST','/api/runtime/heartbeat');
+    const r={request:()=>req,abort:async()=>{calls.blocked++},continue:async()=>{calls.continued++}};
+    await contextHandlers[0](r);
+    assert.equal(calls.blocked,1);
+    assert.equal(calls.continued,0);
+  });
+  // Fulfilled synthetic POST is allowed and a requestfinished event is NOT
+  // treated as a real live mutation.
+  await runGuard(async({guarded,pageHandlers,finished})=>{
+    await guarded.route('**/preview',route=>route.fulfill({status:200,body:'{}'}));
+    const req=makeRequest('POST','/api/inventory-imports/preview');
+    await pageHandlers[0]({request:()=>req,fulfill:async()=>{calls.mockFulfilled++}});
+    finished[0](req);
+  });
+  assert.equal(calls.mockFulfilled,1);
+  // A registered page route cannot send a mutation to the live network.
+  await runGuard(async({guarded,pageHandlers})=>{
+    await guarded.route('**/*',route=>route.continue());
+    await assert.rejects(pageHandlers[0]({request:()=>makeRequest('PATCH','/api/stock'),abort:async()=>{calls.blocked++}}),/unmocked write/);
+  });
+  // Any completed unmocked non-auth write must still fail the test.
+  await assert.rejects(runGuard(async({finished})=>{
+    finished[0](makeRequest('POST','/api/stock/adjust'));
+  }),/Expected values|unauthorized live write/);
+  let navigated='';
+  await testHelpers.loginAsTenant({addInitScript:async()=>{},goto:async url=>{navigated=url},getByRole:()=>({})});
+  assert.equal(navigated,'/dashboard');
+  process.env.PW_ORIGINAL_SUITE_GROUP='PRODUCTS';
+  await fixture.test.bulkSession[0]({browser},async session=>assert.deepEqual(session.snapshot,{cookies:[],origins:[]}));
+  assert.equal(calls.logins,4,'Nonbulk group does not use worker authentication');
+  process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_02_RECHECK';
+  process.env.PW_BASE_URL='https://wrong.example.invalid';
   await assert.rejects(fixture.test.bulkSession[0]({browser},async()=>{}),/exact reviewed production origin/);
-  console.log('PASS: One job-wide in-memory login, 275 restored contexts over 11 simulated worker restarts, plus one expiring-token renewal.');
-  console.log('PASS: Dashboard navigation semantics restored; an unmocked POST and page-route PATCH are blocked; mocked POST allowed.');
-  console.log('PASS: Wrong origin and absent bootstrap session fail closed; previous nonbulk groups unaffected.');
+  console.log('PASS: Three independent worker login/refresh sessions; 25 restored contexts per worker; expiry renews only one.');
+  console.log('PASS: Production startup POST aborted but not misreported as a completed write.');
+  console.log('PASS: Synthetic POST fulfillment tracked; page-route write continuation aborted; unmocked completed write fails.');
+  console.log('PASS: Dashboard helper and wrong-origin / legacy nonbulk behavior.');
 } finally {
-  for(const [key,value] of Object.entries(original)) if(value===undefined)delete process.env[key]; else process.env[key]=value;
+  for(const [key,value] of Object.entries(original)) if(value===undefined)delete process.env[key];else process.env[key]=value;
 }

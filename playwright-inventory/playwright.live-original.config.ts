@@ -32,8 +32,7 @@ const testMatch = entries.map(entry => `**/${entry.file}`);
 export default defineConfig({
   testDir: './tests',
   testMatch,
-  // Shared in-memory login before Chromium workers begin; prevents re-login on test failures.
-  globalSetup: GROUP.startsWith('BULK_SAFE_') ? './support/bulkSharedAuthSetup.ts' : undefined,
+  // Each Chromium worker owns a distinct refresh-cookie session; no job-wide shared cookie.
   // Original ID is anchored to its Playwright title; unique across the complete 9,900.
   grep: new RegExp(`\\b(?:${selectedIds.join('|')})\\b`),
   fullyParallel: false,

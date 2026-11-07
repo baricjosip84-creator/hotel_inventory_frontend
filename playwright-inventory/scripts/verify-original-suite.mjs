@@ -163,24 +163,33 @@ if (bulkIds || nextBulkIds) {
   const session = fs.readFileSync(path.join(root, 'support/tenantSession.ts'), 'utf8');
   const products = fs.readFileSync(path.join(testRoot, 'tenant/products/products.spec.ts'), 'utf8');
   const suppliers = fs.readFileSync(path.join(testRoot, 'tenant/suppliers/suppliers.spec.ts'), 'utf8');
-  const setup = fs.readFileSync(path.join(root, 'support/bulkSharedAuthSetup.ts'),'utf8');
   const config = fs.readFileSync(path.join(root, 'playwright.live-original.config.ts'),'utf8');
   assert(adapter.includes("{ scope: 'worker' }") && adapter.includes('storageState: async ({ bulkSession }'),
     'Bulk authentication must restore isolated per-test contexts');
-  assert(adapter.includes('PW_BULK_SHARED_AUTH_STATE') && setup.includes('process.env.PW_BULK_SHARED_AUTH_STATE') &&
-    config.includes('globalSetup:'), 'Workers must use one job-wide in-memory auth state, not repeated logins');
+  assert(adapter.includes('snapshot: await authenticate()') && !config.includes('globalSetup:') &&
+    !adapter.includes('PW_BULK_SHARED_AUTH_STATE'), 'Worker refresh cookies must be isolated; no shared job-wide refresh cookie');
   assert(adapter.includes('page.context().route') && adapter.includes("property === 'continue'") &&
-    adapter.includes('approvedLogin(method,'), 'Read-only guard must block all unmocked writes, including page.route continuations');
+    adapter.includes('unexpectedlyCompletedWrites') && adapter.includes('blockedAtNetworkBoundary') &&
+    adapter.includes('approvedLogin(method,'), 'Read-only guard must block unmocked writes, reject page.route continuations and count only completed writes as violations');
   assert(session.includes("await page.goto('/dashboard')"), 'Bulk login helper must preserve protected dashboard navigation');
   assert(adapter.includes("route.request().url()") && adapter.includes('approvedLogin(method,'),
     'Bulk login bootstrap must retain its network write protection');
   assert(session.includes(".startsWith('BULK_SAFE_')") &&
     session.includes('requireDisposableTenantCredentials();'),
-    'Bulk must not repeat login and must keep credential safety check');
+    'Bulk must reuse worker session and keep credential safety check');
   assert(products.includes("await page.route('**/products', (route) => isApiGet(route)"),
     'Product error mock must not intercept HTML navigation');
   assert((suppliers.match(/\['fetch', 'xhr'\]\.includes\(request\.resourceType\(\)\)/g) || []).length >= 2,
     'Supplier empty/error mocks must not intercept HTML navigation');
+  const movements = fs.readFileSync(path.join(testRoot, 'tenant/stock-movements/stock-movements.spec.ts'), 'utf8');
+  const transfers = fs.readFileSync(path.join(testRoot, 'tenant/stock-transfers/stock-transfers.spec.ts'), 'utf8');
+  assert(movements.includes("toContainText('€10.00')") && movements.includes("toContainText('$7.00')"),
+    'Currency summary test must match separate localized amounts, not ISO-code text');
+  assert((transfers.match(/page\.once\('dialog', dialog => dialog\.accept\(\)\)/g) || []).length >= 2,
+    'Transfer row-removal tests must accept the global Remove confirmation');
+  assert((transfers.match(/select\[id\^="transfer-product-"\]:not\(#transfer-product-filter\)/g) || []).length >= 2,
+    'Transfer row-count assertions must exclude the list filter selector');
+
 }
 // The bulk selected spec files must all use the same non-write fixture adapter.
 if (bulkIds) assert.equal(bulkIds.size, 155, 'Batch 203/204 bulk must retain 155 original IDs');

@@ -1,7 +1,7 @@
 {
   "expected_suite_ids": 9900,
   "expected_spec_files": 152,
-  "source_baseline": "Batch 205: BULK_SAFE_02 ran 250 originals \u2014 144 PASS / 106 FAIL; Batch 206 rechecks 96 failures after fixing test harness, with 10 unresolved product-behavior cases retained as unverified.",
+  "source_baseline": "Batch 205: BULK_SAFE_02 ran 250 originals — 144 PASS / 106 FAIL; Batch 206 rechecks 96 failures after fixing test harness, with 10 unresolved product-behavior cases retained as unverified.",
   "live_origin": "https://hotel-inventory-frontend-mauve.vercel.app",
   "approved_groups": {
     "LOGIN": {
@@ -92,7 +92,7 @@
         "TSMV-010"
       ],
       "secret": true,
-      "sha256": "832fbdb3ad9d6720ed4a7ab8d7f65acedaafdfc1dd5da34d99e76be9bb230f2c"
+      "sha256": "25957063d0e48f150669555eb06b22673fd55f81102673fe9458f42a7a2274eb"
     },
     "SHIPMENTS": {
       "file": "tenant/shipments/shipments.spec.ts",
@@ -139,7 +139,7 @@
             "TSTR-021",
             "TSTR-022"
           ],
-          "sha256": "9cb7dc4415741a92fdb0cd2572189e0dbae1e204a38c842a03740a790fcd3d4e"
+          "sha256": "499a8231d4b463c9b7d659d6d12279d381d7852e86c2bab3cae1e52f8e9639a3"
         },
         {
           "file": "tenant/stock-movements/stock-movements.spec.ts",
@@ -175,7 +175,7 @@
             "TSMV-039",
             "TSMV-040"
           ],
-          "sha256": "832fbdb3ad9d6720ed4a7ab8d7f65acedaafdfc1dd5da34d99e76be9bb230f2c"
+          "sha256": "25957063d0e48f150669555eb06b22673fd55f81102673fe9458f42a7a2274eb"
         },
         {
           "file": "tenant/shipments/shipments.spec.ts",
@@ -366,7 +366,7 @@
             "TSMV-076",
             "TSMV-077"
           ],
-          "sha256": "832fbdb3ad9d6720ed4a7ab8d7f65acedaafdfc1dd5da34d99e76be9bb230f2c"
+          "sha256": "25957063d0e48f150669555eb06b22673fd55f81102673fe9458f42a7a2274eb"
         },
         {
           "file": "tenant/shipments/shipments.spec.ts",
@@ -630,7 +630,7 @@
             "TSTR-079",
             "TSTR-080"
           ],
-          "sha256": "9cb7dc4415741a92fdb0cd2572189e0dbae1e204a38c842a03740a790fcd3d4e"
+          "sha256": "499a8231d4b463c9b7d659d6d12279d381d7852e86c2bab3cae1e52f8e9639a3"
         }
       ],
       "secret": true,
@@ -662,7 +662,7 @@
             "TSMV-073",
             "TSMV-074"
           ],
-          "sha256": "832fbdb3ad9d6720ed4a7ab8d7f65acedaafdfc1dd5da34d99e76be9bb230f2c"
+          "sha256": "25957063d0e48f150669555eb06b22673fd55f81102673fe9458f42a7a2274eb"
         },
         {
           "file": "tenant/reports/reports.spec.ts",
@@ -768,7 +768,7 @@
             "TSTR-026",
             "TSTR-055"
           ],
-          "sha256": "9cb7dc4415741a92fdb0cd2572189e0dbae1e204a38c842a03740a790fcd3d4e"
+          "sha256": "499a8231d4b463c9b7d659d6d12279d381d7852e86c2bab3cae1e52f8e9639a3"
         }
       ],
       "secret": true

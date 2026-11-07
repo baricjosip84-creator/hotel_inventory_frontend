@@ -397,8 +397,10 @@ test.describe('Stock Movements — deep links, legacy proof and safe evidence (B
  test('TSMV-065 Mixed-currency inbound summary keeps currencies distinct',async({page})=>{
   await openMovementLedger(page,{summary:{total_rows:2,inbound_rows:2,received_cost_by_currency:[{currency_code:'EUR',received_cost:10},{currency_code:'USD',received_cost:7}]}});
   const summary=page.getByLabel('Filtered stock movement summary');
-  await expect(summary).toContainText('EUR');
-  await expect(summary).toContainText('USD');
+  // Dashboard renders locale currency symbols, not ISO currency codes.
+  // The two amounts must remain separate (not added into a fictitious total).
+  await expect(summary).toContainText('€10.00');
+  await expect(summary).toContainText('$7.00');
   await expect(summary).toContainText('currencies are never added together');
  });
  test('TSMV-066 No user identity is explicitly attributed to system or support actor',async({page})=>{
