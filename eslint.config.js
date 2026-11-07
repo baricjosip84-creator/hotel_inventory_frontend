@@ -13,6 +13,7 @@ export default defineConfig([
     'playwright-report',
     'playwright-deployment-report',
     'test-results',
+    'playwright-inventory/**',
   ]),
   {
     files: ['**/*.{ts,tsx}'],
