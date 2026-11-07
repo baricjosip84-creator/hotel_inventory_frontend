@@ -14,7 +14,15 @@ const stockRows=[
  {id:'pw-stock-mismatch',product_id:'pw-product-cleaner',product_name:'Synthetic Cleaner',product_category:'Cleaning',product_unit:'L',storage_location_id:'pw-location-storage',storage_location_name:'Storage Room',quantity:15,reserved_quantity:0,available_lot_quantity:12,usable_lot_quantity:12,effective_min_quantity:5,version:4}
 ];
 async function openStock(page:Page,rows:unknown[]=stockRows,url='/stock'){
- await loginAsTenant(page);await page.route(stockEndpoint,r=>fulfillJson(r,rows));await page.goto(url);
+ await loginAsTenant(page);
+ // The **/stock glob also matches a browser DOCUMENT request for /stock.
+ // Intercept only API reads; otherwise Playwright would replace the app HTML with JSON.
+ await page.route(stockEndpoint,route=>{
+  const request=route.request();
+  if(request.method()!=='GET'||!['fetch','xhr'].includes(request.resourceType()))return route.continue();
+  return fulfillJson(route,rows);
+ });
+ await page.goto(url);
  await expect(page.getByText('Stock workspace',{exact:true})).toBeVisible();
 }
 const positionRows=(page:Page)=>page.locator('.stock-page__desktop-table tbody tr');

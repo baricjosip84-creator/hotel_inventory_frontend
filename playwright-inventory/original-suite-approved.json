@@ -46,7 +46,7 @@
         "TST-010"
       ],
       "secret": true,
-      "sha256": "51926a5d1ddd73388e4fd3ae1a85126ca6157c650c7d35b78aeb2169ae9276f8"
+      "sha256": "3a77136b099312e4aac8a743f28e180ccf0be654c9fecfbdd4b0730a2ec24686"
     },
     "SUPPLIERS": {
       "file": "tenant/suppliers/suppliers.spec.ts",
