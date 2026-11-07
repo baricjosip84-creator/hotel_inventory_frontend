@@ -327,9 +327,9 @@ test.describe('Stock — selection, lot governance and controlled stock actions 
   await openStock(page,stockRows.map(r=>r.id==='pw-stock-empty'?{...r,version:0}:r));
   await selectStockByName(page,'Synthetic Plates');await page.getByRole('button',{name:'Count',exact:true}).first().click();
   await page.locator('#stock-action-quantity').fill('-1');
-  await expect(page.getByText('Counted quantity must be zero or greater.')).toBeVisible();
+  await expect(page.getByText('Counted quantity must be zero or greater.',{exact:true}).last()).toBeVisible();
   await page.locator('#stock-action-quantity').fill('0');
-  await expect(page.getByText('Re-enter the physical count after refreshing this stock position.')).toBeVisible();
+  await expect(page.getByText('Re-enter the physical count after refreshing this stock position.',{exact:true}).last()).toBeVisible();
   await expect(page.getByRole('button',{name:'Apply Physical Count',exact:true})).toBeDisabled();
  });
  test('TST-041 VERSION_CONFLICT in mocked Count POST clears stale count entry',async({page})=>{
@@ -347,9 +347,9 @@ test.describe('Stock — selection, lot governance and controlled stock actions 
   await openStock(page,[tracked]);await selectStockByName(page,'Synthetic Coffee');
   await page.getByRole('button',{name:'Adjust',exact:true}).first().click();
   await page.locator('#stock-adjustment-change').fill('1');
-  await expect(page.getByText('This product requires a lot or batch number for added stock.')).toBeVisible();
+  await expect(page.getByText('This product requires a lot or batch number for added stock.',{exact:true}).last()).toBeVisible();
   await page.locator('#stock-action-lot').fill('PW-TRACK-001');
-  await expect(page.getByText('This product requires an expiry date for added stock.')).toBeVisible();
+  await expect(page.getByText('This product requires an expiry date for added stock.',{exact:true}).last()).toBeVisible();
   await page.locator('#stock-action-expiry').fill('2030-05-10');
   await expect(page.getByRole('button',{name:'Manual Adjustment',exact:true})).toBeEnabled();
  });
@@ -357,9 +357,9 @@ test.describe('Stock — selection, lot governance and controlled stock actions 
   await openStock(page);await selectStockByName(page,'Synthetic Coffee');
   await page.getByRole('button',{name:'Adjust',exact:true}).first().click();
   await page.locator('#stock-adjustment-change').fill('0');
-  await expect(page.getByText('Adjustment must be a non-zero number.')).toBeVisible();
+  await expect(page.getByText('Adjustment must be a non-zero number.',{exact:true}).last()).toBeVisible();
   await page.locator('#stock-adjustment-change').fill('-31');
-  await expect(page.getByText('Adjustment cannot result in negative stock.')).toBeVisible();
+  await expect(page.getByText('Adjustment cannot result in negative stock.',{exact:true}).last()).toBeVisible();
   await expect(page.getByRole('button',{name:'Manual Adjustment',exact:true})).toBeDisabled();
  });
  test('TST-044 Adjustment resulting in reserved-stock shortfall needs acknowledgment',async({page})=>{

@@ -1,7 +1,7 @@
 {
   "expected_suite_ids": 9900,
   "expected_spec_files": 152,
-  "source_baseline": "Batch 208: Batch 207 96-ID recheck yielded 56 PASS / 40 FAIL. New recheck selects 39 failed-only IDs; TDASH-049 held for management-permission acceptance. Previous 10 Batch 206 quarantines unchanged.",
+  "source_baseline": "Batch 209: Batch 208 39-ID run 23 PASS, 3 FAIL, 13 NOT RUN (maxFailures=3). Batch 209 selects 14 tests (TST-040 plus 13 not-run), holds TST-038/039 pending Consume permissions. Previously passed IDs excluded.",
   "live_origin": "https://hotel-inventory-frontend-mauve.vercel.app",
   "approved_groups": {
     "LOGIN": {
@@ -46,7 +46,7 @@
         "TST-010"
       ],
       "secret": true,
-      "sha256": "6df454c79d6bbf846d9af2b6e084150c51475c03db2bec6298299946245cb7f3"
+      "sha256": "64db75883cf60929dc2444eb3fee2ccf2f58381af96f5504de1f3a107a4db5e2"
     },
     "SUPPLIERS": {
       "file": "tenant/suppliers/suppliers.spec.ts",
@@ -256,7 +256,7 @@
             "TST-018",
             "TST-019"
           ],
-          "sha256": "6df454c79d6bbf846d9af2b6e084150c51475c03db2bec6298299946245cb7f3"
+          "sha256": "64db75883cf60929dc2444eb3fee2ccf2f58381af96f5504de1f3a107a4db5e2"
         },
         {
           "file": "tenant/storage-locations/storage-locations.spec.ts",
@@ -559,7 +559,7 @@
             "TST-069",
             "TST-070"
           ],
-          "sha256": "6df454c79d6bbf846d9af2b6e084150c51475c03db2bec6298299946245cb7f3"
+          "sha256": "64db75883cf60929dc2444eb3fee2ccf2f58381af96f5504de1f3a107a4db5e2"
         },
         {
           "file": "tenant/storage-locations/storage-locations.spec.ts",
@@ -752,7 +752,7 @@
             "TST-059",
             "TST-060"
           ],
-          "sha256": "6df454c79d6bbf846d9af2b6e084150c51475c03db2bec6298299946245cb7f3"
+          "sha256": "64db75883cf60929dc2444eb3fee2ccf2f58381af96f5504de1f3a107a4db5e2"
         },
         {
           "file": "tenant/storage-locations/storage-locations.spec.ts",
@@ -824,7 +824,32 @@
             "TST-057",
             "TST-058"
           ],
-          "sha256": "6df454c79d6bbf846d9af2b6e084150c51475c03db2bec6298299946245cb7f3"
+          "sha256": "64db75883cf60929dc2444eb3fee2ccf2f58381af96f5504de1f3a107a4db5e2"
+        }
+      ],
+      "secret": true
+    },
+    "BULK_SAFE_02_RECHECK_3": {
+      "entries": [
+        {
+          "file": "tenant/stock/stock.spec.ts",
+          "ids": [
+            "TST-040",
+            "TST-042",
+            "TST-043",
+            "TST-044",
+            "TST-048",
+            "TST-049",
+            "TST-051",
+            "TST-052",
+            "TST-053",
+            "TST-054",
+            "TST-055",
+            "TST-056",
+            "TST-057",
+            "TST-058"
+          ],
+          "sha256": "64db75883cf60929dc2444eb3fee2ccf2f58381af96f5504de1f3a107a4db5e2"
         }
       ],
       "secret": true
@@ -1255,5 +1280,62 @@
     "separately_unverified": {
       "TDASH-049": "GET setup checklist is permission-gated; role capability not proven for live tenant. No fake pass."
     }
+  },
+  "batch_208_last_execution": {
+    "total": 39,
+    "passed": 23,
+    "failed": 3,
+    "not_run": 13,
+    "passed_ids": [
+      "TDASH-050",
+      "TDASH-052",
+      "TDASH-054",
+      "TDASH-057",
+      "TDASH-059",
+      "TDASH-060",
+      "TDASH-061",
+      "TDASH-062",
+      "TDASH-064",
+      "TDASH-065",
+      "TDASH-067",
+      "TDASH-069",
+      "TDASH-070",
+      "TDASH-071",
+      "TDASH-072",
+      "TDASH-075",
+      "TDASH-076",
+      "TDASH-077",
+      "TDASH-078",
+      "TST-029",
+      "TST-030",
+      "TST-031",
+      "TST-036"
+    ],
+    "failed_ids": [
+      "TST-038",
+      "TST-039",
+      "TST-040"
+    ],
+    "not_run_ids": [
+      "TST-042",
+      "TST-043",
+      "TST-044",
+      "TST-048",
+      "TST-049",
+      "TST-051",
+      "TST-052",
+      "TST-053",
+      "TST-054",
+      "TST-055",
+      "TST-056",
+      "TST-057",
+      "TST-058"
+    ],
+    "log_file": "logs_114893437246.zip",
+    "notes": "GitHub stopped after 3 failures; 13 tests never started. 23 PASS are not rerun."
+  },
+  "batch_209_held_unverified": {
+    "TST-038": "Stock Consume validation requires effective stock.consume AND inventory usage recording permission; production account rendered a different default action, not the Consume Stock submit button. Do not claim PASS.",
+    "TST-039": "Stock Consume reservation check cannot be evaluated if tenant cannot select Consume action; prior run filled Count form and consumption warning never appeared. Do not claim PASS."
   }
 }

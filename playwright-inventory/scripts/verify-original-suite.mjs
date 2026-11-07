@@ -55,13 +55,14 @@ for (const [group, entry] of Object.entries(manifest.approved_groups)) {
 // explicit, source-fingerprinted retry of previously failed BULK_SAFE_02 IDs.
 const retryGroup = 'BULK_SAFE_02_RECHECK';
 const secondRetryGroup = 'BULK_SAFE_02_RECHECK_2';
+const thirdRetryGroup = 'BULK_SAFE_02_RECHECK_3';
 const originalGroup = 'BULK_SAFE_02';
 const bulkGroups = [...seenApprovedByGroup.entries()].filter(([name])=>name.startsWith('BULK_SAFE_'));
 for (const [bulkName, bulkIds] of bulkGroups) {
   const otherIds = new Set([...seenApprovedByGroup.entries()]
     .filter(([name]) => name !== bulkName && !(
-      (new Set([originalGroup,retryGroup,secondRetryGroup]).has(name) &&
-       new Set([originalGroup,retryGroup,secondRetryGroup]).has(bulkName))
+      (new Set([originalGroup,retryGroup,secondRetryGroup,thirdRetryGroup]).has(name) &&
+       new Set([originalGroup,retryGroup,secondRetryGroup,thirdRetryGroup]).has(bulkName))
     )).flatMap(([,ids])=>[...ids]));
   for (const id of bulkIds) assert(!otherIds.has(id), `Bulk cannot reuse another group's ID: ${bulkName}/${id}`);
 }
@@ -95,6 +96,42 @@ if (seenApprovedByGroup.has(secondRetryGroup)) {
   assert([...selected].every(id => !manifest.batch_205_last_execution.passed_ids.includes(id)), 'Never rerun the first 144 passes');
   assert.equal(new Set([...selected, ...run.passed_ids, ...held]).size, 96);
   console.log('PASS: Batch 208 selects exactly 39 failed-only IDs; 56 prior passes and 1 permission-dependent case excluded.');
+}
+
+if (seenApprovedByGroup.has(thirdRetryGroup)) {
+  const run = manifest.batch_208_last_execution;
+  assert(run && run.total===39 && run.passed===23 && run.failed===3 && run.not_run===13,
+    'Batch 208 log result counts unexpectedly changed');
+  const prior = seenApprovedByGroup.get(secondRetryGroup);
+  assert.equal(prior.size, 39);
+  const all = [...run.passed_ids,...run.failed_ids,...run.not_run_ids];
+  assert.equal(new Set(all).size,39);
+  assert.deepEqual(new Set(all),prior,'Batch 208 history must match its selected IDs');
+  const held = new Set(Object.keys(manifest.batch_209_held_unverified));
+  assert.deepEqual(held,new Set(['TST-038','TST-039']),
+    'Consumption-permission tests must be tracked, not silently omitted');
+  const selected = seenApprovedByGroup.get(thirdRetryGroup);
+  assert.equal(selected.size,14);
+  assert.deepEqual(selected,new Set([...run.failed_ids,...run.not_run_ids].filter(id=>!held.has(id))),
+    'Recheck must be exactly failed or not-run IDs, except permission-held cases');
+  assert([...selected].every(id=>!run.passed_ids.includes(id)),'Do not repeat the 23 Batch 208 passes');
+  assert([...selected].every(id=>!manifest.batch_207_last_execution.passed_ids.includes(id)),'Do not repeat Batch 207 passes');
+  assert([...selected].every(id=>!manifest.batch_205_last_execution.passed_ids.includes(id)),'Do not repeat Batch 205 passes');
+  assert.equal(new Set([...selected,...held,...run.passed_ids]).size,39);
+  const stock = fs.readFileSync(path.join(testRoot,'tenant/stock/stock.spec.ts'),'utf8');
+  for (const error of ['Counted quantity must be zero or greater.',
+     'Re-enter the physical count after refreshing this stock position.',
+     'This product requires a lot or batch number for added stock.',
+     'This product requires an expiry date for added stock.',
+     'Adjustment must be a non-zero number.',
+     'Adjustment cannot result in negative stock.']) {
+    assert(stock.includes(`getByText('${error}',{exact:true}).last()`),
+      `Previously ambiguous stock risk/action message not disambiguated: ${error}`);
+  }
+  const config = fs.readFileSync(path.join(root,'playwright.live-original.config.ts'),'utf8');
+  assert(config.includes("'BULK_SAFE_02_RECHECK_3'].includes(GROUP) ? 1"),
+    'Batch 209 must run single-worker to avoid rapid parallel logins');
+  console.log('PASS: Batch 209 rechecks exactly 14 unverified IDs, holds two permission cases; all 23 latest passes excluded.');
 }
 const bulkIds = seenApprovedByGroup.get('BULK_SAFE_01');
 const nextBulkIds = seenApprovedByGroup.get('BULK_SAFE_02');

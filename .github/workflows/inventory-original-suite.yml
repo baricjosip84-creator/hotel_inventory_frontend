@@ -21,6 +21,7 @@ on:
           - BULK_SAFE_02
           - BULK_SAFE_02_RECHECK
           - BULK_SAFE_02_RECHECK_2
+          - BULK_SAFE_02_RECHECK_3
       confirmation:
         description: 'Type ORIGINALTESTS to run the selected group'
         required: true
@@ -58,6 +59,7 @@ jobs:
           node scripts/verify-original-suite.mjs
           node scripts/check-bulk-auth-fixture.mjs
           node scripts/check-stock-route-safety.mjs
+          node scripts/check-batch-209-stock-contract.mjs
       - name: Discover all 9,900 authored original tests (no browser, no credentials)
         if: ${{ inputs.group == 'DISCOVER_ALL' }}
         env:

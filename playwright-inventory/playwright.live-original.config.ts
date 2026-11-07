@@ -36,7 +36,7 @@ export default defineConfig({
   // Original ID is anchored to its Playwright title; unique across the complete 9,900.
   grep: new RegExp(`\\b(?:${selectedIds.join('|')})\\b`),
   fullyParallel: false,
-  workers: GROUP === 'BULK_SAFE_02_RECHECK_2' ? 1 : GROUP.startsWith('BULK_SAFE_') ? 3 : 1,
+  workers: ['BULK_SAFE_02_RECHECK_2','BULK_SAFE_02_RECHECK_3'].includes(GROUP) ? 1 : GROUP.startsWith('BULK_SAFE_') ? 3 : 1,
   forbidOnly: true,
   retries: 0,
   maxFailures: GROUP === 'BULK_SAFE_02_RECHECK_2' ? 3 : undefined,
