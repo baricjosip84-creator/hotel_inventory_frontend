@@ -86,6 +86,8 @@ test.describe('Platform Tenant Lifecycle — Batch 64, GENERATED_UNRUN',()=>{
   await expect(page.getByRole('link',{name:'Tenant exports'})).toHaveCount(0);
  });
 
+});
+
 // Batch 65 continuation. Source: PlatformTenantLifecyclePage.tsx + tenantLifecycle.js.
 // All operations use synthetic Platform HTTP responses; zero live mutations.
 test.describe('Platform Tenant Lifecycle — Batch 65 continuation, GENERATED_UNRUN', () => {

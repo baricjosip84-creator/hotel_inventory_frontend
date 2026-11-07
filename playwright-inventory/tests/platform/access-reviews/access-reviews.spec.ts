@@ -86,7 +86,7 @@ test.describe('Access Reviews — source-specific governance UI (BATCH_082_GENER
  test('PARV-015 Status filter switches from open to completed and persists in URL',async({page})=>{
   await openAccessReviews(page);await filters(page).getByLabel('Status').selectOption('completed');
  await expect(card(page,doneReview.title)).toBeVisible();await expect(card(page,baseReview.title)).toHaveCount(0);
- expect(new URL(page.url()).searchParams.get('status')).toBe('completed';
+ expect(new URL(page.url()).searchParams.get('status')).toBe('completed');
  });
  test('PARV-016 Scope filter transmits platform_users value to list endpoint',async({page})=>{
   const seen:string[]=[];await openAccessReviews(page,{onCall:(m,u,q)=>{if(m==='GET'&&u===endpoint)seen.push(q.get('scope')||'');}});
@@ -94,7 +94,7 @@ test.describe('Access Reviews — source-specific governance UI (BATCH_082_GENER
  });
  test('PARV-017 Free text search matches review title and stores URL value',async({page})=>{
   await openAccessReviews(page);await filters(page).getByLabel('Search').fill('Privileged');
- await expect(card(page,baseReview.title)).toBeVisible();expect(new URL(page.url()).searchParams.get('search')).toBe('Privileged';
+ await expect(card(page,baseReview.title)).toBeVisible();expect(new URL(page.url()).searchParams.get('search')).toBe('Privileged');
  });
  test('PARV-018 Unknown status URL blocks backend evidence listing',async({page})=>{
   const calls:string[]=[];await openAccessReviews(page,{query:'status=invalid',onCall:(m,u)=>{if(m==='GET'&&u===endpoint)calls.push(u);}});
