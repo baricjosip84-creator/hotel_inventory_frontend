@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from '../../../support/liveOriginalSafeTest';
 import { fulfillJson, loginAsTenant } from '../../../support/tenantSession';
 
 // Batch 5 — GENERATED_UNRUN. Source: frontend/src/pages/AlertsPage.tsx,
@@ -64,20 +64,23 @@ function serverFilteredAlerts(url: URL, rows: SyntheticAlert[]) {
   }).slice(0, Number(params.get('limit') || 100));
 }
 
+// The frontend route /alerts also matches **/alerts; only XHR/fetch may receive JSON.
+const isAlertApiGet = (route: import('@playwright/test').Route) =>
+  route.request().method() === 'GET' && ['xhr', 'fetch'].includes(route.request().resourceType());
 async function fixtureAlerts(page: Page, rows: SyntheticAlert[] = syntheticAlerts) {
-  const list = (route: import('@playwright/test').Route) => route.request().method() === 'GET'
-    ? fulfillJson(route, serverFilteredAlerts(new URL(route.request().url()), rows)) : route.abort();
+  const list = (route: import('@playwright/test').Route) => isAlertApiGet(route)
+    ? fulfillJson(route, serverFilteredAlerts(new URL(route.request().url()), rows)) : route.fallback();
   await page.route('**/alerts?*', list);
   await page.route('**/alerts', list);
   await page.route('**/alerts/*', route => {
-    if (route.request().method() !== 'GET') return route.abort();
+    if (!isAlertApiGet(route)) return route.fallback();
     const id = new URL(route.request().url()).pathname.split('/').pop() || '';
     const record = rows.find(row => row.id === decodeURIComponent(id));
     return record ? fulfillJson(route, record) : fulfillJson(route, { error: { message:'Synthetic alert not found' } }, 404);
   });
   await page.route('**/admin/alerts/*', route => route.abort());
-  await page.route('**/products', route => route.request().method() === 'GET'
-    ? fulfillJson(route, [{ id:'pw-product-01', name:'Synthetic Coffee', category:'Beverages' }]) : route.abort());
+  await page.route('**/products', route => isAlertApiGet(route)
+    ? fulfillJson(route, [{ id:'pw-product-01', name:'Synthetic Coffee', category:'Beverages' }]) : route.fallback());
 }
 async function openAlertWorkspace(page: Page, url = '/alerts', rows: SyntheticAlert[] = syntheticAlerts) {
   await loginAsTenant(page);
@@ -289,7 +292,7 @@ test.describe('Alerts — deep links, context and rendering', () => {
 
   test('TALERT-022 missing low-stock measurements remain unknown rather than displayed as numeric zero', async ({ page }) => {
     const low = { ...syntheticAlerts[2], current_usable_quantity:null, current_min_quantity:null, current_shortage_quantity:null };
-    await page.route('**/alerts?*', route => fulfillJson(route, [low]));
+    await page.route('**/alerts?*', route => isAlertApiGet(route) ? fulfillJson(route, [low]) : route.fallback());
     await page.reload();
     const card = alertCard(page, 'pw-alert-low');
     await expect(card.getByText('Current usable stock:')).toBeVisible();
@@ -619,7 +622,7 @@ test.describe('Alerts — manual create, permissions and controlled emergency ov
 
   test('TALERT-052 recovered low stock shows recovery, not active shortage warning', async ({ page }) => {
     const low = { ...syntheticAlerts[2], current_condition_status:'recovered' as const, current_usable_quantity:8, current_shortage_quantity:0 };
-    await page.route('**/alerts?*', route => fulfillJson(route, [low]));
+    await page.route('**/alerts?*', route => isAlertApiGet(route) ? fulfillJson(route, [low]) : route.fallback());
     await page.reload();
     const card = alertCard(page, 'pw-alert-low');
     await expect(card.locator('.app-success-state').getByText('Recovered')).toBeVisible();
@@ -629,7 +632,7 @@ test.describe('Alerts — manual create, permissions and controlled emergency ov
 
   test('TALERT-053 automatically resolved system alert is labeled resolved automatically', async ({ page }) => {
     const resolved = { ...syntheticAlerts[2], resolved:true, resolved_at:baseTime, resolution_note:'Automatically resolved: stock recovered to or above the configured location minimum.' };
-    await page.route('**/alerts?*', route => fulfillJson(route, [resolved]));
+    await page.route('**/alerts?*', route => isAlertApiGet(route) ? fulfillJson(route, [resolved]) : route.fallback());
     await page.goto('/alerts?resolved=true');
     const card = alertCard(page, 'pw-alert-low');
     await expect(card.getByText('Resolved automatically')).toBeVisible();

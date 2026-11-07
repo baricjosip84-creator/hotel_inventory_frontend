@@ -57,7 +57,12 @@ for (const entry of group.entries) {
 }
 assert.equal(newIds.size,120);
 const config = fs.readFileSync(path.join(root,'playwright.live-original.config.ts'),'utf8');
-assert(config.includes("'BULK_SAFE_03','BULK_SAFE_03_RECHECK','BULK_SAFE_02_RECHECK_2','BULK_SAFE_02_RECHECK_3'].includes(GROUP) ? 1"),'Batch 210 must be single worker to avoid login-rate limits');
+const singleWorker = config.match(/workers:\s*\[([^\]]+)\]\.includes\(GROUP\)\s*\?\s*1/);
+assert(singleWorker, 'Reviewed bulk worker limit must be explicit');
+const singleWorkerGroups = [...singleWorker[1].matchAll(/'([A-Z0-9_]+)'/g)].map(match => match[1]);
+for (const group of ['BULK_SAFE_03','BULK_SAFE_03_RECHECK','BULK_SAFE_04','BULK_SAFE_02_RECHECK_2','BULK_SAFE_02_RECHECK_3']) {
+  assert(singleWorkerGroups.includes(group), `Bulk group ${group} must use one worker`);
+}
 assert(config.includes('maxFailures: GROUP ===') && config.includes(' : undefined'),'Do not hide failures with an early cutoff');
 const env = fs.readFileSync(path.join(root,'support/environment.ts'),'utf8');
 assert(env.includes('liveReviewedGroup'),'Credential gate must check manifest');
