@@ -252,7 +252,7 @@ test.describe('Stock Transfers — draft validation, mutation governance and aud
   await openTransferCase(page);await page.getByRole('button',{name:'Add item'}).click();
   await expect(formProduct(page,1)).toBeVisible();
   await page.getByRole('button',{name:'Remove'}).last().click();
-  await expect(formProduct(page,1)).toHaveCount(0);
+  await expect(page.locator('select[id^="transfer-product-"]')).toHaveCount(1);
   await expect(page.getByRole('button',{name:'Remove'})).toBeDisabled();
  });
  test('TSTR-027 Product selected in one row is disabled in another',async({page})=>{
@@ -442,7 +442,7 @@ test.describe('Stock Transfers — operational boundaries and historical evidenc
   const {writes}=await openTransferCase(page);await expect(page.getByRole('button',{name:'Remove'})).toBeDisabled();
   await page.getByRole('button',{name:'Add item'}).click();await expect(formProduct(page,1)).toBeVisible();
   await page.getByRole('button',{name:'Remove'}).nth(1).click();
-  await expect(formProduct(page,1)).toHaveCount(0);await expect(page.getByRole('button',{name:'Remove'})).toBeDisabled();expect(writes).toHaveLength(0);
+  await expect(page.locator('select[id^="transfer-product-"]')).toHaveCount(1);await expect(page.getByRole('button',{name:'Remove'})).toBeDisabled();expect(writes).toHaveLength(0);
  });
  test('TSTR-056 Product selector blocks selecting the same product twice in one draft',async({page})=>{
   await openTransferCase(page);await formFrom(page).selectOption('pw-source');await formProduct(page).selectOption('pw-product');

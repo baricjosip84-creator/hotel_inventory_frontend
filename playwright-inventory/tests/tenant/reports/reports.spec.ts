@@ -270,7 +270,7 @@ test.describe('Tenant Reports — exports, filters, entitlement and keyboard (Ba
   await panel(page,'product-movements').getByLabel('From').fill('2026-01-02');
   await panel(page,'product-movements').getByLabel('To').fill('2026-01-31');
   await expect.poll(()=>gets(calls,'product-movements').at(-1)?.query).toContain('from=2026-01-02');
-  expect(gets(calls,'product-movements').at(-1)?.query).toContain('to=2026-01-31');
+  await expect.poll(()=>gets(calls,'product-movements').at(-1)?.query).toContain('to=2026-01-31');
  });
  test('TRPT-032 Date range bounds prevent a To date earlier than From',async({page})=>{
   await openReports(page);await selectReport(page,'product-movements');
@@ -293,7 +293,7 @@ test.describe('Tenant Reports — exports, filters, entitlement and keyboard (Ba
   await pick(page,'inventory-variance','Result limit','200');
   await panel(page,'inventory-variance').getByLabel('From').fill('2026-01-05');
   await expect.poll(()=>gets(calls,'inventory-variance').at(-1)?.query).toContain('limit=200');
-  expect(gets(calls,'inventory-variance').at(-1)?.query).toContain('from=2026-01-05');
+  await expect.poll(()=>gets(calls,'inventory-variance').at(-1)?.query).toContain('from=2026-01-05');
  });
  test('TRPT-036 Stock transfer status filter requests executed transfers only',async({page})=>{
   const calls=await openReports(page);await selectReport(page,'stock-transfer-activity');

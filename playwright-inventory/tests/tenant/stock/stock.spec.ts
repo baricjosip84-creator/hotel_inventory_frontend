@@ -356,7 +356,7 @@ test.describe('Stock — selection, lot governance and controlled stock actions 
   await openStock(page);await selectStockByName(page,'Synthetic Coffee');
   await page.getByRole('button',{name:'Adjust',exact:true}).first().click();
   await page.locator('#stock-adjustment-change').fill('-29');
-  await expect(page.getByText('Confirm that the adjustment creates a shortage against active reservations.')).toBeVisible();
+  await expect(page.getByText('Confirm that the adjustment creates a shortage against active reservations.', { exact: true }).last()).toBeVisible();
   const acknowledge=page.getByLabel(/I confirm this physical count or correction is real/);
   await acknowledge.check();
   await expect(page.getByRole('button',{name:'Manual Adjustment',exact:true})).toBeEnabled();

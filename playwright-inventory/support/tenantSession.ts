@@ -19,6 +19,10 @@ export async function loginAsTenant(page: Page): Promise<void> {
     // Keep the exact-origin, allowed-group and presence-of-credentials gate.
     requireDisposableTenantCredentials();
     await selectEnglishUI(page);
+    // Preserve loginAsTenant()'s existing semantic contract: dashboard is open.
+    // A restored token alone leaves the new test page at about:blank.
+    await page.goto('/dashboard');
+    await expect(page.getByRole('heading', { name: 'Operations Dashboard' })).toBeVisible();
     return;
   }
   const { email, password } = requireDisposableTenantCredentials();

@@ -453,7 +453,7 @@ test.describe('Storage Locations — directory and lifecycle boundary coverage (
   test('TSL-050 Editing a custom-zone location restores its free-text condition', async ({ page }) => {
     await openLocations(page);
     await locRow(page, 'Archive Section').getByRole('button', { name: 'Edit' }).click();
-    await expect(form(page).getByLabel('Storage Condition')).toHaveValue('__custom_condition__');
+    await expect(form(page).getByLabel('Storage Condition', { exact: true })).toHaveValue('__custom_condition__');
     await expect(form(page).getByLabel('Custom storage condition')).toHaveValue('Special Cool');
   });
   test('TSL-051 Editing custom condition into a standard value sends a standard PATCH', async ({ page }) => {

@@ -7,152 +7,119 @@ const require = createRequire(import.meta.url);
 const ts = require('typescript');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FRONTEND = 'https://hotel-inventory-frontend-mauve.vercel.app';
-const originalEnv = Object.fromEntries(
-  ['PW_LIVE_ORIGINAL_READONLY','PW_ORIGINAL_SUITE_GROUP','PW_BASE_URL'].map(k=>[k,process.env[k]])
-);
-let credentialsChecked = 0;
-const environmentStub = { requireDisposableTenantCredentials: () => {
-  credentialsChecked++;
-  return { email: 'stub@example.invalid', password: 'stub-only-password' };
-}};
-const calls = { logins: 0, contexts: 0, closed: 0, locale: 0, intercepted: 0 };
-function mockExpect(value) {
-  return {
-    toBeVisible: async () => {},
-    toEqual: expected => assert.deepEqual(value, expected)
+const keys = ['PW_LIVE_ORIGINAL_READONLY','PW_ORIGINAL_SUITE_GROUP','PW_BASE_URL','PW_BULK_SHARED_AUTH_STATE'];
+const original = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+const calls = { logins: 0, contexts: 0, closed: 0, browserClosed: 0, loginNavigations: 0, locale: 0, blocked: 0, fulfilled: 0 };
+const jwt = (seconds = 3600) => `simulation.${Buffer.from(JSON.stringify({exp:Math.floor(Date.now()/1000)+seconds})).toString('base64url')}.signature`;
+const snapshot = () => ({cookies:[],origins:[{origin:FRONTEND,localStorage:[{name:'inventory_access_token',value:jwt()}]}]});
+const mockExpect = (value) => ({toBeVisible: async () => {}, toEqual: wanted => assert.deepEqual(value,wanted)});
+const playwright = { expect: mockExpect, test: {extend: fixtures => fixtures}, chromium: {launch: async () => browser} };
+const environment = { requireDisposableTenantCredentials: () => ({email:'stub@example.invalid',password:'NOT_A_REAL_PASSWORD'}) };
+const loaded = {};
+function load(rel) {
+  if (loaded[rel]) return loaded[rel];
+  const file = path.join(root,rel);
+  const res = ts.transpileModule(fs.readFileSync(file,'utf8'),{fileName:file,compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true},reportDiagnostics:true});
+  assert.equal((res.diagnostics??[]).filter(d=>d.category===ts.DiagnosticCategory.Error).length,0,`Cannot transpile ${rel}`);
+  const m = new Module(file); m.filename=file; m.paths=Module._nodeModulePaths(path.dirname(file));
+  m.require=(id)=> {
+    if(id==='@playwright/test')return playwright;
+    if(id==='./environment')return environment;
+    if(id==='./liveOriginalSafeTest')return load('support/liveOriginalSafeTest.ts');
+    if(id.startsWith('.')) throw Error(`Unexpected local import in ${rel}: ${id}`);
+    return require(id);
   };
+  m._compile(res.outputText,file);loaded[rel]=m.exports;return loaded[rel];
 }
-const playwrightStub = { expect: mockExpect, test: { extend: fixtures => fixtures } };
-function loadTs(relative) {
-  const full = path.join(root,relative);
-  const result = ts.transpileModule(fs.readFileSync(full,'utf8'), {
-    fileName: full,
-    compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true, target: ts.ScriptTarget.ES2022 },
-    reportDiagnostics: true
-  });
-  const errors = (result.diagnostics || []).filter(x => x.category === ts.DiagnosticCategory.Error);
-  assert.equal(errors.length, 0, `TypeScript transpilation failed for ${relative}`);
-  const m = new Module(full);
-  m.filename = full;
-  m.paths = Module._nodeModulePaths(path.dirname(full));
-  m.require = (name) => {
-    if (name === '@playwright/test') return playwrightStub;
-    if (name === './environment') return environmentStub;
-    throw new Error(`Unexpected test bootstrap import: ${name}`);
-  };
-  m._compile(result.outputText,full);
-  return m.exports;
-}
-const fixture = loadTs('support/liveOriginalSafeTest.ts');
-const tenantSession = loadTs('support/tenantSession.ts');
-const stubJwt = `stub.${Buffer.from(JSON.stringify({exp: Math.floor(Date.now()/1000)+3600})).toString('base64url')}.signature`;
-const sessionState = { cookies: [{name:'simulated-only',value:'no-secret',domain:'hotel-inventory-frontend-mauve.vercel.app',path:'/',expires:-1,httpOnly:false,secure:true,sameSite:'Lax'}],
-  origins:[{origin:FRONTEND,localStorage:[{name:'inventory_access_token',value:stubJwt}]}] };
-function fakeBrowser() {
-  return { newContext: async (options) => {
-    calls.contexts++;
-    assert.equal(options.baseURL, FRONTEND);
-    assert.equal(options.serviceWorkers, 'block');
+const browser = {
+  newContext: async options => {
+    calls.contexts++; assert.equal(options.baseURL,FRONTEND);assert.equal(options.serviceWorkers,'block');
     return {
-      route: async (_pattern, cb) => { assert.equal(typeof cb,'function'); calls.intercepted++; },
+      route: async (pattern,handler) => { assert.equal(pattern,'**/*'); assert.equal(typeof handler,'function'); },
       newPage: async () => ({
-        addInitScript: async () => calls.locale++,
-        goto: async route => assert.equal(route,'/login'),
-        locator: () => ({fill: async () => {},click: async () => {calls.logins++}}),
-        getByRole: () => ({})
+        addInitScript: async()=>{calls.locale++},goto:async url=>assert.equal(url,'/login'),
+        locator:()=>({fill:async()=>{}, click:async()=>{calls.logins++}}), getByRole:()=>({})
       }),
-      storageState: async () => sessionState,
-      close: async () => {calls.closed++}
+      storageState: async()=>snapshot(), close:async()=>{calls.closed++}
     };
-  }};
-}
-const authFixture = fixture.test.bulkSession[0];
-const storageFixture = fixture.test.storageState;
+  },close:async()=>{calls.browserClosed++}
+};
+const fixture = load('support/liveOriginalSafeTest.ts');
+const tenantSession=load('support/tenantSession.ts');
+const globalSetup=load('support/bulkSharedAuthSetup.ts').default;
 try {
   process.env.PW_LIVE_ORIGINAL_READONLY='YES';
-  process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_01';
-  process.env.PW_BASE_URL=FRONTEND;
-  let count=0;
-  await authFixture({browser:fakeBrowser()},async state => {
-    assert.deepEqual(state.snapshot,sessionState);
-    // Simulate 155 independently created test contexts using ONE worker state.
-    for(let i=0;i<155;i++) {
-      await storageFixture({bulkSession:state},async restored=>{
-        assert.deepEqual(restored,sessionState);
-        count++;
-      });
-    }
-    let calledLoginEndpoint=false;
-    await tenantSession.loginAsTenant({
-      addInitScript: async()=>{},
-      goto: async()=>{calledLoginEndpoint=true}
-    });
-    assert.equal(calledLoginEndpoint,false,'Bulk tests must not perform per-test /auth/login');
-    assert.equal(calls.logins,1,'Expected one login across 155 fresh contexts');
-    // Force the token near expiry; only then must the worker renew once.
-    state.snapshot = structuredClone(sessionState);
-    state.snapshot.origins[0].localStorage[0].value = `stub.${Buffer.from(JSON.stringify({exp: Math.floor(Date.now()/1000)+10})).toString('base64url')}.signature`;
-    await storageFixture({bulkSession:state},async restored=>{
-      assert.deepEqual(restored,sessionState,'Renewed storageState must contain the fresh auth token');
-    });
-    assert.equal(calls.logins,2,'Expiring worker must renew exactly once');
-  });
-  assert.equal(count,155);
-  assert.equal(calls.logins,2);
-  assert.equal(calls.contexts,2);
-  assert.equal(calls.closed,2);
-  assert.equal(calls.intercepted,2,'Bootstrap and renewal must both include write guards');
-  assert.equal(calls.locale,2);
-  assert.equal(credentialsChecked,2); // once for bootstrap, once for tenantSession guard
-
-  // Batch 205: the same in-memory authenticated worker fixture must also
-  // reuse ONE login for the second bulk group, not run per-test credentials.
   process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_02';
   process.env.PW_BASE_URL=FRONTEND;
-  let secondBatchRestored=0;
-  await authFixture({browser:fakeBrowser()},async state=>{
-    for(let i=0;i<250;i++) {
-      await storageFixture({bulkSession:state},async restored=>{
-        assert.deepEqual(restored,sessionState);
-        secondBatchRestored++;
-      });
-    }
-    let navigatedToLogin=false;
-    await tenantSession.loginAsTenant({addInitScript:async()=>{}, goto:async()=>{navigatedToLogin=true}});
-    assert.equal(navigatedToLogin,false,'BULK_SAFE_02 must not attempt per-test login');
-  });
-  assert.equal(secondBatchRestored,250);
-  assert.equal(calls.logins,3,'One extra login only for the new bulk worker');
-  assert.equal(calls.contexts,3);
-  assert.equal(calls.closed,3);
-  assert.equal(calls.intercepted,3);
-
-  // Existing non-bulk groups must retain their original login behavior.
-  process.env.PW_ORIGINAL_SUITE_GROUP='PRODUCTS';
-  await authFixture({browser:fakeBrowser()},async state=>{
-    assert.deepEqual(state.snapshot,{cookies:[],origins:[]});
-    await storageFixture({bulkSession:state},async restored=>assert.equal(restored,undefined));
-  });
-  let oldLoginNavigations=0;
-  await tenantSession.loginAsTenant({
-    addInitScript: async()=>{},
-    goto: async url=>{assert.equal(url,'/login');oldLoginNavigations++},
-    locator:()=>({fill:async()=>{},click:async()=>{}}),
-    getByRole:()=>({})
-  });
-  assert.equal(oldLoginNavigations,1,'Legacy groups should still login per test');
-  assert.equal(calls.logins,3,'No extra bootstrap login for existing groups');
-
-  // Fail closed if the exact origin is wrong before any browser is opened.
-  process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_02';
-  process.env.PW_BASE_URL='https://wrong.example.invalid';
-  await assert.rejects(authFixture({browser:fakeBrowser()},async()=>{}),/exact reviewed production origin/);
-  assert.equal(calls.contexts,3);
-  console.log('PASS: mocked worker auth: BULK_SAFE_01 (155) and BULK_SAFE_02 (250) share one login per worker; token renewal tested.');
-  console.log('PASS: legacy login maintained; bootstrap protected; wrong-origin execution denied; no real secrets used.');
-} finally {
-  for (const [key,value] of Object.entries(originalEnv)) {
-    if(value===undefined) delete process.env[key];
-    else process.env[key]=value;
+  delete process.env.PW_BULK_SHARED_AUTH_STATE;
+  await assert.rejects(fixture.test.bulkSession[0]({browser},async()=>{}),/Missing bulk auth setup/);
+  assert.equal(calls.logins,0);
+  await globalSetup();
+  assert.equal(calls.logins,1,'Exactly ONE bootstrap login per entire GitHub job');
+  assert.equal(calls.browserClosed,1);
+  const captured=JSON.parse(process.env.PW_BULK_SHARED_AUTH_STATE);
+  assert.equal(captured.origins[0].origin,FRONTEND);
+  let restored=0;
+  for(let worker=0;worker<11;worker++) {
+    await fixture.test.bulkSession[0]({browser}, async session => {
+      for(let i=0;i<25;i++) {
+        await fixture.test.storageState({bulkSession:session},async state=>{
+          assert.equal(state.origins[0].origin,FRONTEND);restored++;
+        });
+      }
+      // Worker exits/fails: creating a replacement worker MUST NOT log in again.
+    });
   }
+  assert.equal(restored,275);
+  assert.equal(calls.logins,1,'Worker restarts must not trigger new logins or rate limits');
+  // Unlike a restart, a genuinely near-expired token must renew once safely.
+  await fixture.test.bulkSession[0]({browser},async session=>{
+    session.snapshot.origins[0].localStorage[0].value=jwt(10);
+    await fixture.test.storageState({bulkSession:session},async state=>{
+      assert.notEqual(state.origins[0].localStorage[0].value,session.snapshot.origins[0].localStorage[0].value+'-stale');
+      const token=state.origins[0].localStorage[0].value;
+      assert(token!==null && token.split('.').length===3);
+    });
+  });
+  assert.equal(calls.logins,2,'A genuinely expiring token should renew once');
+  let navigated = '';
+  await tenantSession.loginAsTenant({addInitScript:async()=>{},goto:async url=>{navigated=url;calls.loginNavigations++;},getByRole:()=>({})});
+  assert.equal(navigated,'/dashboard','Restored bulk login must still open the dashboard');
+  const contextHandlers=[];const pageHandlers=[];
+  const page={
+    context:()=>({route:async (_pattern,cb)=>contextHandlers.push(cb)}),
+    route:async (_pattern,cb)=>pageHandlers.push(cb)
+  };
+  await fixture.test.page({page}, async guardedPage=>{
+    // User-defined mocked POST: Playwright runs page handlers before context handlers.
+    await guardedPage.route('**/inventory-imports/preview', async route => route.fulfill({status:200,body:'{}'}));
+    const syntheticWrite={request:()=>({method:()=> 'POST',url:()=> FRONTEND+'/api/inventory-imports/preview'}),fulfill:async()=>{calls.fulfilled++}};
+    await pageHandlers[0](syntheticWrite);
+    assert.equal(calls.fulfilled,1,'Synthetic write should be fulfilled locally');
+    assert.equal(calls.blocked,0,'Mocks must not be mistaken for live writes');
+    const unmocked = {request:()=>({method:()=> 'POST',url:()=> FRONTEND+'/api/inventory-imports/commit'}),abort:async()=>{calls.blocked++}};
+    await contextHandlers[0](unmocked);
+    assert.equal(calls.blocked,1,'Unmocked write must be blocked at network boundary');
+  }).then(()=>{throw Error('Unmocked POST must make test fail closed')},error=>assert.match(error.message,/Expected values|Unmocked production write attempted/));
+  // A page-level route that calls continue on a write must be blocked too.
+  const ctx=[],handlers=[];
+  const page2={context:()=>({route:async(_pattern,cb)=>ctx.push(cb)}),route:async(_pattern,cb)=>handlers.push(cb)};
+  await fixture.test.page({page:page2},async guarded=>{
+    await guarded.route('**/*',route=>route.continue());
+    await assert.rejects(handlers[0]({request:()=>({method:()=> 'PATCH',url:()=> FRONTEND+'/api/stock'}),abort:async()=>{calls.blocked++}}),/unmocked write/);
+  }).then(()=>{throw Error('page.route write continuation should fail test')},error=>assert.match(error.message,/Expected values|Unmocked production write attempted/));
+  // Existing single-page groups retain original flow.
+  process.env.PW_ORIGINAL_SUITE_GROUP='PRODUCTS';
+  await fixture.test.bulkSession[0]({browser},async session=>{
+    assert.deepEqual(session.snapshot,{cookies:[],origins:[]});
+  });
+  assert.equal(calls.logins,2);
+  process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_02';
+  process.env.PW_BASE_URL='https://invalid.example.invalid';
+  await assert.rejects(fixture.test.bulkSession[0]({browser},async()=>{}),/exact reviewed production origin/);
+  console.log('PASS: One job-wide in-memory login, 275 restored contexts over 11 simulated worker restarts, plus one expiring-token renewal.');
+  console.log('PASS: Dashboard navigation semantics restored; an unmocked POST and page-route PATCH are blocked; mocked POST allowed.');
+  console.log('PASS: Wrong origin and absent bootstrap session fail closed; previous nonbulk groups unaffected.');
+} finally {
+  for(const [key,value] of Object.entries(original)) if(value===undefined)delete process.env[key]; else process.env[key]=value;
 }

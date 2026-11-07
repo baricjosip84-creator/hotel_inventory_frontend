@@ -19,6 +19,7 @@ on:
           - SHIPMENTS
           - BULK_SAFE_01
           - BULK_SAFE_02
+          - BULK_SAFE_02_RECHECK
       confirmation:
         description: 'Type ORIGINALTESTS to run the selected group'
         required: true

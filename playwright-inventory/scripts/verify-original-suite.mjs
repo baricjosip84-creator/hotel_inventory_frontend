@@ -51,12 +51,32 @@ for (const [group, entry] of Object.entries(manifest.approved_groups)) {
   }
   seenApprovedByGroup.set(group, idsInGroup);
 }
-// All bulk groups must be disjoint from every other previously approved group.
+// Original bulk groups are disjoint. The only permitted overlap is the
+// explicit, source-fingerprinted retry of previously failed BULK_SAFE_02 IDs.
+const retryGroup = 'BULK_SAFE_02_RECHECK';
+const originalGroup = 'BULK_SAFE_02';
 const bulkGroups = [...seenApprovedByGroup.entries()].filter(([name])=>name.startsWith('BULK_SAFE_'));
 for (const [bulkName, bulkIds] of bulkGroups) {
   const otherIds = new Set([...seenApprovedByGroup.entries()]
-    .filter(([name]) => name !== bulkName).flatMap(([,ids])=>[...ids]));
-  for (const id of bulkIds) assert(!otherIds.has(id), `Bulk cannot reuse a previously approved ID: ${bulkName}/${id}`);
+    .filter(([name]) => name !== bulkName && !(
+      (name===retryGroup && bulkName===originalGroup) ||
+      (name===originalGroup && bulkName===retryGroup)
+    )).flatMap(([,ids])=>[...ids]));
+  for (const id of bulkIds) assert(!otherIds.has(id), `Bulk cannot reuse another group's ID: ${bulkName}/${id}`);
+}
+if (seenApprovedByGroup.has(retryGroup)) {
+  const firstRun = manifest.batch_205_last_execution;
+  const retryIds = seenApprovedByGroup.get(retryGroup);
+  assert.equal(firstRun.total,250);assert.equal(firstRun.passed,144);assert.equal(firstRun.failed,106);
+  assert.equal(new Set([...firstRun.passed_ids,...firstRun.failed_ids]).size,250);
+  assert.equal(firstRun.passed_ids.length,144);assert.equal(firstRun.failed_ids.length,106);
+  assert.deepEqual(new Set([...firstRun.passed_ids,...firstRun.failed_ids]), seenApprovedByGroup.get(originalGroup));
+  const quarantined = Object.keys(manifest.batch_206_quarantined_unverified);
+  assert.equal(quarantined.length,10);
+  assert.equal(retryIds.size,96);
+  assert.deepEqual(new Set([...retryIds,...quarantined]),new Set(firstRun.failed_ids));
+  assert([...retryIds].every(id => !firstRun.passed_ids.includes(id)), 'Recheck must not repeat 144 already green scenarios');
+  console.log('PASS: prior 144 successful IDs preserved; 96 failed IDs rechecked; 10 known mismatches remain unverified.');
 }
 const bulkIds = seenApprovedByGroup.get('BULK_SAFE_01');
 const nextBulkIds = seenApprovedByGroup.get('BULK_SAFE_02');
@@ -137,16 +157,22 @@ for (const { group, file, ids } of allApproved) {
 assert(workflowBody.includes('playwright.live-original.config.ts --list'));
 assert(workflowBody.includes('playwright.live-original.config.ts'));
 assert(workflowBody.includes("if: ${{ inputs.group != 'DISCOVER_ALL' }}"));
-// Batch 204 regressions: bulk must reuse worker-authenticated storage state and
-// API mocks must never replace document navigation with synthetic JSON.
+// Bulk source safety and the browser-auth bootstrap must remain fail closed.
 if (bulkIds || nextBulkIds) {
   const adapter = fs.readFileSync(path.join(root, 'support/liveOriginalSafeTest.ts'), 'utf8');
   const session = fs.readFileSync(path.join(root, 'support/tenantSession.ts'), 'utf8');
   const products = fs.readFileSync(path.join(testRoot, 'tenant/products/products.spec.ts'), 'utf8');
   const suppliers = fs.readFileSync(path.join(testRoot, 'tenant/suppliers/suppliers.spec.ts'), 'utf8');
+  const setup = fs.readFileSync(path.join(root, 'support/bulkSharedAuthSetup.ts'),'utf8');
+  const config = fs.readFileSync(path.join(root, 'playwright.live-original.config.ts'),'utf8');
   assert(adapter.includes("{ scope: 'worker' }") && adapter.includes('storageState: async ({ bulkSession }'),
-    'Bulk authentication must be worker-scoped and restored per test');
-  assert(adapter.includes("request.url()") && adapter.includes('approvedLogin(method,'),
+    'Bulk authentication must restore isolated per-test contexts');
+  assert(adapter.includes('PW_BULK_SHARED_AUTH_STATE') && setup.includes('process.env.PW_BULK_SHARED_AUTH_STATE') &&
+    config.includes('globalSetup:'), 'Workers must use one job-wide in-memory auth state, not repeated logins');
+  assert(adapter.includes('page.context().route') && adapter.includes("property === 'continue'") &&
+    adapter.includes('approvedLogin(method,'), 'Read-only guard must block all unmocked writes, including page.route continuations');
+  assert(session.includes("await page.goto('/dashboard')"), 'Bulk login helper must preserve protected dashboard navigation');
+  assert(adapter.includes("route.request().url()") && adapter.includes('approvedLogin(method,'),
     'Bulk login bootstrap must retain its network write protection');
   assert(session.includes(".startsWith('BULK_SAFE_')") &&
     session.includes('requireDisposableTenantCredentials();'),
@@ -158,7 +184,9 @@ if (bulkIds || nextBulkIds) {
 }
 // The bulk selected spec files must all use the same non-write fixture adapter.
 if (bulkIds) assert.equal(bulkIds.size, 155, 'Batch 203/204 bulk must retain 155 original IDs');
-if (nextBulkIds) assert.equal(nextBulkIds.size, 250, 'Batch 205 bulk must retain 250 new original IDs');
+if (nextBulkIds) assert.equal(nextBulkIds.size, 250, 'Batch 205 original bulk must retain 250 original IDs');
+if (seenApprovedByGroup.has(retryGroup)) assert.equal(seenApprovedByGroup.get(retryGroup).size,96,
+ 'Batch 206 must recheck 96 previously failed original IDs, without retesting 144 already green.');
 console.log(`PASS: Workflow dispatch options, manifest, and original test IDs match (${declared.length - 1} runnable groups).`);
 console.log(`PASS: credential-gate runtime preflight for ${preflightCount} reviewed groups; unknown groups/wrong origin/missing flags/missing credentials denied.`);
 console.log(`PASS: ${found.length} original scenarios from ${specs.length} spec files; ${allApproved.reduce((n,g)=>n+g.ids.length,0)} approved runtime ID memberships in ${Object.keys(manifest.approved_groups).length} groups.`);
