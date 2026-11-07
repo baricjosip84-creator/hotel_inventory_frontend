@@ -52,6 +52,8 @@ const test = base.extend({
 });
 
 test('LIVE-AUTH-TENANT-001: login then read Dashboard, Products and Stock', async ({ page }) => {
+  // More read-only pages are exercised in this single authenticated browser journey.
+  test.setTimeout(240_000);
   const email = process.env.PW_TENANT_EMAIL;
   const password = process.env.PW_TENANT_PASSWORD;
   // Don't display secret names alongside their values or copy them to artifacts.
@@ -148,6 +150,78 @@ test('LIVE-AUTH-TENANT-001: login then read Dashboard, Products and Stock', asyn
     await expect(search).toHaveValue('');
     await expect(clear).toBeDisabled();
     await expect(stock.getByText('No stock positions match the current search and filters.', { exact: true })).toHaveCount(0);
+  });
+
+
+  await test.step('Suppliers: search no-match and clear (no supplier changes)', async () => {
+    await page.goto('/suppliers');
+    await expect(page).toHaveURL(/\/suppliers(?:[?#]|$)/, { timeout: 25_000 });
+    const suppliers = page.locator('.io-suppliers-page');
+    await expect(suppliers.getByRole('heading', { name: 'Supplier workspace', exact: true })).toBeVisible({ timeout: 25_000 });
+    const search = suppliers.locator('#supplier-search');
+    await expect(search).toBeVisible();
+    await search.fill('pw-no-supplier-match-zz987654321');
+    await expect(suppliers.getByText('No suppliers match the current search.', { exact: true })).toBeVisible({ timeout: 30_000 });
+    const clear = suppliers.getByRole('button', { name: 'Clear Search', exact: true });
+    await expect(clear).toBeEnabled();
+    await clear.click();
+    await expect(search).toHaveValue('');
+    await expect(clear).toBeDisabled();
+  });
+
+  await test.step('Stock Movements: search ledger and clear filters (read only)', async () => {
+    await page.goto('/stock-movements');
+    await expect(page).toHaveURL(/\/stock-movements(?:[?#]|$)/, { timeout: 25_000 });
+    const movements = page.locator('.io-stock-movements-page');
+    await expect(movements.getByRole('heading', { name: 'Stock movement ledger', exact: true })).toBeVisible({ timeout: 25_000 });
+    await expect(movements.getByRole('heading', { name: 'Movement Ledger', exact: true })).toBeVisible({ timeout: 25_000 });
+    const search = movements.locator('.stock-movements-search-field input[type="search"]');
+    await expect(search).toBeVisible();
+    await search.fill('pw-no-movement-match-zz987654321');
+    await expect(search).toHaveValue('pw-no-movement-match-zz987654321');
+    const clear = movements.getByRole('button', { name: /^Clear Filters/ });
+    await expect(clear).toBeEnabled();
+    await clear.click();
+    await expect(search).toHaveValue('');
+    await expect(clear).toBeDisabled();
+  });
+
+  await test.step('Stock Transfers: filter draft status and reset search safely', async () => {
+    await page.goto('/stock-transfers');
+    await expect(page).toHaveURL(/\/stock-transfers(?:[?#]|$)/, { timeout: 25_000 });
+    const transfers = page.locator('.io-stock-transfers-page');
+    await expect(transfers.getByRole('heading', { name: 'Stock transfer workspace', exact: true })).toBeVisible({ timeout: 25_000 });
+    await expect(transfers.getByRole('heading', { name: 'Stock Transfers', exact: true })).toBeVisible({ timeout: 25_000 });
+    const search = transfers.locator('#transfer-search');
+    const status = transfers.locator('#transfer-status-filter');
+    await expect(search).toBeVisible();
+    await status.selectOption('draft');
+    await expect(status).toHaveValue('draft');
+    await search.fill('pw-no-transfer-match-zz987654321');
+    await expect(search).toHaveValue('pw-no-transfer-match-zz987654321');
+    const clear = transfers.getByRole('button', { name: 'Clear filters', exact: true });
+    await expect(clear).toBeEnabled();
+    await clear.click();
+    await expect(search).toHaveValue('');
+    await expect(status).toHaveValue('');
+    await expect(clear).toBeDisabled();
+  });
+
+  await test.step('Purchase Orders: filter search/status and reset without edits', async () => {
+    await page.goto('/purchase-orders');
+    await expect(page).toHaveURL(/\/purchase-orders(?:[?#]|$)/, { timeout: 25_000 });
+    const registry = page.locator('#purchase-order-registry');
+    await expect(registry.getByRole('heading', { name: 'Purchase order registry', exact: true })).toBeVisible({ timeout: 30_000 });
+    const search = registry.locator('.purchase-orders-primary-filters .purchase-orders-field--search input');
+    const status = registry.locator('.purchase-orders-primary-filters select').first();
+    await expect(search).toBeVisible();
+    await status.selectOption('draft');
+    await expect(status).toHaveValue('draft');
+    await search.fill('pw-no-purchase-order-match-zz987654321');
+    await expect(registry.getByText('No purchase orders found.', { exact: true })).toBeVisible({ timeout: 25_000 });
+    await registry.getByRole('button', { name: 'Clear filters', exact: true }).click();
+    await expect(search).toHaveValue('');
+    await expect(status).toHaveValue('');
   });
 
 });
