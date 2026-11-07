@@ -99,7 +99,7 @@ test.describe('Alerts — query, filtering, summary and navigation', () => {
   test.beforeEach(async ({ page }) => { await openAlertWorkspace(page); });
 
   test('TALERT-001 default queue lists open synthetic alerts, not resolved records', async ({ page }) => {
-    await expect(page.getByRole('heading', { name:'Alert queue' })).toBeVisible();
+    await expect(page.getByRole('heading', { name:'Alert queue', exact:true })).toBeVisible();
     await expect(alertCard(page, 'pw-alert-manual')).toBeVisible();
     await expect(alertCard(page, 'pw-alert-critical')).toBeVisible();
     await expect(alertCard(page, 'pw-alert-resolved')).toHaveCount(0);
@@ -657,7 +657,7 @@ test.describe('Tenant Alerts — source workflow precedence and legacy card evid
   test('TALERT-054 transfer family opens Stock Transfers instead of generic stock', async ({ page }) => {
     const card = await openB180Alert(page, 'pw-b180-054', 'TRANSFER_NEEDS_REVIEW', {stock_id:'pw-stock-a'});
     await expect(card.getByRole('link',{name:'Open Stock Transfers'})).toHaveAttribute('href','/stock-transfers');
-    await expect(card.getByRole('link',{name:'Open Stock'})).toHaveCount(0);
+    await expect(card.getByRole('link',{name:'Open Stock',exact:true})).toHaveCount(0);
   });
   test('TALERT-055 reservation family opens Reservations instead of generic stock', async ({ page }) => {
     const card = await openB180Alert(page, 'pw-b180-055', 'RESERVATION_BLOCKED', {stock_id:'pw-stock-b'});
@@ -719,15 +719,15 @@ test.describe('Tenant Alerts — source workflow precedence and legacy card evid
   test('TALERT-069 shipment category wins before a linked stock fallback', async ({ page }) => {
     const card = await openB180Alert(page, 'pw-b180-069', 'SHIPMENT_INCOMPLETE',{stock_id:'pw-stock-f'});
     await expect(card.getByRole('link',{name:'Open Shipments'})).toHaveAttribute('href','/shipments');
-    await expect(card.getByRole('link',{name:'Open Stock'})).toHaveCount(0);
+    await expect(card.getByRole('link',{name:'Open Stock',exact:true})).toHaveCount(0);
   });
   test('TALERT-070 stock identifier is encoded in stock fallback query', async ({ page }) => {
     const card = await openB180Alert(page, 'pw-b180-070', 'Manual stock follow-up',{stock_id:'stock / review&item=7',product_id:'pw-product-f'});
-    await expect(card.getByRole('link',{name:'Open Stock'})).toHaveAttribute('href','/stock?stock_id=stock%20%2F%20review%26item%3D7');
+    await expect(card.getByRole('link',{name:'Open Stock',exact:true})).toHaveAttribute('href','/stock?stock_id=stock%20%2F%20review%26item%3D7');
   });
   test('TALERT-071 product identifier is encoded when stock ID is absent', async ({ page }) => {
     const card = await openB180Alert(page, 'pw-b180-071', 'Manual product follow-up',{product_id:'item / & test'});
-    await expect(card.getByRole('link',{name:'Open Stock'})).toHaveAttribute('href','/stock?product_id=item%20%2F%20%26%20test');
+    await expect(card.getByRole('link',{name:'Open Stock',exact:true})).toHaveAttribute('href','/stock?product_id=item%20%2F%20%26%20test');
   });
   test('TALERT-072 unlinked manual alert falls back to Action Center', async ({ page }) => {
     const card = await openB180Alert(page, 'pw-b180-072', 'Uncategorized manual notice');

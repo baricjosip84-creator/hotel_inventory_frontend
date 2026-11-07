@@ -1,4 +1,4 @@
-import { test as base, expect, type BrowserContext, type Route } from '@playwright/test';
+import { test as base, expect, type BrowserContext, type Page, type Route } from '@playwright/test';
 import { requireDisposableTenantCredentials } from './environment';
 export type { Page, Route } from '@playwright/test';
 
@@ -13,7 +13,9 @@ const FRONTEND_ORIGIN = 'https://hotel-inventory-frontend-mauve.vercel.app';
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const BULK_GROUP_PREFIX = 'BULK_SAFE_';
 type AuthState = Awaited<ReturnType<BrowserContext['storageState']>>;
-type WorkerSession = { snapshot: AuthState; renew: () => Promise<void>; absorb: (observed: AuthState) => void };
+type WorkerSession = { snapshot: AuthState; lastLoginAt: number; renew: () => Promise<void>; absorb: (observed: AuthState) => void };
+const liveBulkSessions = new WeakMap<Page, WorkerSession>();
+const MAX_SESSION_AGE_MS = 8 * 60 * 1000;
 
 // The application's refresh-cookie and access-token pair can rotate during GETs.
 // Copy *only authentication state* back to the worker after a test, not its
@@ -66,6 +68,28 @@ function approvedLogin(method: string, rawUrl: string): boolean {
   } catch { return false; }
 }
 
+/** Recover a worker's legitimate authenticated browser session exactly once if
+ * the dashboard fails to load. This does not relax the production write guard:
+ * fresh credentials are used only by the narrowly allowed /auth/login route.
+ * Never serializes tokens or cookies to artifacts or logs. */
+export async function restoreBulkTenantSession(page: Page): Promise<void> {
+  if (!bulkEnabled()) throw new Error('Bulk session recovery is restricted to reviewed live groups');
+  const session = liveBulkSessions.get(page);
+  if (!session) throw new Error('No approved worker session is associated with this page');
+  await session.renew();
+  const state = session.snapshot;
+  const token = state.origins.find(x => x.origin === FRONTEND_ORIGIN)?.localStorage
+    .find(x => x.name === 'inventory_access_token')?.value;
+  if (!token || tokenExpiresSoon(state)) throw new Error('Renewed worker has no usable tenant token');
+  await page.context().clearCookies();
+  await page.context().addCookies(state.cookies);
+  if (new URL(page.url()).origin !== FRONTEND_ORIGIN) await page.goto('/login');
+  await page.evaluate(freshToken => {
+    localStorage.setItem('inventory_access_token', freshToken);
+  }, token);
+  await page.goto('/dashboard');
+}
+
 /** A proven independent login per worker, reused for all its tests. */
 export const test = base.extend<{}, { bulkSession: WorkerSession }>({
   bulkSession: [async ({ browser }, use) => {
@@ -103,7 +127,8 @@ export const test = base.extend<{}, { bulkSession: WorkerSession }>({
     };
     const session: WorkerSession = {
       snapshot: await authenticate(),
-      renew: async () => { session.snapshot = await authenticate(); },
+      lastLoginAt: Date.now(),
+      renew: async () => { session.snapshot = await authenticate(); session.lastLoginAt = Date.now(); },
       absorb: (observed) => {
         const fresh = transplantAuthentication(session.snapshot, observed);
         if (fresh) session.snapshot = fresh;
@@ -118,7 +143,9 @@ export const test = base.extend<{}, { bulkSession: WorkerSession }>({
       await use(undefined); // preserve the existing legacy/non-live default
       return;
     }
-    if (tokenExpiresSoon(bulkSession.snapshot)) await bulkSession.renew();
+    if (tokenExpiresSoon(bulkSession.snapshot) || Date.now() - bulkSession.lastLoginAt > MAX_SESSION_AGE_MS) {
+      await bulkSession.renew();
+    }
     await use(bulkSession.snapshot);
   },
   page: async ({ page, bulkSession }, use) => {
@@ -174,7 +201,9 @@ export const test = base.extend<{}, { bulkSession: WorkerSession }>({
         return handler(guarded);
       }, options);
     }) as typeof page.route;
-    await use(page);
+    if (bulkEnabled()) liveBulkSessions.set(page, bulkSession);
+    try { await use(page); }
+    finally { liveBulkSessions.delete(page); }
     // Preserve rotated auth tokens/cookies across *isolated* test contexts.
     // This prevents an expired/stale refresh cookie from forcing repeated logins
     // after ~10-15 minutes while never carrying test-local permission overrides.

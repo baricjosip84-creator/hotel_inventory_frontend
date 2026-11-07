@@ -49,7 +49,7 @@ async function openSystem(page: Page, options: Options = {}) {
     if (route.request().isNavigationRequest()) return route.continue();
     const url = new URL(route.request().url());
     const path = url.pathname.replace(/^\/api(?=\/)/, '');
-    if (!path.startsWith('/system-context') && path !== '/execution-requests') return route.continue();
+    if (!path.startsWith('/system-context') && path !== '/execution-requests') return route.fallback();
     let payload: unknown;
     try { payload = route.request().postDataJSON(); } catch { payload = undefined; }
     calls.push({ method: route.request().method(), path, payload });
@@ -77,7 +77,9 @@ async function openSystem(page: Page, options: Options = {}) {
       status: 'captured', generated_at: date, read_only: true, execution_enabled: false, mutation_enabled: false
     });
     if (path === '/execution-requests' && route.request().method() === 'POST') return fulfillJson(route, { id: 'pw-review-request' }, 201);
-    return route.continue();
+    // Never continue an unreviewed write to production: let the context guard
+    // abort non-GET requests and allow only the specifically mocked POSTs above.
+    return route.fallback();
   });
   await page.goto('/system-context');
   await expect(page.getByRole('heading', { name: 'System Context workspace' })).toBeVisible();

@@ -9,7 +9,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FRONTEND = 'https://hotel-inventory-frontend-mauve.vercel.app';
 const keys = ['PW_LIVE_ORIGINAL_READONLY','PW_ORIGINAL_SUITE_GROUP','PW_BASE_URL'];
 const original = Object.fromEntries(keys.map(key => [key,process.env[key]]));
-const calls = {logins:0, contexts:0, blocked:0, continued:0, mockFulfilled:0};
+const calls = {logins:0, contexts:0, blocked:0, continued:0, mockFulfilled:0, recovered:0};
 const jwt = (sec = 3600) => `pw.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now()/1000)+sec })).toString('base64url')}.signature`;
 const snapshot = id => ({cookies:[{name:'refresh',value:`cookie-${id}`,domain:'hotel-inventory-frontend-mauve.vercel.app',path:'/',expires:-1,httpOnly:true,secure:true,sameSite:'Lax'}],origins:[{origin:FRONTEND,localStorage:[{name:'inventory_access_token',value:jwt()}]}]});
 const expectMock = value => ({toBeVisible:async()=>{},toEqual:wanted=>assert.deepEqual(value,wanted)});
@@ -20,7 +20,7 @@ function load(rel) {
   const res=ts.transpileModule(fs.readFileSync(file,'utf8'),{fileName:file,compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true},reportDiagnostics:true});
   assert.equal((res.diagnostics??[]).filter(x=>x.category===ts.DiagnosticCategory.Error).length,0,`Cannot transpile ${rel}`);
   const m=new Module(file);m.filename=file;m.paths=Module._nodeModulePaths(path.dirname(file));
-  m.require=(id)=>id==='@playwright/test'?playwright:id==='./environment'?environment:require(id);
+  m.require=(id)=>id==='@playwright/test'?playwright:id==='./environment'?environment:id==='./liveOriginalSafeTest'?fixture:require(id);
   m._compile(res.outputText,file);return m.exports;
 }
 const fixture=load('support/liveOriginalSafeTest.ts');
@@ -48,22 +48,33 @@ async function runWorker() {
   return stored;
 }
 const makeRequest=(method, path)=>({method:()=>method,url:()=>FRONTEND+path});
-async function runGuard(callback) {
+async function runGuard(callback, workerOverride) {
   const contextHandlers=[];const pageHandlers=[];const finished=[];
   let absorbed = false;
   const rotated = snapshot('mock-page-rotation');
+  const browserState={cleared:0,cookies:[],token:null,paths:[]};
+  const context={
+    route:async(pattern,cb)=>{assert.equal(pattern,'**/*');contextHandlers.push(cb)},
+    storageState:async()=>rotated,
+    clearCookies:async()=>{browserState.cleared++},
+    addCookies:async cookies=>{browserState.cookies=cookies}
+  };
   const page={
-    context:()=>({
-      route:async(pattern,cb)=>{assert.equal(pattern,'**/*');contextHandlers.push(cb)},
-      storageState:async()=>rotated
-    }),
+    context:()=>context, url:()=>FRONTEND+'/dashboard',
+    evaluate:async (_fn,token)=>{browserState.token=token},
+    goto:async path=>{browserState.paths.push(path)},
     on:(event,handler)=>{if(event==='requestfinished')finished.push(handler)},
     route:async(_pattern,cb)=>pageHandlers.push(cb)
   };
-  await fixture.test.page({page,bulkSession:{absorb:state=>{
+  const worker=workerOverride??{absorb:state=>{
     assert.equal(state.cookies[0].value,'cookie-mock-page-rotation');
     absorbed = true;
-  }}},async guarded=>callback({guarded,contextHandlers,pageHandlers,finished}));
+  }};
+  if (workerOverride) {
+    const originalAbsorb = worker.absorb;
+    worker.absorb = state => { absorbed = true; originalAbsorb(state); };
+  }
+  await fixture.test.page({page,bulkSession:worker},async guarded=>callback({guarded,contextHandlers,pageHandlers,finished,browserState}));
   assert(absorbed,'Page teardown must feed refreshed auth state back to the worker');
 }
 try {
@@ -91,6 +102,25 @@ try {
     assert(state.origins[0].localStorage[0].value!==jwt(10));
   });
   assert.equal(calls.logins,4,'Only expiring worker renews');
+  // Proactive renewal must also cover a valid JWT backed by an aging refresh-cookie pair.
+  workers[1].session.lastLoginAt = Date.now() - 9*60*1000;
+  await fixture.test.storageState({bulkSession:workers[1].session},async state=>{
+    assert.equal(state.cookies[0].value,`cookie-${calls.contexts}`);
+  });
+  assert.equal(calls.logins,5,'Aged refresh identity renews before the user-facing dashboard fails');
+  // Recover a single failed dashboard with a fresh worker identity, never a
+  // shared on-disk authentication snapshot and never an unmocked write.
+  const repair={snapshot:snapshot('stale-identity'),lastLoginAt:Date.now(),renew:async()=>{
+    calls.recovered++;repair.snapshot=snapshot('recovered-identity');repair.lastLoginAt=Date.now();
+  },absorb:()=>{}};
+  await runGuard(async({guarded,browserState})=>{
+    await fixture.restoreBulkTenantSession(guarded);
+    assert.equal(browserState.cleared,1);
+    assert.equal(browserState.cookies[0].value,'cookie-recovered-identity');
+    assert.equal(browserState.token,repair.snapshot.origins[0].localStorage[0].value);
+    assert.deepEqual(browserState.paths,['/dashboard']);
+  },repair);
+  assert.equal(calls.recovered,1,'Dashboard recovery is worker-scoped and explicit');
   // Simulate an application-startup POST. It MUST be blocked before live network;
   // an aborted request is not a completed mutation or a test failure.
   await runGuard(async({contextHandlers})=>{
@@ -123,14 +153,14 @@ try {
   assert.equal(navigated,'/dashboard');
   process.env.PW_ORIGINAL_SUITE_GROUP='PRODUCTS';
   await fixture.test.bulkSession[0]({browser},async session=>assert.deepEqual(session.snapshot,{cookies:[],origins:[]}));
-  assert.equal(calls.logins,4,'Nonbulk group does not use worker authentication');
+  assert.equal(calls.logins,5,'Nonbulk group does not use worker authentication');
   process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_02_RECHECK';
   process.env.PW_BASE_URL='https://wrong.example.invalid';
   await assert.rejects(fixture.test.bulkSession[0]({browser},async()=>{}),/exact reviewed production origin/);
   console.log('PASS: Three independent worker logins; rotated cookies carried between contexts, expired auth and permission overrides rejected.');
   console.log('PASS: Production startup POST aborted but not misreported as a completed write.');
   console.log('PASS: Synthetic POST fulfillment tracked; page-route write continuation aborted; unmocked completed write fails.');
-  console.log('PASS: Dashboard helper and wrong-origin / legacy nonbulk behavior.');
+  console.log('PASS: Proactive stale-session renewal and worker-scoped dashboard recovery; wrong-origin / legacy nonbulk behavior.');
 } finally {
   for(const [key,value] of Object.entries(original)) if(value===undefined)delete process.env[key];else process.env[key]=value;
 }

@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import { requireDisposableTenantCredentials } from './environment';
+import { restoreBulkTenantSession } from './liveOriginalSafeTest';
 
 export async function selectEnglishUI(page: Page): Promise<void> {
   // App source: src/i18n/config.ts, I18nProvider.tsx
@@ -22,7 +23,16 @@ export async function loginAsTenant(page: Page): Promise<void> {
     // Preserve loginAsTenant()'s existing semantic contract: dashboard is open.
     // A restored token alone leaves the new test page at about:blank.
     await page.goto('/dashboard');
-    await expect(page.getByRole('heading', { name: 'Operations Dashboard' })).toBeVisible();
+    const dashboard = page.getByRole('heading', { name: 'Operations Dashboard' });
+    try {
+      await expect(dashboard).toBeVisible({ timeout: 9_000 });
+    } catch {
+      // A rotated/invalid refresh session can outlive the JWT's nominal expiry.
+      // Reauthenticate this worker once, then require the protected dashboard.
+      // Do not silently skip the test when the account still cannot access it.
+      await restoreBulkTenantSession(page);
+      await expect(dashboard).toBeVisible({ timeout: 15_000 });
+    }
     return;
   }
   const { email, password } = requireDisposableTenantCredentials();

@@ -9,7 +9,7 @@ const manifest = JSON.parse(fs.readFileSync(path.join(root,'original-suite-appro
 const group = manifest.approved_groups.BULK_SAFE_04;
 const previous = new Set();
 for(const [name, definition] of Object.entries(manifest.approved_groups)) {
- if (name === 'BULK_SAFE_04') continue;
+ if (name === 'BULK_SAFE_04' || name === 'BULK_SAFE_04_RECHECK') continue;
  for(const entry of definition.entries ?? [definition]) for(const id of entry.ids) previous.add(id);
 }
 assert.equal(group.secret,true);
