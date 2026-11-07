@@ -50,8 +50,10 @@ jobs:
           node-version: '22'
       - name: Install original suite dependencies
         run: npm install --no-audit --no-fund
-      - name: Verify all scenario IDs and reviewed-source fingerprints
-        run: node scripts/verify-original-suite.mjs
+      - name: Verify all scenario IDs, reviewed fingerprints, and bulk authentication isolation
+        run: |
+          node scripts/verify-original-suite.mjs
+          node scripts/check-bulk-auth-fixture.mjs
       - name: Discover all 9,900 authored original tests (no browser, no credentials)
         if: ${{ inputs.group == 'DISCOVER_ALL' }}
         env:

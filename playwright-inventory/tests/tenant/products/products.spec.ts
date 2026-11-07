@@ -211,7 +211,9 @@ test.describe('Products — error and access boundaries', () => {
   test.beforeEach(async ({ page }) => { await loginAsTenant(page); });
 
   test('TPROD-014 products API error is presented explicitly in the catalog instead of fake rows', async ({ page }) => {
-    await page.route('**/products', (route) => fulfillJson(route, { error: { message: 'Synthetic catalog unavailable' } }, 503));
+    await page.route('**/products', (route) => isApiGet(route)
+      ? fulfillJson(route, { error: { message: 'Synthetic catalog unavailable' } }, 503)
+      : route.continue());
     await page.goto('/products');
     await expect(list(page).getByText(/Failed to load products: Synthetic catalog unavailable/)).toBeVisible();
   });

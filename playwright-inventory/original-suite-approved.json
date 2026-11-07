@@ -1,7 +1,7 @@
 {
   "expected_suite_ids": 9900,
   "expected_spec_files": 152,
-  "source_baseline": "Batch 201 FULL ZIP (latest user-installed; Batch 202 not installed)",
+  "source_baseline": "Batch 203 installed; Batch 204 fixes BULK_SAFE_01 login and two navigation mocks",
   "live_origin": "https://hotel-inventory-frontend-mauve.vercel.app",
   "approved_groups": {
     "LOGIN": {
@@ -31,7 +31,7 @@
         "TPROD-006"
       ],
       "secret": true,
-      "sha256": "062ab36f44ca193d1a3d342c81cdd5f0f3ca14923f0929d15242230e30223962"
+      "sha256": "f8f1173dce17f0c35a6d407ccfe06f44d15f3d5482a670623a0629bed5eed98a"
     },
     "STOCK": {
       "file": "tenant/stock/stock.spec.ts",
@@ -60,7 +60,7 @@
         "TSUP-007"
       ],
       "secret": true,
-      "sha256": "e1d05098239b8fe2f7ae4cc4dcea7f260db62ff78f8440b2b4dc64c414214c84"
+      "sha256": "5edd445810c13e23764e59a4a3e2cfee99dfe0c8890d5eff8cdbaf003f061acd"
     },
     "PURCHASE_ORDERS": {
       "file": "tenant/purchase-orders/purchase-orders.spec.ts",
@@ -226,7 +226,7 @@
             "TPROD-017",
             "TPROD-018"
           ],
-          "sha256": "062ab36f44ca193d1a3d342c81cdd5f0f3ca14923f0929d15242230e30223962"
+          "sha256": "f8f1173dce17f0c35a6d407ccfe06f44d15f3d5482a670623a0629bed5eed98a"
         },
         {
           "file": "tenant/suppliers/suppliers.spec.ts",
@@ -241,7 +241,7 @@
             "TSUP-032",
             "TSUP-033"
           ],
-          "sha256": "e1d05098239b8fe2f7ae4cc4dcea7f260db62ff78f8440b2b4dc64c414214c84"
+          "sha256": "5edd445810c13e23764e59a4a3e2cfee99dfe0c8890d5eff8cdbaf003f061acd"
         },
         {
           "file": "tenant/stock/stock.spec.ts",

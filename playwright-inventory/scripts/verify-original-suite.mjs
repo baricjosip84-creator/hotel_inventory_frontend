@@ -134,6 +134,25 @@ for (const { group, file, ids } of allApproved) {
 assert(workflowBody.includes('playwright.live-original.config.ts --list'));
 assert(workflowBody.includes('playwright.live-original.config.ts'));
 assert(workflowBody.includes("if: ${{ inputs.group != 'DISCOVER_ALL' }}"));
+// Batch 204 regressions: bulk must reuse worker-authenticated storage state and
+// API mocks must never replace document navigation with synthetic JSON.
+if (bulkIds) {
+  const adapter = fs.readFileSync(path.join(root, 'support/liveOriginalSafeTest.ts'), 'utf8');
+  const session = fs.readFileSync(path.join(root, 'support/tenantSession.ts'), 'utf8');
+  const products = fs.readFileSync(path.join(testRoot, 'tenant/products/products.spec.ts'), 'utf8');
+  const suppliers = fs.readFileSync(path.join(testRoot, 'tenant/suppliers/suppliers.spec.ts'), 'utf8');
+  assert(adapter.includes("{ scope: 'worker' }") && adapter.includes('storageState: async ({ bulkSession }'),
+    'Bulk authentication must be worker-scoped and restored per test');
+  assert(adapter.includes("request.url()") && adapter.includes('approvedLogin(method,'),
+    'Bulk login bootstrap must retain its network write protection');
+  assert(session.includes("PW_ORIGINAL_SUITE_GROUP === 'BULK_SAFE_01'") &&
+    session.includes('requireDisposableTenantCredentials();'),
+    'Bulk must not repeat login and must keep credential safety check');
+  assert(products.includes("await page.route('**/products', (route) => isApiGet(route)"),
+    'Product error mock must not intercept HTML navigation');
+  assert((suppliers.match(/\['fetch', 'xhr'\]\.includes\(request\.resourceType\(\)\)/g) || []).length >= 2,
+    'Supplier empty/error mocks must not intercept HTML navigation');
+}
 // The bulk selected spec files must all use the same non-write fixture adapter.
 if (bulkIds) assert.equal(bulkIds.size, 155, 'Batch 203 bulk must contain exactly 155 new IDs');
 console.log(`PASS: Workflow dispatch options, manifest, and original test IDs match (${declared.length - 1} runnable groups).`);

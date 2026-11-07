@@ -11,6 +11,16 @@ export async function selectEnglishUI(page: Page): Promise<void> {
 }
 
 export async function loginAsTenant(page: Page): Promise<void> {
+  // The reviewed bulk fixture has authenticated this worker and installed its
+  // storageState into a fresh context for each test. Repeating /auth/login 155
+  // times triggered widespread login failures in the first production bulk run.
+  if (process.env.PW_LIVE_ORIGINAL_READONLY === 'YES' &&
+      process.env.PW_ORIGINAL_SUITE_GROUP === 'BULK_SAFE_01') {
+    // Keep the exact-origin, allowed-group and presence-of-credentials gate.
+    requireDisposableTenantCredentials();
+    await selectEnglishUI(page);
+    return;
+  }
   const { email, password } = requireDisposableTenantCredentials();
   await selectEnglishUI(page);
   await page.goto('/login');

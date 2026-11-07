@@ -142,13 +142,22 @@ test.describe('Suppliers — directory, search, selected supplier and errors', (
   });
 
   test('TSUP-032 empty supplier directory distinguishes no records from no search matches', async ({ page }) => {
-    await page.route('**/suppliers', route => fulfillJson(route, []));
+    await page.route('**/suppliers', route => {
+      const request = route.request();
+      return request.method() === 'GET' && ['fetch', 'xhr'].includes(request.resourceType())
+        ? fulfillJson(route, []) : route.continue();
+    });
     await page.reload();
     await expect(directory(page).getByText('No suppliers have been created yet.')).toBeVisible();
   });
 
   test('TSUP-033 suppliers API error shows error state, not stale synthetic records', async ({ page }) => {
-    await page.route('**/suppliers', route => fulfillJson(route, { error: { message: 'Synthetic supplier API offline' } }, 503));
+    await page.route('**/suppliers', route => {
+      const request = route.request();
+      return request.method() === 'GET' && ['fetch', 'xhr'].includes(request.resourceType())
+        ? fulfillJson(route, { error: { message: 'Synthetic supplier API offline' } }, 503)
+        : route.continue();
+    });
     await page.reload();
     await expect(page.getByText(/Failed to load suppliers: Synthetic supplier API offline/)).toBeVisible();
     await expect(supplierRow(page, 'Synthetic Harbor Foods')).toHaveCount(0);
