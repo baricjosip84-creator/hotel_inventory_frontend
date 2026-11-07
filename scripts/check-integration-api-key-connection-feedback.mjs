@@ -26,7 +26,7 @@ for(const key of texts){ck(loc.includes(JSON.stringify(key)),`all-locales source
 ck(page.includes('{apiClientMessage ? <div className="form-success">{apiClientMessage}</div> : null}'),'API results displayed in API card');
 ck(page.includes('{connectionMessage ? <div className="form-success">{connectionMessage}</div> : null}'),'Connection results displayed in connection card');
 ck(page.includes('{connectionError ? <div className="form-error">{connectionError}</div> : null}'),'Connection errors displayed within connection card');
-ck(page.includes('{webhookActionError ? <div className="form-error">{webhookActionError}</div> : null}'),'Webhook errors displayed within webhook card');
+ck(page.includes('{webhookActionError ? <div className="form-error" role="alert">{webhookActionError}</div> : null}'),'Webhook errors displayed within webhook card');
 ck(page.includes('saveConnection.mutate(Boolean(editingConnection))'),'Connection edit mode captured at submission');
 ck(page.includes('{apiScopes.length === 0 ? <p'),'Zero-scope explanation shown in creation and editing');
 const requests=[];const state={};
@@ -42,6 +42,8 @@ const context={
   clearApiClientForm:()=>{state.clearedApi=true;},clearConnectionForm:()=>{state.clearedConnection=true;},
   setApiClientMessage:(v)=>{state.apiMessage=v;},setConnectionMessage:(v)=>{state.connectionMessage=v;},setWebhookMessage:(v)=>{state.webhookMessage=v;},
   setConnectionError:(v)=>{state.connectionError=v;},setWebhookActionError:(v)=>{state.webhookError=v;},
+  // Action notifications are emitted by the real webhook handlers; capture them without showing a browser toast.
+  showTenantActionSuccess:(v)=>{state.toastSuccess=v;},showTenantActionError:(v)=>{state.toastError=v;},
   setRevealedKey:(v)=>{state.revealedKey=v;}, setName:(v)=>{state.name=v;},setDescription:()=>{},setApiScopes:()=>{},setApiExpiresAt:()=>{},setApiAllowedIps:()=>{},
   setError:(v)=>{state.error=v;},revealedKey:{clientId:'key-001',value:'FAKE_OLD'},
   qc:{invalidateQueries:()=>Promise.resolve()},
@@ -76,12 +78,14 @@ for(const [name,input,endpoint,method,message,response] of cases){
  mutation.onSuccess(response,input);
  const observed = name==='changeWebhookStatus'?'webhookMessage':name.includes('Connection')?'connectionMessage':'apiMessage';
  ck(state[observed]===message,`${name} action-specific feedback`);
+ if(name==='changeWebhookStatus') ck(state.toastSuccess===message,`${name} emits action-specific success toast`);
  if(name==='saveConnection') ck(JSON.parse(requests[0][1].body).expected_version===(input?9:0),'save connection optimistic lock preserved');
  if(name==='rotateClient'||name==='createClient') ck(state.revealedKey?.value==='FAKE_TEST_ONLY','one-time replacement key remains shown');
  if(name==='revokeClient') ck(state.revealedKey===null,'revoke does not leave a displayed revoked key');
  if(mutation.onError && (name==='saveConnection'||name==='changeConnectionStatus'||name==='changeWebhookStatus')) {
    mutation.onError(new Error('Mock offline rejection'),input);
    ck((name==='changeWebhookStatus'?state.webhookError:state.connectionError)?.includes('Mock offline rejection'), `${name} error is shown beside the attempted action`);
+   if(name==='changeWebhookStatus') ck(state.toastError==='Mock offline rejection',`${name} emits action-specific error toast`);
  }
 }
 console.log(`API key, connection and webhook-status action feedback: ${n}/${n} passed`);
