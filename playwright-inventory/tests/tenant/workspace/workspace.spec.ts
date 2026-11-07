@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from '../../../support/liveOriginalSafeTest';
 import { loginAsTenant, fulfillJson } from '../../../support/tenantSession';
 
 // Batch 10 — Workspace: a router-reachable, role-filtered READ-ONLY tenant page.

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from '../../../support/liveOriginalSafeTest';
 import { loginAsTenant, fulfillJson } from '../../../support/tenantSession';
 
 // Batch 8 — Real-time Operations Feed. GENERATED_UNRUN: source-inspected only.
