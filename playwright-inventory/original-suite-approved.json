@@ -60,7 +60,7 @@
         "TSUP-007"
       ],
       "secret": true,
-      "sha256": "bbba50573f9cdf1246e1c2f5afc1f4ae5ac680a0f250d7bec562ccf53aa0749b"
+      "sha256": "e1d05098239b8fe2f7ae4cc4dcea7f260db62ff78f8440b2b4dc64c414214c84"
     },
     "PURCHASE_ORDERS": {
       "file": "tenant/purchase-orders/purchase-orders.spec.ts",

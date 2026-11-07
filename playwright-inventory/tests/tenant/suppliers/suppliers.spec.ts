@@ -26,8 +26,16 @@ const syntheticPerformance = {
 };
 
 async function fixtureSuppliers(page: Page) {
-  await page.route('**/suppliers', route => route.request().method() === 'GET'
-    ? fulfillJson(route, syntheticSuppliers) : route.abort());
+  // The **/suppliers glob matches both API GETs and the /suppliers HTML
+  // navigation. Mock only fetch/XHR reads; let the actual app document load.
+  await page.route('**/suppliers', route => {
+    const request = route.request();
+    if (request.method() === 'GET' && ['fetch', 'xhr'].includes(request.resourceType())) {
+      return fulfillJson(route, syntheticSuppliers);
+    }
+    if (request.method() === 'GET') return route.continue();
+    return route.abort(); // All non-GET supplier calls remain blocked.
+  });
   await page.route('**/suppliers/sla-breaches', route => route.request().method() === 'GET'
     ? fulfillJson(route, syntheticBreaches) : route.abort());
   await page.route('**/suppliers/pw-sup-01/performance', route => fulfillJson(route, syntheticPerformance));
