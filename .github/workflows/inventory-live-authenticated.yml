@@ -1,0 +1,46 @@
+name: Inventory - live tenant read-only pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type TENANTREADONLY to sign in using existing Production secrets and visit 3 read-only tenant pages'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  live-tenant-readonly:
+    if: ${{ github.event.inputs.confirmation == 'TENANTREADONLY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # E2E_EMAIL and E2E_PASSWORD already exist in this GitHub Environment.
+    environment: Production
+    defaults:
+      run:
+        working-directory: playwright-inventory
+    env:
+      PW_LIVE_AUTH_READONLY: 'YES'
+      PW_BASE_URL: 'https://hotel-inventory-frontend-mauve.vercel.app'
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: List only authenticated production read-only smoke
+        run: npx playwright test --config=playwright.live-authenticated.config.ts --list
+      - name: Test tenant login, Dashboard, Products and Stock (no inventory mutations)
+        env:
+          PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
+          PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: npx playwright test --config=playwright.live-authenticated.config.ts
+      # No artifact upload: traces, screenshots, browser storage, or authentication
+      # context must not be published from runs with real tenant credentials.
