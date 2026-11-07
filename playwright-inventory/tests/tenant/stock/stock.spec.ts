@@ -1,4 +1,4 @@
-import {test,expect,type Page} from '../../../support/liveOriginalSafeTest';
+import {test,expect,type Page,type Route} from '../../../support/liveOriginalSafeTest';
 import {loginAsTenant,fulfillJson} from '../../../support/tenantSession';
 import {loginAsDisposableRole} from '../../../support/roleSession';
 
@@ -6,6 +6,16 @@ import {loginAsDisposableRole} from '../../../support/roleSession';
 // backend/src/routes/stock.js. GET fixtures prove rendered UI behavior only,
 // never backend tenant isolation, mutation correctness, or persistence.
 const stockEndpoint='**/stock';
+// Only API GET/XHR/fetch calls can be replaced with synthetic stock data.
+// The glob also matches /stock DOCUMENT navigation; fulfilling that with JSON
+// causes the entire workspace to disappear, as seen in the Batch 207 log.
+const mockStockApi = (page:Page, handler:(route:Route)=>Promise<void>) =>
+ page.route(stockEndpoint,route=>{
+  const request=route.request();
+  if(request.method()!=='GET'||!['fetch','xhr'].includes(request.resourceType()))return route.fallback();
+  return handler(route);
+ });
+
 const stockRows=[
  {id:'pw-stock-coffee',product_id:'pw-product-coffee',product_name:'Synthetic Coffee',product_category:'Beverages',product_unit:'kg',storage_location_id:'pw-location-main',storage_location_name:'Main Warehouse',quantity:30,reserved_quantity:2,available_lot_quantity:30,usable_lot_quantity:30,effective_min_quantity:5,version:2},
  {id:'pw-stock-milk',product_id:'pw-product-milk',product_name:'Synthetic Milk',product_category:'Dairy',product_unit:'L',storage_location_id:'pw-location-kitchen',storage_location_name:'Kitchen',quantity:4,reserved_quantity:0,available_lot_quantity:4,usable_lot_quantity:4,effective_min_quantity:10,version:3},
@@ -17,7 +27,7 @@ async function openStock(page:Page,rows:unknown[]=stockRows,url='/stock'){
  await loginAsTenant(page);
  // The **/stock glob also matches a browser DOCUMENT request for /stock.
  // Intercept only API reads; otherwise Playwright would replace the app HTML with JSON.
- await page.route(stockEndpoint,route=>{
+ await mockStockApi(page,route=>{
   const request=route.request();
   if(request.method()!=='GET'||!['fetch','xhr'].includes(request.resourceType()))return route.continue();
   return fulfillJson(route,rows);
@@ -33,13 +43,13 @@ const statusSelect=(page:Page)=>page.locator('#stock-status-filter');
 test.describe('Stock — workspace, positions and filters (Batch 20)',()=>{
  test('TST-001 A delayed stock GET shows the loading position state',async({page})=>{
   await loginAsTenant(page);let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
-  await page.route(stockEndpoint,async route=>{await gate;await fulfillJson(route,stockRows);});
+  await mockStockApi(page,async route=>{await gate;await fulfillJson(route,stockRows);});
   await page.goto('/stock');await expect(page.getByText('Loading stock positions...')).toBeVisible();
   release();await expect(page.getByText('Stock workspace',{exact:true})).toBeVisible();
  });
  test('TST-002 Failed stock GET offers Try Again and recovers to the actual workbench',async({page})=>{
   await loginAsTenant(page);let fail=true;let requests=0;
-  await page.route(stockEndpoint,route=>{requests++;return fulfillJson(route,fail?{message:'Synthetic stock failure'}:stockRows,fail?503:200);});
+  await mockStockApi(page,route=>{requests++;return fulfillJson(route,fail?{message:'Synthetic stock failure'}:stockRows,fail?503:200);});
   await page.goto('/stock');await expect(page.getByText('Failed to load stock:',{exact:false})).toBeVisible();
   fail=false;await page.getByRole('button',{name:'Try Again'}).click();await expect(page.getByText('Stock workspace',{exact:true})).toBeVisible();expect(requests).toBeGreaterThanOrEqual(2);
  });
@@ -131,7 +141,7 @@ test.describe('Stock — workspace, positions and filters (Batch 20)',()=>{
  });
  test('TST-020 Lot and reconciliation GETs remain lazy until the operator expands detail',async({page})=>{
   await loginAsTenant(page);let lots=0;let reconciliations=0;
-  await page.route(stockEndpoint,route=>fulfillJson(route,stockRows));
+  await mockStockApi(page,route=>fulfillJson(route,stockRows));
   await page.route('**/stock/lots',route=>{lots++;return fulfillJson(route,[]);});
   await page.route('**/stock/reconciliation',route=>{reconciliations++;return fulfillJson(route,{summary:{row_count:0,ledger_mismatch_count:0,lot_mismatch_count:0,expired_still_available_count:0},rows:[]});});
   await page.goto('/stock');await expect(page.getByText('Stock workspace',{exact:true})).toBeVisible();
@@ -148,7 +158,7 @@ const stockReconciliation={summary:{row_count:0,ledger_mismatch_count:0,lot_mism
 const lot=(id:string, condition:string, days=30)=>({id,product_id:'pw-product-coffee',product_name:'Synthetic Coffee',product_unit:'kg',storage_location_id:'pw-location-main',storage_location_name:'Main Warehouse',lot_number:id,batch_number:'',condition,operational_status:condition,quantity:2,days_to_expiry:days,unit_cost:4,unit_cost_currency:'EUR'});
 async function stockWithLots(page:Page,lots:unknown[]){
  await loginAsTenant(page);
- await page.route('**/stock',r=>fulfillJson(r,stockRows));
+ await mockStockApi(page,r=>fulfillJson(r,stockRows));
  await page.route('**/stock/lots',r=>fulfillJson(r,lots));
  await page.route('**/stock/reconciliation',r=>fulfillJson(r,stockReconciliation));
  await page.goto('/stock');
@@ -192,7 +202,7 @@ test.describe('Stock — selection, lot governance and controlled stock actions 
  });
  test('TST-025 Refresh Stock re-fetches positions and expanded lot/reconciliation data',async({page})=>{
   await loginAsTenant(page);let stock=0,lots=0,reconciliations=0;
-  await page.route('**/stock',r=>{stock++;return fulfillJson(r,stockRows);});
+  await mockStockApi(page,r=>{stock++;return fulfillJson(r,stockRows);});
   await page.route('**/stock/lots',r=>{lots++;return fulfillJson(r,[]);});
   await page.route('**/stock/reconciliation',r=>{reconciliations++;return fulfillJson(r,stockReconciliation);});
   await page.goto('/stock');await page.getByRole('button',{name:'Load lot & integrity details'}).click();
@@ -204,7 +214,7 @@ test.describe('Stock — selection, lot governance and controlled stock actions 
  });
  test('TST-026 Authorized stock adjuster opens and closes Opening Stock Import',async({page})=>{
   await loginAsDisposableRole(page,'PW_STOCK_ADJUSTER');
-  await page.route('**/stock',r=>fulfillJson(r,stockRows));await page.goto('/stock');
+  await mockStockApi(page,r=>fulfillJson(r,stockRows));await page.goto('/stock');
   await page.getByRole('button',{name:'Opening stock setup'}).click();
   await expect(page.getByText('Opening Stock Import',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Hide opening stock setup'}).click();
@@ -212,14 +222,14 @@ test.describe('Stock — selection, lot governance and controlled stock actions 
  });
  test('TST-027 Stock read-only user has no opening import and cannot post adjustments',async({page})=>{
   await loginAsDisposableRole(page,'PW_STOCK_READ_ONLY');
-  await page.route('**/stock',r=>fulfillJson(r,stockRows));await page.goto('/stock');
+  await mockStockApi(page,r=>fulfillJson(r,stockRows));await page.goto('/stock');
   await expect(page.getByRole('heading',{name:'Stock workspace'})).toBeVisible();
   await expect(page.getByRole('button',{name:'Opening stock setup'})).toHaveCount(0);
   await selectStockByName(page,'Synthetic Coffee');
   await expect(page.getByRole('button',{name:'Adjust',exact:true})).toBeDisabled();
  });
  test('TST-028 Expanded lot/integrity failure stays in its own error panel',async({page})=>{
-  await loginAsTenant(page);await page.route('**/stock',r=>fulfillJson(r,stockRows));
+  await loginAsTenant(page);await mockStockApi(page,r=>fulfillJson(r,stockRows));
   await page.route('**/stock/lots',r=>fulfillJson(r,{message:'Synthetic lot fetch error'},503));
   await page.route('**/stock/reconciliation',r=>fulfillJson(r,stockReconciliation));
   await page.goto('/stock');await page.getByRole('button',{name:'Load lot & integrity details'}).click();
@@ -374,12 +384,12 @@ test.describe('Stock — selection, lot governance and controlled stock actions 
   await expect(page.getByText('35',{exact:true}).first()).toBeVisible();
  });
  test('TST-046 Stock reader without usage.read sees explicit gated usage ledger',async({page})=>{
-  await loginAsDisposableRole(page,'PW_STOCK_READ_ONLY');await page.route('**/stock',r=>fulfillJson(r,stockRows));await page.goto('/stock');
+  await loginAsDisposableRole(page,'PW_STOCK_READ_ONLY');await mockStockApi(page,r=>fulfillJson(r,stockRows));await page.goto('/stock');
   await selectStockByName(page,'Synthetic Coffee');
   await expect(page.getByText('Usage history is unavailable because this role does not have inventory usage read access.')).toBeVisible();
  });
  test('TST-047 Stock reader without stock_movements.read sees movement restriction',async({page})=>{
-  await loginAsDisposableRole(page,'PW_STOCK_READ_ONLY');await page.route('**/stock',r=>fulfillJson(r,stockRows));await page.goto('/stock');
+  await loginAsDisposableRole(page,'PW_STOCK_READ_ONLY');await mockStockApi(page,r=>fulfillJson(r,stockRows));await page.goto('/stock');
   await selectStockByName(page,'Synthetic Coffee');
   await expect(page.getByText('Movement history is unavailable because this role does not have stock movement read access.')).toBeVisible();
   await expect(page.getByRole('link',{name:'Open Full Stock Ledger'})).toHaveCount(0);

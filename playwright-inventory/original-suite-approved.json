@@ -1,7 +1,7 @@
 {
   "expected_suite_ids": 9900,
   "expected_spec_files": 152,
-  "source_baseline": "Batch 205: BULK_SAFE_02 ran 250 originals — 144 PASS / 106 FAIL; Batch 206 rechecks 96 failures after fixing test harness, with 10 unresolved product-behavior cases retained as unverified.",
+  "source_baseline": "Batch 208: Batch 207 96-ID recheck yielded 56 PASS / 40 FAIL. New recheck selects 39 failed-only IDs; TDASH-049 held for management-permission acceptance. Previous 10 Batch 206 quarantines unchanged.",
   "live_origin": "https://hotel-inventory-frontend-mauve.vercel.app",
   "approved_groups": {
     "LOGIN": {
@@ -46,7 +46,7 @@
         "TST-010"
       ],
       "secret": true,
-      "sha256": "12c1e3fa7318f874b444434d6053dbd1c5704f887dbafe7d91e31eda7e1280ba"
+      "sha256": "6df454c79d6bbf846d9af2b6e084150c51475c03db2bec6298299946245cb7f3"
     },
     "SUPPLIERS": {
       "file": "tenant/suppliers/suppliers.spec.ts",
@@ -256,7 +256,7 @@
             "TST-018",
             "TST-019"
           ],
-          "sha256": "12c1e3fa7318f874b444434d6053dbd1c5704f887dbafe7d91e31eda7e1280ba"
+          "sha256": "6df454c79d6bbf846d9af2b6e084150c51475c03db2bec6298299946245cb7f3"
         },
         {
           "file": "tenant/storage-locations/storage-locations.spec.ts",
@@ -559,7 +559,7 @@
             "TST-069",
             "TST-070"
           ],
-          "sha256": "12c1e3fa7318f874b444434d6053dbd1c5704f887dbafe7d91e31eda7e1280ba"
+          "sha256": "6df454c79d6bbf846d9af2b6e084150c51475c03db2bec6298299946245cb7f3"
         },
         {
           "file": "tenant/storage-locations/storage-locations.spec.ts",
@@ -752,7 +752,7 @@
             "TST-059",
             "TST-060"
           ],
-          "sha256": "12c1e3fa7318f874b444434d6053dbd1c5704f887dbafe7d91e31eda7e1280ba"
+          "sha256": "6df454c79d6bbf846d9af2b6e084150c51475c03db2bec6298299946245cb7f3"
         },
         {
           "file": "tenant/storage-locations/storage-locations.spec.ts",
@@ -769,6 +769,62 @@
             "TSTR-055"
           ],
           "sha256": "499a8231d4b463c9b7d659d6d12279d381d7852e86c2bab3cae1e52f8e9639a3"
+        }
+      ],
+      "secret": true
+    },
+    "BULK_SAFE_02_RECHECK_2": {
+      "entries": [
+        {
+          "file": "tenant/dashboard/dashboard.spec.ts",
+          "ids": [
+            "TDASH-050",
+            "TDASH-052",
+            "TDASH-054",
+            "TDASH-057",
+            "TDASH-059",
+            "TDASH-060",
+            "TDASH-061",
+            "TDASH-062",
+            "TDASH-064",
+            "TDASH-065",
+            "TDASH-067",
+            "TDASH-069",
+            "TDASH-070",
+            "TDASH-071",
+            "TDASH-072",
+            "TDASH-075",
+            "TDASH-076",
+            "TDASH-077",
+            "TDASH-078"
+          ],
+          "sha256": "c3c58a50d910bb449e75d33976afbaea081d2ceb807cb6551080e22aba6c3484"
+        },
+        {
+          "file": "tenant/stock/stock.spec.ts",
+          "ids": [
+            "TST-029",
+            "TST-030",
+            "TST-031",
+            "TST-036",
+            "TST-038",
+            "TST-039",
+            "TST-040",
+            "TST-042",
+            "TST-043",
+            "TST-044",
+            "TST-048",
+            "TST-049",
+            "TST-051",
+            "TST-052",
+            "TST-053",
+            "TST-054",
+            "TST-055",
+            "TST-056",
+            "TST-057",
+            "TST-058"
+          ],
+          "sha256": "6df454c79d6bbf846d9af2b6e084150c51475c03db2bec6298299946245cb7f3"
         }
       ],
       "secret": true
@@ -1048,5 +1104,156 @@
     "TSTR-080": "Stock-transfer Export CSV control was unavailable during simulated error.",
     "TSL-040": "Search and condition updates unexpectedly retained pinned location_id.",
     "TSL-045": "Condition filter update unexpectedly retained pinned location_id."
+  },
+  "batch_207_last_execution": {
+    "run": "logs_114882962680.zip",
+    "group": "BULK_SAFE_02_RECHECK",
+    "total": 96,
+    "passed": 56,
+    "failed": 40,
+    "passed_ids": [
+      "TDASH-015",
+      "TDASH-016",
+      "TDASH-017",
+      "TDASH-018",
+      "TDASH-019",
+      "TDASH-020",
+      "TDASH-023",
+      "TDASH-025",
+      "TDASH-026",
+      "TDASH-027",
+      "TDASH-028",
+      "TDASH-030",
+      "TDASH-031",
+      "TDASH-032",
+      "TDASH-033",
+      "TDASH-034",
+      "TDASH-035",
+      "TDASH-036",
+      "TDASH-039",
+      "TDASH-040",
+      "TDASH-042",
+      "TDASH-043",
+      "TDASH-044",
+      "TDASH-045",
+      "TDASH-046",
+      "TDASH-047",
+      "TDASH-048",
+      "TDASH-051",
+      "TRPT-031",
+      "TRPT-035",
+      "TSL-034",
+      "TSL-050",
+      "TSMV-051",
+      "TSMV-052",
+      "TSMV-053",
+      "TSMV-054",
+      "TSMV-055",
+      "TSMV-056",
+      "TSMV-057",
+      "TSMV-058",
+      "TSMV-059",
+      "TSMV-060",
+      "TSMV-061",
+      "TSMV-062",
+      "TSMV-063",
+      "TSMV-064",
+      "TSMV-065",
+      "TSMV-066",
+      "TSMV-067",
+      "TSMV-068",
+      "TSMV-073",
+      "TSMV-074",
+      "TST-059",
+      "TST-060",
+      "TSTR-026",
+      "TSTR-055"
+    ],
+    "failed_ids": [
+      "TDASH-049",
+      "TDASH-050",
+      "TDASH-052",
+      "TDASH-054",
+      "TDASH-057",
+      "TDASH-059",
+      "TDASH-060",
+      "TDASH-061",
+      "TDASH-062",
+      "TDASH-064",
+      "TDASH-065",
+      "TDASH-067",
+      "TDASH-069",
+      "TDASH-070",
+      "TDASH-071",
+      "TDASH-072",
+      "TDASH-075",
+      "TDASH-076",
+      "TDASH-077",
+      "TDASH-078",
+      "TST-029",
+      "TST-030",
+      "TST-031",
+      "TST-036",
+      "TST-038",
+      "TST-039",
+      "TST-040",
+      "TST-042",
+      "TST-043",
+      "TST-044",
+      "TST-048",
+      "TST-049",
+      "TST-051",
+      "TST-052",
+      "TST-053",
+      "TST-054",
+      "TST-055",
+      "TST-056",
+      "TST-057",
+      "TST-058"
+    ],
+    "recheck_2_ids": [
+      "TDASH-050",
+      "TDASH-052",
+      "TDASH-054",
+      "TDASH-057",
+      "TDASH-059",
+      "TDASH-060",
+      "TDASH-061",
+      "TDASH-062",
+      "TDASH-064",
+      "TDASH-065",
+      "TDASH-067",
+      "TDASH-069",
+      "TDASH-070",
+      "TDASH-071",
+      "TDASH-072",
+      "TDASH-075",
+      "TDASH-076",
+      "TDASH-077",
+      "TDASH-078",
+      "TST-029",
+      "TST-030",
+      "TST-031",
+      "TST-036",
+      "TST-038",
+      "TST-039",
+      "TST-040",
+      "TST-042",
+      "TST-043",
+      "TST-044",
+      "TST-048",
+      "TST-049",
+      "TST-051",
+      "TST-052",
+      "TST-053",
+      "TST-054",
+      "TST-055",
+      "TST-056",
+      "TST-057",
+      "TST-058"
+    ],
+    "separately_unverified": {
+      "TDASH-049": "GET setup checklist is permission-gated; role capability not proven for live tenant. No fake pass."
+    }
   }
 }

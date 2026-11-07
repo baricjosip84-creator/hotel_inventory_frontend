@@ -54,13 +54,14 @@ for (const [group, entry] of Object.entries(manifest.approved_groups)) {
 // Original bulk groups are disjoint. The only permitted overlap is the
 // explicit, source-fingerprinted retry of previously failed BULK_SAFE_02 IDs.
 const retryGroup = 'BULK_SAFE_02_RECHECK';
+const secondRetryGroup = 'BULK_SAFE_02_RECHECK_2';
 const originalGroup = 'BULK_SAFE_02';
 const bulkGroups = [...seenApprovedByGroup.entries()].filter(([name])=>name.startsWith('BULK_SAFE_'));
 for (const [bulkName, bulkIds] of bulkGroups) {
   const otherIds = new Set([...seenApprovedByGroup.entries()]
     .filter(([name]) => name !== bulkName && !(
-      (name===retryGroup && bulkName===originalGroup) ||
-      (name===originalGroup && bulkName===retryGroup)
+      (new Set([originalGroup,retryGroup,secondRetryGroup]).has(name) &&
+       new Set([originalGroup,retryGroup,secondRetryGroup]).has(bulkName))
     )).flatMap(([,ids])=>[...ids]));
   for (const id of bulkIds) assert(!otherIds.has(id), `Bulk cannot reuse another group's ID: ${bulkName}/${id}`);
 }
@@ -77,6 +78,23 @@ if (seenApprovedByGroup.has(retryGroup)) {
   assert.deepEqual(new Set([...retryIds,...quarantined]),new Set(firstRun.failed_ids));
   assert([...retryIds].every(id => !firstRun.passed_ids.includes(id)), 'Recheck must not repeat 144 already green scenarios');
   console.log('PASS: prior 144 successful IDs preserved; 96 failed IDs rechecked; 10 known mismatches remain unverified.');
+}
+if (seenApprovedByGroup.has(secondRetryGroup)) {
+  const run = manifest.batch_207_last_execution;
+  assert(run && run.total === 96 && run.passed === 56 && run.failed === 40);
+  assert.equal(run.passed_ids.length, 56);
+  assert.equal(run.failed_ids.length, 40);
+  const previous = seenApprovedByGroup.get(retryGroup);
+  assert.deepEqual(new Set([...run.passed_ids, ...run.failed_ids]), previous);
+  const held = new Set(Object.keys(run.separately_unverified));
+  assert.deepEqual(held, new Set(['TDASH-049']));
+  const selected = seenApprovedByGroup.get(secondRetryGroup);
+  assert.equal(selected.size, 39);
+  assert.deepEqual(selected, new Set(run.failed_ids.filter(x => !held.has(x))));
+  assert([...selected].every(id => !run.passed_ids.includes(id)), 'Never rerun previously passed tests');
+  assert([...selected].every(id => !manifest.batch_205_last_execution.passed_ids.includes(id)), 'Never rerun the first 144 passes');
+  assert.equal(new Set([...selected, ...run.passed_ids, ...held]).size, 96);
+  console.log('PASS: Batch 208 selects exactly 39 failed-only IDs; 56 prior passes and 1 permission-dependent case excluded.');
 }
 const bulkIds = seenApprovedByGroup.get('BULK_SAFE_01');
 const nextBulkIds = seenApprovedByGroup.get('BULK_SAFE_02');
