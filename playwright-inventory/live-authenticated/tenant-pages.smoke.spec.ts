@@ -78,10 +78,76 @@ test('LIVE-AUTH-TENANT-001: login then read Dashboard, Products and Stock', asyn
     await expect(page.locator('.io-products-page').getByRole('heading', { name: 'Product workspace', exact: true })).toBeVisible({ timeout: 25_000 });
   });
 
+  await test.step('Products: search no-match and clear (browser-only filter)', async () => {
+    await page.goto('/products');
+    const list = page.locator('#product-list-panel');
+    await expect(list.getByRole('heading', { name: 'Product List', exact: true })).toBeVisible();
+    const search = list.locator('#product-list-search');
+    await expect(search).toBeVisible();
+    // Deliberately implausible SKU/search; no private tenant data is required.
+    await search.fill('pw-live-no-matches-20261107-zz987654321');
+    await expect(list.getByText('No products match the current search and filters.', { exact: true })).toBeVisible();
+    await list.getByRole('button', { name: 'Clear product search' }).click();
+    await expect(search).toHaveValue('');
+    await expect(list.getByRole('button', { name: 'Clear product search' })).toHaveCount(0);
+    await expect(list.getByText('No products match the current search and filters.', { exact: true })).toHaveCount(0);
+  });
+
+  await test.step('Products: cost filter reset and read-only workspace tabs', async () => {
+    const list = page.locator('#product-list-panel');
+    const status = list.locator('#product-list-cost-status');
+    await expect(status).toBeVisible();
+    await status.selectOption('uncosted');
+    await expect(status).toHaveValue('uncosted');
+    const clear = list.getByRole('button', { name: 'Clear Product Filters' });
+    await expect(clear).toBeEnabled();
+    await clear.click();
+    await expect(status).toHaveValue('');
+    await expect(clear).toBeDisabled();
+
+    const costTab = page.getByRole('tab', { name: 'Cost & value', exact: true });
+    await expect(costTab).toBeVisible();
+    await costTab.click();
+    await expect(costTab).toHaveAttribute('aria-selected', 'true');
+    const catalogTab = page.getByRole('tab', { name: 'Catalog', exact: true });
+    await catalogTab.click();
+    await expect(catalogTab).toHaveAttribute('aria-selected', 'true');
+    await expect(list.locator('#product-list-search')).toBeVisible();
+  });
+
+
   await test.step('Stock: tenant stock workspace loads', async () => {
     await page.goto('/stock');
     await expect(page).toHaveURL(/\/stock(?:[?#]|$)/, { timeout: 25_000 });
     await expect(page.locator('.io-stock-page')).toBeVisible({ timeout: 25_000 });
     await expect(page.locator('.io-stock-page').getByRole('heading', { name: 'Stock workspace', exact: true })).toBeVisible({ timeout: 25_000 });
   });
+
+
+  await test.step('Stock: live stock search and clear (or genuine no-stock state)', async () => {
+    await page.goto('/stock');
+    const stock = page.locator('.io-stock-page');
+    await expect(stock.getByRole('heading', { name: 'Stock workspace', exact: true })).toBeVisible();
+    const search = stock.locator('#stock-position-search');
+    const empty = stock.getByText('No stock positions are available yet. Stock appears here after a product has an on-hand balance at a storage location.', { exact: true });
+    await expect.poll(async () => {
+      if (await search.isVisible()) return 'positions';
+      if (await empty.isVisible()) return 'empty';
+      return 'loading';
+    }, { timeout: 30_000 }).not.toBe('loading');
+    if (await empty.isVisible()) {
+      await expect(empty).toBeVisible();
+      return;
+    }
+    await expect(search).toBeVisible();
+    await search.fill('pw-live-no-matches-20261107-zz987654321');
+    await expect(stock.getByText('No stock positions match the current search and filters.', { exact: true })).toBeVisible();
+    const clear = stock.getByRole('button', { name: 'Clear Stock Filters' });
+    await expect(clear).toBeEnabled();
+    await clear.click();
+    await expect(search).toHaveValue('');
+    await expect(clear).toBeDisabled();
+    await expect(stock.getByText('No stock positions match the current search and filters.', { exact: true })).toHaveCount(0);
+  });
+
 });
