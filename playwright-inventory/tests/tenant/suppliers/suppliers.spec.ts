@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from '../../../support/liveOriginalSafeTest';
 import { fulfillJson, loginAsTenant } from '../../../support/tenantSession';
 
 // Batch 4 — /suppliers, source-grounded from frontend/src/pages/SuppliersPage.tsx,

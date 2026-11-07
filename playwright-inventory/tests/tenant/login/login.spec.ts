@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../../support/liveOriginalSafeTest';
 import { fulfillJson, loginAsTenant, selectEnglishUI } from '../../../support/tenantSession';
 
 // Sources: frontend/src/pages/LoginPage.tsx; frontend/src/components/i18n/LanguageSelector.tsx;

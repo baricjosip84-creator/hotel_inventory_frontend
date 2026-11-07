@@ -1,4 +1,4 @@
-import {test,expect,type Page,type Route} from '@playwright/test';
+import {test,expect,type Page,type Route} from '../../../support/liveOriginalSafeTest';
 import {loginAsTenant,fulfillJson} from '../../../support/tenantSession';
 // Batch 27: PurchaseOrdersPage.tsx, router /purchase-orders, frontend subscription gating,
 // GET /purchase-orders with filters, GET /suppliers /products, GET /purchase-orders/:id,

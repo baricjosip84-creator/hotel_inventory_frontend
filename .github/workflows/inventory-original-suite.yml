@@ -1,0 +1,78 @@
+name: Inventory - original 9900 Playwright suite
+
+on:
+  workflow_dispatch:
+    inputs:
+      group:
+        description: 'DISCOVER_ALL checks all 9,900 without a browser; other choices run reviewed ORIGINAL scenario IDs'
+        required: true
+        type: choice
+        default: DISCOVER_ALL
+        options:
+          - DISCOVER_ALL
+          - LOGIN
+          - PRODUCTS
+          - STOCK
+          - SUPPLIERS
+          - PURCHASE_ORDERS
+      confirmation:
+        description: 'Type ORIGINALTESTS to run the selected group'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inventory-original-suite-production
+  cancel-in-progress: false
+
+jobs:
+  original-suite:
+    if: ${{ inputs.confirmation == 'ORIGINALTESTS' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: Production
+    defaults:
+      run:
+        working-directory: playwright-inventory
+    env:
+      PW_BASE_URL: 'https://hotel-inventory-frontend-mauve.vercel.app'
+    steps:
+      - name: Checkout frontend repository
+        uses: actions/checkout@v4
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install original suite dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify all scenario IDs and reviewed-source fingerprints
+        run: node scripts/verify-original-suite.mjs
+      - name: Discover all 9,900 authored original tests (no browser, no credentials)
+        if: ${{ inputs.group == 'DISCOVER_ALL' }}
+        env:
+          PW_BASE_URL: 'http://127.0.0.1:5173'
+        run: |
+          npx playwright test --config=playwright.config.ts --list > original-test-discovery.txt
+          tail -n 1 original-test-discovery.txt
+          node -e "const s=require('fs').readFileSync('original-test-discovery.txt','utf8');const m=s.match(/Total:\s+(\d+)\s+tests?\s+in\s+(\d+)\s+files?/);if(!m||Number(m[1])!==9900||Number(m[2])!==152){console.error('Unexpected Playwright discovery totals',m?.slice(1));process.exit(1)}console.log('PASS: Playwright discovered 9,900 tests across 152 spec files')"
+      - name: Install browser for reviewed existing tests
+        if: ${{ inputs.group != 'DISCOVER_ALL' }}
+        run: npx playwright install --with-deps chromium
+      - name: List the approved original test IDs before execution
+        if: ${{ inputs.group != 'DISCOVER_ALL' }}
+        env:
+          PW_LIVE_ORIGINAL_READONLY: 'YES'
+          PW_ORIGINAL_SUITE_GROUP: ${{ inputs.group }}
+        run: npx playwright test --config=playwright.live-original.config.ts --list
+      - name: Run reviewed ORIGINAL scenarios on live Vercel (not a new smoke suite)
+        if: ${{ inputs.group != 'DISCOVER_ALL' }}
+        env:
+          PW_LIVE_ORIGINAL_READONLY: 'YES'
+          PW_ORIGINAL_SUITE_GROUP: ${{ inputs.group }}
+          PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
+          PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: npx playwright test --config=playwright.live-original.config.ts
+      # No auth snapshots, traces, videos, screenshots, or artifacts uploaded.
+      # Only one reviewed group per run; no unrestricted 9,900-test live execution.

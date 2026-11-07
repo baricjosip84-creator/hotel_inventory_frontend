@@ -24,8 +24,13 @@ export function targetBaseURL(): string {
 export function requireDisposableTenantCredentials(): { email: string; password: string } {
   // This gate is intentionally stricter for any tests that authenticate and
   // can reach real tenant data. A live/prod tenant must never be used.
-  if (process.env.PW_TEST_ENVIRONMENT !== 'disposable') {
-    throw new Error('PW_TEST_ENVIRONMENT=disposable is required for authenticated tests');
+  const approvedLiveOrigin = 'https://hotel-inventory-frontend-mauve.vercel.app';
+  const group = process.env.PW_ORIGINAL_SUITE_GROUP;
+  const liveReviewedGroup = ['PRODUCTS', 'STOCK', 'SUPPLIERS', 'PURCHASE_ORDERS'].includes(group || '');
+  const liveApproved = process.env.PW_LIVE_ORIGINAL_READONLY === 'YES'
+    && liveReviewedGroup && process.env.PW_BASE_URL === approvedLiveOrigin;
+  if (!liveApproved && process.env.PW_TEST_ENVIRONMENT !== 'disposable') {
+    throw new Error('Disposable tenant required except the separately guarded live-original reviewed tests');
   }
   const email = process.env.PW_TENANT_EMAIL;
   const password = process.env.PW_TENANT_PASSWORD;

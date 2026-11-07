@@ -1,0 +1,82 @@
+{
+  "expected_suite_ids": 9900,
+  "expected_spec_files": 152,
+  "source_baseline": "Batch 192 FULL ZIP",
+  "live_origin": "https://hotel-inventory-frontend-mauve.vercel.app",
+  "approved_groups": {
+    "LOGIN": {
+      "file": "tenant/login/login.spec.ts",
+      "ids": [
+        "TLOG-001",
+        "TLOG-002",
+        "TLOG-003",
+        "TLOG-004",
+        "TLOG-005",
+        "TLOG-006",
+        "TLOG-007",
+        "TLOG-010",
+        "TLOG-011"
+      ],
+      "secret": false,
+      "sha256": "e90756d002efc4bef6eaecc8e6b053c62cda2458d10022ba9eaf2438d0888c47"
+    },
+    "PRODUCTS": {
+      "file": "tenant/products/products.spec.ts",
+      "ids": [
+        "TPROD-001",
+        "TPROD-002",
+        "TPROD-003",
+        "TPROD-004",
+        "TPROD-005",
+        "TPROD-006"
+      ],
+      "secret": true,
+      "sha256": "64707acad3d5f4eb550ed1e7760616422727275243506f477e545486dc8ff7a7"
+    },
+    "STOCK": {
+      "file": "tenant/stock/stock.spec.ts",
+      "ids": [
+        "TST-003",
+        "TST-004",
+        "TST-005",
+        "TST-006",
+        "TST-007",
+        "TST-008",
+        "TST-009",
+        "TST-010"
+      ],
+      "secret": true,
+      "sha256": "51926a5d1ddd73388e4fd3ae1a85126ca6157c650c7d35b78aeb2169ae9276f8"
+    },
+    "SUPPLIERS": {
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "ids": [
+        "TSUP-001",
+        "TSUP-002",
+        "TSUP-003",
+        "TSUP-004",
+        "TSUP-005",
+        "TSUP-006",
+        "TSUP-007"
+      ],
+      "secret": true,
+      "sha256": "bbba50573f9cdf1246e1c2f5afc1f4ae5ac680a0f250d7bec562ccf53aa0749b"
+    },
+    "PURCHASE_ORDERS": {
+      "file": "tenant/purchase-orders/purchase-orders.spec.ts",
+      "ids": [
+        "TPO-001",
+        "TPO-002",
+        "TPO-003",
+        "TPO-004",
+        "TPO-005",
+        "TPO-006",
+        "TPO-007",
+        "TPO-008"
+      ],
+      "secret": true,
+      "sha256": "d7424f66cb6ce90b454ce42223eb4a06bd123f0c5996fc5096204bafcde77611"
+    }
+  },
+  "status": "Source-reviewed allowlist: frontend/UI + mocked GETs only; backend effects unverified"
+}

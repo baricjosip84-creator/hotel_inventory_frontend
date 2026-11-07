@@ -1,4 +1,4 @@
-import {test,expect,type Page} from '@playwright/test';
+import {test,expect,type Page} from '../../../support/liveOriginalSafeTest';
 import {loginAsTenant,fulfillJson} from '../../../support/tenantSession';
 import {loginAsDisposableRole} from '../../../support/roleSession';
 

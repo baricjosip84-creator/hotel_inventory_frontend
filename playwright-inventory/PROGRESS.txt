@@ -1403,3 +1403,59 @@ NOT DONE: no npm, TypeScript compilation, Playwright discovery/execution, browse
 - Live-readonly mutation guard remains active: every non-GET/HEAD/OPTIONS request is aborted; any completed non-readonly request is still a failure. No backend or user data changes introduced.
 - Static check and isolated browser-storage simulation PASS. Actual GitHub rerun after this fix is NOT YET DONE. User only needs to replace `playwright-inventory/support/liveReadOnlyTest.ts` and commit, then rerun `Inventory - live Vercel read-only checks` with `READONLY`.
 - No evidence of an application language defect from this failure. Original 417 blocked obligations, 272 partial features, PLCR-084 remain open. Continue only from B188 FULL.
+
+
+## Batch 189 — Ready for first authenticated LIVE tenant navigation (7 Nov 2026)
+- B188 live public smoke subsequently reported GREEN by user: 6 public login-page checks passed.
+- Added separate GitHub workflow using Production environment secrets E2E_EMAIL/E2E_PASSWORD, live-only config, single read-only tenant journey (Login > Dashboard > Products > Stock), exact Vercel origin and authentication-only POST allowlist. Zero inventory mutation calls authorized.
+- No production app code change. No credentials in ZIP. No Browser/UI execution of new authenticated smoke yet; offline TS syntax/YAML verified.
+- Existing 9,900 test declarations and 152 original spec files remain unchanged. 417 blocked, 272 partial and PLCR-084 remain.
+- Next: add only changed files to existing frontend GitHub repository; GitHub Actions > Inventory - live tenant read-only pages > Run workflow > TENANTREADONLY. Inspect result before expanding.
+
+
+## Batch 190 — Live authenticated tenant functional checks (7 November 2026)
+- Parent source of truth: Batch 189 FULL SHA-256 `2660be786840ed88838444c3385168ae3d2d90e31113ef4356b25011bb248877`.
+- User reported existing GitHub **Inventory - live tenant read-only pages** workflow GREEN. This is user-reported runtime evidence for B189's single authenticated journey, not independently inspected runner logs.
+- Extended **the same one-login** live authenticated Playwright test with 3 additional read-only steps: Product List impossible search + clear; product cost-status filter reset + Catalog/Cost & value tab navigation; Stock search + clear (or genuine no-stock empty state). Source anchors: `src/pages/products/ProductListFiltersPanel.tsx`, `ProductListPanel.tsx`, `ProductPageContent.tsx`, `src/pages/StockPage.tsx`.
+- Reuse existing `.github/workflows/inventory-live-authenticated.yml`, `Production` E2E secrets, exact Vercel origin and inventory-write request block. NO extra logins, NO server-side inventory writes requested, NO frontend/backend source changes.
+- Main original Playwright suite remains 9,900 declarations / 152 main spec files, all unrun in its own suite. Cumulative ledger remains 10,318 / features 10,610; 417 blocked, 272 partial and PLCR-084 unchanged.
+- B190 code has static TS transpilation verification and source-path evidence; **new functional steps have NOT been executed**. Rerun existing Actions workflow with TENANTREADONLY to verify in a browser. Do not run original bulk suite on production.
+
+
+## Batch 191 — Next live authenticated, read-only page checks (7 November 2026)
+- Source of truth B190 FULL: SHA-256 `dd2b56b32c130524c2392109c2b62dfbe0a5b7e15f11d83c67697c13e508977a`.
+- User reports B190 GitHub `Inventory - live tenant read-only pages` run GREEN. This is a user report, not independently retrieved CI logs.
+- Same one authenticated Production-secrets login, same exact approved Vercel origin, same browser-request guard blocking all business writes. No additional credentials or workflow needed.
+- Added four `test.step()` blocks to `playwright-inventory/live-authenticated/tenant-pages.smoke.spec.ts`: Suppliers search+clear; Stock Movements search+reset; Stock Transfers status/search+reset; Purchase Orders search/status+reset.
+- Exact original frontend source paths reviewed: `src/pages/SuppliersPage.tsx`, `src/pages/StockMovementsPage.tsx`, `src/pages/StockTransfersPage.tsx`, `src/pages/PurchaseOrdersPage.tsx`.
+- Main generated suite unchanged: 9,900 authored declarations / 152 specs, ledger 10,318, feature inventory 10,610, blocked 417, partial 272, unresolved PLCR-084; these main cases have not been run. The LIVE CI smoke remains one Playwright `test` with 11 sequential `test.step` segments; a failed step stops subsequent steps (and requires investigation).
+- `COVERAGE_LEDGER.csv` and `PAGE_FUNCTION_INVENTORY.csv` remain deliberately **unchanged**, since neither new main test scenarios nor feature-status acceptance were added. Other five cumulative text trackers updated.
+- Live checks are source-reviewed and syntax-checked only, NOT browser executed yet. An inaccessible page or a failed API fetch should fail rather than silently pass.
+
+
+## Batch 192 — Storage Locations, Alerts, Shipments: live read-only checks (7 November 2026)
+- Parent source of truth B191 FULL SHA-256 `15ad578fdc03c8925ff3696aa762788e38e830e05e5be30e7c9a16d50214e9ea`.
+- User reports B191 GitHub authenticated smoke GREEN. This is user-provided result, not independently downloaded CI logs.
+- Added 3 steps to the existing **single** LIVE-AUTH-TENANT-001 browser journey: storage location search URL + reset; Alerts severity/search Apply filters + reset; Shipments status/search and no-match + reset.
+- Same Production environment secrets (`E2E_EMAIL`, `E2E_PASSWORD`), same approved Vercel origin and same request guard permitting only GET/HEAD/OPTIONS and login/refresh POST. No new environments, mutations, secrets, or new workflows.
+- Extended per-test timeout from 240 to 360 seconds for additional navigations; GitHub workflow job remains capped at 15 minutes and unchanged.
+- Source anchors reviewed in immutable frontend `src/pages/StorageLocationsPage.tsx`, `src/pages/AlertsPage.tsx`, `src/pages/ShipmentsPage.tsx`.
+- Live smoke now remains 1 authenticated Playwright test with 14 sequential test.step blocks; new three steps are UNRUN. A failed step stops later steps. Do not call all 9,900 generated scenarios executed.
+- Main generated suite remains 9,900 authored test declarations / 152 spec files. Frozen ledgers: 10,318 coverage rows; 10,610 feature rows; blocked 417; partially classified 272; unresolved PLCR-084. No new main test declarations, so COVERAGE_LEDGER.csv and PAGE_FUNCTION_INVENTORY.csv intentionally unchanged.
+- On GitHub upload only replace `playwright-inventory/live-authenticated/tenant-pages.smoke.spec.ts`. Existing workflow, config, read-only guard, and frontend stay unchanged.
+
+
+
+## Batch 193 — Switch from smoke checks to the original Playwright suite (7 November 2026)
+- Source of truth: Batch 192 FULL (SHA-256 `2f05443d7c7384d1b99c276f084463404d1c0c2e92098e9f013bd895bc254577`).
+- No new test declarations. The original 9,900 scenario IDs in 152 specs remain intact.
+- Added `Inventory - original 9900 Playwright suite` GitHub workflow with explicit `DISCOVER_ALL`, `LOGIN`, `PRODUCTS`, `STOCK`, `SUPPLIERS`, and `PURCHASE_ORDERS` selections.
+- `DISCOVER_ALL` will call actual Playwright test discovery (`--list`) for 9,900 specs; no browser actions, credentials or application mutations.
+- Reviewed original scenario allowlist: 9 LOGIN, 6 PRODUCTS, 8 STOCK, 7 SUPPLIERS, 8 PURCHASE_ORDERS = 38 original test IDs (not new smoke tests); one group per GitHub run. Other 9,862 remain unexecuted and require review for permissions, fixture behavior, potential writes and baseline expectations.
+- Approved host: `https://hotel-inventory-frontend-mauve.vercel.app`; existing Production secrets are used only for authenticated reviewed groups. Production live write guard denies non-auth POST/PUT/PATCH/DELETE at page route level and reports unexpected completed write requests. Auth login/refresh POST can create sessions/audit entries.
+- The generated main suite continues to reject production targets; only the guarded, source-reviewed separate config can target Vercel. Role-based and mutating tests are NOT approved for production.
+- Added source fingerprint gate; any edit to a reviewed original spec blocks that group until re-reviewed. Preserved old live smoke workflows.
+- Updated language initializer for original TLOG-007 to honor saved user language after reload. Assertions themselves not changed. Import changes in 5 specs attach the guard for approved groups.
+- `COVERAGE_LEDGER.csv` (10,318 records) and `PAGE_FUNCTION_INVENTORY.csv` (10,610 records) unchanged because coverage status is NOT runtime-verified yet. The 417 blocked, 272 partial and PLCR-084 unresolved obligations remain.
+- Local status: static source and TypeScript transpilation PASS; Playwright dependency installation timed out in this workspace; GitHub `DISCOVER_ALL` and all live browser runs remain **NOT EXECUTED** here. Do not claim they passed until actual Actions results exist.
+- Exact GitHub folder placement is relative to the frontend repo root. Upload the GitHub setup ZIP's contents, preserving `.github/workflows/...` and `playwright-inventory/...` paths.

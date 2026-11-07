@@ -3,7 +3,11 @@ import { requireDisposableTenantCredentials } from './environment';
 
 export async function selectEnglishUI(page: Page): Promise<void> {
   // App source: src/i18n/config.ts, I18nProvider.tsx
-  await page.addInitScript(() => localStorage.setItem('inventory_locale', 'en-GB'));
+  await page.addInitScript(() => {
+    if (localStorage.getItem('inventory_locale') === null) {
+      localStorage.setItem('inventory_locale', 'en-GB');
+    }
+  });
 }
 
 export async function loginAsTenant(page: Page): Promise<void> {

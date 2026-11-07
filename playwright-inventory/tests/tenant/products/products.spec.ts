@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from '../../../support/liveOriginalSafeTest';
 import { fulfillJson, loginAsTenant } from '../../../support/tenantSession';
 
 // First Products-page batch. Source:
