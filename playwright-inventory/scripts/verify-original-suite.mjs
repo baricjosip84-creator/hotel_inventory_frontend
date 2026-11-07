@@ -20,14 +20,42 @@ for (const spec of specs) {
 if (specs.length !== manifest.expected_spec_files || found.length !== manifest.expected_suite_ids || new Set(found).size !== found.length) {
   throw new Error(`Original suite unexpectedly changed: ${specs.length} specs, ${found.length} declarations, ${new Set(found).size} unique IDs`);
 }
-for (const [group, entry] of Object.entries(manifest.approved_groups)) {
-  const file = path.join(testRoot,entry.file);
-  const body = fs.readFileSync(file);
-  const sha = crypto.createHash('sha256').update(body).digest('hex');
-  if (sha !== entry.sha256) throw new Error(`Reviewed source changed; re-review required for group: ${group}`);
-  for (const id of entry.ids) {
-    if (!found.includes(id)) throw new Error(`Approved ID no longer exists: ${group}/${id}`);
+const allApproved = [];
+const seenApprovedByGroup = new Map();
+function entriesOf(group, entry) {
+  const entries = Array.isArray(entry.entries) ? entry.entries : [{ file: entry.file, ids: entry.ids, sha256: entry.sha256 }];
+  assert(entries.length > 0, `No approved source entries in ${group}`);
+  for (const part of entries) {
+    assert(/^tenant\/[a-z0-9-]+\/[a-z0-9-]+\.spec\.ts$/.test(part.file), `Invalid approved source path: ${group}`);
+    assert(Array.isArray(part.ids) && part.ids.length > 0, `Empty approved IDs: ${group}`);
+    allApproved.push({group, ...part});
   }
+  return entries;
+}
+for (const [group, entry] of Object.entries(manifest.approved_groups)) {
+  const idsInGroup = new Set();
+  for (const part of entriesOf(group, entry)) {
+    const file = path.join(testRoot, part.file);
+    const body = fs.readFileSync(file);
+    const sha = crypto.createHash('sha256').update(body).digest('hex');
+    if (sha !== part.sha256) throw new Error(`Reviewed source changed; re-review required for ${group}/${part.file}`);
+    for (const id of part.ids) {
+      if (!found.includes(id)) throw new Error(`Approved ID no longer exists: ${group}/${id}`);
+      assert(!idsInGroup.has(id), `Duplicate approved ID in group ${group}: ${id}`);
+      idsInGroup.add(id);
+    }
+    if (group === 'BULK_SAFE_01') {
+      assert(body.toString().includes("'../../../support/liveOriginalSafeTest'"), `Bulk source lacks read-only network guard: ${part.file}`);
+      assert(!part.ids.some(id => !/^[A-Z0-9]+-\d{3}$/.test(id)), `Invalid original ID in ${part.file}`);
+    }
+  }
+  seenApprovedByGroup.set(group, idsInGroup);
+}
+// Do not hide previously executed tests inside the new bulk list.
+const bulkIds = seenApprovedByGroup.get('BULK_SAFE_01');
+if (bulkIds) {
+  const otherIds = new Set([...seenApprovedByGroup.entries()].filter(([name])=>name!=='BULK_SAFE_01').flatMap(([,ids])=>[...ids]));
+  for (const id of bulkIds) assert(!otherIds.has(id), `Bulk must contain only new original test IDs: ${id}`);
 }
 // Preflight the real tenant-credential gate (no browser, network, or real credentials).
 // The same verified manifest controls which groups may authenticate on the approved live origin.
@@ -92,17 +120,23 @@ for (const key of ['PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}', 'PW_TENANT_PASSW
 // Prevent dispatch-menu drift: every selectable live group must exist in the reviewed manifest.
 const optionsSection = workflowBody.match(/^\s{8}options:\s*$([\s\S]*?)(?=^\s{6}confirmation:)/m);
 assert(optionsSection, 'Live workflow group choice options are missing');
-const declared = [...optionsSection[1].matchAll(/^\s{10}-\s+([A-Z_]+)\s*$/gm)].map(match => match[1]);
+const declared = [...optionsSection[1].matchAll(/^\s{10}-\s+([A-Z0-9_]+)\s*$/gm)].map(match => match[1]);
 assert.deepEqual(declared, ['DISCOVER_ALL', ...Object.keys(manifest.approved_groups)], 'Workflow group menu and reviewed manifest disagree');
 assert.equal(new Set(declared).size, declared.length, 'Duplicate live group choice');
-for (const [name, entry] of Object.entries(manifest.approved_groups)) {
-  const body = fs.readFileSync(path.join(testRoot, entry.file), 'utf8');
-  for (const id of entry.ids) {
+for (const { group, file, ids } of allApproved) {
+  const body = fs.readFileSync(path.join(testRoot, file), 'utf8');
+  for (const id of ids) {
     const matches = body.match(new RegExp(`\\btest\\s*\\(\\s*['"]${id}\\b`, 'g')) ?? [];
-    assert.equal(matches.length, 1, `Approved ID must map to exactly one original test: ${name}/${id}`);
+    assert.equal(matches.length, 1, `Approved ID must map to exactly one original test: ${group}/${id}`);
   }
 }
+// Ensure the workflow sends the full reviewed group to the browser runner, not to an unguarded script.
+assert(workflowBody.includes('playwright.live-original.config.ts --list'));
+assert(workflowBody.includes('playwright.live-original.config.ts'));
+assert(workflowBody.includes("if: ${{ inputs.group != 'DISCOVER_ALL' }}"));
+// The bulk selected spec files must all use the same non-write fixture adapter.
+if (bulkIds) assert.equal(bulkIds.size, 155, 'Batch 203 bulk must contain exactly 155 new IDs');
 console.log(`PASS: Workflow dispatch options, manifest, and original test IDs match (${declared.length - 1} runnable groups).`);
 console.log(`PASS: credential-gate runtime preflight for ${preflightCount} reviewed groups; unknown groups/wrong origin/missing flags/missing credentials denied.`);
-console.log(`PASS: ${found.length} original scenarios from ${specs.length} spec files; ${Object.values(manifest.approved_groups).reduce((n,g)=>n+g.ids.length,0)} reviewed runtime IDs in ${Object.keys(manifest.approved_groups).length} groups.`);
+console.log(`PASS: ${found.length} original scenarios from ${specs.length} spec files; ${allApproved.reduce((n,g)=>n+g.ids.length,0)} approved runtime ID memberships in ${Object.keys(manifest.approved_groups).length} groups.`);
 console.log('No original scenario declarations added or removed. No live credentials read by this check.');

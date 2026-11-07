@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../../support/liveOriginalSafeTest';
 import { fulfillJson, loginAsTenant, summaryFixture } from '../../../support/tenantSession';
 
 // Sources: frontend/src/pages/DashboardPage.tsx; frontend/src/app/router.tsx;

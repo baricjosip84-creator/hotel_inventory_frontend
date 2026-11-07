@@ -1,4 +1,4 @@
-import {test,expect,type Page,type Route} from '@playwright/test';
+import {test,expect,type Page,type Route} from '../../../support/liveOriginalSafeTest';
 import {readFile} from 'node:fs/promises';
 import {loginAsDisposableRole} from '../../../support/roleSession';
 import {loginAsTenant,fulfillJson} from '../../../support/tenantSession';

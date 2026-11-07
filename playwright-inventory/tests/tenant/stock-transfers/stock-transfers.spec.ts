@@ -1,4 +1,4 @@
-import {test,expect,type Page,type Route} from '@playwright/test';
+import {test,expect,type Page,type Route} from '../../../support/liveOriginalSafeTest';
 import {loginAsTenant,fulfillJson} from '../../../support/tenantSession';
 import {loginAsDisposableRole} from '../../../support/roleSession';
 // Batch 26: StockTransfersPage.tsx, GET /stock-transfers, /summary, /filter-options,

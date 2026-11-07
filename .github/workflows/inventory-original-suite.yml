@@ -17,6 +17,7 @@ on:
           - PURCHASE_ORDERS
           - STOCK_MOVEMENTS
           - SHIPMENTS
+          - BULK_SAFE_01
       confirmation:
         description: 'Type ORIGINALTESTS to run the selected group'
         required: true
@@ -33,7 +34,7 @@ jobs:
   original-suite:
     if: ${{ inputs.confirmation == 'ORIGINALTESTS' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 75
     environment: Production
     defaults:
       run:
@@ -67,7 +68,10 @@ jobs:
         env:
           PW_LIVE_ORIGINAL_READONLY: 'YES'
           PW_ORIGINAL_SUITE_GROUP: ${{ inputs.group }}
-        run: npx playwright test --config=playwright.live-original.config.ts --list
+        run: |
+          npx playwright test --config=playwright.live-original.config.ts --list > original-selected.txt
+          tail -n 1 original-selected.txt
+          node scripts/check-live-original-discovery.mjs
       - name: Run reviewed ORIGINAL scenarios on live Vercel (not a new smoke suite)
         if: ${{ inputs.group != 'DISCOVER_ALL' }}
         env:
@@ -77,4 +81,4 @@ jobs:
           PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
         run: npx playwright test --config=playwright.live-original.config.ts
       # No auth snapshots, traces, videos, screenshots, or artifacts uploaded.
-      # Only one reviewed group per run; no unrestricted 9,900-test live execution.
+      # One explicitly approved bulk group or single legacy group per run; no unrestricted 9,900-test live execution.
