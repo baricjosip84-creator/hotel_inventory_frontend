@@ -76,6 +76,23 @@
       ],
       "secret": true,
       "sha256": "648636b61d559b50492441eafbd4bbd3490bd92de1e24ee577b911ca54b535a0"
+    },
+    "STOCK_MOVEMENTS": {
+      "file": "tenant/stock-movements/stock-movements.spec.ts",
+      "ids": [
+        "TSMV-001",
+        "TSMV-002",
+        "TSMV-003",
+        "TSMV-004",
+        "TSMV-005",
+        "TSMV-006",
+        "TSMV-007",
+        "TSMV-008",
+        "TSMV-009",
+        "TSMV-010"
+      ],
+      "secret": true,
+      "sha256": "2d44ea1fc7fe93613b54187165354652416b9b541d2ad221ae6d7911abb95567"
     }
   },
   "status": "Source-reviewed allowlist: frontend/UI + mocked GETs only; backend effects unverified"
