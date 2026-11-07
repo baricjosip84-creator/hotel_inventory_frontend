@@ -1,9 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 import manifest from './original-suite-approved.json';
 
-/** Exact IDs and original file path for one source-reviewed group; NOT smoke tests. */
+/** Approved ORIGINAL scenarios only. A bulk group can span several source-fingerprinted specs. */
+type ApprovedEntry = { file: string; ids: string[]; sha256: string };
+type ApprovedGroup = { file?: string; ids?: string[]; entries?: ApprovedEntry[]; secret: boolean };
 const GROUP = process.env.PW_ORIGINAL_SUITE_GROUP || '';
-const approved = manifest.approved_groups as Record<string, { file: string; ids: string[]; secret: boolean }>;
+const approved = manifest.approved_groups as Record<string, ApprovedGroup>;
 if (process.env.PW_LIVE_ORIGINAL_READONLY !== 'YES' || !Object.prototype.hasOwnProperty.call(approved, GROUP)) {
   throw new Error('Choose an approved original-suite group and set PW_LIVE_ORIGINAL_READONLY=YES');
 }
@@ -13,17 +15,27 @@ if (target.origin !== approvedOrigin || !['', '/'].includes(target.pathname) || 
   throw new Error('Original-suite live mode is restricted to the existing Vercel frontend origin');
 }
 const group = approved[GROUP];
-const expectedIds = group.ids;
-if (!expectedIds.length || expectedIds.some(id => !/^[A-Z]+-\d{3}$/.test(id))) {
-  throw new Error('Invalid reviewed original-suite test ID allowlist');
+const entries: ApprovedEntry[] = group.entries ?? (
+  group.file && group.ids ? [{ file: group.file, ids: group.ids, sha256: '' }] : []
+);
+if (entries.length === 0 || entries.some(entry =>
+  !entry.file.startsWith('tenant/') || !entry.file.endsWith('.spec.ts') ||
+  !entry.ids.length || entry.ids.some(id => !/^[A-Z0-9]+-\d{3}$/.test(id))
+)) {
+  throw new Error('Invalid reviewed original-suite test ID/file allowlist');
 }
+const selectedIds = entries.flatMap(entry => entry.ids);
+if (selectedIds.length !== new Set(selectedIds).size) {
+  throw new Error('Duplicate original-suite test ID in approved group');
+}
+const testMatch = entries.map(entry => `**/${entry.file}`);
 export default defineConfig({
   testDir: './tests',
-  testMatch: `**/${group.file}`,
-  // Match the selected scenario ID inside its fully qualified Playwright title.
-  grep: new RegExp(`\\b(?:${expectedIds.join('|')})\\b`),
+  testMatch,
+  // Original ID is anchored to its Playwright title; unique across the complete 9,900.
+  grep: new RegExp(`\\b(?:${selectedIds.join('|')})\\b`),
   fullyParallel: false,
-  workers: 1,
+  workers: GROUP === 'BULK_SAFE_01' ? 3 : 1,
   forbidOnly: true,
   retries: 0,
   timeout: 90_000,

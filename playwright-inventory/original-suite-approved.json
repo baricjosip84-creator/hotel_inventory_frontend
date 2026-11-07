@@ -1,7 +1,7 @@
 {
   "expected_suite_ids": 9900,
   "expected_spec_files": 152,
-  "source_baseline": "Batch 192 FULL ZIP",
+  "source_baseline": "Batch 201 FULL ZIP (latest user-installed; Batch 202 not installed)",
   "live_origin": "https://hotel-inventory-frontend-mauve.vercel.app",
   "approved_groups": {
     "LOGIN": {
@@ -92,7 +92,7 @@
         "TSMV-010"
       ],
       "secret": true,
-      "sha256": "2d44ea1fc7fe93613b54187165354652416b9b541d2ad221ae6d7911abb95567"
+      "sha256": "832fbdb3ad9d6720ed4a7ab8d7f65acedaafdfc1dd5da34d99e76be9bb230f2c"
     },
     "SHIPMENTS": {
       "file": "tenant/shipments/shipments.spec.ts",
@@ -109,8 +109,229 @@
         "TSH-010"
       ],
       "secret": true,
-      "sha256": "4ab7b3f97e0f5e31f536dfa77a1c23e0a90f263f2b2d780bed0f6d8536a58d91"
+      "sha256": "67fe0e2f24d71ea1f546fb69a57b686559e34b2f55b801c6fafec233b2a4a0ab"
+    },
+    "BULK_SAFE_01": {
+      "entries": [
+        {
+          "file": "tenant/stock-transfers/stock-transfers.spec.ts",
+          "ids": [
+            "TSTR-001",
+            "TSTR-002",
+            "TSTR-003",
+            "TSTR-004",
+            "TSTR-005",
+            "TSTR-006",
+            "TSTR-007",
+            "TSTR-008",
+            "TSTR-009",
+            "TSTR-010",
+            "TSTR-011",
+            "TSTR-012",
+            "TSTR-013",
+            "TSTR-014",
+            "TSTR-015",
+            "TSTR-016",
+            "TSTR-017",
+            "TSTR-018",
+            "TSTR-019",
+            "TSTR-020",
+            "TSTR-021",
+            "TSTR-022"
+          ],
+          "sha256": "15620e7a008d0d8a645c75c094dd08646d6a10e5db5e254bbaf3ece49bac9ff2"
+        },
+        {
+          "file": "tenant/stock-movements/stock-movements.spec.ts",
+          "ids": [
+            "TSMV-011",
+            "TSMV-012",
+            "TSMV-013",
+            "TSMV-014",
+            "TSMV-015",
+            "TSMV-016",
+            "TSMV-017",
+            "TSMV-018",
+            "TSMV-019",
+            "TSMV-020",
+            "TSMV-021",
+            "TSMV-022",
+            "TSMV-023",
+            "TSMV-024",
+            "TSMV-025",
+            "TSMV-026",
+            "TSMV-027",
+            "TSMV-028",
+            "TSMV-029",
+            "TSMV-030",
+            "TSMV-031",
+            "TSMV-032",
+            "TSMV-033",
+            "TSMV-034",
+            "TSMV-035",
+            "TSMV-036",
+            "TSMV-037",
+            "TSMV-038",
+            "TSMV-039",
+            "TSMV-040"
+          ],
+          "sha256": "832fbdb3ad9d6720ed4a7ab8d7f65acedaafdfc1dd5da34d99e76be9bb230f2c"
+        },
+        {
+          "file": "tenant/shipments/shipments.spec.ts",
+          "ids": [
+            "TSH-011",
+            "TSH-012",
+            "TSH-013",
+            "TSH-014",
+            "TSH-015",
+            "TSH-016",
+            "TSH-017",
+            "TSH-018",
+            "TSH-019",
+            "TSH-020"
+          ],
+          "sha256": "67fe0e2f24d71ea1f546fb69a57b686559e34b2f55b801c6fafec233b2a4a0ab"
+        },
+        {
+          "file": "tenant/purchase-orders/purchase-orders.spec.ts",
+          "ids": [
+            "TPO-009",
+            "TPO-010",
+            "TPO-011",
+            "TPO-012",
+            "TPO-013",
+            "TPO-014",
+            "TPO-015",
+            "TPO-016",
+            "TPO-017",
+            "TPO-018",
+            "TPO-019",
+            "TPO-020"
+          ],
+          "sha256": "648636b61d559b50492441eafbd4bbd3490bd92de1e24ee577b911ca54b535a0"
+        },
+        {
+          "file": "tenant/products/products.spec.ts",
+          "ids": [
+            "TPROD-007",
+            "TPROD-008",
+            "TPROD-010",
+            "TPROD-011",
+            "TPROD-012",
+            "TPROD-013",
+            "TPROD-014",
+            "TPROD-015",
+            "TPROD-016",
+            "TPROD-017",
+            "TPROD-018"
+          ],
+          "sha256": "062ab36f44ca193d1a3d342c81cdd5f0f3ca14923f0929d15242230e30223962"
+        },
+        {
+          "file": "tenant/suppliers/suppliers.spec.ts",
+          "ids": [
+            "TSUP-008",
+            "TSUP-009",
+            "TSUP-010",
+            "TSUP-011",
+            "TSUP-012",
+            "TSUP-017",
+            "TSUP-018",
+            "TSUP-032",
+            "TSUP-033"
+          ],
+          "sha256": "e1d05098239b8fe2f7ae4cc4dcea7f260db62ff78f8440b2b4dc64c414214c84"
+        },
+        {
+          "file": "tenant/stock/stock.spec.ts",
+          "ids": [
+            "TST-011",
+            "TST-012",
+            "TST-013",
+            "TST-014",
+            "TST-015",
+            "TST-016",
+            "TST-017",
+            "TST-018",
+            "TST-019"
+          ],
+          "sha256": "3a77136b099312e4aac8a743f28e180ccf0be654c9fecfbdd4b0730a2ec24686"
+        },
+        {
+          "file": "tenant/storage-locations/storage-locations.spec.ts",
+          "ids": [
+            "TSL-001",
+            "TSL-002",
+            "TSL-003",
+            "TSL-004",
+            "TSL-005",
+            "TSL-006",
+            "TSL-007",
+            "TSL-008",
+            "TSL-009",
+            "TSL-010",
+            "TSL-011",
+            "TSL-012",
+            "TSL-013",
+            "TSL-014",
+            "TSL-015",
+            "TSL-021",
+            "TSL-022",
+            "TSL-024",
+            "TSL-029",
+            "TSL-030"
+          ],
+          "sha256": "4ec5479c5b539ef1415f1b148277a0ca7223aa38f706ba332a74da1f8a7085a4"
+        },
+        {
+          "file": "tenant/reports/reports.spec.ts",
+          "ids": [
+            "TRPT-001",
+            "TRPT-002",
+            "TRPT-003",
+            "TRPT-004",
+            "TRPT-005",
+            "TRPT-006",
+            "TRPT-007",
+            "TRPT-008",
+            "TRPT-009",
+            "TRPT-010",
+            "TRPT-011",
+            "TRPT-012",
+            "TRPT-013",
+            "TRPT-014",
+            "TRPT-015",
+            "TRPT-016",
+            "TRPT-017",
+            "TRPT-018",
+            "TRPT-019",
+            "TRPT-020"
+          ],
+          "sha256": "0df445f6168ff528fc7f740aa99ed6e266d2268ac9898a1046a5e5072d5d4414"
+        },
+        {
+          "file": "tenant/dashboard/dashboard.spec.ts",
+          "ids": [
+            "TDASH-001",
+            "TDASH-002",
+            "TDASH-004",
+            "TDASH-005",
+            "TDASH-006",
+            "TDASH-007",
+            "TDASH-008",
+            "TDASH-009",
+            "TDASH-010",
+            "TDASH-011",
+            "TDASH-012",
+            "TDASH-013"
+          ],
+          "sha256": "c3c58a50d910bb449e75d33976afbaea081d2ceb807cb6551080e22aba6c3484"
+        }
+      ],
+      "secret": true,
+      "notes": "Source-reviewed, GET-only or non-submitting UI checks; live safe-test adapter blocks unmocked writes. One GitHub run across 10 source files; Batch 202 was not installed and is incorporated here."
     }
   },
-  "status": "Source-reviewed allowlist: frontend/UI + mocked GETs only; backend effects unverified"
+  "status": "Batch 203: 58 prior confirmed passes; 155 new reviewed original IDs for a single bulk production-safe browser run; browser outcomes unverified."
 }
