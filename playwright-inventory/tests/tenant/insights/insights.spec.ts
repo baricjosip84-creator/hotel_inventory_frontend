@@ -130,7 +130,21 @@ async function openInsights(page: Page, o: InsightOptions = {}) {
   return { calls };
 }
 const supplierCards = (page: Page) => page.locator('.insights-item-card--supplier');
-const supplierControl = (page: Page, label: string) => page.getByLabel(label, { exact: true });
+// On wrapped labels, nested select option text makes exact accessible-name matching
+// unreliable. Limit matching to a known label prefix and its own form control.
+const supplierControl = (page: Page, label: string) => {
+  const labels: Record<string, RegExp> = {
+    'Recent history window': /^\s*Recent history window\b/,
+    'Search suppliers': /^\s*Search suppliers\b/,
+    'Risk filter': /^\s*Risk filter\b/,
+    'Performance tier': /^\s*Performance tier\b/,
+    'Sort suppliers': /^\s*Sort suppliers\b/,
+    'Page size': /^\s*Page size\b/
+  };
+  const pattern = labels[label];
+  if (!pattern) throw new Error(`Unknown Insights control: ${label}`);
+  return page.locator('section.insights-section label').filter({ hasText: pattern }).locator('input, select');
+};
 
  test.describe('Insights — initial evidence, URL state and supplier review (Batch 39)', () => {
   test('TINS-001 Insights page identifies read-only intelligence workspace', async ({ page }) => {
@@ -140,7 +154,7 @@ const supplierControl = (page: Page, label: string) => page.getByLabel(label, { 
   });
   test('TINS-002 Initial insights load queries eight separate source endpoints', async ({ page }) => {
     const s = await openInsights(page);
-    await expect(page.getByText('Health Score')).toBeVisible();
+    await expect(page.getByText('Health Score', { exact: true })).toBeVisible();
     for (const endpoint of [
       '/inventory-insights/depletion-risk?', '/inventory-insights/depletion-risk/root-cause-review?',
       '/reorder-insights/recommendations?', '/operational-insights/health-score',
@@ -482,7 +496,7 @@ const manyReorders = Array.from({ length: 9 }, (_, i) => ({ ...reorderRow, produ
   });
   test('TINS-047 Unusual movement card exposes daily rates and product link', async ({ page }) => {
     await openInsights(page, { anomalies: [anomalyRow] });
-    const item = page.getByRole('heading', { name: 'Unusual inventory movement' }).locator('..').locator('..');
+    const item = page.locator('section.insights-section').filter({ has: page.getByRole('heading', { name: 'Unusual inventory movement', exact: true }) });
     await expect(item).toContainText('Synthetic Anomaly Item');
     await expect(item).toContainText('Spike Ratio');
     await expect(page.getByRole('link', { name: 'Open movements' })).toHaveAttribute('href', '/stock-movements?product_id=pw-ins-anomaly-1');

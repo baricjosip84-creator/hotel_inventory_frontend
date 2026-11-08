@@ -65,7 +65,7 @@ const putCalls = (calls: TenantCall[]) => calls.filter(c => c.method === 'PUT' &
 test.describe('Tenant Settings — profile and first validation workflows (Batch 38)', () => {
   test('TSET-001 Tenant settings route displays the current tenant identity and record', async ({ page }) => {
     await openSettings(page);
-    await expect(page.getByRole('heading', { name: 'Tenant settings' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Tenant settings', exact: true, level: 2 })).toBeVisible();
     await expect(page.locator('.tenant-settings-current-card')).toContainText('Synthetic Inventory Hotel');
     await expect(page.locator('.tenant-settings-record')).toContainText(tenant.id);
   });
@@ -258,7 +258,7 @@ test.describe('Tenant Settings — refresh, governance, limits, navigation and s
   test('TSET-028 Default language selection submits tenant locale, not personal UI change', async ({ page }) => {
     const s = await openSettings(page);
     await field(page, 'Default application language').locator('select').selectOption('hr-HR');
-    await expect(page.getByRole('heading', { name: 'Tenant settings' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Tenant settings', exact: true, level: 2 })).toBeVisible();
     await save(page).click();
     expect(putCalls(s.calls)[0].payload?.default_locale).toBe('hr-HR');
     await expect(page.locator('.tenant-settings-message[role=status]')).toContainText('Tenant settings saved.');

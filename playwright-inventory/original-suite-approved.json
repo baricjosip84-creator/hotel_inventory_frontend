@@ -1586,7 +1586,7 @@
             "TINS-049",
             "TINS-050"
           ],
-          "sha256": "85479735c0b65d457ca12ffa5d878ce50e374cd0f2a22f7bca7137002b861091"
+          "sha256": "4518a8477267cafe50675cc33153da077706d1a62f46a5e41e9e1e270b9fb95e"
         },
         {
           "file": "tenant/digital-twin/digital-twin.spec.ts",
@@ -1675,7 +1675,7 @@
             "TSET-006",
             "TSET-007"
           ],
-          "sha256": "b8b70848f59e278130b16564db3dc4c93bee1e108588145b431a8a6ff8c7155a"
+          "sha256": "70ef85d28dcbfe773e683c99ef9360e9bbb4e36305e37a40b776117063dfc507"
         }
       ],
       "secret": true,
@@ -1736,7 +1736,7 @@
             "TINS-049",
             "TINS-050"
           ],
-          "sha256": "85479735c0b65d457ca12ffa5d878ce50e374cd0f2a22f7bca7137002b861091"
+          "sha256": "4518a8477267cafe50675cc33153da077706d1a62f46a5e41e9e1e270b9fb95e"
         },
         {
           "file": "tenant/digital-twin/digital-twin.spec.ts",
@@ -1762,7 +1762,40 @@
             "TSET-006",
             "TSET-007"
           ],
-          "sha256": "b8b70848f59e278130b16564db3dc4c93bee1e108588145b431a8a6ff8c7155a"
+          "sha256": "70ef85d28dcbfe773e683c99ef9360e9bbb4e36305e37a40b776117063dfc507"
+        }
+      ],
+      "secret": true
+    },
+    "BULK_SAFE_06_RECHECK_2": {
+      "entries": [
+        {
+          "file": "tenant/insights/insights.spec.ts",
+          "ids": [
+            "TINS-002",
+            "TINS-007",
+            "TINS-008",
+            "TINS-009",
+            "TINS-012",
+            "TINS-013",
+            "TINS-014",
+            "TINS-017",
+            "TINS-022",
+            "TINS-023",
+            "TINS-028",
+            "TINS-029",
+            "TINS-030",
+            "TINS-035",
+            "TINS-047"
+          ],
+          "sha256": "4518a8477267cafe50675cc33153da077706d1a62f46a5e41e9e1e270b9fb95e"
+        },
+        {
+          "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+          "ids": [
+            "TSET-001"
+          ],
+          "sha256": "70ef85d28dcbfe773e683c99ef9360e9bbb4e36305e37a40b776117063dfc507"
         }
       ],
       "secret": true
@@ -3108,6 +3141,99 @@
       "Fallback unmatched Tenant Settings requests to network guard instead of continuing unmocked writes",
       "Digital Twin exact read-only label and safe URL-poll placeholder"
     ],
+    "production_write_boundary": "unchanged"
+  },
+  "batch_219_last_execution": {
+    "date": "2026-11-08",
+    "github_log": "logs_115165617693.zip",
+    "group": "BULK_SAFE_06_RECHECK",
+    "selected_original": 63,
+    "passed_original": 46,
+    "failed_original": 17,
+    "passed_ids": [
+      "TDT-001",
+      "TDT-006",
+      "TDT-036",
+      "TDT-039",
+      "TDT-040",
+      "TDT-041",
+      "TDT-043",
+      "TINS-001",
+      "TINS-003",
+      "TINS-004",
+      "TINS-005",
+      "TINS-006",
+      "TINS-010",
+      "TINS-011",
+      "TINS-015",
+      "TINS-016",
+      "TINS-018",
+      "TINS-019",
+      "TINS-020",
+      "TINS-021",
+      "TINS-025",
+      "TINS-026",
+      "TINS-027",
+      "TINS-031",
+      "TINS-032",
+      "TINS-033",
+      "TINS-034",
+      "TINS-036",
+      "TINS-037",
+      "TINS-038",
+      "TINS-039",
+      "TINS-040",
+      "TINS-041",
+      "TINS-042",
+      "TINS-043",
+      "TINS-045",
+      "TINS-046",
+      "TINS-048",
+      "TINS-049",
+      "TINS-050",
+      "TSET-002",
+      "TSET-003",
+      "TSET-004",
+      "TSET-005",
+      "TSET-006",
+      "TSET-007"
+    ],
+    "failed_ids": [
+      "TINS-002",
+      "TINS-007",
+      "TINS-008",
+      "TINS-009",
+      "TINS-012",
+      "TINS-013",
+      "TINS-014",
+      "TINS-017",
+      "TINS-022",
+      "TINS-023",
+      "TINS-024",
+      "TINS-028",
+      "TINS-029",
+      "TINS-030",
+      "TINS-035",
+      "TINS-047",
+      "TSET-001"
+    ],
+    "evidence": "Parsed 63 exact ✓/✘ scenario outcome lines from GitHub uploaded original-suite log; no skips; original IDs matched selected set",
+    "safety": "Existing context write blocker retained; no frontend/backend changes."
+  },
+  "batch_220_preflight": {
+    "date": "2026-11-08",
+    "group": "BULK_SAFE_06_RECHECK_2",
+    "selected_count": 16,
+    "prior_confirmed_green": 905,
+    "prior_held_unverified": 22,
+    "status": "offline_source_and_static_checks_only_pending_github",
+    "fixes": [
+      "Use wrapped-label form-control selectors for Insights select fields (nested option text had broken getByLabel exact)",
+      "Health Score label uses exact match to disambiguate refreshed status",
+      "Unusual movement anomaly assertion scoped to its full section rather than header",
+      "Tenant Settings heading uses exact match to avoid h1/h2 ambiguity"
+    ],
+    "newly_held": "TINS-024 - frontend preserves selected supplier detail when filter changes; no false-pass test alteration",
     "production_write_boundary": "unchanged"
   }
 }
