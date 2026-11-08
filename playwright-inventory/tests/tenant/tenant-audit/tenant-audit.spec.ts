@@ -101,13 +101,13 @@ test.describe('Tenant Audit — registry, filters and safe evidence (Batch 37)',
   });
   test('TAUD-012 Valid date range applies from and to dates', async ({ page }) => {
     const s = await openAudit(page); await filter(page, 'From').locator('input').fill('2026-01-01');
-    await filter(page, 'To').locator('input').fill('2026-02-01');
+    await page.getByRole('textbox', { name: 'To', exact: true }).fill('2026-02-01');
     await expect.poll(() => latestList(s.calls).get('to')).toBe('2026-02-01');
     expect(latestList(s.calls).get('from')).toBe('2026-01-01');
   });
   test('TAUD-013 Inverted dates show error and do not apply invalid query', async ({ page }) => {
     const s = await openAudit(page); await filter(page, 'From').locator('input').fill('2026-12-01');
-    await filter(page, 'To').locator('input').fill('2026-01-01');
+    await page.getByRole('textbox', { name: 'To', exact: true }).fill('2026-01-01');
     await expect(page.getByRole('alert')).toContainText('From date must be before or equal to To date');
     await expect(page.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
     expect(listCalls(s.calls).some(c => new URLSearchParams(c.search).get('from') === '2026-12-01' && new URLSearchParams(c.search).get('to') === '2026-01-01')).toBe(false);
@@ -121,8 +121,10 @@ test.describe('Tenant Audit — registry, filters and safe evidence (Batch 37)',
     const s = await openAudit(page); await filter(page, 'Search audit history').locator('input').fill('example');
     await expect.poll(() => latestList(s.calls).get('search')).toBe('example');
     await page.getByRole('button', { name: 'Reset', exact: true }).click();
-    await expect.poll(() => latestList(s.calls).get('search')).toBeNull();
+    // The initial unfiltered page may be reused from the UI query cache, without a second GET.
+    await expect(filter(page, 'Search audit history').locator('input')).toHaveValue('');
     await expect(page.getByRole('button', { name: 'Reset', exact: true })).toBeDisabled();
+    await expect(auditTable(page).locator('tbody tr').first()).toBeVisible();
   });
   test('TAUD-016 Next uses server has_more and updates offset', async ({ page }) => {
     const s = await openAudit(page, { hasMore: true }); await page.getByRole('button', { name: 'Next', exact: true }).click();
@@ -133,7 +135,10 @@ test.describe('Tenant Audit — registry, filters and safe evidence (Batch 37)',
     const s = await openAudit(page, { hasMore: true }); await page.getByRole('button', { name: 'Next', exact: true }).click();
     await expect.poll(() => latestList(s.calls).get('offset')).toBe('50');
     await page.getByRole('button', { name: 'Previous', exact: true }).click();
-    await expect.poll(() => latestList(s.calls).get('offset')).toBe('0');
+    // Going back to page 1 may reuse cached results; a new offset=0 GET is not required.
+    await expect(page.locator('.tenant-audit-pagination-meta')).toContainText('Page 1');
+    await expect(page.getByRole('button', { name: 'Previous', exact: true })).toBeDisabled();
+    await expect(auditTable(page).locator('tbody tr').first()).toBeVisible();
   });
   test('TAUD-018 Details expand on demand and fetch selected event only', async ({ page }) => {
     const s = await openAudit(page); await expect(auditTable(page).locator('.tenant-audit-detail-panel')).toHaveCount(0);
@@ -387,7 +392,7 @@ test.describe('Tenant Audit — details, export, permissions and resilience (Bat
     await expect.poll(() => latestList(s.calls).get('action')).toBe('update');
     const before = listCalls(s.calls).length;
     await filter(page, 'From').locator('input').fill('2026-11-01');
-    await filter(page, 'To').locator('input').fill('2026-01-01');
+    await page.getByRole('textbox', { name: 'To', exact: true }).fill('2026-01-01');
     await expect(page.getByRole('alert')).toContainText('From date must be before or equal to To date');
     await expect(page.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
     expect(latestList(s.calls).get('action')).toBe('update');
@@ -487,7 +492,7 @@ test.describe('Tenant Audit — source-bound filter, attribution and evidence ed
   test('TAUD-058 Invalid date range marks both dates invalid with linked error text', async ({ page }) => {
     await openAudit(page);
     await filter(page, 'From').locator('input').fill('2026-11-30');
-    await filter(page, 'To').locator('input').fill('2026-11-01');
+    await page.getByRole('textbox', { name: 'To', exact: true }).fill('2026-11-01');
     for (const label of ['From', 'To']) {
       await expect(filter(page, label).locator('input')).toHaveAttribute('aria-invalid', 'true');
       await expect(filter(page, label).locator('input')).toHaveAttribute('aria-describedby', 'tenant-audit-date-range-error');

@@ -1448,7 +1448,7 @@
             "TAUD-019",
             "TAUD-020"
           ],
-          "sha256": "6c80f6402266fddfb78116b89700cfac02fa916b965464496c59bb64db0ff373"
+          "sha256": "42f690fa038c79f07dfeca2cbc3e57aeb92d6afa7ad27f58d6322503f57bd105"
         }
       ],
       "secret": true,
@@ -1501,7 +1501,7 @@
             "TAUD-019",
             "TAUD-020"
           ],
-          "sha256": "6c80f6402266fddfb78116b89700cfac02fa916b965464496c59bb64db0ff373"
+          "sha256": "42f690fa038c79f07dfeca2cbc3e57aeb92d6afa7ad27f58d6322503f57bd105"
         },
         {
           "file": "tenant/workflow-composer/workflow-composer.spec.ts",
@@ -1514,6 +1514,22 @@
       ],
       "secret": true,
       "notes": "Batch 216; ONLY 31 original IDs that failed GitHub B215; excludes 89 newly passed plus all prior 682/21 held."
+    },
+    "BULK_SAFE_05_RECHECK_2": {
+      "entries": [
+        {
+          "file": "tenant/tenant-audit/tenant-audit.spec.ts",
+          "ids": [
+            "TAUD-012",
+            "TAUD-013",
+            "TAUD-015",
+            "TAUD-017"
+          ],
+          "sha256": "42f690fa038c79f07dfeca2cbc3e57aeb92d6afa7ad27f58d6322503f57bd105"
+        }
+      ],
+      "secret": true,
+      "notes": "Batch 217: 4 remaining failed-only TAUD IDs after B216 GitHub 27/31 PASS. Excludes all 798 confirmed GREEN and 21 historical held. Read-only synthetic GET UI checks."
     }
   },
   "status": "Batch 203: 58 prior confirmed passes; 155 new reviewed original IDs for a single bulk production-safe browser run; browser outcomes unverified.",
@@ -2616,7 +2632,60 @@
         "count": 2
       }
     ],
-    "status": "source_repaired_pending_github_browser_run",
+    "status": "completed_27_pass_4_fail",
     "safety": "No test added or deleted; no real write enabled; production nonwrite intercept remains; only previous failed IDs may run."
+  },
+  "batch_216_last_execution": {
+    "date": "2026-11-08",
+    "github_log": "logs_115081396828.zip",
+    "group": "BULK_SAFE_05_RECHECK",
+    "selected_original": 31,
+    "passed_original": 27,
+    "failed_original": 4,
+    "passed_ids": [
+      "TACT-002",
+      "TCOL-006",
+      "TCOL-007",
+      "TCOL-008",
+      "TCOL-009",
+      "TCOL-010",
+      "TCOL-011",
+      "TCOL-042",
+      "TCOL-043",
+      "TAUD-001",
+      "TAUD-002",
+      "TAUD-003",
+      "TAUD-004",
+      "TAUD-005",
+      "TAUD-006",
+      "TAUD-007",
+      "TAUD-008",
+      "TAUD-009",
+      "TAUD-010",
+      "TAUD-011",
+      "TAUD-014",
+      "TAUD-016",
+      "TAUD-018",
+      "TAUD-019",
+      "TAUD-020",
+      "TWFC-001",
+      "TWFC-010"
+    ],
+    "failed_ids": [
+      "TAUD-012",
+      "TAUD-013",
+      "TAUD-015",
+      "TAUD-017"
+    ],
+    "log_verification": "31 unique Playwright outcome lines reconciled with all exact B216 selected IDs. 27 pass, 4 fail. No skipped or previously passed IDs re-run.",
+    "nonwrite_boundary": "Existing production nonwrite test guard unchanged; job failed on four UI assertions, no reported unauthorized writes."
+  },
+  "batch_217_preflight": {
+    "selected_group": "BULK_SAFE_05_RECHECK_2",
+    "selected_count": 4,
+    "prior_confirmed_green": 798,
+    "historical_held": 21,
+    "status": "source_repaired_pending_github_browser_run",
+    "safety": "UI-only test fixes, no application code changes, production nonwrite boundary preserved. Live pass not yet proven."
   }
 }
