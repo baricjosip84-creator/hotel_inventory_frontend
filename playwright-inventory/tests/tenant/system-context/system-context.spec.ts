@@ -101,7 +101,7 @@ const openHistory = (page: Page) => page.getByRole('tab', { name: 'Planning hist
   });
   test('TSC-003 Failed context GET shows named source error, not fake metrics', async ({ page }) => {
     await openSystem(page, { errorPath: '/system-context' });
-    await expect(page.getByText('System Context failed to load')).toBeVisible();
+    await expect(page.getByText('System Context failed to load', { exact: true })).toBeVisible();
     await expect(page.locator('.system-context-metrics')).toHaveCount(0);
   });
   test('TSC-004 Risk card uses supplied critical signal evidence', async ({ page }) => {
@@ -132,7 +132,7 @@ const openHistory = (page: Page) => page.getByRole('tab', { name: 'Planning hist
   });
   test('TSC-009 Operational snapshot uses submitted inventory and procurement amounts', async ({ page }) => {
     await openSystem(page);
-    const snapshotSection = page.getByRole('heading', { name: 'Operational snapshot' }).locator('..').locator('..');
+    const snapshotSection = page.locator('.system-context-panel').filter({ has: page.getByRole('heading', { name: 'Operational snapshot', exact: true }) });
     await expect(snapshotSection).toContainText('Low-stock products');
     await expect(snapshotSection).toContainText('Open shipments');
     await expect(snapshotSection).toContainText('Open purchase orders');
@@ -564,7 +564,7 @@ test.describe('System Context — source routing and read-only planning boundari
   });
   test('TSC-072 Low-priority recommendation has neutral tone', async ({ page }) => {
     await openSystem(page, { value: scValue({ recommendations: [scRecommendation('low_alert', { priority: 'low' })] }) });
-    await expect(scRecCard(page).locator('.system-context-pill--neutral')).toContainText('Low');
+    await expect(scRecCard(page).locator('.system-context-recommendation__top .system-context-pill--neutral').filter({ hasText: /^Low$/ })).toHaveText('Low');
   });
   test('TSC-073 Unknown recommendation action retains supplied readable text', async ({ page }) => {
     await openSystem(page, { value: scValue({ recommendations: [scRecommendation('custom_text', { action: 'Ask the purchasing lead to review invoice mismatches.' })] }) });

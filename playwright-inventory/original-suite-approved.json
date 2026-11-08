@@ -1154,7 +1154,7 @@
             "TSC-073",
             "TSC-074"
           ],
-          "sha256": "b1a0bf1f6fe9c834b9c98a8e60472590d4614c1a3171e6fbc53810219a6f8d39"
+          "sha256": "c08048a64b62801f6f29bc53eb629ffec23d5e28581183103646b66f67849620"
         },
         {
           "file": "tenant/operations-feed/operations-feed.spec.ts",
@@ -1261,7 +1261,7 @@
             "TSC-073",
             "TSC-074"
           ],
-          "sha256": "b1a0bf1f6fe9c834b9c98a8e60472590d4614c1a3171e6fbc53810219a6f8d39"
+          "sha256": "c08048a64b62801f6f29bc53eb629ffec23d5e28581183103646b66f67849620"
         },
         {
           "file": "tenant/operations-feed/operations-feed.spec.ts",
@@ -1281,6 +1281,28 @@
       ],
       "secret": true,
       "notes": "Batch 213: recheck 63 failed-only IDs after source-reviewed fixes. Never rerun 51 passes; six Alerts filter assertions held for separate production behavior review."
+    },
+    "BULK_SAFE_04_RECHECK_2": {
+      "entries": [
+        {
+          "file": "tenant/alerts/alerts.spec.ts",
+          "ids": [
+            "TALERT-001"
+          ],
+          "sha256": "5dd80556e06a1411a643278d386cd00a32b2d07acbf8ca74397a09b37f8f5e0b"
+        },
+        {
+          "file": "tenant/system-context/system-context.spec.ts",
+          "ids": [
+            "TSC-003",
+            "TSC-009",
+            "TSC-072"
+          ],
+          "sha256": "c08048a64b62801f6f29bc53eb629ffec23d5e28581183103646b66f67849620"
+        }
+      ],
+      "secret": true,
+      "notes": "Batch 214: exactly four failed-only IDs from the 63-test Batch 213 run; 59 passes remain counted and are not repeated. Auth bootstrap bounded recovery; specific selectors preserve expectations."
     }
   },
   "status": "Batch 203: 58 prior confirmed passes; 155 new reviewed original IDs for a single bulk production-safe browser run; browser outcomes unverified.",
@@ -2128,5 +2150,81 @@
       "TALERT-011"
     ],
     "last_verified_green_total": 619
+  },
+  "batch_213_last_execution": {
+    "source_group": "BULK_SAFE_04_RECHECK",
+    "total": 63,
+    "passed": 59,
+    "failed": 4,
+    "failed_ids": [
+      "TALERT-001",
+      "TSC-003",
+      "TSC-009",
+      "TSC-072"
+    ],
+    "passed_ids": [
+      "TALERT-054",
+      "TALERT-073",
+      "TALERT-074",
+      "TSC-001",
+      "TSC-002",
+      "TSC-004",
+      "TSC-005",
+      "TSC-006",
+      "TSC-007",
+      "TSC-008",
+      "TSC-010",
+      "TSC-011",
+      "TSC-012",
+      "TSC-013",
+      "TSC-014",
+      "TSC-015",
+      "TSC-016",
+      "TSC-017",
+      "TSC-018",
+      "TSC-019",
+      "TSC-020",
+      "TSC-021",
+      "TSC-022",
+      "TSC-023",
+      "TSC-024",
+      "TSC-025",
+      "TSC-026",
+      "TSC-051",
+      "TSC-052",
+      "TSC-053",
+      "TSC-054",
+      "TSC-055",
+      "TSC-056",
+      "TSC-057",
+      "TSC-058",
+      "TSC-059",
+      "TSC-060",
+      "TSC-061",
+      "TSC-062",
+      "TSC-063",
+      "TSC-064",
+      "TSC-065",
+      "TSC-066",
+      "TSC-067",
+      "TSC-068",
+      "TSC-069",
+      "TSC-070",
+      "TSC-071",
+      "TSC-073",
+      "TSC-074",
+      "TFEED-053",
+      "TFEED-054",
+      "TFEED-055",
+      "TFEED-056",
+      "TFEED-060",
+      "TFEED-061",
+      "TFEED-062",
+      "TFEED-063",
+      "TFEED-064"
+    ],
+    "confirmed_cumulative_passed": 678,
+    "next_group": "BULK_SAFE_04_RECHECK_2",
+    "note": "59 successes plus 4 failure details from original GitHub log logs_115013409745.zip; 6 original Alerts filtering cases remain unverified."
   }
 }

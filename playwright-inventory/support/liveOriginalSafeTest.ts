@@ -125,10 +125,24 @@ export const test = base.extend<{}, { bulkSession: WorkerSession }>({
         return state;
       } finally { await context.close(); }
     };
+    // A fresh login occasionally completes without rendering the dashboard in
+    // the first browser context. Retry the isolated authentication bootstrap at
+    // most ONCE, with a short backoff. Never reuse cookies from the failed
+    // context, suppress a persistent failure, or retry an unauthorized write.
+    const authenticateWithRecovery = async (): Promise<AuthState> => {
+      try { return await authenticate(); }
+      catch (firstError) {
+        await new Promise(resolve => setTimeout(resolve, 2_000));
+        try { return await authenticate(); }
+        catch (secondError) {
+          throw new Error('Approved tenant login failed on both isolated attempts', { cause: secondError });
+        }
+      }
+    };
     const session: WorkerSession = {
-      snapshot: await authenticate(),
+      snapshot: await authenticateWithRecovery(),
       lastLoginAt: Date.now(),
-      renew: async () => { session.snapshot = await authenticate(); session.lastLoginAt = Date.now(); },
+      renew: async () => { session.snapshot = await authenticateWithRecovery(); session.lastLoginAt = Date.now(); },
       absorb: (observed) => {
         const fresh = transplantAuthentication(session.snapshot, observed);
         if (fresh) session.snapshot = fresh;

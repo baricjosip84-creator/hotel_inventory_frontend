@@ -65,8 +65,8 @@ for (const [bulkName, bulkIds] of bulkGroups) {
         new Set([originalGroup,retryGroup,secondRetryGroup,thirdRetryGroup]).has(bulkName)) ||
        (new Set(['BULK_SAFE_03','BULK_SAFE_03_RECHECK']).has(name) &&
         new Set(['BULK_SAFE_03','BULK_SAFE_03_RECHECK']).has(bulkName)) ||
-       (new Set(['BULK_SAFE_04','BULK_SAFE_04_RECHECK']).has(name) &&
-        new Set(['BULK_SAFE_04','BULK_SAFE_04_RECHECK']).has(bulkName)))
+       (new Set(['BULK_SAFE_04','BULK_SAFE_04_RECHECK','BULK_SAFE_04_RECHECK_2']).has(name) &&
+        new Set(['BULK_SAFE_04','BULK_SAFE_04_RECHECK','BULK_SAFE_04_RECHECK_2']).has(bulkName)))
     )).flatMap(([,ids])=>[...ids]));
   for (const id of bulkIds) assert(!otherIds.has(id), `Bulk cannot reuse another group's ID: ${bulkName}/${id}`);
 }
@@ -239,7 +239,7 @@ if (bulkIds || nextBulkIds) {
   const config = fs.readFileSync(path.join(root, 'playwright.live-original.config.ts'),'utf8');
   assert(adapter.includes("{ scope: 'worker' }") && adapter.includes('storageState: async ({ bulkSession }'),
     'Bulk authentication must restore isolated per-test contexts');
-  assert(adapter.includes('snapshot: await authenticate()') && !config.includes('globalSetup:') &&
+  assert(adapter.includes('snapshot: await authenticateWithRecovery()') && !config.includes('globalSetup:') &&
     !adapter.includes('PW_BULK_SHARED_AUTH_STATE'), 'Worker refresh cookies must be isolated; no shared job-wide refresh cookie');
   assert(adapter.includes('page.context().route') && adapter.includes("property === 'continue'") &&
     adapter.includes('unexpectedlyCompletedWrites') && adapter.includes('blockedAtNetworkBoundary') &&

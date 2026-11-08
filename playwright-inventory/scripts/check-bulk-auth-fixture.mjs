@@ -12,7 +12,13 @@ const original = Object.fromEntries(keys.map(key => [key,process.env[key]]));
 const calls = {logins:0, contexts:0, blocked:0, continued:0, mockFulfilled:0, recovered:0};
 const jwt = (sec = 3600) => `pw.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now()/1000)+sec })).toString('base64url')}.signature`;
 const snapshot = id => ({cookies:[{name:'refresh',value:`cookie-${id}`,domain:'hotel-inventory-frontend-mauve.vercel.app',path:'/',expires:-1,httpOnly:true,secure:true,sameSite:'Lax'}],origins:[{origin:FRONTEND,localStorage:[{name:'inventory_access_token',value:jwt()}]}]});
-const expectMock = value => ({toBeVisible:async()=>{},toEqual:wanted=>assert.deepEqual(value,wanted)});
+let transientDashboardFailures = 0;
+const expectMock = value => ({toBeVisible:async()=>{
+  if (transientDashboardFailures > 0) {
+    transientDashboardFailures--;
+    throw new Error('Synthetic first-context dashboard load failed');
+  }
+},toEqual:wanted=>assert.deepEqual(value,wanted)});
 const playwright = {expect:expectMock,test:{extend:fixtures=>fixtures}};
 const environment = {requireDisposableTenantCredentials:()=>({email:'stub@example.invalid',password:'NOT_A_REAL_PASSWORD'})};
 function load(rel) {
@@ -157,6 +163,19 @@ try {
   process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_02_RECHECK';
   process.env.PW_BASE_URL='https://wrong.example.invalid';
   await assert.rejects(fixture.test.bulkSession[0]({browser},async()=>{}),/exact reviewed production origin/);
+  // Batch 214 regression: a transient failed dashboard MUST retry exactly once
+  // in a fresh browser context without sharing cookies or changing write guards.
+  process.env.PW_BASE_URL = FRONTEND;
+  transientDashboardFailures = 1;
+  const beforeRetry = { contexts: calls.contexts, logins: calls.logins };
+  await runWorker();
+  assert.equal(calls.contexts - beforeRetry.contexts, 2, 'Transient failure must use exactly one isolated retry');
+  assert.equal(calls.logins - beforeRetry.logins, 2, 'Both isolated login attempts exercised');
+  // Two consecutive failures must remain RED, never silently mark authentication GREEN.
+  transientDashboardFailures = 2;
+  await assert.rejects(fixture.test.bulkSession[0]({browser},async()=>{}),/both isolated attempts/);
+  assert.equal(transientDashboardFailures, 0);
+  console.log('PASS: 1 bounded recovery for transient dashboard failure; persistent login failure remains fatal.');
   console.log('PASS: Three independent worker logins; rotated cookies carried between contexts, expired auth and permission overrides rejected.');
   console.log('PASS: Production startup POST aborted but not misreported as a completed write.');
   console.log('PASS: Synthetic POST fulfillment tracked; page-route write continuation aborted; unmocked completed write fails.');

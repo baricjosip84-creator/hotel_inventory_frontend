@@ -1,0 +1,57 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const ts = require('typescript');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const repo = path.resolve(root, '..');
+const manifest = JSON.parse(fs.readFileSync(path.join(root,'original-suite-approved.json'),'utf8'));
+const previous = manifest.approved_groups.BULK_SAFE_04_RECHECK;
+const next = manifest.approved_groups.BULK_SAFE_04_RECHECK_2;
+const outcome = manifest.batch_213_last_execution;
+const allPreviouslySelected = previous.entries.flatMap(entry => entry.ids);
+const nextIds = next.entries.flatMap(entry => entry.ids);
+assert.equal(outcome.total,63);
+assert.equal(outcome.passed,59);
+assert.equal(outcome.failed,4);
+assert.equal(new Set(allPreviouslySelected).size,63);
+assert.deepEqual(new Set([...outcome.passed_ids,...outcome.failed_ids]),new Set(allPreviouslySelected));
+assert.deepEqual(nextIds,['TALERT-001','TSC-003','TSC-009','TSC-072']);
+assert.deepEqual(new Set(nextIds),new Set(outcome.failed_ids));
+assert(!nextIds.some(id=>outcome.passed_ids.includes(id)), 'Do not repeat any of the 59 passing IDs');
+assert.equal(outcome.confirmed_cumulative_passed,678);
+assert.deepEqual(next.entries.map(e=>e.ids.length),[1,3]);
+const texts = {};
+for (const e of next.entries) {
+  const f = path.join(root,'tests',e.file);
+  const code = fs.readFileSync(f,'utf8');
+  assert.equal(crypto.createHash('sha256').update(code).digest('hex'),e.sha256,`Source review drift: ${e.file}`);
+  const sf = ts.createSourceFile(f,code,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
+  assert.equal(sf.parseDiagnostics.length,0);
+  assert(code.includes("from '../../../support/liveOriginalSafeTest'"));
+  for(const id of e.ids) assert.equal((code.match(new RegExp(`\\btest\\s*\\(\\s*['"]${id}\\b`,'g'))||[]).length,1);
+  texts[e.file]=code;
+}
+const sc=texts['tenant/system-context/system-context.spec.ts'];
+assert(sc.includes("getByText('System Context failed to load', { exact: true })"));
+assert(sc.includes("page.locator('.system-context-panel').filter({ has: page.getByRole('heading', { name: 'Operational snapshot', exact: true }) })"));
+assert(sc.includes("filter({ hasText: /^Low$/ })"));
+const a=fs.readFileSync(path.join(root,'support/liveOriginalSafeTest.ts'),'utf8');
+assert(a.includes('authenticateWithRecovery()'));
+assert(a.includes("context.route('**/*'") && a.includes("page.context().route('**/*'"));
+assert(a.includes("property === 'continue'") && a.includes("unexpectedlyCompletedWrites"));
+assert(a.includes("await new Promise(resolve => setTimeout(resolve, 2_000))"));
+for(const spec of ['support/liveOriginalSafeTest.ts','playwright.live-original.config.ts']) {
+  const f=path.join(root,spec), src=fs.readFileSync(f,'utf8');
+  assert.equal(ts.createSourceFile(f,src,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS).parseDiagnostics.length,0);
+}
+const w=fs.readFileSync(path.join(repo,'.github/workflows/inventory-original-suite.yml'),'utf8');
+assert(w.includes('          - BULK_SAFE_04_RECHECK_2'));
+assert(w.includes('node scripts/check-batch-214-contract.mjs'));
+const c=fs.readFileSync(path.join(root,'playwright.live-original.config.ts'),'utf8');
+assert(c.includes("'BULK_SAFE_04_RECHECK_2'") && c.includes('.includes(GROUP) ? 1'));
+console.log('PASS Batch 214: exactly 4 previously failed original IDs; 59 successful IDs excluded.');
+console.log('PASS: source-hashed locator fixes, bounded isolated login retry, production write guards and strict 1-worker config.');
