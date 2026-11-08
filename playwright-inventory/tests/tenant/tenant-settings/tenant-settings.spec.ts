@@ -36,7 +36,9 @@ async function openSettings(page: Page, options: SettingsOptions = {}) {
     const u = new URL(route.request().url());
     const path = u.pathname;
     const method = route.request().method();
-    if (!/^\/(?:api\/)?tenants(?:\/[^/]+)?$/.test(path)) return route.continue();
+    // Pass unmatched requests to the existing write-blocking context route.
+    // A broad page.route must never continue unrelated live POST requests.
+    if (!/^\/(?:api\/)?tenants(?:\/[^/]+)?$/.test(path)) return route.fallback();
     if (path.endsWith('/currency-context') || path.endsWith('/subscription-access')) return route.continue();
     const payload = method === 'PUT' ? route.request().postDataJSON() as Record<string, unknown> : undefined;
     calls.push({ method, path, payload });

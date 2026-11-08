@@ -118,7 +118,9 @@ async function openInsights(page: Page, o: InsightOptions = {}) {
     const url = new URL(route.request().url());
     const path = url.pathname.replace(/^\/api(?=\/)/, '');
     const json = insightResponse(path, o);
-    if (!json) return route.continue();
+    // Unrecognized requests fall through to the existing context-level write guard.
+    // Never continue an unmocked POST/PATCH/DELETE from a broad page route.
+    if (!json) return route.fallback();
     calls.push(`${route.request().method()} ${path}${url.search}`);
     if (o.errorPath === path) return fulfillJson(route, { message: 'Synthetic insights source unavailable' }, 503);
     return fulfillJson(route, json);

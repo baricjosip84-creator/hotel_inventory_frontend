@@ -25,7 +25,7 @@ const overlays=(page:Page)=>page.locator('.digital-twin-overlay-section');
 
 test.describe('Digital Twin — snapshot, filters, relationships, source links (Batch 18)',()=>{
  test('TDT-001 Overview says read-only and not a live simulation',async({page})=>{
-  await openTwin(page);await expect(page.getByText('Read-only operational context')).toBeVisible();
+  await openTwin(page);await expect(page.getByText('Read-only operational context',{exact:true})).toBeVisible();
   await expect(page.getByText('It is not a live simulation and does not change source records.',{exact:false})).toBeVisible();
  });
  test('TDT-002 Pending snapshot fetch shows loading context',async({page})=>{
@@ -52,7 +52,7 @@ test.describe('Digital Twin — snapshot, filters, relationships, source links (
  test('TDT-006 Operational area filter sends twin_domain query',async({page})=>{
   await openTwin(page);let requestUrl='';await page.route(endpoint,route=>{requestUrl=route.request().url();return fulfillJson(route,twinData());});
   await twinFilters(page).getByLabel('Operational area').selectOption('supplier_flow');
-  await expect.poll(()=>new URL(requestUrl).searchParams.get('twin_domain')).toBe('supplier_flow');
+  await expect.poll(()=>new URL(requestUrl || 'https://invalid.example').searchParams.get('twin_domain')).toBe('supplier_flow');
  });
  test('TDT-007 Review perspective sends view_mode and changes request',async({page})=>{
   await openTwin(page);let url='';await page.route(endpoint,route=>{url=route.request().url();return fulfillJson(route,twinData());});
