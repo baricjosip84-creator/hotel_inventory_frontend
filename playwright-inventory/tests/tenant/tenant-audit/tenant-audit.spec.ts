@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route } from '@playwright/test';
+import { test, expect, type Page, type Route } from '../../../support/liveOriginalSafeTest';
 import { loginAsTenant, fulfillJson } from '../../../support/tenantSession';
 import { loginAsDisposableRole } from '../../../support/roleSession';
 
@@ -33,6 +33,10 @@ async function openAudit(page: Page, opts: Options = {}) {
   });
   await page.goto('/audit');
   await expect(page.locator('#tenant-audit-workspace-top')).toBeVisible();
+  // All three independent query endpoints must be observed before synchronous assertions.
+  await expect.poll(() => calls.some(c => /\/audit$/.test(c.path) && c.method === 'GET')).toBe(true);
+  await expect.poll(() => calls.some(c => c.path.endsWith('/audit/summary'))).toBe(true);
+  await expect.poll(() => calls.some(c => c.path.endsWith('/audit/filter-options'))).toBe(true);
   return { calls };
 }
 const listCalls = (calls: Call[]) => calls.filter(c => c.path.match(/\/audit$/) && c.method === 'GET');

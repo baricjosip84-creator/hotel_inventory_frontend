@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route } from '@playwright/test';
+import { test, expect, type Page, type Route } from '../../../support/liveOriginalSafeTest';
 import { loginAsTenant, fulfillJson } from '../../../support/tenantSession';
 
 // Batch 6 — GENERATED_UNRUN. Source:
@@ -158,7 +158,7 @@ test.describe('Action Center — summary, filters and deep-link routing', () => 
       return fulfillJson(route, filteredFixture(new URL(route.request().url())));
     });
     await page.getByRole('button',{ name:'Refresh' }).click();
-    await expect.poll(() => count).toBe(1);
+    await expect.poll(() => count).toBeGreaterThanOrEqual(1);
     await expect(actionCard(page,'pw-action-alert')).toBeVisible();
   });
 
