@@ -1,3 +1,16 @@
+# Current execution checkpoint — Batch 218 (8 November 2026)
+
+- **Confirmed user-reported live GREEN:** 802 unique original scenarios (through Batch 217).
+- **Previously held:** 21 scenarios, none in Batch 218.
+- **Batch 218 pending:** `BULK_SAFE_06`, exactly 120 newly approved original IDs, source-fingerprinted across Insights (49), Digital Twin (46), Learning Feedback (18) and Tenant Settings (7).
+- **Next GitHub action:** apply the Batch 218 FIX overlay to frontend repo `main`, then Actions → Inventory - original 9900 Playwright suite → Run workflow → `BULK_SAFE_06` → confirmation `ORIGINALTESTS`.
+- Current offline tests **do not prove the 120 tests passed**; inspect the live GitHub results and keep failed IDs separate for a future failed-only recheck.
+- Production non-authenticated writes are denied by `support/liveOriginalSafeTest.ts`; only the specifically reviewed original ID allowlist is runnable. Do not run all 9,900 against production.
+
+---
+
+## Historical initial setup (superseded execution order)
+
 # Executing the original 9,900 generated Playwright scenarios
 
 This setup runs **existing original test IDs**, not newly invented smoke checks.

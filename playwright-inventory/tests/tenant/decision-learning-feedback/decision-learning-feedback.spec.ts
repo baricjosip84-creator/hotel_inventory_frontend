@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from '../../../support/liveOriginalSafeTest';
 import { loginAsTenant, fulfillJson } from '../../../support/tenantSession';
 import { loginAsDisposableRole } from '../../../support/roleSession';
 
@@ -65,13 +65,13 @@ test.describe('Learning Feedback — summary and history (Batch 13)',()=>{
   await openLearning(page,[sampleEvidence]);let url='';
   await page.route(summaryEndpoint,route=>{url=route.request().url();return fulfillJson(route,summary([]));});
   await filters(page).getByLabel('Search',{exact:true}).fill('Synthetic coffee');
-  await expect.poll(()=>new URL(url).searchParams.get('evidence_search')).toBe('Synthetic coffee');
+  await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('evidence_search')).toBe('Synthetic coffee');
  });
  test('TDLF-007 review state filter propagates to backend',async({page})=>{
   await openLearning(page);let url='';
   await page.route(summaryEndpoint,route=>{url=route.request().url();return fulfillJson(route,summary([]));});
   await filters(page).getByLabel('Review status').selectOption('unreviewed');
-  await expect.poll(()=>new URL(url).searchParams.get('evidence_review_status')).toBe('unreviewed');
+  await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('evidence_review_status')).toBe('unreviewed');
  });
  test('TDLF-008 observed date filters submit ISO datetime boundaries',async({page})=>{
   await openLearning(page);let url='';
@@ -80,14 +80,14 @@ test.describe('Learning Feedback — summary and history (Batch 13)',()=>{
   await filters(page).getByLabel('Observed to').fill('2026-10-31');
   const expectedFrom=await page.evaluate(()=>new Date('2026-10-01T00:00:00').toISOString());
   const expectedTo=await page.evaluate(()=>new Date('2026-10-31T23:59:59').toISOString());
-  await expect.poll(()=>new URL(url).searchParams.get('evidence_date_to')).toBe(expectedTo);
-  expect(new URL(url).searchParams.get('evidence_date_from')).toBe(expectedFrom);
+  await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('evidence_date_to')).toBe(expectedTo);
+  expect(new URL(url || 'https://invalid.example').searchParams.get('evidence_date_from')).toBe(expectedFrom);
  });
  test('TDLF-009 history sorting sends supported attention order',async({page})=>{
   await openLearning(page);let url='';
   await page.route(summaryEndpoint,route=>{url=route.request().url();return fulfillJson(route,summary([]));});
   await filters(page).getByLabel('Sort').selectOption('attention');
-  await expect.poll(()=>new URL(url).searchParams.get('evidence_sort')).toBe('attention');
+  await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('evidence_sort')).toBe('attention');
  });
  test('TDLF-010 clear filters returns original backend search and newest order',async({page})=>{
   await openLearning(page);let url='';
@@ -96,9 +96,9 @@ test.describe('Learning Feedback — summary and history (Batch 13)',()=>{
   await filters(page).getByLabel('Review status').selectOption('open');
   await filters(page).getByLabel('Sort').selectOption('oldest');
   await filters(page).getByRole('button',{name:'Clear filters'}).click();
-  await expect.poll(()=>new URL(url).searchParams.get('evidence_sort')).toBe('newest');
-  expect(new URL(url).searchParams.get('evidence_search')).toBe('');
-  expect(new URL(url).searchParams.get('evidence_review_status')).toBe('');
+  await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('evidence_sort')).toBe('newest');
+  expect(new URL(url || 'https://invalid.example').searchParams.get('evidence_search')).toBe('');
+  expect(new URL(url || 'https://invalid.example').searchParams.get('evidence_review_status')).toBe('');
  });
  test('TDLF-011 summary statistics reflect server supplied evidence totals',async({page})=>{
   await openLearning(page,[sampleEvidence],summary([sampleEvidence],{governance:{continuous_learning_posture:'early_learning',outcome_count:7,forecast_accuracy_count:4,policy_effectiveness_count:3,optimization_result_count:2,observed_domains:['inventory']}}));
@@ -124,7 +124,7 @@ test.describe('Learning Feedback — summary and history (Batch 13)',()=>{
   await openLearning(page,[sampleEvidence]);let url='';
   await page.route(detailEndpoint,route=>{url=route.request().url();return fulfillJson(route,{...sampleEvidence,expected_result:'More stock',observed_result:'Stock recovered'});});
   await table(page).getByRole('button',{name:'View details'}).click();
-  await expect.poll(()=>new URL(url).searchParams.get('evidence_key')).toBe('pw-outcome-13');
+  await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('evidence_key')).toBe('pw-outcome-13');
   await expect(page.getByRole('heading',{name:'Feedback evidence details'})).toBeVisible();
  });
  test('TDLF-016 closing evidence details restores list view',async({page})=>{
@@ -166,9 +166,9 @@ test.describe('Learning Feedback — summary and history (Batch 13)',()=>{
   await page.route(sourcesEndpoint,route=>{url=route.request().url();return fulfillJson(route,{sources:[]});});
   await page.goto('/decision-learning-feedback');
   await page.locator('.learning-feedback-form-card').getByLabel('Find source').fill('synthetic policy');
-  await expect.poll(()=>new URL(url).searchParams.get('search')).toBe('synthetic policy');
-  expect(new URL(url).searchParams.get('feedback_type')).toBe('learning-outcomes');
-  expect(new URL(url).searchParams.get('limit')).toBe('25');
+  await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('search')).toBe('synthetic policy');
+  expect(new URL(url || 'https://invalid.example').searchParams.get('feedback_type')).toBe('learning-outcomes');
+  expect(new URL(url || 'https://invalid.example').searchParams.get('limit')).toBe('25');
  });
 });
 
@@ -341,10 +341,10 @@ async function registerLearningWrite(page:Page,reply:Record<string,unknown>={id:
  });
  test('TDLF-038 review board Older requests review_offset 25 while preserving bucket offsets',async({page})=>{
   await openGovernedFeedback(page,{data:withReviewBoard([reviewItem],{total:30,limit:25,offset:0,has_previous:false,has_next:true})});
-  let last='';await page.route(summaryEndpoint,route=>{last=route.request().url();const offset=Number(new URL(last).searchParams.get('review_offset'));return fulfillJson(route,withReviewBoard([reviewItem],{total:30,offset,limit:25,has_previous:offset>0,has_next:false}));});
+  let last='';await page.route(summaryEndpoint,route=>{last=route.request().url();const offset=Number(new URL(last || 'https://invalid.example').searchParams.get('review_offset'));return fulfillJson(route,withReviewBoard([reviewItem],{total:30,offset,limit:25,has_previous:offset>0,has_next:false}));});
   await page.locator('.learning-feedback-review-board').getByRole('button',{name:'Older'}).click();
-  await expect.poll(()=>new URL(last).searchParams.get('review_offset')).toBe('25');
-  expect(new URL(last).searchParams.get('outcome_offset')).toBe('0');
+  await expect.poll(()=>new URL(last || 'https://invalid.example').searchParams.get('review_offset')).toBe('25');
+  expect(new URL(last || 'https://invalid.example').searchParams.get('outcome_offset')).toBe('0');
  });
  test('TDLF-039 action-plan follow-up creates only a draft Execution Request',async({page})=>{
   const action={action_key:'verify_evidence',action_type:'governed_review',priority:'high',rationale:'Synthetic review required',recommended_owner:'operations',evidence_count:2,affected_domains:['inventory']};
@@ -389,9 +389,9 @@ async function registerLearningWrite(page:Page,reply:Record<string,unknown>={id:
   await filters(page).getByLabel('Sort').selectOption('oldest');
   const from=await page.evaluate(()=>new Date('2026-10-04T00:00:00').toISOString());
   const to=await page.evaluate(()=>new Date('2026-10-07T23:59:59').toISOString());
-  await expect.poll(()=>new URL(url).searchParams.get('evidence_sort')).toBe('oldest');
-  expect(new URL(url).searchParams.get('evidence_date_from')).toBe(from);
-  expect(new URL(url).searchParams.get('evidence_date_to')).toBe(to);
+  await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('evidence_sort')).toBe('oldest');
+  expect(new URL(url || 'https://invalid.example').searchParams.get('evidence_date_from')).toBe(from);
+  expect(new URL(url || 'https://invalid.example').searchParams.get('evidence_date_to')).toBe(to);
  });
  test('TDLF-045 outcome Yes, Partly and No map to the documented 1, 0 and -1 score values',async({page})=>{
   await openGovernedFeedback(page);const writes=await registerLearningWrite(page);
@@ -427,13 +427,13 @@ async function registerLearningWrite(page:Page,reply:Record<string,unknown>={id:
  test('TDLF-048 independent evidence buckets retain separate offsets when paging',async({page})=>{
   const forecastRow={accuracy_key:'pw-forecast-14',source_label:'Synthetic forecast',forecast_domain:'inventory',calibration_status:'observed',percentage_error:4,observed_at:'2026-10-19T00:00:00Z'};
   const extra=summary([feedbackRecord],{forecast_accuracy:[forecastRow],pagination:{outcomes:{total:50,offset:0,limit:25,has_next:true,has_previous:false},forecast_accuracy:{total:50,offset:0,limit:25,has_next:true,has_previous:false},policy_effectiveness:{total:0,offset:0,has_next:false,has_previous:false},optimization_results:{total:0,offset:0,has_next:false,has_previous:false}}});
-  await openLearning(page,[feedbackRecord],extra);let url='';await page.route(summaryEndpoint,route=>{url=route.request().url();const params=new URL(url).searchParams;return fulfillJson(route,summary([feedbackRecord],{...extra,pagination:{...(extra.pagination as Record<string,unknown>),outcomes:{total:50,offset:Number(params.get('outcome_offset')),limit:25,has_next:true,has_previous:true},forecast_accuracy:{total:50,offset:Number(params.get('forecast_offset')),limit:25,has_next:true,has_previous:true}}}));});
+  await openLearning(page,[feedbackRecord],extra);let url='';await page.route(summaryEndpoint,route=>{url=route.request().url();const params=new URL(url || 'https://invalid.example').searchParams;return fulfillJson(route,summary([feedbackRecord],{...extra,pagination:{...(extra.pagination as Record<string,unknown>),outcomes:{total:50,offset:Number(params.get('outcome_offset')),limit:25,has_next:true,has_previous:true},forecast_accuracy:{total:50,offset:Number(params.get('forecast_offset')),limit:25,has_next:true,has_previous:true}}}));});
   await table(page).getByRole('button',{name:'Older'}).click();
-  await expect.poll(()=>new URL(url).searchParams.get('outcome_offset')).toBe('25');
-  expect(new URL(url).searchParams.get('forecast_offset')).toBe('0');
+  await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('outcome_offset')).toBe('25');
+  expect(new URL(url || 'https://invalid.example').searchParams.get('forecast_offset')).toBe('0');
   await page.locator('.learning-feedback-evidence-table').filter({has:page.getByRole('heading',{name:'Forecast accuracy'})}).getByRole('button',{name:'Older'}).click();
-  await expect.poll(()=>new URL(url).searchParams.get('forecast_offset')).toBe('25');
-  expect(new URL(url).searchParams.get('outcome_offset')).toBe('25');
+  await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('forecast_offset')).toBe('25');
+  expect(new URL(url || 'https://invalid.example').searchParams.get('outcome_offset')).toBe('25');
  });
  test('TDLF-049 successful independent review invalidates and refreshes summary evidence',async({page})=>{
   let reviewed=false;await openGovernedFeedback(page,{data:withReviewBoard([reviewItem])});

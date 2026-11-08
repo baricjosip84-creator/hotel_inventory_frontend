@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route } from '@playwright/test';
+import { test, expect, type Page, type Route } from '../../../support/liveOriginalSafeTest';
 import { loginAsTenant, fulfillJson } from '../../../support/tenantSession';
 
 // Batch 39: read-only synthetic fixtures matching InsightsPage query functions.

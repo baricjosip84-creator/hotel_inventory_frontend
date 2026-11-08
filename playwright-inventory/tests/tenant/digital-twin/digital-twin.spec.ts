@@ -1,4 +1,4 @@
-import {test,expect,type Page} from '@playwright/test';
+import {test,expect,type Page} from '../../../support/liveOriginalSafeTest';
 import {loginAsTenant,fulfillJson} from '../../../support/tenantSession';
 
 // Batch 18: Digital Twin source-backed read-only UI, not an operational simulator.
@@ -57,27 +57,27 @@ test.describe('Digital Twin — snapshot, filters, relationships, source links (
  test('TDT-007 Review perspective sends view_mode and changes request',async({page})=>{
   await openTwin(page);let url='';await page.route(endpoint,route=>{url=route.request().url();return fulfillJson(route,twinData());});
   await twinFilters(page).getByLabel('Review perspective').selectOption('congestion_heatmap');
-  await expect.poll(()=>new URL(url).searchParams.get('view_mode')).toBe('congestion_heatmap');
+  await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('view_mode')).toBe('congestion_heatmap');
   await expect(twinFilters(page)).toContainText('does not generate a live diagram, simulation, or measured heatmap');
  });
  test('TDT-008 Overlay urgency filter sends critical value',async({page})=>{
   await openTwin(page);let url='';await page.route(endpoint,route=>{url=route.request().url();return fulfillJson(route,twinData());});
-  await twinFilters(page).getByLabel('Overlay urgency').selectOption('critical');await expect.poll(()=>new URL(url).searchParams.get('urgency')).toBe('critical');
+  await twinFilters(page).getByLabel('Overlay urgency').selectOption('critical');await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('urgency')).toBe('critical');
  });
  test('TDT-009 Result limit option 100 requests a bounded hundred per list',async({page})=>{
   await openTwin(page);let url='';await page.route(endpoint,route=>{url=route.request().url();return fulfillJson(route,twinData());});
-  await twinFilters(page).getByLabel('Maximum records per list').selectOption('100');await expect.poll(()=>new URL(url).searchParams.get('limit')).toBe('100');
+  await twinFilters(page).getByLabel('Maximum records per list').selectOption('100');await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('limit')).toBe('100');
  });
  test('TDT-010 Search submit trims input and sends exact search query',async({page})=>{
   await openTwin(page);let url='';await page.route(endpoint,route=>{url=route.request().url();return fulfillJson(route,twinData());});
   await twinFilters(page).getByLabel('Search connected records').fill('   Synthetic supplier   ');await twinFilters(page).getByRole('button',{name:'Search',exact:true}).click();
-  await expect.poll(()=>new URL(url).searchParams.get('search')).toBe('Synthetic supplier');
+  await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('search')).toBe('Synthetic supplier');
  });
  test('TDT-011 Clear search sends empty search filter and removes active label',async({page})=>{
   await openTwin(page);let url='';await page.route(endpoint,route=>{url=route.request().url();return fulfillJson(route,twinData());});
   await twinFilters(page).getByLabel('Search connected records').fill('shipment');await twinFilters(page).getByRole('button',{name:'Search',exact:true}).click();
   await expect(twinFilters(page).getByRole('button',{name:'Clear search'})).toBeVisible();
-  await twinFilters(page).getByRole('button',{name:'Clear search'}).click();await expect.poll(()=>new URL(url).searchParams.get('search')).toBe('');
+  await twinFilters(page).getByRole('button',{name:'Clear search'}).click();await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('search')).toBe('');
   await expect(twinFilters(page).getByLabel('Search connected records')).toHaveValue('');
  });
  test('TDT-012 Clear filters resets all selectors and local text',async({page})=>{
@@ -101,13 +101,13 @@ test.describe('Digital Twin — snapshot, filters, relationships, source links (
   await openTwin(page,twinData({review_first:{title:'Synthetic urgent review',summary:'Inspect connected risk',node_key:'dt_000000000000000000000001',urgency:'critical'}}));
   let url='';await page.route(endpoint,route=>{url=route.request().url();return fulfillJson(route,twinData({review_first:{title:'Synthetic urgent review',node_key:'dt_000000000000000000000001'},focus:{found:true,node_key:'dt_000000000000000000000001',label:'Synthetic inventory item',connected_count:1}}));});
   await page.locator('.digital-twin-review-first').getByRole('button',{name:'Review connected context'}).click();
-  await expect.poll(()=>new URL(url).searchParams.get('focus_node_key')).toBe('dt_000000000000000000000001');
+  await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('focus_node_key')).toBe('dt_000000000000000000000001');
   await expect(page.locator('.digital-twin-focus-panel')).toContainText('Synthetic inventory item');
  });
  test('TDT-016 Topology point focus opens connections with exact node ID',async({page})=>{
   await openTwin(page);let url='';await page.route(endpoint,route=>{url=route.request().url();return fulfillJson(route,twinData({focus:{found:true,node_key:'dt_000000000000000000000001',label:'Synthetic inventory item',connected_count:1}}));});
   await nodePanel(page).getByRole('button',{name:'Show connections'}).click();
-  await expect.poll(()=>new URL(url).searchParams.get('focus_node_key')).toBe('dt_000000000000000000000001');
+  await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('focus_node_key')).toBe('dt_000000000000000000000001');
   await expect(page.locator('.digital-twin-focus-panel')).toContainText('1 directly connected records found');
  });
  test('TDT-017 Dependency list shows source, affected record and confidence',async({page})=>{
@@ -128,15 +128,15 @@ test.describe('Digital Twin — snapshot, filters, relationships, source links (
   await openTwin(page,twinData({pagination:{nodes:{...pageInfo,total_matching:2,has_more:true,next_offset:50},edges:pageInfo,overlays:pageInfo}}));
   let url='';await page.route(endpoint,route=>{url=route.request().url();return fulfillJson(route,twinData());});
   await nodePanel(page).getByRole('button',{name:'Next'}).click();
-  await expect.poll(()=>new URL(url).searchParams.get('node_offset')).toBe('50');
-  const params=new URL(url).searchParams;expect(params.get('edge_offset')).toBe('0');expect(params.get('overlay_offset')).toBe('0');
+  await expect.poll(()=>new URL(url || 'https://invalid.example').searchParams.get('node_offset')).toBe('50');
+  const params=new URL(url || 'https://invalid.example').searchParams;expect(params.get('edge_offset')).toBe('0');expect(params.get('overlay_offset')).toBe('0');
  });
 });
 
 // Batch 19 continuation: source-specific boundary, route-gate and read-only checks.
 // Synthetic fixtures prove UI behavior only; do not interpret them as backend authorization proofs.
 import {loginAsDisposableRole} from '../../../support/roleSession';
-const twinQuery=(url:string)=>new URL(url).searchParams;
+const twinQuery=(url:string)=>new URL(url || 'https://invalid.example').searchParams;
 const focusFor=(key:string,extra:Record<string,unknown>={})=>({found:true,node_key:key,label:'Synthetic inventory item',node_type:'product',twin_domain:'inventory_flow',status:'active',connected_count:1,...extra});
 
 test.describe('Digital Twin — deeper boundary, permissions and focus behavior (Batch 19)',()=>{

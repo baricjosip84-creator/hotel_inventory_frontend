@@ -59,4 +59,6 @@ assert(workflow.includes('node scripts/check-batch-217-contract.mjs'));
 assert(!workflow.includes('continue-on-error: true'));
 console.log('PASS B217: exact 4 B216 failed-only original IDs; prior 798 GREEN plus 21 held excluded.');
 console.log('PASS B217: reviewed source SHA, exact-name date locator, cache-safe UI checks, strict write guard and one-worker GitHub group.');
-console.log('PENDING B217 GitHub: no browser results have yet been observed for the 4 rechecks.');
+assert.equal(manifest.batch_217_last_execution?.passed_original, 4);
+assert.deepEqual(manifest.batch_217_last_execution?.passed_ids, selected);
+console.log('B217 GITHUB: user-confirmed GREEN 4/4; final log file not attached. Total now 802 unique GREEN.');
