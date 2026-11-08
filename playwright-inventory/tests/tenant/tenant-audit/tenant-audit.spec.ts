@@ -18,7 +18,7 @@ async function openAudit(page: Page, opts: Options = {}) {
   else await loginAsTenant(page);
   const calls: Call[] = [];
   let listRequestNumber = 0;
-  await page.route('**/*', async (route: Route) => {
+  await page.route('**/audit**', async (route: Route) => {
     if (route.request().isNavigationRequest()) return route.continue();
     const u = new URL(route.request().url()), path = u.pathname, method = route.request().method();
     if (!/^\/(?:api\/)?audit(?:\/|$)/.test(path)) return route.continue();

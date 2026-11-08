@@ -92,8 +92,8 @@ test.describe('Action Center — summary, filters and deep-link routing', () => 
     for (const title of ['Open actions shown','Highest urgency','Approval gated','Execution mode']) {
       await expect(summary.getByText(title, {exact:true})).toBeVisible();
     }
-    await expect(summary.locator('.io-workspace-stat').filter({ has:summary.getByText('Open actions shown', {exact:true}) })).toContainText('5');
-    await expect(summary.locator('.io-workspace-stat').filter({ has:summary.getByText('Highest urgency', {exact:true}) })).toContainText('Critical');
+    await expect(summary.locator('.io-workspace-stat').filter({ hasText:'Open actions shown' })).toContainText('5');
+    await expect(summary.locator('.io-workspace-stat').filter({ hasText:'Highest urgency' })).toContainText('Critical');
   });
 
   test('TACT-003 empty list shows no matching actions instead of invented records', async ({page}) => {

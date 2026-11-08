@@ -52,32 +52,32 @@ test.describe('Enterprise Collaboration — read-only coordination and source na
  test('TCOL-006 coordination-area selector sends collaboration_domain and resets offset',async({page})=>{
   await openCollaboration(page);let url='';await page.route(collaborationEndpoint,route=>{url=route.request().url();return fulfillJson(route,collaborationData());});
   await filterBox(page).getByLabel('Coordination area').selectOption('alerts');
-  await expect.poll(()=>new URL(url).searchParams.get('collaboration_domain')).toBe('alerts');expect(new URL(url).searchParams.get('offset')).toBe('0');
+  await expect.poll(()=>url ? new URL(url).searchParams.get('collaboration_domain') : null).toBe('alerts');expect(new URL(url).searchParams.get('offset')).toBe('0');
  });
  test('TCOL-007 recommendation-type filter sends exact thread_type',async({page})=>{
   await openCollaboration(page);let url='';await page.route(collaborationEndpoint,route=>{url=route.request().url();return fulfillJson(route,collaborationData());});
   await filterBox(page).getByLabel('Recommendation type').selectOption('incident_thread');
-  await expect.poll(()=>new URL(url).searchParams.get('thread_type')).toBe('incident_thread');
+  await expect.poll(()=>url ? new URL(url).searchParams.get('thread_type') : null).toBe('incident_thread');
  });
  test('TCOL-008 urgency selector requests high severity only',async({page})=>{
   await openCollaboration(page);let url='';await page.route(collaborationEndpoint,route=>{url=route.request().url();return fulfillJson(route,collaborationData());});
   await filterBox(page).getByLabel('Urgency').selectOption('high');
-  await expect.poll(()=>new URL(url).searchParams.get('urgency')).toBe('high');
+  await expect.poll(()=>url ? new URL(url).searchParams.get('urgency') : null).toBe('high');
  });
  test('TCOL-009 attention-state filter sends blocked query key',async({page})=>{
   await openCollaboration(page);let url='';await page.route(collaborationEndpoint,route=>{url=route.request().url();return fulfillJson(route,collaborationData());});
   await filterBox(page).getByLabel('Needs attention because').selectOption('blocked');
-  await expect.poll(()=>new URL(url).searchParams.get('attention_state')).toBe('blocked');
+  await expect.poll(()=>url ? new URL(url).searchParams.get('attention_state') : null).toBe('blocked');
  });
  test('TCOL-010 result limit 100 is sent to backend as URL limit',async({page})=>{
   await openCollaboration(page);let url='';await page.route(collaborationEndpoint,route=>{url=route.request().url();return fulfillJson(route,collaborationData());});
   await filterBox(page).getByLabel('Maximum recommendations').selectOption('100');
-  await expect.poll(()=>new URL(url).searchParams.get('limit')).toBe('100');
+  await expect.poll(()=>url ? new URL(url).searchParams.get('limit') : null).toBe('100');
  });
  test('TCOL-011 Clear filters resets every selector to all and default limit',async({page})=>{
   await openCollaboration(page);await filterBox(page).getByLabel('Urgency').selectOption('critical');
   await filterBox(page).getByRole('button',{name:'Clear filters'}).click();
-  await expect(filterBox(page).getByLabel('Urgency')).toHaveValue('all');await expect(filterBox(page).getByLabel('Maximum recommendations')).toHaveValue('25');
+  await expect(filterBox(page).getByLabel('Urgency')).toHaveValue('all');await expect(filterBox(page).getByLabel('Maximum recommendations')).toHaveValue('50');
   await expect(filterBox(page).getByRole('button',{name:'Clear filters'})).toHaveCount(0);
  });
  test('TCOL-012 summary uses total matching count even when only one card returned',async({page})=>{

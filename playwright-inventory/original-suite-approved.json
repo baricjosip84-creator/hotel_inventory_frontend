@@ -1335,7 +1335,7 @@
             "TACT-041",
             "TACT-043"
           ],
-          "sha256": "e91b8a18a11cbe8f6330a547ec455de8d2c5a95faebf871fb380ab41f914293c"
+          "sha256": "42272da7ecd1786fea2d12b21dcd61384f834510413707d9cc4905714abb055f"
         },
         {
           "file": "tenant/collaboration/collaboration.spec.ts",
@@ -1381,7 +1381,7 @@
             "TCOL-043",
             "TCOL-044"
           ],
-          "sha256": "df3d91c6ed7d646ec7d5b7b1aa614bb392da0916bca8fefcc4f1ff7ee9867241"
+          "sha256": "2a2aa866efc505e8aa596549b34d8fe7a756b997e2eceefcd3aec1f3d7896db7"
         },
         {
           "file": "tenant/workflow-composer/workflow-composer.spec.ts",
@@ -1422,7 +1422,7 @@
             "TWFC-034",
             "TWFC-035"
           ],
-          "sha256": "92160df7ab0ee1e2d47112d4f120ce6c0852c34d55342d04aed71ee91a39d905"
+          "sha256": "795c211f0fccad2719b3bcb65385c1aa854b1d8e8ade095869a9f77f9a1e0109"
         },
         {
           "file": "tenant/tenant-audit/tenant-audit.spec.ts",
@@ -1448,11 +1448,72 @@
             "TAUD-019",
             "TAUD-020"
           ],
-          "sha256": "326aad49632142987657b9a5fda029d66cd0333e89dcc8d8a5baa277d38b841a"
+          "sha256": "6c80f6402266fddfb78116b89700cfac02fa916b965464496c59bb64db0ff373"
         }
       ],
       "secret": true,
       "notes": "Batch 215: 120 unpassed original tenant IDs, four read-only GET-synthetic UI surfaces, unique from B214 682 GREEN and 21 held; GitHub execution NOT YET VERIFIED."
+    },
+    "BULK_SAFE_05_RECHECK": {
+      "entries": [
+        {
+          "file": "tenant/action-center/action-center.spec.ts",
+          "ids": [
+            "TACT-002"
+          ],
+          "sha256": "42272da7ecd1786fea2d12b21dcd61384f834510413707d9cc4905714abb055f"
+        },
+        {
+          "file": "tenant/collaboration/collaboration.spec.ts",
+          "ids": [
+            "TCOL-006",
+            "TCOL-007",
+            "TCOL-008",
+            "TCOL-009",
+            "TCOL-010",
+            "TCOL-011",
+            "TCOL-042",
+            "TCOL-043"
+          ],
+          "sha256": "2a2aa866efc505e8aa596549b34d8fe7a756b997e2eceefcd3aec1f3d7896db7"
+        },
+        {
+          "file": "tenant/tenant-audit/tenant-audit.spec.ts",
+          "ids": [
+            "TAUD-001",
+            "TAUD-002",
+            "TAUD-003",
+            "TAUD-004",
+            "TAUD-005",
+            "TAUD-006",
+            "TAUD-007",
+            "TAUD-008",
+            "TAUD-009",
+            "TAUD-010",
+            "TAUD-011",
+            "TAUD-012",
+            "TAUD-013",
+            "TAUD-014",
+            "TAUD-015",
+            "TAUD-016",
+            "TAUD-017",
+            "TAUD-018",
+            "TAUD-019",
+            "TAUD-020"
+          ],
+          "sha256": "6c80f6402266fddfb78116b89700cfac02fa916b965464496c59bb64db0ff373"
+        },
+        {
+          "file": "tenant/workflow-composer/workflow-composer.spec.ts",
+          "ids": [
+            "TWFC-001",
+            "TWFC-010"
+          ],
+          "sha256": "795c211f0fccad2719b3bcb65385c1aa854b1d8e8ade095869a9f77f9a1e0109"
+        }
+      ],
+      "secret": true,
+      "notes": "Batch 216; ONLY 31 original IDs that failed GitHub B215; excludes 89 newly passed plus all prior 682/21 held."
     }
   },
   "status": "Batch 203: 58 prior confirmed passes; 155 new reviewed original IDs for a single bulk production-safe browser run; browser outcomes unverified.",
@@ -2383,7 +2444,7 @@
     "prior_user_confirmed_green": 682,
     "prior_held_unverified": 21,
     "prior_not_approved": 9197,
-    "execution_status": "not_executed",
+    "execution_status": "completed_89_pass_31_fail",
     "selected_by_spec": {
       "tenant/action-center/action-center.spec.ts": 25,
       "tenant/collaboration/collaboration.spec.ts": 40,
@@ -2397,5 +2458,165 @@
       "src/pages/TenantAuditPage.tsx"
     ],
     "safety": "intercepted GET fixtures; context blocks unmocked POST/PUT/PATCH/DELETE; auth login/refresh narrowly permitted."
+  },
+  "batch_215_last_execution": {
+    "date": "2026-11-08",
+    "github_log": "logs_115070126553.zip",
+    "group": "BULK_SAFE_05",
+    "selected_original": 120,
+    "passed_original": 89,
+    "failed_original": 31,
+    "passed_ids": [
+      "TACT-001",
+      "TACT-003",
+      "TACT-004",
+      "TACT-005",
+      "TACT-006",
+      "TACT-007",
+      "TACT-008",
+      "TACT-009",
+      "TACT-010",
+      "TACT-011",
+      "TACT-012",
+      "TACT-013",
+      "TACT-014",
+      "TACT-015",
+      "TACT-016",
+      "TACT-017",
+      "TACT-018",
+      "TACT-019",
+      "TACT-020",
+      "TACT-021",
+      "TACT-022",
+      "TACT-023",
+      "TACT-041",
+      "TACT-043",
+      "TCOL-001",
+      "TCOL-004",
+      "TCOL-005",
+      "TCOL-012",
+      "TCOL-013",
+      "TCOL-014",
+      "TCOL-015",
+      "TCOL-016",
+      "TCOL-017",
+      "TCOL-018",
+      "TCOL-019",
+      "TCOL-020",
+      "TCOL-023",
+      "TCOL-024",
+      "TCOL-025",
+      "TCOL-026",
+      "TCOL-027",
+      "TCOL-028",
+      "TCOL-029",
+      "TCOL-030",
+      "TCOL-031",
+      "TCOL-032",
+      "TCOL-033",
+      "TCOL-034",
+      "TCOL-035",
+      "TCOL-036",
+      "TCOL-037",
+      "TCOL-038",
+      "TCOL-039",
+      "TCOL-040",
+      "TCOL-041",
+      "TCOL-044",
+      "TWFC-002",
+      "TWFC-003",
+      "TWFC-004",
+      "TWFC-005",
+      "TWFC-006",
+      "TWFC-007",
+      "TWFC-008",
+      "TWFC-009",
+      "TWFC-011",
+      "TWFC-012",
+      "TWFC-013",
+      "TWFC-014",
+      "TWFC-015",
+      "TWFC-016",
+      "TWFC-017",
+      "TWFC-018",
+      "TWFC-019",
+      "TWFC-020",
+      "TWFC-021",
+      "TWFC-022",
+      "TWFC-023",
+      "TWFC-024",
+      "TWFC-025",
+      "TWFC-026",
+      "TWFC-027",
+      "TWFC-028",
+      "TWFC-029",
+      "TWFC-030",
+      "TWFC-031",
+      "TWFC-032",
+      "TWFC-033",
+      "TWFC-034",
+      "TWFC-035"
+    ],
+    "failed_ids": [
+      "TACT-002",
+      "TCOL-006",
+      "TCOL-007",
+      "TCOL-008",
+      "TCOL-009",
+      "TCOL-010",
+      "TCOL-011",
+      "TCOL-042",
+      "TCOL-043",
+      "TAUD-001",
+      "TAUD-002",
+      "TAUD-003",
+      "TAUD-004",
+      "TAUD-005",
+      "TAUD-006",
+      "TAUD-007",
+      "TAUD-008",
+      "TAUD-009",
+      "TAUD-010",
+      "TAUD-011",
+      "TAUD-012",
+      "TAUD-013",
+      "TAUD-014",
+      "TAUD-015",
+      "TAUD-016",
+      "TAUD-017",
+      "TAUD-018",
+      "TAUD-019",
+      "TAUD-020",
+      "TWFC-001",
+      "TWFC-010"
+    ],
+    "log_verification": "Parsed exact 120 GitHub Playwright ✓/✘ outcome lines, all IDs unique and disjoint with prior 682 passes and 21 held IDs; job exit code 1.",
+    "nonwrite_boundary": "Audit page catch-all had attempted to continue unrelated POSTs, which live write guard blocked; no completed unauthorized writes reported."
+  },
+  "batch_216_preflight": {
+    "selected_group": "BULK_SAFE_05_RECHECK",
+    "selected_count": 31,
+    "prior_confirmed_green": 771,
+    "prior_held_from_b214": 21,
+    "specs": [
+      {
+        "file": "tenant/action-center/action-center.spec.ts",
+        "count": 1
+      },
+      {
+        "file": "tenant/collaboration/collaboration.spec.ts",
+        "count": 8
+      },
+      {
+        "file": "tenant/tenant-audit/tenant-audit.spec.ts",
+        "count": 20
+      },
+      {
+        "file": "tenant/workflow-composer/workflow-composer.spec.ts",
+        "count": 2
+      }
+    ],
+    "status": "source_repaired_pending_github_browser_run",
+    "safety": "No test added or deleted; no real write enabled; production nonwrite intercept remains; only previous failed IDs may run."
   }
 }

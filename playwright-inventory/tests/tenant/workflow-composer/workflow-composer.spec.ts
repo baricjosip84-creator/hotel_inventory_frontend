@@ -103,7 +103,7 @@ test.describe('Workflow Composer — human-owned plans, filters and safe source 
   test.beforeEach(async ({page})=>{await openComposer(page);});
 
   test('TWFC-001 page identifies workflow guidance as read-only and source-owned',async ({page}) => {
-    await expect(page.getByRole('heading',{name:'Workflow Composer'})).toBeVisible();
+    await expect(page.getByRole('heading',{name:'Workflow Composer',level:1})).toBeVisible();
     await expect(page.locator('.workflow-composer-page')).toContainText('Nothing is published, automated, or executed from this page.');
     await expect(page.getByText('Review a suggested plan, then open its source page and use only the actions available to your role. Nothing is published or executed here.')).toBeVisible();
   });
@@ -194,7 +194,9 @@ test.describe('Workflow Composer — human-owned plans, filters and safe source 
   test('TWFC-010 backend permitted domains determine allowed Work area values',async ({page}) => {
     await mockComposer(page,baseBlueprints(),['execution','alerts']);
     await page.reload();
-    const values=await page.getByLabel('Work area').locator('option').evaluateAll(nodes=>nodes.map(n=>(n as HTMLOptionElement).value));
+    const options=page.getByLabel('Work area').locator('option');
+    await expect(options).toHaveCount(3);
+    const values=await options.evaluateAll(nodes=>nodes.map(n=>(n as HTMLOptionElement).value));
     expect(values).toEqual(['all','execution','alerts']);
   });
 
