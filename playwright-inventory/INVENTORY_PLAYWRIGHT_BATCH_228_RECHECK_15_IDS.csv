@@ -1,0 +1,16 @@
+test_id,original_spec,github_state
+TIU-006,tenant/inventory-usage/inventory-usage.spec.ts,previously_failed_recheck
+TIU-007,tenant/inventory-usage/inventory-usage.spec.ts,previously_failed_recheck
+TIU-008,tenant/inventory-usage/inventory-usage.spec.ts,previously_failed_recheck
+TIU-011,tenant/inventory-usage/inventory-usage.spec.ts,previously_failed_recheck
+TIU-012,tenant/inventory-usage/inventory-usage.spec.ts,previously_failed_recheck
+TIU-013,tenant/inventory-usage/inventory-usage.spec.ts,previously_failed_recheck
+TIU-014,tenant/inventory-usage/inventory-usage.spec.ts,previously_failed_recheck
+TIU-017,tenant/inventory-usage/inventory-usage.spec.ts,previously_failed_recheck
+TIU-018,tenant/inventory-usage/inventory-usage.spec.ts,previously_failed_recheck
+TIU-029,tenant/inventory-usage/inventory-usage.spec.ts,previously_failed_recheck
+TIU-033,tenant/inventory-usage/inventory-usage.spec.ts,previously_failed_recheck
+TIU-037,tenant/inventory-usage/inventory-usage.spec.ts,previously_failed_recheck
+TIU-047,tenant/inventory-usage/inventory-usage.spec.ts,previously_failed_recheck
+TIU-048,tenant/inventory-usage/inventory-usage.spec.ts,previously_failed_recheck
+TIU-049,tenant/inventory-usage/inventory-usage.spec.ts,previously_failed_recheck

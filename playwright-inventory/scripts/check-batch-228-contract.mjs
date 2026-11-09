@@ -42,7 +42,7 @@ assert.equal(green.size,1205);assert.equal(held.size,23);
 assert(selected.every(id=>!green.has(id)&&!held.has(id)), 'Previously GREEN or held ID was reselected');
 assert.equal(new Set([...green,...held,...selected]).size,1375);
 // Prior approval groups cannot be revised by this new, independent batch.
-const prior=Object.fromEntries(Object.entries(manifest.approved_groups).filter(([name])=>name!=='BULK_SAFE_09'));
+const prior=Object.fromEntries(Object.entries(manifest.approved_groups).filter(([name])=>name!=='BULK_SAFE_09'&&name!=='BULK_SAFE_09_RECHECK'));
 const canonical=(o)=>JSON.stringify(o,(k,v)=> v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a<b?-1:a>b?1:0)):v);
 assert.equal(sha(canonical(prior)),state.prior_approved_groups_sha256,'Earlier approved groups altered');
 const astMaps=new Map();let total=0,skipCount=0,specCount=0;
@@ -77,7 +77,7 @@ for(const e of group.entries){
  const file='tests/'+e.file,src=read(file);
  assert(src.includes("from '../../../support/liveOriginalSafeTest'"),'Missing production guard '+file);
  assert.equal(sha(src),e.sha256,'Selected source fingerprint mismatch '+file);
- assert.equal(e.sha256,state.spec_sha256[e.file]);
+ assert.equal(e.sha256,e.file==='tenant/inventory-usage/inventory-usage.spec.ts' ? manifest.batch_228_recheck.recheck_usage_spec_sha256 : state.spec_sha256[e.file]);
  assert.deepEqual(e.ids,state.selected_by_file[e.file]);
  for(const id of e.ids){
   const entry=astMaps.get(id);assert(entry&&!entry.skipped&&entry.spec===e.file,'Selected ID misplaced or skipped '+id);

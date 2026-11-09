@@ -27,8 +27,11 @@ async function openUsage(page:Page,opts:UsageMocks={}){
  await page.goto('/inventory-usage');
  await expect(page.getByRole('heading',{name:'Inventory usage ledger'})).toBeVisible();
 }
-const tab=(page:Page,name:string)=>page.getByRole('tab',{name:new RegExp(`^${name}(?:\\s+\\d+)?$`)});
+const tab=(page:Page,name:string)=>page.getByRole('tab',{name:new RegExp(`^${name}(?:\\s|$)`)});
 const usageRequests=(paths:URL[],endpoint:string)=>paths.filter(u=>u.pathname.endsWith(endpoint));
+// The page uses nested <label><select> controls. Locate by source-defined
+// default option to avoid incorrect exact accessible-label matching.
+const usageSelect=(page:Page, option:string)=>page.locator('select').filter({has:page.getByRole('option',{name:option,exact:true})}).first();
 
  test.describe('Inventory Usage — page, filters and ledger basics (Batch 22)',()=>{
  test('TIU-001 Usage workspace displays source-defined KPI labels',async({page})=>{
@@ -50,15 +53,15 @@ const usageRequests=(paths:URL[],endpoint:string)=>paths.filter(u=>u.pathname.en
   await openUsage(page);await expect(page.getByRole('button',{name:'Export filtered CSV'})).toBeDisabled();
  });
  test('TIU-006 Product filter sends product_id to usage summary',async({page})=>{
-  const seen:URL[]=[];await openUsage(page,{onGet:u=>seen.push(u)});await page.getByLabel('Product',{exact:true}).selectOption('pw-product');
+  const seen:URL[]=[];await openUsage(page,{onGet:u=>seen.push(u)});await usageSelect(page,'All products').selectOption('pw-product');
   await expect.poll(()=>usageRequests(seen,'/summary').some(u=>u.searchParams.get('product_id')==='pw-product')).toBe(true);
  });
  test('TIU-007 Location filter sends storage_location_id',async({page})=>{
-  const seen:URL[]=[];await openUsage(page,{onGet:u=>seen.push(u)});await page.getByLabel('Storage location').selectOption('pw-location');
+  const seen:URL[]=[];await openUsage(page,{onGet:u=>seen.push(u)});await usageSelect(page,'All locations').selectOption('pw-location');
   await expect.poll(()=>usageRequests(seen,'/summary').some(u=>u.searchParams.get('storage_location_id')==='pw-location')).toBe(true);
  });
  test('TIU-008 Reason filter uses the backend consumption_reason key',async({page})=>{
-  const seen:URL[]=[];await openUsage(page,{onGet:u=>seen.push(u)});await page.getByLabel('Reason',{exact:true}).selectOption('damage');
+  const seen:URL[]=[];await openUsage(page,{onGet:u=>seen.push(u)});await usageSelect(page,'All reasons').selectOption('damage');
   await expect.poll(()=>usageRequests(seen,'/summary').some(u=>u.searchParams.get('consumption_reason')==='damage')).toBe(true);
  });
  test('TIU-009 Department filter trims its value in GET query',async({page})=>{
@@ -70,19 +73,19 @@ const usageRequests=(paths:URL[],endpoint:string)=>paths.filter(u=>u.pathname.en
   await expect.poll(()=>usageRequests(seen,'/summary').some(u=>u.searchParams.get('include_reversed')==='true')).toBe(true);
  });
  test('TIU-011 Invalid inverted dates display message and stop summary requests',async({page})=>{
-  const seen:URL[]=[];await openUsage(page,{onGet:u=>seen.push(u)});await page.getByLabel('From').fill('2026-09-10');await page.getByLabel('To').fill('2026-09-01');
+  const seen:URL[]=[];await openUsage(page,{onGet:u=>seen.push(u)});await page.getByLabel('From').fill('2026-09-10');await page.getByLabel('To',{exact:true}).fill('2026-09-01');
   await expect(page.getByText('The To date must be the same as or later than the From date.')).toBeVisible();
   const count=usageRequests(seen,'/summary').length;await page.getByLabel('Department / team').fill('Maintenance');
   await expect(page.getByText('The To date must be the same as or later than the From date.')).toBeVisible();expect(usageRequests(seen,'/summary').length).toBe(count);
  });
  test('TIU-012 Same-day date range includes the entire selected calendar day',async({page})=>{
-  const seen:URL[]=[];await openUsage(page,{onGet:u=>seen.push(u)});await page.getByLabel('From').fill('2026-09-10');await page.getByLabel('To').fill('2026-09-10');
+  const seen:URL[]=[];await openUsage(page,{onGet:u=>seen.push(u)});await page.getByLabel('From').fill('2026-09-10');await page.getByLabel('To',{exact:true}).fill('2026-09-10');
   await expect.poll(()=>usageRequests(seen,'/summary').some(u=>u.searchParams.get('start_date')==='2026-09-10T00:00:00.000'&&u.searchParams.get('end_date')==='2026-09-10T23:59:59.999')).toBe(true);
  });
  test('TIU-013 Reset filters clears product, reason and reversed flag',async({page})=>{
   const seen:URL[]=[];await openUsage(page,{onGet:u=>seen.push(u)});
-  await page.getByLabel('Reason',{exact:true}).selectOption('damage');await page.getByLabel('Include reversed usage').check();
-  await page.getByRole('button',{name:'Reset filters'}).click();await expect(page.getByLabel('Reason',{exact:true})).toHaveValue('');
+  await usageSelect(page,'All reasons').selectOption('damage');await page.getByLabel('Include reversed usage').check();
+  await page.getByRole('button',{name:'Reset filters'}).click();await expect(usageSelect(page,'All reasons')).toHaveValue('');
   await expect(page.getByLabel('Include reversed usage')).not.toBeChecked();await expect.poll(()=>usageRequests(seen,'/summary').some(u=>u.searchParams.get('consumption_reason')===null&&u.searchParams.get('include_reversed')===null)).toBe(true);
  });
  test('TIU-014 Ledger view renders filtered empty-state explanation',async({page})=>{
@@ -103,7 +106,7 @@ const usageRequests=(paths:URL[],endpoint:string)=>paths.filter(u=>u.pathname.en
  test('TIU-018 Ledger page resets when a filter changes',async({page})=>{
   const seen:URL[]=[];await openUsage(page,{usageCount:51,onGet:u=>seen.push(u)});await tab(page,'Ledger').click();await page.getByRole('button',{name:'Next',exact:true}).click();
   await expect.poll(()=>usageRequests(seen,'/usage').some(u=>u.searchParams.get('offset')==='25')).toBe(true);
-  await page.getByLabel('Reason',{exact:true}).selectOption('damage');await expect.poll(()=>usageRequests(seen,'/usage').some(u=>u.searchParams.get('consumption_reason')==='damage'&&!u.searchParams.has('offset'))).toBe(true);
+  await usageSelect(page,'All reasons').selectOption('damage');await expect.poll(()=>usageRequests(seen,'/usage').some(u=>u.searchParams.get('consumption_reason')==='damage'&&!u.searchParams.has('offset'))).toBe(true);
  });
  test('TIU-019 Templates tab shows empty template guidance without a mutation',async({page})=>{
   await openUsage(page);await tab(page,'Templates').click();await expect(page.getByText('No templates saved yet.')).toBeVisible();
@@ -219,9 +222,9 @@ test.describe('Inventory Usage — delegated flows and governance (Batch 23)',()
  test('TIU-029 Editing a saved template loads product, location and quantity',async({page})=>{
   await openUsageScenario(page,{templates:[usageTemplate]});await templateTab(page).click();await page.getByRole('button',{name:'Edit',exact:true}).click();
   await expect(page.getByLabel('Template name')).toHaveValue(usageTemplate.name);
-  await expect(page.getByLabel('Product',{exact:true}).first()).toHaveValue('pw-product');
-  await expect(page.getByLabel('Storage location',{exact:true}).first()).toHaveValue('pw-location');
-  await expect(page.getByLabel('Quantity',{exact:true}).first()).toHaveValue('2');
+  await expect(usageSelect(page,'Select product')).toHaveValue('pw-product');
+  await expect(usageSelect(page,'Select location')).toHaveValue('pw-location');
+  await expect(page.locator('input[type=number][placeholder="0"]').first()).toHaveValue('2');
  });
  test('TIU-030 Updating a template submits optimistic expected_version and original line references',async({page})=>{
   const seen=await openUsageScenario(page,{templates:[usageTemplate]});await templateTab(page).click();await page.getByRole('button',{name:'Edit',exact:true}).click();
@@ -241,8 +244,10 @@ test.describe('Inventory Usage — delegated flows and governance (Batch 23)',()
  });
  test('TIU-033 Scheduled templates expose due and blocked summary without running',async({page})=>{
   const seen=await openUsageScenario(page,{scheduled:{rows:[],summary:{template_count:3,due_count:2,blocked_count:1,evidence_acknowledgement_required_count:0}}});
-  await templateTab(page).click();await expect(page.getByText('Scheduled usage templates')).toBeVisible();
-  await expect(page.getByRole('button',{name:'Record due templates'})).toBeEnabled();
+  await templateTab(page).click();await expect(page.getByRole('heading',{name:'Scheduled usage templates'})).toBeVisible();
+  await expect(page.getByText('3 scheduled',{exact:true})).toBeVisible();
+  await expect(page.getByText('2 due',{exact:true})).toBeVisible();
+  await expect(page.getByText('1 blocked',{exact:true})).toBeVisible();
   expect(reqs(seen,'POST','/stock/usage/templates/scheduled/run-due')).toHaveLength(0);
  });
  test('TIU-034 Confirming scheduled run submits one batch and displays synthetic response',async({page})=>{
