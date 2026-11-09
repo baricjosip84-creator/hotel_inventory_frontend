@@ -28,7 +28,7 @@ assert.equal(last.confirmed_before_recheck,1380);
 assert.deepEqual(last.confirmed_pass_ids,[...priorRun]);
 assert.equal(group.secret,true);
 assert.equal(entries.length,2);
-assert.deepEqual(Object.keys(approved.approved_groups).slice(-3),['BULK_SAFE_10','BULK_SAFE_10_RECHECK','BULK_SAFE_10_RECHECK_2']);
+assert.deepEqual(Object.keys(approved.approved_groups).slice(-4,-1),['BULK_SAFE_10','BULK_SAFE_10_RECHECK','BULK_SAFE_10_RECHECK_2']);
 assert.equal(Object.keys(bodyBefore).length,9900);
 assert.equal(Object.keys(beforeGreens).length,1290);
 assert.equal(Object.keys(batchGreens).length,87);

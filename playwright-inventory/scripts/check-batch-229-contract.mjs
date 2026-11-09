@@ -23,7 +23,7 @@ const approvedKeys=Object.keys(manifest.approved_groups);
 const previousKeys=b.approved_groups_previous;
 assert.deepEqual(approvedKeys.slice(0,previousKeys.length),previousKeys,'Historical groups changed');
 assert.equal(approvedKeys[previousKeys.length],'BULK_SAFE_10');
-assert.deepEqual(approvedKeys.slice(previousKeys.length+1),['BULK_SAFE_10_RECHECK','BULK_SAFE_10_RECHECK_2']);
+assert.deepEqual(approvedKeys.slice(previousKeys.length+1,previousKeys.length+3),['BULK_SAFE_10_RECHECK','BULK_SAFE_10_RECHECK_2']);
 assert.equal(b.all_original_tests,9900);assert.equal(b.original_spec_files,152);assert.equal(b.scenario_skips,357);
 const confirmed=[...source228.confirmed_green_ids,...manifest.batch_228_execution.passed_ids,...priorRetry.recheck_ids];
 const excluded=[...source228.held_unverified_ids,...manifest.batch_228_recheck.deferred_unverified_ids];

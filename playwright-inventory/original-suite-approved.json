@@ -2796,6 +2796,18 @@
         }
       ],
       "secret": true
+    },
+    "BULK_SAFE_10_RECHECK_3": {
+      "entries": [
+        {
+          "file": "tenant/products/products.spec.ts",
+          "ids": [
+            "TPROD-076"
+          ],
+          "sha256": "a4846d792f16e33d3ea288ba43e7f46776fb4d8df81ca8e3b79ff775187b9d2f"
+        }
+      ],
+      "secret": true
     }
   },
   "status": "Batch 203: 58 prior confirmed passes; 155 new reviewed original IDs for a single bulk production-safe browser run; browser outcomes unverified.",
@@ -5520,5 +5532,20 @@
     "batch229_deferred": 35,
     "source_log": "logs_115679245572.zip",
     "result": "OFFLINE_PREFLIGHT_ONLY"
+  },
+  "batch_229_recheck3": {
+    "group": "BULK_SAFE_10_RECHECK_3",
+    "source_log": "logs_115689135985.zip",
+    "github_pass_ids": [
+      "TSUP-054"
+    ],
+    "github_fail_ids": [
+      "TPROD-076"
+    ],
+    "confirmed_green_before_run": 1381,
+    "retry_ids": [
+      "TPROD-076"
+    ],
+    "note": "Single scenario from prior auth-bootstrap failure; first login attempts had no valid JWT. Original test source unchanged; only one bounded Playwright retry on this selected group."
   }
 }
