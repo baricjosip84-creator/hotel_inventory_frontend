@@ -1,4 +1,4 @@
-import {test,expect,type Page} from '@playwright/test';
+import {test,expect,type Page} from '../../../support/liveOriginalSafeTest';
 import {loginAsTenant,fulfillJson} from '../../../support/tenantSession';
 import {loginAsDisposableRole} from '../../../support/roleSession';
 
@@ -77,37 +77,37 @@ test.describe('Probabilistic Forecasting — page evidence, filters and paging (
  test('TPF-009 business-area filter sends forecast_domain',async({page})=>{
   await openForecast(page);let url='';await page.route(forecastSummaryEndpoint,route=>{url=route.request().url();return fulfillJson(route,forecastResponse());});
   await filterPanel(page).getByLabel('Business area').selectOption('inventory');
-  await expect.poll(()=>new URL(url).searchParams.get('forecast_domain')).toBe('inventory');
+  await expect.poll(()=>url ? new URL(url).searchParams.get('forecast_domain') : null).toBe('inventory');
  });
  test('TPF-010 forecast-type selection sends demand_distribution to summary endpoint',async({page})=>{
   await openForecast(page);let url='';await page.route(forecastSummaryEndpoint,route=>{url=route.request().url();return fulfillJson(route,forecastResponse());});
   await filterPanel(page).getByLabel('Forecast type').selectOption('demand_distribution');
-  await expect.poll(()=>new URL(url).searchParams.get('forecast_type')).toBe('demand_distribution');
+  await expect.poll(()=>url ? new URL(url).searchParams.get('forecast_type') : null).toBe('demand_distribution');
  });
  test('TPF-011 model-status selection sends approved_for_advisory_use without mutation',async({page})=>{
   await openForecast(page);let url='';await page.route(forecastSummaryEndpoint,route=>{url=route.request().url();return fulfillJson(route,forecastResponse());});
   await filterPanel(page).getByLabel('Model status').selectOption('approved_for_advisory_use');
-  await expect.poll(()=>new URL(url).searchParams.get('model_status')).toBe('approved_for_advisory_use');
+  await expect.poll(()=>url ? new URL(url).searchParams.get('model_status') : null).toBe('approved_for_advisory_use');
  });
  test('TPF-012 uncertainty method selection is retained in server-side query',async({page})=>{
   await openForecast(page);let url='';await page.route(forecastSummaryEndpoint,route=>{url=route.request().url();return fulfillJson(route,forecastResponse());});
   await filterPanel(page).getByLabel('Uncertainty method').selectOption('scenario_distribution');
-  await expect.poll(()=>new URL(url).searchParams.get('uncertainty_method')).toBe('scenario_distribution');
+  await expect.poll(()=>url ? new URL(url).searchParams.get('uncertainty_method') : null).toBe('scenario_distribution');
  });
  test('TPF-013 risk-type filter requests stockout_risk',async({page})=>{
   await openForecast(page);let url='';await page.route(forecastSummaryEndpoint,route=>{url=route.request().url();return fulfillJson(route,forecastResponse());});
   await filterPanel(page).getByLabel('Risk type').selectOption('stockout_risk');
-  await expect.poll(()=>new URL(url).searchParams.get('risk_type')).toBe('stockout_risk');
+  await expect.poll(()=>url ? new URL(url).searchParams.get('risk_type') : null).toBe('stockout_risk');
  });
  test('TPF-014 actual-outcome type filter requests forecast_error',async({page})=>{
   await openForecast(page);let url='';await page.route(forecastSummaryEndpoint,route=>{url=route.request().url();return fulfillJson(route,forecastResponse());});
   await filterPanel(page).getByLabel('Outcome measurement type').selectOption('forecast_error');
-  await expect.poll(()=>new URL(url).searchParams.get('calibration_type')).toBe('forecast_error');
+  await expect.poll(()=>url ? new URL(url).searchParams.get('calibration_type') : null).toBe('forecast_error');
  });
  test('TPF-015 evidence list record limit supports up to 200',async({page})=>{
   await openForecast(page);let url='';await page.route(forecastSummaryEndpoint,route=>{url=route.request().url();return fulfillJson(route,forecastResponse());});
   await filterPanel(page).getByLabel('Maximum records per evidence list').selectOption('200');
-  await expect.poll(()=>new URL(url).searchParams.get('limit')).toBe('200');
+  await expect.poll(()=>url ? new URL(url).searchParams.get('limit') : null).toBe('200');
  });
  test('TPF-016 Clear filters returns all categories and limit to default values',async({page})=>{
   await openForecast(page);
@@ -235,7 +235,7 @@ test.describe('Probabilistic Forecasting — exact-source reviews and evidence b
   await openFocusedForecast(page);let url='';
   await page.route(focusedSourcePattern,route=>{url=route.request().url();return fulfillJson(route,focusedResponse());});
   await page.getByLabel('Focused evidence paging').getByLabel('Maximum records per evidence list').selectOption('100');
-  await expect.poll(()=>new URL(url).searchParams.get('limit')).toBe('100');
+  await expect.poll(()=>url ? new URL(url).searchParams.get('limit') : null).toBe('100');
   expect(new URL(url).pathname).toContain(`/probabilistic-forecasting-source/${focusedForecastId}`);
  });
  test('TPF-030 focused range/risk/outcome Older navigation uses separate offsets',async({page})=>{
@@ -256,7 +256,7 @@ test.describe('Probabilistic Forecasting — exact-source reviews and evidence b
   await forecastSection(page,'Forecast models').getByRole('button',{name:'Older'}).click();
   await forecastSection(page,'Uncertainty ranges').getByRole('button',{name:'Older'}).click();
   await filterPanel(page).getByLabel('Business area').selectOption('inventory');
-  await expect.poll(()=>new URL(url).searchParams.get('forecast_domain')).toBe('inventory');
+  await expect.poll(()=>url ? new URL(url).searchParams.get('forecast_domain') : null).toBe('inventory');
   const qs=new URL(url).searchParams;expect(qs.get('model_offset')).toBe(null);expect(qs.get('interval_offset')).toBe(null);
  });
  test('TPF-032 advisory page offers no stock edit or automated inventory mutation controls',async({page})=>{

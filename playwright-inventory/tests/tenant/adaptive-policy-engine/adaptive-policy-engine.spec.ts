@@ -1,4 +1,4 @@
-import {test, expect, type Page} from '@playwright/test';
+import {test, expect, type Page} from '../../../support/liveOriginalSafeTest';
 import {loginAsTenant, fulfillJson} from '../../../support/tenantSession';
 import {loginAsDisposableRole} from '../../../support/roleSession';
 
@@ -54,27 +54,27 @@ test.describe('Adaptive Policy Engine — tenant evidence and governed actions (
  test('TAPE-006 business-area selection propagates policy_domain server filter',async({page})=>{
   await openPolicy(page);let last='';await page.route(policySummaryEndpoint,route=>{last=route.request().url();return fulfillJson(route,policyResponse());});
   await policyFilters(page).getByLabel('Business area').selectOption('inventory');
-  await expect.poll(()=>new URL(last).searchParams.get('policy_domain')).toBe('inventory');
+  await expect.poll(()=>last ? new URL(last).searchParams.get('policy_domain') : null).toBe('inventory');
  });
  test('TAPE-007 policy-type filter propagates dynamic_replenishment to summary request',async({page})=>{
   await openPolicy(page);let last='';await page.route(policySummaryEndpoint,route=>{last=route.request().url();return fulfillJson(route,policyResponse());});
   await policyFilters(page).getByLabel('Policy type').selectOption('dynamic_replenishment');
-  await expect.poll(()=>new URL(last).searchParams.get('policy_type')).toBe('dynamic_replenishment');
+  await expect.poll(()=>last ? new URL(last).searchParams.get('policy_type') : null).toBe('dynamic_replenishment');
  });
  test('TAPE-008 policy-status filter requests reviewed-for-manual-application state',async({page})=>{
   await openPolicy(page);let last='';await page.route(policySummaryEndpoint,route=>{last=route.request().url();return fulfillJson(route,policyResponse());});
   await policyFilters(page).getByLabel('Policy status').selectOption('approved_for_manual_application');
-  await expect.poll(()=>new URL(last).searchParams.get('policy_status')).toBe('approved_for_manual_application');
+  await expect.poll(()=>last ? new URL(last).searchParams.get('policy_status') : null).toBe('approved_for_manual_application');
  });
  test('TAPE-009 recommendation-type filter is server-side and specific',async({page})=>{
   await openPolicy(page);let last='';await page.route(policySummaryEndpoint,route=>{last=route.request().url();return fulfillJson(route,policyResponse());});
   await policyFilters(page).getByLabel('Recommendation type').selectOption('threshold_adjustment');
-  await expect.poll(()=>new URL(last).searchParams.get('recommendation_type')).toBe('threshold_adjustment');
+  await expect.poll(()=>last ? new URL(last).searchParams.get('recommendation_type') : null).toBe('threshold_adjustment');
  });
  test('TAPE-010 changing per-list limit includes supported maximum of 200',async({page})=>{
   await openPolicy(page);let last='';await page.route(policySummaryEndpoint,route=>{last=route.request().url();return fulfillJson(route,policyResponse());});
   await policyFilters(page).getByLabel('Maximum records per evidence list').selectOption('200');
-  await expect.poll(()=>new URL(last).searchParams.get('limit')).toBe('200');
+  await expect.poll(()=>last ? new URL(last).searchParams.get('limit') : null).toBe('200');
   await expect(page.locator('.adaptive-policy-limit-note').last()).toContainText('200');
  });
  test('TAPE-011 Clear filters resets all categories and limit to 25',async({page})=>{
@@ -84,7 +84,7 @@ test.describe('Adaptive Policy Engine — tenant evidence and governed actions (
   await policyFilters(page).getByRole('button',{name:'Clear filters'}).click();
   await expect(policyFilters(page).getByLabel('Policy type')).toHaveValue('');
   await expect(policyFilters(page).getByLabel('Maximum records per evidence list')).toHaveValue('25');
-  await expect.poll(()=>new URL(last).searchParams.get('limit')).toBe('25');
+  await expect.poll(()=>last ? new URL(last).searchParams.get('limit') : null).toBe('25');
   expect(new URL(last).searchParams.get('policy_type')).toBe(null);
  });
  test('TAPE-012 summary failure offers Retry and restores evidence once API succeeds',async({page})=>{
