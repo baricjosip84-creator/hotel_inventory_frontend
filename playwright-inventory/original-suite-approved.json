@@ -2527,6 +2527,222 @@
         }
       ],
       "secret": true
+    },
+    "BULK_SAFE_10": {
+      "entries": [
+        {
+          "file": "tenant/suppliers/suppliers.spec.ts",
+          "ids": [
+            "TSUP-024",
+            "TSUP-025",
+            "TSUP-027",
+            "TSUP-028",
+            "TSUP-039",
+            "TSUP-040",
+            "TSUP-045",
+            "TSUP-046",
+            "TSUP-047",
+            "TSUP-048",
+            "TSUP-049",
+            "TSUP-050",
+            "TSUP-051",
+            "TSUP-052",
+            "TSUP-053",
+            "TSUP-054",
+            "TSUP-055",
+            "TSUP-060",
+            "TSUP-061",
+            "TSUP-062",
+            "TSUP-063",
+            "TSUP-064"
+          ],
+          "sha256": "5edd445810c13e23764e59a4a3e2cfee99dfe0c8890d5eff8cdbaf003f061acd"
+        },
+        {
+          "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+          "ids": [
+            "TSET-020",
+            "TSET-021",
+            "TSET-022",
+            "TSET-023",
+            "TSET-024",
+            "TSET-025",
+            "TSET-026",
+            "TSET-030",
+            "TSET-031",
+            "TSET-038",
+            "TSET-039",
+            "TSET-040",
+            "TSET-041",
+            "TSET-042",
+            "TSET-044",
+            "TSET-045",
+            "TSET-046",
+            "TSET-051",
+            "TSET-052",
+            "TSET-053"
+          ],
+          "sha256": "70ef85d28dcbfe773e683c99ef9360e9bbb4e36305e37a40b776117063dfc507"
+        },
+        {
+          "file": "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts",
+          "ids": [
+            "TPF-021",
+            "TPF-022",
+            "TPF-023",
+            "TPF-024",
+            "TPF-025",
+            "TPF-026",
+            "TPF-027",
+            "TPF-028",
+            "TPF-029",
+            "TPF-030",
+            "TPF-032"
+          ],
+          "sha256": "e2ccaf15f553be36c11ef00161cc3a9aede0093a2ca8e93fc577d5cb7730e7c8"
+        },
+        {
+          "file": "tenant/system-context/system-context.spec.ts",
+          "ids": [
+            "TSC-037",
+            "TSC-040",
+            "TSC-041",
+            "TSC-042",
+            "TSC-043",
+            "TSC-044",
+            "TSC-045",
+            "TSC-046"
+          ],
+          "sha256": "c08048a64b62801f6f29bc53eb629ffec23d5e28581183103646b66f67849620"
+        },
+        {
+          "file": "tenant/products/products.spec.ts",
+          "ids": [
+            "TPROD-021",
+            "TPROD-022",
+            "TPROD-024",
+            "TPROD-068",
+            "TPROD-069",
+            "TPROD-031",
+            "TPROD-077",
+            "TPROD-046",
+            "TPROD-036",
+            "TPROD-039",
+            "TPROD-040",
+            "TPROD-041",
+            "TPROD-052",
+            "TPROD-055",
+            "TPROD-076"
+          ],
+          "sha256": "f8f1173dce17f0c35a6d407ccfe06f44d15f3d5482a670623a0629bed5eed98a"
+        },
+        {
+          "file": "tenant/collaboration/collaboration.spec.ts",
+          "ids": [
+            "TCOL-002",
+            "TCOL-003",
+            "TCOL-021",
+            "TCOL-022",
+            "TCOL-045",
+            "TCOL-046"
+          ],
+          "sha256": "2a2aa866efc505e8aa596549b34d8fe7a756b997e2eceefcd3aec1f3d7896db7"
+        },
+        {
+          "file": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+          "ids": [
+            "TCDO-021",
+            "TCDO-022",
+            "TCDO-023",
+            "TCDO-025",
+            "TCDO-026",
+            "TCDO-030",
+            "TCDO-031",
+            "TCDO-033"
+          ],
+          "sha256": "401308d0f3a885fda1559361cbe7f85c2966c336c59374c82a7794d8872c7aad"
+        },
+        {
+          "file": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+          "ids": [
+            "TDLF-022",
+            "TDLF-026",
+            "TDLF-029",
+            "TDLF-031",
+            "TDLF-033",
+            "TDLF-034",
+            "TDLF-037"
+          ],
+          "sha256": "a2ff2f7d333f348827855c0b92eb754f0fea981375ace153a47a4f1fb488260d"
+        },
+        {
+          "file": "tenant/stock/stock.spec.ts",
+          "ids": [
+            "TST-001",
+            "TST-002",
+            "TST-020",
+            "TST-021",
+            "TST-022",
+            "TST-023"
+          ],
+          "sha256": "64db75883cf60929dc2444eb3fee2ccf2f58381af96f5504de1f3a107a4db5e2"
+        },
+        {
+          "file": "tenant/shipments/shipments.spec.ts",
+          "ids": [
+            "TSH-031",
+            "TSH-033",
+            "TSH-036",
+            "TSH-040",
+            "TSH-041",
+            "TSH-042",
+            "TSH-045"
+          ],
+          "sha256": "67fe0e2f24d71ea1f546fb69a57b686559e34b2f55b801c6fafec233b2a4a0ab"
+        },
+        {
+          "file": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+          "ids": [
+            "TAPE-015",
+            "TAPE-017",
+            "TAPE-019",
+            "TAPE-022",
+            "TAPE-023",
+            "TAPE-027"
+          ],
+          "sha256": "d37ce933ad44c71f5266e14f951bf65449d73076ff3bd2dd7031ff5f71bebc6b"
+        },
+        {
+          "file": "tenant/alerts/alerts.spec.ts",
+          "ids": [
+            "TALERT-028",
+            "TALERT-044",
+            "TALERT-047",
+            "TALERT-051"
+          ],
+          "sha256": "2af12d3306161273820d0fac2a7027083b5192eef5d0e903ac40127600850664"
+        },
+        {
+          "file": "tenant/tenant-audit/tenant-audit.spec.ts",
+          "ids": [
+            "TAUD-026",
+            "TAUD-027",
+            "TAUD-028",
+            "TAUD-044",
+            "TAUD-068"
+          ],
+          "sha256": "f33f79613fe8041b84e5af95ae4df46b8f5ca09e1749ed1c37827b257ed818b5"
+        },
+        {
+          "file": "tenant/stock-movements/stock-movements.spec.ts",
+          "ids": [
+            "TSMV-043",
+            "TSMV-078"
+          ],
+          "sha256": "25957063d0e48f150669555eb06b22673fd55f81102673fe9458f42a7a2274eb"
+        }
+      ],
+      "secret": true
     }
   },
   "status": "Batch 203: 58 prior confirmed passes; 155 new reviewed original IDs for a single bulk production-safe browser run; browser outcomes unverified.",
@@ -3603,7 +3819,7 @@
       "TWFC-001",
       "TWFC-010"
     ],
-    "log_verification": "Parsed exact 120 GitHub Playwright \u2713/\u2718 outcome lines, all IDs unique and disjoint with prior 682 passes and 21 held IDs; job exit code 1.",
+    "log_verification": "Parsed exact 120 GitHub Playwright ✓/✘ outcome lines, all IDs unique and disjoint with prior 682 passes and 21 held IDs; job exit code 1.",
     "nonwrite_boundary": "Audit page catch-all had attempted to continue unrelated POSTs, which live write guard blocked; no completed unauthorized writes reported."
   },
   "batch_216_preflight": {
@@ -3945,7 +4161,7 @@
       "TINS-047",
       "TSET-001"
     ],
-    "evidence": "Parsed 63 exact \u2713/\u2718 scenario outcome lines from GitHub uploaded original-suite log; no skips; original IDs matched selected set",
+    "evidence": "Parsed 63 exact ✓/✘ scenario outcome lines from GitHub uploaded original-suite log; no skips; original IDs matched selected set",
     "safety": "Existing context write blocker retained; no frontend/backend changes."
   },
   "batch_220_preflight": {
@@ -3991,7 +4207,7 @@
       "TINS-030",
       "TINS-035"
     ],
-    "evidence": "Exact GitHub output \u2713/\u2718 original scenario lines, no skips; 16 selected and accounted for.",
+    "evidence": "Exact GitHub output ✓/✘ original scenario lines, no skips; 16 selected and accounted for.",
     "safety": "Production write guard unchanged."
   },
   "batch_221_preflight": {
@@ -4892,5 +5108,145 @@
     "prior_batch_228_deferred": 62,
     "pre_dispatch_usage_spec_sha256": "6ae020d73e4c935aff024a3e3ea1f3d7b0f0d68a28020b368e14710aef09d157",
     "recheck_usage_spec_sha256": "5f48781ab060b9c50304eb816656737d613fcafdf813588a313630f614cefc74"
+  },
+  "batch_229_preflight": {
+    "date": "2026-11-09",
+    "previous_confirmed_green": 1290,
+    "previous_held": 23,
+    "batch_228_deferred": 62,
+    "group": "BULK_SAFE_10",
+    "selected_original_count": 127,
+    "selected_ids": [
+      "TSUP-024",
+      "TSUP-025",
+      "TSUP-027",
+      "TSUP-028",
+      "TSUP-039",
+      "TSUP-040",
+      "TSUP-045",
+      "TSUP-046",
+      "TSUP-047",
+      "TSUP-048",
+      "TSUP-049",
+      "TSUP-050",
+      "TSUP-051",
+      "TSUP-052",
+      "TSUP-053",
+      "TSUP-054",
+      "TSUP-055",
+      "TSUP-060",
+      "TSUP-061",
+      "TSUP-062",
+      "TSUP-063",
+      "TSUP-064",
+      "TSET-020",
+      "TSET-021",
+      "TSET-022",
+      "TSET-023",
+      "TSET-024",
+      "TSET-025",
+      "TSET-026",
+      "TSET-030",
+      "TSET-031",
+      "TSET-038",
+      "TSET-039",
+      "TSET-040",
+      "TSET-041",
+      "TSET-042",
+      "TSET-044",
+      "TSET-045",
+      "TSET-046",
+      "TSET-051",
+      "TSET-052",
+      "TSET-053",
+      "TPF-021",
+      "TPF-022",
+      "TPF-023",
+      "TPF-024",
+      "TPF-025",
+      "TPF-026",
+      "TPF-027",
+      "TPF-028",
+      "TPF-029",
+      "TPF-030",
+      "TPF-032",
+      "TSC-037",
+      "TSC-040",
+      "TSC-041",
+      "TSC-042",
+      "TSC-043",
+      "TSC-044",
+      "TSC-045",
+      "TSC-046",
+      "TPROD-021",
+      "TPROD-022",
+      "TPROD-024",
+      "TPROD-068",
+      "TPROD-069",
+      "TPROD-031",
+      "TPROD-077",
+      "TPROD-046",
+      "TPROD-036",
+      "TPROD-039",
+      "TPROD-040",
+      "TPROD-041",
+      "TPROD-052",
+      "TPROD-055",
+      "TPROD-076",
+      "TCOL-002",
+      "TCOL-003",
+      "TCOL-021",
+      "TCOL-022",
+      "TCOL-045",
+      "TCOL-046",
+      "TCDO-021",
+      "TCDO-022",
+      "TCDO-023",
+      "TCDO-025",
+      "TCDO-026",
+      "TCDO-030",
+      "TCDO-031",
+      "TCDO-033",
+      "TDLF-022",
+      "TDLF-026",
+      "TDLF-029",
+      "TDLF-031",
+      "TDLF-033",
+      "TDLF-034",
+      "TDLF-037",
+      "TST-001",
+      "TST-002",
+      "TST-020",
+      "TST-021",
+      "TST-022",
+      "TST-023",
+      "TSH-031",
+      "TSH-033",
+      "TSH-036",
+      "TSH-040",
+      "TSH-041",
+      "TSH-042",
+      "TSH-045",
+      "TAPE-015",
+      "TAPE-017",
+      "TAPE-019",
+      "TAPE-022",
+      "TAPE-023",
+      "TAPE-027",
+      "TALERT-028",
+      "TALERT-044",
+      "TALERT-047",
+      "TALERT-051",
+      "TAUD-026",
+      "TAUD-027",
+      "TAUD-028",
+      "TAUD-044",
+      "TAUD-068",
+      "TSMV-043",
+      "TSMV-078"
+    ],
+    "browser_execution": "NOT_RUN",
+    "source": "INVENTORY_PLAYWRIGHT_BATCH_228_RECHECK_FULL.zip",
+    "note": "Batch 228 recheck 15 GREEN per user; no GitHub log uploaded for that run. Batch 229 pending live result."
   }
 }

@@ -42,7 +42,7 @@ assert.equal(green.size,1205);assert.equal(held.size,23);
 assert(selected.every(id=>!green.has(id)&&!held.has(id)), 'Previously GREEN or held ID was reselected');
 assert.equal(new Set([...green,...held,...selected]).size,1375);
 // Prior approval groups cannot be revised by this new, independent batch.
-const prior=Object.fromEntries(Object.entries(manifest.approved_groups).filter(([name])=>name!=='BULK_SAFE_09'&&name!=='BULK_SAFE_09_RECHECK'));
+const prior=Object.fromEntries(Object.entries(manifest.approved_groups).filter(([name])=>name!=='BULK_SAFE_09'&&name!=='BULK_SAFE_09_RECHECK'&&name!=='BULK_SAFE_10'));
 const canonical=(o)=>JSON.stringify(o,(k,v)=> v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a<b?-1:a>b?1:0)):v);
 assert.equal(sha(canonical(prior)),state.prior_approved_groups_sha256,'Earlier approved groups altered');
 const astMaps=new Map();let total=0,skipCount=0,specCount=0;
