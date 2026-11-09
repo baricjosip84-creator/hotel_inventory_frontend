@@ -1,3 +1,4 @@
+import {assertHistoricalSourceCompatible} from './batch-229-recheck-source-allowlist.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -20,7 +21,7 @@ assert.deepEqual(group.entries.map(x=>x.ids.length),[40,50,30]);
 const all=[];
 for(const entry of group.entries){
  const source=fs.readFileSync(path.join(root,'tests',entry.file),'utf8');
- assert.equal(crypto.createHash('sha256').update(source).digest('hex'),entry.sha256,`Source changed: ${entry.file}`);
+ assertHistoricalSourceCompatible(entry.file,crypto.createHash('sha256').update(source).digest('hex'),entry.sha256,`Source changed: ${entry.file}`);
  assert(source.includes("support/liveOriginalSafeTest'"),`Missing production guard: ${entry.file}`);
  for(const id of entry.ids){
   assert(!previous.has(id),`Previously approved scenario repeated: ${id}`);

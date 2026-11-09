@@ -1041,8 +1041,8 @@ test.describe('Products — source-grounded cost risk/action controls', () => {
     });
     await section.locator('select').nth(0).selectOption('missing_cost');
     await section.getByPlaceholder('Search product or category').fill('Coffee');
-    await section.locator('select').nth(2).selectOption('name');
-    await section.locator('select').nth(3).selectOption('asc');
+    await section.locator('select').nth(1).selectOption('name');
+    await section.locator('select').nth(2).selectOption('asc');
     await req;
     await expect(section.locator('select').nth(0)).toHaveValue('missing_cost');
   });
@@ -1113,17 +1113,17 @@ test.describe('Products — cost controls reporting and governance review eviden
   });
 
   test('TPROD-076 Refresh Governance refetches operator-facing summary', async ({ page }) => {
+    // The governance query enables after the hardening and report reads settle.
+    await expect(page.getByText('Stocked products with cost basis')).toBeVisible();
     let reads = 0;
     await page.route('**/products/cost-governance-summary?*', route => {
       reads += 1;
       return fulfillJson(route, costFixtures['cost-governance-summary']);
     });
     const button = page.getByRole('button', { name: 'Refresh Governance' });
-    await expect(button).toBeVisible();
-    const req = page.waitForRequest(r => r.url().includes('/products/cost-governance-summary?'));
+    await expect(button).toBeEnabled();
     await button.click();
-    await req;
-    expect(reads).toBeGreaterThanOrEqual(1);
+    await expect.poll(() => reads).toBeGreaterThanOrEqual(1);
   });
 
   test('TPROD-077 human-review queue renders sourced queue counts and reviewer guidance', async ({ page }) => {

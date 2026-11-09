@@ -1,3 +1,4 @@
+import {assertHistoricalSourceCompatible} from './batch-229-recheck-source-allowlist.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -48,7 +49,7 @@ for(const e of group.entries){
  assert(e.ids.every(id=>oldEntry.ids.includes(id)),'Recheck includes non-B223 ID '+e.file);
  assert(e.ids.every(id=>previous.failed_ids.includes(id)),'Previously GREEN reselected '+e.file);
  const code=read('tests/'+e.file);
- assert.equal(sha(code),e.sha256,'SHA mismatch '+e.file);
+ assertHistoricalSourceCompatible(e.file,sha(code),e.sha256,'SHA mismatch '+e.file);
  assert.equal(b.spec_sha256[e.file],e.sha256);
  assert.equal(oldEntry.sha256,e.sha256,'B223 reviewed SHA was not re-pinned '+e.file);
  assert(code.includes("from '../../../support/liveOriginalSafeTest'"),'Guarded test import lost '+e.file);

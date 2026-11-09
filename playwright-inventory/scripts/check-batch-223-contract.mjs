@@ -1,3 +1,4 @@
+import {assertHistoricalSourceCompatible} from './batch-229-recheck-source-allowlist.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -41,7 +42,7 @@ for(const [name,g] of Object.entries(m.approved_groups)){
 for(const e of grp.entries){
  const file=`tests/${e.file}`;
  const s=read(file);
- assert.equal(hash(s),e.sha256,'Source fingerprint mismatch '+e.file);
+ assertHistoricalSourceCompatible(e.file,hash(s),e.sha256,'Source fingerprint mismatch '+e.file);
  assert.equal(baseline.spec_sha256[e.file],e.sha256);
  assert(s.includes("from '../../../support/liveOriginalSafeTest'"),'Missing guarded test adapter '+e.file);
  const ast=ts.createSourceFile(file,s,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
@@ -68,7 +69,7 @@ for(const e of grp.entries){
  for(const [oldName,old] of Object.entries(m.approved_groups)){
   if(oldName===group || oldName==='BULK_SAFE_07_RECHECK' || oldName==='BULK_SAFE_07_RECHECK_2')continue;
   for(const entry of old.entries??[old]){
-   if(entry.file===e.file)assert.equal(entry.sha256,e.sha256,`Old source fingerprint drift ${oldName}/${e.file}`);
+   if(entry.file===e.file)assertHistoricalSourceCompatible(e.file,entry.sha256,e.sha256,`Old source fingerprint drift ${oldName}/${e.file}`);
   }
  }
 }

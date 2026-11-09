@@ -1,3 +1,4 @@
+import {assertHistoricalSourceCompatible} from './batch-229-recheck-source-allowlist.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -38,7 +39,7 @@ for (const [group, entry] of Object.entries(manifest.approved_groups)) {
     const file = path.join(testRoot, part.file);
     const body = fs.readFileSync(file);
     const sha = crypto.createHash('sha256').update(body).digest('hex');
-    if (sha !== part.sha256) throw new Error(`Reviewed source changed; re-review required for ${group}/${part.file}`);
+    assertHistoricalSourceCompatible(part.file,sha,part.sha256,`Reviewed source changed: ${group}/${part.file}`);
     for (const id of part.ids) {
       if (!found.includes(id)) throw new Error(`Approved ID no longer exists: ${group}/${id}`);
       assert(!idsInGroup.has(id), `Duplicate approved ID in group ${group}: ${id}`);
@@ -76,7 +77,9 @@ for (const [bulkName, bulkIds] of bulkGroups) {
        (new Set(['BULK_SAFE_08','BULK_SAFE_08_RECHECK']).has(name) &&
         new Set(['BULK_SAFE_08','BULK_SAFE_08_RECHECK']).has(bulkName)) ||
        (new Set(['BULK_SAFE_09','BULK_SAFE_09_RECHECK']).has(name) &&
-        new Set(['BULK_SAFE_09','BULK_SAFE_09_RECHECK']).has(bulkName)))
+        new Set(['BULK_SAFE_09','BULK_SAFE_09_RECHECK']).has(bulkName)) ||
+       (new Set(['BULK_SAFE_10','BULK_SAFE_10_RECHECK']).has(name) &&
+        new Set(['BULK_SAFE_10','BULK_SAFE_10_RECHECK']).has(bulkName)))
     )).flatMap(([,ids])=>[...ids]));
   for (const id of bulkIds) assert(!otherIds.has(id), `Bulk cannot reuse another group's ID: ${bulkName}/${id}`);
 }

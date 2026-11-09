@@ -1,0 +1,6 @@
+test_id,spec_file,reason
+TSUP-054,tenant/suppliers/suppliers.spec.ts,never fulfill document navigation with API JSON
+TPF-021,tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts,actual API request uses /api path prefix
+TSC-046,tenant/system-context/system-context.spec.ts,scope to containing section instead of wrong DOM ancestor
+TPROD-069,tenant/products/products.spec.ts,"three selects, not four; correct sort/direction indices"
+TPROD-076,tenant/products/products.spec.ts,wait for prerequisite query; observe direct refetch without orphan request promise

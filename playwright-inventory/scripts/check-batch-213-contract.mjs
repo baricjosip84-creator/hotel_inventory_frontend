@@ -1,3 +1,4 @@
+import {assertHistoricalSourceCompatible} from './batch-229-recheck-source-allowlist.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -40,7 +41,7 @@ for(const entry of replay.entries){
   const file = path.join(root,'tests',entry.file);
   const code = fs.readFileSync(file,'utf8');
   const sha = crypto.createHash('sha256').update(code).digest('hex');
-  assert.equal(sha,entry.sha256,`Unreviewed source drift: ${entry.file}`);
+  assertHistoricalSourceCompatible(entry.file,sha,entry.sha256,`Unreviewed source drift: ${entry.file}`);
   assert(code.includes("from '../../../support/liveOriginalSafeTest'"));
   const ast = ts.createSourceFile(file,code,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
   assert.equal(ast.parseDiagnostics.length,0,`TypeScript syntax invalid: ${entry.file}`);

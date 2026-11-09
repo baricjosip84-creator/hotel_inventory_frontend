@@ -1,0 +1,36 @@
+test_id,reason
+TPF-032,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TSC-040,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TSC-041,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TSC-042,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TSC-043,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TPROD-077,needs separate frontend behavior investigation; excluded from unverified rerun
+TCDO-021,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TCDO-022,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TCDO-023,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TCDO-025,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TCDO-026,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TCDO-030,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TCDO-031,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TCDO-033,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TDLF-022,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TDLF-026,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TDLF-029,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TDLF-031,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TDLF-033,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TDLF-034,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TDLF-037,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TSH-040,needs separate frontend behavior investigation; excluded from unverified rerun
+TAPE-015,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TAPE-017,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TAPE-019,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TAPE-022,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TAPE-023,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TAPE-027,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TAUD-026,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TAUD-027,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TAUD-028,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TAUD-044,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TAUD-068,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TSMV-043,disposable-role fixture refused public Vercel origin; must use isolated disposable environment
+TSMV-078,disposable-role fixture refused public Vercel origin; must use isolated disposable environment

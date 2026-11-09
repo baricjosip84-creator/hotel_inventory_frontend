@@ -425,7 +425,10 @@ test.describe('System Context — governed history and diagnostics (Batch 41)', 
       forecast_scenarios: Array.from({ length: 10 }, (_, i) => ({ ...scenarios[0], code: `case-${i}`, label: `Forecast case ${i}` }))
     });
     await openHistory(page);
-    const planning = page.getByRole('heading', { name: 'Read-only scenario planning' }).locator('..').locator('..');
+    // PanelHeading wraps its h2 twice; use the containing section, not two parent hops.
+    const planning = page.locator('section').filter({
+      has: page.getByRole('heading', { name: 'Read-only scenario planning' })
+    }).first();
     await expect(planning.locator('.system-context-recommendation')).toHaveCount(8);
     await expect(planning).not.toContainText('Forecast case 9');
   });

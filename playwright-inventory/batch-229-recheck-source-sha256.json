@@ -1,0 +1,18 @@
+{
+  "tenant/suppliers/suppliers.spec.ts": {
+    "before_sha256": "5edd445810c13e23764e59a4a3e2cfee99dfe0c8890d5eff8cdbaf003f061acd",
+    "after_sha256": "13f3865374de6a40316a677a73e2268dc9fec405ef2f6c609f4a511a74a27b69"
+  },
+  "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts": {
+    "before_sha256": "e2ccaf15f553be36c11ef00161cc3a9aede0093a2ca8e93fc577d5cb7730e7c8",
+    "after_sha256": "4f3ffc8ea461386ec94d9ec2adb1d631f552f2f1484565f899bcd4b983bbd49e"
+  },
+  "tenant/system-context/system-context.spec.ts": {
+    "before_sha256": "c08048a64b62801f6f29bc53eb629ffec23d5e28581183103646b66f67849620",
+    "after_sha256": "ae27e99de75eaa5bbc36d0f1aa5dd613678eb58c9ce9079714a63d06fa26457c"
+  },
+  "tenant/products/products.spec.ts": {
+    "before_sha256": "f8f1173dce17f0c35a6d407ccfe06f44d15f3d5482a670623a0629bed5eed98a",
+    "after_sha256": "cbc7672b390914c1a15014f3182058f1734195f041d50574785a451a40df2547"
+  }
+}

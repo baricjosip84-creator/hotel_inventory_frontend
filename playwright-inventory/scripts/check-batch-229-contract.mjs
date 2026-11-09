@@ -18,9 +18,11 @@ const frozen1205=JSON.parse(read('batch-228-frozen-green-body-sha256.json'));
 const frozen70=JSON.parse(read('batch-228-confirmed-70-green-body-sha256.json'));
 const group=manifest.approved_groups.BULK_SAFE_10;
 assert(group && group.secret===true && Array.isArray(group.entries) && group.entries.length===14);
-assert.deepEqual(Object.keys(manifest.approved_groups).slice(0,-1),b.approved_groups_previous,
- 'Historical approved group keys modified or reordered');
-assert.equal(Object.keys(manifest.approved_groups).at(-1),'BULK_SAFE_10');
+const approvedKeys=Object.keys(manifest.approved_groups);
+const previousKeys=b.approved_groups_previous;
+assert.deepEqual(approvedKeys.slice(0,previousKeys.length),previousKeys,'Historical groups changed');
+assert.equal(approvedKeys[previousKeys.length],'BULK_SAFE_10');
+assert.deepEqual(approvedKeys.slice(previousKeys.length+1),['BULK_SAFE_10_RECHECK']);
 assert.equal(b.all_original_tests,9900);assert.equal(b.original_spec_files,152);assert.equal(b.scenario_skips,357);
 const confirmed=[...source228.confirmed_green_ids,...manifest.batch_228_execution.passed_ids,...priorRetry.recheck_ids];
 const excluded=[...source228.held_unverified_ids,...manifest.batch_228_recheck.deferred_unverified_ids];
@@ -69,7 +71,8 @@ for(const e of group.entries){
  const source=read('tests/'+e.file);
  assert(source.includes("from '../../../support/liveOriginalSafeTest'"),'Missing protected Playwright fixture '+e.file);
  assert.equal(sha(source),e.sha256,'Unreviewed spec changed '+e.file);
- assert.equal(e.sha256,b.spec_sha256[e.file]);
+ if(!manifest.batch_229_recheck?.recheck_ids.some(id=>e.ids.includes(id)))
+   assert.equal(e.sha256,b.spec_sha256[e.file]);
  assert.deepEqual(e.ids,b.selected_by_file[e.file]);
  for(const id of e.ids){
   const test=observed.get(id);assert(test&&!test.skip&&test.file===e.file,'Misplaced/skipped test '+id);

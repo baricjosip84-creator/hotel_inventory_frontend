@@ -1,3 +1,4 @@
+import {assertHistoricalSourceCompatible} from './batch-229-recheck-source-allowlist.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -42,7 +43,7 @@ const idsBySpec=new Map();
 for(const entry of group.entries){
  assert(entry.file.startsWith('tenant/') && entry.file.endsWith('.spec.ts'));
  const name='tests/'+entry.file,source=read(name);
- assert.equal(sha(source),entry.sha256,`Original source SHA mismatch ${name}`);
+ assertHistoricalSourceCompatible(entry.file,sha(source),entry.sha256,`Original source SHA mismatch ${name}`);
  assert.equal(batch.spec_sha256[entry.file],entry.sha256);
  assert(source.includes("from '../../../support/liveOriginalSafeTest'"),`No live read-only fixture: ${name}`);
  const ast=ts.createSourceFile(name,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);

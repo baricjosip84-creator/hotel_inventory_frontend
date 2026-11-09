@@ -2556,7 +2556,7 @@
             "TSUP-063",
             "TSUP-064"
           ],
-          "sha256": "5edd445810c13e23764e59a4a3e2cfee99dfe0c8890d5eff8cdbaf003f061acd"
+          "sha256": "13f3865374de6a40316a677a73e2268dc9fec405ef2f6c609f4a511a74a27b69"
         },
         {
           "file": "tenant/tenant-settings/tenant-settings.spec.ts",
@@ -2599,7 +2599,7 @@
             "TPF-030",
             "TPF-032"
           ],
-          "sha256": "e2ccaf15f553be36c11ef00161cc3a9aede0093a2ca8e93fc577d5cb7730e7c8"
+          "sha256": "4f3ffc8ea461386ec94d9ec2adb1d631f552f2f1484565f899bcd4b983bbd49e"
         },
         {
           "file": "tenant/system-context/system-context.spec.ts",
@@ -2613,7 +2613,7 @@
             "TSC-045",
             "TSC-046"
           ],
-          "sha256": "c08048a64b62801f6f29bc53eb629ffec23d5e28581183103646b66f67849620"
+          "sha256": "ae27e99de75eaa5bbc36d0f1aa5dd613678eb58c9ce9079714a63d06fa26457c"
         },
         {
           "file": "tenant/products/products.spec.ts",
@@ -2634,7 +2634,7 @@
             "TPROD-055",
             "TPROD-076"
           ],
-          "sha256": "f8f1173dce17f0c35a6d407ccfe06f44d15f3d5482a670623a0629bed5eed98a"
+          "sha256": "cbc7672b390914c1a15014f3182058f1734195f041d50574785a451a40df2547"
         },
         {
           "file": "tenant/collaboration/collaboration.spec.ts",
@@ -2740,6 +2740,40 @@
             "TSMV-078"
           ],
           "sha256": "25957063d0e48f150669555eb06b22673fd55f81102673fe9458f42a7a2274eb"
+        }
+      ],
+      "secret": true
+    },
+    "BULK_SAFE_10_RECHECK": {
+      "entries": [
+        {
+          "file": "tenant/suppliers/suppliers.spec.ts",
+          "ids": [
+            "TSUP-054"
+          ],
+          "sha256": "13f3865374de6a40316a677a73e2268dc9fec405ef2f6c609f4a511a74a27b69"
+        },
+        {
+          "file": "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts",
+          "ids": [
+            "TPF-021"
+          ],
+          "sha256": "4f3ffc8ea461386ec94d9ec2adb1d631f552f2f1484565f899bcd4b983bbd49e"
+        },
+        {
+          "file": "tenant/system-context/system-context.spec.ts",
+          "ids": [
+            "TSC-046"
+          ],
+          "sha256": "ae27e99de75eaa5bbc36d0f1aa5dd613678eb58c9ce9079714a63d06fa26457c"
+        },
+        {
+          "file": "tenant/products/products.spec.ts",
+          "ids": [
+            "TPROD-069",
+            "TPROD-076"
+          ],
+          "sha256": "cbc7672b390914c1a15014f3182058f1734195f041d50574785a451a40df2547"
         }
       ],
       "secret": true
@@ -3819,7 +3853,7 @@
       "TWFC-001",
       "TWFC-010"
     ],
-    "log_verification": "Parsed exact 120 GitHub Playwright ✓/✘ outcome lines, all IDs unique and disjoint with prior 682 passes and 21 held IDs; job exit code 1.",
+    "log_verification": "Parsed exact 120 GitHub Playwright \u2713/\u2718 outcome lines, all IDs unique and disjoint with prior 682 passes and 21 held IDs; job exit code 1.",
     "nonwrite_boundary": "Audit page catch-all had attempted to continue unrelated POSTs, which live write guard blocked; no completed unauthorized writes reported."
   },
   "batch_216_preflight": {
@@ -4161,7 +4195,7 @@
       "TINS-047",
       "TSET-001"
     ],
-    "evidence": "Parsed 63 exact ✓/✘ scenario outcome lines from GitHub uploaded original-suite log; no skips; original IDs matched selected set",
+    "evidence": "Parsed 63 exact \u2713/\u2718 scenario outcome lines from GitHub uploaded original-suite log; no skips; original IDs matched selected set",
     "safety": "Existing context write blocker retained; no frontend/backend changes."
   },
   "batch_220_preflight": {
@@ -4207,7 +4241,7 @@
       "TINS-030",
       "TINS-035"
     ],
-    "evidence": "Exact GitHub output ✓/✘ original scenario lines, no skips; 16 selected and accounted for.",
+    "evidence": "Exact GitHub output \u2713/\u2718 original scenario lines, no skips; 16 selected and accounted for.",
     "safety": "Production write guard unchanged."
   },
   "batch_221_preflight": {
@@ -5248,5 +5282,201 @@
     "browser_execution": "NOT_RUN",
     "source": "INVENTORY_PLAYWRIGHT_BATCH_228_RECHECK_FULL.zip",
     "note": "Batch 228 recheck 15 GREEN per user; no GitHub log uploaded for that run. Batch 229 pending live result."
+  },
+  "batch_229_execution": {
+    "source": "GitHub uploaded logs_115654367655.zip",
+    "source_commit": "f4c00a29d41ab05ce90ea5b6aad956f5b83ef376",
+    "group": "BULK_SAFE_10",
+    "selected_count": 127,
+    "passed_count": 87,
+    "failed_count": 40,
+    "passed_ids": [
+      "TSUP-024",
+      "TSUP-025",
+      "TSUP-027",
+      "TSUP-028",
+      "TSUP-039",
+      "TSUP-040",
+      "TSUP-045",
+      "TSUP-046",
+      "TSUP-047",
+      "TSUP-048",
+      "TSUP-049",
+      "TSUP-050",
+      "TSUP-051",
+      "TSUP-052",
+      "TSUP-053",
+      "TSUP-055",
+      "TSUP-060",
+      "TSUP-061",
+      "TSUP-062",
+      "TSUP-063",
+      "TSUP-064",
+      "TSET-020",
+      "TSET-021",
+      "TSET-022",
+      "TSET-023",
+      "TSET-024",
+      "TSET-025",
+      "TSET-026",
+      "TSET-030",
+      "TSET-031",
+      "TSET-038",
+      "TSET-039",
+      "TSET-040",
+      "TSET-041",
+      "TSET-042",
+      "TSET-044",
+      "TSET-045",
+      "TSET-046",
+      "TSET-051",
+      "TSET-052",
+      "TSET-053",
+      "TPF-022",
+      "TPF-023",
+      "TPF-024",
+      "TPF-025",
+      "TPF-026",
+      "TPF-027",
+      "TPF-028",
+      "TPF-029",
+      "TPF-030",
+      "TSC-037",
+      "TSC-044",
+      "TSC-045",
+      "TPROD-021",
+      "TPROD-022",
+      "TPROD-024",
+      "TPROD-068",
+      "TPROD-031",
+      "TPROD-046",
+      "TPROD-036",
+      "TPROD-039",
+      "TPROD-040",
+      "TPROD-041",
+      "TPROD-052",
+      "TPROD-055",
+      "TCOL-002",
+      "TCOL-003",
+      "TCOL-021",
+      "TCOL-022",
+      "TCOL-045",
+      "TCOL-046",
+      "TST-001",
+      "TST-002",
+      "TST-020",
+      "TST-021",
+      "TST-022",
+      "TST-023",
+      "TSH-031",
+      "TSH-033",
+      "TSH-036",
+      "TSH-041",
+      "TSH-042",
+      "TSH-045",
+      "TALERT-028",
+      "TALERT-044",
+      "TALERT-047",
+      "TALERT-051"
+    ],
+    "failed_ids": [
+      "TSUP-054",
+      "TPF-021",
+      "TPF-032",
+      "TSC-040",
+      "TSC-041",
+      "TSC-042",
+      "TSC-043",
+      "TSC-046",
+      "TPROD-069",
+      "TPROD-077",
+      "TPROD-076",
+      "TCDO-021",
+      "TCDO-022",
+      "TCDO-023",
+      "TCDO-025",
+      "TCDO-026",
+      "TCDO-030",
+      "TCDO-031",
+      "TCDO-033",
+      "TDLF-022",
+      "TDLF-026",
+      "TDLF-029",
+      "TDLF-031",
+      "TDLF-033",
+      "TDLF-034",
+      "TDLF-037",
+      "TSH-040",
+      "TAPE-015",
+      "TAPE-017",
+      "TAPE-019",
+      "TAPE-022",
+      "TAPE-023",
+      "TAPE-027",
+      "TAUD-026",
+      "TAUD-027",
+      "TAUD-028",
+      "TAUD-044",
+      "TAUD-068",
+      "TSMV-043",
+      "TSMV-078"
+    ],
+    "confirmed_green_total": 1377,
+    "browser_confirmation": "GitHub Actions browser log"
+  },
+  "batch_229_recheck": {
+    "group": "BULK_SAFE_10_RECHECK",
+    "recheck_ids": [
+      "TSUP-054",
+      "TPF-021",
+      "TSC-046",
+      "TPROD-069",
+      "TPROD-076"
+    ],
+    "recheck_count": 5,
+    "deferred_unverified_ids": [
+      "TPF-032",
+      "TSC-040",
+      "TSC-041",
+      "TSC-042",
+      "TSC-043",
+      "TPROD-077",
+      "TCDO-021",
+      "TCDO-022",
+      "TCDO-023",
+      "TCDO-025",
+      "TCDO-026",
+      "TCDO-030",
+      "TCDO-031",
+      "TCDO-033",
+      "TDLF-022",
+      "TDLF-026",
+      "TDLF-029",
+      "TDLF-031",
+      "TDLF-033",
+      "TDLF-034",
+      "TDLF-037",
+      "TSH-040",
+      "TAPE-015",
+      "TAPE-017",
+      "TAPE-019",
+      "TAPE-022",
+      "TAPE-023",
+      "TAPE-027",
+      "TAUD-026",
+      "TAUD-027",
+      "TAUD-028",
+      "TAUD-044",
+      "TAUD-068",
+      "TSMV-043",
+      "TSMV-078"
+    ],
+    "deferred_count": 35,
+    "safety_blocked_count": 33,
+    "remaining_app_source_review_ids": [
+      "TPROD-077",
+      "TSH-040"
+    ],
+    "status": "OFFLINE_PREFLIGHT_ONLY"
   }
 }

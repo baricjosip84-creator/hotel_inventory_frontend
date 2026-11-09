@@ -177,7 +177,7 @@ test.describe('Probabilistic Forecasting — exact-source reviews and evidence b
   await page.route(focusedSourcePattern,route=>{requested.push(new URL(route.request().url()).pathname);return fulfillJson(route,focusedResponse());});
   await page.goto(focusedUrl);
   await expect(page.getByText('Synthetic focused forecast').first()).toBeVisible();
-  expect(requested).toContain(`/decision-intelligence/probabilistic-forecasting-source/${focusedForecastId}`);
+  expect(requested).toContain(`/api/decision-intelligence/probabilistic-forecasting-source/${focusedForecastId}`);
   expect(requested).not.toContain('summary');
  });
  test('TPF-022 invalid source_action_id is not treated as a recognized exact model UUID',async({page})=>{

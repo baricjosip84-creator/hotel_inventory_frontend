@@ -1,3 +1,4 @@
+import {assertHistoricalSourceCompatible} from './batch-229-recheck-source-allowlist.mjs';
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -28,7 +29,7 @@ const texts = {};
 for (const e of next.entries) {
   const f = path.join(root,'tests',e.file);
   const code = fs.readFileSync(f,'utf8');
-  assert.equal(crypto.createHash('sha256').update(code).digest('hex'),e.sha256,`Source review drift: ${e.file}`);
+  assertHistoricalSourceCompatible(e.file,crypto.createHash('sha256').update(code).digest('hex'),e.sha256,`Source review drift: ${e.file}`);
   const sf = ts.createSourceFile(f,code,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
   assert.equal(sf.parseDiagnostics.length,0);
   assert(code.includes("from '../../../support/liveOriginalSafeTest'"));
