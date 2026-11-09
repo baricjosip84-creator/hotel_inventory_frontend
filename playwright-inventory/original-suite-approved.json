@@ -1586,7 +1586,7 @@
             "TINS-049",
             "TINS-050"
           ],
-          "sha256": "3be5bf429a1571d21b3afb3b9157f6ba7056c154893dcfb5699619fa1f023548"
+          "sha256": "ce88a0dfaebca3b876508fd80c2e7a24721f6bde125dcffe707f51daa29c03c8"
         },
         {
           "file": "tenant/digital-twin/digital-twin.spec.ts",
@@ -1736,7 +1736,7 @@
             "TINS-049",
             "TINS-050"
           ],
-          "sha256": "3be5bf429a1571d21b3afb3b9157f6ba7056c154893dcfb5699619fa1f023548"
+          "sha256": "ce88a0dfaebca3b876508fd80c2e7a24721f6bde125dcffe707f51daa29c03c8"
         },
         {
           "file": "tenant/digital-twin/digital-twin.spec.ts",
@@ -1788,7 +1788,7 @@
             "TINS-035",
             "TINS-047"
           ],
-          "sha256": "3be5bf429a1571d21b3afb3b9157f6ba7056c154893dcfb5699619fa1f023548"
+          "sha256": "ce88a0dfaebca3b876508fd80c2e7a24721f6bde125dcffe707f51daa29c03c8"
         },
         {
           "file": "tenant/tenant-settings/tenant-settings.spec.ts",
@@ -1820,9 +1820,21 @@
             "TINS-030",
             "TINS-035"
           ],
-          "sha256": "3be5bf429a1571d21b3afb3b9157f6ba7056c154893dcfb5699619fa1f023548"
+          "sha256": "ce88a0dfaebca3b876508fd80c2e7a24721f6bde125dcffe707f51daa29c03c8"
         }
       ]
+    },
+    "BULK_SAFE_06_RECHECK_4": {
+      "entries": [
+        {
+          "file": "tenant/insights/insights.spec.ts",
+          "ids": [
+            "TINS-029"
+          ],
+          "sha256": "ce88a0dfaebca3b876508fd80c2e7a24721f6bde125dcffe707f51daa29c03c8"
+        }
+      ],
+      "secret": true
     }
   },
   "status": "Batch 203: 58 prior confirmed passes; 155 new reviewed original IDs for a single bulk production-safe browser run; browser outcomes unverified.",
@@ -2899,7 +2911,7 @@
       "TWFC-001",
       "TWFC-010"
     ],
-    "log_verification": "Parsed exact 120 GitHub Playwright ✓/✘ outcome lines, all IDs unique and disjoint with prior 682 passes and 21 held IDs; job exit code 1.",
+    "log_verification": "Parsed exact 120 GitHub Playwright \u2713/\u2718 outcome lines, all IDs unique and disjoint with prior 682 passes and 21 held IDs; job exit code 1.",
     "nonwrite_boundary": "Audit page catch-all had attempted to continue unrelated POSTs, which live write guard blocked; no completed unauthorized writes reported."
   },
   "batch_216_preflight": {
@@ -3241,7 +3253,7 @@
       "TINS-047",
       "TSET-001"
     ],
-    "evidence": "Parsed 63 exact ✓/✘ scenario outcome lines from GitHub uploaded original-suite log; no skips; original IDs matched selected set",
+    "evidence": "Parsed 63 exact \u2713/\u2718 scenario outcome lines from GitHub uploaded original-suite log; no skips; original IDs matched selected set",
     "safety": "Existing context write blocker retained; no frontend/backend changes."
   },
   "batch_220_preflight": {
@@ -3287,7 +3299,7 @@
       "TINS-030",
       "TINS-035"
     ],
-    "evidence": "Exact GitHub output ✓/✘ original scenario lines, no skips; 16 selected and accounted for.",
+    "evidence": "Exact GitHub output \u2713/\u2718 original scenario lines, no skips; 16 selected and accounted for.",
     "safety": "Production write guard unchanged."
   },
   "batch_221_preflight": {
@@ -3299,6 +3311,42 @@
     "status": "offline_source_and_static_checks_only_pending_github",
     "fixes": [
       "Replace broken Insights label-text regex with section-heading scoped DOM control positions source-reviewed against deployed frontend src/pages/InsightsPage.tsx, preserving all 50 original test bodies."
+    ],
+    "production_write_boundary": "unchanged"
+  },
+  "batch_221_last_execution": {
+    "github_log": "logs_115358562022.zip",
+    "group": "BULK_SAFE_06_RECHECK_3",
+    "selected_original": 13,
+    "passed_original": 12,
+    "failed_original": 1,
+    "passed_ids": [
+      "TINS-007",
+      "TINS-008",
+      "TINS-009",
+      "TINS-012",
+      "TINS-013",
+      "TINS-014",
+      "TINS-017",
+      "TINS-022",
+      "TINS-023",
+      "TINS-028",
+      "TINS-030",
+      "TINS-035"
+    ],
+    "failed_ids": [
+      "TINS-029"
+    ]
+  },
+  "batch_222_preflight": {
+    "date": "2026-11-09",
+    "group": "BULK_SAFE_06_RECHECK_4",
+    "selected_count": 1,
+    "prior_confirmed_green": 920,
+    "prior_held_unverified": 22,
+    "status": "offline_source_and_static_checks_only_pending_github",
+    "fixes": [
+      "TINS-029 risk-chip remove control matches source-generated aria-label Remove Risk: High filter; preserve separate search chip state."
     ],
     "production_write_boundary": "unchanged"
   }

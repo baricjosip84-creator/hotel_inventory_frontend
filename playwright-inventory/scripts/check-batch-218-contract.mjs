@@ -30,7 +30,7 @@ assert.deepEqual(selected,b.selected_ids);
 assert.equal(selected.length,120);
 assert.equal(new Set(selected).size,120);
 assert.equal(new Set([...selected,...b.confirmed_green_ids,...b.held_unverified_ids]).size,943);
-const previouslyApproved = new Set(Object.entries(manifest.approved_groups).filter(([group])=>group!=='BULK_SAFE_06' && group!=='BULK_SAFE_06_RECHECK' && group!=='BULK_SAFE_06_RECHECK_2' && group!=='BULK_SAFE_06_RECHECK_3').flatMap(([,g])=>(g.entries??[{ids:g.ids}]).flatMap(e=>e.ids)));
+const previouslyApproved = new Set(Object.entries(manifest.approved_groups).filter(([group])=>group!=='BULK_SAFE_06' && group!=='BULK_SAFE_06_RECHECK' && group!=='BULK_SAFE_06_RECHECK_2' && group!=='BULK_SAFE_06_RECHECK_3' && group!=='BULK_SAFE_06_RECHECK_4').flatMap(([,g])=>(g.entries??[{ids:g.ids}]).flatMap(e=>e.ids)));
 assert(selected.every(id=>!previouslyApproved.has(id)), 'Previously approved original scenario repeated');
 const expectedPrefix = new Map([['tenant/insights/insights.spec.ts','TINS'],['tenant/digital-twin/digital-twin.spec.ts','TDT'],['tenant/decision-learning-feedback/decision-learning-feedback.spec.ts','TDLF'],['tenant/tenant-settings/tenant-settings.spec.ts','TSET']]);
 for(const e of group.entries){

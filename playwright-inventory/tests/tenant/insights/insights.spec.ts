@@ -384,7 +384,7 @@ const manyReorders = Array.from({ length: 9 }, (_, i) => ({ ...reorderRow, produ
     await supplierControl(page, 'Search suppliers').fill('Synthetic');
     const chipBar = page.getByLabel('Active supplier performance filters');
     await expect(chipBar.getByRole('button', { name: /^Remove .* filter$/ })).toHaveCount(2);
-    await chipBar.getByRole('button', { name: /Remove .*High risk.* filter/ }).click();
+    await chipBar.getByRole('button', { name: /^Remove Risk: High filter$/ }).click();
     await expect(supplierControl(page, 'Risk filter')).toHaveValue('all');
     await expect(supplierControl(page, 'Search suppliers')).toHaveValue('Synthetic');
   });

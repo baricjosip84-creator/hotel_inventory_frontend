@@ -1,0 +1,2 @@
+scenario_id,spec,prior_gitHub_status,batch222_status
+TINS-029,tenant/insights/insights.spec.ts,FAILED: 90-second chip remove locator timeout,SELECTED FOR RERUN
