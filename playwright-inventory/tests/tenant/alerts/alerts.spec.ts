@@ -162,19 +162,26 @@ test.describe('Alerts — query, filtering, summary and navigation', () => {
   });
 
   test('TALERT-008 selected page size changes API limit and URL without inventing pagination', async ({ page }) => {
-    let sentLimit: string | null = null;
-    await page.route('**/alerts?*', route => {
-      sentLimit = new URL(route.request().url()).searchParams.get('limit');
-      return fulfillJson(route, serverFilteredAlerts(new URL(route.request().url()), syntheticAlerts));
+    // Observe API requests without shadowing the already-safe GET fixture: a broad
+    // /alerts?* route would also match frontend document navigation and can strand
+    // the address bar at /alerts instead of exercising React Router navigation.
+    const apiLimits: string[] = [];
+    page.on('request', request => {
+      if (request.method() !== 'GET' || !['xhr', 'fetch'].includes(request.resourceType())) return;
+      const url = new URL(request.url());
+      if (/\/alerts$/.test(url.pathname)) apiLimits.push(url.searchParams.get('limit') ?? '');
     });
     await filtersPanel(page).getByRole('combobox', { name:'Maximum results' }).selectOption('50');
     await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();
-    await expect(page).toHaveURL(/limit=50/);
+    await expect(page).toHaveURL(/(?:\?|&)limit=50(?:&|$)/);
+    await expect.poll(() => apiLimits.includes('50')).toBe(true);
+    await expect(filtersPanel(page).getByRole('combobox', { name:'Maximum results' })).toHaveValue('50');
     await filtersPanel(page).getByRole('combobox', { name:'Maximum results' }).selectOption('25');
     await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();
-    await expect(page).not.toHaveURL(/limit=50/);
+    await expect(page).toHaveURL(/(?:\?|&)limit=25(?:&|$)/);
+    await expect.poll(() => apiLimits.includes('25')).toBe(true);
     await expect(alertCard(page, 'pw-alert-manual')).toBeVisible();
-    expect(sentLimit).toBe('25');
+    await expect(filtersPanel(page).getByRole('combobox', { name:'Maximum results' })).toHaveValue('25');
   });
 
   test('TALERT-009 Clear filters restores default search/severity/ownership/open state', async ({ page }) => {

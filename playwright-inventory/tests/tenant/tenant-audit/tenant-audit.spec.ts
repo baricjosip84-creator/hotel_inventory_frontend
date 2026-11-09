@@ -493,6 +493,9 @@ test.describe('Tenant Audit — source-bound filter, attribution and evidence ed
     await expect.poll(() => latestList(s.calls).get('support_only')).toBe('true');
     await input.uncheck();
     await expect(input).not.toBeChecked();
+    // Audit applies draft filters after a 350ms debounce. With cached initial
+    // query data, Refresh must not run until the *applied* filter has cleared.
+    await expect(page.getByRole('button', { name: 'Reset', exact: true })).toBeDisabled();
     const readsBefore = listCalls(s.calls).length;
     await page.getByRole('button', { name: 'Refresh', exact: true }).click();
     await expect.poll(() => listCalls(s.calls).length).toBeGreaterThan(readsBefore);
@@ -501,11 +504,17 @@ test.describe('Tenant Audit — source-bound filter, attribution and evidence ed
 
   test('TAUD-058 Invalid date range marks both dates invalid with linked error text', async ({ page }) => {
     await openAudit(page);
-    await filter(page, 'From').locator('input').fill('2026-11-30');
-    await page.getByRole('textbox', { name: 'To', exact: true }).fill('2026-11-01');
+    // Match the exact visible field label. Once validation appears, the To
+    // field also contains the phrase "From date must..." and a fuzzy hasText
+    // selector for From would incorrectly match BOTH date fields.
+    const dateInput = (label: string) => page.locator('label.tenant-audit-field')
+      .filter({ has: page.getByText(label, { exact: true }) }).locator('input[type="date"]');
+    await dateInput('From').fill('2026-11-30');
+    await dateInput('To').fill('2026-11-01');
     for (const label of ['From', 'To']) {
-      await expect(page.getByRole('textbox', { name: label, exact: true })).toHaveAttribute('aria-invalid', 'true');
-      await expect(page.getByRole('textbox', { name: label, exact: true })).toHaveAttribute('aria-describedby', 'tenant-audit-date-range-error');
+      const dateField = dateInput(label);
+      await expect(dateField).toHaveAttribute('aria-invalid', 'true');
+      await expect(dateField).toHaveAttribute('aria-describedby', 'tenant-audit-date-range-error');
     }
     await expect(page.locator('#tenant-audit-date-range-error')).toContainText('From date must be before or equal to To date.');
   });
@@ -517,11 +526,13 @@ test.describe('Tenant Audit — source-bound filter, attribution and evidence ed
     await expect.poll(() => latestList(s.calls).get('search')).toBe('Synthetic');
     await search.fill('  ');
     await expect(search).toHaveValue('  ');
+    // Wait for the debounced applied state, not only the immediately cleared UI.
+    await expect(page.getByRole('button', { name: 'Reset', exact: true })).toBeDisabled();
+    await expect(page.locator('.tenant-audit-filter-pending')).toHaveCount(0);
     const readsBefore = listCalls(s.calls).length;
     await page.getByRole('button', { name: 'Refresh', exact: true }).click();
     await expect.poll(() => listCalls(s.calls).length).toBeGreaterThan(readsBefore);
     await expect.poll(() => latestList(s.calls).has('search')).toBe(false);
-    await expect(page.locator('.tenant-audit-filter-pending')).toHaveCount(0);
   });
 
   test('TAUD-060 Exact action fallback trims pasted code before sending list query', async ({ page }) => {

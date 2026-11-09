@@ -1,0 +1,5 @@
+test_id,source_spec,prior_outcome
+TAUD-057,tenant/tenant-audit/tenant-audit.spec.ts,FAIL B224
+TAUD-058,tenant/tenant-audit/tenant-audit.spec.ts,FAIL B224
+TAUD-059,tenant/tenant-audit/tenant-audit.spec.ts,FAIL B224
+TALERT-008,tenant/alerts/alerts.spec.ts,FAIL B224

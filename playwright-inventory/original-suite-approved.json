@@ -1098,7 +1098,7 @@
             "TALERT-073",
             "TALERT-074"
           ],
-          "sha256": "a39c8d6af4dc06d3096ea527b09c2b2a7e32ef6afcfa2a440866d3fc171ba100"
+          "sha256": "2af12d3306161273820d0fac2a7027083b5192eef5d0e903ac40127600850664"
         },
         {
           "file": "tenant/system-context/system-context.spec.ts",
@@ -1205,7 +1205,7 @@
             "TALERT-073",
             "TALERT-074"
           ],
-          "sha256": "a39c8d6af4dc06d3096ea527b09c2b2a7e32ef6afcfa2a440866d3fc171ba100"
+          "sha256": "2af12d3306161273820d0fac2a7027083b5192eef5d0e903ac40127600850664"
         },
         {
           "file": "tenant/system-context/system-context.spec.ts",
@@ -1289,7 +1289,7 @@
           "ids": [
             "TALERT-001"
           ],
-          "sha256": "a39c8d6af4dc06d3096ea527b09c2b2a7e32ef6afcfa2a440866d3fc171ba100"
+          "sha256": "2af12d3306161273820d0fac2a7027083b5192eef5d0e903ac40127600850664"
         },
         {
           "file": "tenant/system-context/system-context.spec.ts",
@@ -1448,7 +1448,7 @@
             "TAUD-019",
             "TAUD-020"
           ],
-          "sha256": "c6e65b9e6e7e5734640c72edd8965e8ef0c9cbd6a49f4580ed4387b20097cdad"
+          "sha256": "f33f79613fe8041b84e5af95ae4df46b8f5ca09e1749ed1c37827b257ed818b5"
         }
       ],
       "secret": true,
@@ -1501,7 +1501,7 @@
             "TAUD-019",
             "TAUD-020"
           ],
-          "sha256": "c6e65b9e6e7e5734640c72edd8965e8ef0c9cbd6a49f4580ed4387b20097cdad"
+          "sha256": "f33f79613fe8041b84e5af95ae4df46b8f5ca09e1749ed1c37827b257ed818b5"
         },
         {
           "file": "tenant/workflow-composer/workflow-composer.spec.ts",
@@ -1525,7 +1525,7 @@
             "TAUD-015",
             "TAUD-017"
           ],
-          "sha256": "c6e65b9e6e7e5734640c72edd8965e8ef0c9cbd6a49f4580ed4387b20097cdad"
+          "sha256": "f33f79613fe8041b84e5af95ae4df46b8f5ca09e1749ed1c37827b257ed818b5"
         }
       ],
       "secret": true,
@@ -1989,7 +1989,7 @@
             "TAUD-070",
             "TAUD-071"
           ],
-          "sha256": "c6e65b9e6e7e5734640c72edd8965e8ef0c9cbd6a49f4580ed4387b20097cdad"
+          "sha256": "f33f79613fe8041b84e5af95ae4df46b8f5ca09e1749ed1c37827b257ed818b5"
         },
         {
           "file": "tenant/alerts/alerts.spec.ts",
@@ -2020,7 +2020,7 @@
             "TALERT-087",
             "TALERT-088"
           ],
-          "sha256": "a39c8d6af4dc06d3096ea527b09c2b2a7e32ef6afcfa2a440866d3fc171ba100"
+          "sha256": "2af12d3306161273820d0fac2a7027083b5192eef5d0e903ac40127600850664"
         }
       ],
       "secret": true
@@ -2068,14 +2068,35 @@
             "TAUD-058",
             "TAUD-059"
           ],
-          "sha256": "c6e65b9e6e7e5734640c72edd8965e8ef0c9cbd6a49f4580ed4387b20097cdad"
+          "sha256": "f33f79613fe8041b84e5af95ae4df46b8f5ca09e1749ed1c37827b257ed818b5"
         },
         {
           "file": "tenant/alerts/alerts.spec.ts",
           "ids": [
             "TALERT-008"
           ],
-          "sha256": "a39c8d6af4dc06d3096ea527b09c2b2a7e32ef6afcfa2a440866d3fc171ba100"
+          "sha256": "2af12d3306161273820d0fac2a7027083b5192eef5d0e903ac40127600850664"
+        }
+      ],
+      "secret": true
+    },
+    "BULK_SAFE_07_RECHECK_2": {
+      "entries": [
+        {
+          "file": "tenant/tenant-audit/tenant-audit.spec.ts",
+          "ids": [
+            "TAUD-057",
+            "TAUD-058",
+            "TAUD-059"
+          ],
+          "sha256": "f33f79613fe8041b84e5af95ae4df46b8f5ca09e1749ed1c37827b257ed818b5"
+        },
+        {
+          "file": "tenant/alerts/alerts.spec.ts",
+          "ids": [
+            "TALERT-008"
+          ],
+          "sha256": "2af12d3306161273820d0fac2a7027083b5192eef5d0e903ac40127600850664"
         }
       ],
       "secret": true
@@ -3798,5 +3819,53 @@
     "status": "offline_checks_only_pending_github",
     "network_safety": "existing production write guard maintained",
     "source_changes": "exactly 26 failed scenarios and shared read-only audit/login helpers; 134 prior winning original test bodies unchanged"
+  },
+  "batch_224_last_execution": {
+    "github_log": "logs_115399718557.zip",
+    "group": "BULK_SAFE_07_RECHECK",
+    "selected_original": 26,
+    "passed_original": 22,
+    "failed_original": 4,
+    "passed_ids": [
+      "TAPE-012",
+      "TAPE-028",
+      "TAPE-032",
+      "TAPE-044",
+      "TPF-008",
+      "TPF-019",
+      "TPF-020",
+      "TPF-031",
+      "TPF-033",
+      "TPF-034",
+      "TPF-035",
+      "TPF-036",
+      "TPF-037",
+      "TAUD-034",
+      "TAUD-035",
+      "TAUD-036",
+      "TAUD-037",
+      "TAUD-038",
+      "TAUD-045",
+      "TAUD-046",
+      "TAUD-047",
+      "TAUD-055"
+    ],
+    "failed_ids": [
+      "TALERT-008",
+      "TAUD-057",
+      "TAUD-058",
+      "TAUD-059"
+    ],
+    "notes": "GitHub list reporter: 22 PASS and 4 FAIL; expected assertions analyzed against current public frontend source."
+  },
+  "batch_225_preflight": {
+    "source": "INVENTORY_PLAYWRIGHT_BATCH_224_FULL.zip",
+    "prior_confirmed_green": 1077,
+    "prior_held_unverified": 22,
+    "selected_count": 4,
+    "group": "BULK_SAFE_07_RECHECK_2",
+    "status": "offline_checks_only_pending_github",
+    "network_safety": "strict production write guard preserved; alerts API requests observed without route override",
+    "source_changes": "exactly 4 previously failing test bodies across 2 specs; all 22 B224 successful test bodies are byte-identical"
   }
 }

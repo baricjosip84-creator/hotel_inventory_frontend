@@ -2210,8 +2210,8 @@
   "spec_sha256": {
     "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts": "e2ccaf15f553be36c11ef00161cc3a9aede0093a2ca8e93fc577d5cb7730e7c8",
     "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts": "d37ce933ad44c71f5266e14f951bf65449d73076ff3bd2dd7031ff5f71bebc6b",
-    "tenant/tenant-audit/tenant-audit.spec.ts": "c6e65b9e6e7e5734640c72edd8965e8ef0c9cbd6a49f4580ed4387b20097cdad",
-    "tenant/alerts/alerts.spec.ts": "a39c8d6af4dc06d3096ea527b09c2b2a7e32ef6afcfa2a440866d3fc171ba100"
+    "tenant/tenant-audit/tenant-audit.spec.ts": "f33f79613fe8041b84e5af95ae4df46b8f5ca09e1749ed1c37827b257ed818b5",
+    "tenant/alerts/alerts.spec.ts": "2af12d3306161273820d0fac2a7027083b5192eef5d0e903ac40127600850664"
   },
   "previous_spec_sha256": {
     "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts": "b85b2b0a9168a7cd20df92e8baa65dec84b27fcd605d292e006681fd2fc0ca59",
