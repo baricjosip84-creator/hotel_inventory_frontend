@@ -78,8 +78,8 @@ for (const [bulkName, bulkIds] of bulkGroups) {
         new Set(['BULK_SAFE_08','BULK_SAFE_08_RECHECK']).has(bulkName)) ||
        (new Set(['BULK_SAFE_09','BULK_SAFE_09_RECHECK']).has(name) &&
         new Set(['BULK_SAFE_09','BULK_SAFE_09_RECHECK']).has(bulkName)) ||
-       (new Set(['BULK_SAFE_10','BULK_SAFE_10_RECHECK']).has(name) &&
-        new Set(['BULK_SAFE_10','BULK_SAFE_10_RECHECK']).has(bulkName)))
+       (new Set(['BULK_SAFE_10','BULK_SAFE_10_RECHECK','BULK_SAFE_10_RECHECK_2']).has(name) &&
+        new Set(['BULK_SAFE_10','BULK_SAFE_10_RECHECK','BULK_SAFE_10_RECHECK_2']).has(bulkName)))
     )).flatMap(([,ids])=>[...ids]));
   for (const id of bulkIds) assert(!otherIds.has(id), `Bulk cannot reuse another group's ID: ${bulkName}/${id}`);
 }

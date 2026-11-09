@@ -1,0 +1,10 @@
+{
+  "tenant/suppliers/suppliers.spec.ts": {
+    "prior_recheck_sha256": "13f3865374de6a40316a677a73e2268dc9fec405ef2f6c609f4a511a74a27b69",
+    "second_recheck_sha256": "bf050619db06abe2f5fe4fa4c5b283d96ecc6043c42e1308063839668e41320b"
+  },
+  "tenant/products/products.spec.ts": {
+    "prior_recheck_sha256": "cbc7672b390914c1a15014f3182058f1734195f041d50574785a451a40df2547",
+    "second_recheck_sha256": "a4846d792f16e33d3ea288ba43e7f46776fb4d8df81ca8e3b79ff775187b9d2f"
+  }
+}

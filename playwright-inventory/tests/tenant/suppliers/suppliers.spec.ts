@@ -632,11 +632,16 @@ test.describe('Suppliers — source-backed directory, form and delivery boundari
   });
 
   test('TSUP-054 supplier name-prefix matches sort ahead of name-substring matches', async ({ page }) => {
-    // Match only supplier JSON reads; the /suppliers document must load normally.
-    await page.route(request => request.method() === 'GET'
-      && ['fetch', 'xhr'].includes(request.resourceType())
-      && new URL(request.url()).pathname.endsWith('/suppliers'),
-      route => fulfillJson(route, [syntheticSuppliers[0], { ...syntheticSuppliers[1], name: 'Harborline Wholesale' }]));
+    // The glob catches both HTML navigation and the supplier JSON endpoint.
+    // Only fulfill GET fetch/XHR. Delegate navigation to the original guarded route.
+    await page.route('**/suppliers', route => {
+      const request = route.request();
+      if (request.method() === 'GET' && ['fetch', 'xhr'].includes(request.resourceType())) {
+        return fulfillJson(route, [syntheticSuppliers[0], { ...syntheticSuppliers[1], name: 'Harborline Wholesale' }]);
+      }
+      if (request.method() === 'GET') return route.fallback();
+      return route.abort();
+    });
     await page.reload();
     await page.locator('#supplier-search').fill('Harbor');
     await expect(directory(page).locator('tbody tr').first()).toContainText('Harborline Wholesale');

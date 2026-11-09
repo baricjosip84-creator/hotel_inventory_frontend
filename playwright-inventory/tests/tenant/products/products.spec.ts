@@ -1120,7 +1120,13 @@ test.describe('Products — cost controls reporting and governance review eviden
       reads += 1;
       return fulfillJson(route, costFixtures['cost-governance-summary']);
     });
-    const button = page.getByRole('button', { name: 'Refresh Governance' });
+    // The panel has exactly one header action; locate it by panel structure,
+    // not the translated text (the tenant locale can change on live Vercel).
+    const governancePanel = page.locator('section').filter({
+      has: page.getByText('Stocked products with cost basis', { exact: true })
+    }).first();
+    const button = governancePanel.locator(':scope > div').first().getByRole('button').first();
+    await expect(button).toBeVisible();
     await expect(button).toBeEnabled();
     await button.click();
     await expect.poll(() => reads).toBeGreaterThanOrEqual(1);

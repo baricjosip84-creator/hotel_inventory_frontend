@@ -1,0 +1,3 @@
+test_id,original_spec,reason
+TSUP-054,tenant/suppliers/suppliers.spec.ts,Correct Playwright page.route request inspection
+TPROD-076,tenant/products/products.spec.ts,Governance header control located structurally independent of translation

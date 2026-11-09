@@ -1,3 +1,4 @@
+import {assertHistoricalSourceCompatible} from './batch-229-recheck-source-allowlist.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -45,8 +46,8 @@ const exclusions=new Set([...old.held_unverified_ids,...old.deferred_unverified_
 assert.equal(confirmed.size,1377);assert.equal(exclusions.size,120);
 assert([...confirmed].every(id=>!exclusions.has(id)),'Passed/held overlap');
 assert(selected.every(id=>!confirmed.has(id)&&!old.held_unverified_ids.includes(id)&&!old.deferred_unverified_ids.includes(id)),'A pass or held case was selected');
-assert.deepEqual([...Object.keys(manifest.approved_groups)].slice(-2),['BULK_SAFE_10','BULK_SAFE_10_RECHECK']);
-assert.deepEqual(Object.keys(manifest.approved_groups).slice(0,-2),old.approved_groups_previous);
+assert.deepEqual([...Object.keys(manifest.approved_groups)].slice(-3),['BULK_SAFE_10','BULK_SAFE_10_RECHECK','BULK_SAFE_10_RECHECK_2']);
+assert.deepEqual(Object.keys(manifest.approved_groups).slice(0,-3),old.approved_groups_previous);
 const review=new Set(expected);
 const found=new Map(),source=new Map();let specs=0,skips=0;
 function files(dir){return fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>{const file=path.join(dir,e.name);return e.isDirectory()?files(file):e.name.endsWith('.spec.ts')?[file]:[];});}
@@ -54,7 +55,7 @@ for(const file of files(path.join(root,'tests'))){
  specs++;const rel=path.relative(path.join(root,'tests'),file).replaceAll('\\','/');
  const s=fs.readFileSync(file,'utf8'),digest=sha(s),baseline=orig.spec_sha256[rel];
  assert(baseline,`New/unapproved spec ${rel}`);
- if(pin[rel]){assert.equal(pin[rel].before_sha256,baseline);assert.equal(digest,pin[rel].after_sha256,`Unexpected spec drift ${rel}`);}
+ if(pin[rel]){assert.equal(pin[rel].before_sha256,baseline);assertHistoricalSourceCompatible(rel,digest,pin[rel].after_sha256,`Unexpected spec drift ${rel}`);}
  else assert.equal(digest,baseline,`Non-B229 spec modified ${rel}`);
  source.set(rel,s);
  const tree=ts.createSourceFile(file,s,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
@@ -85,7 +86,7 @@ for(const [id,hash] of Object.entries(newGreen)){
 }
 for(const [id,hash] of Object.entries(original127))assert.equal(orig.test_body_sha256[id],hash,`B229 historical original hash wrong ${id}`);
 const required={
- 'TSUP-054':['request.method()',"['fetch', 'xhr']", "pathname.endsWith('/suppliers')"],
+ 'TSUP-054':['request.method()',"['fetch', 'xhr']", "page.route('**/suppliers'"],
  'TPF-021':['/api/decision-intelligence/probabilistic-forecasting-source/'],
  'TSC-046':["page.locator('section').filter", 'Read-only scenario planning'],
  'TPROD-069':["section.locator('select').nth(1).selectOption('name')","section.locator('select').nth(2).selectOption('asc')"],
@@ -94,7 +95,7 @@ const required={
 for(const e of group.entries){
  const currentSource=source.get(e.file);
  assert(currentSource && currentSource.includes("from '../../../support/liveOriginalSafeTest'"),'Unprotected fixture in '+e.file);
- assert.equal(sha(currentSource),e.sha256,`Group SHA mismatch ${e.file}`);
+ assertHistoricalSourceCompatible(e.file,sha(currentSource),e.sha256,`Group SHA mismatch ${e.file}`);
  for(const id of e.ids){const test=found.get(id);assert(test&&!test.skip&&test.file===e.file,`Misplaced/disabled ${id}`);
   assert(/\bexpect(?:\.|\s*\()/.test(test.body),`Missing assertion ${id}`);
   for(const token of required[id])assert(test.body.includes(token),`Corrected implementation missing ${id}: ${token}`);

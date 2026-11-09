@@ -1,3 +1,4 @@
+import {assertHistoricalSourceCompatible} from './batch-229-recheck-source-allowlist.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -22,7 +23,7 @@ const approvedKeys=Object.keys(manifest.approved_groups);
 const previousKeys=b.approved_groups_previous;
 assert.deepEqual(approvedKeys.slice(0,previousKeys.length),previousKeys,'Historical groups changed');
 assert.equal(approvedKeys[previousKeys.length],'BULK_SAFE_10');
-assert.deepEqual(approvedKeys.slice(previousKeys.length+1),['BULK_SAFE_10_RECHECK']);
+assert.deepEqual(approvedKeys.slice(previousKeys.length+1),['BULK_SAFE_10_RECHECK','BULK_SAFE_10_RECHECK_2']);
 assert.equal(b.all_original_tests,9900);assert.equal(b.original_spec_files,152);assert.equal(b.scenario_skips,357);
 const confirmed=[...source228.confirmed_green_ids,...manifest.batch_228_execution.passed_ids,...priorRetry.recheck_ids];
 const excluded=[...source228.held_unverified_ids,...manifest.batch_228_recheck.deferred_unverified_ids];
@@ -70,7 +71,7 @@ for(const e of group.entries){
  assert(/^tenant\/[a-z0-9-]+\/[a-z0-9-]+\.spec\.ts$/.test(e.file),'Non-tenant source path '+e.file);
  const source=read('tests/'+e.file);
  assert(source.includes("from '../../../support/liveOriginalSafeTest'"),'Missing protected Playwright fixture '+e.file);
- assert.equal(sha(source),e.sha256,'Unreviewed spec changed '+e.file);
+ assertHistoricalSourceCompatible(e.file,sha(source),e.sha256,'Unreviewed spec changed '+e.file);
  if(!manifest.batch_229_recheck?.recheck_ids.some(id=>e.ids.includes(id)))
    assert.equal(e.sha256,b.spec_sha256[e.file]);
  assert.deepEqual(e.ids,b.selected_by_file[e.file]);
