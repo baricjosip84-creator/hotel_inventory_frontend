@@ -1,0 +1,148 @@
+original_test_id,source_spec,reviewed_title
+TRSV-001,tenant/inventory-reservations/inventory-reservations.spec.ts,Reservation operations hero and separate queue render
+TRSV-002,tenant/inventory-reservations/inventory-reservations.spec.ts,"Overview loads options, summary, source demand, projected stock and conflicts separately"
+TRSV-003,tenant/inventory-reservations/inventory-reservations.spec.ts,"Summary shows source-backed open reservations, drafts and open protected units"
+TRSV-004,tenant/inventory-reservations/inventory-reservations.spec.ts,"Workspace tabs expose overview, creation, queue and capacity destinations"
+TRSV-005,tenant/inventory-reservations/inventory-reservations.spec.ts,Empty queue shows source-defined no-matches guidance
+TRSV-006,tenant/inventory-reservations/inventory-reservations.spec.ts,Status filter requests draft reservations by backend status code
+TRSV-007,tenant/inventory-reservations/inventory-reservations.spec.ts,Source type filter sends requisition to list and demand-summary queries
+TRSV-008,tenant/inventory-reservations/inventory-reservations.spec.ts,Source ID filter trims spaces before list GET
+TRSV-009,tenant/inventory-reservations/inventory-reservations.spec.ts,Requesting department filter trims user input
+TRSV-010,tenant/inventory-reservations/inventory-reservations.spec.ts,Target department filter is passed into server query
+TRSV-011,tenant/inventory-reservations/inventory-reservations.spec.ts,Urgent priority filter uses explicit priority code
+TRSV-012,tenant/inventory-reservations/inventory-reservations.spec.ts,Product filter uses actual selected product ID
+TRSV-013,tenant/inventory-reservations/inventory-reservations.spec.ts,"Free text search trims before list GET, preserving text content"
+TRSV-014,tenant/inventory-reservations/inventory-reservations.spec.ts,Clear filters returns select to All and removes search query
+TRSV-015,tenant/inventory-reservations/inventory-reservations.spec.ts,Initial queue GET uses limit page size plus one and offset zero
+TRSV-016,tenant/inventory-reservations/inventory-reservations.spec.ts,Setting page size 50 requests 51 rows for next-page detection
+TRSV-017,tenant/inventory-reservations/inventory-reservations.spec.ts,Next page advances offset 25 when a 26th row exists
+TRSV-018,tenant/inventory-reservations/inventory-reservations.spec.ts,Selected reservation deep link separately loads detail and audit records
+TRSV-019,tenant/inventory-reservations/inventory-reservations.spec.ts,Projected free stock uses independent source rows and capacity table
+TRSV-020,tenant/inventory-reservations/inventory-reservations.spec.ts,Linked source requires a correctly formed UUID before draft creation
+TRSV-021,tenant/inventory-reservations/inventory-reservations.spec.ts,Blank reservation line disables draft submission and explains missing product and quantity
+TRSV-022,tenant/inventory-reservations/inventory-reservations.spec.ts,Entered zero and negative reservation quantities are rejected before POST
+TRSV-023,tenant/inventory-reservations/inventory-reservations.spec.ts,Valid event-source UUID removes linked-source validation error
+TRSV-024,tenant/inventory-reservations/inventory-reservations.spec.ts,Repeated same-product strategy and location lines are rejected
+TRSV-025,tenant/inventory-reservations/inventory-reservations.spec.ts,Specific-location allocation demands a selected storage location
+TRSV-028,tenant/inventory-reservations/inventory-reservations.spec.ts,Protected requisition draft does not expose manual edit action
+TRSV-033,tenant/inventory-reservations/inventory-reservations.spec.ts,Future expiration timestamp prevents manual Expire action
+TRSV-037,tenant/inventory-reservations/inventory-reservations.spec.ts,Quantity above open reserved is rejected locally
+TRSV-038,tenant/inventory-reservations/inventory-reservations.spec.ts,Allocation conflicts show actual reason and conflict magnitude
+TRSV-041,tenant/inventory-reservations/inventory-reservations.spec.ts,Source summary displays grouped requested and open-reserved totals
+TRSV-042,tenant/inventory-reservations/inventory-reservations.spec.ts,Product filter narrows projected-free-stock endpoint without losing limit
+TRSV-043,tenant/inventory-reservations/inventory-reservations.spec.ts,CSV export GET retains active source and status filters
+TRSV-044,tenant/inventory-reservations/inventory-reservations.spec.ts,Audit metadata expands only on explicit details disclosure
+TRSV-048,tenant/inventory-reservations/inventory-reservations.spec.ts,GET queue failure shows error and preserves applied status filter
+TRSV-049,tenant/inventory-reservations/inventory-reservations.spec.ts,No due reservations disables tenant-wide expiry action
+TRSV-050,tenant/inventory-reservations/inventory-reservations.spec.ts,Outbound-managed reservation hides manual lifecycle buttons
+TIR-001,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Requisition operations workspace renders its actual hero
+TIR-002,tenant/inventory-requisitions/inventory-requisitions.spec.ts,"Page independently loads summary, options, and requisitions queue"
+TIR-003,tenant/inventory-requisitions/inventory-requisitions.spec.ts,"KPI cards show source-defined open, remaining and action metrics"
+TIR-004,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Empty queue shows filter-aware guidance rather than a placeholder record
+TIR-005,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Queue search trims whitespace before GET search parameter
+TIR-006,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Status filter sends submitted code to queue endpoint
+TIR-007,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Product filter uses server product_id field
+TIR-008,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Advanced filter panel can be revealed and hidden without a mutation
+TIR-009,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Priority filter sends urgent as backend priority
+TIR-010,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Due state filter sends overdue code
+TIR-011,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Fulfillment state filter sends partially fulfilled code
+TIR-012,tenant/inventory-requisitions/inventory-requisitions.spec.ts,SLA filter sends approval breach code
+TIR-013,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Approval threshold level uses explicit executive_value filter
+TIR-014,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Department filter trims value and uses requesting_department
+TIR-015,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Inverted threshold gap filter prevents invalid queue fetch
+TIR-016,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Inverted needed-by dates give validation error before GET
+TIR-017,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Clear filters removes status and search from a new request
+TIR-018,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Default queue GET reserves one extra row for next-page detection
+TIR-019,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Changing queue page size to 50 requests 51 records
+TIR-020,tenant/inventory-requisitions/inventory-requisitions.spec.ts,"Requisition deep link fetches detail, activity, and fulfillment history"
+TIR-021,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Create draft is blocked until department and product line supplied
+TIR-022,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Zero quantity keeps the requisition save disabled
+TIR-026,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Editable draft exposes its edit form only in permitted ownership context
+TIR-029,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Governed approval disabled until workflow explanation satisfies minimum
+TIR-037,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Partially fulfilled detail keeps remaining quantity and fulfillment history visible
+TIR-038,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Bulk checkbox is disabled for drafts and enabled for approved queue rows
+TIR-042,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Activity timeline renders source audit metadata from its separate endpoint
+TIR-043,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Linked reservation is shown with actual status and navigation action
+TIR-047,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Filtered queue export retrieves independent rows with current status
+TIR-048,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Queue next page sends offset equal to displayed page size
+TIR-049,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Queue error is rendered and chosen status filter remains selected
+TIR-050,tenant/inventory-requisitions/inventory-requisitions.spec.ts,Clear filters resets threshold range and department without changing permissions
+TEXR-001,tenant/execution-requests/execution-requests.spec.ts,Registry heading explains approval does not execute a change
+TEXR-002,tenant/execution-requests/execution-requests.spec.ts,Initial registry requests bounded 25-row first page
+TEXR-003,tenant/execution-requests/execution-requests.spec.ts,Four request metadata sources load separately
+TEXR-004,tenant/execution-requests/execution-requests.spec.ts,Empty registry shows explicit no-match state
+TEXR-005,tenant/execution-requests/execution-requests.spec.ts,Registry GET failure displays error rather than rows
+TEXR-006,tenant/execution-requests/execution-requests.spec.ts,Optional creation options failing leaves registry usable and warns
+TEXR-007,tenant/execution-requests/execution-requests.spec.ts,Optional adapter registry failing does not hide request rows
+TEXR-008,tenant/execution-requests/execution-requests.spec.ts,Optional safeguards failing preserves safe warning on queue
+TEXR-009,tenant/execution-requests/execution-requests.spec.ts,Tabs navigate between create queue and safeguards sections
+TEXR-010,tenant/execution-requests/execution-requests.spec.ts,Workflow status filter sends pending_review query and resets offset
+TEXR-011,tenant/execution-requests/execution-requests.spec.ts,Request-type filter sends product_min_stock_update
+TEXR-012,tenant/execution-requests/execution-requests.spec.ts,Execution-outcome filter sends failed status separately
+TEXR-013,tenant/execution-requests/execution-requests.spec.ts,Search trims outer whitespace before query
+TEXR-014,tenant/execution-requests/execution-requests.spec.ts,Changing row size requests 50 and resets to first page
+TEXR-015,tenant/execution-requests/execution-requests.spec.ts,Next and Previous buttons request correct offsets
+TEXR-016,tenant/execution-requests/execution-requests.spec.ts,Clear filters resets status and keyword to the default query
+TEXR-017,tenant/execution-requests/execution-requests.spec.ts,Opening registry row presents selected request detail
+TEXR-018,tenant/execution-requests/execution-requests.spec.ts,URL request_id deep-link fetches selected record
+TEXR-020,tenant/execution-requests/execution-requests.spec.ts,Create form blocks submit until product and numeric value supplied
+TEXR-021,tenant/execution-requests/execution-requests.spec.ts,"Standard-cost draft POST carries product, number, source and controlled type"
+TEXR-023,tenant/execution-requests/execution-requests.spec.ts,Negative standard cost is rejected client-side without POST
+TEXR-026,tenant/execution-requests/execution-requests.spec.ts,No active product choices disables product selection and draft creation
+TEXR-037,tenant/execution-requests/execution-requests.spec.ts,Separation-of-duties review blocker disables review buttons
+TEXR-038,tenant/execution-requests/execution-requests.spec.ts,"Approved product change without products.write exposes permission gate, no execute action"
+TEXR-045,tenant/execution-requests/execution-requests.spec.ts,Workflow timeline shows known actor and event label without exposing raw snapshots
+TEXR-046,tenant/execution-requests/execution-requests.spec.ts,Audit-pack endpoint loads only after selecting its control
+TEXR-047,tenant/execution-requests/execution-requests.spec.ts,Security review is fetched lazily and independently from audit pack
+TEXR-048,tenant/execution-requests/execution-requests.spec.ts,Execution before/after review requires deliberate lazy load
+TEXR-049,tenant/execution-requests/execution-requests.spec.ts,CSV export uses 100-row pages with matching filters and downloads CSV
+TIU-001,tenant/inventory-usage/inventory-usage.spec.ts,Usage workspace displays source-defined KPI labels
+TIU-002,tenant/inventory-usage/inventory-usage.spec.ts,Usage loads summary and log listing through separate endpoints
+TIU-003,tenant/inventory-usage/inventory-usage.spec.ts,Overview is initially selected with operational filters visible
+TIU-004,tenant/inventory-usage/inventory-usage.spec.ts,Refresh page re-requests usage summary and ledger evidence
+TIU-005,tenant/inventory-usage/inventory-usage.spec.ts,Empty usage disables filtered CSV export
+TIU-006,tenant/inventory-usage/inventory-usage.spec.ts,Product filter sends product_id to usage summary
+TIU-007,tenant/inventory-usage/inventory-usage.spec.ts,Location filter sends storage_location_id
+TIU-008,tenant/inventory-usage/inventory-usage.spec.ts,Reason filter uses the backend consumption_reason key
+TIU-009,tenant/inventory-usage/inventory-usage.spec.ts,Department filter trims its value in GET query
+TIU-010,tenant/inventory-usage/inventory-usage.spec.ts,Include reversed usage changes summary request flag
+TIU-011,tenant/inventory-usage/inventory-usage.spec.ts,Invalid inverted dates display message and stop summary requests
+TIU-012,tenant/inventory-usage/inventory-usage.spec.ts,Same-day date range includes the entire selected calendar day
+TIU-013,tenant/inventory-usage/inventory-usage.spec.ts,"Reset filters clears product, reason and reversed flag"
+TIU-014,tenant/inventory-usage/inventory-usage.spec.ts,Ledger view renders filtered empty-state explanation
+TIU-015,tenant/inventory-usage/inventory-usage.spec.ts,Ledger page size 50 changes GET limit
+TIU-016,tenant/inventory-usage/inventory-usage.spec.ts,Ledger page size 100 changes GET limit
+TIU-017,tenant/inventory-usage/inventory-usage.spec.ts,Ledger next page queries offset 25 for the next page
+TIU-018,tenant/inventory-usage/inventory-usage.spec.ts,Ledger page resets when a filter changes
+TIU-019,tenant/inventory-usage/inventory-usage.spec.ts,Templates tab shows empty template guidance without a mutation
+TIU-020,tenant/inventory-usage/inventory-usage.spec.ts,Templates have a dedicated workspace and separate saved-template heading
+TIU-029,tenant/inventory-usage/inventory-usage.spec.ts,"Editing a saved template loads product, location and quantity"
+TIU-032,tenant/inventory-usage/inventory-usage.spec.ts,Loading template into bulk recorder keeps its line and shared department
+TIU-033,tenant/inventory-usage/inventory-usage.spec.ts,Scheduled templates expose due and blocked summary without running
+TIU-037,tenant/inventory-usage/inventory-usage.spec.ts,Details requests a single selected record without mutating ledger rows
+TIU-041,tenant/inventory-usage/inventory-usage.spec.ts,Period-close history moves by 100 records via offset query
+TIU-043,tenant/inventory-usage/inventory-usage.spec.ts,Usage stock-impact panel disables export when there are no rows
+TIU-044,tenant/inventory-usage/inventory-usage.spec.ts,Anomaly watch exposes spike guidance but disables CSV for empty results
+TIU-045,tenant/inventory-usage/inventory-usage.spec.ts,Governance exceptions include count and explicit manual-review actions
+TIU-046,tenant/inventory-usage/inventory-usage.spec.ts,"Overview exposes product, reason, department, location and user breakdowns"
+TIU-047,tenant/inventory-usage/inventory-usage.spec.ts,Reversed usage remains visible in ledger history
+TIU-048,tenant/inventory-usage/inventory-usage.spec.ts,Ledger exposes quantity before and after plus movement identifier
+TIU-049,tenant/inventory-usage/inventory-usage.spec.ts,Failed usage ledger GET presents its own error without changing another filter
+TCDO-001,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,page explicitly disclaims automatic business execution and inferred winners
+TCDO-004,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,KPI counts reflect server governance totals rather than only rendered list length
+TCDO-005,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,"comparison page keeps runs, objectives, choices, tradeoffs and actual outcomes distinct"
+TCDO-006,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,failed summary GET offers Retry and does not present stale records
+TCDO-007,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,Refresh evidence retries only summary GET without any mutation
+TCDO-008,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,empty comparison disables plan and readiness tabs
+TCDO-009,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,filtering by area clears stale selected run and sends optimization_domain
+TCDO-010,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,run status filter is reflected in server query
+TCDO-011,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,objective type filters by actual backend objective_type key
+TCDO-012,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,option status filter retains ranked choices
+TCDO-013,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,tradeoff direction sends impact_direction without changing source records
+TCDO-014,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,recorded outcome filter sends result_status to summary
+TCDO-015,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,maximum evidence limit 200 updates URL and read query only
+TCDO-016,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,Clear filters restores defaults and unselects previous run
+TCDO-017,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,selecting a planning run scopes summary GET to review_run_id
+TCDO-018,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,Open plan selects specific saved run and changes route view
+TCDO-019,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,readiness tab requires one selected run and never pools unrelated runs
+TCDO-020,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,selected run shows its isolated lifecycle check cards with advisory caution

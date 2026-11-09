@@ -1,6 +1,6 @@
 import {loginAsDisposableRole} from '../../../support/roleSession';
 import {targetBaseURL} from '../../../support/environment';
-import {test,expect,type Page,type Route} from '@playwright/test';
+import {test,expect,type Page,type Route} from '../../../support/liveOriginalSafeTest';
 import {loginAsTenant,fulfillJson} from '../../../support/tenantSession';
 
 // Batch 24 — InventoryReservationsPage.tsx /inventory-reservations.
