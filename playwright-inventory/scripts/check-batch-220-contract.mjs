@@ -72,8 +72,11 @@ assert.equal(verified46,46);
 const insights=read('tests/tenant/insights/insights.spec.ts');
 const settings=read('tests/tenant/tenant-settings/tenant-settings.spec.ts');
 assert(insights.includes('const supplierControl = (page: Page, label: string) => {'));
-for(const label of ['Recent history window','Risk filter','Performance tier','Sort suppliers','Page size','Search suppliers'])assert(insights.includes(`'${label}': /^`));
-assert(insights.includes("page.locator('section.insights-section label').filter({ hasText: pattern }).locator('input, select')"));
+// Later B221 selector repair keeps the same original test bodies and explicit controls;
+// the archived B220 selection is unchanged, but obsolete text selectors must not be required.
+for(const label of ['Recent history window','Risk filter','Performance tier','Sort suppliers','Page size','Search suppliers'])assert(insights.includes(`case '${label}': return`));
+assert(insights.includes("page.getByRole('heading', { name: 'Supplier performance', exact: true })"));
+assert(insights.includes("page.getByRole('heading', { name: 'Insight controls', exact: true })"));
 assert(insights.includes("getByText('Health Score', { exact: true })"));
 assert(insights.includes("page.locator('section.insights-section').filter({ has: page.getByRole('heading', { name: 'Unusual inventory movement', exact: true }) })"));
 assert(settings.includes("getByRole('heading', { name: 'Tenant settings', exact: true, level: 2 })"));

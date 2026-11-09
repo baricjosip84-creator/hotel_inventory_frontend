@@ -1586,7 +1586,7 @@
             "TINS-049",
             "TINS-050"
           ],
-          "sha256": "4518a8477267cafe50675cc33153da077706d1a62f46a5e41e9e1e270b9fb95e"
+          "sha256": "3be5bf429a1571d21b3afb3b9157f6ba7056c154893dcfb5699619fa1f023548"
         },
         {
           "file": "tenant/digital-twin/digital-twin.spec.ts",
@@ -1736,7 +1736,7 @@
             "TINS-049",
             "TINS-050"
           ],
-          "sha256": "4518a8477267cafe50675cc33153da077706d1a62f46a5e41e9e1e270b9fb95e"
+          "sha256": "3be5bf429a1571d21b3afb3b9157f6ba7056c154893dcfb5699619fa1f023548"
         },
         {
           "file": "tenant/digital-twin/digital-twin.spec.ts",
@@ -1788,7 +1788,7 @@
             "TINS-035",
             "TINS-047"
           ],
-          "sha256": "4518a8477267cafe50675cc33153da077706d1a62f46a5e41e9e1e270b9fb95e"
+          "sha256": "3be5bf429a1571d21b3afb3b9157f6ba7056c154893dcfb5699619fa1f023548"
         },
         {
           "file": "tenant/tenant-settings/tenant-settings.spec.ts",
@@ -1799,6 +1799,30 @@
         }
       ],
       "secret": true
+    },
+    "BULK_SAFE_06_RECHECK_3": {
+      "secret": true,
+      "entries": [
+        {
+          "file": "tenant/insights/insights.spec.ts",
+          "ids": [
+            "TINS-007",
+            "TINS-008",
+            "TINS-009",
+            "TINS-012",
+            "TINS-013",
+            "TINS-014",
+            "TINS-017",
+            "TINS-022",
+            "TINS-023",
+            "TINS-028",
+            "TINS-029",
+            "TINS-030",
+            "TINS-035"
+          ],
+          "sha256": "3be5bf429a1571d21b3afb3b9157f6ba7056c154893dcfb5699619fa1f023548"
+        }
+      ]
     }
   },
   "status": "Batch 203: 58 prior confirmed passes; 155 new reviewed original IDs for a single bulk production-safe browser run; browser outcomes unverified.",
@@ -3234,6 +3258,48 @@
       "Tenant Settings heading uses exact match to avoid h1/h2 ambiguity"
     ],
     "newly_held": "TINS-024 - frontend preserves selected supplier detail when filter changes; no false-pass test alteration",
+    "production_write_boundary": "unchanged"
+  },
+  "batch_220_last_execution": {
+    "date": "2026-11-08",
+    "github_log": "logs_115178390345.zip",
+    "group": "BULK_SAFE_06_RECHECK_2",
+    "selected_original": 16,
+    "passed_original": 3,
+    "failed_original": 13,
+    "passed_ids": [
+      "TINS-002",
+      "TINS-047",
+      "TSET-001"
+    ],
+    "failed_ids": [
+      "TINS-007",
+      "TINS-008",
+      "TINS-009",
+      "TINS-012",
+      "TINS-013",
+      "TINS-014",
+      "TINS-017",
+      "TINS-022",
+      "TINS-023",
+      "TINS-028",
+      "TINS-029",
+      "TINS-030",
+      "TINS-035"
+    ],
+    "evidence": "Exact GitHub output ✓/✘ original scenario lines, no skips; 16 selected and accounted for.",
+    "safety": "Production write guard unchanged."
+  },
+  "batch_221_preflight": {
+    "date": "2026-11-08",
+    "group": "BULK_SAFE_06_RECHECK_3",
+    "selected_count": 13,
+    "prior_confirmed_green": 908,
+    "prior_held_unverified": 22,
+    "status": "offline_source_and_static_checks_only_pending_github",
+    "fixes": [
+      "Replace broken Insights label-text regex with section-heading scoped DOM control positions source-reviewed against deployed frontend src/pages/InsightsPage.tsx, preserving all 50 original test bodies."
+    ],
     "production_write_boundary": "unchanged"
   }
 }

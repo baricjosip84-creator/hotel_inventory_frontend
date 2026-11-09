@@ -132,18 +132,25 @@ async function openInsights(page: Page, o: InsightOptions = {}) {
 const supplierCards = (page: Page) => page.locator('.insights-item-card--supplier');
 // On wrapped labels, nested select option text makes exact accessible-name matching
 // unreliable. Limit matching to a known label prefix and its own form control.
+// Source-reviewed against src/pages/InsightsPage.tsx (GitHub main, 2026-11-08).
+// The exact-label and prefix-text locators broke on wrapped select elements:
+// text from child <option> nodes contributes to label text, and anchored regex
+// filters were not matching the rendered controls. Locate the known control
+// by its section heading and *documented DOM order*, without changing any
+// behavior assertions or allowing live writes. See B221 contract for checks.
 const supplierControl = (page: Page, label: string) => {
-  const labels: Record<string, RegExp> = {
-    'Recent history window': /^\s*Recent history window\b/,
-    'Search suppliers': /^\s*Search suppliers\b/,
-    'Risk filter': /^\s*Risk filter\b/,
-    'Performance tier': /^\s*Performance tier\b/,
-    'Sort suppliers': /^\s*Sort suppliers\b/,
-    'Page size': /^\s*Page size\b/
-  };
-  const pattern = labels[label];
-  if (!pattern) throw new Error(`Unknown Insights control: ${label}`);
-  return page.locator('section.insights-section label').filter({ hasText: pattern }).locator('input, select');
+  const sections = page.locator('section.insights-section');
+  const history = sections.filter({ has: page.getByRole('heading', { name: 'Insight controls', exact: true }) });
+  const suppliers = sections.filter({ has: page.getByRole('heading', { name: 'Supplier performance', exact: true }) });
+  switch (label) {
+    case 'Recent history window': return history.locator('select').first();
+    case 'Search suppliers': return suppliers.locator('input').first();
+    case 'Risk filter': return suppliers.locator('select').nth(0);
+    case 'Performance tier': return suppliers.locator('select').nth(1);
+    case 'Sort suppliers': return suppliers.locator('select').nth(2);
+    case 'Page size': return suppliers.locator('select').nth(3);
+    default: throw new Error(`Unknown Insights control: ${label}`);
+  }
 };
 
  test.describe('Insights — initial evidence, URL state and supplier review (Batch 39)', () => {
