@@ -1401,7 +1401,7 @@
     "tenant/tenant-settings/tenant-settings.spec.ts": "70ef85d28dcbfe773e683c99ef9360e9bbb4e36305e37a40b776117063dfc507",
     "tenant/system-context/system-context.spec.ts": "c08048a64b62801f6f29bc53eb629ffec23d5e28581183103646b66f67849620",
     "tenant/tenant-audit/tenant-audit.spec.ts": "f33f79613fe8041b84e5af95ae4df46b8f5ca09e1749ed1c37827b257ed818b5",
-    "tenant/operations-feed/operations-feed.spec.ts": "8dd09251b68b85c1c0b6912b28bd5f337365411fa70c1b1f3a831c0497609cf4",
+    "tenant/operations-feed/operations-feed.spec.ts": "5bbac743e7c75ee7350a2793202d790ca5d27e6b38a7413b4c25371d89147e6e",
     "tenant/dashboard/dashboard.spec.ts": "c3c58a50d910bb449e75d33976afbaea081d2ceb807cb6551080e22aba6c3484"
   },
   "expected_original_suite_ids": 9900,

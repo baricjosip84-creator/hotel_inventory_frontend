@@ -1,0 +1,13 @@
+original_test_id,source_spec,reason
+TFEED-036,tenant/operations-feed/operations-feed.spec.ts,Operations Feed async-options race
+TRC-060,tenant/reliability-command/reliability-command.spec.ts,auth/session timeout in long bulk run; verify short isolated rerun
+TRC-061,tenant/reliability-command/reliability-command.spec.ts,auth/session timeout in long bulk run; verify short isolated rerun
+TRC-062,tenant/reliability-command/reliability-command.spec.ts,auth/session timeout in long bulk run; verify short isolated rerun
+TRC-063,tenant/reliability-command/reliability-command.spec.ts,auth/session timeout in long bulk run; verify short isolated rerun
+TRC-064,tenant/reliability-command/reliability-command.spec.ts,auth/session timeout in long bulk run; verify short isolated rerun
+TWKS-044,tenant/workspace/workspace.spec.ts,auth/session timeout in long bulk run; verify short isolated rerun
+TWKS-045,tenant/workspace/workspace.spec.ts,auth/session timeout in long bulk run; verify short isolated rerun
+TWKS-047,tenant/workspace/workspace.spec.ts,auth/session timeout in long bulk run; verify short isolated rerun
+TWKS-048,tenant/workspace/workspace.spec.ts,auth/session timeout in long bulk run; verify short isolated rerun
+TWKS-049,tenant/workspace/workspace.spec.ts,auth/session timeout in long bulk run; verify short isolated rerun
+TWKS-050,tenant/workspace/workspace.spec.ts,auth/session timeout in long bulk run; verify short isolated rerun

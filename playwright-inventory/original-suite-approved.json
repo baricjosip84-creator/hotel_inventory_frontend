@@ -992,7 +992,7 @@
             "TFEED-046",
             "TFEED-047"
           ],
-          "sha256": "8dd09251b68b85c1c0b6912b28bd5f337365411fa70c1b1f3a831c0497609cf4"
+          "sha256": "5bbac743e7c75ee7350a2793202d790ca5d27e6b38a7413b4c25371d89147e6e"
         }
       ],
       "secret": true,
@@ -1046,7 +1046,7 @@
             "TFEED-007",
             "TFEED-032"
           ],
-          "sha256": "8dd09251b68b85c1c0b6912b28bd5f337365411fa70c1b1f3a831c0497609cf4"
+          "sha256": "5bbac743e7c75ee7350a2793202d790ca5d27e6b38a7413b4c25371d89147e6e"
         }
       ],
       "secret": true,
@@ -1190,7 +1190,7 @@
             "TFEED-076",
             "TFEED-077"
           ],
-          "sha256": "8dd09251b68b85c1c0b6912b28bd5f337365411fa70c1b1f3a831c0497609cf4"
+          "sha256": "5bbac743e7c75ee7350a2793202d790ca5d27e6b38a7413b4c25371d89147e6e"
         }
       ],
       "secret": true
@@ -1276,7 +1276,7 @@
             "TFEED-063",
             "TFEED-064"
           ],
-          "sha256": "8dd09251b68b85c1c0b6912b28bd5f337365411fa70c1b1f3a831c0497609cf4"
+          "sha256": "5bbac743e7c75ee7350a2793202d790ca5d27e6b38a7413b4c25371d89147e6e"
         }
       ],
       "secret": true,
@@ -2256,7 +2256,7 @@
             "TFEED-080",
             "TFEED-081"
           ],
-          "sha256": "8dd09251b68b85c1c0b6912b28bd5f337365411fa70c1b1f3a831c0497609cf4"
+          "sha256": "5bbac743e7c75ee7350a2793202d790ca5d27e6b38a7413b4c25371d89147e6e"
         },
         {
           "file": "tenant/dashboard/dashboard.spec.ts",
@@ -2281,6 +2281,41 @@
             "TDASH-074"
           ],
           "sha256": "c3c58a50d910bb449e75d33976afbaea081d2ceb807cb6551080e22aba6c3484"
+        }
+      ],
+      "secret": true
+    },
+    "BULK_SAFE_08_RECHECK": {
+      "entries": [
+        {
+          "file": "tenant/operations-feed/operations-feed.spec.ts",
+          "ids": [
+            "TFEED-036"
+          ],
+          "sha256": "5bbac743e7c75ee7350a2793202d790ca5d27e6b38a7413b4c25371d89147e6e"
+        },
+        {
+          "file": "tenant/reliability-command/reliability-command.spec.ts",
+          "ids": [
+            "TRC-060",
+            "TRC-061",
+            "TRC-062",
+            "TRC-063",
+            "TRC-064"
+          ],
+          "sha256": "0d85621980c856f13615230d10828fd483b0277bdcd30731fd19e9691f0abdc7"
+        },
+        {
+          "file": "tenant/workspace/workspace.spec.ts",
+          "ids": [
+            "TWKS-044",
+            "TWKS-045",
+            "TWKS-047",
+            "TWKS-048",
+            "TWKS-049",
+            "TWKS-050"
+          ],
+          "sha256": "35ff644b779404c0c40ed9b24635e49973d32c84c1e29c936d3489f10791aa3e"
         }
       ],
       "secret": true
@@ -4084,5 +4119,155 @@
     "source_spec_files": 9,
     "live_status": "offline_contract_passed_live_browser_pending",
     "risk_boundary": "Original 125 scenarios unchanged; production-write guard unchanged; selected fixtures use approved liveOriginalSafeTest; excludes extra-role logins and any previous passed/held."
+  },
+  "batch_226_last_execution": {
+    "github_log": "logs_115424410070 (1).zip",
+    "group": "BULK_SAFE_08",
+    "selected_original": 125,
+    "passed_original": 113,
+    "failed_original": 12,
+    "passed_ids": [
+      "TACT-026",
+      "TACT-027",
+      "TACT-029",
+      "TACT-030",
+      "TACT-031",
+      "TACT-033",
+      "TACT-034",
+      "TACT-035",
+      "TACT-036",
+      "TACT-037",
+      "TACT-038",
+      "TACT-039",
+      "TACT-040",
+      "TACT-042",
+      "TACT-044",
+      "TACT-045",
+      "TDASH-003",
+      "TDASH-014",
+      "TDASH-021",
+      "TDASH-022",
+      "TDASH-024",
+      "TDASH-029",
+      "TDASH-037",
+      "TDASH-038",
+      "TDASH-041",
+      "TDASH-053",
+      "TDASH-055",
+      "TDASH-056",
+      "TDASH-058",
+      "TDASH-063",
+      "TDASH-066",
+      "TDASH-068",
+      "TDASH-073",
+      "TDASH-074",
+      "TFEED-018",
+      "TFEED-021",
+      "TFEED-022",
+      "TFEED-023",
+      "TFEED-035",
+      "TFEED-037",
+      "TFEED-078",
+      "TFEED-079",
+      "TFEED-080",
+      "TFEED-081",
+      "TRC-051",
+      "TRC-052",
+      "TRC-053",
+      "TRC-054",
+      "TRC-055",
+      "TRC-056",
+      "TRC-057",
+      "TRC-058",
+      "TRC-059",
+      "TRC-065",
+      "TRC-066",
+      "TRC-067",
+      "TRC-068",
+      "TRC-069",
+      "TRC-070",
+      "TRC-071",
+      "TRC-072",
+      "TRC-073",
+      "TRC-074",
+      "TRC-075",
+      "TRC-076",
+      "TRC-077",
+      "TRC-078",
+      "TRC-079",
+      "TSC-075",
+      "TSC-076",
+      "TSC-077",
+      "TSC-078",
+      "TSC-079",
+      "TSC-080",
+      "TSC-081",
+      "TSC-082",
+      "TSC-083",
+      "TSC-084",
+      "TSC-085",
+      "TAUD-031",
+      "TAUD-032",
+      "TAUD-033",
+      "TAUD-072",
+      "TSET-008",
+      "TSET-009",
+      "TSET-010",
+      "TSET-011",
+      "TSET-012",
+      "TSET-013",
+      "TSET-014",
+      "TSET-015",
+      "TWFC-036",
+      "TWFC-037",
+      "TWFC-038",
+      "TWFC-039",
+      "TWFC-040",
+      "TWFC-041",
+      "TWFC-042",
+      "TWFC-043",
+      "TWFC-044",
+      "TWFC-045",
+      "TWFC-046",
+      "TWFC-047",
+      "TWFC-048",
+      "TWFC-049",
+      "TWFC-050",
+      "TWFC-051",
+      "TWFC-052",
+      "TWKS-040",
+      "TWKS-041",
+      "TWKS-042",
+      "TWKS-043",
+      "TWKS-046"
+    ],
+    "failed_ids": [
+      "TFEED-036",
+      "TRC-060",
+      "TRC-061",
+      "TRC-062",
+      "TRC-063",
+      "TRC-064",
+      "TWKS-044",
+      "TWKS-045",
+      "TWKS-047",
+      "TWKS-048",
+      "TWKS-049",
+      "TWKS-050"
+    ],
+    "status": "actual_github_browser_run_red"
+  },
+  "batch_227_preflight": {
+    "source": "INVENTORY_PLAYWRIGHT_BATCH_226_FULL.zip",
+    "github_source": "logs_115424410070 (1).zip",
+    "prior_confirmed_green": 1080,
+    "new_confirmed_green": 1193,
+    "held_unverified": 23,
+    "selected_count": 12,
+    "group": "BULK_SAFE_08_RECHECK",
+    "status": "offline_check_only_browser_pending",
+    "production_write_guard": "unchanged",
+    "assertion_fix": "TFEED-036 waits for 3 allowed-domain native options before evaluateAll",
+    "auth_approach": "12-case single-worker rerun finishes before the repeated long-run session churn; no credential or guard bypass"
   }
 }

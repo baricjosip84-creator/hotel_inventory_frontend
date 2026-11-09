@@ -366,7 +366,12 @@ async function openFeed(page: Page, url = '/real-time-operations-feed') {
   test('TFEED-036 backend allowed domains restrict Work area options',async ({page}) => {
     await fixtureFeed(page, syntheticTimeline(), ['alerts','execution']);
     await page.reload();
-    const choices = await page.getByLabel('Work area').locator('option').evaluateAll(options =>
+    // Do not inspect option nodes before the async allowed-domains GET has populated the select.
+    // evaluateAll() does not retry on an empty locator; the original race returned [].
+    const workArea = page.getByLabel('Work area');
+    await expect(workArea).toBeVisible();
+    await expect(workArea.locator('option')).toHaveCount(3);
+    const choices = await workArea.locator('option').evaluateAll(options =>
       options.map(option => (option as HTMLOptionElement).value));
     expect(choices).toEqual(['all','alerts','execution']);
     await expect(page.getByLabel('Work area')).toHaveValue('all');
