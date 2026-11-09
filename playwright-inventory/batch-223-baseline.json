@@ -1,7 +1,7 @@
 {
   "date": "2026-11-09",
   "authoritative_source": "INVENTORY_PLAYWRIGHT_BATCH_222_FULL.zip",
-  "last_confirmed_user_run": "BULK_SAFE_06_RECHECK_4 \u2014 TINS-029 GREEN by user report",
+  "last_confirmed_user_run": "BULK_SAFE_06_RECHECK_4 — TINS-029 GREEN by user report",
   "confirmed_green_ids": [
     "TALERT-001",
     "TALERT-002",
@@ -1284,13 +1284,13 @@
   "expected_original_suite_ids": 9900,
   "live_status": "BULK_SAFE_07 not yet executed",
   "spec_sha256": {
-    "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts": "b85b2b0a9168a7cd20df92e8baa65dec84b27fcd605d292e006681fd2fc0ca59",
-    "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts": "5f364135dddf09966753b0b0ad59ab38fa4221e7caa66fe54f2f2197181c38d8",
-    "tenant/tenant-audit/tenant-audit.spec.ts": "42f690fa038c79f07dfeca2cbc3e57aeb92d6afa7ad27f58d6322503f57bd105",
-    "tenant/alerts/alerts.spec.ts": "5dd80556e06a1411a643278d386cd00a32b2d07acbf8ca74397a09b37f8f5e0b"
+    "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts": "e2ccaf15f553be36c11ef00161cc3a9aede0093a2ca8e93fc577d5cb7730e7c8",
+    "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts": "d37ce933ad44c71f5266e14f951bf65449d73076ff3bd2dd7031ff5f71bebc6b",
+    "tenant/tenant-audit/tenant-audit.spec.ts": "c6e65b9e6e7e5734640c72edd8965e8ef0c9cbd6a49f4580ed4387b20097cdad",
+    "tenant/alerts/alerts.spec.ts": "a39c8d6af4dc06d3096ea527b09c2b2a7e32ef6afcfa2a440866d3fc171ba100"
   },
   "preserved_existing_source_sha256": {
-    "tenant/tenant-audit/tenant-audit.spec.ts": "42f690fa038c79f07dfeca2cbc3e57aeb92d6afa7ad27f58d6322503f57bd105",
-    "tenant/alerts/alerts.spec.ts": "5dd80556e06a1411a643278d386cd00a32b2d07acbf8ca74397a09b37f8f5e0b"
+    "tenant/tenant-audit/tenant-audit.spec.ts": "c6e65b9e6e7e5734640c72edd8965e8ef0c9cbd6a49f4580ed4387b20097cdad",
+    "tenant/alerts/alerts.spec.ts": "a39c8d6af4dc06d3096ea527b09c2b2a7e32ef6afcfa2a440866d3fc171ba100"
   }
 }

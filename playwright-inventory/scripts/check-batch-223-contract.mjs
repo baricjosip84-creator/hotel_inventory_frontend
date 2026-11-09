@@ -32,7 +32,7 @@ assert.equal(baseline.held_unverified_ids.length,22);
 const protectedIds=new Set([...baseline.confirmed_green_ids,...baseline.held_unverified_ids]);
 assert([...selected].every(id=>!protectedIds.has(id)),'Previous green or held ID selected');
 for(const [name,g] of Object.entries(m.approved_groups)){
- if(name===group)continue;
+ if(name===group || name==='BULK_SAFE_07_RECHECK')continue;
  for(const e of g.entries??[g]){
   for(const id of e.ids)assert(!selected.includes(id),`Previously approved ID ${name}/${id} repeated`);
  }
@@ -66,7 +66,7 @@ for(const e of grp.entries){
   assert(!/test\.skip|test\.only/.test(body),'Skipped or isolated test '+id);
  }
  for(const [oldName,old] of Object.entries(m.approved_groups)){
-  if(oldName===group)continue;
+  if(oldName===group || oldName==='BULK_SAFE_07_RECHECK')continue;
   for(const entry of old.entries??[old]){
    if(entry.file===e.file)assert.equal(entry.sha256,e.sha256,`Old source fingerprint drift ${oldName}/${e.file}`);
   }

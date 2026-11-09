@@ -19,7 +19,9 @@ async function openAudit(page: Page, opts: Options = {}) {
   const calls: Call[] = [];
   let listRequestNumber = 0;
   await page.route('**/audit**', async (route: Route) => {
-    if (route.request().isNavigationRequest()) return route.continue();
+    // Only the CSV download route is allowed to intercept a navigation.
+    // Other document navigations must never receive JSON route fixtures.
+    if (route.request().isNavigationRequest() && !/\/audit\/export\.csv$/.test(new URL(route.request().url()).pathname)) return route.continue();
     const u = new URL(route.request().url()), path = u.pathname, method = route.request().method();
     if (!/^\/(?:api\/)?audit(?:\/|$)/.test(path)) return route.continue();
     calls.push({ method, path, search: u.search });
@@ -465,6 +467,10 @@ test.describe('Tenant Audit — source-bound filter, attribution and evidence ed
     await auditTable(page).getByRole('button', { name: 'View details' }).first().click();
     await expect(page.locator('.tenant-audit-detail-panel')).toBeVisible();
     await page.getByRole('button', { name: 'Reset', exact: true }).click();
+    await expect(page.getByRole('checkbox', { name: 'Support-session actions only' })).not.toBeChecked();
+    const readsBefore = listCalls(s.calls).length;
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await expect.poll(() => listCalls(s.calls).length).toBeGreaterThan(readsBefore);
     await expect.poll(() => latestList(s.calls).has('support_only')).toBe(false);
     await expect(page.getByRole('checkbox', { name: 'Support-session actions only' })).not.toBeChecked();
     await expect(page.locator('.tenant-audit-detail-panel')).toHaveCount(0);
@@ -486,6 +492,10 @@ test.describe('Tenant Audit — source-bound filter, attribution and evidence ed
     await input.check();
     await expect.poll(() => latestList(s.calls).get('support_only')).toBe('true');
     await input.uncheck();
+    await expect(input).not.toBeChecked();
+    const readsBefore = listCalls(s.calls).length;
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await expect.poll(() => listCalls(s.calls).length).toBeGreaterThan(readsBefore);
     await expect.poll(() => latestList(s.calls).has('support_only')).toBe(false);
   });
 
@@ -494,8 +504,8 @@ test.describe('Tenant Audit — source-bound filter, attribution and evidence ed
     await filter(page, 'From').locator('input').fill('2026-11-30');
     await page.getByRole('textbox', { name: 'To', exact: true }).fill('2026-11-01');
     for (const label of ['From', 'To']) {
-      await expect(filter(page, label).locator('input')).toHaveAttribute('aria-invalid', 'true');
-      await expect(filter(page, label).locator('input')).toHaveAttribute('aria-describedby', 'tenant-audit-date-range-error');
+      await expect(page.getByRole('textbox', { name: label, exact: true })).toHaveAttribute('aria-invalid', 'true');
+      await expect(page.getByRole('textbox', { name: label, exact: true })).toHaveAttribute('aria-describedby', 'tenant-audit-date-range-error');
     }
     await expect(page.locator('#tenant-audit-date-range-error')).toContainText('From date must be before or equal to To date.');
   });
@@ -506,6 +516,10 @@ test.describe('Tenant Audit — source-bound filter, attribution and evidence ed
     await search.fill('Synthetic');
     await expect.poll(() => latestList(s.calls).get('search')).toBe('Synthetic');
     await search.fill('  ');
+    await expect(search).toHaveValue('  ');
+    const readsBefore = listCalls(s.calls).length;
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await expect.poll(() => listCalls(s.calls).length).toBeGreaterThan(readsBefore);
     await expect.poll(() => latestList(s.calls).has('search')).toBe(false);
     await expect(page.locator('.tenant-audit-filter-pending')).toHaveCount(0);
   });

@@ -67,10 +67,10 @@ test.describe('Probabilistic Forecasting — page evidence, filters and paging (
  });
  test('TPF-008 failed forecast summary GET supports Retry with a fresh read',async({page})=>{
   await loginAsTenant(page);let reads=0;
-  await page.route(forecastSummaryEndpoint,route=>{reads++;return fulfillJson(route,reads===1?{message:'Synthetic failure'}:forecastResponse(),reads===1?503:200);});
+  let failed=true;await page.route(forecastSummaryEndpoint,route=>{reads++;return fulfillJson(route,failed?{message:'Synthetic failure'}:forecastResponse(),failed?503:200);});
   await page.goto('/probabilistic-forecasting');
   await expect(page.getByRole('heading',{name:'Probabilistic forecast evidence could not be loaded'})).toBeVisible();
-  await page.getByRole('button',{name:'Retry'}).click();
+  failed=false;await page.getByRole('button',{name:'Retry'}).click();
   await expect(page.getByRole('heading',{name:'Probabilistic Forecasting'})).toBeVisible();
   expect(reads).toBeGreaterThanOrEqual(2);
  });
@@ -139,6 +139,7 @@ test.describe('Probabilistic Forecasting — page evidence, filters and paging (
    return fulfillJson(route,forecastResponse({pagination:{...forecastResponse().pagination,models:{total:80,offset,limit:25,has_previous:offset>0,has_next:true}}}));
   });
   await forecastSection(page,'Forecast models').getByRole('button',{name:'Older'}).click();
+  await expect.poll(()=>lastUrl?new URL(lastUrl).searchParams.get('model_offset'):null).toBe('25');
   await expect(forecastSection(page,'Forecast models').getByRole('button',{name:'Newer'})).toBeEnabled();
   await forecastSection(page,'Forecast models').getByRole('button',{name:'Newer'}).click();
   await expect.poll(()=>requests).toBeGreaterThanOrEqual(2);

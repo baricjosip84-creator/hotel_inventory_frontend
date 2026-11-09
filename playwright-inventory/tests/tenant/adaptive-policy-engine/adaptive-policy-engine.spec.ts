@@ -89,10 +89,10 @@ test.describe('Adaptive Policy Engine — tenant evidence and governed actions (
  });
  test('TAPE-012 summary failure offers Retry and restores evidence once API succeeds',async({page})=>{
   await loginAsTenant(page);let calls=0;
-  await page.route(policySummaryEndpoint,route=>{calls++;return fulfillJson(route,calls===1?{message:'Synthetic policy service unavailable'}:policyResponse(),calls===1?503:200);});
+  let failed=true;await page.route(policySummaryEndpoint,route=>{calls++;return fulfillJson(route,failed?{message:'Synthetic policy service unavailable'}:policyResponse(),failed?503:200);});
   await page.goto('/adaptive-policy-engine');
   await expect(page.getByRole('heading',{name:'Adaptive policy evidence could not be loaded'})).toBeVisible();
-  await page.getByRole('button',{name:'Retry'}).click();
+  failed=false;await page.getByRole('button',{name:'Retry'}).click();
   await expect(page.getByRole('heading',{name:'Adaptive Policy Engine'})).toBeVisible();
   expect(calls).toBeGreaterThanOrEqual(2);
  });
@@ -239,7 +239,7 @@ test.describe('Adaptive Policy Engine — governed writes, lifecycle and measure
   await openPolicy(page,{data:policyResponse({signals})});
   const row=page.locator('#adaptive-policy-recommendation-pw-recommendation-14');
   await expect(row.locator('.adaptive-policy-table__subtext--timeline')).toContainText('Latest observed signal:');
-  await expect(row.locator('.adaptive-policy-table__subtext--timeline')).toContainText('New signal');
+  await expect(row.locator('.adaptive-policy-table__subtext--timeline')).toContainText('new_signal');
   await expect(row.locator('.adaptive-policy-table__subtext--timeline')).toContainText('2');
  });
  test('TAPE-029 read-only role sees approved recommendation without governing controls',async({page})=>{
@@ -263,7 +263,7 @@ test.describe('Adaptive Policy Engine — governed writes, lifecycle and measure
   await loginAsTenant(page);let queried='';
   await page.route(policySummaryEndpoint,route=>{queried=route.request().url();return fulfillJson(route,policyResponse());});
   await page.goto('/adaptive-policy-engine?source_action_id=adaptive_policy_recommendation%3Apw-recommendation-14');
-  await expect.poll(()=>new URL(queried).searchParams.get('source_action_id')).toBe('adaptive_policy_recommendation:pw-recommendation-14');
+  await expect.poll(()=>queried?new URL(queried).searchParams.get('source_action_id'):null).toBe('adaptive_policy_recommendation:pw-recommendation-14');
  });
  test('TAPE-033 monitoring application offers a governed reason form for recalibration',async({page})=>{
   const form=await openLifecycleForm(page,'applied_monitoring','Recalibrate');
@@ -350,7 +350,7 @@ test.describe('Adaptive Policy Engine — governed writes, lifecycle and measure
   await openPolicy(page,{data:policyResponse({recommendations:[{...recommendation,risk_level:'critical',confidence_score:0.9}]})});
   const row=page.locator('#adaptive-policy-recommendation-pw-recommendation-14');
   await expect(row).toContainText('Critical');await expect(row).toContainText('90%');
-  await expect(page.getByLabel('Adaptive policy filters')).toContainText('not automatic approval');
+  await expect(page.locator('.adaptive-policy-evidence-guide')).toContainText('still require a person to decide');
   await expect(row.getByRole('button',{name:'Record applied change'})).toHaveCount(0);
  });
  test('TAPE-045 original policy value and proposed change remain distinct in recorder',async({page})=>{

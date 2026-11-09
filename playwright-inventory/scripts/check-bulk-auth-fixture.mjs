@@ -37,7 +37,7 @@ const browser={newContext:async options=>{
   return {
     route:async (pattern,cb)=>{ assert.equal(pattern,'**/*'); assert.equal(typeof cb,'function'); },
     newPage:async ()=>({
-      addInitScript:async()=>{},goto:async url=>assert.equal(url,'/login'),
+      addInitScript:async()=>{},goto:async url=>assert(['/login','/dashboard'].includes(url),'Only login/dashboard recovery allowed'),
       locator:()=>({fill:async()=>{},click:async()=>{calls.logins++}}),getByRole:()=>({})
     }),
     storageState:async()=>snapshot(id),close:async()=>{}
@@ -109,7 +109,7 @@ try {
   });
   assert.equal(calls.logins,4,'Only expiring worker renews');
   // Proactive renewal must also cover a valid JWT backed by an aging refresh-cookie pair.
-  workers[1].session.lastLoginAt = Date.now() - 9*60*1000;
+  workers[1].session.lastLoginAt = Date.now() - 31*60*1000;
   await fixture.test.storageState({bulkSession:workers[1].session},async state=>{
     assert.equal(state.cookies[0].value,`cookie-${calls.contexts}`);
   });
@@ -163,16 +163,17 @@ try {
   process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_02_RECHECK';
   process.env.PW_BASE_URL='https://wrong.example.invalid';
   await assert.rejects(fixture.test.bulkSession[0]({browser},async()=>{}),/exact reviewed production origin/);
-  // Batch 214 regression: a transient failed dashboard MUST retry exactly once
-  // in a fresh browser context without sharing cookies or changing write guards.
+  // Batch 224: a transient dashboard render failure with a valid token should
+  // retry the protected dashboard GET in the SAME context before another login.
   process.env.PW_BASE_URL = FRONTEND;
   transientDashboardFailures = 1;
   const beforeRetry = { contexts: calls.contexts, logins: calls.logins };
   await runWorker();
-  assert.equal(calls.contexts - beforeRetry.contexts, 2, 'Transient failure must use exactly one isolated retry');
-  assert.equal(calls.logins - beforeRetry.logins, 2, 'Both isolated login attempts exercised');
-  // Two consecutive failures must remain RED, never silently mark authentication GREEN.
-  transientDashboardFailures = 2;
+  assert.equal(calls.contexts - beforeRetry.contexts, 1, 'Transient dashboard GET must not trigger redundant login');
+  assert.equal(calls.logins - beforeRetry.logins, 1, 'One authenticated context for a transient dashboard failure');
+  // Four consecutive failures defeat both same-context dashboard loads on
+  // two independently authenticated contexts; never silently mark GREEN.
+  transientDashboardFailures = 4;
   await assert.rejects(fixture.test.bulkSession[0]({browser},async()=>{}),/both isolated attempts/);
   assert.equal(transientDashboardFailures, 0);
   console.log('PASS: 1 bounded recovery for transient dashboard failure; persistent login failure remains fatal.');

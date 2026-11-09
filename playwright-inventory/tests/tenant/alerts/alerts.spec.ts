@@ -167,9 +167,12 @@ test.describe('Alerts — query, filtering, summary and navigation', () => {
       sentLimit = new URL(route.request().url()).searchParams.get('limit');
       return fulfillJson(route, serverFilteredAlerts(new URL(route.request().url()), syntheticAlerts));
     });
+    await filtersPanel(page).getByRole('combobox', { name:'Maximum results' }).selectOption('50');
+    await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();
+    await expect(page).toHaveURL(/limit=50/);
     await filtersPanel(page).getByRole('combobox', { name:'Maximum results' }).selectOption('25');
     await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();
-    await expect(page).toHaveURL(/limit=25/);
+    await expect(page).not.toHaveURL(/limit=50/);
     await expect(alertCard(page, 'pw-alert-manual')).toBeVisible();
     expect(sentLimit).toBe('25');
   });

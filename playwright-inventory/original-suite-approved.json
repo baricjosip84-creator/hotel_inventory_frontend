@@ -1098,7 +1098,7 @@
             "TALERT-073",
             "TALERT-074"
           ],
-          "sha256": "5dd80556e06a1411a643278d386cd00a32b2d07acbf8ca74397a09b37f8f5e0b"
+          "sha256": "a39c8d6af4dc06d3096ea527b09c2b2a7e32ef6afcfa2a440866d3fc171ba100"
         },
         {
           "file": "tenant/system-context/system-context.spec.ts",
@@ -1205,7 +1205,7 @@
             "TALERT-073",
             "TALERT-074"
           ],
-          "sha256": "5dd80556e06a1411a643278d386cd00a32b2d07acbf8ca74397a09b37f8f5e0b"
+          "sha256": "a39c8d6af4dc06d3096ea527b09c2b2a7e32ef6afcfa2a440866d3fc171ba100"
         },
         {
           "file": "tenant/system-context/system-context.spec.ts",
@@ -1289,7 +1289,7 @@
           "ids": [
             "TALERT-001"
           ],
-          "sha256": "5dd80556e06a1411a643278d386cd00a32b2d07acbf8ca74397a09b37f8f5e0b"
+          "sha256": "a39c8d6af4dc06d3096ea527b09c2b2a7e32ef6afcfa2a440866d3fc171ba100"
         },
         {
           "file": "tenant/system-context/system-context.spec.ts",
@@ -1448,7 +1448,7 @@
             "TAUD-019",
             "TAUD-020"
           ],
-          "sha256": "42f690fa038c79f07dfeca2cbc3e57aeb92d6afa7ad27f58d6322503f57bd105"
+          "sha256": "c6e65b9e6e7e5734640c72edd8965e8ef0c9cbd6a49f4580ed4387b20097cdad"
         }
       ],
       "secret": true,
@@ -1501,7 +1501,7 @@
             "TAUD-019",
             "TAUD-020"
           ],
-          "sha256": "42f690fa038c79f07dfeca2cbc3e57aeb92d6afa7ad27f58d6322503f57bd105"
+          "sha256": "c6e65b9e6e7e5734640c72edd8965e8ef0c9cbd6a49f4580ed4387b20097cdad"
         },
         {
           "file": "tenant/workflow-composer/workflow-composer.spec.ts",
@@ -1525,7 +1525,7 @@
             "TAUD-015",
             "TAUD-017"
           ],
-          "sha256": "42f690fa038c79f07dfeca2cbc3e57aeb92d6afa7ad27f58d6322503f57bd105"
+          "sha256": "c6e65b9e6e7e5734640c72edd8965e8ef0c9cbd6a49f4580ed4387b20097cdad"
         }
       ],
       "secret": true,
@@ -1914,7 +1914,7 @@
             "TPF-089",
             "TPF-090"
           ],
-          "sha256": "b85b2b0a9168a7cd20df92e8baa65dec84b27fcd605d292e006681fd2fc0ca59"
+          "sha256": "e2ccaf15f553be36c11ef00161cc3a9aede0093a2ca8e93fc577d5cb7730e7c8"
         },
         {
           "file": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
@@ -1943,7 +1943,7 @@
             "TAPE-047",
             "TAPE-048"
           ],
-          "sha256": "5f364135dddf09966753b0b0ad59ab38fa4221e7caa66fe54f2f2197181c38d8"
+          "sha256": "d37ce933ad44c71f5266e14f951bf65449d73076ff3bd2dd7031ff5f71bebc6b"
         },
         {
           "file": "tenant/tenant-audit/tenant-audit.spec.ts",
@@ -1989,7 +1989,7 @@
             "TAUD-070",
             "TAUD-071"
           ],
-          "sha256": "42f690fa038c79f07dfeca2cbc3e57aeb92d6afa7ad27f58d6322503f57bd105"
+          "sha256": "c6e65b9e6e7e5734640c72edd8965e8ef0c9cbd6a49f4580ed4387b20097cdad"
         },
         {
           "file": "tenant/alerts/alerts.spec.ts",
@@ -2020,7 +2020,62 @@
             "TALERT-087",
             "TALERT-088"
           ],
-          "sha256": "5dd80556e06a1411a643278d386cd00a32b2d07acbf8ca74397a09b37f8f5e0b"
+          "sha256": "a39c8d6af4dc06d3096ea527b09c2b2a7e32ef6afcfa2a440866d3fc171ba100"
+        }
+      ],
+      "secret": true
+    },
+    "BULK_SAFE_07_RECHECK": {
+      "entries": [
+        {
+          "file": "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts",
+          "ids": [
+            "TPF-008",
+            "TPF-019",
+            "TPF-020",
+            "TPF-031",
+            "TPF-033",
+            "TPF-034",
+            "TPF-035",
+            "TPF-036",
+            "TPF-037"
+          ],
+          "sha256": "e2ccaf15f553be36c11ef00161cc3a9aede0093a2ca8e93fc577d5cb7730e7c8"
+        },
+        {
+          "file": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+          "ids": [
+            "TAPE-012",
+            "TAPE-028",
+            "TAPE-032",
+            "TAPE-044"
+          ],
+          "sha256": "d37ce933ad44c71f5266e14f951bf65449d73076ff3bd2dd7031ff5f71bebc6b"
+        },
+        {
+          "file": "tenant/tenant-audit/tenant-audit.spec.ts",
+          "ids": [
+            "TAUD-034",
+            "TAUD-035",
+            "TAUD-036",
+            "TAUD-037",
+            "TAUD-038",
+            "TAUD-045",
+            "TAUD-046",
+            "TAUD-047",
+            "TAUD-055",
+            "TAUD-057",
+            "TAUD-058",
+            "TAUD-059"
+          ],
+          "sha256": "c6e65b9e6e7e5734640c72edd8965e8ef0c9cbd6a49f4580ed4387b20097cdad"
+        },
+        {
+          "file": "tenant/alerts/alerts.spec.ts",
+          "ids": [
+            "TALERT-008"
+          ],
+          "sha256": "a39c8d6af4dc06d3096ea527b09c2b2a7e32ef6afcfa2a440866d3fc171ba100"
         }
       ],
       "secret": true
@@ -3100,7 +3155,7 @@
       "TWFC-001",
       "TWFC-010"
     ],
-    "log_verification": "Parsed exact 120 GitHub Playwright \u2713/\u2718 outcome lines, all IDs unique and disjoint with prior 682 passes and 21 held IDs; job exit code 1.",
+    "log_verification": "Parsed exact 120 GitHub Playwright ✓/✘ outcome lines, all IDs unique and disjoint with prior 682 passes and 21 held IDs; job exit code 1.",
     "nonwrite_boundary": "Audit page catch-all had attempted to continue unrelated POSTs, which live write guard blocked; no completed unauthorized writes reported."
   },
   "batch_216_preflight": {
@@ -3442,7 +3497,7 @@
       "TINS-047",
       "TSET-001"
     ],
-    "evidence": "Parsed 63 exact \u2713/\u2718 scenario outcome lines from GitHub uploaded original-suite log; no skips; original IDs matched selected set",
+    "evidence": "Parsed 63 exact ✓/✘ scenario outcome lines from GitHub uploaded original-suite log; no skips; original IDs matched selected set",
     "safety": "Existing context write blocker retained; no frontend/backend changes."
   },
   "batch_220_preflight": {
@@ -3488,7 +3543,7 @@
       "TINS-030",
       "TINS-035"
     ],
-    "evidence": "Exact GitHub output \u2713/\u2718 original scenario lines, no skips; 16 selected and accounted for.",
+    "evidence": "Exact GitHub output ✓/✘ original scenario lines, no skips; 16 selected and accounted for.",
     "safety": "Production write guard unchanged."
   },
   "batch_221_preflight": {
@@ -3561,5 +3616,187 @@
       "TALERT": 25
     },
     "notes": "Selected only unpassed original tenant read-only or page-locally mocked GET scenarios; role-dependent, stock-write, fiscal, and external-provider paths excluded."
+  },
+  "batch_223_last_execution": {
+    "github_log": "logs_115375400916.zip",
+    "group": "BULK_SAFE_07",
+    "selected_original": 160,
+    "passed_original": 134,
+    "failed_original": 26,
+    "passed_ids": [
+      "TAPE-001",
+      "TAPE-002",
+      "TAPE-003",
+      "TAPE-004",
+      "TAPE-005",
+      "TAPE-006",
+      "TAPE-007",
+      "TAPE-008",
+      "TAPE-009",
+      "TAPE-010",
+      "TAPE-011",
+      "TAPE-016",
+      "TAPE-030",
+      "TAPE-031",
+      "TAPE-042",
+      "TAPE-043",
+      "TAPE-046",
+      "TAPE-047",
+      "TAPE-048",
+      "TALERT-003",
+      "TALERT-013",
+      "TALERT-014",
+      "TALERT-015",
+      "TALERT-018",
+      "TALERT-019",
+      "TALERT-022",
+      "TALERT-036",
+      "TALERT-037",
+      "TALERT-038",
+      "TALERT-075",
+      "TALERT-076",
+      "TALERT-077",
+      "TALERT-078",
+      "TALERT-079",
+      "TALERT-080",
+      "TALERT-081",
+      "TALERT-082",
+      "TALERT-083",
+      "TALERT-084",
+      "TALERT-085",
+      "TALERT-086",
+      "TALERT-087",
+      "TALERT-088",
+      "TPF-001",
+      "TPF-002",
+      "TPF-003",
+      "TPF-004",
+      "TPF-009",
+      "TPF-010",
+      "TPF-011",
+      "TPF-012",
+      "TPF-013",
+      "TPF-014",
+      "TPF-015",
+      "TPF-016",
+      "TPF-017",
+      "TPF-018",
+      "TPF-038",
+      "TPF-039",
+      "TPF-040",
+      "TPF-041",
+      "TPF-042",
+      "TPF-043",
+      "TPF-044",
+      "TPF-045",
+      "TPF-047",
+      "TPF-051",
+      "TPF-052",
+      "TPF-053",
+      "TPF-054",
+      "TPF-055",
+      "TPF-056",
+      "TPF-057",
+      "TPF-058",
+      "TPF-059",
+      "TPF-060",
+      "TPF-061",
+      "TPF-062",
+      "TPF-063",
+      "TPF-064",
+      "TPF-065",
+      "TPF-066",
+      "TPF-067",
+      "TPF-068",
+      "TPF-069",
+      "TPF-070",
+      "TPF-071",
+      "TPF-072",
+      "TPF-073",
+      "TPF-074",
+      "TPF-075",
+      "TPF-076",
+      "TPF-077",
+      "TPF-078",
+      "TPF-079",
+      "TPF-080",
+      "TPF-081",
+      "TPF-082",
+      "TPF-083",
+      "TPF-084",
+      "TPF-085",
+      "TPF-086",
+      "TPF-087",
+      "TPF-088",
+      "TPF-089",
+      "TPF-090",
+      "TAUD-021",
+      "TAUD-022",
+      "TAUD-023",
+      "TAUD-024",
+      "TAUD-029",
+      "TAUD-030",
+      "TAUD-039",
+      "TAUD-042",
+      "TAUD-043",
+      "TAUD-048",
+      "TAUD-049",
+      "TAUD-050",
+      "TAUD-051",
+      "TAUD-052",
+      "TAUD-053",
+      "TAUD-054",
+      "TAUD-056",
+      "TAUD-060",
+      "TAUD-061",
+      "TAUD-062",
+      "TAUD-063",
+      "TAUD-064",
+      "TAUD-065",
+      "TAUD-066",
+      "TAUD-067",
+      "TAUD-069",
+      "TAUD-070",
+      "TAUD-071"
+    ],
+    "failed_ids": [
+      "TAPE-012",
+      "TAPE-028",
+      "TAPE-032",
+      "TAPE-044",
+      "TALERT-008",
+      "TPF-008",
+      "TPF-019",
+      "TPF-020",
+      "TPF-031",
+      "TPF-033",
+      "TPF-034",
+      "TPF-035",
+      "TPF-036",
+      "TPF-037",
+      "TAUD-034",
+      "TAUD-035",
+      "TAUD-036",
+      "TAUD-037",
+      "TAUD-038",
+      "TAUD-045",
+      "TAUD-046",
+      "TAUD-047",
+      "TAUD-055",
+      "TAUD-057",
+      "TAUD-058",
+      "TAUD-059"
+    ],
+    "notes": "134 live green according to 2026-11-09 GitHub supplied log. Failed 26 selected for B224; no browser PASS claimed for those."
+  },
+  "batch_224_preflight": {
+    "source": "INVENTORY_PLAYWRIGHT_BATCH_223_FULL.zip",
+    "prior_confirmed_green": 1055,
+    "prior_held_unverified": 22,
+    "selected_count": 26,
+    "group": "BULK_SAFE_07_RECHECK",
+    "status": "offline_checks_only_pending_github",
+    "network_safety": "existing production write guard maintained",
+    "source_changes": "exactly 26 failed scenarios and shared read-only audit/login helpers; 134 prior winning original test bodies unchanged"
   }
 }

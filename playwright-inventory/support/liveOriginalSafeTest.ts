@@ -15,7 +15,10 @@ const BULK_GROUP_PREFIX = 'BULK_SAFE_';
 type AuthState = Awaited<ReturnType<BrowserContext['storageState']>>;
 type WorkerSession = { snapshot: AuthState; lastLoginAt: number; renew: () => Promise<void>; absorb: (observed: AuthState) => void };
 const liveBulkSessions = new WeakMap<Page, WorkerSession>();
-const MAX_SESSION_AGE_MS = 8 * 60 * 1000;
+// The current auth JWT expiry is checked before every test. Rotated cookies and
+// JWTs are already absorbed from completed GETs; avoid needless 8-minute login
+// churn on long, single-worker runs (which can trigger auth rate-limits).
+const MAX_SESSION_AGE_MS = 30 * 60 * 1000;
 
 // The application's refresh-cookie and access-token pair can rotate during GETs.
 // Copy *only authentication state* back to the worker after a test, not its
@@ -119,7 +122,17 @@ export const test = base.extend<{}, { bulkSession: WorkerSession }>({
         await page.locator('#login-email').fill(email);
         await page.locator('#login-password').fill(password);
         await page.locator('[data-auth-form="true"] button[type="submit"]').click();
-        await expect(page.getByRole('heading', { name: 'Operations Dashboard' })).toBeVisible({ timeout: 25_000 });
+        const dashboard = page.getByRole('heading', { name: 'Operations Dashboard' });
+        try { await expect(dashboard).toBeVisible({ timeout: 15_000 }); }
+        catch (firstDashboardError) {
+          // Retry a stalled protected GET once *in the same authenticated context*
+          // before making another login request. Never accept mere URL navigation
+          // as proof of permission or bypass the dashboard/token checks.
+          const provisional = await context.storageState();
+          if (tokenExpiresSoon(provisional)) throw firstDashboardError;
+          await page.goto('/dashboard');
+          await expect(dashboard).toBeVisible({ timeout: 15_000 });
+        }
         const state = await context.storageState();
         if (tokenExpiresSoon(state)) throw new Error('Bulk worker authentication returned an expired token');
         return state;
