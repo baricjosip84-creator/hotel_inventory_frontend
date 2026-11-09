@@ -2100,6 +2100,190 @@
         }
       ],
       "secret": true
+    },
+    "BULK_SAFE_08": {
+      "entries": [
+        {
+          "file": "tenant/reliability-command/reliability-command.spec.ts",
+          "ids": [
+            "TRC-051",
+            "TRC-052",
+            "TRC-053",
+            "TRC-054",
+            "TRC-055",
+            "TRC-056",
+            "TRC-057",
+            "TRC-058",
+            "TRC-059",
+            "TRC-060",
+            "TRC-061",
+            "TRC-062",
+            "TRC-063",
+            "TRC-064",
+            "TRC-065",
+            "TRC-066",
+            "TRC-067",
+            "TRC-068",
+            "TRC-069",
+            "TRC-070",
+            "TRC-071",
+            "TRC-072",
+            "TRC-073",
+            "TRC-074",
+            "TRC-075",
+            "TRC-076",
+            "TRC-077",
+            "TRC-078",
+            "TRC-079"
+          ],
+          "sha256": "0d85621980c856f13615230d10828fd483b0277bdcd30731fd19e9691f0abdc7"
+        },
+        {
+          "file": "tenant/workflow-composer/workflow-composer.spec.ts",
+          "ids": [
+            "TWFC-036",
+            "TWFC-037",
+            "TWFC-038",
+            "TWFC-039",
+            "TWFC-040",
+            "TWFC-041",
+            "TWFC-042",
+            "TWFC-043",
+            "TWFC-044",
+            "TWFC-045",
+            "TWFC-046",
+            "TWFC-047",
+            "TWFC-048",
+            "TWFC-049",
+            "TWFC-050",
+            "TWFC-051",
+            "TWFC-052"
+          ],
+          "sha256": "795c211f0fccad2719b3bcb65385c1aa854b1d8e8ade095869a9f77f9a1e0109"
+        },
+        {
+          "file": "tenant/action-center/action-center.spec.ts",
+          "ids": [
+            "TACT-026",
+            "TACT-027",
+            "TACT-029",
+            "TACT-030",
+            "TACT-031",
+            "TACT-033",
+            "TACT-034",
+            "TACT-035",
+            "TACT-036",
+            "TACT-037",
+            "TACT-038",
+            "TACT-039",
+            "TACT-040",
+            "TACT-042",
+            "TACT-044",
+            "TACT-045"
+          ],
+          "sha256": "42272da7ecd1786fea2d12b21dcd61384f834510413707d9cc4905714abb055f"
+        },
+        {
+          "file": "tenant/workspace/workspace.spec.ts",
+          "ids": [
+            "TWKS-040",
+            "TWKS-041",
+            "TWKS-042",
+            "TWKS-043",
+            "TWKS-044",
+            "TWKS-045",
+            "TWKS-046",
+            "TWKS-047",
+            "TWKS-048",
+            "TWKS-049",
+            "TWKS-050"
+          ],
+          "sha256": "35ff644b779404c0c40ed9b24635e49973d32c84c1e29c936d3489f10791aa3e"
+        },
+        {
+          "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+          "ids": [
+            "TSET-008",
+            "TSET-009",
+            "TSET-010",
+            "TSET-011",
+            "TSET-012",
+            "TSET-013",
+            "TSET-014",
+            "TSET-015"
+          ],
+          "sha256": "70ef85d28dcbfe773e683c99ef9360e9bbb4e36305e37a40b776117063dfc507"
+        },
+        {
+          "file": "tenant/system-context/system-context.spec.ts",
+          "ids": [
+            "TSC-075",
+            "TSC-076",
+            "TSC-077",
+            "TSC-078",
+            "TSC-079",
+            "TSC-080",
+            "TSC-081",
+            "TSC-082",
+            "TSC-083",
+            "TSC-084",
+            "TSC-085"
+          ],
+          "sha256": "c08048a64b62801f6f29bc53eb629ffec23d5e28581183103646b66f67849620"
+        },
+        {
+          "file": "tenant/tenant-audit/tenant-audit.spec.ts",
+          "ids": [
+            "TAUD-031",
+            "TAUD-032",
+            "TAUD-033",
+            "TAUD-072"
+          ],
+          "sha256": "f33f79613fe8041b84e5af95ae4df46b8f5ca09e1749ed1c37827b257ed818b5"
+        },
+        {
+          "file": "tenant/operations-feed/operations-feed.spec.ts",
+          "ids": [
+            "TFEED-018",
+            "TFEED-021",
+            "TFEED-022",
+            "TFEED-023",
+            "TFEED-035",
+            "TFEED-036",
+            "TFEED-037",
+            "TFEED-078",
+            "TFEED-079",
+            "TFEED-080",
+            "TFEED-081"
+          ],
+          "sha256": "8dd09251b68b85c1c0b6912b28bd5f337365411fa70c1b1f3a831c0497609cf4"
+        },
+        {
+          "file": "tenant/dashboard/dashboard.spec.ts",
+          "ids": [
+            "TDASH-003",
+            "TDASH-014",
+            "TDASH-021",
+            "TDASH-022",
+            "TDASH-024",
+            "TDASH-029",
+            "TDASH-037",
+            "TDASH-038",
+            "TDASH-041",
+            "TDASH-053",
+            "TDASH-055",
+            "TDASH-056",
+            "TDASH-058",
+            "TDASH-063",
+            "TDASH-066",
+            "TDASH-068",
+            "TDASH-073",
+            "TDASH-074"
+          ],
+          "sha256": "c3c58a50d910bb449e75d33976afbaea081d2ceb807cb6551080e22aba6c3484"
+        }
+      ],
+      "secret": true
     }
   },
   "status": "Batch 203: 58 prior confirmed passes; 155 new reviewed original IDs for a single bulk production-safe browser run; browser outcomes unverified.",
@@ -3867,5 +4051,38 @@
     "status": "offline_checks_only_pending_github",
     "network_safety": "strict production write guard preserved; alerts API requests observed without route override",
     "source_changes": "exactly 4 previously failing test bodies across 2 specs; all 22 B224 successful test bodies are byte-identical"
+  },
+  "batch_225_last_execution": {
+    "github_log": "logs_115412216453.zip",
+    "group": "BULK_SAFE_07_RECHECK_2",
+    "selected_original": 4,
+    "passed_original": 3,
+    "failed_original": 1,
+    "passed_ids": [
+      "TAUD-057",
+      "TAUD-058",
+      "TAUD-059"
+    ],
+    "failed_ids": [
+      "TALERT-008"
+    ],
+    "notes": "3 Tenant Audit tests passed; TALERT-008 held due to observed /alerts URL after Apply despite current frontend source buildSearchParams/setSearchParams; do not weaken original URL contract."
+  },
+  "batch_226_preflight": {
+    "source": "INVENTORY_PLAYWRIGHT_BATCH_225_FULL.zip",
+    "github_log": "logs_115412216453.zip",
+    "confirmed_green_before": 1077,
+    "newly_green": 3,
+    "confirmed_green_after": 1080,
+    "held_before": 22,
+    "newly_held": [
+      "TALERT-008"
+    ],
+    "held_after": 23,
+    "selected_count": 125,
+    "approved_group": "BULK_SAFE_08",
+    "source_spec_files": 9,
+    "live_status": "offline_contract_passed_live_browser_pending",
+    "risk_boundary": "Original 125 scenarios unchanged; production-write guard unchanged; selected fixtures use approved liveOriginalSafeTest; excludes extra-role logins and any previous passed/held."
   }
 }

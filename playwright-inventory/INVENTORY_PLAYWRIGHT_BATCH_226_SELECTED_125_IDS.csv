@@ -1,0 +1,126 @@
+test_id,spec_file,original_test_title,preflight_status
+TRC-051,tenant/reliability-command/reliability-command.spec.ts,TRC-051 Evidence without a key-value separator is displayed as a human sentence,static_source_and_guard_reviewed__live_pending
+TRC-052,tenant/reliability-command/reliability-command.spec.ts,TRC-052 Boolean true evidence is rendered as affirmative human-readable evidence,static_source_and_guard_reviewed__live_pending
+TRC-053,tenant/reliability-command/reliability-command.spec.ts,TRC-053 Boolean false evidence is rendered as negative human-readable evidence,static_source_and_guard_reviewed__live_pending
+TRC-054,tenant/reliability-command/reliability-command.spec.ts,TRC-054 Negative decimal evidence is numeric rather than interpreted as an identifier,static_source_and_guard_reviewed__live_pending
+TRC-055,tenant/reliability-command/reliability-command.spec.ts,TRC-055 Canonical status encoded inside evidence is displayed as a readable label,static_source_and_guard_reviewed__live_pending
+TRC-056,tenant/reliability-command/reliability-command.spec.ts,TRC-056 Empty evidence value explicitly discloses missing evidence,static_source_and_guard_reviewed__live_pending
+TRC-057,tenant/reliability-command/reliability-command.spec.ts,TRC-057 Dimension with no recommendation provides a human-review fallback,static_source_and_guard_reviewed__live_pending
+TRC-058,tenant/reliability-command/reliability-command.spec.ts,TRC-058 Blank dimension label is not mistaken for a named system dimension,static_source_and_guard_reviewed__live_pending
+TRC-059,tenant/reliability-command/reliability-command.spec.ts,TRC-059 Missing readiness code renders Not assessed instead of a readiness claim,static_source_and_guard_reviewed__live_pending
+TRC-060,tenant/reliability-command/reliability-command.spec.ts,TRC-060 Multiple evidence items preserve server-provided order,static_source_and_guard_reviewed__live_pending
+TRC-061,tenant/reliability-command/reliability-command.spec.ts,TRC-061 Risk whose dimension key was not returned gets a generic dimension label,static_source_and_guard_reviewed__live_pending
+TRC-062,tenant/reliability-command/reliability-command.spec.ts,TRC-062 Blank risk label uses an explicit review item fallback,static_source_and_guard_reviewed__live_pending
+TRC-063,tenant/reliability-command/reliability-command.spec.ts,TRC-063 Risk with missing next action keeps manual decision advice visible,static_source_and_guard_reviewed__live_pending
+TRC-064,tenant/reliability-command/reliability-command.spec.ts,TRC-064 Missing risk owner is displayed as Not reported,static_source_and_guard_reviewed__live_pending
+TRC-065,tenant/reliability-command/reliability-command.spec.ts,TRC-065 Missing risk runbook is displayed as Not reported,static_source_and_guard_reviewed__live_pending
+TRC-066,tenant/reliability-command/reliability-command.spec.ts,TRC-066 Risk owner and runbook internal identifiers are formatted for operators,static_source_and_guard_reviewed__live_pending
+TRC-067,tenant/reliability-command/reliability-command.spec.ts,TRC-067 Critical severity and degraded readiness receive independent visual tones,static_source_and_guard_reviewed__live_pending
+TRC-068,tenant/reliability-command/reliability-command.spec.ts,TRC-068 Zero risk score stays an assessed zero and is not treated as absent,static_source_and_guard_reviewed__live_pending
+TRC-069,tenant/reliability-command/reliability-command.spec.ts,TRC-069 Empty review-stage title uses its named fallback,static_source_and_guard_reviewed__live_pending
+TRC-070,tenant/reliability-command/reliability-command.spec.ts,TRC-070 Empty review-stage description renders manual guidance fallback,static_source_and_guard_reviewed__live_pending
+TRC-071,tenant/reliability-command/reliability-command.spec.ts,TRC-071 Empty review item label uses the standard review-item fallback,static_source_and_guard_reviewed__live_pending
+TRC-072,tenant/reliability-command/reliability-command.spec.ts,TRC-072 Blank review-stage status is described as Not assessed,static_source_and_guard_reviewed__live_pending
+TRC-073,tenant/reliability-command/reliability-command.spec.ts,TRC-073 Empty suggested reviewer is explicitly reported as missing,static_source_and_guard_reviewed__live_pending
+TRC-074,tenant/reliability-command/reliability-command.spec.ts,TRC-074 Review item with no instructions does not render misleading empty steps,static_source_and_guard_reviewed__live_pending
+TRC-075,tenant/reliability-command/reliability-command.spec.ts,TRC-075 Machine-readable review instruction becomes a human sentence,static_source_and_guard_reviewed__live_pending
+TRC-076,tenant/reliability-command/reliability-command.spec.ts,TRC-076 Unknown backend safety key uses a readable label rather than raw identifier,static_source_and_guard_reviewed__live_pending
+TRC-077,tenant/reliability-command/reliability-command.spec.ts,TRC-077 Safety flag truth values receive separate display classes,static_source_and_guard_reviewed__live_pending
+TRC-078,tenant/reliability-command/reliability-command.spec.ts,TRC-078 Missing stage item count falls back to number of supplied review items,static_source_and_guard_reviewed__live_pending
+TRC-079,tenant/reliability-command/reliability-command.spec.ts,TRC-079 Explicit zero stage count keeps default accordion closed even when rows exist,static_source_and_guard_reviewed__live_pending
+TWFC-036,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-036 multi-person approval chain displays each recommended human review,static_source_and_guard_reviewed__live_pending
+TWFC-037,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-037 no extra approval step produces explicit no-approval explanation,static_source_and_guard_reviewed__live_pending
+TWFC-038,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-038 technical plan details show identifiers only when diagnostic access is enabled,static_source_and_guard_reviewed__live_pending
+TWFC-039,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-039 explicit backend diagnostics denial hides technical plan identifiers,static_source_and_guard_reviewed__live_pending
+TWFC-040,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-040 Copy ID writes the displayed plan ID to clipboard,static_source_and_guard_reviewed__live_pending
+TWFC-041,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-041 absent source-action identifier has no Copy ID action in that row,static_source_and_guard_reviewed__live_pending
+TWFC-042,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-042 no returned blueprints displays explicit empty plan state,static_source_and_guard_reviewed__live_pending
+TWFC-043,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-043 initial failed summary fetch exposes retry without fake plans,static_source_and_guard_reviewed__live_pending
+TWFC-044,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-044 failed refresh preserves the last plan snapshot and warns it may be stale,static_source_and_guard_reviewed__live_pending
+TWFC-045,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-045 pending first summary shows loading explanation before any plan,static_source_and_guard_reviewed__live_pending
+TWFC-046,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-046 Refresh plans is disabled during a pending GET and enabled after it settles,static_source_and_guard_reviewed__live_pending
+TWFC-047,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-047 absent summary guidance renders clear read-only fallback instructions,static_source_and_guard_reviewed__live_pending
+TWFC-048,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-048 guidance points to the matching backend-selected plan title,static_source_and_guard_reviewed__live_pending
+TWFC-049,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-049 plain-language safety controls remain visible without technical safety details,static_source_and_guard_reviewed__live_pending
+TWFC-050,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-050 reading guidance and refreshing does not submit any operational mutation,static_source_and_guard_reviewed__live_pending
+TWFC-051,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-051 alert without record reference uses a safe unresolved-alert search link,static_source_and_guard_reviewed__live_pending
+TWFC-052,tenant/workflow-composer/workflow-composer.spec.ts,TWFC-052 untrusted external or unknown integration source surfaces never become links,static_source_and_guard_reviewed__live_pending
+TACT-026,tenant/action-center/action-center.spec.ts,TACT-026 Governance readiness disclosure tracks open state in URL and restores it,static_source_and_guard_reviewed__live_pending
+TACT-027,tenant/action-center/action-center.spec.ts,"TACT-027 unavailable readiness reports scoped assessment, not zero health",static_source_and_guard_reviewed__live_pending
+TACT-029,tenant/action-center/action-center.spec.ts,TACT-029 Technical diagnostics disclosure expands and persists its URL state,static_source_and_guard_reviewed__live_pending
+TACT-030,tenant/action-center/action-center.spec.ts,TACT-030 Both advanced disclosures preserve their independent expanded query flags,static_source_and_guard_reviewed__live_pending
+TACT-031,tenant/action-center/action-center.spec.ts,TACT-031 Closing an advanced disclosure removes only its own URL flag,static_source_and_guard_reviewed__live_pending
+TACT-033,tenant/action-center/action-center.spec.ts,TACT-033 Governance traceability score shows human-operated orchestration evidence,static_source_and_guard_reviewed__live_pending
+TACT-034,tenant/action-center/action-center.spec.ts,TACT-034 Remediation feedback renders actual blockers and supplied manual evidence,static_source_and_guard_reviewed__live_pending
+TACT-035,tenant/action-center/action-center.spec.ts,TACT-035 Effectiveness review displays source readiness percentage and blockers,static_source_and_guard_reviewed__live_pending
+TACT-036,tenant/action-center/action-center.spec.ts,TACT-036 Escalation governance displays candidate count and manual governance gate,static_source_and_guard_reviewed__live_pending
+TACT-037,tenant/action-center/action-center.spec.ts,TACT-037 Closure verification distinguishes candidate presence from unresolved gate,static_source_and_guard_reviewed__live_pending
+TACT-038,tenant/action-center/action-center.spec.ts,TACT-038 Contract diagnostics lists missing response keys and blockers,static_source_and_guard_reviewed__live_pending
+TACT-039,tenant/action-center/action-center.spec.ts,TACT-039 Route exposure audit detects missing panels and frontend contract drift,static_source_and_guard_reviewed__live_pending
+TACT-040,tenant/action-center/action-center.spec.ts,TACT-040 Diagnostic disclosure is read only and cannot send mutation requests,static_source_and_guard_reviewed__live_pending
+TACT-042,tenant/action-center/action-center.spec.ts,TACT-042 Known execution closure title localizes while arbitrary source title stays literal,static_source_and_guard_reviewed__live_pending
+TACT-044,tenant/action-center/action-center.spec.ts,TACT-044 Filtered action list still identifies readiness as unfiltered bounded source sample,static_source_and_guard_reviewed__live_pending
+TACT-045,tenant/action-center/action-center.spec.ts,"TACT-045 Missing numeric readiness fields display fallback values, not NaN or Infinity",static_source_and_guard_reviewed__live_pending
+TWKS-040,tenant/workspace/workspace.spec.ts,TWKS-040 removing alerts.read hides Alerts without denying Workspace access,static_source_and_guard_reviewed__live_pending
+TWKS-041,tenant/workspace/workspace.spec.ts,TWKS-041 unknown domain deep link defaults to All and omits API domain filter,static_source_and_guard_reviewed__live_pending
+TWKS-042,tenant/workspace/workspace.spec.ts,TWKS-042 losing a selected work-area permission resets the filter to All,static_source_and_guard_reviewed__live_pending
+TWKS-043,tenant/workspace/workspace.spec.ts,TWKS-043 urgency and work-area are independent GET filters,static_source_and_guard_reviewed__live_pending
+TWKS-044,tenant/workspace/workspace.spec.ts,TWKS-044 replacing filter URL state does not push a browser-history entry,static_source_and_guard_reviewed__live_pending
+TWKS-045,tenant/workspace/workspace.spec.ts,TWKS-045 initial pending GET displays a role-scoped loading message,static_source_and_guard_reviewed__live_pending
+TWKS-046,tenant/workspace/workspace.spec.ts,TWKS-046 refresh disables duplicate requests while its GET is pending,static_source_and_guard_reviewed__live_pending
+TWKS-047,tenant/workspace/workspace.spec.ts,TWKS-047 missing profile falls back to definition without trusting a spoofed role label,static_source_and_guard_reviewed__live_pending
+TWKS-048,tenant/workspace/workspace.spec.ts,TWKS-048 query-string suffix cannot bypass exact source path allowlist,static_source_and_guard_reviewed__live_pending
+TWKS-049,tenant/workspace/workspace.spec.ts,TWKS-049 changing both filters and refreshing never sends workspace writes,static_source_and_guard_reviewed__live_pending
+TWKS-050,tenant/workspace/workspace.spec.ts,TWKS-050 access-denied response hides action controls and exposes retry,static_source_and_guard_reviewed__live_pending
+TSET-008,tenant/tenant-settings/tenant-settings.spec.ts,TSET-008 Editing name marks form unsaved and enables saving valid changes,static_source_and_guard_reviewed__live_pending
+TSET-009,tenant/tenant-settings/tenant-settings.spec.ts,TSET-009 Removing required company name presents field error and disables submit,static_source_and_guard_reviewed__live_pending
+TSET-010,tenant/tenant-settings/tenant-settings.spec.ts,TSET-010 Empty organization type is invalid and cannot be submitted,static_source_and_guard_reviewed__live_pending
+TSET-011,tenant/tenant-settings/tenant-settings.spec.ts,TSET-011 Invalid supplier-facing email is identified without PUT call,static_source_and_guard_reviewed__live_pending
+TSET-012,tenant/tenant-settings/tenant-settings.spec.ts,TSET-012 Valid business email re-enables save after an invalid entry,static_source_and_guard_reviewed__live_pending
+TSET-013,tenant/tenant-settings/tenant-settings.spec.ts,TSET-013 Inverted operating-season dates show validation and prevent save,static_source_and_guard_reviewed__live_pending
+TSET-014,tenant/tenant-settings/tenant-settings.spec.ts,TSET-014 Currency must be exactly three alphabetic characters,static_source_and_guard_reviewed__live_pending
+TSET-015,tenant/tenant-settings/tenant-settings.spec.ts,TSET-015 Reset changes restores original profile and removes unsaved indicator,static_source_and_guard_reviewed__live_pending
+TSC-075,tenant/system-context/system-context.spec.ts,TSC-075 Known pricing action hides execution-request machine token,static_source_and_guard_reviewed__live_pending
+TSC-076,tenant/system-context/system-context.spec.ts,TSC-076 Missing score breakdown omits calculation detail table,static_source_and_guard_reviewed__live_pending
+TSC-077,tenant/system-context/system-context.spec.ts,TSC-077 Fully current source counters show reassuring empty state,static_source_and_guard_reviewed__live_pending
+TSC-078,tenant/system-context/system-context.spec.ts,TSC-078 Attention list displays at most five freshness sources,static_source_and_guard_reviewed__live_pending
+TSC-079,tenant/system-context/system-context.spec.ts,TSC-079 Stale section has cautious automation-planning message,static_source_and_guard_reviewed__live_pending
+TSC-080,tenant/system-context/system-context.spec.ts,TSC-080 Unknown source timestamp distinguishes unknown from stale,static_source_and_guard_reviewed__live_pending
+TSC-081,tenant/system-context/system-context.spec.ts,TSC-081 Explicit no-approval requirement shows policy-dependent boundary,static_source_and_guard_reviewed__live_pending
+TSC-082,tenant/system-context/system-context.spec.ts,TSC-082 Missing guardrail defaults conservatively to Required approval,static_source_and_guard_reviewed__live_pending
+TSC-083,tenant/system-context/system-context.spec.ts,TSC-083 Invalid context-quality numeric string formats to zero not NaN,static_source_and_guard_reviewed__live_pending
+TSC-084,tenant/system-context/system-context.spec.ts,TSC-084 Exactly one readiness blocker has singular helper text,static_source_and_guard_reviewed__live_pending
+TSC-085,tenant/system-context/system-context.spec.ts,TSC-085 Three readiness blockers show plural helper text,static_source_and_guard_reviewed__live_pending
+TAUD-031,tenant/tenant-audit/tenant-audit.spec.ts,TAUD-031 CSV uses committed trimmed filters and waits for debounced editing,static_source_and_guard_reviewed__live_pending
+TAUD-032,tenant/tenant-audit/tenant-audit.spec.ts,TAUD-032 CSV export error displays feedback without changing committed filters,static_source_and_guard_reviewed__live_pending
+TAUD-033,tenant/tenant-audit/tenant-audit.spec.ts,TAUD-033 Export is disabled while event list is being refetched,static_source_and_guard_reviewed__live_pending
+TAUD-072,tenant/tenant-audit/tenant-audit.spec.ts,TAUD-072 Successful CSV export requests both refreshed list and summary evidence,static_source_and_guard_reviewed__live_pending
+TFEED-018,tenant/operations-feed/operations-feed.spec.ts,TFEED-018 persisted last-visit timestamp marks newer items in new-only view,static_source_and_guard_reviewed__live_pending
+TFEED-021,tenant/operations-feed/operations-feed.spec.ts,TFEED-021 diagnostics permission exposes technical event details and source fields,static_source_and_guard_reviewed__live_pending
+TFEED-022,tenant/operations-feed/operations-feed.spec.ts,"TFEED-022 without tenant diagnostics read, technical event details are hidden",static_source_and_guard_reviewed__live_pending
+TFEED-023,tenant/operations-feed/operations-feed.spec.ts,TFEED-023 redacted payload metadata never claims raw payload is readable,static_source_and_guard_reviewed__live_pending
+TFEED-035,tenant/operations-feed/operations-feed.spec.ts,TFEED-035 feed refresh performs only read-only summary GET calls,static_source_and_guard_reviewed__live_pending
+TFEED-036,tenant/operations-feed/operations-feed.spec.ts,TFEED-036 backend allowed domains restrict Work area options,static_source_and_guard_reviewed__live_pending
+TFEED-037,tenant/operations-feed/operations-feed.spec.ts,TFEED-037 deep-linked unauthorized domain is cleared after source access arrives,static_source_and_guard_reviewed__live_pending
+TFEED-078,tenant/operations-feed/operations-feed.spec.ts,TFEED-078 source URL fragment is never accepted as an internal navigation link,static_source_and_guard_reviewed__live_pending
+TFEED-079,tenant/operations-feed/operations-feed.spec.ts,TFEED-079 source URL with a newline is rejected instead of becoming a router link,static_source_and_guard_reviewed__live_pending
+TFEED-080,tenant/operations-feed/operations-feed.spec.ts,TFEED-080 source URL longer than safety limit cannot become actionable,static_source_and_guard_reviewed__live_pending
+TFEED-081,tenant/operations-feed/operations-feed.spec.ts,TFEED-081 legacy operational summary source routes to current Action Center,static_source_and_guard_reviewed__live_pending
+TDASH-003,tenant/dashboard/dashboard.spec.ts,TDASH-003 backend summary failure shows explicit dashboard error instead of stale metrics,static_source_and_guard_reviewed__live_pending
+TDASH-014,tenant/dashboard/dashboard.spec.ts,TDASH-014 a reduced effective-permission snapshot hides inaccessible KPI cards and quick actions,static_source_and_guard_reviewed__live_pending
+TDASH-021,tenant/dashboard/dashboard.spec.ts,"TDASH-021 movement activity displays classified reason, actor, location and signed quantity",static_source_and_guard_reviewed__live_pending
+TDASH-022,tenant/dashboard/dashboard.spec.ts,TDASH-022 supplier performance shows shipment counts and opens the selected supplier,static_source_and_guard_reviewed__live_pending
+TDASH-024,tenant/dashboard/dashboard.spec.ts,TDASH-024 depletion-risk product opens the exact stock_id route,static_source_and_guard_reviewed__live_pending
+TDASH-029,tenant/dashboard/dashboard.spec.ts,TDASH-029 Reports action is hidden on denied entitlement and shown when authorized,static_source_and_guard_reviewed__live_pending
+TDASH-037,tenant/dashboard/dashboard.spec.ts,TDASH-037 unclassified historical movement retains an explicit warning label,static_source_and_guard_reviewed__live_pending
+TDASH-038,tenant/dashboard/dashboard.spec.ts,TDASH-038 missing insights permission shows explicit health access explanation,static_source_and_guard_reviewed__live_pending
+TDASH-041,tenant/dashboard/dashboard.spec.ts,TDASH-041 overdue shipment supplier link preserves exact supplier_id context,static_source_and_guard_reviewed__live_pending
+TDASH-053,tenant/dashboard/dashboard.spec.ts,TDASH-053 depletion risk ranks descending by numeric score and limits display to six,static_source_and_guard_reviewed__live_pending
+TDASH-055,tenant/dashboard/dashboard.spec.ts,TDASH-055 depletion consumption metric prefers classified consumption over outbound fallback,static_source_and_guard_reviewed__live_pending
+TDASH-056,tenant/dashboard/dashboard.spec.ts,TDASH-056 older depletion payload falls back to outbound if classified consumption is absent,static_source_and_guard_reviewed__live_pending
+TDASH-058,tenant/dashboard/dashboard.spec.ts,TDASH-058 reorder recommendations sort descending and display at most six positive quantities,static_source_and_guard_reviewed__live_pending
+TDASH-063,tenant/dashboard/dashboard.spec.ts,TDASH-063 reorder action preserves URL-encoded product identifier for procurement handoff,static_source_and_guard_reviewed__live_pending
+TDASH-066,tenant/dashboard/dashboard.spec.ts,TDASH-066 anomaly daily consumption fields override legacy outbound fields independently,static_source_and_guard_reviewed__live_pending
+TDASH-068,tenant/dashboard/dashboard.spec.ts,TDASH-068 unlinked alert displays neutral product fallback and acknowledged state,static_source_and_guard_reviewed__live_pending
+TDASH-073,tenant/dashboard/dashboard.spec.ts,TDASH-073 customer return reason shows safe reference and condition while preserving raw tooltip,static_source_and_guard_reviewed__live_pending
+TDASH-074,tenant/dashboard/dashboard.spec.ts,TDASH-074 customer return rejects an unsafe reference in visible reason while keeping evidence in tooltip,static_source_and_guard_reviewed__live_pending
