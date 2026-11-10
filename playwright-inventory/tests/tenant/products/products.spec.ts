@@ -1120,12 +1120,11 @@ test.describe('Products — cost controls reporting and governance review eviden
       reads += 1;
       return fulfillJson(route, costFixtures['cost-governance-summary']);
     });
-    // The coverage subtitle can appear in an inner statistics card and other
-    // panels. Anchor to the source-defined Cost Governance Summary heading,
-    // then its top-level header action (ProductCostGovernanceSummaryPanel.tsx).
-    const governancePanel = page.locator('section').filter({
-      has: page.getByRole('heading', { name: 'Cost Governance Summary', exact: true })
-    });
+    // This subtitle is already visible and occurs in the governance StatCard.
+    // StatCard only renders divs; its nearest section is precisely the outer
+    // ProductCostGovernanceSummaryPanel. No translated heading is required.
+    const governancePanel = page.getByText('Stocked products with cost basis', { exact: true })
+      .locator('xpath=ancestor::section[1]');
     await expect(governancePanel).toHaveCount(1);
     const button = governancePanel.locator(':scope > div').first().locator(':scope > button[type="button"]');
     await expect(button).toHaveCount(1);

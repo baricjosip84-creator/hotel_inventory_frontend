@@ -1,0 +1,8 @@
+{
+  "tenant/products/products.spec.ts": {
+    "previous_sha256": "73751b3dfc7ba3e38e7abae0b24cddfb799c6ae1667d4a5a8b99b4e137093aee",
+    "new_sha256": "404dc7e66bb06605181820aa46292ce13543070ad647ea796d029d7e2d536cd5",
+    "modified_test_id": "TPROD-076",
+    "source_evidence": "ProductCostGovernanceSummaryPanel: StatCard subtitle is nested in a div within the panel section, which contains the refresh button as a direct header div child."
+  }
+}

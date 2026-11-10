@@ -16,11 +16,11 @@ const manifest=json('original-suite-approved.json');
 const approved=manifest.approved_groups;
 const groupName='BULK_SAFE_10_RECHECK_4';
 const group=approved[groupName];
-const prior=Object.fromEntries(Object.entries(approved).slice(0,-1));
+const prior=Object.fromEntries(Object.entries(approved).filter(([name])=>!['BULK_SAFE_10_RECHECK_4','BULK_SAFE_10_RECHECK_5'].includes(name)));
 const historical=json('batch-229-recheck4-prior-approved-groups.json');
 assert.equal(Object.keys(prior).length,historical.prior_group_count,'Historical group count changed');
 assert.equal(sha(JSON.stringify(prior,(k,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b))):v)),historical.previous_approved_groups_sha256,'Historical approved groups changed');
-assert.deepEqual(Object.keys(approved).slice(-5),[
+assert.deepEqual(Object.keys(approved).filter(k=>k!=='BULK_SAFE_10_RECHECK_5').slice(-5),[
   'BULK_SAFE_10','BULK_SAFE_10_RECHECK','BULK_SAFE_10_RECHECK_2','BULK_SAFE_10_RECHECK_3',groupName]);
 assert.equal(group.secret,true);
 assert.deepEqual(group.entries.map(e=>[e.file,e.ids]),[['tenant/products/products.spec.ts',['TPROD-076']]]);
@@ -59,7 +59,10 @@ for(const file of list(path.join(root,'tests'))){
  const relative=path.relative(path.join(root,'tests'),file).replaceAll('\\','/');
  const source=fs.readFileSync(file,'utf8');
  const actual=sha(source);
- if(relative==='tenant/products/products.spec.ts')assert.equal(actual,revision.new_sha256,'Product source differs from reviewed fix');
+ if(relative==='tenant/products/products.spec.ts'){const fifth=json('batch-229-recheck5-product-source-sha256.json')[relative];
+   assert.equal(fifth.previous_sha256,revision.new_sha256);
+   assert.equal(actual,fifth.new_sha256,'Product source differs from fifth reviewed fix');
+ }
  else assert.equal(actual,oldSources[relative],'Non-selected original file changed: '+relative);
  const tree=ts.createSourceFile(file,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
  assert.equal(tree.parseDiagnostics.length,0,'TS parse failed '+relative);
@@ -93,7 +96,7 @@ for(const id of confirmed)assert.equal(known.get(id)?.hash,previousBodies[id],'C
 for(const id of excluded)assert.equal(known.get(id)?.hash,previousBodies[id],'Previously held body changed '+id);
 const t=known.get('TPROD-076');
 assert(t&&!t.skip&&t.file==='tenant/products/products.spec.ts');
-assert(t.body.includes("has: page.getByRole('heading', { name: 'Cost Governance Summary', exact: true })"));
+assert(t.body.includes(".locator('xpath=ancestor::section[1]')"));
 assert(t.body.includes("const button = governancePanel.locator(':scope > div').first().locator(':scope > button[type=\"button\"]')"));
 assert(t.body.includes('await expect(governancePanel).toHaveCount(1)'));
 assert(t.body.includes('await expect(button).toHaveCount(1)'));

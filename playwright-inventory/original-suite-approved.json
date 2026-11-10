@@ -2820,6 +2820,18 @@
         }
       ],
       "secret": true
+    },
+    "BULK_SAFE_10_RECHECK_5": {
+      "entries": [
+        {
+          "file": "tenant/products/products.spec.ts",
+          "ids": [
+            "TPROD-076"
+          ],
+          "sha256": "404dc7e66bb06605181820aa46292ce13543070ad647ea796d029d7e2d536cd5"
+        }
+      ],
+      "secret": true
     }
   },
   "status": "Batch 203: 58 prior confirmed passes; 155 new reviewed original IDs for a single bulk production-safe browser run; browser outcomes unverified.",
@@ -3896,7 +3908,7 @@
       "TWFC-001",
       "TWFC-010"
     ],
-    "log_verification": "Parsed exact 120 GitHub Playwright \u2713/\u2718 outcome lines, all IDs unique and disjoint with prior 682 passes and 21 held IDs; job exit code 1.",
+    "log_verification": "Parsed exact 120 GitHub Playwright ✓/✘ outcome lines, all IDs unique and disjoint with prior 682 passes and 21 held IDs; job exit code 1.",
     "nonwrite_boundary": "Audit page catch-all had attempted to continue unrelated POSTs, which live write guard blocked; no completed unauthorized writes reported."
   },
   "batch_216_preflight": {
@@ -4238,7 +4250,7 @@
       "TINS-047",
       "TSET-001"
     ],
-    "evidence": "Parsed 63 exact \u2713/\u2718 scenario outcome lines from GitHub uploaded original-suite log; no skips; original IDs matched selected set",
+    "evidence": "Parsed 63 exact ✓/✘ scenario outcome lines from GitHub uploaded original-suite log; no skips; original IDs matched selected set",
     "safety": "Existing context write blocker retained; no frontend/backend changes."
   },
   "batch_220_preflight": {
@@ -4284,7 +4296,7 @@
       "TINS-030",
       "TINS-035"
     ],
-    "evidence": "Exact GitHub output \u2713/\u2718 original scenario lines, no skips; 16 selected and accounted for.",
+    "evidence": "Exact GitHub output ✓/✘ original scenario lines, no skips; 16 selected and accounted for.",
     "safety": "Production write guard unchanged."
   },
   "batch_221_preflight": {
@@ -5572,5 +5584,15 @@
       "TPROD-076"
     ],
     "note": "Fix incorrect governance panel selection using exact source-defined heading and its direct header button; retain refetch assertion and production guard."
+  },
+  "batch_229_recheck5": {
+    "group": "BULK_SAFE_10_RECHECK_5",
+    "source_log": "logs_115833045398.zip",
+    "github_pass_ids": [],
+    "github_fail_ids": [
+      "TPROD-076"
+    ],
+    "confirmed_green_before_run": 1381,
+    "note": "Previous selector not present in live DOM; anchor on already-observed visible StatCard subtitle and closest section; assert actual header click causes GET refetch."
   }
 }
