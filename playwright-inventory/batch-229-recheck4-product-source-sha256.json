@@ -1,0 +1,7 @@
+{
+  "tenant/products/products.spec.ts": {
+    "previous_sha256": "a4846d792f16e33d3ea288ba43e7f46776fb4d8df81ca8e3b79ff775187b9d2f",
+    "new_sha256": "73751b3dfc7ba3e38e7abae0b24cddfb799c6ae1667d4a5a8b99b4e137093aee",
+    "modified_test_id": "TPROD-076"
+  }
+}

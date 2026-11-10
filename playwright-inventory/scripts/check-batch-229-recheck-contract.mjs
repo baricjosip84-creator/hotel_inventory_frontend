@@ -46,8 +46,10 @@ const exclusions=new Set([...old.held_unverified_ids,...old.deferred_unverified_
 assert.equal(confirmed.size,1377);assert.equal(exclusions.size,120);
 assert([...confirmed].every(id=>!exclusions.has(id)),'Passed/held overlap');
 assert(selected.every(id=>!confirmed.has(id)&&!old.held_unverified_ids.includes(id)&&!old.deferred_unverified_ids.includes(id)),'A pass or held case was selected');
-assert.deepEqual([...Object.keys(manifest.approved_groups)].slice(-4,-1),['BULK_SAFE_10','BULK_SAFE_10_RECHECK','BULK_SAFE_10_RECHECK_2']);
-assert.deepEqual(Object.keys(manifest.approved_groups).slice(0,-4),old.approved_groups_previous);
+const groupNames=Object.keys(manifest.approved_groups);
+const b229Index=groupNames.indexOf('BULK_SAFE_10');
+assert.deepEqual(groupNames.slice(b229Index,b229Index+3),['BULK_SAFE_10','BULK_SAFE_10_RECHECK','BULK_SAFE_10_RECHECK_2']);
+assert.deepEqual(groupNames.slice(0,b229Index),old.approved_groups_previous);
 const review=new Set(expected);
 const found=new Map(),source=new Map();let specs=0,skips=0;
 function files(dir){return fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>{const file=path.join(dir,e.name);return e.isDirectory()?files(file):e.name.endsWith('.spec.ts')?[file]:[];});}

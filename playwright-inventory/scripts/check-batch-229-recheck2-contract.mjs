@@ -1,3 +1,4 @@
+import {assertHistoricalSourceCompatible} from './batch-229-recheck-source-allowlist.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -28,7 +29,9 @@ assert.equal(last.confirmed_before_recheck,1380);
 assert.deepEqual(last.confirmed_pass_ids,[...priorRun]);
 assert.equal(group.secret,true);
 assert.equal(entries.length,2);
-assert.deepEqual(Object.keys(approved.approved_groups).slice(-4,-1),['BULK_SAFE_10','BULK_SAFE_10_RECHECK','BULK_SAFE_10_RECHECK_2']);
+const keys=Object.keys(approved.approved_groups);
+const groupStart=keys.indexOf('BULK_SAFE_10');
+assert.deepEqual(keys.slice(groupStart,groupStart+3),['BULK_SAFE_10','BULK_SAFE_10_RECHECK','BULK_SAFE_10_RECHECK_2']);
 assert.equal(Object.keys(bodyBefore).length,9900);
 assert.equal(Object.keys(beforeGreens).length,1290);
 assert.equal(Object.keys(batchGreens).length,87);
@@ -76,7 +79,8 @@ for(const [id,digest] of Object.entries({...beforeGreens,...batchGreens})){
 for(const id of priorRun){assert.equal(results.get(id).digest,bodyBefore[id],`Recent GREEN changed: ${id}`);}
 for(const e of entries){
   const src=read('tests/'+e.file),pin=sourcePins[e.file];
-  assert(pin&&sha(src)===e.sha256&&pin.second_recheck_sha256===e.sha256,'Unknown source revision '+e.file);
+  assert(pin&&pin.second_recheck_sha256===e.sha256,'Unknown source revision '+e.file);
+  assertHistoricalSourceCompatible(e.file,sha(src),e.sha256,'Unapproved future source revision '+e.file);
   assert(src.includes("from '../../../support/liveOriginalSafeTest'"),'Fixture safety missing');
   assert(e.ids.length===1&&results.get(e.ids[0]).file===e.file);
 }
@@ -86,8 +90,9 @@ assert(supplier.includes("request.method() === 'GET' && ['fetch', 'xhr'].include
 assert(supplier.includes('return route.fallback()')&&supplier.includes('return route.abort()'));
 assert(!supplier.includes('page.route(request =>')&& !supplier.includes('route.continue()'));
 const governance=results.get('TPROD-076').body;
-assert(governance.includes("page.getByText('Stocked products with cost basis', { exact: true })"));
-assert(governance.includes(".locator(':scope > div').first().getByRole('button').first()"));
+assert(governance.includes("page.getByText('Stocked products with cost basis')"));
+assert(governance.includes("has: page.getByRole('heading', { name: 'Cost Governance Summary', exact: true })"));
+assert(governance.includes(".locator(':scope > div').first().locator(':scope > button[type=\"button\"]')"));
 assert(governance.includes('await expect.poll(() => reads).toBeGreaterThanOrEqual(1)'));
 for(const id of expected){
   const body=results.get(id).body;

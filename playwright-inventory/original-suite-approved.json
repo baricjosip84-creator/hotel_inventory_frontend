@@ -2808,6 +2808,18 @@
         }
       ],
       "secret": true
+    },
+    "BULK_SAFE_10_RECHECK_4": {
+      "entries": [
+        {
+          "file": "tenant/products/products.spec.ts",
+          "ids": [
+            "TPROD-076"
+          ],
+          "sha256": "73751b3dfc7ba3e38e7abae0b24cddfb799c6ae1667d4a5a8b99b4e137093aee"
+        }
+      ],
+      "secret": true
     }
   },
   "status": "Batch 203: 58 prior confirmed passes; 155 new reviewed original IDs for a single bulk production-safe browser run; browser outcomes unverified.",
@@ -3884,7 +3896,7 @@
       "TWFC-001",
       "TWFC-010"
     ],
-    "log_verification": "Parsed exact 120 GitHub Playwright ✓/✘ outcome lines, all IDs unique and disjoint with prior 682 passes and 21 held IDs; job exit code 1.",
+    "log_verification": "Parsed exact 120 GitHub Playwright \u2713/\u2718 outcome lines, all IDs unique and disjoint with prior 682 passes and 21 held IDs; job exit code 1.",
     "nonwrite_boundary": "Audit page catch-all had attempted to continue unrelated POSTs, which live write guard blocked; no completed unauthorized writes reported."
   },
   "batch_216_preflight": {
@@ -4226,7 +4238,7 @@
       "TINS-047",
       "TSET-001"
     ],
-    "evidence": "Parsed 63 exact ✓/✘ scenario outcome lines from GitHub uploaded original-suite log; no skips; original IDs matched selected set",
+    "evidence": "Parsed 63 exact \u2713/\u2718 scenario outcome lines from GitHub uploaded original-suite log; no skips; original IDs matched selected set",
     "safety": "Existing context write blocker retained; no frontend/backend changes."
   },
   "batch_220_preflight": {
@@ -4272,7 +4284,7 @@
       "TINS-030",
       "TINS-035"
     ],
-    "evidence": "Exact GitHub output ✓/✘ original scenario lines, no skips; 16 selected and accounted for.",
+    "evidence": "Exact GitHub output \u2713/\u2718 original scenario lines, no skips; 16 selected and accounted for.",
     "safety": "Production write guard unchanged."
   },
   "batch_221_preflight": {
@@ -5547,5 +5559,18 @@
       "TPROD-076"
     ],
     "note": "Single scenario from prior auth-bootstrap failure; first login attempts had no valid JWT. Original test source unchanged; only one bounded Playwright retry on this selected group."
+  },
+  "batch_229_recheck4": {
+    "group": "BULK_SAFE_10_RECHECK_4",
+    "source_log": "logs_115695986002.zip",
+    "github_pass_ids": [],
+    "github_fail_ids": [
+      "TPROD-076"
+    ],
+    "confirmed_green_before_run": 1381,
+    "retry_ids": [
+      "TPROD-076"
+    ],
+    "note": "Fix incorrect governance panel selection using exact source-defined heading and its direct header button; retain refetch assertion and production guard."
   }
 }
