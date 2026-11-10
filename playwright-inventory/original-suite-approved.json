@@ -2832,6 +2832,18 @@
         }
       ],
       "secret": true
+    },
+    "BULK_SAFE_10_RECHECK_6": {
+      "entries": [
+        {
+          "file": "tenant/products/products.spec.ts",
+          "ids": [
+            "TPROD-076"
+          ],
+          "sha256": "7cb6f6701c944092aa209e6e2e27f4eac747262c0af531e0051f76ea66bb6047"
+        }
+      ],
+      "secret": true
     }
   },
   "status": "Batch 203: 58 prior confirmed passes; 155 new reviewed original IDs for a single bulk production-safe browser run; browser outcomes unverified.",
@@ -5594,5 +5606,15 @@
     ],
     "confirmed_green_before_run": 1381,
     "note": "Previous selector not present in live DOM; anchor on already-observed visible StatCard subtitle and closest section; assert actual header click causes GET refetch."
+  },
+  "batch_229_recheck6": {
+    "group": "BULK_SAFE_10_RECHECK_6",
+    "source_log": "logs_115840690462.zip",
+    "github_pass_ids": [],
+    "github_fail_ids": [
+      "TPROD-076"
+    ],
+    "confirmed_green_before_run": 1381,
+    "note": "Resolve actual GitHub Recheck5 :scope child-chain mismatch. Source-defined first button within visible governance summary section; retain GET request assertion; no safety modifications."
   }
 }

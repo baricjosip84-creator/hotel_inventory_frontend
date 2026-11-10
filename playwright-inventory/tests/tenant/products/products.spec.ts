@@ -1120,13 +1120,14 @@ test.describe('Products — cost controls reporting and governance review eviden
       reads += 1;
       return fulfillJson(route, costFixtures['cost-governance-summary']);
     });
-    // This subtitle is already visible and occurs in the governance StatCard.
-    // StatCard only renders divs; its nearest section is precisely the outer
-    // ProductCostGovernanceSummaryPanel. No translated heading is required.
+    // The stat text is confirmed visible in the live test account. Locate its
+    // governing section and choose the first button in DOM order: the source
+    // renders Refresh Governance in this section's header, before all exports.
+    // Avoid chained :scope selectors, which resolved to no button in Recheck 5.
     const governancePanel = page.getByText('Stocked products with cost basis', { exact: true })
       .locator('xpath=ancestor::section[1]');
     await expect(governancePanel).toHaveCount(1);
-    const button = governancePanel.locator(':scope > div').first().locator(':scope > button[type="button"]');
+    const button = governancePanel.locator('button[type="button"]').first();
     await expect(button).toHaveCount(1);
     await expect(button).toBeVisible();
     await expect(button).toBeEnabled();

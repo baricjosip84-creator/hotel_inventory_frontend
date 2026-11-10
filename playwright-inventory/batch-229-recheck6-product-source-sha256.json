@@ -1,0 +1,8 @@
+{
+  "tenant/products/products.spec.ts": {
+    "previous_sha256": "404dc7e66bb06605181820aa46292ce13543070ad647ea796d029d7e2d536cd5",
+    "new_sha256": "7cb6f6701c944092aa209e6e2e27f4eac747262c0af531e0051f76ea66bb6047",
+    "modified_test_id": "TPROD-076",
+    "source_evidence": "Current main src/pages/products/ProductCostGovernanceSummaryPanel.tsx renders Refresh Governance as the first button within the section whose coverage stat is already visible. Remove brittle nested :scope and retain GET-refetch assertion."
+  }
+}

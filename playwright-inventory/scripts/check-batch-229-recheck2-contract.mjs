@@ -92,7 +92,7 @@ assert(!supplier.includes('page.route(request =>')&& !supplier.includes('route.c
 const governance=results.get('TPROD-076').body;
 assert(governance.includes("page.getByText('Stocked products with cost basis')"));
 assert(governance.includes(".locator('xpath=ancestor::section[1]')"));
-assert(governance.includes(".locator(':scope > div').first().locator(':scope > button[type=\"button\"]')"));
+assert(governance.includes(".locator('button[type=\"button\"]').first()"));
 assert(governance.includes('await expect.poll(() => reads).toBeGreaterThanOrEqual(1)'));
 for(const id of expected){
   const body=results.get(id).body;

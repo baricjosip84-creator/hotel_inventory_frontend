@@ -16,7 +16,7 @@ assert.equal(group.secret,true);
 assert.deepEqual(group.entries,[old.entries[1]]);
 assert.equal(group.entries[0].ids[0],'TPROD-076');
 assert(original.entries.some(e=>e.file===group.entries[0].file && e.ids.includes('TPROD-076')));
-assert.deepEqual(Object.keys(manifest.approved_groups).filter(k=>!['BULK_SAFE_10_RECHECK_4','BULK_SAFE_10_RECHECK_5'].includes(k)).slice(-4),[
+assert.deepEqual(Object.keys(manifest.approved_groups).filter(k=>!['BULK_SAFE_10_RECHECK_4','BULK_SAFE_10_RECHECK_5','BULK_SAFE_10_RECHECK_6'].includes(k)).slice(-4),[
  'BULK_SAFE_10','BULK_SAFE_10_RECHECK','BULK_SAFE_10_RECHECK_2','BULK_SAFE_10_RECHECK_3']);
 assert.deepEqual(manifest.batch_229_recheck3.github_pass_ids,['TSUP-054']);
 assert.deepEqual(manifest.batch_229_recheck3.github_fail_ids,['TPROD-076']);
@@ -45,7 +45,9 @@ for(const [name,expected] of Object.entries(fingerprints)){
    assert.equal(newer.previous_sha256,expected);
    const fifth=JSON.parse(read('batch-229-recheck5-product-source-sha256.json'))[name];
    assert.equal(fifth.previous_sha256,newer.new_sha256);
-   assert.equal(sha(code),fifth.new_sha256,'Unexpected products source revision');
+   const sixth=JSON.parse(read('batch-229-recheck6-product-source-sha256.json'))[name];
+   assert.equal(sixth.previous_sha256,fifth.new_sha256);
+   assert.equal(sha(code),sixth.new_sha256,'Unexpected products source revision');
  } else assert.equal(sha(code),expected,'Historical file changed: '+name);
  const tree=ts.createSourceFile(name,code,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
  assert.equal(tree.parseDiagnostics.length,0,name);
