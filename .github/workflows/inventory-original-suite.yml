@@ -51,6 +51,8 @@ on:
           - BULK_SAFE_10_RECHECK_6
           - BULK_SAFE_11
           - BULK_SAFE_11_RECHECK
+          - BULK_SAFE_12
+          - BULK_SAFE_13
       confirmation:
         description: 'Type ORIGINALTESTS to run the selected group'
         required: true
@@ -67,7 +69,7 @@ jobs:
   original-suite:
     if: ${{ inputs.confirmation == 'ORIGINALTESTS' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 120
     environment: Production
     defaults:
       run:
@@ -118,6 +120,18 @@ jobs:
           node scripts/check-batch-229-recheck6-contract.mjs
           node scripts/check-batch-230-contract.mjs
           node scripts/check-batch-230-recheck-contract.mjs
+      - name: Prepare approved Batch 231 group in this runner only
+        if: ${{ inputs.group == 'BULK_SAFE_12' }}
+        run: |
+          node scripts/check-batch-231-contract.mjs
+          node scripts/prepare-batch-231-runtime.mjs
+          node scripts/check-batch-231-contract.mjs
+      - name: Prepare approved Batch 232 group and protected fixture in this runner only
+        if: ${{ inputs.group == 'BULK_SAFE_13' }}
+        run: |
+          node scripts/check-batch-232-contract.mjs
+          node scripts/prepare-batch-232-runtime.mjs
+          node scripts/check-batch-232-contract.mjs
       - name: Discover all 9,900 authored original tests (no browser, no credentials)
         if: ${{ inputs.group == 'DISCOVER_ALL' }}
         env:
@@ -145,6 +159,11 @@ jobs:
           PW_ORIGINAL_SUITE_GROUP: ${{ inputs.group }}
           PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
           PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
-        run: npx playwright test --config=playwright.live-original.config.ts
+        run: |
+          if [[ "${{ inputs.group }}" == "BULK_SAFE_12" || "${{ inputs.group }}" == "BULK_SAFE_13" ]]; then
+            npx playwright test --config=playwright.live-original.config.ts --workers=1
+          else
+            npx playwright test --config=playwright.live-original.config.ts
+          fi
       # No auth snapshots, traces, videos, screenshots, or artifacts uploaded.
       # One explicitly approved bulk group or single legacy group per run; no unrestricted 9,900-test live execution.
