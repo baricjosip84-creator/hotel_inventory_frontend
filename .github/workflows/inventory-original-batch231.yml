@@ -1,0 +1,69 @@
+name: Inventory - original 9900 Playwright Batch 231
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type ORIGINALTESTS to run the 180 source-reviewed ORIGINAL test IDs'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inventory-original-suite-production
+  cancel-in-progress: false
+
+jobs:
+  batch-231-original:
+    if: ${{ inputs.confirmation == 'ORIGINALTESTS' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: Production
+    defaults:
+      run:
+        working-directory: playwright-inventory
+    env:
+      PW_BASE_URL: 'https://hotel-inventory-frontend-mauve.vercel.app'
+      PW_LIVE_ORIGINAL_READONLY: 'YES'
+      PW_ORIGINAL_SUITE_GROUP: 'BULK_SAFE_12'
+    steps:
+      - name: Check out existing final installed suite
+        uses: actions/checkout@v4
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install existing suite dependencies
+        run: npm install --no-audit --no-fund
+      - name: Recheck existing 9900 suite and every historical release contract BEFORE adding Batch 231
+        env:
+          PW_ORIGINAL_SUITE_GROUP: 'BULK_SAFE_11_RECHECK'
+        run: |
+          node scripts/verify-original-suite.mjs
+          node scripts/check-bulk-auth-fixture.mjs
+          node scripts/check-stock-route-safety.mjs
+          for checker in scripts/check-batch-*.mjs; do
+            node "$checker"
+          done
+      - name: Audit exactly 180 new ORIGINAL bodies and full safety contract
+        run: node scripts/check-batch-231-contract.mjs
+      - name: Inject B231 source-reviewed allowlist into CI checkout ONLY
+        run: |
+          node scripts/prepare-batch-231-runtime.mjs
+          node scripts/check-batch-231-contract.mjs
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Discover exact 180 ORIGINAL cases before browser execution
+        run: |
+          npx playwright test --config=playwright.live-original.config.ts --workers=1 --list > original-selected.txt
+          tail -n 1 original-selected.txt
+          node scripts/check-live-original-discovery.mjs
+      - name: Run 180 original scenarios once, single worker, production writes denied
+        env:
+          PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
+          PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: npx playwright test --config=playwright.live-original.config.ts --workers=1
+      # Never upload auth snapshots, network traces, videos, screenshots or browser artifacts.
+      # No changes to the real original-suite-approved.json are committed or pushed.

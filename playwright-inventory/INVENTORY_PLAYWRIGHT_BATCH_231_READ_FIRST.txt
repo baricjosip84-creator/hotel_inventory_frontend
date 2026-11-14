@@ -1,0 +1,47 @@
+INVENTORY MANAGEMENT APP / ORIGINAL 9,900 PLAYWRIGHT TESTS
+BATCH 231 — 180 ORIGINAL SCENARIOS (SOURCE-REVIEWED, NOT YET RUN IN GITHUB)
+14 NOVEMBER 2026
+
+STATUS BEFORE B231: 1,455 confirmed browser GREEN; 177 held/deferred; 8,268 unapproved; 200 cumulative issue records.
+SELECTED B231: exactly 180 never-attempted original IDs across 19 guarded tenant spec files.
+NO NEW BROWSER PASSES CLAIMED. GITHUB RUN NOT YET PERFORMED.
+
+EXACT INSTALLATION — ONE ZIP ONLY
+1. Extract INVENTORY_PLAYWRIGHT_BATCH_231_180_GITHUB_FIX.zip into the ROOT of your existing GitHub repository:
+   baricjosip84-creator/hotel_inventory_frontend, branch main.
+   Merge folders and replace matching files if prompted.
+2. Commit and push to main.
+3. GitHub -> Actions -> "Inventory - original 9900 Playwright Batch 231" -> Run workflow
+   Branch: main
+   Confirmation: ORIGINALTESTS
+   Click Run workflow ONCE.
+4. If red, send the GitHub Actions logs ZIP. If GREEN, report GREEN and keep all 180 IDs as new confirmed passes.
+
+DO NOT INSTALL AN OLDER FULL ZIP. DO NOT INSTALL THE REFERENCE-FULL BACKUP.
+Do not rerun Batch 230, other previously passing tests, or held cases.
+
+WHY A SEPARATE WORKFLOW?
+The latest B230 nine-repair source is installed in GitHub but its authoritative 738-file FULL ZIP
+is not available in the Library listing. This FIX ZIP deliberately does not overwrite any old
+spec, the existing original-suite-approved.json manifest, or the existing 9900-test workflow.
+The new workflow first verifies ALL existing source contracts on the installed GitHub source,
+then injects ONLY a new 180-ID approved group into the TEMPORARY CI CHECKOUT.
+The GitHub repository is not permanently changed by that injection.
+
+SAFETY
+The existing liveOriginalSafeTest runtime blocks ALL non-auth network writes.
+Every selected test uses that protected fixture, with exact live origin and credential gates.
+Tests can fulfill synthetic writes only by page-local interceptions; remote production writes are aborted.
+No original test body is changed. No disposable-role tests are selected.
+One worker; no screenshot, video, trace, auth snapshot or uploaded artifacts.
+
+ISSUE TRACKING
+The issue-evidence folder includes a 200-row CSV and matching XLSX derived from the
+available November 14 tracker, with all nine user-confirmed B230 rechecks marked closed.
+Those are historical evidence copies, NOT a replacement for any newer canonical tracker
+already present in GitHub. Batch 231 is PENDING; no application failure has been invented.
+
+AUTHENTICITY LIMIT
+180 tests received AST/source and safety checks, not an authenticated browser run.
+The current frontend implementation cannot be fully verified from the archived
+Playwright-only source; the GitHub browser run is the actual behavior test.

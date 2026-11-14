@@ -1,0 +1,41 @@
+INVENTORY PLAYWRIGHT BATCH 231 / OFFLINE VERIFICATION — 2026-11-14
+
+Authoritative status preserved: 1,455 confirmed browser passes; 177 held/deferred; 8,268 unapproved; 200 issue records.
+Source audit: B230 730-file Playwright source from Library, with final B230 nine-test corrections PROTECTED in GitHub.
+Final B230 recheck archived sources (738-file FULL / nine-file FIX) are referenced by SHA-256 but unavailable to this working container.
+
+B231 tests: 180 unique NEW original IDs; 19 tenant .spec.ts files; no skipped tests.
+Historical selection: 1,632 distinct attempted IDs in B230 approval manifest; intersection with B231 = ZERO.
+Historical original suite: 9,900 authored IDs, 152 spec files, 357 original skips; no selected test body changed.
+Every B231 test body verified using TypeScript AST against recorded SHA-256 fingerprint.
+Every selected spec imports liveOriginalSafeTest; source-review rejects direct disposable-role login, PW_ role data,
+role options, unmocked direct API writes, route.continue in selected bodies, fixed waits, and test.skip.
+Shared beforeEach setup reviewed in selected spec files; no selected scenario relies on disposable-role credentials.
+Safe synthetic writes, when exercised, are routed through the retained page-local mocking boundary.
+Protected live origin / authentication credential requirements / context-level write abort remain in existing code.
+Existing single-worker behavior enforced at the new GitHub workflow CLI level.
+
+Offline tests executed:
+- verify-original-suite.mjs: PASS (9,900 / 152 / 40 historical runnable groups in offline B230 baseline).
+- 30/30 available check-batch-*.mjs historical and new B231 AST contracts: PASS.
+  Two older validators required a local symlink to globally installed TypeScript (no source or ZIP changes).
+- 180-ID offline B231 check: PASS.
+- Simulated final-nine-group presence / B231 CI-only runtime injection / after-injection 180-ID contract: PASS.
+- XLSX reimport and CSV export: PASS (200 records; nine user-confirmed green cases closed).
+- GitHub workflow YAML and release ZIP hash/integrity: checked during packaging.
+
+Not run: Browser discovery or live authenticated Playwright on Vercel (the package is not installed locally).
+Not confirmed: any new B231 browser PASS. Authentication/live app behavior requires GitHub.
+
+SAFETY-PRESERVING DEPLOYMENT
+B231 changes only NEW workflow, NEW contracts, NEW reviewed allowlist, NEW selected IDs,
+NEW verification documentation, and evidence copies. It does not replace B230 test specs,
+old manifest, the existing original workflow or B230 correction code.
+The NEW workflow verifies every existing historical release contract BEFORE
+inserting the reviewed B231 group into the ephemeral checkout and running exactly 180 cases.
+
+One precise GitHub run:
+Workflow: Inventory - original 9900 Playwright Batch 231
+Branch: main
+Confirmation input: ORIGINALTESTS
+Only one execution. Send resulting log ZIP on red.

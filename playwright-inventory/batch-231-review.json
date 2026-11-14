@@ -1,0 +1,1464 @@
+{
+  "batch": 231,
+  "group": "BULK_SAFE_12",
+  "source_basis": "B230 pre-recheck source, selected original test bodies unchanged by 9 known B230 recheck fixes",
+  "historical_attempted_count": 1632,
+  "confirmed_green_count": 1455,
+  "held_deferred_count": 177,
+  "selected_count": 180,
+  "selected": [
+    {
+      "id": "TACT-024",
+      "file": "tenant/action-center/action-center.spec.ts",
+      "title": "TACT-024 diagnostics access reveals technical details and expanded evidence",
+      "sha256": "bfca3d3fd205d6d966d9f7c26a8b75e27fe55e916f8f93aa34da61036a05cad2",
+      "line_in_B230_source": 261,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TACT-025",
+      "file": "tenant/action-center/action-center.spec.ts",
+      "title": "TACT-025 restricted domain permissions remove unauthorized filter options",
+      "sha256": "01f3faeb6217d291496823b7827f3450a0ce6d76e8bb86731bc369f8fcf27258",
+      "line_in_B230_source": 270,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TACT-028",
+      "file": "tenant/action-center/action-center.spec.ts",
+      "title": "TACT-028 Action Center diagnostics disclosure is hidden without tenant diagnostics access",
+      "sha256": "3e81f9b0b51b6897206ce0fd972c4df3db723a011bedfdcc81712d3be7e93d9b",
+      "line_in_B230_source": 301,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TAPE-021",
+      "file": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "title": "TAPE-021 valid JSON submits governed policy application with exact prior and applied values",
+      "sha256": "1ded9967fac72746ca1b71f45d9f8964811bddd9d68313c1c2bfe8e2148e9acb",
+      "line_in_B230_source": 173,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TAPE-025",
+      "file": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "title": "TAPE-025 successful applied-change POST closes form and requests updated evidence",
+      "sha256": "3f7e5ab18766f71575857caf8843d2d09fd149b136544d204d8829cb6a75d4d3",
+      "line_in_B230_source": 213,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TAPE-037",
+      "file": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "title": "TAPE-037 retirement records a human governance reason with retire_policy action",
+      "sha256": "a04530be69ec72ca9bfeffccec8b579a8e2871f39d4ceb5c7b09a4571856598c",
+      "line_in_B230_source": 296,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TAPE-038",
+      "file": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "title": "TAPE-038 resume monitoring can be requested from recalibration-review state",
+      "sha256": "a17abcdb233595700be43953e2e3d4b2bd68f1821e70e0247ffa1ed50a10e21e",
+      "line_in_B230_source": 304,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TAPE-040",
+      "file": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "title": "TAPE-040 rejected lifecycle transition retains reason and shows state-recheck warning",
+      "sha256": "3a75a1139fe5409524d6a990e228181b9fa9b7b8793871310c87178b6fd2140b",
+      "line_in_B230_source": 317,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TAPE-041",
+      "file": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+      "title": "TAPE-041 successful lifecycle POST closes form and refetches updated status",
+      "sha256": "d6a9612dd416b2c33daadfba44ff69c15cf26fa652d4c449f5463aa47cb5ab11",
+      "line_in_B230_source": 325,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TALERT-029",
+      "file": "tenant/alerts/alerts.spec.ts",
+      "title": "TALERT-029 Resolve submits trimmed resolution_note to correct alert ID",
+      "sha256": "a79c519751034af3a0e32126544b635e362e005c6985e89c469ac9883e267300",
+      "line_in_B230_source": 362,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TALERT-030",
+      "file": "tenant/alerts/alerts.spec.ts",
+      "title": "TALERT-030 rejected resolve shows backend reason and no false completion feedback",
+      "sha256": "97d18ac52d6baa755ecfc0c4e77a3c30d2954081d0747a78945e8e3ee1375ae2",
+      "line_in_B230_source": 374,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TALERT-039",
+      "file": "tenant/alerts/alerts.spec.ts",
+      "title": "TALERT-039 successful manual create trims payload, resets form and reports completion",
+      "sha256": "5905f6ff2b11145b35c28afa7387b8e410ac2073d7cfd7fa394409fd04934660",
+      "line_in_B230_source": 481,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TALERT-040",
+      "file": "tenant/alerts/alerts.spec.ts",
+      "title": "TALERT-040 rejected manual create shows error while retaining entered values",
+      "sha256": "74d84a0afb6fd15c400e748912b331eb935e56bbc90af61f0f2ad54182a20c01",
+      "line_in_B230_source": 497,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TALERT-041",
+      "file": "tenant/alerts/alerts.spec.ts",
+      "title": "TALERT-041 cancellation of Critical create confirmation sends no POST",
+      "sha256": "ca763a6fd4cadd310179c2d821e00507641afd81798024a17abdafca0adb904d",
+      "line_in_B230_source": 507,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TALERT-043",
+      "file": "tenant/alerts/alerts.spec.ts",
+      "title": "TALERT-043 optional linked product is sent in manual create payload",
+      "sha256": "9e460cfb7f217aa9bddca6e776b3dc7ff53d9b67f33fc72bee32cda2717404a3",
+      "line_in_B230_source": 538,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TCOL-049",
+      "file": "tenant/collaboration/collaboration.spec.ts",
+      "title": "TCOL-049 Read-only navigation and filtering never emit a coordination mutation request",
+      "sha256": "cbe60f53ee364a48303420ab3f1e6b6d43a5be468e404dc5d35b26e3bf37e2e9",
+      "line_in_B230_source": 259,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TCDO-037",
+      "file": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "title": "TCDO-037 save summary retains reviewer note and the source action only",
+      "sha256": "9f39992ccc40db5a4e6a5b200c765b032b4a7a0bd38491e726b202b65e403306",
+      "line_in_B230_source": 275,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TCDO-040",
+      "file": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "title": "TCDO-040 successful source-backed review selects returned run in plan URL",
+      "sha256": "73dbdec8051c74e43537e7385c5c5a4a5bf8dd308a23e450be71f9a2197913f2",
+      "line_in_B230_source": 299,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TCDO-042",
+      "file": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "title": "TCDO-042 select option mutates explicit option id; current selected choice is disabled",
+      "sha256": "1e2258c644eca2ead7557ee7be9a29b280b2c5c2205b4806035cf4657c6b9184",
+      "line_in_B230_source": 313,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TCDO-043",
+      "file": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "title": "TCDO-043 tradeoff governance POST stores reason and conditions only when user records",
+      "sha256": "078b397f28398987a9d66a78da0a676f15ed2f4b2354e0accf1a24a85b8d2dd5",
+      "line_in_B230_source": 320,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TCDO-046",
+      "file": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+      "title": "TCDO-046 advanced thresholds and cadence sent as numbers/enum by PUT",
+      "sha256": "4cbe0df73278c68eb1ac22e27233cdb51588fa7d7d7867edaab03ab7081f6504",
+      "line_in_B230_source": 341,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TDLF-028",
+      "file": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "title": "TDLF-028 successful evidence capture reports evidence-only save and clears form",
+      "sha256": "4624140e832508c67d28af8a1e867ef3fb225a772d26bdd8247f13b265a33e0b",
+      "line_in_B230_source": 263,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TDLF-030",
+      "file": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "title": "TDLF-030 Edit fetches full persisted record and offers Save feedback changes instead of duplicate",
+      "sha256": "25da8673d462d0ae00958bcbc0c6a3f39b008209f0f082290d011fae02a63c82",
+      "line_in_B230_source": 278,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TDLF-035",
+      "file": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "title": "TDLF-035 owner assignment posts an open review with reviewer and due time",
+      "sha256": "00b2601597eb873de24bd8f25f825b20b0006f7455dd1d6cea49497eafb397d4",
+      "line_in_B230_source": 314,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TDLF-040",
+      "file": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "title": "TDLF-040 evidence-detail follow-up POST references selected evidence and creates draft only",
+      "sha256": "766630011c652f0a34545412c16b3e53bffa110ff14de46490b7cd88752fc973",
+      "line_in_B230_source": 358,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TDLF-046",
+      "file": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "title": "TDLF-046 late evidence-detail response cannot overwrite later selected row",
+      "sha256": "5a49126eb4bb49d933eeb3cf741576164e723bd965a96badec37d6ab311efa69",
+      "line_in_B230_source": 405,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TDLF-047",
+      "file": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "title": "TDLF-047 closing evidence detail returns keyboard focus to originating row action",
+      "sha256": "d067ced9059a0acd17cf353437f4b590f80721a8fe684e3bdf50e4332a87e9e0",
+      "line_in_B230_source": 420,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TDLF-048",
+      "file": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+      "title": "TDLF-048 independent evidence buckets retain separate offsets when paging",
+      "sha256": "bad91228f756b08cbaf17bfc45bedd461cee098d0e5286dfc064acf172eed138",
+      "line_in_B230_source": 427,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TEXR-022",
+      "file": "tenant/execution-requests/execution-requests.spec.ts",
+      "title": "TEXR-022 Minimum-stock draft sends min_stock, not standard_unit_cost",
+      "sha256": "b31e43f4b977b92e4f5231a0ed43b29375681e31482ae8c197eeb674971901ce",
+      "line_in_B230_source": 219,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TEXR-024",
+      "file": "tenant/execution-requests/execution-requests.spec.ts",
+      "title": "TEXR-024 Zero is valid numeric cost and is sent as number zero",
+      "sha256": "2bb152c24e8d9df14552985262e23004eb9b1789c8f108aaecb170a1e344ed92",
+      "line_in_B230_source": 239,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TEXR-025",
+      "file": "tenant/execution-requests/execution-requests.spec.ts",
+      "title": "TEXR-025 Business reason is limited to 1000 characters and trimmed in POST",
+      "sha256": "a7cffd9de31749e77b2b85665a7b2059c9144e7e347ca5730499eb123f73e742",
+      "line_in_B230_source": 248,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TEXR-032",
+      "file": "tenant/execution-requests/execution-requests.spec.ts",
+      "title": "TEXR-032 Submit service error leaves synthetic row in draft state",
+      "sha256": "ca09902db791ddea5f820ec65b6ac275b48762f045258c09575b90754f916b3b",
+      "line_in_B230_source": 304,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TEXR-033",
+      "file": "tenant/execution-requests/execution-requests.spec.ts",
+      "title": "TEXR-033 Approve confirmation and note are separated from product execution",
+      "sha256": "386da60cbc00a56a2a35a3b009b7d55603fea9248b858686afd71781e187c86b",
+      "line_in_B230_source": 311,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TEXR-034",
+      "file": "tenant/execution-requests/execution-requests.spec.ts",
+      "title": "TEXR-034 Dismissing approval confirmation makes no POST",
+      "sha256": "9a8f5d4ab4200c51026af9923df0ffeb033b011508ed8a8e98b1b55a0e520b2e",
+      "line_in_B230_source": 318,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TEXR-035",
+      "file": "tenant/execution-requests/execution-requests.spec.ts",
+      "title": "TEXR-035 Rejection reason below three trimmed characters leaves request untouched",
+      "sha256": "0518feddc0d7de8fc5609eee249d4b50bdc7942beed7df4313df4e9f5b37a978",
+      "line_in_B230_source": 324,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TEXR-036",
+      "file": "tenant/execution-requests/execution-requests.spec.ts",
+      "title": "TEXR-036 Valid rejection note is trimmed and submitted, not executed",
+      "sha256": "b8c4cb0f452a6c4a9b7f6b787b2f0eb421e715552bb85e552a7ebd8713ffd51e",
+      "line_in_B230_source": 330,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TEXR-039",
+      "file": "tenant/execution-requests/execution-requests.spec.ts",
+      "title": "TEXR-039 Dismissing controlled execution confirmation prevents POST",
+      "sha256": "8c928e35e194e94a16598e81882fb3770daeded001953666f5c7ed77c7e45053",
+      "line_in_B230_source": 348,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TEXR-040",
+      "file": "tenant/execution-requests/execution-requests.spec.ts",
+      "title": "TEXR-040 Controlled execution failure renders stored failure reason, not success",
+      "sha256": "151010af62127b37db092ad6e2d68e5db9d8d5d1b19f78d1f31d874084dba41f",
+      "line_in_B230_source": 354,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TEXR-041",
+      "file": "tenant/execution-requests/execution-requests.spec.ts",
+      "title": "TEXR-041 Review-only approved request uses execute-noop instead of product mutation",
+      "sha256": "78f7ec042c818a2019061e69fdfa0fff316771e63a5d995a19caec7935e0d289",
+      "line_in_B230_source": 361,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TEXR-042",
+      "file": "tenant/execution-requests/execution-requests.spec.ts",
+      "title": "TEXR-042 Cancellation rejects a reason shorter than three non-space characters",
+      "sha256": "5229531ad40cbf4ea671303f1aac999f3f72e058fedc4308b23ce7855b544248",
+      "line_in_B230_source": 368,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIR-024",
+      "file": "tenant/inventory-requisitions/inventory-requisitions.spec.ts",
+      "title": "TIR-024 Draft payload trims department and retains explicit urgent priority",
+      "sha256": "4bf40371b3923a1f48ef6df4f8cd0015121caab6a58419d6dbcdc1e6a8d4c32a",
+      "line_in_B230_source": 207,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TIR-027",
+      "file": "tenant/inventory-requisitions/inventory-requisitions.spec.ts",
+      "title": "TIR-027 Draft edit PUT uses the selected expected version header",
+      "sha256": "f2acd550fc8a2ced1a9f88a861b9ed8674efaedc2965f5854cb9b820ed666ede",
+      "line_in_B230_source": 225,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TIR-028",
+      "file": "tenant/inventory-requisitions/inventory-requisitions.spec.ts",
+      "title": "TIR-028 Submit action posts explicitly to the selected requisition route",
+      "sha256": "23f8ecc4d838ef7b66fc63de592ec1b09547503c0d6d8108bf96b6952cc4efb3",
+      "line_in_B230_source": 231,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TIR-034",
+      "file": "tenant/inventory-requisitions/inventory-requisitions.spec.ts",
+      "title": "TIR-034 Explicit fulfillment line quantity and optional serials are sent without real posting",
+      "sha256": "8bffe6b02eb0e77f24048599c02c39c5e13a6e559ae521b9c4e154605cc66f46",
+      "line_in_B230_source": 261,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIR-035",
+      "file": "tenant/inventory-requisitions/inventory-requisitions.spec.ts",
+      "title": "TIR-035 Linked reservation creation sends allocate false under reservation API",
+      "sha256": "2020ce3175c03bb0bdc424a9ebf7fbf993f41bd5a3cc11c649d2f6e96fb31bef",
+      "line_in_B230_source": 269,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TIR-036",
+      "file": "tenant/inventory-requisitions/inventory-requisitions.spec.ts",
+      "title": "TIR-036 Fulfill-all-remaining carries explicit intent and no manual line array",
+      "sha256": "a4bcd73b3367b9be40557d9b8a71ef07f0be1ef8c4623e150330466905d4a095",
+      "line_in_B230_source": 274,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIR-040",
+      "file": "tenant/inventory-requisitions/inventory-requisitions.spec.ts",
+      "title": "TIR-040 Bulk selection and explicit click create one bulk fulfillment request, then show result",
+      "sha256": "19f91c050819fe6b80e479984dd7c22775dfeba0f9fb3fc71811fb7d49cb7c18",
+      "line_in_B230_source": 298,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TRSV-026",
+      "file": "tenant/inventory-reservations/inventory-reservations.spec.ts",
+      "title": "TRSV-026 Create draft submits normalized source and numeric line quantity",
+      "sha256": "0d3307790b79a2f07056d4962da182819c8fe865c8a3fc5b91c75633ea4d95b5",
+      "line_in_B230_source": 202,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TRSV-027",
+      "file": "tenant/inventory-reservations/inventory-reservations.spec.ts",
+      "title": "TRSV-027 Owner-permitted draft edit sends If-Match-Version and edited lines",
+      "sha256": "df2cef22a0ccdcda78dafa6a404ec6886458d50f4a60fb6e864c279e12d9b816",
+      "line_in_B230_source": 212,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TRSV-029",
+      "file": "tenant/inventory-reservations/inventory-reservations.spec.ts",
+      "title": "TRSV-029 Draft Activate requests lifecycle POST only after explicit confirmation",
+      "sha256": "cf5fb6a0e85f8d828c164dd87357985d2847d1728fc67fc52e001f84da439814",
+      "line_in_B230_source": 225,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TRSV-030",
+      "file": "tenant/inventory-reservations/inventory-reservations.spec.ts",
+      "title": "TRSV-030 Allocate sends allow_partial and current detail expected_version",
+      "sha256": "4d6cfb8e937d9969316568b7ef58a2afbee56dec538c7f5d3233185c60b99175",
+      "line_in_B230_source": 229,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TRSV-031",
+      "file": "tenant/inventory-reservations/inventory-reservations.spec.ts",
+      "title": "TRSV-031 Release sends entered lifecycle note to release endpoint",
+      "sha256": "8b7d1163226d4625029d80d661a1e98c079f28cec10bc9ba413177e9f8839e64",
+      "line_in_B230_source": 234,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TRSV-032",
+      "file": "tenant/inventory-reservations/inventory-reservations.spec.ts",
+      "title": "TRSV-032 Cancellation stays disabled without reason and requires confirmation",
+      "sha256": "7e8bbf3b1320bb1ef59b57e950daafc4787e750cf24ad4857a47188e8e7f1bd5",
+      "line_in_B230_source": 240,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TRSV-034",
+      "file": "tenant/inventory-reservations/inventory-reservations.spec.ts",
+      "title": "TRSV-034 Tenant due-expiration confirms and displays real response counts",
+      "sha256": "06af2dfc2b829b2cb5a6e7f659d2afffd00f597810310914f0144bc8f57f484f",
+      "line_in_B230_source": 252,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TRSV-035",
+      "file": "tenant/inventory-reservations/inventory-reservations.spec.ts",
+      "title": "TRSV-035 Fulfill all reserved requires confirmation and posts boolean flag",
+      "sha256": "ce3c2d1ddb3c9285f30b6fe1d20ed1acaaea4a24498c1b4906ec01ad93540508",
+      "line_in_B230_source": 261,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TRSV-036",
+      "file": "tenant/inventory-reservations/inventory-reservations.spec.ts",
+      "title": "TRSV-036 Partial fulfillment sends selected reservation_item_id and numeric quantity",
+      "sha256": "250c1e02750347159f453889e18cc0ecd1e407497a25e614926b7029233f27ac",
+      "line_in_B230_source": 266,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TRSV-039",
+      "file": "tenant/inventory-reservations/inventory-reservations.spec.ts",
+      "title": "TRSV-039 Conflict allocation requires dialog confirmation before posting",
+      "sha256": "027f39fc13c33d048201f3b50a4bf88053d57066b3c72a571c3bc29e20f21154",
+      "line_in_B230_source": 284,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TRSV-040",
+      "file": "tenant/inventory-reservations/inventory-reservations.spec.ts",
+      "title": "TRSV-040 Conflict release posts resolution code only after confirmation",
+      "sha256": "8b6071c74cb6882b6b0ecaebb18585f989f17d15a8e1c9eccb3871f919c47e49",
+      "line_in_B230_source": 291,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIU-021",
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "title": "TIU-021 Barcode preview sends barcode and location, without recording consumption",
+      "sha256": "22b4ac7762c35fd96a80e52eb7046c3aa3c6a5293dea1e995aeda608d06f3084",
+      "line_in_B230_source": 173,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIU-022",
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "title": "TIU-022 Barcode controls prohibit preview for missing barcode, location, or nonpositive quantity",
+      "sha256": "31b5089b5b23bdf8c9e253d860ac7d2521cef6a3dae255fabbf76028bfe2e7ab",
+      "line_in_B230_source": 179,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIU-023",
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "title": "TIU-023 Barcode evidence link distinguishes metadata from actual upload",
+      "sha256": "48a8fbb6f64f0d47d394eeca86b1065b225950f88f16f82c8db04e707ef9cf5c",
+      "line_in_B230_source": 185,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIU-024",
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "title": "TIU-024 Preview and repeated preview preserve one client scan ID for a single draft",
+      "sha256": "67ae3e64b52bdc796b53c0ce5b57b73eb5053383ea25f1bab0a3b5a154c0bd50",
+      "line_in_B230_source": 193,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIU-025",
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "title": "TIU-025 Bulk preview and record actions disabled with no valid product/location/quantity lines",
+      "sha256": "7a0da1ac8ea23ce08f8f28cc76296af5d5a3a5ef617580a67e2a93df80e8e88a",
+      "line_in_B230_source": 200,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIU-026",
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "title": "TIU-026 Bulk readiness POST is distinct from actual bulk consumption POST",
+      "sha256": "3d67b5fae1ebabbe3dbf053e12bed26a55ea6c5fd12d27f82a309bbac1745e9a",
+      "line_in_B230_source": 205,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIU-027",
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "title": "TIU-027 Bulk shared missing-evidence acknowledgement is explicit in readiness body",
+      "sha256": "b38ca3e9ec434b9b9000e53940eabda43fe4c4df323753b62e64c4f4397b7cbc",
+      "line_in_B230_source": 211,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIU-028",
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "title": "TIU-028 Template save requires a nonblank name and at least one valid line",
+      "sha256": "4dec8f52d5de0d702f4b4fcd214bbee7b00f790447c588ab8a5012456c594480",
+      "line_in_B230_source": 217,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TIU-030",
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "title": "TIU-030 Updating a template submits optimistic expected_version and original line references",
+      "sha256": "93c555dfd0edb0a398353524eca9579a677716e789825d7e25136e6655d8e2de",
+      "line_in_B230_source": 229,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIU-031",
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "title": "TIU-031 Cancelling archive confirmation must not DELETE saved template",
+      "sha256": "84970f143693eb125a3d9157897030ddc4f5e88e56a33f853f04900b06afecac",
+      "line_in_B230_source": 236,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIU-034",
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "title": "TIU-034 Confirming scheduled run submits one batch and displays synthetic response",
+      "sha256": "5096724cea86a2becacfe1422d009a6d6f42b62070677b93899654c2c759e9e6",
+      "line_in_B230_source": 253,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIU-035",
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "title": "TIU-035 Empty reversal prompt prevents reversal POST",
+      "sha256": "10ead417bae098860b031abada29d35761d38d062a32f5c718199fd55ceb2335",
+      "line_in_B230_source": 259,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIU-036",
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "title": "TIU-036 Follow-up review requires written reason; accepted review sends typed status",
+      "sha256": "548f3f411193629a16a06f3bfa40ed4028ba9475fa366761f51e5996bc2ba87d",
+      "line_in_B230_source": 263,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIU-039",
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "title": "TIU-039 Period close preview posts date range without closing",
+      "sha256": "f0bb8fa0c8f04826f303e4bbfc1b33e4acfe606beb6fd6dc9d723e5028a9e958",
+      "line_in_B230_source": 282,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIU-040",
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "title": "TIU-040 Period close requires confirmation; cancellation causes no close POST",
+      "sha256": "89af82d3355dc31986a8e56fede25234d212e5988c3f747b1a20adc3822fd211",
+      "line_in_B230_source": 287,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TIU-042",
+      "file": "tenant/inventory-usage/inventory-usage.spec.ts",
+      "title": "TIU-042 Nonempty usage ledger triggers CSV download with filtered columns",
+      "sha256": "480ec376b635e4a39e3f25a87f8473fdec7ba95e62c57b7dc0cf35efb79046c2",
+      "line_in_B230_source": 295,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-009",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-009 removing products.write and stock.read prevents edits and hides costing tabs",
+      "sha256": "4d5cb2fea65480bec2f15d0b85c0ecd8c12d4ddc4b77833f95cd0f5cbbea464f",
+      "line_in_B230_source": 221,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-019",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-019 create sends normalized typed fields, announces success and refetches Products",
+      "sha256": "2dad373510c7f086fa89da12116193d42f22ee82a6077894673166ef62667d1c",
+      "line_in_B230_source": 285,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TPROD-026",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-026 declining restore preserves archived product without POST",
+      "sha256": "1f3ca41e2c96c17981782f33d9956e161be33834a74ff0d8b75130b331508512",
+      "line_in_B230_source": 432,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-027",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-027 confirmed restore posts version then removes row from archived list",
+      "sha256": "a76b2e5f172bcfcc154c54b87d08dc54a0342e992c654d1fa413aae391afbc79",
+      "line_in_B230_source": 441,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-045",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-045 archive endpoint failure shows scoped error without breaking catalog",
+      "sha256": "ec922247b1e7d68bd7789da9457f8759fe4a9916225327c877637e1a30150f02",
+      "line_in_B230_source": 454,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-033",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-033 edited package sends PATCH with version and normalized package details",
+      "sha256": "ab84aa3e7a30f2627fff7446983d2d04064919bd23ad8c009856ff13d3f3ae74",
+      "line_in_B230_source": 485,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-030",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-030 previewing valid CSV does not commit before explicit confirmation",
+      "sha256": "d576e44dec5910ef371f835f80e8e250aa695a0205d515bc1f65a3098e19c400",
+      "line_in_B230_source": 545,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TPROD-037",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-037 Export Products CSV creates products-costing.csv",
+      "sha256": "25a4c129070f0216f48403f66dee86b60fa83bff10448429f96ec0aba6c64226",
+      "line_in_B230_source": 569,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-050",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-050 Cost controls review export downloads evidence file when rows exist",
+      "sha256": "edfae22216dcc9230211080b8770aa2132edf4b49630ef03af68dfbf5f0cc917",
+      "line_in_B230_source": 675,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-053",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-053 cancelled package archive sends no mutation and retains package row",
+      "sha256": "d4bbaf6c7fd43366e1ab408b794bc3e8db7b5857054a3935e8fc25b5ce20347d",
+      "line_in_B230_source": 720,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-058",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-058 rejected restore preserves archived item and shows archive-scoped error",
+      "sha256": "098b1ecf01fbb5e2cee8dd51dc4ca7993aca3054b59b99035ac4e1ffe7a25a72",
+      "line_in_B230_source": 778,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-060",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-060 cost source filter issues a source-scoped history request then clears",
+      "sha256": "5f86109f5d7d82ae893b23f2903e374c1c317e4405dba05ae5ce1d089ab0d360",
+      "line_in_B230_source": 795,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-063",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-063 editing without suppliers.read omits supplier_id from versioned PATCH",
+      "sha256": "9c3cfc5d4ecf6ceef7c97b9c8cf494c78f853bd1d69da31f96dc8356cc1f45e5",
+      "line_in_B230_source": 811,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-061",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-061 populated cost history exports product-scoped audit CSV",
+      "sha256": "89bb33e920afeaac5e0babbb7a0c777e6d150ea27bf849a65caefa9d6b17f4cd",
+      "line_in_B230_source": 832,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-066",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-066 valuation CSV exports the displayed received-cost detail records",
+      "sha256": "d150536c7e754956a116a8eea814d2161d9cf2ffdefca819a8df864be3807178",
+      "line_in_B230_source": 995,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-070",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-070 nonempty risk details export CSV from filtered evidence",
+      "sha256": "c58a50b14e60988baa03a67cb15c49588baf6a0f34ea3fe41b4e359165bc64f6",
+      "line_in_B230_source": 1050,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-072",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-072 nonempty costing action worklist exports CSV with expected filename",
+      "sha256": "b1e35d07bc1d1945d11ca85fcc2845ff93551038b8927fdfad482c62fb11bd7d",
+      "line_in_B230_source": 1074,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-073",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-073 cost report exports evidence rows to source-defined CSV",
+      "sha256": "a4b19a066468d82363768492d284d8a7ede93e3438ac54024df06213bc86cb83",
+      "line_in_B230_source": 1092,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-074",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-074 nonempty governance audit pack provides its original audit CSV export",
+      "sha256": "ea6723b6044e8cdc878ec0eae7a17c3d9bbe546fbeaded2a1c92e43ca24879d1",
+      "line_in_B230_source": 1100,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-075",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-075 governance audit print invokes browser print only with loaded pack",
+      "sha256": "489a18180a017e838c232b236bef4567371fac233788094bbbf50f28063a28ec",
+      "line_in_B230_source": 1107,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TPROD-078",
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-078 absent review/closure/handoff rows disable all three supporting CSV controls",
+      "sha256": "719711debc54e9d13a24733e953e20593800207699490f6866ddc373d81cc5d2",
+      "line_in_B230_source": 1146,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TRPT-024",
+      "file": "tenant/reports/reports.spec.ts",
+      "title": "TRPT-024 PDF action requests a PDF for the selected report and shows completion",
+      "sha256": "386e711a583037f309eca6d2bf91242bb49bab727a5bb680906c9bf85a2594d0",
+      "line_in_B230_source": 218,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TRPT-027",
+      "file": "tenant/reports/reports.spec.ts",
+      "title": "TRPT-027 Browser popup refusal provides a visible print-specific explanation",
+      "sha256": "0f8ca6f3787046f1d2bafc1e9f2e123df298c958df797736bfb9e3056128e2c7",
+      "line_in_B230_source": 238,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TRPT-028",
+      "file": "tenant/reports/reports.spec.ts",
+      "title": "TRPT-028 Print opens cloned report panel with CSS hiding controls",
+      "sha256": "afdaaf9ad7d65e38165fe1d4a309ac240ca260bcdd780ae85111cad18662a6c8",
+      "line_in_B230_source": 244,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSH-021",
+      "file": "tenant/shipments/shipments.spec.ts",
+      "title": "TSH-021 Create shipment supplier is required and safe default is empty",
+      "sha256": "d986bd859b6c0c5d8e9bb354f1abd965a5cc5ca2e0c182472bada80a1741837c",
+      "line_in_B230_source": 228,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSH-022",
+      "file": "tenant/shipments/shipments.spec.ts",
+      "title": "TSH-022 Creating a shipment with valid supplier and date sends the source-backed request body",
+      "sha256": "ef67e53c8fc8b0f5fe201ba96d63c62afc111053002158a56f509fb0c1666cbc",
+      "line_in_B230_source": 233,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSH-024",
+      "file": "tenant/shipments/shipments.spec.ts",
+      "title": "TSH-024 Pending shipment header edit sends the original If-Match-Version",
+      "sha256": "4e8dac24d4cfa5300df75ce06bee34a20714601f6d16d7ce72740d2e57f4de6f",
+      "line_in_B230_source": 248,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSH-026",
+      "file": "tenant/shipments/shipments.spec.ts",
+      "title": "TSH-026 Shipment deletion requires explicit confirmation before DELETE",
+      "sha256": "f8379c0af8990882f92935e52a940e7408ce9833446551e3a074e71ff3d7882f",
+      "line_in_B230_source": 263,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSH-028",
+      "file": "tenant/shipments/shipments.spec.ts",
+      "title": "TSH-028 Item quantity edit sends expected item version and numeric value",
+      "sha256": "1204f3e8bc168a007cdf9fe98a7dcd7b9b616ab66e76a946b2ab31ec704fd0eb",
+      "line_in_B230_source": 281,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSH-034",
+      "file": "tenant/shipments/shipments.spec.ts",
+      "title": "TSH-034 Receive request carries exact version, line fields and discrepancy details",
+      "sha256": "b7560b21fc6e252aecbd14d323b020ebf92f26cfc4050c1c7db120518e61411e",
+      "line_in_B230_source": 321,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSH-035",
+      "file": "tenant/shipments/shipments.spec.ts",
+      "title": "TSH-035 Shortage reason may be saved without receiving stock",
+      "sha256": "6d70586f6886764e22a058fd06eef6e696e582b55229494953fd1b6b246d8166",
+      "line_in_B230_source": 331,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSH-039",
+      "file": "tenant/shipments/shipments.spec.ts",
+      "title": "TSH-039 Supplier email cannot send invalid recipient and reports configuration rejection",
+      "sha256": "0367177c4df5f60e1f6dfe7c7679b3107ba5f84060b0336b6b8b143ee4bbcd33",
+      "line_in_B230_source": 360,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TST-041",
+      "file": "tenant/stock/stock.spec.ts",
+      "title": "TST-041 VERSION_CONFLICT in mocked Count POST clears stale count entry",
+      "sha256": "ab1c1c924c153ade4b591d42cafd3b2b573bba5131f1f7d8d069e5ee4552b252",
+      "line_in_B230_source": 335,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TST-045",
+      "file": "tenant/stock/stock.spec.ts",
+      "title": "TST-045 Mocked adjustment result shows quantity evidence and refreshed UI",
+      "sha256": "0c56641f72bf8a721251a4e17d1b3e42e60754cfb2358662122f1d05ab1ebbca",
+      "line_in_B230_source": 374,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TST-050",
+      "file": "tenant/stock/stock.spec.ts",
+      "title": "TST-050 Mocked stock POST rejection appears next to action without a success result",
+      "sha256": "fca4a5d965b3ac255101a655e903c9dd3a2e7181310c4fc74ccfdd5ff081c3bd",
+      "line_in_B230_source": 410,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSMV-045",
+      "file": "tenant/stock-movements/stock-movements.spec.ts",
+      "title": "TSMV-045 Export requests the full filtered ledger in batches of 500",
+      "sha256": "160d13bcd7d0a03717dba3d05a7f966abc1f597b2c1a5e0a2f77f990e3c13e15",
+      "line_in_B230_source": 277,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSMV-047",
+      "file": "tenant/stock-movements/stock-movements.spec.ts",
+      "title": "TSMV-047 CSV escapes spreadsheet formulas in free text instead of executing them",
+      "sha256": "fafd54587d23a42a1d659425b6a8b2e1e1d924f4f0b14297fc6e91905d54d9f6",
+      "line_in_B230_source": 289,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSMV-048",
+      "file": "tenant/stock-movements/stock-movements.spec.ts",
+      "title": "TSMV-048 CSV export GET failure shows an error and no download",
+      "sha256": "aa4b8527a43cacfa282d2e5e629686668b1751fe20a695ba9f5dabcfb88707d3",
+      "line_in_B230_source": 295,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSTR-030",
+      "file": "tenant/stock-transfers/stock-transfers.spec.ts",
+      "title": "TSTR-030 Valid draft create POST carries locations, trimmed notes, item UOM and serial array",
+      "sha256": "9498bbe48c5d8f923a060346ff8f53451d5e5f253ab0325d0939c10713eeb29f",
+      "line_in_B230_source": 281,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSTR-036",
+      "file": "tenant/stock-transfers/stock-transfers.spec.ts",
+      "title": "TSTR-036 Saving edited draft sends versioned PATCH with item data",
+      "sha256": "267b4498df314f7a0964851d2843867341d6d526707f5a5c14d3ae0bbbf7de89",
+      "line_in_B230_source": 316,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSTR-038",
+      "file": "tenant/stock-transfers/stock-transfers.spec.ts",
+      "title": "TSTR-038 Cancel editing resets create form without any PATCH",
+      "sha256": "cc8f0fd2b5859837b594ed58f3106b6ee2b82deee7be3b5522743565abaff09f",
+      "line_in_B230_source": 331,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSTR-042",
+      "file": "tenant/stock-transfers/stock-transfers.spec.ts",
+      "title": "TSTR-042 Accepting execution confirmation POSTs version without silently running first",
+      "sha256": "b5a77d16e4d9e91493ecb511931a062997b424face82713c319ad67f1a94808c",
+      "line_in_B230_source": 356,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSTR-045",
+      "file": "tenant/stock-transfers/stock-transfers.spec.ts",
+      "title": "TSTR-045 Confirmed cancellation submits numeric version and trimmed reason",
+      "sha256": "8520bff31dd4bf41cdd78f29f08bd91398bcc084a747d22d77c3442edc52b77c",
+      "line_in_B230_source": 374,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSTR-050",
+      "file": "tenant/stock-transfers/stock-transfers.spec.ts",
+      "title": "TSTR-050 Filtered CSV sends active query and safely escapes spreadsheet formulas",
+      "sha256": "933ddc51250057241afd73f04cc6bc4fd944e3056b374edcaa5ee303f11d3f88",
+      "line_in_B230_source": 411,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSTR-067",
+      "file": "tenant/stock-transfers/stock-transfers.spec.ts",
+      "title": "TSTR-067 Cancel API rejection preserves draft controls and displays its error",
+      "sha256": "cc789b67140c50d5e95f26985b3f0a1f2d27b14c40dc1f30d7c56648970aa0c4",
+      "line_in_B230_source": 512,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSL-016",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-016 Required name prevents empty create submission in the browser",
+      "sha256": "324811c724704787081f86543103f55d03d0d71522bbfada0066384413fc5b63",
+      "line_in_B230_source": 145,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSL-017",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-017 Create trims name and sends null for unselected condition",
+      "sha256": "f816696050d862fc189814607d7052014eeb86576b3fd36fa24e9638c34ad663",
+      "line_in_B230_source": 151,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSL-018",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-018 Duplicate existing name is stopped before POST regardless of casing",
+      "sha256": "8df1512c40c0abf38f317baf1fa2fe74d056bee8ddfe01193b20e8ea753100d5",
+      "line_in_B230_source": 159,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSL-019",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-019 Custom condition becomes a real field and is saved in request payload",
+      "sha256": "686b624dd916fb39119f8de10a91a9b929848460039ae3cf6bca8ce4843e8b2f",
+      "line_in_B230_source": 166,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSL-020",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-020 Empty custom condition fails native required validation",
+      "sha256": "d7fcdd5ee246ad5b378c54c304d47749cbc0d1fab58ee3acc47a4fc4cdec7895",
+      "line_in_B230_source": 175,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSL-023",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-023 Update sends PATCH with explicit If-Match-Version of edited row",
+      "sha256": "3db921d897b2627a438c6501b747faef3ba25fca9aa90425b8f15f4bf6d1e1ee",
+      "line_in_B230_source": 196,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSL-025",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-025 Refusing native Retire confirmation sends no DELETE",
+      "sha256": "73a338026d9c95e99f301b4c48f05fe94a821e98eda7bcd942d7f9526216639f",
+      "line_in_B230_source": 216,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSL-026",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-026 Confirming Retire sends expected revision as If-Match-Version",
+      "sha256": "47d93d014cbe5e7782c4de57c1db5b3cfb36356f2f99dec1a637c7e6d81d6c3f",
+      "line_in_B230_source": 223,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSL-027",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-027 Dependency-blocked retirement shows rejection rather than success",
+      "sha256": "8e9ae35c6ab372b248ad7523790fd1a6d8a3b4130ff9684621dcbfe529eb12c7",
+      "line_in_B230_source": 232,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSL-028",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-028 Server create conflict retains the draft and exposes an error",
+      "sha256": "dfefb72fb92cf5a09cd7a6fcc1186cb40ec59122353daff9d596f5789f834412",
+      "line_in_B230_source": 240,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSL-039",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-039 Stale version PATCH rejection retains the draft and avoids success",
+      "sha256": "5b40d53cb4cafadbd3a5d525c78dee65b3142fb3a708fe856f2bbd6b49814f45",
+      "line_in_B230_source": 354,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSL-048",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-048 Standard condition is posted without the custom-condition sentinel",
+      "sha256": "de7baad6af46f9639a9ad6f2f30eb34711e3fa73c648a66c9a33b6f8d4077c66",
+      "line_in_B230_source": 433,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSL-049",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-049 Switching from custom condition to not specified posts null",
+      "sha256": "80d069d9402522ad9e147c63195b0ef892e761641dd6ec18ba346ac5b0e045c7",
+      "line_in_B230_source": 442,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSL-051",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-051 Editing custom condition into a standard value sends a standard PATCH",
+      "sha256": "b687b634e09bc375776ae3e2e194b642168800063aed56339f3f8482eedc0eab",
+      "line_in_B230_source": 459,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSL-052",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-052 An unchanged own name is not incorrectly rejected as duplicate during edit",
+      "sha256": "46c552b0b406cb6e696191ef1fd22430c0400eaaf98afb928e1a965d95071794",
+      "line_in_B230_source": 468,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSL-053",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-053 Renaming a location to another location name blocks PATCH locally",
+      "sha256": "6de634169d62c70b2795d4a418e6602c2d928dc733e6dff957e85c7fd459ca8b",
+      "line_in_B230_source": 475,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSL-054",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-054 Failed update retains edited draft and error without claiming success",
+      "sha256": "a324df3a8834c186b901a4b9192d1fc49063ede826817ce4a65893fbc857b41c",
+      "line_in_B230_source": 483,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSL-061",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-061 Successful update returns to create mode and clears the edit draft",
+      "sha256": "c73e3498f46d8013fd7e8cc0a52734ba9b40883ccaf594facc5093e8c7ff7568",
+      "line_in_B230_source": 535,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSL-062",
+      "file": "tenant/storage-locations/storage-locations.spec.ts",
+      "title": "TSL-062 Retire confirmation explains stock dependencies and historical retention",
+      "sha256": "5a1582ab8fd496c93a5b181079539fe60f06a95d164bd5c99875f11f300535b1",
+      "line_in_B230_source": 545,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSUP-013",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-013 required supplier name is blocked by HTML validity before POST",
+      "sha256": "1e5e39def03f4ea62bbf4d25ccbf4b677e9f5ea42b66ee52e66e39020bcc9a91",
+      "line_in_B230_source": 178,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSUP-014",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-014 malformed email fails browser validation without creating supplier",
+      "sha256": "0bae3fc45732cff32ba76fc0d1bb72d633b3d302eba3246ebc938f78c42084e9",
+      "line_in_B230_source": 188,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSUP-015",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-015 creation normalizes whitespace, sends null optionals, then shows success",
+      "sha256": "d2baeded3b36bd24494478eaf1ee8c4d4a62085efc5f4a2b9f07d3703db7b9da",
+      "line_in_B230_source": 200,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSUP-016",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-016 duplicate supplier name shows server conflict without success feedback",
+      "sha256": "91676e1a91d7e8725bdb7fc272bb851aabb50ddd84aab53a75162e8cc0307d85",
+      "line_in_B230_source": 215,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSUP-019",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-019 supplier update PATCH has If-Match-Version and trimmed new values",
+      "sha256": "32e58fa9115620f9bbed3b2894841fd3f10ca8a745f70511535fe34140b3a1b5",
+      "line_in_B230_source": 245,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSUP-020",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-020 stale-version update shows conflict and no false success message",
+      "sha256": "ab5f393aebf48db77c3e410a06185ade1564be28b5a5100fe31f4c713671c8de",
+      "line_in_B230_source": 262,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSUP-021",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-021 decline archive leaves row and sends no DELETE",
+      "sha256": "a7f4ca94f2dae378870680f1ac47a6230fa74b29127cd0581d27ed7fd70d909a",
+      "line_in_B230_source": 272,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSUP-022",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-022 confirmed archive sends versioned DELETE and displays success",
+      "sha256": "2c8086133b4c6cf197f33f705ae843ab832d42db6c647c66b26eb5795e7ecaa7",
+      "line_in_B230_source": 281,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSUP-023",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-023 archive dependency rejection displays error and keeps supplier visible",
+      "sha256": "4dd30602a3c4c95e64422adcd43052dce154466d14834950eec1012ed46c3bde",
+      "line_in_B230_source": 294,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSUP-031",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-031 no suppliers.write leaves directory readable but removes write forms and imports",
+      "sha256": "19e0402cac2d61902606929d9a7557121a6af384e2b17de33c8db6159881fbb7",
+      "line_in_B230_source": 370,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSUP-034",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-034 CSV preview submits normalized supplier rows but never commits tenant data",
+      "sha256": "8358b5708dd9f80c06abfd49340f60617c534d30b38839ad49a40d04c5319257",
+      "line_in_B230_source": 412,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSUP-035",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-035 invalid server preview displays row-level validation and exports a CSV without commit",
+      "sha256": "0d6a4efd0f0129025756c4e27b800c507e0a68f935640212919d3676a84390be",
+      "line_in_B230_source": 433,
+      "writes_intercepted_locally": true
+    },
+    {
+      "id": "TSUP-041",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-041 changed source version while editing closes stale edit form with warning",
+      "sha256": "27865f62a02836a5d638dd2c5e5beaf3dd9a51604d68fb66622148576bb52f59",
+      "line_in_B230_source": 519,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSUP-042",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-042 refreshing directory updates an open supplier performance identity",
+      "sha256": "3289d55deb5d0fc7eaed5ddc44a3f5a5d325dc972ee1769691915ac7ac1ff0d7",
+      "line_in_B230_source": 531,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSUP-044",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-044 archiving supplier currently being edited closes edit without retaining stale values",
+      "sha256": "fc7c77ec668fed078ab5e3828968099ac48c1e2e662bd610256fcfbc4d0d2f92",
+      "line_in_B230_source": 554,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSUP-056",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-056 clearing optional values in an update sends null rather than empty strings",
+      "sha256": "7ff869a6ed9e8693841de0b9cf7e71fff7701c7e83b985b1b37e07a681aac00b",
+      "line_in_B230_source": 662,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSUP-057",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-057 cancelling an edit after a failed PATCH clears its stale error",
+      "sha256": "c2e1ad305d1afd954d7b02b66e5d54c4302725a494889384a4d34ee90dd66e3e",
+      "line_in_B230_source": 679,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSUP-058",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-058 disappearing supplier during refresh closes an in-progress edit",
+      "sha256": "41fdca66774d02ef168a4c48768144a011ba7ce076e33130c4f5f21b1db31e54",
+      "line_in_B230_source": 691,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSUP-059",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-059 disappearing supplier during refresh closes a stale performance panel",
+      "sha256": "8c1e89437c4fd9be5588b16dda9e0df3843d826e67b676acfd477e9a670cf4cc",
+      "line_in_B230_source": 702,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSUP-068",
+      "file": "tenant/suppliers/suppliers.spec.ts",
+      "title": "TSUP-068 supplier archive dialog describes outstanding dependency safeguards",
+      "sha256": "40960280600092c491e9aeef1272dc5bcb05bfe6b5c19d833b32c9834b46fe3f",
+      "line_in_B230_source": 785,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-016",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-016 Saving trims identity fields and shows response-backed success",
+      "sha256": "37dfc659a60bfc5e158427d690a22c28015d8104458714078a5036ba08726038",
+      "line_in_B230_source": 163,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-017",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-017 Failed PUT preserves the unsaved edit and displays server error",
+      "sha256": "5e0caa0461867b8169bbc6864360c27d7238bc7759147394aed81783844c9bd4",
+      "line_in_B230_source": 173,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-019",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-019 Active tenant write lock disables editing even for update-authorized role",
+      "sha256": "b56c1f82100e909e5bac9be02979eae01dcb956ed3b70f6aced5439e24ba6419",
+      "line_in_B230_source": 189,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-029",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-029 Configured tenant currency change rejected by API is not reported saved",
+      "sha256": "b1a9f403a4b79725260f93cffd2de1e410d9057ae6202fcd06fbdd99e46c4c01",
+      "line_in_B230_source": 266,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-032",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-032 Confirmed legacy currency change submits explicit confirmation flag",
+      "sha256": "4ed0e6487e169af397c105b95c01c89f250d3bdfa7d9605befbabf2ed28d067a",
+      "line_in_B230_source": 291,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-034",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-034 Pending PUT disables duplicate submit, reset and editing",
+      "sha256": "664b8205d4ac8d1a9e97fb1cb1bdb21455fe6256b300ad9e10c66beeb8a59c93",
+      "line_in_B230_source": 307,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-035",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-035 Declining discard confirmation retains dirty form and route",
+      "sha256": "bce222e0a40af43ae4933572a50952b87b063ff3d184ca5ca45dde9beb7c47fa",
+      "line_in_B230_source": 317,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-036",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-036 Accepting discard confirmation proceeds through tenant navigation",
+      "sha256": "fecd4cc8b18031eb1d289b3dcd718d9da1b3ff2b3851f489136f37711c38f5de",
+      "line_in_B230_source": 325,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-047",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-047 Whitespace-only location legal name and business phone become null in PUT",
+      "sha256": "fdad48403ad8f707a46588bce7d9706636ea52e70c94fdff597206ed5a92d6ad",
+      "line_in_B230_source": 417,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-048",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-048 Whitespace-only tax address and payment terms become null in PUT",
+      "sha256": "47774efb25b7142d9fb103c87f5368576d09e5d76f0eb5fbaac10d8c0fe9f297",
+      "line_in_B230_source": 426,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-049",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-049 Organization type and supplier name are trimmed separately on PUT",
+      "sha256": "07cb7e41969544dfc5dbd249aba45dd0e51b59e405da6127a24045ddfc416e93",
+      "line_in_B230_source": 435,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-050",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-050 A supplier-contact edit transmits each distinct field without changing tenant ID",
+      "sha256": "a99657a506210f40f1f82631fd833ced74b10acb689588d9071811f098e46bd7",
+      "line_in_B230_source": 443,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-054",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-054 Entering lowercase currency renders and sends uppercase ISO text",
+      "sha256": "10ee495c838b35cc1d1c6ee30674bd8b0228270438dad868789cedf41d36c6d9",
+      "line_in_B230_source": 475,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-057",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-057 Clearing saved operating season dates serializes both dates as null",
+      "sha256": "a65f708329d2cf8fca557d84e863bdf50aa479a4722748a8590af8e94c2c929a",
+      "line_in_B230_source": 498,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-059",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-059 Draft season badge updates before save while overview reflects persisted season",
+      "sha256": "eb03d8eeda56ad0b451b8390995a115e95ae9d605d0b6d605d1c545b9a45f3ca",
+      "line_in_B230_source": 513,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-063",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-063 Legacy tenant unrelated profile edit keeps confirmation flag false",
+      "sha256": "5e9fe7611a789c7ddbe7df4e8e4be32b819986d0c415cc9a28745bde1f63ce5e",
+      "line_in_B230_source": 535,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-065",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-065 Successful name edit updates persisted overview and clears unsaved badge",
+      "sha256": "1dbf9fc66bc39dc899931993cee7bb86239b9aec819ce8814060f7e265ca2574",
+      "line_in_B230_source": 553,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-066",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-066 Payment terms remain visible after a successful intercepted update",
+      "sha256": "7cc387be3ef3fe9e641759d6324b3573382c6fd62d0fb2d4f6ee075cef3a34e4",
+      "line_in_B230_source": 563,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-067",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-067 Refresher is reenabled after a successful save settles all dirty state",
+      "sha256": "af92c18d42f89f352da009e1e5ab70596338c1806bc093ff5655b73f39059e81",
+      "line_in_B230_source": 571,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-068",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-068 Editing a new field clears prior save confirmation until next successful PUT",
+      "sha256": "07d4b7624c30712de21976cd8d85d6c0098e321bb381f13adbf63d13053daf64",
+      "line_in_B230_source": 579,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-069",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-069 Changing a field after failed PUT clears stale error but preserves draft",
+      "sha256": "45a0668bdf3f4399306a4c142ec2138da7dbc756d68c1a38c90d49784a25e4ab",
+      "line_in_B230_source": 589,
+      "writes_intercepted_locally": false
+    },
+    {
+      "id": "TSET-071",
+      "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+      "title": "TSET-071 Write lock applies to governance, locale and currency controls together",
+      "sha256": "d9f8524c9bc107e54d12ac4fa9a89c9d516d5627aec221a7751c3b933b1f909b",
+      "line_in_B230_source": 610,
+      "writes_intercepted_locally": false
+    }
+  ],
+  "preflight_rules": [
+    "original 9900 and 152 source specs",
+    "no previously attempted ID",
+    "no skipped test",
+    "selected original callback SHA256 pinned",
+    "guarded test import required",
+    "no disposable role through direct call, role option or PW_ fixture",
+    "no direct API writes, continuing route or fixed wait in selected body",
+    "every test asserts expected behavior",
+    "exact URL & credential and live write guards preserved",
+    "single Chromium worker",
+    "no traces/screenshots/videos/artifact upload"
+  ]
+}
