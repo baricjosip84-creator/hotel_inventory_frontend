@@ -1,0 +1,11 @@
+B232 cumulative ledger reconciliation — November 14, 2026
+Original suite: 9900 unique IDs.
+Historical B230 ledger: 1,381 confirmed PASS and 121 held in supplied B230 source.
+B230 GitHub log logs_118051514789.zip: 65 PASS / 65 FAIL among 130 original cases.
+B230 final 9 recheck user-confirmed GREEN: 9 additional PASS from those 65 FAIL.
+B230 final: 1,455 PASS, 177 held/deferred; exactly 1,632 attempted IDs match B230 manifest.
+B231: 180 new original IDs user-confirmed all GREEN; previous 1,632 attempted excluded.
+B231 final / B232 starting point: 1,635 PASS, 177 HELD, 8,088 unapproved; 240 B232 new candidates not yet tested.
+
+CSV rows use first-party GitHub log and original source ledgers. B230 nine/B231 180 are user-confirmed results; no separate B231 action log was attached. The per-ID classification derives from those confirmations and the exact reviewed ID lists.
+B232 test IDs are excluded from both historical PASS and HELD files until browser evidence.

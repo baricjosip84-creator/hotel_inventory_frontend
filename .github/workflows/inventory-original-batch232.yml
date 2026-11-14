@@ -1,0 +1,69 @@
+name: Inventory - original 9900 Playwright Batch 232
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type ORIGINALTESTS to run exactly 240 original, source-reviewed test IDs'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inventory-original-suite-production
+  cancel-in-progress: false
+
+jobs:
+  batch-232-original:
+    if: ${{ inputs.confirmation == 'ORIGINALTESTS' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: Production
+    defaults:
+      run:
+        working-directory: playwright-inventory
+    env:
+      PW_BASE_URL: 'https://hotel-inventory-frontend-mauve.vercel.app'
+      PW_LIVE_ORIGINAL_READONLY: 'YES'
+      PW_ORIGINAL_SUITE_GROUP: 'BULK_SAFE_13'
+    steps:
+      - name: Check out existing B230 final + B231 installed suite
+        uses: actions/checkout@v4
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install existing suite dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify historical 9900 suite and all installed release contracts BEFORE any CI adaptation
+        env:
+          PW_ORIGINAL_SUITE_GROUP: 'BULK_SAFE_11_RECHECK'
+        run: |
+          node scripts/verify-original-suite.mjs
+          node scripts/check-bulk-auth-fixture.mjs
+          node scripts/check-stock-route-safety.mjs
+          for checker in scripts/check-batch-*.mjs; do
+            node "$checker"
+          done
+      - name: Audit 240 new original scenario bodies and protected live tenant boundaries
+        run: node scripts/check-batch-232-contract.mjs
+      - name: Adapt original test imports ONLY in the temporary CI checkout
+        run: |
+          node scripts/prepare-batch-232-runtime.mjs
+          node scripts/check-batch-232-contract.mjs
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Discover precisely the 240 source-approved original scenarios
+        run: |
+          npx playwright test --config=playwright.live-original.config.ts --workers=1 --list > original-selected.txt
+          tail -n 1 original-selected.txt
+          node scripts/check-live-original-discovery.mjs
+      - name: Execute 240 original scenarios once, one worker, production HTTP writes denied
+        env:
+          PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
+          PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: npx playwright test --config=playwright.live-original.config.ts --workers=1
+      # No trace, screenshots, video, auth snapshot or browser artifacts are uploaded.
+      # The CI-only source import adaptation and approved group overlay are never pushed to main.

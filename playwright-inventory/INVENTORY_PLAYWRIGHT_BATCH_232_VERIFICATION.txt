@@ -1,0 +1,58 @@
+INVENTORY MANAGEMENT APP / PLAYWRIGHT ORIGINAL 9,900 / BATCH 232
+November 14, 2026 — 240 new originals, read-only guarded live test workflow
+
+HISTORICAL RECONCILIATION
+- 9,900 original unique IDs; 152 original spec files in the baseline archive.
+- Original B230 ledger: 1,381 pass IDs; 121 held IDs.
+- Exact B230 GitHub log (logs_118051514789.zip): 65 PASS + 65 FAIL out of 130.
+- Nine B230 failing IDs rechecked and user-confirmed GREEN, yielding 1,455 PASS / 177 held.
+- B231 review: 180 original IDs, all user-confirmed GREEN (GitHub log not separately provided).
+- B232 starting counts: 1,635 PASS / 177 held / 8,088 previously unapproved.
+- B232 selects 240 NEW, distinct original IDs; intersection with B230 original attempted and B231 equals zero.
+- 200 permanent application issue records carried forward unchanged, no invented app failures.
+
+SELECTED AREAS (240 / 8 ORIGINAL TENANT SPEC FILES)
+52 Intelligence Review; 45 Mobile Execution; 36 Tenant Permissions Lifecycle;
+38 Sessions lifecycle; 20 Users; 20 Admin System; 18 Scanner; 11 Tenant Permissions.
+
+OFFLINE VERIFICATION COMPLETED
+- Original source AST body hashes for all 240 reviewed cases: PASS.
+- All 240 contain assertions, no original skip/roleLogin/disposable-role direct call,
+  direct unmocked API write or fixed wait: PASS.
+- All eight original spec files compile via TypeScript transpileModule: 0 diagnostics.
+- Original 9900 / 152 verification on available B230 source: PASS.
+- 31/31 available check-batch-*.mjs release contract checks (including B231 and B232): PASS,
+  with B231/B232 OFFLINE_BASELINE mode for the final B230 nine-group manifest which is
+  known to exist only in the installed GitHub main source (not in older Library ZIP).
+- Local temporary CI-only B230 nine-group presence simulated so B232 import swap and
+  post-injection AST/body/fingerprint checks could run: PASS. This local simulation does
+  not assert possession or execution of the actual final nine-recheck source.
+- Original test-body text unchanged by importer: PASS.
+- CI guard retains exact production frontend origin, credential checks, only auth
+  POST/refresh allowed remotely, all other non-GET writes aborted or locally fulfilled.
+- No record writes, external service integration, or isolated roles were attempted.
+- Eight original spec files had zero TypeScript syntactic diagnostics after the swap.
+
+NOT PERFORMED / MUST NOT CLAIM
+- No authenticated browser/Playwright run was performed locally.
+- @playwright/test is absent in this local offline environment: real Playwright --list
+  and live browser assertions are delegated to exact GitHub Actions workflow.
+- The final B230 738-file FULL ZIP and exact installed GitHub source are not locally available.
+- No new B232 PASS counts until the GitHub browser run proves them.
+
+GITHUB SAFETY
+- FIX contains only additions: new workflow, 2 new check/prepare scripts, selection, review,
+  new ledger records, tracker carry-forward, documentation. NO old test bodies or manifest replaced.
+- GitHub workflow preflights current installed historical suite / all release scripts FIRST.
+- Fail closed if any source changed or final B230 nine-correction group missing.
+- After preflight only ephemeral CI checkout import declarations are swapped;
+  original scenario bodies remain hash-locked; manifest overlay only in CI checkout.
+- CI validates exactly 240 Playwright discovered cases BEFORE running one worker.
+- The historical suite verifier is deliberately run before runtime-only manifest overlay;
+  it must NOT run afterward since the old workflow group menu does not list the temporary B232 group.
+- Existing GitHub source, B230 patches, B231 workflow, and past PASS/HELD unchanged.
+
+USER ACTION
+Install ONLY INVENTORY_PLAYWRIGHT_BATCH_232_240_GITHUB_FIX.zip into repository ROOT,
+commit/push main, Actions -> Inventory - original 9900 Playwright Batch 232,
+branch main, confirmation ORIGINALTESTS, run once. Report GREEN or send log ZIP.

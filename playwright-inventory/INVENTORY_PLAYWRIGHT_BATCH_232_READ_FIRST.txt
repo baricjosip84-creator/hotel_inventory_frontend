@@ -1,0 +1,22 @@
+INVENTORY PLAYWRIGHT — BATCH 232, 240 NEW ORIGINAL SCENARIOS, 8 TENANT SPEC FILES
+STATUS: user reported Batch 231 all GREEN, accepted as 180 browser passes. Cumulative 1,635/9,900; held 177; unapproved 8,088 before B232.
+
+EXACT INSTALLATION:
+1) Extract ONLY INVENTORY_PLAYWRIGHT_BATCH_232_240_GITHUB_FIX.zip into the repository ROOT
+   baricjosip84-creator/hotel_inventory_frontend, on branch main. Keep existing B230 final and B231 files intact.
+2) Commit and push the 13 NEW Batch 232 files to main. Do not replace tests or the historical manifest.
+3) GitHub -> Actions -> Inventory - original 9900 Playwright Batch 232 -> Run workflow.
+   Branch main. Input confirmation ORIGINALTESTS. One run only.
+4) Report GREEN if all 240 actually pass; otherwise provide GitHub log ZIP for classification.
+
+DO NOT INSTALL ANY REFERENCE FULL ARCHIVE. DO NOT REPEAT OLD PASSES OR HELD TESTS.
+
+SAFETY: Every selected source body remains unchanged. These eight original specs import ordinary Playwright,
+so CI changes ONLY their import lines in its ephemeral checkout to use the existing liveOriginalSafeTest
+fixture; no original test body is rewritten. The existing frontend-origin/auth and non-auth write guard
+remain required. All test-local synthetic write mocks use route.fulfill. One worker, no traces/video/screenshots.
+The workflow fails closed if historical source files drift, B230 final nine are missing, B231 code is missing,
+or any selected source body is not byte-identical to this review. It does not write to the repository.
+
+BROWSER STATUS: 240 NEW tests are OFFLINE/PREFLIGHT-REVIEWED only, NOT browser-confirmed until GitHub.
+Historical issue tracker carries 200 records forward unchanged, including prior failures and closures.

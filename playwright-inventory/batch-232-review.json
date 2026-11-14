@@ -1,0 +1,1988 @@
+{
+  "batch": 232,
+  "group": "BULK_SAFE_13",
+  "source_basis": "The B230 Library source for these eight untouched original specs; B230 final nine changed other specs; B231 was CI-only and not committed to manifest.",
+  "previous_confirmed_green_user_reported": 1635,
+  "previous_held": 177,
+  "original_suite": 9900,
+  "historical_attempted_count_in_B230_manifest": 1632,
+  "previous_B231_confirmed_green_user_reported": 180,
+  "selected_count": 240,
+  "spec_files": 8,
+  "source_files": {
+    "tenant/intelligence-review/intelligence-review.spec.ts": {
+      "source_sha256": "19dbc5638216b2d9c70cf324451be9976afeb214a8876848c40cb273beef9c59",
+      "new_ids": [
+        "TINT-001",
+        "TINT-002",
+        "TINT-003",
+        "TINT-004",
+        "TINT-005",
+        "TINT-006",
+        "TINT-007",
+        "TINT-008",
+        "TINT-009",
+        "TINT-010",
+        "TINT-011",
+        "TINT-012",
+        "TINT-013",
+        "TINT-014",
+        "TINT-015",
+        "TINT-016",
+        "TINT-017",
+        "TINT-018",
+        "TINT-019",
+        "TINT-020",
+        "TINT-021",
+        "TINT-022",
+        "TINT-023",
+        "TINT-024",
+        "TINT-025",
+        "TINT-026",
+        "TINT-027",
+        "TINT-028",
+        "TINT-029",
+        "TINT-030",
+        "TINT-031",
+        "TINT-032",
+        "TINT-033",
+        "TINT-034",
+        "TINT-035",
+        "TINT-036",
+        "TINT-037",
+        "TINT-038",
+        "TINT-039",
+        "TINT-040",
+        "TINT-043",
+        "TINT-044",
+        "TINT-045",
+        "TINT-046",
+        "TINT-047",
+        "TINT-048",
+        "TINT-049",
+        "TINT-050",
+        "TINT-051",
+        "TINT-056",
+        "TINT-057",
+        "TINT-059"
+      ]
+    },
+    "tenant/mobile-execution/mobile-execution.spec.ts": {
+      "source_sha256": "0308a8e22cf0bdf83fe090bafc6089e4d3d3cc95b2a1656066d00bc8596c4ad7",
+      "new_ids": [
+        "TMOB-001",
+        "TMOB-002",
+        "TMOB-003",
+        "TMOB-004",
+        "TMOB-005",
+        "TMOB-006",
+        "TMOB-007",
+        "TMOB-008",
+        "TMOB-009",
+        "TMOB-010",
+        "TMOB-011",
+        "TMOB-012",
+        "TMOB-013",
+        "TMOB-014",
+        "TMOB-015",
+        "TMOB-016",
+        "TMOB-017",
+        "TMOB-018",
+        "TMOB-019",
+        "TMOB-020",
+        "TMOB-021",
+        "TMOB-022",
+        "TMOB-024",
+        "TMOB-025",
+        "TMOB-026",
+        "TMOB-027",
+        "TMOB-028",
+        "TMOB-029",
+        "TMOB-030",
+        "TMOB-031",
+        "TMOB-032",
+        "TMOB-033",
+        "TMOB-034",
+        "TMOB-035",
+        "TMOB-036",
+        "TMOB-037",
+        "TMOB-038",
+        "TMOB-039",
+        "TMOB-040",
+        "TMOB-041",
+        "TMOB-042",
+        "TMOB-043",
+        "TMOB-044",
+        "TMOB-045",
+        "TMOB-046"
+      ]
+    },
+    "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts": {
+      "source_sha256": "e3e04bec94edcddf95a130d1b337c2f6eb9e8ef032c331a8dda892893652485a",
+      "new_ids": [
+        "TPER-021",
+        "TPER-022",
+        "TPER-023",
+        "TPER-024",
+        "TPER-025",
+        "TPER-026",
+        "TPER-027",
+        "TPER-028",
+        "TPER-029",
+        "TPER-030",
+        "TPER-031",
+        "TPER-032",
+        "TPER-033",
+        "TPER-036",
+        "TPER-041",
+        "TPER-042",
+        "TPER-043",
+        "TPER-044",
+        "TPER-045",
+        "TPER-048",
+        "TPER-049",
+        "TPER-053",
+        "TPER-058",
+        "TPER-063",
+        "TPER-064",
+        "TPER-065",
+        "TPER-066",
+        "TPER-067",
+        "TPER-068",
+        "TPER-069",
+        "TPER-070",
+        "TPER-072",
+        "TPER-073",
+        "TPER-074",
+        "TPER-075",
+        "TPER-077"
+      ]
+    },
+    "tenant/sessions/sessions-batch33.spec.ts": {
+      "source_sha256": "ef20357bdf93a7d8139707dddafb8763af98ce6a5d2445b7c8d09ac399d3144a",
+      "new_ids": [
+        "TSES-021",
+        "TSES-022",
+        "TSES-023",
+        "TSES-024",
+        "TSES-025",
+        "TSES-026",
+        "TSES-027",
+        "TSES-028",
+        "TSES-029",
+        "TSES-030",
+        "TSES-031",
+        "TSES-032",
+        "TSES-034",
+        "TSES-043",
+        "TSES-044",
+        "TSES-045",
+        "TSES-046",
+        "TSES-049",
+        "TSES-051",
+        "TSES-052",
+        "TSES-053",
+        "TSES-054",
+        "TSES-055",
+        "TSES-056",
+        "TSES-057",
+        "TSES-058",
+        "TSES-059",
+        "TSES-060",
+        "TSES-061",
+        "TSES-062",
+        "TSES-064",
+        "TSES-065",
+        "TSES-068",
+        "TSES-073",
+        "TSES-074",
+        "TSES-075",
+        "TSES-076",
+        "TSES-077"
+      ]
+    },
+    "tenant/users/users.spec.ts": {
+      "source_sha256": "0758fd1bfb1a7886bf80eff471e8382edb70dfb15f926dbd39426ae75838c75c",
+      "new_ids": [
+        "TUSR-001",
+        "TUSR-002",
+        "TUSR-003",
+        "TUSR-004",
+        "TUSR-005",
+        "TUSR-006",
+        "TUSR-007",
+        "TUSR-008",
+        "TUSR-009",
+        "TUSR-010",
+        "TUSR-011",
+        "TUSR-012",
+        "TUSR-013",
+        "TUSR-014",
+        "TUSR-015",
+        "TUSR-016",
+        "TUSR-017",
+        "TUSR-018",
+        "TUSR-019",
+        "TUSR-020"
+      ]
+    },
+    "tenant/admin-system/admin-system.spec.ts": {
+      "source_sha256": "50d3fdb17f5ca8b209e1086d7bab7f0519f2b8ad753a0c667517b7068f0d61b9",
+      "new_ids": [
+        "TADM-001",
+        "TADM-002",
+        "TADM-003",
+        "TADM-004",
+        "TADM-005",
+        "TADM-006",
+        "TADM-007",
+        "TADM-008",
+        "TADM-009",
+        "TADM-010",
+        "TADM-011",
+        "TADM-012",
+        "TADM-013",
+        "TADM-014",
+        "TADM-015",
+        "TADM-016",
+        "TADM-017",
+        "TADM-018",
+        "TADM-019",
+        "TADM-020"
+      ]
+    },
+    "tenant/scanner/scanner.spec.ts": {
+      "source_sha256": "518f62e47781a36fb2d2672e574536e96472ca26c7c6478b4ef79f2d0e7bd2e6",
+      "new_ids": [
+        "TSN-001",
+        "TSN-002",
+        "TSN-003",
+        "TSN-004",
+        "TSN-006",
+        "TSN-007",
+        "TSN-009",
+        "TSN-010",
+        "TSN-011",
+        "TSN-012",
+        "TSN-013",
+        "TSN-014",
+        "TSN-015",
+        "TSN-016",
+        "TSN-017",
+        "TSN-018",
+        "TSN-019",
+        "TSN-020"
+      ]
+    },
+    "tenant/tenant-permissions/tenant-permissions.spec.ts": {
+      "source_sha256": "21ce7f1e317633be9593cc96f6cb43825a1b6f031ad131b969f626d9a878ed0d",
+      "new_ids": [
+        "TPER-001",
+        "TPER-002",
+        "TPER-004",
+        "TPER-005",
+        "TPER-006",
+        "TPER-007",
+        "TPER-008",
+        "TPER-009",
+        "TPER-010",
+        "TPER-011",
+        "TPER-012"
+      ]
+    }
+  },
+  "selected": [
+    {
+      "id": "TINT-001",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-001 page identifies the Intelligence Review governed workflow",
+      "sha256": "e020e9fc066ea289dcd67843c783877a3d105255d9ceb8b05634b58a84cf73c2",
+      "line_in_B230_source": 60
+    },
+    {
+      "id": "TINT-002",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-002 queue explicitly states review decisions cannot execute inventory operations",
+      "sha256": "17f09c50e60bfcbceff932da65a9b5d71fc454046afce02652ac9874adbb396a",
+      "line_in_B230_source": 65
+    },
+    {
+      "id": "TINT-003",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-003 overview reflects backend open and approval totals",
+      "sha256": "c6ab03c548b9bd292bafcea3a9992c578f19de34d5a88ee876df349a685ad397",
+      "line_in_B230_source": 69
+    },
+    {
+      "id": "TINT-004",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-004 overview displays human-decision-only safety rule",
+      "sha256": "97a6bfaf8a59f62b6dec4853c3d8428f3c57eed132ac9ffaf75961dc1440adce",
+      "line_in_B230_source": 75
+    },
+    {
+      "id": "TINT-005",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-005 recommendation view starts selected and readiness remains separate",
+      "sha256": "f86a8deaa17c98bcfdaeff8144fe8f367f3b8e33b83cff96df50da2bddbf89f4",
+      "line_in_B230_source": 80
+    },
+    {
+      "id": "TINT-006",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-006 source link opens tenant Action Center, not external execution",
+      "sha256": "aa367aa7683432a706c2062337d4274839c73588eaacc6d51531297abfdaebfd",
+      "line_in_B230_source": 86
+    },
+    {
+      "id": "TINT-007",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-007 review toolbar links to the separate Workflow Composer",
+      "sha256": "9876f01904b46dd85b7f6f79aa3e83adfdb22bf65b6d66b36cf1469f208206e1",
+      "line_in_B230_source": 90
+    },
+    {
+      "id": "TINT-008",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-008 category filter includes decision, governance and remediation domains",
+      "sha256": "27bd3d1bed4cb6e21334d17c7d1733487d8b4e6be9e43c683a151ef26ef28269",
+      "line_in_B230_source": 94
+    },
+    {
+      "id": "TINT-009",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-009 review state offers the overdue and actionable lifecycle filters",
+      "sha256": "584e78c9755128b46b7dda87992558afda2984be9ca1e12977e545ef6ae352f3",
+      "line_in_B230_source": 99
+    },
+    {
+      "id": "TINT-010",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-010 urgency options cover critical through low with All default",
+      "sha256": "5f64ddbf4e3bbfec0d4d29f439c21ac3d97188e7167297d4b38be2271d8bbdd9",
+      "line_in_B230_source": 104
+    },
+    {
+      "id": "TINT-011",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-011 sort choices retain highest-priority and chronological controls",
+      "sha256": "cbe576bf1dbe8ea0560c20bbd3e042c7dbd0455ac96eae8d80c8a371bc9964a5",
+      "line_in_B230_source": 110
+    },
+    {
+      "id": "TINT-012",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-012 queue renders each returned review once",
+      "sha256": "261c3ad52b2e779a434fe5f88d16bc636276db042f752403456e6cd655f28ec2",
+      "line_in_B230_source": 115
+    },
+    {
+      "id": "TINT-013",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-013 first review starts selected with corresponding evidence",
+      "sha256": "59d69649351da1d0acaf9ec3455398669eab99d8361b30af7238ca89c60db4c3",
+      "line_in_B230_source": 121
+    },
+    {
+      "id": "TINT-014",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-014 switching selected review changes the URL and card",
+      "sha256": "13234e61de6f26f6b027a00333b67dd4b7206e6b5c41d015e7fea71609566cf6",
+      "line_in_B230_source": 128
+    },
+    {
+      "id": "TINT-015",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-015 selected queue review survives a hard reload",
+      "sha256": "c843b9bb157635a87194f74e180f94085b4e60006ef77a6398470afaedd3fd53",
+      "line_in_B230_source": 135
+    },
+    {
+      "id": "TINT-016",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-016 category selection sends its domain in the GET request",
+      "sha256": "e266b7ba30ce70285bb40d6f81406e5e8dd96011813bf856a63032e78b7babc9",
+      "line_in_B230_source": 142
+    },
+    {
+      "id": "TINT-017",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-017 choosing pending-review state creates review_state parameter",
+      "sha256": "0f8554b198cc573c858d26ae0ec3bd4fce07ed2594163b579ab0cedbcd6a41cf",
+      "line_in_B230_source": 150
+    },
+    {
+      "id": "TINT-018",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-018 overdue view uses due_state rather than an invalid review_state",
+      "sha256": "9f4a8115c0e33511d86187faccb8cd230ad8a29039f1df64e34c8635f4674b03",
+      "line_in_B230_source": 158
+    },
+    {
+      "id": "TINT-019",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-019 selecting critical urgency reaches the API as urgency=critical",
+      "sha256": "1d33582f2c7b15d07cc38f6a4fcbd93f1c414183ec14a9a84b250dc8cb786f0c",
+      "line_in_B230_source": 166
+    },
+    {
+      "id": "TINT-020",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-020 search trims API term while maintaining visible user input",
+      "sha256": "96f0e751bbd87c5c129497dab690fa34db0344a2eaab026edf6e9bc6a1d1a2a6",
+      "line_in_B230_source": 174
+    },
+    {
+      "id": "TINT-021",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-021 due-soonest sort reaches backend with a matching URL filter",
+      "sha256": "adca42f59caa78661f0ac83e24fd4ab3c62ae34282ba6f8ee488d8c716ef9930",
+      "line_in_B230_source": 182
+    },
+    {
+      "id": "TINT-022",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-022 changing filter resets offset and discards stale selected-review ID",
+      "sha256": "a8283359cff5a68ec21ec8c98b45480e92bcbd077057ca260675a51cfcab3098",
+      "line_in_B230_source": 190
+    },
+    {
+      "id": "TINT-023",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-023 queue result selection never changes source_action_id deep link",
+      "sha256": "7097ee5664b7b0edbd07c99c7dbaa21e2443bc0a5a5a2ecb1b26e4f11f7cfdd6",
+      "line_in_B230_source": 199
+    },
+    {
+      "id": "TINT-024",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-024 Next page updates offset while keeping limit 25",
+      "sha256": "84413158703bff68c5cc71a38bef6a6568a20d3f4c204a50d41528af51bd2713",
+      "line_in_B230_source": 207
+    },
+    {
+      "id": "TINT-025",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-025 Previous page returns to earlier offset",
+      "sha256": "c5453b5bb4053ced74dae338b213e451bcc6bdaf62923a195ac4df43da1cbb9e",
+      "line_in_B230_source": 218
+    },
+    {
+      "id": "TINT-026",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-026 focused source-action request uses a single-item limit and ignores queue filters",
+      "sha256": "968bf6383f9ba3c4f62795fe527bd1e5ee7fce657a080531aeb68113e79b2fc1",
+      "line_in_B230_source": 228
+    },
+    {
+      "id": "TINT-027",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-027 missing focused source review shows a role-safe unavailable message",
+      "sha256": "745c696dde6f6d15b79a2a7bf2b1c72f34b1e4091d7f32ee6e3ea6e4c2706b2e",
+      "line_in_B230_source": 239
+    },
+    {
+      "id": "TINT-028",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-028 focused view hides queue filters and aggregate totals",
+      "sha256": "ba34be58d3b5938c863239f547de2dc3fc32a6c78f967675e119e3d7347996e1",
+      "line_in_B230_source": 246
+    },
+    {
+      "id": "TINT-029",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-029 invalid category URL value cannot reach backend as a domain",
+      "sha256": "c2c73d7711f9c35059623edc69cf2c56b07daa06ffb8479b91c7cfba4301f49a",
+      "line_in_B230_source": 254
+    },
+    {
+      "id": "TINT-030",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-030 overlarge offset is normalized to zero before API call",
+      "sha256": "6fe217106911267c98e2bcc0d2803a0bae3bb9c9e0f94ad7d622ce4e5c5ce49e",
+      "line_in_B230_source": 262
+    },
+    {
+      "id": "TINT-031",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-031 empty recommendation queue renders an explicit filtered empty state",
+      "sha256": "08326b1e577629932abe45c700b79ae9a715e175fbe38ee9a3ddaf3dbc6cace1",
+      "line_in_B230_source": 270
+    },
+    {
+      "id": "TINT-032",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-032 failed queue GET shows error and no fabricated review cards",
+      "sha256": "78a12595a31c9781b36221bc9221416c057b0b6520d961199f034f1b76ec674f",
+      "line_in_B230_source": 276
+    },
+    {
+      "id": "TINT-033",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-033 pending queue GET displays a loading notice rather than stale reviews",
+      "sha256": "3588643c802d9a6ee9dc99dfb03f492459617629fa661397c5efccee44a9703d",
+      "line_in_B230_source": 283
+    },
+    {
+      "id": "TINT-034",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-034 refresh is a GET-only request with limit 25 and sort priority",
+      "sha256": "0fd3a12ce92cda0b993a57a1f5a89b26b3de1db3b7fee7f9f42016b2871fc7de",
+      "line_in_B230_source": 291
+    },
+    {
+      "id": "TINT-035",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-035 selected review distinguishes confidence evidence from authorization",
+      "sha256": "acd4a3134b36f90b84defc4e894675741b646fe5c0c278497b9b3d5e6efea897",
+      "line_in_B230_source": 301
+    },
+    {
+      "id": "TINT-036",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-036 stale local selected review displays a warning without substituting another card",
+      "sha256": "e1fa18372eb06930f81fdba5aa21b34b9bb8bd9cf6271ec0c53723296119ac1b",
+      "line_in_B230_source": 308
+    },
+    {
+      "id": "TINT-037",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-037 URL readiness view does not issue recommendation queue GET",
+      "sha256": "a95cd8335867d3905fbbda4ef5511561bd4a0b8231c86966d91d56f64c5d527e",
+      "line_in_B230_source": 363
+    },
+    {
+      "id": "TINT-038",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-038 business readiness renders source-reported features and priority",
+      "sha256": "2a1dde2805144c67f20efdd0118fd26603c95d80b6502393c722e4a98067189f",
+      "line_in_B230_source": 371
+    },
+    {
+      "id": "TINT-039",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-039 readiness API rejection surfaces error without submitting a write",
+      "sha256": "41a336f16bf90fbcf6bb83475e37e866890fe3b8a386ac1c19c3fff9b42fa95b",
+      "line_in_B230_source": 378
+    },
+    {
+      "id": "TINT-040",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-040 explicit readiness refresh requests refresh=true for new evidence",
+      "sha256": "5d259e726d3ff3cbfed812a057441559397a79238ef5a355b89c8e167ea12d30",
+      "line_in_B230_source": 386
+    },
+    {
+      "id": "TINT-043",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-043 history opens for selected action and shows persisted event actor",
+      "sha256": "7e3c92fa7c99b079b97038c4adfb29d04df24476b375a416674b99da62f7bb80",
+      "line_in_B230_source": 420
+    },
+    {
+      "id": "TINT-044",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-044 history request error retains selected source review",
+      "sha256": "aae7af7b83b91e2a623e1028424bef7fefbe16eef344add18361cb100213f879",
+      "line_in_B230_source": 428
+    },
+    {
+      "id": "TINT-045",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-045 decision menu renders only decisions supplied by lifecycle",
+      "sha256": "1920a8f72a5af87741fb479b88ba6bce74a0395ac95de3805e23781efc9c931e",
+      "line_in_B230_source": 437
+    },
+    {
+      "id": "TINT-046",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-046 required reason prevents POST while empty",
+      "sha256": "f81ff55e067129656f07358d291feb64d694e99a4590d31b8fdf830c76e2ac4c",
+      "line_in_B230_source": 442
+    },
+    {
+      "id": "TINT-047",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-047 permitted POST includes decision and exact expected version",
+      "sha256": "10594b32017854bcba798e7dcbf826ad85a86593439a2f1d51e5d45c64cedbf2",
+      "line_in_B230_source": 450
+    },
+    {
+      "id": "TINT-048",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-048 rejected POST reports failure without success claim",
+      "sha256": "8f1dcbbbc3f12b6cd83399c213ba21c75847e23052902b8a7172ba174f624c0f",
+      "line_in_B230_source": 458
+    },
+    {
+      "id": "TINT-049",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-049 successful decision refreshes GET evidence only and opens history",
+      "sha256": "5ae1decf21f5398091e9ab76a4e168f027f5b1831b5cf13a5e6216cbd5c1b2e1",
+      "line_in_B230_source": 465
+    },
+    {
+      "id": "TINT-050",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-050 policy exception requires override reason even after reason category",
+      "sha256": "b799c18cdf0cff49b6aeb1fa0a0808aef3a01506e3ccc0f1153824fbbd2fd309",
+      "line_in_B230_source": 475
+    },
+    {
+      "id": "TINT-051",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-051 escalation requires assigned role and due date before submit",
+      "sha256": "02e2d71c8e5a4b6b5f6763e13530f3775aeaf49978339251cad081ded3d04865",
+      "line_in_B230_source": 483
+    },
+    {
+      "id": "TINT-056",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-056 approved replenishment review reveals PO draft with revalidation note",
+      "sha256": "3e46b949d561f738bf84cfb52a0cf8f1ecc677162c3762df601705176a46b7e4",
+      "line_in_B230_source": 526
+    },
+    {
+      "id": "TINT-057",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-057 Purchase Order draft failure preserves current review",
+      "sha256": "bb1d7a0f82b7be2ced97aa63c773626d9fd2cffc51e10e5f3551287731746754",
+      "line_in_B230_source": 531
+    },
+    {
+      "id": "TINT-059",
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-059 arbitrary source URL is not exposed as a navigation link",
+      "sha256": "042c5bed90e72e4200a0225c5cf25e09655b83f7670242f958ad4d53ab97ac48",
+      "line_in_B230_source": 544
+    },
+    {
+      "id": "TMOB-001",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-001 page presents touch-first queue and responsibility selector",
+      "sha256": "0469f1f37603e65ec6dda7e241bf76b655dce678c2de8fcbda8529e342c00409",
+      "line_in_B230_source": 73
+    },
+    {
+      "id": "TMOB-002",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-002 initial queue request is limited to 25 tasks at offset zero in mine scope",
+      "sha256": "29a5458dc6ac95ad71497547dd08e98078823737de3289a798a16da8fbf09ff8",
+      "line_in_B230_source": 79
+    },
+    {
+      "id": "TMOB-003",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-003 overview reflects three mine tasks and one overdue item",
+      "sha256": "3d2d60d0eb14b2a33108cdea0b3042ecc29046d13a799db383a89c1cc0ba75d3",
+      "line_in_B230_source": 91
+    },
+    {
+      "id": "TMOB-004",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-004 owned work cards show priority, location, product context and due state",
+      "sha256": "b5baa1269d2c11a5c1ddccec663e47f806a68b5796391eaa1ba8f3a08b8d3599",
+      "line_in_B230_source": 97
+    },
+    {
+      "id": "TMOB-005",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-005 urgency filter updates route and removes mismatching tasks",
+      "sha256": "9a58eae06aed0e28d84301a789e6356c09d1261515adfd010a3b3bded2d44a36",
+      "line_in_B230_source": 105
+    },
+    {
+      "id": "TMOB-006",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-006 task source filter updates URL and restricts cards to matching source",
+      "sha256": "926851928878779bbd7a63e8c2661e35c35a7598889b43146da1165d74bd63d0",
+      "line_in_B230_source": 112
+    },
+    {
+      "id": "TMOB-007",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-007 ownership tab switches to unassigned work and requests corresponding scope",
+      "sha256": "aea4f8cd0602111061054cda584b45956ac6f23398e166f515d33835b2c084f0",
+      "line_in_B230_source": 119
+    },
+    {
+      "id": "TMOB-008",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-008 combined deep-link filters restore after navigation and reload",
+      "sha256": "380440e8203a200f5701a856ffcdb9110c34a18e57d6ce56e93ddf2e41c36269",
+      "line_in_B230_source": 126
+    },
+    {
+      "id": "TMOB-009",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-009 unsupported query values default to safe scope and all filters",
+      "sha256": "3e33e610ab5730aad2968020757a3498bfc7f58bbeb697c0b6cf6a775b2016ea",
+      "line_in_B230_source": 135
+    },
+    {
+      "id": "TMOB-010",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-010 changing filter clears stale pagination parameter",
+      "sha256": "059ec89c4ee1b0ce9b81591a00679b52e02ba0a93b6ee145333af72791588081",
+      "line_in_B230_source": 142
+    },
+    {
+      "id": "TMOB-011",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-011 refresh repeats source GET without writing to task state",
+      "sha256": "373332eab43b03d63b7bfdfd73029312a0deebd9b18695e55304338f51ca5234",
+      "line_in_B230_source": 149
+    },
+    {
+      "id": "TMOB-012",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-012 no matching records shows explicit empty queue state",
+      "sha256": "b1ca27934fb7cc16fdf53485cefc5d5ff8430198dd32a28df0391fd8a967b428",
+      "line_in_B230_source": 160
+    },
+    {
+      "id": "TMOB-013",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-013 queue API denial displays error, not invented task cards",
+      "sha256": "4e4cad4290440d0779beff011908a474450321c02f59e50478db7af50c544f6a",
+      "line_in_B230_source": 167
+    },
+    {
+      "id": "TMOB-014",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-014 ready owned task exposes start, complete and block actions",
+      "sha256": "90c051e20017475cb2e19a6858f05e167a00a1c5cca6ddf8328090361efaeec6",
+      "line_in_B230_source": 174
+    },
+    {
+      "id": "TMOB-015",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-015 in-progress task offers completion or blocking, not redundant start",
+      "sha256": "514860322f34070a2826387515617b305a9837fbfa2d39631320801b1864f39e",
+      "line_in_B230_source": 180
+    },
+    {
+      "id": "TMOB-016",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-016 blocked task permits unblock without duplicate block or complete",
+      "sha256": "dcb826106a7a3e939482879b9c9687a1a0aa36cdb18f0c32771506bee40531b3",
+      "line_in_B230_source": 187
+    },
+    {
+      "id": "TMOB-017",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-017 other team member work stays read-only in team scope",
+      "sha256": "dfa274909ff7c0fddf2303b0bc60c79f253b6859e978a8deeca869ec5534369c",
+      "line_in_B230_source": 194
+    },
+    {
+      "id": "TMOB-018",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-018 eligible unassigned task offers take and not owned-task controls",
+      "sha256": "f44e5310e68ac747d084917133af2a699650fe05a732751b10b0834b57daeef5",
+      "line_in_B230_source": 201
+    },
+    {
+      "id": "TMOB-019",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-019 unassigned task with can_take false has no assignment button",
+      "sha256": "f186141eda2b5e5d9072e9489a2961aa9d3a148c7364e03be3f8ea05d4ac2dcb",
+      "line_in_B230_source": 208
+    },
+    {
+      "id": "TMOB-020",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-020 manual task detail link includes precise task ID",
+      "sha256": "e86338a99c925d89f5b718d1e4b1f91286b90371c468c0fe9af692ab207559f9",
+      "line_in_B230_source": 213
+    },
+    {
+      "id": "TMOB-021",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-021 scan-ready task links to scanner with encoded task identifier",
+      "sha256": "e1dfac224538b78fa3b5fd520c8cf1fada1c5cfabe66c984cc499b2501d4c031",
+      "line_in_B230_source": 218
+    },
+    {
+      "id": "TMOB-022",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-022 transfer task links to its owning source workflow",
+      "sha256": "cfe8a946cbab5d47048ea1cd8d19ce28a244d6dd155cd54bc80634bfbe234cf7",
+      "line_in_B230_source": 223
+    },
+    {
+      "id": "TMOB-024",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-024 cancelling a block reason hides composer without submitting mutation",
+      "sha256": "ed1da7986fdb02a4d8197f663a42cf858397860a15a54829c2f232a65e3de67c",
+      "line_in_B230_source": 238
+    },
+    {
+      "id": "TMOB-025",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-025 applied row-level sync produces task action confirmation",
+      "sha256": "b95e1c1f00f7cfad634ad02b2221fb7d07ba21118693e96d4b83a26d15e1f408",
+      "line_in_B230_source": 249
+    },
+    {
+      "id": "TMOB-026",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-026 failed row-level sync reports failure rather than a success toast",
+      "sha256": "bfd3ce252ccad153d5cdbaef2207df077afd5dc8b89f088ff40c928f2cd8f7c1",
+      "line_in_B230_source": 261
+    },
+    {
+      "id": "TMOB-027",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-027 ambiguous row-level sync does not claim task mutation was applied",
+      "sha256": "52a1515a7fa036e5eddf039f3e8974ce0adf49fc3564d312b9992cd72ba8ec78",
+      "line_in_B230_source": 269
+    },
+    {
+      "id": "TMOB-028",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-028 offline action queues locally without sending a write request",
+      "sha256": "1981e15e43219df08a2fcc21694510c67d987f2f55c6cdcb003b301bd7ca05a8",
+      "line_in_B230_source": 276
+    },
+    {
+      "id": "TMOB-029",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-029 user can remove a queued offline action from the pending list",
+      "sha256": "c1364eb48c3f8e36b993cdbeef4a8e730bcca742dd7e33829f2ce6b46b41c080",
+      "line_in_B230_source": 286
+    },
+    {
+      "id": "TMOB-030",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-030 empty recent evidence history is disclosed in expandable panel",
+      "sha256": "d97239b093423a304b4e19be6f893d1dc15179e765d8c5d0b7a5d35a10d8ef22",
+      "line_in_B230_source": 295
+    },
+    {
+      "id": "TMOB-031",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-031 recent evidence list offers task navigation and respects download-disabled flag",
+      "sha256": "72cd15560b9557ef7c036e84413f502318320017d4332e1cca329a9173d07c80",
+      "line_in_B230_source": 301
+    },
+    {
+      "id": "TMOB-032",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-032 evidence read permission failure is explicit rather than removing recovery panel",
+      "sha256": "71c8f6b27eea1dd1e5eb043c1d1410f657af668afe3d335532b7df2953d9fac5",
+      "line_in_B230_source": 314
+    },
+    {
+      "id": "TMOB-033",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-033 next queue page uses offset 25 and shows tasks 26 through 50",
+      "sha256": "fd303f3c75ff36cae58e43e0abeda0bdea538210bb5b3cbcc9738cebce612e80",
+      "line_in_B230_source": 366
+    },
+    {
+      "id": "TMOB-034",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-034 final queue page disables Next and Previous navigates back one page",
+      "sha256": "ecc8659d22ca591ff6860950985279680366b0366a50197c4eddf128ef0033a0",
+      "line_in_B230_source": 381
+    },
+    {
+      "id": "TMOB-035",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-035 offline disables queue refresh and reconnecting re-enables it",
+      "sha256": "ed5d2c7192eca0ba8b01b9e53e94bad79d76c5209a78db4da3a40817c1a382d6",
+      "line_in_B230_source": 393
+    },
+    {
+      "id": "TMOB-036",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-036 receipt belonging to another task never confirms evidence upload",
+      "sha256": "6d8b281cffbe75f7d570fd1fc75b9dfcd16b4098624dd89055b42f1e51c798e4",
+      "line_in_B230_source": 401
+    },
+    {
+      "id": "TMOB-037",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-037 receipt plus persisted task evidence list confirms exact attachment",
+      "sha256": "8f8c3ff9406cf24157715e6a00be29692c02b4b2a433857ce76fce98b928fe5d",
+      "line_in_B230_source": 413
+    },
+    {
+      "id": "TMOB-038",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-038 accepted upload without matching list entry remains unverified",
+      "sha256": "825e2fd18a92c4e06c9aa32de2270cbc984bd03284f59d50651a2d025c168be6",
+      "line_in_B230_source": 429
+    },
+    {
+      "id": "TMOB-039",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-039 list readback failure discloses upload verification uncertainty",
+      "sha256": "a9d4d0c849cd1cefccdad14e52de09021fdcb92eb8c9b29f46c86168e2fde1b7",
+      "line_in_B230_source": 438
+    },
+    {
+      "id": "TMOB-040",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-040 upload rejection reports error without an attachment success confirmation",
+      "sha256": "a47bfbf17ee8d14f7d05ccc1c2724c50995d4328130261bb4e6db9f57e6ca6c3",
+      "line_in_B230_source": 447
+    },
+    {
+      "id": "TMOB-041",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-041 failed offline replay keeps queued action with failure reason",
+      "sha256": "6f3a56ee348dd7f00906398953f6ce08c6c765ae9bee2d20308d23eac72e9162",
+      "line_in_B230_source": 454
+    },
+    {
+      "id": "TMOB-042",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-042 applied offline replay removes the confirmed queued operation",
+      "sha256": "2fe515a8c7adf6ee116d6df31dbd273b2534d943c84a8a933670ed526eb39e80",
+      "line_in_B230_source": 467
+    },
+    {
+      "id": "TMOB-043",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-043 ambiguous replay response retains pending operation for safe retry",
+      "sha256": "0485d6d2865c01279023b44bed15e49a8302857f19b4e9edcce7d099d607ec36",
+      "line_in_B230_source": 482
+    },
+    {
+      "id": "TMOB-044",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-044 completion permission alone does not allow update-only actions",
+      "sha256": "8f444e7dae58d9660d86f0fa0fc4f0c97195e6fb7b631249a0d19895db4746fb",
+      "line_in_B230_source": 491
+    },
+    {
+      "id": "TMOB-045",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-045 attachment read denied keeps evidence recovery panel with explicit alert",
+      "sha256": "d2c7bb86f703c99463ec126efd35f04b7644c5db4e1cf2c26e4d406a20d58789",
+      "line_in_B230_source": 501
+    },
+    {
+      "id": "TMOB-046",
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-046 nonpermitted transfer source does not expose source workflow link",
+      "sha256": "bf4afd8d653cb130f6d3ad51fd4c5e0468f5866ead9761c826bee960097f1467",
+      "line_in_B230_source": 511
+    },
+    {
+      "id": "TPER-021",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-021 Manager policy save confirms and submits expected_revision",
+      "sha256": "9ae1699fb5880d980b808dbe372a36f9927f2046106da6d43cdc68536d8d0917",
+      "line_in_B230_source": 108
+    },
+    {
+      "id": "TPER-022",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-022 Cancelling policy save leaves draft and sends no PUT",
+      "sha256": "71a1b50a172a1a4458199608b9ea6a40bf06f3107aa7060deeb4b16b567a0a9c",
+      "line_in_B230_source": 114
+    },
+    {
+      "id": "TPER-023",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-023 Successful save refreshes matrix and acknowledges result",
+      "sha256": "422f8bc0254ec2a3947bd6ab2ae3c545a3f563a7febf1298087d0abf3507d932",
+      "line_in_B230_source": 118
+    },
+    {
+      "id": "TPER-024",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-024 Stale revision rejection keeps local draft",
+      "sha256": "7fec8801973af771a8509e630c69550f321b6d6a09a7206eb3307022d4b5fc4c",
+      "line_in_B230_source": 123
+    },
+    {
+      "id": "TPER-025",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-025 Failed policy request leaves Save available for retry",
+      "sha256": "a09028a5e21abe45cbf2f80bb41a5f8ed855cadb9fb4c6ef45eb2b2c0d1c13b4",
+      "line_in_B230_source": 128
+    },
+    {
+      "id": "TPER-026",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-026 Default built-in baseline disables Reset",
+      "sha256": "808768d5c1dfc33d738ef3f578e409b768abbbd7f7d3e0652e32e2389203b944",
+      "line_in_B230_source": 133
+    },
+    {
+      "id": "TPER-027",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-027 Overridden Manager policy reset sends revisioned DELETE",
+      "sha256": "e8d8cd5ee33f4d0793d3da72179090a981c88f77573a5f3a1d13bd329bbbbdae",
+      "line_in_B230_source": 136
+    },
+    {
+      "id": "TPER-028",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-028 Cancelled built-in reset does not issue DELETE",
+      "sha256": "d35967e0277aeca8fbcd6d8179e9d99070a73176e6f4c55fd6d848cdda6be892",
+      "line_in_B230_source": 142
+    },
+    {
+      "id": "TPER-029",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-029 Discard draft accepts confirmation and restores server state",
+      "sha256": "daef6648779707ea5642778ec3640b177baaaaa24dee274795b79d81c1d1a1e0",
+      "line_in_B230_source": 146
+    },
+    {
+      "id": "TPER-030",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-030 Cancelled discard retains unsaved policy draft",
+      "sha256": "49d0565076c48d2535fff5ca4e6e1fe1808f71d27d711cd8a0ffe869871a6747",
+      "line_in_B230_source": 150
+    },
+    {
+      "id": "TPER-031",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-031 Confirmed role change discards draft and selects Staff",
+      "sha256": "b3fbe3642267623dd01302acd0cd730e74957e7c26e8302e340239ccde7f7e2a",
+      "line_in_B230_source": 154
+    },
+    {
+      "id": "TPER-032",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-032 Cancelled dirty role change remains on Manager",
+      "sha256": "0da6eb13c52a976cd1459cae60d69c370141029d97b711ad38c50cc51e4b120e",
+      "line_in_B230_source": 158
+    },
+    {
+      "id": "TPER-033",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-033 Custom workspace lists roles and reveals empty state",
+      "sha256": "bec45ef0703c5917b96eda19e9a11e8854815dacae6dcbb75b5153d78fad48fc",
+      "line_in_B230_source": 162
+    },
+    {
+      "id": "TPER-036",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-036 Template choice previews description and count",
+      "sha256": "af514d4ed12687ee1f5d2ebcb0d46ca7b16d6dd943ce6085474f3c34f3e374ee",
+      "line_in_B230_source": 177
+    },
+    {
+      "id": "TPER-041",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-041 Duplicate via prompt posts the trimmed copied name",
+      "sha256": "eae398447b7d01ea9a651a202d9ed3bf0156802f61635851f083cfbdaad3ec26",
+      "line_in_B230_source": 211
+    },
+    {
+      "id": "TPER-042",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-042 Cancelled duplicate prompt has no POST",
+      "sha256": "75b8f885478d77e7290236fa887921a2ca9eb3512c0f20e67b41429ec3a5d2f5",
+      "line_in_B230_source": 218
+    },
+    {
+      "id": "TPER-043",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-043 Active user assignment disables custom deactivation",
+      "sha256": "4fc4163bf6ac7e53e4dbff370b67bd76d45bcda449b392e780d7cac03bb6c3fd",
+      "line_in_B230_source": 222
+    },
+    {
+      "id": "TPER-044",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-044 Cancelled deactivation dialog makes no PATCH",
+      "sha256": "80c661368c7019f055bbdd4bef391382dd75d79bdaeba4adbff20377d85b8070",
+      "line_in_B230_source": 227
+    },
+    {
+      "id": "TPER-045",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-045 Confirmed deactivation then reactivation use versioned PATCH",
+      "sha256": "42dd451c09744558e86978211acdc10850df59306f82f22b12f82d6495354234",
+      "line_in_B230_source": 231
+    },
+    {
+      "id": "TPER-048",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-048 Custom role policy save sends version and excludes locked/reserved rights",
+      "sha256": "c99e8d6052f662eb9b5dfe9ed4488186ba8db6d842af296f1b8511a6cfaea5e0",
+      "line_in_B230_source": 250
+    },
+    {
+      "id": "TPER-049",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-049 Reset to starting template sends versioned DELETE",
+      "sha256": "ef438507cf6f9a5d39c5cfa4d31a04beedfd2688aa4ce793dc1d127c75735cc3",
+      "line_in_B230_source": 256
+    },
+    {
+      "id": "TPER-053",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-053 Create description accepts its five-hundred-character boundary locally",
+      "sha256": "7b9c0059287c2ed43f7325d39bcc864419888051453ead427977ce16e5278603",
+      "line_in_B230_source": 284
+    },
+    {
+      "id": "TPER-058",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-058 Metadata name counter reaches eighty with client-side length bound",
+      "sha256": "4823043cc5d5af8c9b802cd8bdcca1a2c65bd32bfcf01f4f29ad49059841619a",
+      "line_in_B230_source": 318
+    },
+    {
+      "id": "TPER-063",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-063 Single-character duplicate name is rejected before any POST",
+      "sha256": "878660aadfa9a6c1c8dadfcf6025afaaf85089ff622ff926e8af9d6463fa8439",
+      "line_in_B230_source": 354
+    },
+    {
+      "id": "TPER-064",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-064 Reserved Staff duplicate name is rejected before POST",
+      "sha256": "76874d36bae0a1e0665a6d2d5be0693d40b5bb11814b33c3dbb0e8a3b96cabc4",
+      "line_in_B230_source": 359
+    },
+    {
+      "id": "TPER-065",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-065 Whitespace duplicate prompt exits without creating a role",
+      "sha256": "1d7b90cc3dc58c69fd05b6c0eedae03b5512738fd35fe93fdc95cc25dd9d0bd8",
+      "line_in_B230_source": 364
+    },
+    {
+      "id": "TPER-066",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-066 Rejected duplicate POST keeps current role selected and reports error",
+      "sha256": "3f8751c1f762d2b82003305e06b6a5761fe00a5bb19f19916cdf29043e3e01ec",
+      "line_in_B230_source": 369
+    },
+    {
+      "id": "TPER-067",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-067 Inactive custom role is identifiable and exposes an Activate action",
+      "sha256": "22e7224d03956cf2a8242632a938e0f9d63e4f45cbb8d61a3ed7c717799c132a",
+      "line_in_B230_source": 378
+    },
+    {
+      "id": "TPER-068",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-068 Unassigned custom role explains safe deactivation",
+      "sha256": "7c2390f0e7832120261135e4ce22be3409d0a662096151bd010030009fd236da",
+      "line_in_B230_source": 385
+    },
+    {
+      "id": "TPER-069",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-069 One active assignment produces singular blocking explanation",
+      "sha256": "74074d0de3d4755c07cad8a02650620d74072aece1cc59ac73d65b933113eddf",
+      "line_in_B230_source": 391
+    },
+    {
+      "id": "TPER-070",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-070 Multiple active assignments produce plural blocking explanation",
+      "sha256": "00124e03b0ba84a66484ce3e20b314a7c48861f38c72851706aa87dfdab3f3fb",
+      "line_in_B230_source": 398
+    },
+    {
+      "id": "TPER-072",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-072 Inactive role lifecycle guidance explains reactivation prerequisite",
+      "sha256": "23dafa328cca927c1d2e0495acb91bcbdbe4324cb1afb4ab4c7f0effe250de5c",
+      "line_in_B230_source": 412
+    },
+    {
+      "id": "TPER-073",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-073 Rejected custom permission PUT preserves the dirty permission draft",
+      "sha256": "df69ad2b967205fd1c91cea566644029fdec4786c08f3c10f7f82c15a5792193",
+      "line_in_B230_source": 417
+    },
+    {
+      "id": "TPER-074",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-074 Rejected custom-policy reset preserves the stored override",
+      "sha256": "f0ee0190f6d8faf34846b6d984161213e1e0f8b6a081659ec1c85225281d032a",
+      "line_in_B230_source": 424
+    },
+    {
+      "id": "TPER-075",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-075 Rejected deactivation PATCH preserves the active custom role",
+      "sha256": "452dc2170ee50f9a2f6fa9bdf60e42089374a0c9923d7fe12d0828c967768bd1",
+      "line_in_B230_source": 431
+    },
+    {
+      "id": "TPER-077",
+      "file": "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts",
+      "title": "TPER-077 Unchecking required Product viewing cascades to Product editing",
+      "sha256": "fe8cbad80e03f762519c9efaf36cbe4c0174712e239560a6541d9bcb851cbab1",
+      "line_in_B230_source": 447
+    },
+    {
+      "id": "TSES-021",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-021 Failed refresh exposes the source-defined error and retry view",
+      "sha256": "1ac7a6d2577ddb7e936864472fa4804802fceb9c00edb8b39ce523488fee435d",
+      "line_in_B230_source": 59
+    },
+    {
+      "id": "TSES-022",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-022 Refresh is disabled during an outstanding list refetch",
+      "sha256": "4f768dbc89168c4116767bc1fea6e6f089c027635193f0063bec384683eb1457",
+      "line_in_B230_source": 66
+    },
+    {
+      "id": "TSES-023",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-023 Empty non-first server page automatically returns to previous page",
+      "sha256": "290af41ab990eb28b23f3bb1dd5f1afccbc6db85eb60eeed04168f371c4c5676",
+      "line_in_B230_source": 75
+    },
+    {
+      "id": "TSES-024",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-024 Changing page size on page two sends first page and new size",
+      "sha256": "e77f7a57051945c8926a1a3325a6b4e6d9227ec56febecdcca1ba5ae46f05728",
+      "line_in_B230_source": 83
+    },
+    {
+      "id": "TSES-025",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-025 Server has_next false disables Next but keeps rows visible",
+      "sha256": "a7875bb0893e1f8918f39ed4c621d5fc24f04c200a32b8fa21bf6730af24c2ea",
+      "line_in_B230_source": 90
+    },
+    {
+      "id": "TSES-026",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-026 Missing IP address is labeled Unknown network",
+      "sha256": "1a5e6fdf9708782112750802514d740f1d88b117e55ec8c19122c703301b8577",
+      "line_in_B230_source": 96
+    },
+    {
+      "id": "TSES-027",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-027 IPv6 loopback is reported as proxy or local with original address",
+      "sha256": "5051a137dafb93cec973197691860f68706ae347879a121d47708b30e45bb03a",
+      "line_in_B230_source": 100
+    },
+    {
+      "id": "TSES-028",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-028 Opera user-agent identifies browser version and Windows OS",
+      "sha256": "12b592602cc15ce8fe58ec9b81ce7931ec77c383ac3122c71ba0514b5029618b",
+      "line_in_B230_source": 105
+    },
+    {
+      "id": "TSES-029",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-029 Hover device cell retains the raw user-agent signature in title",
+      "sha256": "d6284fbc6d2d512e17e71b26d9a285107cdebf284a58b41ff12b5f05da0dc733",
+      "line_in_B230_source": 110
+    },
+    {
+      "id": "TSES-030",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-030 Long session IDs display shortened identifier but retain exact title",
+      "sha256": "2bda91b06c2a743aeaf768a672cc3e586438afbe51cd4aac5cf72ce0f4752e51",
+      "line_in_B230_source": 114
+    },
+    {
+      "id": "TSES-031",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-031 Invalid creation timestamp remains raw text instead of crashing",
+      "sha256": "2e996f3d5d7545ee21f55e0e0fa19742d9c71558d59fb6c7a67a3462f0bed62f",
+      "line_in_B230_source": 119
+    },
+    {
+      "id": "TSES-032",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-032 Empty last-used timestamp displays em dash",
+      "sha256": "7f43f7c6d7d56abd335d1d32a5ab6c5aae2abda90794062be5596ed5ba6fc2c3",
+      "line_in_B230_source": 123
+    },
+    {
+      "id": "TSES-034",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-034 Revoked badge wins over expired timestamp",
+      "sha256": "06076b1a31d07efba979347be0de00446d3983fb4c0caff0ac868382eb758070",
+      "line_in_B230_source": 133
+    },
+    {
+      "id": "TSES-043",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-043 Pending status fetch temporarily disables filters and displays selected results",
+      "sha256": "6185102f248e5a5993087248ee4cac9911ea092d2d09488cb3640ee0292292a3",
+      "line_in_B230_source": 199
+    },
+    {
+      "id": "TSES-044",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-044 CURRENT badge comes solely from returned is_current value",
+      "sha256": "56b2ceb75d081f43fcef124199be1465992355d2a8cbefd3247261bb72aac1d6",
+      "line_in_B230_source": 210
+    },
+    {
+      "id": "TSES-045",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-045 Unfamiliar underscore-separated session type becomes readable badge",
+      "sha256": "bac6d619a11b588aa98e060a3ea22e316a22c79e93d30c0ba2ea16cfbe5715b3",
+      "line_in_B230_source": 216
+    },
+    {
+      "id": "TSES-046",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-046 HTML-looking user agent renders inert text, not an HTML element",
+      "sha256": "270324963445483c05398e79ee127a1370dfc2d696fae85e27859122c47ee46a",
+      "line_in_B230_source": 220
+    },
+    {
+      "id": "TSES-049",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-049 Unauthenticated direct navigation to sessions redirects to login",
+      "sha256": "f2779ced3dcfe6f2d6721a9f718fce59b6cf593a14bf359406f090ca65299a62",
+      "line_in_B230_source": 243
+    },
+    {
+      "id": "TSES-051",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-051 Network labels trim surrounding whitespace from a reported address",
+      "sha256": "7598b9abde7e597b3f1eaaa5dc4862b0bd0840159d34ad02101dcdb234c740cb",
+      "line_in_B230_source": 265
+    },
+    {
+      "id": "TSES-052",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-052 IPv4-mapped loopback is identified as a proxy and preserves the reported address",
+      "sha256": "44bda06d26adc00bf5bfa34baaefb5bd09cb51a4ab0ba01974c3e3a210cd89f0",
+      "line_in_B230_source": 269
+    },
+    {
+      "id": "TSES-053",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-053 Whitespace-only network input falls back to Unknown network",
+      "sha256": "51460e5ae58d754d3edc094e6e60c57a81ecaea3a2c681d28795fd67b1077f58",
+      "line_in_B230_source": 274
+    },
+    {
+      "id": "TSES-054",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-054 Null browser signature produces Unknown device without a fake title",
+      "sha256": "b1c87e4ef79011ae1d1c8a4c7ce89d54249da1dd7d5cfa6ed4fda152f94682ea",
+      "line_in_B230_source": 278
+    },
+    {
+      "id": "TSES-055",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-055 HeadlessChrome is labelled distinctly from ordinary Chrome",
+      "sha256": "5bbe1b313a49d89ebdddefeebae0663855597406f17f58563f2df06de0f650e4",
+      "line_in_B230_source": 283
+    },
+    {
+      "id": "TSES-056",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-056 Edge browser signature takes priority over embedded Chrome token",
+      "sha256": "bd1185c4563d7e04bdfbe5d267c71d37ce2602e2e07590231bd3e43935cfc424",
+      "line_in_B230_source": 288
+    },
+    {
+      "id": "TSES-057",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-057 Safari dotted version is recognized and iOS device label retained",
+      "sha256": "821459ad352c1090dd9523a045467082c4264f2639ec5511a4557555f7d17dfb",
+      "line_in_B230_source": 292
+    },
+    {
+      "id": "TSES-058",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-058 Playwright automation signature takes priority over Chrome markers",
+      "sha256": "34d26518d2b0e172e74270853e970e1571d7b0c5c64a8935c1f251021b1b11bb",
+      "line_in_B230_source": 297
+    },
+    {
+      "id": "TSES-059",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-059 Firefox on Linux keeps the browser version and OS in the summary",
+      "sha256": "525fd2a0f9a82f7624589a58e40d0dd8858f1ad9efacc3a2a2305e3fae96814d",
+      "line_in_B230_source": 302
+    },
+    {
+      "id": "TSES-060",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-060 Unrecognized browser signature falls back to Browser on Unknown OS",
+      "sha256": "41b01cc38ff1081b3ad25ad9c1bfccc2a52bcaa18cff1c4465e63d4188be5689",
+      "line_in_B230_source": 307
+    },
+    {
+      "id": "TSES-061",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-061 Omitted session type does not invent a third status badge",
+      "sha256": "f5e1500d41927e290780689e28103186864e7dbeb1cb105ff0d059150ca65dbf",
+      "line_in_B230_source": 311
+    },
+    {
+      "id": "TSES-062",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-062 Tenant session type is rendered as Tenant Session rather than a raw key",
+      "sha256": "bfdc71f6befe907ceaa931c351998f947421b0e0b3ee616dae3cf02f165e4cca",
+      "line_in_B230_source": 315
+    },
+    {
+      "id": "TSES-064",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-064 Empty creation timestamp is represented by an em dash",
+      "sha256": "19444f6968d7c1ae8582ac08ee4c4f36c2d9d479c3e199ff31b766193a200653",
+      "line_in_B230_source": 325
+    },
+    {
+      "id": "TSES-065",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-065 Malformed expiry date remains literal text for operator inspection",
+      "sha256": "6239a6b1bcd8116fd7c8157ecfe7459889d51cf1e8d5712f0dfdb75f1a4a9f39",
+      "line_in_B230_source": 329
+    },
+    {
+      "id": "TSES-068",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-068 Session ID of exactly eighteen characters is not shortened",
+      "sha256": "60739a2e98201d04078a841c6d205406909daccd780f1da805af5771181efe78",
+      "line_in_B230_source": 345
+    },
+    {
+      "id": "TSES-073",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-073 Empty revoked view provides history guidance, not the active-list message",
+      "sha256": "9275da672efbc2bc9dabde414b34bd3d1bcca2d7fdcac35afc88a5ec332fa094",
+      "line_in_B230_source": 369
+    },
+    {
+      "id": "TSES-074",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-074 Revoked filter updates the inventory status badge independently of row count",
+      "sha256": "23e38668632bcfe12b7a0b113e53c907f590ddf6d82d9558ad6425a2bb8e6b90",
+      "line_in_B230_source": 374
+    },
+    {
+      "id": "TSES-075",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-075 Changing the status clears prior refresh success feedback",
+      "sha256": "882069035d5a30328a0f12887a8f4597c898f85e2bc5abace7e03747f9833140",
+      "line_in_B230_source": 379
+    },
+    {
+      "id": "TSES-076",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-076 Changing the page size clears stale success feedback",
+      "sha256": "2b02311712cd619c536e0099e74c76a6050a36241e85709af9c5d16cb252a6a2",
+      "line_in_B230_source": 385
+    },
+    {
+      "id": "TSES-077",
+      "file": "tenant/sessions/sessions-batch33.spec.ts",
+      "title": "TSES-077 Last partially filled page reports correct visible row range",
+      "sha256": "646082825817526aa785a13e9a3b86751600395826f132cb29d6e62ed638c21e",
+      "line_in_B230_source": 391
+    },
+    {
+      "id": "TUSR-001",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-001 Directory and role choices use tenant user GET endpoints",
+      "sha256": "528d55f00d8f0000894b276907ad99e9b2604dd789f108c9e457b519edf9eb83",
+      "line_in_B230_source": 65
+    },
+    {
+      "id": "TUSR-002",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-002 Summary cards distinguish active, inactive, admins and custom-role users",
+      "sha256": "aea6dfd07cf1fd0c3de8e2ad18ce2c1d1a92b065da8be423f55c18af6004fae1",
+      "line_in_B230_source": 72
+    },
+    {
+      "id": "TUSR-003",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-003 Search filters directory by account name case-insensitively",
+      "sha256": "6a29fdb67b6b4d0984fadb248b9709328f627d744845eba2bed01121766081d5",
+      "line_in_B230_source": 78
+    },
+    {
+      "id": "TUSR-004",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-004 Search filters directory by email substring",
+      "sha256": "7dc81d0421c40073c59bef01d52f860c0579f24ac48854b7b10bcbd79db325d0",
+      "line_in_B230_source": 82
+    },
+    {
+      "id": "TUSR-005",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-005 Search matches displayed custom access role label",
+      "sha256": "55c4fb0f587d92114615b99428b27403ca95e18c406f73f7c4dfdd49dc9c4874",
+      "line_in_B230_source": 86
+    },
+    {
+      "id": "TUSR-006",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-006 Active status filter hides inactive directory accounts",
+      "sha256": "bb08f7a028257e1f5a1688e573c2c07e1117f4bb8655dfa720ffaf0fe496fbd5",
+      "line_in_B230_source": 90
+    },
+    {
+      "id": "TUSR-007",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-007 Inactive status filter isolates deactivated accounts",
+      "sha256": "5ff699c99c137982bbad653279f08d9752ccb3141f9e8a933cdc206e16e4d780",
+      "line_in_B230_source": 94
+    },
+    {
+      "id": "TUSR-008",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-008 No-match search shows filter empty state without write requests",
+      "sha256": "03edda4c39e2ef5225287ba8ad61f1ff6f4fdb0193efb22e28cad61762b18299",
+      "line_in_B230_source": 98
+    },
+    {
+      "id": "TUSR-009",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-009 Empty tenant directory offers the create-user next step",
+      "sha256": "9ef5169d86b7a0f0c515abd994961445050bf9c20aac9bcc843916c4266e0fc1",
+      "line_in_B230_source": 103
+    },
+    {
+      "id": "TUSR-010",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-010 Refresh refetches users and displays success feedback",
+      "sha256": "8a4aa57732438c4cb8d2653f06aff7474866bbe8110d9de981a89723293adffb",
+      "line_in_B230_source": 107
+    },
+    {
+      "id": "TUSR-011",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-011 Missing last login displays Never rather than a fabricated timestamp",
+      "sha256": "b1257ab6319132625a417f08251ed6e1f23336393dd589feac526725697dfc14",
+      "line_in_B230_source": 113
+    },
+    {
+      "id": "TUSR-012",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-012 Card displays custom role model and account status",
+      "sha256": "650342c2b5ee3ac5abad5d9c373b20e419ae8af19d9b5ffcc410e16b380d0640",
+      "line_in_B230_source": 116
+    },
+    {
+      "id": "TUSR-013",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-013 Create user opens a dedicated account form work area",
+      "sha256": "ffd9d8a14e7984f80644b3bfc86bad18d87f1b9318a2609c73f584eaa5d85e0a",
+      "line_in_B230_source": 121
+    },
+    {
+      "id": "TUSR-014",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-014 Empty required fields prevent submission or POST",
+      "sha256": "8f9ccc748a378afe8e905d0ffac373dfdb8e00e9990895fb9cc5acda4edff79e",
+      "line_in_B230_source": 127
+    },
+    {
+      "id": "TUSR-015",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-015 Invalid email keeps the form disabled with invalid input marker",
+      "sha256": "4bf442ca42efb9606e61768662e1201b36abea602b5ee3ca615c853e5e4c81e9",
+      "line_in_B230_source": 131
+    },
+    {
+      "id": "TUSR-016",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-016 Password shorter than ten characters blocks create and reports length",
+      "sha256": "84e49131654e941ea8c071ce7c75ebb7ce453de7fd3901b8d00c4761cab40982",
+      "line_in_B230_source": 137
+    },
+    {
+      "id": "TUSR-017",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-017 Show and Hide password toggles the input type only",
+      "sha256": "fd15e16819f57ddd4b0b84c0484cdf95d735bca73ff2b884d399babd18006557",
+      "line_in_B230_source": 143
+    },
+    {
+      "id": "TUSR-018",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-018 Built-in and custom assignable roles appear from options endpoint",
+      "sha256": "0f102337f7a315eddb99fd4c2fa26b7b2a7681ab6f889fab84c9b6e89c7a19b6",
+      "line_in_B230_source": 151
+    },
+    {
+      "id": "TUSR-019",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-019 Valid create trims name, lowercases email, sends role and shows success",
+      "sha256": "fa6276b05c606a55920ba6191f73b4950dd41c2e3701052fe08c81c815f01c10",
+      "line_in_B230_source": 156
+    },
+    {
+      "id": "TUSR-020",
+      "file": "tenant/users/users.spec.ts",
+      "title": "TUSR-020 Duplicate email response keeps form and displays field-level conflict",
+      "sha256": "bf33aebb81c62b52cd0e3a0a4bc8c771e37c19839afdd02112d3b38052654952",
+      "line_in_B230_source": 164
+    },
+    {
+      "id": "TADM-001",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-001 Tenant admin system loads through actual status GET",
+      "sha256": "baca3f9f65f583b0e13c269b8e472eb398d59edfb0ac4d6c48e37e7541ba2657",
+      "line_in_B230_source": 44
+    },
+    {
+      "id": "TADM-002",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-002 Unlocked status renders WRITES OPEN and individual CLEAR lock badges",
+      "sha256": "48d516418bc1163ae7176008b5b4ca9390a7679d915d2d87408b323299080424",
+      "line_in_B230_source": 48
+    },
+    {
+      "id": "TADM-003",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-003 Platform-only write lock reports blocked operations",
+      "sha256": "98659b4080eb7b5fefaedde836bdb90e4182589525175a21e5f458057494e97f",
+      "line_in_B230_source": 52
+    },
+    {
+      "id": "TADM-004",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-004 Tenant-only write lock identifies tenant as blocker",
+      "sha256": "2df402f63334fa7fd76b06a7f63e09059c20baf6b79e3ec5f4831fe8afddc240",
+      "line_in_B230_source": 56
+    },
+    {
+      "id": "TADM-005",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-005 Combined locks identify both sources without mutation control",
+      "sha256": "f0f3ccb7658172fbfced66b451546a5303d22283e1a1036be47f529a9093ba6f",
+      "line_in_B230_source": 60
+    },
+    {
+      "id": "TADM-006",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-006 Maintenance mode enabled is visible and read-only",
+      "sha256": "bf74f00c7cbf2ca2f8af95dfd6bf009d7e4d1c09d0e374969b17b32afa31e117",
+      "line_in_B230_source": 64
+    },
+    {
+      "id": "TADM-007",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-007 Disabled maintenance reports OFF instead of active",
+      "sha256": "8db36979caee262f2637de09e683b36d50949bd1bc7e9bdd0d12d67228ad5f6d",
+      "line_in_B230_source": 68
+    },
+    {
+      "id": "TADM-008",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-008 Blocking KPI uses authoritative status count not loaded row count",
+      "sha256": "7c15d9abf385432ead04bcb98e7cb4c20f610e434ae20acd63ca2fba33b0e7cb",
+      "line_in_B230_source": 72
+    },
+    {
+      "id": "TADM-009",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-009 Malformed status blocker count falls back to numeric zero",
+      "sha256": "d167b25924b9b429b59bb293770f96308b298133d201fe11cca7d1c2fdc71ff0",
+      "line_in_B230_source": 76
+    },
+    {
+      "id": "TADM-010",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-010 Forbidden system-status reports unavailable and preserves diagnostic area",
+      "sha256": "f7cd87f96dca362b0812a4f18fc08682de0bb180a21909322025cc534cf2fb43",
+      "line_in_B230_source": 80
+    },
+    {
+      "id": "TADM-011",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-011 Reported timestamp does not fall back to missing placeholder",
+      "sha256": "ccea836518b36a28010e147044e6c550ac68095680035ec7ad024e762e0c5b68",
+      "line_in_B230_source": 84
+    },
+    {
+      "id": "TADM-012",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-012 Tenant ID is displayed from status response",
+      "sha256": "e45862ea444072c0460bc031dae331dc6a28b061b6d9cf06893002f1669ea770",
+      "line_in_B230_source": 88
+    },
+    {
+      "id": "TADM-013",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-013 Posture does not expose controls to alter platform/tenant locks",
+      "sha256": "85e3615691eede8e24e1dd9e893f618f07805c487f05a50d496b47b42a8c1ee9",
+      "line_in_B230_source": 91
+    },
+    {
+      "id": "TADM-014",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-014 Blocking alert presents mapped readable type and evidence text",
+      "sha256": "c1b2c04e0b3f3710d60420bb6a1102a780f2fe747a4d72c4f5abe7aa9bb0ffaf",
+      "line_in_B230_source": 94
+    },
+    {
+      "id": "TADM-015",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-015 Blocking alert shows source severity and acknowledgement state",
+      "sha256": "2baf50bfff8c2bba5bff8ee879c7efc6432399a76cb987c701c088827b1d7453",
+      "line_in_B230_source": 98
+    },
+    {
+      "id": "TADM-016",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-016 Negative stock renders product, storage and quantity",
+      "sha256": "e79b2cfb2231988642946841360e36be409e1f58955e355c33e7b8aab00bfdca",
+      "line_in_B230_source": 102
+    },
+    {
+      "id": "TADM-017",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-017 Finalized shipment shortage displays PO and source counts",
+      "sha256": "be7cf51173547703032c098a63f2abcc6e179e4f390e747cd35ee456de2d4dbd",
+      "line_in_B230_source": 106
+    },
+    {
+      "id": "TADM-018",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-018 Empty diagnostic lists render three separate safe empty states",
+      "sha256": "607ebbd9e838190f51e623bb18c5bee3378b2181a727662f447432d4bfcdaf30",
+      "line_in_B230_source": 111
+    },
+    {
+      "id": "TADM-019",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-019 Partial diagnostic forbidden failure does not hide other sections",
+      "sha256": "0c38a7728de98cd30cd8e939709f7881a56bc2d042296cee2ee197ee2ec21aff",
+      "line_in_B230_source": 117
+    },
+    {
+      "id": "TADM-020",
+      "file": "tenant/admin-system/admin-system.spec.ts",
+      "title": "TADM-020 Refresh re-queries status and all three diagnostics without POST",
+      "sha256": "5ffc4127c4ff295e071d03be7ed739d94d9ca9d3e2a315971fd282dcfb89516e",
+      "line_in_B230_source": 122
+    },
+    {
+      "id": "TSN-001",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-001 Default scanner opens shipment QR lookup without stock activity",
+      "sha256": "6231bef7bb91b7bd2c4c8cb51534d4fb0cf8e78ce0e13aa8510ff06b8dd6df32",
+      "line_in_B230_source": 37
+    },
+    {
+      "id": "TSN-002",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-002 Manual submission is disabled while the scanned value is blank",
+      "sha256": "aef76d0312f96a8e83b129d3715f1eea0662e552b5263809260703e4fc032051",
+      "line_in_B230_source": 42
+    },
+    {
+      "id": "TSN-003",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-003 Help reveals camera and manual fallback instructions without starting a camera",
+      "sha256": "5a7a2df8bfd3dc719a26809357a7076a56b91fdd5e4e5aaf885188ff22f8b293",
+      "line_in_B230_source": 45
+    },
+    {
+      "id": "TSN-004",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-004 Manual and upload controls remain available without initiating hardware capture",
+      "sha256": "ea8e99392a758785d64d769e5d086b0cb6135f1508352df8183dd76062116b54",
+      "line_in_B230_source": 50
+    },
+    {
+      "id": "TSN-006",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-006 Unknown shipment QR shows specific lookup failure",
+      "sha256": "35237a787a24e4357287877eb3e679dafa218f882f1da98d74ec61326d12f7d2",
+      "line_in_B230_source": 59
+    },
+    {
+      "id": "TSN-007",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-007 Failed lookup retains decoded code and offers correction without dispatching stock",
+      "sha256": "e0f26f0b121c8ee48f2a09ce29be4959602a4caa472b4138984910031efa3b77",
+      "line_in_B230_source": 63
+    },
+    {
+      "id": "TSN-009",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-009 Verification mode loads its specific shipment context through read-only GET",
+      "sha256": "200d88a5203678f62a65ddc202b0d7265d2e32f6d9adf62909eb620e7b0b4240",
+      "line_in_B230_source": 72
+    },
+    {
+      "id": "TSN-010",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-010 Verification rejects a QR code belonging to a different shipment",
+      "sha256": "a09e2a079462d1b0bdfb4f9c098d7ebe31cac8017c3fd30ddec1d3c2afe0ce1e",
+      "line_in_B230_source": 77
+    },
+    {
+      "id": "TSN-011",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-011 Matching verification QR navigates to its shipment rather than posting stock",
+      "sha256": "4cd99ef9874ff145ee348f221488ea309962a25403d0b24bf30eb25551577c59",
+      "line_in_B230_source": 83
+    },
+    {
+      "id": "TSN-012",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-012 Failed verification-context GET prevents manual scan submission",
+      "sha256": "f810825f4fb84c4574fade31256fb8e8119e2a89e7a16e635e6a1b32f77c7b0e",
+      "line_in_B230_source": 88
+    },
+    {
+      "id": "TSN-013",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-013 Unknown scanner mode safely falls back to shipment QR lookup",
+      "sha256": "e228e22f10c1287dacd45a485492b7cd6338a77c43c8f817df358c5cfa0e4dce",
+      "line_in_B230_source": 93
+    },
+    {
+      "id": "TSN-014",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-014 Product scanner without shipment id blocks manual and image input",
+      "sha256": "044b7729855d444acae3e22edc909d385c87d205b3295e33aa3461978b362d57",
+      "line_in_B230_source": 97
+    },
+    {
+      "id": "TSN-015",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-015 Product scanner without destination blocks scan submission",
+      "sha256": "93147582088888d7c23958f904fdcde54dea1f16b4a6698baeac9c605b48a525",
+      "line_in_B230_source": 102
+    },
+    {
+      "id": "TSN-016",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-016 Unknown destination is rejected after options fetch",
+      "sha256": "a5ec81fb2a110d200bbc74ed09537c8713d3b56bc9b321404df350f48fbc1eb1",
+      "line_in_B230_source": 107
+    },
+    {
+      "id": "TSN-017",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-017 Finalized receiving context disables product barcode entry",
+      "sha256": "f377a66fc848300d8abb0b507f974f534e4a5eafb8edc54134221b9d4ab4845e",
+      "line_in_B230_source": 113
+    },
+    {
+      "id": "TSN-018",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-018 Valid product context exposes session metrics with zero recorded receipts",
+      "sha256": "5b84aad1ecf46f6ed47ad058b55f5b6cc27e2bd97625ffcab976e51c904cff5b",
+      "line_in_B230_source": 118
+    },
+    {
+      "id": "TSN-019",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-019 Finish receiving returns to the exact shipment without a barcode mutation",
+      "sha256": "3ecbfe178a4e5afb3fb40fb9e47166dee5454f53d6334a097321cc5592e9edf0",
+      "line_in_B230_source": 124
+    },
+    {
+      "id": "TSN-020",
+      "file": "tenant/scanner/scanner.spec.ts",
+      "title": "TSN-020 Invalid image type and oversize image are refused before decoding",
+      "sha256": "ab6e3ab56b2dff33713f9b19dfcc2f3c61dd7d70b295a2de4f735bfc27fbbb9f",
+      "line_in_B230_source": 128
+    },
+    {
+      "id": "TPER-001",
+      "file": "tenant/tenant-permissions/tenant-permissions.spec.ts",
+      "title": "TPER-001 Policy editor loads tenant GET matrix with no write",
+      "sha256": "1f7853bc8149c3277ba2f4f24985fbfa722676fc0dd80aea515d604cfe435516",
+      "line_in_B230_source": 57
+    },
+    {
+      "id": "TPER-002",
+      "file": "tenant/tenant-permissions/tenant-permissions.spec.ts",
+      "title": "TPER-002 Overview gives source-backed permission, built-in and custom counts",
+      "sha256": "9ad39068ced3618330f8f5ae32a88c339354f12e7abd63bbcc4e3d54df82391a",
+      "line_in_B230_source": 61
+    },
+    {
+      "id": "TPER-004",
+      "file": "tenant/tenant-permissions/tenant-permissions.spec.ts",
+      "title": "TPER-004 Selecting Manager changes role panel without a policy write",
+      "sha256": "cdeb4a2f1206710c729a671e2ace1cf152945f470b244fd4db28e2f5b3a0c680",
+      "line_in_B230_source": 70
+    },
+    {
+      "id": "TPER-005",
+      "file": "tenant/tenant-permissions/tenant-permissions.spec.ts",
+      "title": "TPER-005 Selecting Staff shows its own defaults and assigned users",
+      "sha256": "5e24fbdd8dffef1e3c02e082fc30142b7d2161fa88cb8473b75eb6db9b76126b",
+      "line_in_B230_source": 75
+    },
+    {
+      "id": "TPER-006",
+      "file": "tenant/tenant-permissions/tenant-permissions.spec.ts",
+      "title": "TPER-006 Custom role card identifies starting template",
+      "sha256": "68cc0966e4e85e38a6bff694e7217cdcd8c45a58ed1bc592cc7286401506ac05",
+      "line_in_B230_source": 80
+    },
+    {
+      "id": "TPER-007",
+      "file": "tenant/tenant-permissions/tenant-permissions.spec.ts",
+      "title": "TPER-007 Search by human-readable permission label narrows result",
+      "sha256": "29f84a51f8310ab55f636369d63cedcc06e3646bd869b64e5f2f1221af03b3b0",
+      "line_in_B230_source": 84
+    },
+    {
+      "id": "TPER-008",
+      "file": "tenant/tenant-permissions/tenant-permissions.spec.ts",
+      "title": "TPER-008 Search by technical permission key matches hidden key",
+      "sha256": "516bb7922ab9c2cab27c097f200aa69569d141c15f750052bc7147fa269eec38",
+      "line_in_B230_source": 89
+    },
+    {
+      "id": "TPER-009",
+      "file": "tenant/tenant-permissions/tenant-permissions.spec.ts",
+      "title": "TPER-009 Search by permission group matches all group members",
+      "sha256": "e6519086610f94fedf6e84b11f6c80aafcc936992d5aae14d2ad4ca6cd207ad6",
+      "line_in_B230_source": 94
+    },
+    {
+      "id": "TPER-010",
+      "file": "tenant/tenant-permissions/tenant-permissions.spec.ts",
+      "title": "TPER-010 No-match search provides Clear search recovery",
+      "sha256": "579a320826abfc9e6196ae5125a1af8f5473df5f8ffccc1aa56485b1a689f4a6",
+      "line_in_B230_source": 99
+    },
+    {
+      "id": "TPER-011",
+      "file": "tenant/tenant-permissions/tenant-permissions.spec.ts",
+      "title": "TPER-011 Show technical keys reveals permission identifiers",
+      "sha256": "22889f7afeb680ab0fdd8ac17636254d820eaa828f39542e78319e4b7155b648",
+      "line_in_B230_source": 104
+    },
+    {
+      "id": "TPER-012",
+      "file": "tenant/tenant-permissions/tenant-permissions.spec.ts",
+      "title": "TPER-012 Hide technical keys removes identifiers from accessible rows",
+      "sha256": "21355fcf2744e1b1b316e6bdcdae95db6e6cd1afb878084bb28e1d0174c94056",
+      "line_in_B230_source": 110
+    }
+  ],
+  "safety_design": {
+    "no_original_test_body_changes": true,
+    "temporary_CI_only_fixture_import_adaptation": true,
+    "any_non_auth_remote_HTTP_write": "blocked by liveOriginalSafeTest fixture",
+    "local_mock_writes": "allowed only by guarded page.route.fulfill, no external write",
+    "require_B230_final_9": true,
+    "require_B231_contract_preflight": true,
+    "worker_count": 1,
+    "no_video_trace_screenshots_or_uploaded_artifacts": true,
+    "no_production_record_mutations": true,
+    "note": "Static verification only until GitHub browser run. Some UI assertions may fail; classify evidence accurately."
+  }
+}
