@@ -232,8 +232,38 @@ for (const key of ['PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}', 'PW_TENANT_PASSW
 const optionsSection = workflowBody.match(/^\s{8}options:\s*$([\s\S]*?)(?=^\s{6}confirmation:)/m);
 assert(optionsSection, 'Live workflow group choice options are missing');
 const declared = [...optionsSection[1].matchAll(/^\s{10}-\s+([A-Z0-9_]+)\s*$/gm)].map(match => match[1]);
-assert.deepEqual(declared, ['DISCOVER_ALL', ...Object.keys(manifest.approved_groups)], 'Workflow group menu and reviewed manifest disagree');
+// B231/B232 are deliberately added to the reviewed manifest ONLY inside their
+// ephemeral GitHub runner checkout, after this baseline verifier completes.
+// The dispatch choices are static and must match this *exact* extension; no
+// unreviewed group may be accepted and the historic manifest stays unchanged.
+const runnerOnly = [
+  { group: 'BULK_SAFE_12', batch: 231, count: 180 },
+  { group: 'BULK_SAFE_13', batch: 232, count: 240 },
+];
+assert.deepEqual(
+  declared,
+  ['DISCOVER_ALL', ...Object.keys(manifest.approved_groups), ...runnerOnly.map(x => x.group)],
+  'Workflow group menu must match the reviewed manifest plus exactly B231/B232 ephemeral groups'
+);
 assert.equal(new Set(declared).size, declared.length, 'Duplicate live group choice');
+for (const { group, batch, count } of runnerOnly) {
+  assert(!Object.hasOwn(manifest.approved_groups, group), `${group} must be runner-only, not a committed manifest entry`);
+  const reviewPath = path.join(root, `batch-${batch}-review.json`);
+  const review = JSON.parse(fs.readFileSync(reviewPath, 'utf8'));
+  assert.equal(review.batch, batch, `${group}: incorrect reviewed batch`);
+  assert.equal(review.group, group, `${group}: incorrect reviewed group`);
+  assert.equal(review.selected.length, count, `${group}: incorrect reviewed test count`);
+  // Verify that only the named input triggers the pinned review / mutation.
+  assert(workflowBody.includes(`if: \${{ inputs.group == '${group}' }}`), `${group}: CI group gate missing`);
+  for (const script of [
+    `check-batch-${batch}-contract.mjs`,
+    `prepare-batch-${batch}-runtime.mjs`,
+  ]) {
+    assert(fs.existsSync(path.join(root, 'scripts', script)), `${group}: missing reviewed runner script ${script}`);
+    assert(workflowBody.includes(`node scripts/${script}`), `${group}: CI does not execute ${script}`);
+  }
+}
+
 for (const { group, file, ids } of allApproved) {
   const body = fs.readFileSync(path.join(testRoot, file), 'utf8');
   for (const id of ids) {
