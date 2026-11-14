@@ -1,0 +1,131 @@
+test_id,original_spec,test_title,state
+TSET-060,tenant/tenant-settings/tenant-settings.spec.ts,TSET-060 Organization type slug gets a readable tenant identity label,PENDING_GITHUB_BROWSER
+TSET-061,tenant/tenant-settings/tenant-settings.spec.ts,TSET-061 Missing organization type falls back to facility in overview and form,PENDING_GITHUB_BROWSER
+TSET-062,tenant/tenant-settings/tenant-settings.spec.ts,TSET-062 Absent approval-policy field falls back to separation enabled,PENDING_GITHUB_BROWSER
+TSET-070,tenant/tenant-settings/tenant-settings.spec.ts,TSET-070 Reverting an unsaved approval toggle restores baseline without API mutation,PENDING_GITHUB_BROWSER
+TSET-037,tenant/tenant-settings/tenant-settings.spec.ts,TSET-037 Dirty state registers a cancellable before-unload warning,PENDING_GITHUB_BROWSER
+TSET-055,tenant/tenant-settings/tenant-settings.spec.ts,TSET-055 Numeric three-character currency fails pattern validation before PUT,PENDING_GITHUB_BROWSER
+TSET-056,tenant/tenant-settings/tenant-settings.spec.ts,TSET-056 Blank inventory currency blocks a dirty form from submitting,PENDING_GITHUB_BROWSER
+TSET-027,tenant/tenant-settings/tenant-settings.spec.ts,TSET-027 Approval separation toggle persists false in intercepted tenant PUT,PENDING_GITHUB_BROWSER
+TSET-028,tenant/tenant-settings/tenant-settings.spec.ts,"TSET-028 Default language selection submits tenant locale, not personal UI change",PENDING_GITHUB_BROWSER
+TSET-033,tenant/tenant-settings/tenant-settings.spec.ts,TSET-033 Existing legacy code can be explicitly confirmed without changing code,PENDING_GITHUB_BROWSER
+TSET-058,tenant/tenant-settings/tenant-settings.spec.ts,TSET-058 Season-end date minimum tracks the edited start date,PENDING_GITHUB_BROWSER
+TSET-064,tenant/tenant-settings/tenant-settings.spec.ts,TSET-064 Reset clears a legacy currency acknowledgement without sending PUT,PENDING_GITHUB_BROWSER
+TSL-037,tenant/storage-locations/storage-locations.spec.ts,TSL-037 Stock-restricted role sees names without stock counts,PENDING_GITHUB_BROWSER
+TAPE-013,tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts,TAPE-013 read-only policy reviewer cannot run analysis or record approved business-rule change,PENDING_GITHUB_BROWSER
+TAPE-033,tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts,TAPE-033 monitoring application offers a governed reason form for recalibration,PENDING_GITHUB_BROWSER
+TAPE-045,tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts,TAPE-045 original policy value and proposed change remain distinct in recorder,PENDING_GITHUB_BROWSER
+TAPE-050,tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts,TAPE-050 ordinary tenant UI keeps contract audits and technical panels hidden,PENDING_GITHUB_BROWSER
+TAPE-034,tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts,TAPE-034 lifecycle reason under ten trimmed characters keeps submit disabled,PENDING_GITHUB_BROWSER
+TAPE-018,tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts,TAPE-018 manual-application-approved recommendation opens record-only policy change form,PENDING_GITHUB_BROWSER
+TAPE-039,tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts,TAPE-039 completed rollback action is gated to rollback-review state,PENDING_GITHUB_BROWSER
+TAPE-014,tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts,TAPE-014 read-only page refresh reloads GET summary without POST mutation,PENDING_GITHUB_BROWSER
+TAPE-020,tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts,TAPE-020 applied-change recorder blocks empty or too-short change summary before POST,PENDING_GITHUB_BROWSER
+TAPE-024,tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts,TAPE-024 application POST conflict keeps edited draft and displays actionable error,PENDING_GITHUB_BROWSER
+TAPE-035,tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts,TAPE-035 recalibration review posts its exact action and trimmed reason,PENDING_GITHUB_BROWSER
+TAPE-036,tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts,"TAPE-036 rollback review opens a review action, not an automatic rollback",PENDING_GITHUB_BROWSER
+TSH-023,tenant/shipments/shipments.spec.ts,TSH-023 Linked Purchase Order selection stays gated by feature access and eligible supplier,PENDING_GITHUB_BROWSER
+TSH-030,tenant/shipments/shipments.spec.ts,TSH-030 Over-remaining usable receiving quantity is disabled without POST,PENDING_GITHUB_BROWSER
+TSH-025,tenant/shipments/shipments.spec.ts,TSH-025 Nonpending shipment locks header editing,PENDING_GITHUB_BROWSER
+TSH-027,tenant/shipments/shipments.spec.ts,TSH-027 Item add requires product and positive quantity before POST,PENDING_GITHUB_BROWSER
+TSH-029,tenant/shipments/shipments.spec.ts,TSH-029 Line deletion cancelled in confirmation sends no mutation,PENDING_GITHUB_BROWSER
+TSH-032,tenant/shipments/shipments.spec.ts,TSH-032 Scanner launch keeps exact shipment and location context without receiving,PENDING_GITHUB_BROWSER
+TSH-037,tenant/shipments/shipments.spec.ts,TSH-037 Received shipment disables further receiving and finalization,PENDING_GITHUB_BROWSER
+TSH-048,tenant/shipments/shipments.spec.ts,TSH-048 Partial received quantity is displayed from server-provided line data,PENDING_GITHUB_BROWSER
+TSH-049,tenant/shipments/shipments.spec.ts,TSH-049 No shipment item read permission exposes no line GET or detail cards,PENDING_GITHUB_BROWSER
+TSH-050,tenant/shipments/shipments.spec.ts,"TSH-050 Refresh after selected line reloads registry, options and line evidence",PENDING_GITHUB_BROWSER
+TSH-047,tenant/shipments/shipments.spec.ts,TSH-047 Receiving failure preserves the error and never displays successful receipt,PENDING_GITHUB_BROWSER
+TSH-038,tenant/shipments/shipments.spec.ts,TSH-038 Supplier email preview remains non-sending until operator confirmation,PENDING_GITHUB_BROWSER
+TPROD-042,tenant/products/products.spec.ts,TPROD-042 URL filters survive reload and keep supplier-scoped rows,PENDING_GITHUB_BROWSER
+TPROD-043,tenant/products/products.spec.ts,TPROD-043 absent suppliers.read keeps supplier selector unavailable but catalog visible,PENDING_GITHUB_BROWSER
+TPROD-038,tenant/products/products.spec.ts,TPROD-038 a supported barcode QR image filters products by actual decoded value,PENDING_GITHUB_BROWSER
+TPROD-064,tenant/products/products.spec.ts,TPROD-064 category hotspot selects category for Products URL scope,PENDING_GITHUB_BROWSER
+TPROD-065,tenant/products/products.spec.ts,TPROD-065 valuation detail controls issue valuation_basis/search/sort/direction requests,PENDING_GITHUB_BROWSER
+TPROD-067,tenant/products/products.spec.ts,TPROD-067 valuation record opens matching product audit history,PENDING_GITHUB_BROWSER
+TPROD-071,tenant/products/products.spec.ts,TPROD-071 cost action filters preserve chosen type/search/sort/order in the API request,PENDING_GITHUB_BROWSER
+TPROD-029,tenant/products/products.spec.ts,TPROD-029 malformed CSV never reaches the preview endpoint,PENDING_GITHUB_BROWSER
+TPROD-047,tenant/products/products.spec.ts,"TPROD-047 without products.write, CSV chooser and Validate are disabled",PENDING_GITHUB_BROWSER
+TPROD-059,tenant/products/products.spec.ts,TPROD-059 barcode scanner panel closes and returns to the untouched catalog,PENDING_GITHUB_BROWSER
+TPROD-028,tenant/products/products.spec.ts,TPROD-028 CSV import template downloads real products-import-template.csv,PENDING_GITHUB_BROWSER
+TSC-049,tenant/system-context/system-context.spec.ts,TSC-049 Source navigation hides inaccessible Alerts link,PENDING_GITHUB_BROWSER
+TSC-036,tenant/system-context/system-context.spec.ts,TSC-036 Capturing snapshot updates selected snapshot identifier and history query,PENDING_GITHUB_BROWSER
+TSC-038,tenant/system-context/system-context.spec.ts,TSC-038 Diagnostics tab is displayed for tenant diagnostics permission,PENDING_GITHUB_BROWSER
+TSC-047,tenant/system-context/system-context.spec.ts,TSC-047 Read-only history never triggers execution workflow endpoints,PENDING_GITHUB_BROWSER
+TSC-048,tenant/system-context/system-context.spec.ts,TSC-048 Repeated refresh while pending disables duplicate refresh button,PENDING_GITHUB_BROWSER
+TSC-031,tenant/system-context/system-context.spec.ts,TSC-031 Without governance role planning history remains readable but save is disabled,PENDING_GITHUB_BROWSER
+TCDO-002,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,"TCDO-002 empty reader sees no saved decisions, with no governance action",PENDING_GITHUB_BROWSER
+TCDO-027,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,TCDO-027 governor with read-only source evidence cannot invoke Check again builders,PENDING_GITHUB_BROWSER
+TCDO-035,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,TCDO-035 source workflow navigation is tied to actual source type and permission,PENDING_GITHUB_BROWSER
+TCDO-044,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,TCDO-044 cannot request formal Intelligence Review without selected option,PENDING_GITHUB_BROWSER
+TCDO-045,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,TCDO-045 reader sees plan evidence but none of the governor-only mutations,PENDING_GITHUB_BROWSER
+TCDO-047,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,TCDO-047 selected run readiness cards distinguish missing assessment from checks,PENDING_GITHUB_BROWSER
+TCDO-049,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,TCDO-049 deprecated manual wizard is not exposed even with governing permission,PENDING_GITHUB_BROWSER
+TCDO-050,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,TCDO-050 even approved plan explicitly requires action in originating source workflow,PENDING_GITHUB_BROWSER
+TCDO-032,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,TCDO-032 distinct actions sharing product scope permit Compare selected,PENDING_GITHUB_BROWSER
+TCDO-034,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,TCDO-034 single action goes straight to source review without fictional second option,PENDING_GITHUB_BROWSER
+TCDO-036,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,TCDO-036 common impact rows appear only for facts shared across two actions,PENDING_GITHUB_BROWSER
+TCDO-048,tenant/cross-domain-optimization/cross-domain-optimization.spec.ts,TCDO-048 Learning Feedback route includes exact run and selected option,PENDING_GITHUB_BROWSER
+TSMV-041,tenant/stock-movements/stock-movements.spec.ts,TSMV-041 Shipment reference is a link only when shipment read permission exists,PENDING_GITHUB_BROWSER
+TSMV-042,tenant/stock-movements/stock-movements.spec.ts,TSMV-042 Shipment reference stays text without shipment read permission,PENDING_GITHUB_BROWSER
+TSMV-044,tenant/stock-movements/stock-movements.spec.ts,TSMV-044 Transfer reference is plain text without transfer read permission,PENDING_GITHUB_BROWSER
+TSMV-070,tenant/stock-movements/stock-movements.spec.ts,TSMV-070 Restricted historical shipment has no link and no invented PO number,PENDING_GITHUB_BROWSER
+TAUD-041,tenant/tenant-audit/tenant-audit.spec.ts,TAUD-041 Role with audit.read but without diagnostics.read gets no technical toggle,PENDING_GITHUB_BROWSER
+TSUP-043,tenant/suppliers/suppliers.spec.ts,TSUP-043 missing shipments.read hides performance actions while supplier master remains visible,PENDING_GITHUB_BROWSER
+TSUP-065,tenant/suppliers/suppliers.spec.ts,TSUP-065 an orphaned SLA supplier never exposes a performance navigation action,PENDING_GITHUB_BROWSER
+TSUP-066,tenant/suppliers/suppliers.spec.ts,TSUP-066 missing overdue dates render explicit dashes instead of invented dates,PENDING_GITHUB_BROWSER
+TSUP-026,tenant/suppliers/suppliers.spec.ts,TSUP-026 delivery SLA row shows overdue count and opens its supplier performance,PENDING_GITHUB_BROWSER
+TSUP-036,tenant/suppliers/suppliers.spec.ts,TSUP-036 cancelling browser confirmation keeps validated preview and sends no commit,PENDING_GITHUB_BROWSER
+TSUP-067,tenant/suppliers/suppliers.spec.ts,TSUP-067 the displayed filtered count differentiates search results from all suppliers,PENDING_GITHUB_BROWSER
+TSUP-069,tenant/suppliers/suppliers.spec.ts,TSUP-069 explicit failed supplier refresh shows scoped error rather than success,PENDING_GITHUB_BROWSER
+TSUP-070,tenant/suppliers/suppliers.spec.ts,TSUP-070 explicit failed delivery refresh shows scoped error rather than success,PENDING_GITHUB_BROWSER
+TSUP-030,tenant/suppliers/suppliers.spec.ts,TSUP-030 non-CSV supplier import file is rejected before validation or commit,PENDING_GITHUB_BROWSER
+TSUP-037,tenant/suppliers/suppliers.spec.ts,TSUP-037 confirmed supplier import uses current version and reports commit/refetch,PENDING_GITHUB_BROWSER
+TSUP-038,tenant/suppliers/suppliers.spec.ts,TSUP-038 a 2001-data-row CSV is rejected locally before any preview request,PENDING_GITHUB_BROWSER
+TSUP-029,tenant/suppliers/suppliers.spec.ts,TSUP-029 bulk supplier import template downloads source-defined columns,PENDING_GITHUB_BROWSER
+TRC-049,tenant/reliability-command/reliability-command.spec.ts,TRC-049 A failed filtered command fetch shows error view rather than stale Ready,PENDING_GITHUB_BROWSER
+TRC-028,tenant/reliability-command/reliability-command.spec.ts,TRC-028 Unrecognized review-stage source never renders a free-form navigation link,PENDING_GITHUB_BROWSER
+TPF-049,tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts,TPF-049 read role can GET evidence but has no governed refresh control,PENDING_GITHUB_BROWSER
+TPF-046,tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts,TPF-046 reader without operational action-center permission does not see Intelligence Review shortcut,PENDING_GITHUB_BROWSER
+TPF-050,tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts,TPF-050 failed exact-source request never replaces exact-version state with tenant-wide rows,PENDING_GITHUB_BROWSER
+TPF-007,tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts,TPF-007 forecast refresh service failure preserves visible snapshots and shows warning,PENDING_GITHUB_BROWSER
+TSTR-033,tenant/stock-transfers/stock-transfers.spec.ts,TSTR-033 Successful draft creation shows feedback and opens new ID in URL,PENDING_GITHUB_BROWSER
+TSTR-034,tenant/stock-transfers/stock-transfers.spec.ts,TSTR-034 Draft creation API failure surfaces rejection and retains entered fields,PENDING_GITHUB_BROWSER
+TSTR-035,tenant/stock-transfers/stock-transfers.spec.ts,"TSTR-035 Edit draft loads selected locations, notes and existing item quantity",PENDING_GITHUB_BROWSER
+TSTR-041,tenant/stock-transfers/stock-transfers.spec.ts,TSTR-041 Declining native execution confirmation sends no POST,PENDING_GITHUB_BROWSER
+TSTR-043,tenant/stock-transfers/stock-transfers.spec.ts,TSTR-043 Execution API rejection leaves draft actions available and shows error,PENDING_GITHUB_BROWSER
+TSTR-044,tenant/stock-transfers/stock-transfers.spec.ts,TSTR-044 Declining cancellation confirmation leaves draft and sends no mutation,PENDING_GITHUB_BROWSER
+TSTR-059,tenant/stock-transfers/stock-transfers.spec.ts,"TSTR-059 Blank optional notes are sent as null, not whitespace",PENDING_GITHUB_BROWSER
+TSTR-061,tenant/stock-transfers/stock-transfers.spec.ts,TSTR-061 Decimal quantity on a serial-tracked base unit is rejected before POST,PENDING_GITHUB_BROWSER
+TSTR-066,tenant/stock-transfers/stock-transfers.spec.ts,TSTR-066 Whitespace-only cancellation reason is submitted as null after confirmation,PENDING_GITHUB_BROWSER
+TSTR-037,tenant/stock-transfers/stock-transfers.spec.ts,TSTR-037 Version conflict on edited draft shows feedback without reset,PENDING_GITHUB_BROWSER
+TST-024,tenant/stock/stock.spec.ts,TST-024 Clear Stock Filters strips linked product and stock query keys,PENDING_GITHUB_BROWSER
+TST-033,tenant/stock/stock.spec.ts,TST-033 Valid lot Block sends trimmed reason and presents mocked success,PENDING_GITHUB_BROWSER
+TST-034,tenant/stock/stock.spec.ts,TST-034 Held lot Unblock requires at least three characters before release POST,PENDING_GITHUB_BROWSER
+TST-032,tenant/stock/stock.spec.ts,TST-032 Hold-lot prompt cancellation and short reason never send POST,PENDING_GITHUB_BROWSER
+TST-035,tenant/stock/stock.spec.ts,TST-035 Quarantine Release does not POST until user accepts confirmation,PENDING_GITHUB_BROWSER
+TDLF-021,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,TDLF-021 source selection uses backend source facts in evidence reference and payload,PENDING_GITHUB_BROWSER
+TDLF-027,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,"TDLF-027 governed evidence POST transmits source, status, observed time and fact snapshot",PENDING_GITHUB_BROWSER
+TDLF-042,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,TDLF-042 unavailable source search cannot enable an invalid evidence save,PENDING_GITHUB_BROWSER
+TDLF-045,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,"TDLF-045 outcome Yes, Partly and No map to the documented 1, 0 and -1 score values",PENDING_GITHUB_BROWSER
+TDLF-024,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,TDLF-024 changing policy effectiveness status derives bounded business score on save,PENDING_GITHUB_BROWSER
+TDLF-036,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,TDLF-036 Escalate trims sufficient explanation and retains evidence key,PENDING_GITHUB_BROWSER
+TDLF-038,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,TDLF-038 review board Older requests review_offset 25 while preserving bucket offsets,PENDING_GITHUB_BROWSER
+TDLF-050,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,TDLF-050 review API conflict retains the evidence row and displays conflict message,PENDING_GITHUB_BROWSER
+TDLF-039,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,TDLF-039 action-plan follow-up creates only a draft Execution Request,PENDING_GITHUB_BROWSER
+TDLF-044,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,TDLF-044 day-boundary evidence filter retains server-side sort and respects local time conversion,PENDING_GITHUB_BROWSER
+TDLF-049,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,TDLF-049 successful independent review invalidates and refreshes summary evidence,PENDING_GITHUB_BROWSER
+TDLF-025,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,TDLF-025 feedback save remains disabled until a real source is selected,PENDING_GITHUB_BROWSER
+TACT-032,tenant/action-center/action-center.spec.ts,TACT-032 Governance source-page shortcuts are permission gated,PENDING_GITHUB_BROWSER
+TCOL-048,tenant/collaboration/collaboration.spec.ts,TCOL-048 Source-provided escalation and partner guidance appear in Safety limits,PENDING_GITHUB_BROWSER
+TALERT-026,tenant/alerts/alerts.spec.ts,TALERT-026 acknowledge sends POST without payload and displays explicit completion feedback,PENDING_GITHUB_BROWSER
+TALERT-027,tenant/alerts/alerts.spec.ts,TALERT-027 acknowledge failure is visible and never reports acknowledgement succeeded,PENDING_GITHUB_BROWSER
+TALERT-031,tenant/alerts/alerts.spec.ts,TALERT-031 dismissing Reopen confirmation sends no request and leaves resolved record,PENDING_GITHUB_BROWSER
+TALERT-032,tenant/alerts/alerts.spec.ts,TALERT-032 confirming Reopen posts empty body and reports explicit outcome,PENDING_GITHUB_BROWSER
+TALERT-033,tenant/alerts/alerts.spec.ts,TALERT-033 escalation confirmation cancellation sends no POST,PENDING_GITHUB_BROWSER
+TALERT-034,tenant/alerts/alerts.spec.ts,TALERT-034 confirmed escalation makes one POST and states it is in-app only,PENDING_GITHUB_BROWSER
+TALERT-035,tenant/alerts/alerts.spec.ts,TALERT-035 rejected escalation shows server error without success message,PENDING_GITHUB_BROWSER
+TALERT-045,tenant/alerts/alerts.spec.ts,TALERT-045 alerts.read without alerts.write permits filters but hides mutation controls,PENDING_GITHUB_BROWSER
+TALERT-046,tenant/alerts/alerts.spec.ts,TALERT-046 alerts.override without alerts.write allows emergency override only,PENDING_GITHUB_BROWSER
+TALERT-048,tenant/alerts/alerts.spec.ts,TALERT-048 emergency override confirmation cancellation does not send POST,PENDING_GITHUB_BROWSER
+TALERT-050,tenant/alerts/alerts.spec.ts,TALERT-050 emergency override rejection retains reason and shows backend error,PENDING_GITHUB_BROWSER
+TALERT-049,tenant/alerts/alerts.spec.ts,TALERT-049 successful override sends trimmed reason and displays closure confirmation,PENDING_GITHUB_BROWSER

@@ -49,6 +49,7 @@ on:
           - BULK_SAFE_10_RECHECK_4
           - BULK_SAFE_10_RECHECK_5
           - BULK_SAFE_10_RECHECK_6
+          - BULK_SAFE_11
       confirmation:
         description: 'Type ORIGINALTESTS to run the selected group'
         required: true
@@ -114,6 +115,7 @@ jobs:
           node scripts/check-batch-229-recheck4-contract.mjs
           node scripts/check-batch-229-recheck5-contract.mjs
           node scripts/check-batch-229-recheck6-contract.mjs
+          node scripts/check-batch-230-contract.mjs
       - name: Discover all 9,900 authored original tests (no browser, no credentials)
         if: ${{ inputs.group == 'DISCOVER_ALL' }}
         env:

@@ -1,0 +1,122 @@
+test_id,classification,status,evidence_or_reason,first_source
+TALERT-004,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TALERT-005,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TALERT-006,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TALERT-007,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TALERT-009,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TALERT-011,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TDASH-049,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TPO-071,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TRC-009,suspected application bug (not confirmed),HELD_NEEDS_APP_REVIEW,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TRC-048,suspected application bug (not confirmed),HELD_NEEDS_APP_REVIEW,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TRPT-025,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TSH-069,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TSL-040,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TSL-045,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TSMV-050,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TSMV-072,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TST-028,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TST-038,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TST-039,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TSTR-079,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TSTR-080,unclassified test / app behavior,HELD_NEEDS_TRIAGE,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TINS-024,suspected application bug (not confirmed),HELD_NEEDS_APP_REVIEW,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TALERT-008,suspected application bug (not confirmed),HELD_NEEDS_APP_REVIEW,TALERT-008 URL/app behavior mismatch in B225; requires FE/deployment verification,INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+TEXR-001,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-002,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-003,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-004,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-005,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-006,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-007,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-008,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-009,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-010,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-011,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-012,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-013,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-014,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-015,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-016,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-017,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-018,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-020,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-021,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-023,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-026,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-037,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-038,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-045,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-046,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-047,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-048,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TEXR-049,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-001,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-002,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-003,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-004,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-005,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-006,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-007,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-008,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-009,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-010,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-011,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-012,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-013,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-014,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-015,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-016,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-017,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-018,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-019,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-020,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-021,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-022,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-026,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-029,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-037,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-038,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-042,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-043,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-047,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-048,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-049,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIR-050,environment / permission,DEFERRED_PERMISSION,access or permissions unresolved,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TIU-032,environment / permission,DEFERRED_PERMISSION,record-usage permission and UI absent,INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+TPF-032,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TSC-040,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TSC-041,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TSC-042,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TSC-043,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TPROD-077,unclassified test / app behavior,HELD_NEEDS_TRIAGE,needs separate frontend behavior investigation; excluded from unverified rerun,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TCDO-021,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TCDO-022,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TCDO-023,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TCDO-025,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TCDO-026,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TCDO-030,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TCDO-031,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TCDO-033,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TDLF-022,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TDLF-026,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TDLF-029,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TDLF-031,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TDLF-033,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TDLF-034,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TDLF-037,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TSH-040,unclassified test / app behavior,HELD_NEEDS_TRIAGE,needs separate frontend behavior investigation; excluded from unverified rerun,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TAPE-015,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TAPE-017,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TAPE-019,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TAPE-022,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TAPE-023,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TAPE-027,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TAUD-026,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TAUD-027,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TAUD-028,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TAUD-044,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TAUD-068,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TSMV-043,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TSMV-078,environment / permission,DEFERRED_PERMISSION,disposable-role fixture refused public Vercel origin; must use isolated disposable environment,INVENTORY_PLAYWRIGHT_BATCH_229_DEFERRED_35_IDS.csv
+TPROD-076,suspected application behavior / UI evidence missing,HELD_NEEDS_DOM_EVIDENCE,Cost governance panel content absent; no DOM/trace evidence; 6 unsuccessful rechecks,INVENTORY_PLAYWRIGHT_BATCH_229_NEW_HELD_ID.csv

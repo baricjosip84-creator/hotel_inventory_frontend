@@ -1,0 +1,517 @@
+FINAL TESTING RESULTS — INVENTORY MANAGEMENT APP
+=======================================================================
+This file is the cumulative, authoritative record of the USER'S LIVE browser
+acceptance tests from 2026-10-15 onward. Continue to append future test
+entries to this exact file. Do not replace it with the older original audit.
+
+Testing tenant: Test Company 001 (as shown in user screenshots)
+Testing started: 2026-10-15
+Live testing source: Frontend 227 / Backend 126 (deployed via GitHub/Vercel/Render)
+Previous correction: Frontend 228 / Backend 126
+Latest deployed and live tested: Frontend 230 / Backend 126
+
+STATUS DEFINITIONS
+PASS = user tested in browser and confirmed expected outcome.
+FAIL = user tested in browser and observed incorrect behavior.
+FIXED IN SOURCE / RETEST REQUIRED = source patched and local regression passed;
+                                    updated deployment not yet user-verified.
+NOT TESTED = no live acceptance result yet.
+
+=======================================================================
+FT-001 — CASE=24 | SAVING A UNIT CONVERSION AND REFRESH PERSISTENCE
+Date: 2026-10-15
+Section: Advanced Inventory > Units of measure
+Product: HRC-0006 — La Fiesta Tortilla Chips (label partly truncated)
+Steps: Create CASE / Case with factor-to-base 24, purchasing and issue
+       options checked; save; press F5; reselect/verify same product; select
+       From = CASE, To = piece, Quantity = 1; press Convert.
+Expected: CASE is still saved after browser refresh, 1 CASE = 24 piece.
+Observed: CASE — Case (factor 24, Purchase Yes, Issue Yes) remains in the
+          saved unit list after refresh. Conversion displays 'Result: 24 piece'.
+Result: PASS — confirmed by user in browser and screenshots on 2026-10-15.
+Evidence: User-provided screenshots in this conversation, not simulated data.
+Database interpretation: persisted conversion survives an actual browser F5.
+
+FT-002 — INCORRECT GENERIC TOAST AFTER READ-ONLY UNIT CONVERSION
+Date: 2026-10-15
+Section: Advanced Inventory > Units of measure > Conversion test
+Live tested build: FE227 / BE126
+Steps: After conversion 1 CASE -> piece, observe success notification.
+Expected: Inline result only; conversion does not create a product.
+Observed: Correct inline 'Result: 24 piece' PLUS green 'Product created
+          successfully.' notification.
+Initial live result: FAIL (UI feedback misleading; calculation itself PASS).
+Root cause: Conversion uses a read-only calculator POST /inventory-capabilities/
+            products/:id/uom/convert; the shared API layer displays generic
+            'Product created successfully.' for POST unless suppressed.
+Source correction: FE228 adds skipMutationFeedback: true to ONLY the unit
+                   calculator request; the inline result and API route remain.
+Local verification: New 24/24 check passes FE228 and fails against FE227;
+                    inherited UoM regressions also pass (see verification).
+FE228 live retest: FAIL — user pushed FE228 source to Git and provided a
+  2026-10-15 09:17 browser screenshot still displaying both Result: 24 piece
+  and the false Product created successfully toast. The exact JS version Vercel
+  served in that screenshot is not independently proven.
+FE228 status: NOT ACCEPTED. Do not label this defect as resolved.
+FE229 correction: Enforces the no-toast rule in BOTH the UoM page request AND
+  the shared tenant API, specifically for POST /inventory-capabilities/products/
+  :id/uom/convert. FE229 displays a small version marker beside Conversion test
+  to confirm that the new deployed frontend loaded.
+FE229 local tests: New shared guard 35/35 PASS; inherited FE228 guard 24/24 PASS;
+  10 additional UoM regression scripts PASS (426 checks).
+Current FT-002 status: FAIL IN LAST LIVE RETEST / FE229 SOURCE FIX AWAITS RETEST.
+Next live action: Push FE229 frontend and wait for Vercel to finish deploying.
+  Confirm small FE229 marker beside Conversion test; press Ctrl+F5; convert
+  1 CASE -> piece again. Expected: inline 24 piece, no product-created toast.
+  If marker is absent: report deployment/cache mismatch, not another API fix.
+
+=======================================================================
+NEXT LIVE TEST — FT-003 | CUSTOM FIELD PERSISTENCE
+Section: Advanced Inventory > Custom fields
+Original failure: Saving value test_country = Croatia returned invalid-format
+                  error; persistence never conclusively accepted.
+Status: NOT TESTED in the current 2026-10-15 session.
+Do not mark PASS before user confirms actual save and F5 persistence.
+
+MAINTENANCE RULE
+Every future browser test must append: ID, date, original audit ID,
+reproduction steps, expected versus observed outcome, PASS/FAIL, screenshots
+or other evidence when supplied, source correction version, retest status.
+Never mark an offline test result as a user's live PASS.
+=======================================================================
+
+
+=======================================================================
+2026-10-15 — FT-002 / FE229 LIVE RETEST EVIDENCE — USER SCREENSHOTS
+Source visible in browser: FE229 marker beside Conversion test.
+Result: Result: 24 piece after CASE-to-piece conversion, with no false
+        "Product created successfully." toast.
+Conclusion for the ORIGINAL FT-002 false-product-created notification:
+        PASS — LIVE VERIFIED ON FE229.
+Evidence: User screenshots sent at about 09:32–09:33 on 2026-10-15.
+Important: The temporary FE229 release label itself is not production UI.
+
+FT-004 — CONVERSION CONFIRMATION AND PRODUCTION UI CLEANLINESS
+Section: Advanced Inventory > Units of measure > Conversion test
+User-observed problem in FE229: Diagnostic "FE229" label beside heading;
+    a conversion provides the inline result but no meaningful success toast.
+Result FE229: FAIL — user explicitly requested removal of the version label
+    and a proper conversion completion message.
+FE230 SOURCE FIX / RETEST REQUIRED:
+  - Removes the developer diagnostic marker entirely from the UI.
+  - Preserves read-only calculation, displayed numeric result, and shared API
+    guard blocking the generic product-creation success notification.
+  - Shows a *specific* successful conversion confirmation, for example
+    "Conversion calculated: 1 CASE = 24 piece".
+  - Translates the message into all five supported languages.
+  - Makes the inline result an accessible live status.
+  - Suppresses stale successful responses and never confirms on failures.
+Local evidence: 31/31 FE230 checks plus inherited UoM regressions PASS.
+Current status: FIXED IN SOURCE — USER LIVE RETEST REQUIRED AFTER FE230.
+Next step: Deploy FE230 frontend only; choose existing product and convert
+    1 CASE to piece. Expect inline Result: 24 piece, the specific success toast,
+    NO "Product created successfully" and NO FE229/FE230 diagnostic label.
+
+FT-003 — CUSTOM FIELD PERSISTENCE "test_country = Croatia": NOT TESTED.
+=======================================================================
+
+=======================================================================
+2026-10-15 — FT-004 / FE230 LIVE RETEST — PASS
+Section: Advanced Inventory > Units of measure > Conversion test
+Build observed: Frontend 230 (based on disappearance of FE229 label and FE230
+                action-specific message; no separate deployment log verified).
+User action: Convert quantity 1 from CASE to piece for HRC-0006.
+Expected: Inline result 24 piece; specific success toast; no generic product
+          creation toast and no diagnostic version badge or label.
+Observed in user screenshot (2026-10-15, approximately 09:49):
+  - Inline 'Result: 24 piece' visible.
+  - Green toast 'Conversion calculated: 1 CASE = 24 piece' visible.
+  - No 'Product created successfully.' toast visible.
+  - No FE229 or FE230 diagnostic marker visible.
+Result FT-004: PASS — LIVE BROWSER EVIDENCE.
+FT-002 final status: PASS — incorrect generic product-created toast removed.
+FT-001: PASS remains unchanged (saved unit persists through F5; conversion 24).
+Next: FT-003 — Custom Fields 'test_country = Croatia' save and refresh.
+Status FT-003: NOT TESTED.
+=======================================================================
+
+=======================================================================
+2026-10-15 — FT-003 / CUSTOM FIELD SCREEN REVIEW — IN PROGRESS
+Section: Advanced Inventory > Custom fields, entity type Product.
+Evidence: Two user browser screenshots around 09:52 on 2026-10-15.
+Existing field shown in saved field definitions:
+  Key: test_country
+  Label: Test Country
+  Type: Text
+  Required: Yes
+  Status: Active
+Finding: The custom field DEFINITION already exists; do not create a duplicate.
+Next live action: Under 'Use fields on products', select product HRC-0006
+  (the same item used in FT-001); inspect the resulting Test Country value
+  input, then enter Croatia, save custom fields, refresh (F5), reselect
+  product and confirm value Croatia persists without a format error.
+Status: IN PROGRESS — definition visible; per-product value save and refresh
+  NOT YET TESTED. Do NOT mark the original persistence issue PASS yet.
+=======================================================================
+
+
+=======================================================================
+2026-10-15 — FT-003 / CUSTOM FIELD VALUE INPUT — LIVE SCREENSHOT
+Section: Advanced Inventory > Custom fields > Use fields on products.
+Evidence: User screenshot at approximately 09:54 on 2026-10-15,
+  source image(20261015-075407).png in current conversation.
+Selected product: La Fiesta Tortilla Chips 200g — HRC-0006.
+Existing field: Test Country (test_country), required Text field.
+Visible value in input: Croatia.
+Not yet demonstrated: Save custom fields action, successful/no-error
+  response, browser refresh, product reselection, retained saved value.
+Caution: A value visible before pressing Save does NOT demonstrate that
+  it has been committed to the database.
+Current result: IN PROGRESS, NOT PASS OR FAIL for original persistence case.
+Next live action: Click Save custom fields, observe confirmation/error;
+  press F5, reselect HRC-0006, verify Test Country still shows Croatia.
+=======================================================================
+
+
+=======================================================================
+2026-10-15 — FT-003 / CUSTOM FIELD SAVE — LIVE FAIL
+Evidence: user's screenshot image(20261015-075650).png after pressing
+  "Save custom fields" for product HRC-0006, existing required Text field
+  test_country = Croatia.
+Observed: Red/neutral inline text "The request contains an invalid value format"
+  appeared below the unrelated "Create custom field" form, not next to
+  the "Use fields on products" save button. No positive save confirmation.
+Result: FAIL — custom-field value was NOT confirmed saved to PostgreSQL.
+  Do NOT mark persistence PASS merely because Croatia remains typed onscreen.
+
+FE231 / BE127 SOURCE CORRECTION (2026-10-15, NO LIVE RETEST YET):
+- Separate definition-save error and product-value-save error states.
+- Failed product value save now places accessible error next to its Save button,
+  preserves the unsaved user draft and produces one error notification.
+- Server records PostgreSQL SQLSTATE 22P02 with SAFE stage details
+  [CUSTOM_FIELD_VALUE_SQL_FORMAT] for definitions-read, existing-values-read,
+  value-insert, value-update or write-readback, if one of those operations fails.
+  The log omits field values and SQL parameters.
+- Existing exact tenant/product scoping, version checks, JSONB text encoding,
+  readback validation, user permissions and transactional rollback unchanged.
+- 16/16 selected regression scripts passed, plus 18/18 new focused checks.
+- The *database rejection's precise cause remains UNKNOWN* without a live
+  PostgreSQL trace; the UI fix/diagnostics do not constitute a persistence fix.
+Status: FAIL — awaiting re-test of BE127 and FE231, and server diagnostic
+  evidence if it again rejects Croatia.
+Next: Push both updated source archives, select HRC-0006, enter Croatia,
+  click Save custom fields once. If it fails, capture the Render log line
+  beginning [CUSTOM_FIELD_VALUE_SQL_FORMAT] (stage, SQLSTATE, type only).
+  Do not enter any credentials or secrets in this testing record.
+=======================================================================
+
+=======================================================================
+2026-10-15 — FT-003 / BE127 DEPLOYMENT LOG REVIEW (NOT A SAVE RETEST)
+Evidence: Render log excerpt supplied by user. Service reported live,
+  GET / returned 200 and repeated GET /health requests returned 200.
+  GET /api/auth/csrf returned 401 REFRESH_COOKIE_REQUIRED for requests
+  without a refresh-session cookie (user_id and tenant_id were null).
+  Such a 401 is not evidence that the custom-field save was attempted.
+  Supplied excerpt contained no custom-field value write request and no
+  [CUSTOM_FIELD_VALUE_SQL_FORMAT] diagnostic. It does not establish
+  whether test_country = Croatia can now save.
+Current result: FT-003 REMAINS FAIL from the last actual save screenshot;
+  BE127 deployment/health confirmed by logs only.
+Next: Log in to the frontend, select HRC-0006 in Custom fields, attempt
+  Save custom fields with Croatia. If error recurs, share Render log entries
+  immediately after that attempt (redact tokens, cookies, secrets).
+  If save succeeds, refresh and reselect HRC-0006 to verify persistence.
+=======================================================================
+
+
+=======================================================================
+2026-10-15 — FT-003 / FE231 BE127 SECOND LIVE RETEST — FAIL
+Screenshot: Test Country = Croatia for product HRC-0006, save attempted.
+Observed: Action failed toast and correctly located inline message:
+  "Custom field values were not confirmed as saved. The request contains
+   an invalid value format".
+Render evidence: Authenticated PUT /api/inventory-capabilities/custom-fields/
+  product/<product-id> -> HTTP 400, INVALID_INPUT_FORMAT, PostgreSQL SQLSTATE
+  22P02. The corresponding GET succeeded (200). The supplied logs do not show
+  a [CUSTOM_FIELD_VALUE_SQL_FORMAT] stage line, so the failing SQL stage has
+  NOT been established from those logs.
+Status: FAIL, save did not succeed. No F5 readback PASS.
+FE231 UI error-placement fix: PASS in live browser; original save: FAIL.
+
+BE128 SOURCE CHANGE / LIVE RETEST REQUIRED:
+- Product custom field INSERT/UPDATE now bind validated native scalar values
+  into PostgreSQL jsonb_build_object(...), with text/numeric/boolean types,
+  instead of client JSON.stringify(value) followed by a ::jsonb input parse.
+- Expanded safe 22P02 diagnostics to the configuration lock and product
+  existence check before the previously instrumented field queries.
+- Preserves required-field validation, version guards, tenant scoping,
+  transactional rollback, and exact same-transaction readback verification.
+- 99/99 new fake-DB source checks; old service fails new check as expected.
+- PostgreSQL-specific CI smoke provided but not run in the local container.
+No promise of a live fix until backend BE128 is deployed and Croatia survives F5.
+Next: Deploy Backend128 only (Frontend231 unchanged). Retry save ONCE. If it
+fails, look for [CUSTOM_FIELD_VALUE_SQL_FORMAT] near the PUT time in Render
+logs; report only safe stage and SQLSTATE. Do not paste tokens or credentials.
+=======================================================================
+
+=======================================================================
+2026-10-15 — FT-003 / ANOTHER LIVE CUSTOM FIELD SAVE — FAIL
+User screenshot: Test Company 001 > Advanced Inventory > Custom Fields.
+Selected HRC-0006 La Fiesta Tortilla Chips; Test Country = Croatia.
+After clicking Save custom fields, displayed inline error and red toast:
+"The request contains an invalid value format". No success / persistence.
+User Render excerpt at 2026-10-15T08:37:36.986Z:
+Authenticated PUT /api/inventory-capabilities/custom-fields/product/<id>
+returned HTTP 400 INVALID_INPUT_FORMAT with PostgreSQL code 22P02.
+Related GET succeeded with HTTP 200. The provided excerpt does NOT include
+[CUSTOM_FIELD_VALUE_SQL_FORMAT], the safe per-query diagnostic implemented
+in Backend 128. Therefore the source/deploy version at the time of the PUT
+and the failing SQL stage cannot be established from this evidence alone.
+Source review: BE128 contains a per-query catch that logs that marker for
+22P02 inside saveCustomFieldValues (including configuration lock and entity
+existence check); earlier BE127/BE128 changes have not been proven to repair
+the live database failure. Do not mark source correction PASS.
+Status: FAIL — this user-facing test remains open.
+Next: Inspect https://hotel-inventory-backend.onrender.com/health for
+deployment.git_commit; compare with the commit containing BE128, and review
+complete Render log lines immediately around a NEW save request, including
+any stage diagnostic. Do not paste secrets, cookies or DB connection URLs.
+No new code package has been released in this entry.
+=======================================================================
+
+
+=======================================================================
+2026-10-15 — FT-003 / BACKEND 129 SOURCE ATTEMPT — RETEST REQUIRED
+User direction: fix with the code and logs already supplied; do not ask the
+user for another health check, screenshot, or Render log before supplying code.
+Live evidence: authenticated PUT returned HTTP 400 / INVALID_INPUT_FORMAT,
+PostgreSQL SQLSTATE 22P02 after test_country=Croatia was submitted. Earlier
+Backend 128 source change did NOT establish a production fix. No matching
+[CUSTOM_FIELD_VALUE_SQL_FORMAT] log entry was in the available excerpt.
+New source: Backend 129 uses a fully parameterized typed PostgreSQL scalar
+conversion COALESCE(to_jsonb($5::text/numeric/boolean), 'null'::jsonb) rather
+than an application string-to-JSON conversion or a jsonb_build_object call.
+Typed value validation and all optimistic concurrency, tenant, permission and
+same-transaction readback checks remain intact. Added isolated/CI checks for
+native text, boolean, number, select, date, null, insert/update and readback.
+Added CI with disposable PostgreSQL 16 (automated on backend source changes)
+that executes the SQL expression from the production handler. This CI smoke
+has not been run in this local workspace. Production save is not verified.
+Current FT-003 STATUS: FAIL (last live retest) / BE129 SOURCE FIX ATTEMPTED,
+AWAITING LIVE RETEST. Do NOT mark PASS before saving Croatia and F5 readback.
+Next end-user action after backend deploy: retry same Save once; if success,
+press F5 and reselect HRC-0006. Do not ask for new logs first.
+=======================================================================
+
+
+=======================================================================
+2026-10-15 — FT-003 / FE231 BE130 SOURCE ATTEMPT — USER LIVE RECHECK REQUIRED
+Source of truth: Previous FT-003 live result is FAIL (HTTP 400 INVALID_INPUT_FORMAT / SQLSTATE 22P02).
+Production Backend130 revision: serialize the ALREADY validated custom-field scalar into a
+complete JSON document with JSON.stringify(value), then bind it as $5::jsonb for INSERT/UPDATE.
+For a Text value, the bound JSON document is the quoted string "Croatia"; PostgreSQL then
+stores the JSONB string Croatia. Numeric, boolean, select, date, escaped text and optional
+JSON null retain proper types. Per-stage 22P02 logging remains safe. Entity/tenant checks,
+optimistic versions, transaction guard, same-transaction readback and FE231 remain intact.
+BE129 PostgreSQL expression-only smoke was insufficient to prove end-to-end persistence.
+BE130 adds PostgreSQL 16 disposable-CI coverage of production handler and migration-derived
+custom-field table schema (INSERT, COMMIT, GET, UPDATE, versions, rollback and tenant scope).
+These real PostgreSQL CI checks are INCLUDED but COULD NOT RUN in this session (no PostgreSQL
+server, installed pg runtime or live database access). Isolated source/mock checks PASS;
+NO database-backed PASS has been observed, and no Render/Vercel deployment was performed.
+Current FT-003 LIVE STATUS: FAIL / RETEST REQUIRED AFTER BACKEND130 DEPLOY.
+Existing LIVE PASS preserved: FT-001, FT-002, FT-004.
+After BE130 is deployed, enter Croatia in existing test_country field on HRC-0006,
+Save custom fields, press F5, reselect product and check the saved value.
+Do not re-create the field and do not repeat already-passed conversion tests.
+=======================================================================
+
+=======================================================================
+2026-10-15 — FT-003 — NEW LIVE FAILURE AFTER BE130 PACKAGE (DEPLOYMENT REVISION NOT VERIFIED)
+Screenshot: Product HRC-0006 / Test Country = Croatia. Save custom fields showed:
+  "Custom field values were not confirmed as saved. The request contains an invalid value format"
+Render logs 2026-10-15T09:32:39.504Z, request_id=18c50ac8-fd0d-4844-a5ef-197dc136b818:
+  PUT /api/inventory-capabilities/custom-fields/product/<id>
+  HTTP 400 INVALID_INPUT_FORMAT / PostgreSQL SQLSTATE 22P02.
+  Earlier GET of custom-field definitions and values both returned HTTP 200.
+  [CUSTOM_FIELD_VALUE_SQL_FORMAT] stage marker absent in provided 90-line excerpt.
+  Render service startup line is not proof of deployed commit/version.
+  Do NOT infer Backend130 was deployed or that the failing SQL is in the save service.
+
+NEW CAUSAL SOURCE FINDING (BE131):
+- Frontend src/lib/api.ts adds Idempotency-Key to every ordinary write.
+- Backend routes/index.js attaches operational idempotency before inventory-capabilities routes.
+- A successful saveCustomFieldValues() returns an ARRAY of saved rows.
+- Backend src/middleware/idempotency.js fresh-claim and reclaimed-claim branches stored
+  that ARRAY directly in idempotency_keys.response_body (type JSONB, 001_initial.sql).
+- node-postgres serializes JS arrays as PostgreSQL ARRAY literals, not JSON; a JSONB
+  input conversion can therefore fail with SQLSTATE 22P02 during response persistence.
+- transactionMiddleware commits the business transaction before idempotency's response
+  interceptor persists the response. Thus an HTTP 400 from the response interceptor can
+  occur AFTER the underlying Custom Fields save commits. No proof exists this happened
+  in the user's actual database; check F5 retrieval rather than assuming either outcome.
+
+BE131 CODE CHANGE:
+- In BOTH new and reclaimed idempotency paths, serialize the entire response to JSON
+  explicitly with JSON.stringify(body === undefined ? null : body) and bind $2::jsonb.
+- Avoid accidental PostgreSQL ARRAY syntax for arrays of custom-field save results.
+- Preserve existing request hashing, isolation, concurrency, replay, and no-key behavior.
+- Workflow ft003-postgres-jsonb-storage.yml triggers on idempotency changes and runs
+  new scripts/check-ft003-idempotency-jsonb-responses.cjs test.
+
+VERIFICATION (LOCAL, OFFLINE ONLY):
+- New actual middleware VM/executor test: 14/14 assertions PASS, including success,
+  replay, reclaimed key, object/string/null and res.send; JSONB mock rejects
+  non-JSON arrays as PostgreSQL would.
+- Existing checkIdempotencyScopeIsolation.js PASS.
+- Existing checkPlatformIdempotencyHardening.js PASS.
+- Existing FT003 tests check-ft003-typed-jsonb-save.cjs 99/99,
+  check-ft003-custom-field-save-diagnostics.cjs 9/9,
+  check-batch166-custom-field-review-versions.cjs 68/68,
+  check-batch168-custom-field-value-integrity.cjs 51/51,
+  check-batch181-custom-field-text-type.cjs 37/37,
+  check-batch182-transactional-persistence-readback.cjs 26/26 PASS.
+- PostgreSQL database-backed test NOT RUN: no DB service/access in current workspace.
+- GitHub Actions job on disposable PostgreSQL NOT OBSERVED.
+- Production deployment and persisted values NOT VERIFIED; do not claim PASS.
+
+STATUS: FT-003 LIVE FAIL / BE131 CODE CANDIDATE PREPARED, REQUIRES DEPLOY + LIVE RETEST.
+PRESERVED: FT-001, FT-002, FT-004 LIVE PASS. FE231 application source unchanged.
+NEXT: Deploy complete Backend131 to Render (no new migrations; FE231 unchanged).
+Use same existing test_country on product HRC-0006; refresh/reselect product to check
+whether Croatia was already persisted despite earlier HTTP error, then Save once and F5.
+If 400 persists, inspect latest request_id + stage and verify Render's deployed commit.
+
+=======================================================================
+
+BE131 RELEASE ADDENDUM — 2026-10-15
+The FT-003 PostgreSQL 16 CI workflow additionally runs check-ft003-postgres-idempotency-responses.cjs, restricted to a disposable database named ft003 with session-temporary idempotency_keys. The test checks both the original raw-JS-array 22P02 reproduction and repaired array persistence/replay. This PostgreSQL script has NOT been executed here.
+Offline BE130 focused suite re-run 392/392 PASS; new idempotency middleware regression 14/14 PASS, combined 406/406 focused checks plus two idempotency contract scripts PASS. None is a live PASS.
+
+
+========================================================================
+2026-10-15 11:56 local (09:56 UTC) — FT-003 LIVE UI SAVE SUCCESS, RELOAD CHECK PENDING
+========================================================================
+USER SCREENSHOT: image(20261015-095608).png (provided in chat).
+Test Company 001 > Advanced Inventory > Custom Fields, Entity type Product.
+Selected product: La Fiesta Tortilla Chips 200g — HRC-0006.
+Existing required Text field: Test Country (test_country) = Croatia.
+UI shows green success toast: "Success — Custom field values saved and verified."
+No red PostgreSQL 22P02 toast is visible in this result. This directly confirms a successful
+browser save-and-verification outcome after the FE231/BE131 correction was delivered.
+CAVEAT: Screenshot alone DOES NOT show an F5 reload or fresh-page readback. Do not
+claim the full FT-003 reload-persistence acceptance test PASS until Croatia remains
+in the product's existing custom field after refresh/reselect.
+STATUS: FT-003 SAVE STEP PASS; F5 PERSISTENCE CHECK PENDING. Previous live FAIL and
+all earlier engineering/test records retained as history. FT-001/FT-002/FT-004
+remain PASS as previously observed. No additional implementation/deployment is
+requested or evidenced by this screenshot; preserve FE231/BE131 source baseline.
+NEXT USER ACTION: Press F5 on same page. If needed select HRC-0006 again, verify
+Test Country still reads Croatia without typing it. Report the result.
+========================================================================
+
+
+========================================================================
+2026-10-15 11:59 local (09:59 UTC) — FT-003 FULL LIVE ACCEPTANCE PASS
+========================================================================
+TEST: FT-003 — Custom Fields Text persistence, test_country = Croatia.
+TENANT: Test Company 001.
+SCREENSHOTS PROVIDED IN CHAT:
+  image(20261015-095608).png — live save success toast: "Custom field values saved and verified."
+  image(20261015-095744).png — browser after F5; product selection resets to "Select...".
+  image(20261015-095939).png — after reselecting same product, "Croatia" is automatically
+    loaded into existing Test Country field without re-entry.
+PRODUCT: La Fiesta Tortilla Chips 200g — HRC-0006.
+FIELD DEFINITION: test_country / Test Country / Text / Required = Yes / Active.
+EXPECTED: Save Croatia successfully with no invalid-format error, refresh browser,
+          reselect the product, and retrieve Croatia from its stored custom field.
+OBSERVED: FE231 UI displayed a green save-and-verified success message; on fresh
+          F5 reload the product picker cleared as expected; after manually
+          reselecting HRC-0006, Test Country automatically displayed Croatia.
+RESULT: FT-003 PASS — LIVE USER BROWSER SAVE + REFRESH + RESELECT READBACK.
+CONCLUSION: Previous 22P02/INVALID_INPUT_FORMAT failure was not reproduced in
+            this acceptance test. Readback persistence is demonstrated in UI.
+CAUTION: Screenshot evidence is browser-level verification, not an independent
+         database SQL inspection or independent Render deployment revision audit.
+         Do not infer every related Custom Fields scenario passed.
+RELEASE BASELINE: FE231 / BE131 corrective release supplied; backend runtime
+         revision was not independently established by these screenshots.
+PRESERVED: All preceding FT-003 FAILs and offline tests remain historical facts.
+           FT-001 PASS; FT-002 PASS; FT-004 PASS remain unchanged.
+STATUS AFTER THIS TEST: FT-001 PASS, FT-002 PASS, FT-003 PASS, FT-004 PASS.
+NEXT: Move to the next outstanding acceptance item in the original audit/test
+      sequence; do not repeat the successfully completed FT-003 as pending.
+========================================================================
+
+========================================================================
+2026-10-15 12:08 local (CEST) — FT-005 LIVE INVENTORY VALUATION PARITY PASS
+========================================================================
+TEST: FT-005 — Products versus Reports Inventory Valuation (CROSS-DATA-001).
+TENANT: Test Company 001, signed-in Admin, live Vercel browser session.
+SOURCE BASELINE: Delivered FE231 / BE131; runtime commit not independently audited.
+EVIDENCE: Two user-provided screenshots:
+  image(20261015-100834).png — Products page, Inventory Value EUR 1,211.90.
+  image(20261015-100853).png — Reports > Inventory Valuation,
+    Estimated inventory value EUR 1,211.90, 13 valuation rows,
+    Category=All categories, Location=All locations,
+    report last refreshed 15 Oct 2026, 12:08.
+PRIOR HISTORIC FAIL: Products EUR 1,176.80 versus Reports EUR 1,347.80
+  (EUR 171.00 difference), recorded as CROSS-DATA-001. An earlier shared-cost
+  policy source correction (Backend095, Batch183) required live confirmation.
+EXPECTED: With comparable full-tenant scope, both high-level current stock
+  valuation summaries display the same EUR total.
+OBSERVED: Products EUR 1,211.90; Reports EUR 1,211.90.
+DIFFERENCE: EUR 0.00.
+RESULT: FT-005 PASS — LIVE BROWSER SUMMARY VALUATION PARITY (CROSS-DATA-001).
+SCOPE / LIMIT: This is a single same-session browser-level comparison of
+  visible current summary figures; it is not a per-row cost-source reconciliation,
+  independent SQL audit, or test of all filters/currencies/history.
+NO CODE CHANGE: FE231/BE131 unchanged. Do not overwrite original mismatch
+  history; this entry records its live recheck and outcome.
+LIVE TEST ROLLUP: FT-001 PASS; FT-002 PASS; FT-003 PASS; FT-004 PASS;
+  FT-005 PASS.
+NEXT PRIORITY: Historical purchase-order quantities/commitments/spend parity
+  and repeated recommendation effects; this has NOT yet been live-verified
+  in the current acceptance sequence. Record separately as FT-006 when tested.
+========================================================================
+
+========================================================================
+2026-10-15 12:13-12:15 CEST — FT-006 PURCHASE-ORDER REGISTRY RECONCILIATION
+========================================================================
+TEST: FT-006 — Purchase Order quantities, order count and values versus Reports.
+TENANT: Test Company 001 (Admin); FE231/BE131 delivered baseline. Deployed revision not independently audited.
+SCREENSHOTS: image(20261015-101351).png — overview: Total orders 10,
+  Awaiting approval 0, Needs action 5, Overdue 5, Open receiving 0,
+  Estimated value EUR 337.25 (value of currently filtered orders).
+  image(20261015-101502).png — registry first five rows and attention summary.
+  image(20261015-101550).png — registry ALL 10 rows on page 1/1.
+CURRENT REGISTRY ROWS (as observed; euros; no mutations performed):
+  1. Supplier C; Approved; overdue; received 0/36; EUR 108.00
+  2. Supplier D; Completed; received 35/35; EUR 29.75
+  3. Supplier D; Completed; received 12/12; EUR 22.70
+  4. Supplier D; Cancelled; received 0/2; EUR 9.20
+  5. Supplier C; Approved; overdue; received 0/5; EUR 15.00
+  6. Supplier C; Approved; overdue; received 0/5; EUR 15.00
+  7. Supplier C; Approved; overdue; received 0/5; EUR 15.00
+  8. Supplier C; Cancelled; received 0/5; EUR 15.00
+  9. Supplier A; Approved; overdue; received 0/10; EUR 50.00
+ 10. Supplier B; Completed; received 48/48; EUR 57.60
+RECONCILIATION:
+  Approved 5 orders = EUR 203.00; completed 3 orders = EUR 110.05;
+  cancelled 2 orders = EUR 24.20; all 10 rows = EUR 337.25.
+  All ten visible rows sum exactly to the Purchase Orders overview EUR 337.25.
+  Five Approved orders are overdue/need attention, in agreement with the five
+  overdue/needs-action cards. No drafts or awaiting-approval orders are listed.
+  Completed lines shown have full receipt and zero quantity variance.
+NOTE / OPEN LABEL QUESTION: Overview total INCLUDES cancelled orders worth
+  EUR 24.20. This is consistent with 'Value of the currently filtered orders'
+  across All statuses, but users could mistake it for active commitments.
+  Cannot claim it is an accounting error from this screenshot alone.
+RESULT: STEP A (purchase-order list/count/value reconciliation) PASS in browser.
+OVERALL FT-006 STATUS: IN PROGRESS; NOT FULL PASS. Need compare with Reports >
+  PO Commitments and then Purchasing & Spend (these may use different, legitimate
+  status/time scopes). Do NOT assume either report must equal EUR 337.25.
+NEXT ACTION: Open Reports > PO Commitments with default/full scope and share
+  screenshot of summary and any active filters. No order mutation required.
+CODE: No code changes; FE231/BE131 preserved. Earlier live FT-001 through FT-005 remain PASS.
+========================================================================

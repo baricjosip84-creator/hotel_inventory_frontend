@@ -1,0 +1,30 @@
+INVENTORY ORIGINAL PLAYWRIGHT — BATCH 229 TEST HOLD
+Date: 2026-11-10
+Authoritative latest source: INVENTORY_PLAYWRIGHT_BATCH_229_RECHECK6_FULL.zip
+Source GitHub run log: logs_115849706911.zip
+
+ACTUAL RESULT
+BULK_SAFE_10_RECHECK_6: 0 PASS / 1 FAIL
+TPROD-076 — Refresh Governance refetches operator-facing summary
+products.spec.ts:1117; 15-second locator visibility timeout.
+Missing: getByText('Stocked products with cost basis')
+The test failed before clicking Refresh Governance or checking the subsequent GET request.
+The Cost controls tab precondition was reached (beforeEach did not fail).
+The GitHub log archive contains no error-context.md, screenshot or Playwright trace.
+
+DECISION
+HOLD TPROD-076. Do not rerun Recheck 1–6; do not count this test as GREEN.
+Repeated selector changes did not establish the actual live DOM or feature availability.
+No production code edits are justified by this result.
+Do not relax read-only network guard or the API-refetch assertion.
+
+CONFIRMED ACCOUNTING
+1,381 unique original test IDs GREEN / 9,900 total.
+Previously held/deferred: 120 IDs (per latest source verification report).
+New held: TPROD-076; 121 held/deferred total.
+Other unconfirmed and not held/deferred: 8,398 IDs.
+
+NEXT TECHNICAL REQUIREMENT FOR THIS TEST
+Before reconsidering, capture the real rendered Products Cost controls DOM and network state for the test account, ideally a sanitized Playwright trace or error-context.md. Determine if the Governance panel is gated by permissions, loading dependencies, API shape, runtime version, or missing feature. Then patch source-backed assertions only. Do not rerun against production solely to try another selector.
+
+No source or pass ledger modifications are included in this report. This file documents the hold decision; it is NOT a test fix or a GitHub workflow update.

@@ -2844,6 +2844,249 @@
         }
       ],
       "secret": true
+    },
+    "BULK_SAFE_11": {
+      "entries": [
+        {
+          "file": "tenant/tenant-settings/tenant-settings.spec.ts",
+          "ids": [
+            "TSET-060",
+            "TSET-061",
+            "TSET-062",
+            "TSET-070",
+            "TSET-037",
+            "TSET-055",
+            "TSET-056",
+            "TSET-027",
+            "TSET-028",
+            "TSET-033",
+            "TSET-058",
+            "TSET-064"
+          ],
+          "sha256": "70ef85d28dcbfe773e683c99ef9360e9bbb4e36305e37a40b776117063dfc507"
+        },
+        {
+          "file": "tenant/storage-locations/storage-locations.spec.ts",
+          "ids": [
+            "TSL-037"
+          ],
+          "sha256": "28b57263606839bf378814672a677e99a616f72416992db95954aba0df4eb973"
+        },
+        {
+          "file": "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts",
+          "ids": [
+            "TAPE-013",
+            "TAPE-033",
+            "TAPE-045",
+            "TAPE-050",
+            "TAPE-034",
+            "TAPE-018",
+            "TAPE-039",
+            "TAPE-014",
+            "TAPE-020",
+            "TAPE-024",
+            "TAPE-035",
+            "TAPE-036"
+          ],
+          "sha256": "d37ce933ad44c71f5266e14f951bf65449d73076ff3bd2dd7031ff5f71bebc6b"
+        },
+        {
+          "file": "tenant/shipments/shipments.spec.ts",
+          "ids": [
+            "TSH-023",
+            "TSH-030",
+            "TSH-025",
+            "TSH-027",
+            "TSH-029",
+            "TSH-032",
+            "TSH-037",
+            "TSH-048",
+            "TSH-049",
+            "TSH-050",
+            "TSH-047",
+            "TSH-038"
+          ],
+          "sha256": "67fe0e2f24d71ea1f546fb69a57b686559e34b2f55b801c6fafec233b2a4a0ab"
+        },
+        {
+          "file": "tenant/products/products.spec.ts",
+          "ids": [
+            "TPROD-042",
+            "TPROD-043",
+            "TPROD-038",
+            "TPROD-064",
+            "TPROD-065",
+            "TPROD-067",
+            "TPROD-071",
+            "TPROD-029",
+            "TPROD-047",
+            "TPROD-059",
+            "TPROD-028"
+          ],
+          "sha256": "7cb6f6701c944092aa209e6e2e27f4eac747262c0af531e0051f76ea66bb6047"
+        },
+        {
+          "file": "tenant/system-context/system-context.spec.ts",
+          "ids": [
+            "TSC-049",
+            "TSC-036",
+            "TSC-038",
+            "TSC-047",
+            "TSC-048",
+            "TSC-031"
+          ],
+          "sha256": "ae27e99de75eaa5bbc36d0f1aa5dd613678eb58c9ce9079714a63d06fa26457c"
+        },
+        {
+          "file": "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts",
+          "ids": [
+            "TCDO-002",
+            "TCDO-027",
+            "TCDO-035",
+            "TCDO-044",
+            "TCDO-045",
+            "TCDO-047",
+            "TCDO-049",
+            "TCDO-050",
+            "TCDO-032",
+            "TCDO-034",
+            "TCDO-036",
+            "TCDO-048"
+          ],
+          "sha256": "401308d0f3a885fda1559361cbe7f85c2966c336c59374c82a7794d8872c7aad"
+        },
+        {
+          "file": "tenant/stock-movements/stock-movements.spec.ts",
+          "ids": [
+            "TSMV-041",
+            "TSMV-042",
+            "TSMV-044",
+            "TSMV-070"
+          ],
+          "sha256": "25957063d0e48f150669555eb06b22673fd55f81102673fe9458f42a7a2274eb"
+        },
+        {
+          "file": "tenant/tenant-audit/tenant-audit.spec.ts",
+          "ids": [
+            "TAUD-041"
+          ],
+          "sha256": "f33f79613fe8041b84e5af95ae4df46b8f5ca09e1749ed1c37827b257ed818b5"
+        },
+        {
+          "file": "tenant/suppliers/suppliers.spec.ts",
+          "ids": [
+            "TSUP-043",
+            "TSUP-065",
+            "TSUP-066",
+            "TSUP-026",
+            "TSUP-036",
+            "TSUP-067",
+            "TSUP-069",
+            "TSUP-070",
+            "TSUP-030",
+            "TSUP-037",
+            "TSUP-038",
+            "TSUP-029"
+          ],
+          "sha256": "bf050619db06abe2f5fe4fa4c5b283d96ecc6043c42e1308063839668e41320b"
+        },
+        {
+          "file": "tenant/reliability-command/reliability-command.spec.ts",
+          "ids": [
+            "TRC-049",
+            "TRC-028"
+          ],
+          "sha256": "0d85621980c856f13615230d10828fd483b0277bdcd30731fd19e9691f0abdc7"
+        },
+        {
+          "file": "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts",
+          "ids": [
+            "TPF-049",
+            "TPF-046",
+            "TPF-050",
+            "TPF-007"
+          ],
+          "sha256": "4f3ffc8ea461386ec94d9ec2adb1d631f552f2f1484565f899bcd4b983bbd49e"
+        },
+        {
+          "file": "tenant/stock-transfers/stock-transfers.spec.ts",
+          "ids": [
+            "TSTR-033",
+            "TSTR-034",
+            "TSTR-035",
+            "TSTR-041",
+            "TSTR-043",
+            "TSTR-044",
+            "TSTR-059",
+            "TSTR-061",
+            "TSTR-066",
+            "TSTR-037"
+          ],
+          "sha256": "499a8231d4b463c9b7d659d6d12279d381d7852e86c2bab3cae1e52f8e9639a3"
+        },
+        {
+          "file": "tenant/stock/stock.spec.ts",
+          "ids": [
+            "TST-024",
+            "TST-033",
+            "TST-034",
+            "TST-032",
+            "TST-035"
+          ],
+          "sha256": "64db75883cf60929dc2444eb3fee2ccf2f58381af96f5504de1f3a107a4db5e2"
+        },
+        {
+          "file": "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts",
+          "ids": [
+            "TDLF-021",
+            "TDLF-027",
+            "TDLF-042",
+            "TDLF-045",
+            "TDLF-024",
+            "TDLF-036",
+            "TDLF-038",
+            "TDLF-050",
+            "TDLF-039",
+            "TDLF-044",
+            "TDLF-049",
+            "TDLF-025"
+          ],
+          "sha256": "a2ff2f7d333f348827855c0b92eb754f0fea981375ace153a47a4f1fb488260d"
+        },
+        {
+          "file": "tenant/action-center/action-center.spec.ts",
+          "ids": [
+            "TACT-032"
+          ],
+          "sha256": "42272da7ecd1786fea2d12b21dcd61384f834510413707d9cc4905714abb055f"
+        },
+        {
+          "file": "tenant/collaboration/collaboration.spec.ts",
+          "ids": [
+            "TCOL-048"
+          ],
+          "sha256": "2a2aa866efc505e8aa596549b34d8fe7a756b997e2eceefcd3aec1f3d7896db7"
+        },
+        {
+          "file": "tenant/alerts/alerts.spec.ts",
+          "ids": [
+            "TALERT-026",
+            "TALERT-027",
+            "TALERT-031",
+            "TALERT-032",
+            "TALERT-033",
+            "TALERT-034",
+            "TALERT-035",
+            "TALERT-045",
+            "TALERT-046",
+            "TALERT-048",
+            "TALERT-050",
+            "TALERT-049"
+          ],
+          "sha256": "2af12d3306161273820d0fac2a7027083b5192eef5d0e903ac40127600850664"
+        }
+      ],
+      "secret": true
     }
   },
   "status": "Batch 203: 58 prior confirmed passes; 155 new reviewed original IDs for a single bulk production-safe browser run; browser outcomes unverified.",
@@ -3920,7 +4163,7 @@
       "TWFC-001",
       "TWFC-010"
     ],
-    "log_verification": "Parsed exact 120 GitHub Playwright ✓/✘ outcome lines, all IDs unique and disjoint with prior 682 passes and 21 held IDs; job exit code 1.",
+    "log_verification": "Parsed exact 120 GitHub Playwright \u2713/\u2718 outcome lines, all IDs unique and disjoint with prior 682 passes and 21 held IDs; job exit code 1.",
     "nonwrite_boundary": "Audit page catch-all had attempted to continue unrelated POSTs, which live write guard blocked; no completed unauthorized writes reported."
   },
   "batch_216_preflight": {
@@ -4262,7 +4505,7 @@
       "TINS-047",
       "TSET-001"
     ],
-    "evidence": "Parsed 63 exact ✓/✘ scenario outcome lines from GitHub uploaded original-suite log; no skips; original IDs matched selected set",
+    "evidence": "Parsed 63 exact \u2713/\u2718 scenario outcome lines from GitHub uploaded original-suite log; no skips; original IDs matched selected set",
     "safety": "Existing context write blocker retained; no frontend/backend changes."
   },
   "batch_220_preflight": {
@@ -4308,7 +4551,7 @@
       "TINS-030",
       "TINS-035"
     ],
-    "evidence": "Exact GitHub output ✓/✘ original scenario lines, no skips; 16 selected and accounted for.",
+    "evidence": "Exact GitHub output \u2713/\u2718 original scenario lines, no skips; 16 selected and accounted for.",
     "safety": "Production write guard unchanged."
   },
   "batch_221_preflight": {
@@ -5616,5 +5859,316 @@
     ],
     "confirmed_green_before_run": 1381,
     "note": "Resolve actual GitHub Recheck5 :scope child-chain mismatch. Source-defined first button within visible governance summary section; retain GET request assertion; no safety modifications."
+  },
+  "batch_230_preflight": {
+    "source": "INVENTORY_PLAYWRIGHT_BATCH_229_RECHECK6_FULL.zip plus TPROD-076 hold evidence",
+    "date": "2026-11-10",
+    "group": "BULK_SAFE_11",
+    "prior_confirmed_green": 1381,
+    "previously_held_or_deferred": 121,
+    "selected_count": 130,
+    "selected_ids": [
+      "TSET-060",
+      "TSET-061",
+      "TSET-062",
+      "TSET-070",
+      "TSL-037",
+      "TAPE-013",
+      "TAPE-033",
+      "TAPE-045",
+      "TAPE-050",
+      "TSH-023",
+      "TPROD-042",
+      "TSC-049",
+      "TCDO-002",
+      "TCDO-027",
+      "TCDO-035",
+      "TCDO-044",
+      "TCDO-045",
+      "TCDO-047",
+      "TCDO-049",
+      "TCDO-050",
+      "TSMV-041",
+      "TSMV-042",
+      "TSMV-044",
+      "TSMV-070",
+      "TAUD-041",
+      "TSUP-043",
+      "TSUP-065",
+      "TSUP-066",
+      "TSET-037",
+      "TSET-055",
+      "TSET-056",
+      "TAPE-034",
+      "TSH-030",
+      "TPROD-043",
+      "TRC-049",
+      "TPF-049",
+      "TSUP-026",
+      "TSET-027",
+      "TSET-028",
+      "TSET-033",
+      "TSET-058",
+      "TSET-064",
+      "TSTR-033",
+      "TSTR-034",
+      "TSTR-035",
+      "TSTR-041",
+      "TSTR-043",
+      "TSTR-044",
+      "TST-024",
+      "TDLF-021",
+      "TDLF-027",
+      "TDLF-042",
+      "TDLF-045",
+      "TAPE-018",
+      "TAPE-039",
+      "TSH-025",
+      "TSH-027",
+      "TSH-029",
+      "TSH-032",
+      "TSH-037",
+      "TSH-048",
+      "TSH-049",
+      "TSH-050",
+      "TPROD-038",
+      "TPROD-064",
+      "TPROD-065",
+      "TPROD-067",
+      "TPROD-071",
+      "TSC-036",
+      "TSC-038",
+      "TSC-047",
+      "TRC-028",
+      "TCDO-032",
+      "TCDO-034",
+      "TCDO-036",
+      "TCDO-048",
+      "TPF-046",
+      "TPF-050",
+      "TACT-032",
+      "TCOL-048",
+      "TSUP-036",
+      "TSUP-067",
+      "TSUP-069",
+      "TSUP-070",
+      "TSTR-059",
+      "TSTR-061",
+      "TSTR-066",
+      "TST-033",
+      "TST-034",
+      "TALERT-026",
+      "TALERT-027",
+      "TALERT-031",
+      "TALERT-032",
+      "TALERT-033",
+      "TALERT-034",
+      "TALERT-035",
+      "TDLF-024",
+      "TDLF-036",
+      "TDLF-038",
+      "TDLF-050",
+      "TSH-047",
+      "TSC-048",
+      "TPF-007",
+      "TSUP-030",
+      "TSUP-037",
+      "TSUP-038",
+      "TALERT-045",
+      "TALERT-046",
+      "TALERT-048",
+      "TALERT-050",
+      "TDLF-039",
+      "TDLF-044",
+      "TDLF-049",
+      "TAPE-014",
+      "TAPE-020",
+      "TAPE-024",
+      "TAPE-035",
+      "TAPE-036",
+      "TSH-038",
+      "TPROD-029",
+      "TPROD-047",
+      "TPROD-059",
+      "TSC-031",
+      "TSUP-029",
+      "TSTR-037",
+      "TST-032",
+      "TST-035",
+      "TALERT-049",
+      "TDLF-025",
+      "TPROD-028"
+    ],
+    "selected_by_file": {
+      "tenant/tenant-settings/tenant-settings.spec.ts": [
+        "TSET-060",
+        "TSET-061",
+        "TSET-062",
+        "TSET-070",
+        "TSET-037",
+        "TSET-055",
+        "TSET-056",
+        "TSET-027",
+        "TSET-028",
+        "TSET-033",
+        "TSET-058",
+        "TSET-064"
+      ],
+      "tenant/storage-locations/storage-locations.spec.ts": [
+        "TSL-037"
+      ],
+      "tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts": [
+        "TAPE-013",
+        "TAPE-033",
+        "TAPE-045",
+        "TAPE-050",
+        "TAPE-034",
+        "TAPE-018",
+        "TAPE-039",
+        "TAPE-014",
+        "TAPE-020",
+        "TAPE-024",
+        "TAPE-035",
+        "TAPE-036"
+      ],
+      "tenant/shipments/shipments.spec.ts": [
+        "TSH-023",
+        "TSH-030",
+        "TSH-025",
+        "TSH-027",
+        "TSH-029",
+        "TSH-032",
+        "TSH-037",
+        "TSH-048",
+        "TSH-049",
+        "TSH-050",
+        "TSH-047",
+        "TSH-038"
+      ],
+      "tenant/products/products.spec.ts": [
+        "TPROD-042",
+        "TPROD-043",
+        "TPROD-038",
+        "TPROD-064",
+        "TPROD-065",
+        "TPROD-067",
+        "TPROD-071",
+        "TPROD-029",
+        "TPROD-047",
+        "TPROD-059",
+        "TPROD-028"
+      ],
+      "tenant/system-context/system-context.spec.ts": [
+        "TSC-049",
+        "TSC-036",
+        "TSC-038",
+        "TSC-047",
+        "TSC-048",
+        "TSC-031"
+      ],
+      "tenant/cross-domain-optimization/cross-domain-optimization.spec.ts": [
+        "TCDO-002",
+        "TCDO-027",
+        "TCDO-035",
+        "TCDO-044",
+        "TCDO-045",
+        "TCDO-047",
+        "TCDO-049",
+        "TCDO-050",
+        "TCDO-032",
+        "TCDO-034",
+        "TCDO-036",
+        "TCDO-048"
+      ],
+      "tenant/stock-movements/stock-movements.spec.ts": [
+        "TSMV-041",
+        "TSMV-042",
+        "TSMV-044",
+        "TSMV-070"
+      ],
+      "tenant/tenant-audit/tenant-audit.spec.ts": [
+        "TAUD-041"
+      ],
+      "tenant/suppliers/suppliers.spec.ts": [
+        "TSUP-043",
+        "TSUP-065",
+        "TSUP-066",
+        "TSUP-026",
+        "TSUP-036",
+        "TSUP-067",
+        "TSUP-069",
+        "TSUP-070",
+        "TSUP-030",
+        "TSUP-037",
+        "TSUP-038",
+        "TSUP-029"
+      ],
+      "tenant/reliability-command/reliability-command.spec.ts": [
+        "TRC-049",
+        "TRC-028"
+      ],
+      "tenant/probabilistic-forecasting/probabilistic-forecasting.spec.ts": [
+        "TPF-049",
+        "TPF-046",
+        "TPF-050",
+        "TPF-007"
+      ],
+      "tenant/stock-transfers/stock-transfers.spec.ts": [
+        "TSTR-033",
+        "TSTR-034",
+        "TSTR-035",
+        "TSTR-041",
+        "TSTR-043",
+        "TSTR-044",
+        "TSTR-059",
+        "TSTR-061",
+        "TSTR-066",
+        "TSTR-037"
+      ],
+      "tenant/stock/stock.spec.ts": [
+        "TST-024",
+        "TST-033",
+        "TST-034",
+        "TST-032",
+        "TST-035"
+      ],
+      "tenant/decision-learning-feedback/decision-learning-feedback.spec.ts": [
+        "TDLF-021",
+        "TDLF-027",
+        "TDLF-042",
+        "TDLF-045",
+        "TDLF-024",
+        "TDLF-036",
+        "TDLF-038",
+        "TDLF-050",
+        "TDLF-039",
+        "TDLF-044",
+        "TDLF-049",
+        "TDLF-025"
+      ],
+      "tenant/action-center/action-center.spec.ts": [
+        "TACT-032"
+      ],
+      "tenant/collaboration/collaboration.spec.ts": [
+        "TCOL-048"
+      ],
+      "tenant/alerts/alerts.spec.ts": [
+        "TALERT-026",
+        "TALERT-027",
+        "TALERT-031",
+        "TALERT-032",
+        "TALERT-033",
+        "TALERT-034",
+        "TALERT-035",
+        "TALERT-045",
+        "TALERT-046",
+        "TALERT-048",
+        "TALERT-050",
+        "TALERT-049"
+      ]
+    },
+    "status": "OFFLINE_PREFLIGHT_ONLY_NO_GITHUB_RESULT",
+    "safety": "Production non-GET write guard unchanged; no test/spec body modified; only original unapproved tests; single-worker run",
+    "historical_app_issue_tracker": "APPLICATION_ISSUES_TRACKER.csv"
   }
 }

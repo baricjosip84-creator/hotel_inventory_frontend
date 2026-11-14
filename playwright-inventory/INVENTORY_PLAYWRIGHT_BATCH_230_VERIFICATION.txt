@@ -1,0 +1,113 @@
+INVENTORY PLAYWRIGHT — BATCH 230 SOURCE AND ISSUE-TRACKING VERIFICATION
+Date: 2026-11-10
+Source of truth: INVENTORY_PLAYWRIGHT_BATCH_229_RECHECK6_FULL.zip plus later TPROD-076 hold report
+
+TESTS / PASS LEDGER:
+- Original authored tests: 9,900 unique in 152 original .spec.ts files; no spec files modified.
+- Existing user-/log-confirmed passing IDs: 1,381; all explicitly excluded.
+- Prior held/deferred IDs: 121 (23 + 62 + 35 + 1); all explicitly excluded.
+- New group BULK_SAFE_11: 130 unique previously unapproved original IDs across 18 tenant page specs.
+- Originally skipped: 357; not selected.
+- 8,041 previously unapproved, unskipped tests before selection; after selecting 130, 7,911 remain for future approval.
+- Current cumulative confirmed remains 1,381 until the GitHub result is supplied.
+
+PERMISSION AND WRITE BOUNDARY:
+- Protected production origin / guard and authorization source files unchanged.
+- Single worker for BULK_SAFE_11; existing older groups unchanged.
+- Selected tests have no loginAsDisposableRole, page.request write, route.continue or fixed wait in their bodies.
+- Local interceptions/mocks used by original tests; real backend write safety stays enforced by existing guard.
+- No page.spec.ts files, existing passing test bodies, or held scenario bodies were edited.
+
+HISTORICAL ISSUE RECONCILIATION:
+- Canonical APPLICATION_ISSUES_TRACKER.csv: 135 records.
+- Exactly 121 Playwright held/deferred, 7 bounded historic acceptance gates, 4 engineering/UX findings, and 3 explicitly closed items.
+- APPLICATION_AUDIT_44_PAGE_LEDGER.csv: 44 historical page dispositions (not 44 open bugs).
+- APPLICATION_HISTORICAL_FIX_001_092.csv: 92 historical correction entries (not 92 open bugs).
+- Source audit, historical FIX_LOG, FinalTestingResults, handoffs, and held report bundled under docs/issue-evidence.
+- Workbook Summary formulas verified: 121 / 7 / 135 / 44 / 92 / 1,381 / 130.
+- FT147 Users Delete, FT143 Dashboard and FT200 Mobile Take Task preserved as CLOSED; not reopened.
+
+FULL HISTORICAL PRE-BROWSER CHECKS: 32/32 PASS
+- Runtime: Node.js 22.16.0 with previously available TypeScript; all 32 pre-browser workflow validation scripts actually executed.
+- NOTE: Real Playwright --list was not runnable locally: @playwright/test not installed and npx attempted network download; GitHub workflow installs it and checks exact 130 IDs before browser execution.
+- No actual authenticated production browser tests run in this preparation.
+- No claims of production acceptance or new green tests.
+
+ARCHIVE DIFF:
+- Files in old FULL ZIP: 709
+- Files in new FULL source snapshot: 730
+- Changes versus previous source (before adding verification TXT): 28
+- Existing original test source spec changes: 0
+- Removed old files: 0
+
+EXACT GITHUB WORKFLOW RUN:
+- Repo: baricjosip84-creator/hotel_inventory_frontend; branch main.
+- Extract ONLY INVENTORY_PLAYWRIGHT_BATCH_230_BULK_SAFE_11_130_GITHUB_FIX.zip into frontend repo ROOT, replace matching files; commit/push.
+- Workflow: .github/workflows/inventory-original-suite.yml
+- Group: BULK_SAFE_11
+- Confirmation: ORIGINALTESTS
+- Run once; if red upload GitHub logs ZIP. Never rerun past green tests.
+
+CHANGED / NEW FILES:
+- .github/workflows/inventory-original-suite.yml
+- playwright-inventory/APPLICATION_AUDIT_44_PAGE_LEDGER.csv
+- playwright-inventory/APPLICATION_HISTORICAL_FIX_001_092.csv
+- playwright-inventory/APPLICATION_ISSUES_README.md
+- playwright-inventory/APPLICATION_ISSUES_TRACKER.csv
+- playwright-inventory/INVENTORY_APPLICATION_ISSUES_TRACKER_BATCH_230.xlsx
+- playwright-inventory/INVENTORY_PLAYWRIGHT_BATCH_230_CONFIRMED_1381_PASS_IDS.csv
+- playwright-inventory/INVENTORY_PLAYWRIGHT_BATCH_230_HELD_DEFERRED_121_IDS.csv
+- playwright-inventory/INVENTORY_PLAYWRIGHT_BATCH_230_READ_FIRST.md
+- playwright-inventory/INVENTORY_PLAYWRIGHT_BATCH_230_SELECTED_130_IDS.csv
+- playwright-inventory/batch-230-baseline.json
+- playwright-inventory/batch-230-before-9900-body-sha256.json
+- playwright-inventory/docs/issue-evidence/FinalTestingResults(9).txt
+- playwright-inventory/docs/issue-evidence/INVENTORY_2026-10-28_FINITE_AUDIT_RECONCILIATION.txt
+- playwright-inventory/docs/issue-evidence/INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv
+- playwright-inventory/docs/issue-evidence/INVENTORY_PLAYWRIGHT_BATCH_228_DEFERRED_62_IDS.csv
+- playwright-inventory/docs/issue-evidence/INVENTORY_PLAYWRIGHT_BATCH_229_TPROD076_HELD_REPORT.txt
+- playwright-inventory/docs/issue-evidence/INVENTORY_PLAYWRIGHT_COMPLETE_HANDOFF_BATCH_214_2026-11-08.txt
+- playwright-inventory/docs/issue-evidence/INVENTORY_PLAYWRIGHT_COMPLETE_HANDOFF_BATCH_227_2026-11-09.txt
+- playwright-inventory/docs/issue-evidence/Inventory_Management_App_FIX_LOG_2026-10-06(20261015-112237).txt
+- playwright-inventory/original-suite-approved.json
+- playwright-inventory/playwright.live-original.config.ts
+- playwright-inventory/scripts/check-batch-228-contract.mjs
+- playwright-inventory/scripts/check-batch-229-recheck3-contract.mjs
+- playwright-inventory/scripts/check-batch-229-recheck4-contract.mjs
+- playwright-inventory/scripts/check-batch-229-recheck5-contract.mjs
+- playwright-inventory/scripts/check-batch-229-recheck6-contract.mjs
+- playwright-inventory/scripts/check-batch-230-contract.mjs
+
+WORKFLOW VALIDATION:
+- PASS scripts/verify-original-suite.mjs
+- PASS scripts/check-bulk-auth-fixture.mjs
+- PASS scripts/check-stock-route-safety.mjs
+- PASS scripts/check-batch-209-stock-contract.mjs
+- PASS scripts/check-batch-210-bulk-contract.mjs
+- PASS scripts/check-batch-211-contract.mjs
+- PASS scripts/check-batch-212-contract.mjs
+- PASS scripts/check-batch-213-contract.mjs
+- PASS scripts/check-batch-214-contract.mjs
+- PASS scripts/check-batch-215-contract.mjs
+- PASS scripts/check-batch-216-contract.mjs
+- PASS scripts/check-batch-217-contract.mjs
+- PASS scripts/check-batch-218-contract.mjs
+- PASS scripts/check-batch-219-contract.mjs
+- PASS scripts/check-batch-220-contract.mjs
+- PASS scripts/check-batch-221-contract.mjs
+- PASS scripts/check-batch-222-contract.mjs
+- PASS scripts/check-batch-223-contract.mjs
+- PASS scripts/check-batch-224-contract.mjs
+- PASS scripts/check-batch-225-contract.mjs
+- PASS scripts/check-batch-226-contract.mjs
+- PASS scripts/check-batch-227-contract.mjs
+- PASS scripts/check-batch-228-contract.mjs
+- PASS scripts/check-batch-228-recheck-contract.mjs
+- PASS scripts/check-batch-229-contract.mjs
+- PASS scripts/check-batch-229-recheck-contract.mjs
+- PASS scripts/check-batch-229-recheck2-contract.mjs
+- PASS scripts/check-batch-229-recheck3-contract.mjs
+- PASS scripts/check-batch-229-recheck4-contract.mjs
+- PASS scripts/check-batch-229-recheck5-contract.mjs
+- PASS scripts/check-batch-229-recheck6-contract.mjs
+- PASS scripts/check-batch-230-contract.mjs

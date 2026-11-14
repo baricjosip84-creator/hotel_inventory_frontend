@@ -1,0 +1,195 @@
+# Inventory Management App — ORIGINAL PLAYWRIGHT 9,900 — COMPLETE BATCH 227 HANDOFF
+**Checkpoint:** 9 November 2026. **Preferred next conversation title:** `PLAYWRIGHT newest`. This document supersedes the Batch 214 handoff for latest status; it retains the earlier handoff for B177–214 history.
+
+## READ THIS FIRST — authoritative checkpoint
+- **LATEST TEST SOURCE OF TRUTH: `INVENTORY_PLAYWRIGHT_BATCH_227_FULL.zip`.** This is the cumulative test project; do not start from older FULL ZIPs, FIX overlays, GitHub logs, or the unrelated WORK `package.json`.
+- **LAST USER REPORT:** “green now” after **Batch 227 `BULK_SAFE_08_RECHECK`**, 12 selected original tests. It was prepared as a 12-test recheck and user explicitly confirmed GREEN. **No final 12-test GitHub ZIP was uploaded.** This makes the 12 passes user-confirmed, not independently log-verified.
+- **Actual distinct original test IDs GREEN = 1,205 / 9,900 = 12.17%**. By B227, **1,193** were supported by earlier checkpoints and uploaded GitHub logs; final **12** are user-confirmed.
+- **Held/unverified = 23 IDs**, excluded from live new groups. They are NOT green.
+- **Approved distinct IDs = 1,228** = 1,205 green + 23 held. **Not yet approved = 8,672**; not every item should be described as “never executed,” because historical review/test details differ.
+- **Not confirmed passing = 8,695** (= 9,900 - 1,205), including 23 held and 8,672 never-approved IDs. These numbers must not be merged with B185 acceptance obligations.
+- **Authored source:** 9,900 distinct original declarations across 152 original `.spec.ts` files; ZIP additionally includes 2 separate live smoke `.spec.ts` files (154 `.spec.ts` total archive paths). Historical route inventory 137/137 coverage declarations; NOT evidence that 137 route behaviors pass.
+- **Latest browser group CLOSED**: `BULK_SAFE_08_RECHECK` 12/12 GREEN as user reported. **NEXT: Batch 228, new large preflighted group (roughly 125–200+ safely reviewable original IDs), no rerun or reinstall of Batch 227.**
+
+## Scope and real deployment topology
+- Project: Inventory Management App, multi-tenant SaaS; Playwright original authored scenario test suite, not Work Operations or SMOOOZ Finance.
+- Frontend GitHub: `baricjosip84-creator/hotel_inventory_frontend`, branch `main`. Existing repo already contains all installed B227 changes after user GREEN run.
+- Frontend Vercel: `https://hotel-inventory-frontend-mauve.vercel.app`. Backend: existing Render deployment.
+- GitHub Actions workflow: `.github/workflows/inventory-original-suite.yml` with display label `Inventory - original 9900 Playwright suite`. Workflow page: https://github.com/baricjosip84-creator/hotel_inventory_frontend/actions/workflows/inventory-original-suite.yml
+- GitHub environment: `Production` with `E2E_EMAIL` and `E2E_PASSWORD` secrets already configured. Never ask for secret contents or embed credentials.
+- Test project root is `playwright-inventory/`; primary runner `playwright.live-original.config.ts`; authorization manifest `original-suite-approved.json`; safety fixture `support/liveOriginalSafeTest.ts` and supporting auth helper `support/tenantSession.ts`.
+- These B215–B227 corrections are test/workflow changes, **not** a deployment of new app frontend or backend code. The FULL archive does not contain a complete current React frontend/backend repository. A real product fix must use actual frontend/backend source, not invented files.
+
+## Exact GitHub Actions outcomes (new distinct passes only)
+| Batch | Run group | Selected | New PASS | Failed/held after run | Cumulative GREEN | Evidence |
+|---|---|---:|---:|---:|---:|---|
+| 214 | `BULK_SAFE_04_RECHECK_2` | 4 | 4 | 0 | 682 | User-confirmed GREEN; baseline from prior handoff |
+| 215 | `BULK_SAFE_05` | 120 | 89 | 31 | 771 | logs_115070126553.zip |
+| 216 | `BULK_SAFE_05_RECHECK` | 31 | 27 | 4 | 798 | logs_115081396828.zip |
+| 217 | `BULK_SAFE_05_RECHECK_2` | 4 | 4 | 0 | 802 | User reported GREEN; no final rerun log |
+| 218 | `BULK_SAFE_06` | 120 | 57 | 63 | 859 | logs_115129636958 (1).zip |
+| 219 | `BULK_SAFE_06_RECHECK` | 63 | 46 | 17 | 905 | logs_115165617693.zip |
+| 220 | `BULK_SAFE_06_RECHECK_2` | 16 | 3 | 13 | 908 | logs_115178390345.zip; TINS-024 held |
+| 221 | `BULK_SAFE_06_RECHECK_3` | 13 | 12 | 1 | 920 | logs_115358562022.zip |
+| 222 | `BULK_SAFE_06_RECHECK_4` | 1 | 1 | 0 | 921 | User reported GREEN (TINS-029); no log |
+| 223 | `BULK_SAFE_07` | 160 | 134 | 26 | 1055 | logs_115375400916.zip |
+| 224 | `BULK_SAFE_07_RECHECK` | 26 | 22 | 4 | 1077 | logs_115399718557.zip |
+| 225 | `BULK_SAFE_07_RECHECK_2` | 4 | 3 | 1 | 1080 | logs_115412216453.zip; TALERT-008 held |
+| 226 | `BULK_SAFE_08` | 125 | 113 | 12 | 1193 | logs_115424410070 (1).zip |
+| 227 | `BULK_SAFE_08_RECHECK` | 12 | 12 | 0 | 1205 | User reported GREEN; no final rerun log |
+
+### Reconciliation, do NOT double-count
+- At B214: 682 GREEN, 21 held. B215–217 original new group +120 GREEN, so 802. B218–222 new group +119 GREEN and TINS-024 held, so 921 and 22 held. B223–225 +159 GREEN and TALERT-008 held, so 1,080 and 23 held. B226–227 +125 GREEN, so **1,205** with **23 held**.
+- The 30 named approved GitHub groups contain repeated IDs for failed-only rechecks. Sum of per-group ID counts is **1,644**, but distinct approved union is exactly **1,228**. Use the 1,205-ID pass ledger, **not** the sum of group sizes.
+- Source of truth for 1,193 prior GREEN IDs is `playwright-inventory/batch-227-baseline.json -> confirmed_green_ids`; 12 newly GREEN IDs are `selected_ids`; 23 held are `held_unverified_ids`. In THIS handoff the files `BATCH_227_CONFIRMED_1205_PASS_IDS.csv` and `BATCH_227_HELD_23_UNVERIFIED_IDS.csv` persist final user-confirmed status. Baseline JSON was written BEFORE the final user GREEN, so its `live_status` still says pending. Do not misread it as contradictory evidence.
+- Uploaded logs prove the pre-recheck outcomes, not the final green-only user confirmations for B214, B217, B222 or B227.
+
+## Batch 215–227 complete development narrative and root causes
+**Batch 215** — Prepared 120 new original IDs: Action Center, Collaboration, Workflow Composer and Tenant Audit. Network/locator preflight and write guard. User ran `BULK_SAFE_05`. **Outcome:** 89 PASS, 31 FAIL. Failures: Action Center 1, Collaboration 8, Tenant Audit 20, Workflow Composer 2. Main problems strict locators/URL assumptions/network interception.
+
+**Batch 216** — Changed only failing tests; corrected route matching, selector nesting, polling, reload and default page size assumptions. **Outcome:** Rerun `BULK_SAFE_05_RECHECK`: 27 PASS, 4 FAIL (Tenant Audit TAUD-012/013/015/017).
+
+**Batch 217** — Corrected Audit date locator ambiguity, reset/previous assertions and timing; no prior passed test bodies repeated. **Outcome:** User reported final `BULK_SAFE_05_RECHECK_2` GREEN 4/4. 802 total.
+
+**Batch 218** — Selected 120 new read-only/mocked cases: Insights, Digital Twin, Learning Feedback and Tenant Settings. **Outcome:** `BULK_SAFE_06` 57 PASS / 63 FAIL; broad catch-all handlers and stale selectors/unstable auth.
+
+**Batch 219** — Corrected excessive request interception in Insights/Tenant Settings and Digital Twin assertions; retry 63. **Outcome:** `BULK_SAFE_06_RECHECK` 46 PASS / 17 FAIL, mainly Insights 16 + Tenant Settings 1.
+
+**Batch 220** — Reviewed 17 failures; corrected 16 test selectors and deliberately held TINS-024 due to real supplier-details behavior mismatch. **Outcome:** `BULK_SAFE_06_RECHECK_2` 3 PASS / 13 FAIL (all Insights). Held rose 21→22.
+
+**Batch 221** — Fixed brittle Insights label-to-control selectors, targeting real sections/controls. **Outcome:** `BULK_SAFE_06_RECHECK_3` 12 PASS / 1 FAIL; TINS-029 expected “High risk” while UI chip says “Risk: High”.
+
+**Batch 222** — Fixed just TINS-029 chip-label matcher. **Outcome:** User reported `BULK_SAFE_06_RECHECK_4` GREEN 1/1. B218 wave 119/120 green, TINS-024 held.
+
+**Batch 223** — Prepared 160 original new tests: Probabilistic Forecasting 72; Adaptive Policy 23; Tenant Audit 40; Alerts 25. **Outcome:** `BULK_SAFE_07` 134 PASS / 26 FAIL; login/session churn, URL/request timing and selectors.
+
+**Batch 224** — Corrected polling/mocking/selector issues and login-recovery behavior; recheck only 26. **Outcome:** `BULK_SAFE_07_RECHECK` 22 PASS / 4 FAIL: TALERT-008 and TAUD-057/058/059.
+
+**Batch 225** — Corrected Audit filter debounce/date textbox and narrowed Alerts handler. **Outcome:** `BULK_SAFE_07_RECHECK_2` 3 PASS / 1 FAIL. TALERT-008 URL stayed `/alerts`, expected `limit=50` in URL; do NOT delete assertion.
+
+**Batch 226** — Held TALERT-008 for actual frontend/deployment investigation. Prepared 125 new tests across nine previously exercised tenant areas. **Outcome:** `BULK_SAFE_08` 113 PASS / 12 FAIL. Operations Feed TFEED-036 async option race; 5 Reliability and 6 Workspace tests timed out in long run.
+
+**Batch 227** — Fixed TFEED-036 await for visible work-area select / three native options. Retried same original assertions for TRC-060..064 and TWKS-044,045,047..050 in short single-worker group. 22 offline checks PASS. **Outcome:** User reported final `BULK_SAFE_08_RECHECK` GREEN 12/12. **1205 / 9900** confirmed. No new GitHub log for final result.
+
+### Critical regression lessons
+- NEVER `page.route` intercept the document navigation to `/products`, `/alerts`, `/stock` etc. Apply method/API-target guards and fail closed; returning JSON as HTML caused widespread failures.
+- NEVER add catch-all forwarding/mocking that exposes real POST/PATCH/PUT/DELETE writes to production; preserve guards and auth exceptions exactly as tested. Synthetic GET responses do **not** prove real backend correctness.
+- Bulk login rate limits/session expiry were recurring failures; use B227 validated fixture and single-worker settings, not per-test login churn or naive shared refresh state. A short rerun resolved several late-run timeouts, but this does NOT guarantee no future timeout.
+- Check real current frontend labels/panels before approving original tests: `Risk: High` chip versus “High risk”; duplicate-text locators; strict role-name collisions; URL caching and delayed debounced filters; page size 50; actual table headers; selectors after async renders.
+- Do not neutralize a product-behavior expectation just for GREEN. Held TINS-024 and TALERT-008 require app/source validation, not superficial assertion deletion.
+- Do not re-run any previously GREEN ID in new bulk groups, or re-enable held/privileged/live-mutating scenarios simply to inflate count.
+
+## The 23 held/unverified original IDs: exact list and why
+- **B206 quarantined product-behavior cases (10):** `TPO-071`, `TRPT-025`, `TSH-069`, `TST-028`, `TSMV-050`, `TSMV-072`, `TSTR-079`, `TSTR-080`, `TSL-040`, `TSL-045`. Historically related to filter URL, CSV export, page size, stock/integrity flags, pinned locations and permissions. Revalidate against app code individually.
+- **Stock Consume permission (2):** `TST-038`, `TST-039`; user tenant showed Count rather than Consume. Do not force the permission.
+- **Dashboard role (1):** `TDASH-049`; management role prerequisite unproven.
+- **Reliability Clear filters (2):** `TRC-009`, `TRC-048`; expected default/readiness did not restore; likely UI/product behavior or fixture mismatch.
+- **Alerts URL/filter (6):** `TALERT-004`, `005`, `006`, `007`, `009`, `011`; source/observed URL filters mismatch. Do not change assertions to manufacture success.
+- **Insights supplier details (1, added B220):** `TINS-024`; expected supplier details to close, actual app kept them open. Needs explicit decision whether app or test expectation is wrong.
+- **Alerts page-size URL (1, added B226):** `TALERT-008`; page remains `/alerts` instead of expected `?limit=50`. Need compare current FE production build, actual route, debounce, history, API request. Held rather than weakened.
+- Total 10+2+1+2+6+1+1 = **23**, disjoint from 1,205 passes. See attached CSV for verbatim ledger and original approved spec paths.
+
+## Historical non-live acceptance blockers (NOT fresh 2026-11-09 audit)
+- B185 audit claimed **417 blocked obligations** (290 operational signoffs; 73 backend/security/DB; 24 provider/owner; 17 source-hardening; 9 browser a11y/performance; 4 product/role), **272 partially classified features**, **357 scenario skips** and **24 supplemental in-test skips**, and unresolved `PLCR-084`. These figures are historical and not newly re-verified at B227; do not claim they are resolved or necessarily unchanged.
+- This suite contains **9,900 authored tests**, not 9,900 already executed or 9,900 independent product requirements. Browser tests with synthetic API fixtures prove selected UI behavior only, not live persistence, cross-tenant isolation, stock adjustment, regulatory/provider operations, privileged flows or production readiness.
+
+## Authoritative source, checksums, and what to install
+- **`INVENTORY_PLAYWRIGHT_BATCH_227_FULL.zip`** — 3,671,447 bytes — SHA-256 `81e6668e64c898764b6ba7b2b483f8316d0fcd7ff3a117b612dd05a817e854b3`. AUTHORITATIVE current cumulative source.
+- **`INVENTORY_PLAYWRIGHT_BATCH_227_RECHECK_12_GITHUB_FIX.zip`** — 54,696 bytes — SHA-256 `36fc001206cfa59bfaea4a831ef3d538bde6b098b660efc1604f701be6b272b6`. Already installed; historical applied fix; NEVER reinstall for next batch.
+- **`INVENTORY_PLAYWRIGHT_BATCH_227_VERIFICATION.txt`** — 3,019 bytes — SHA-256 `305fae4053af532fd74c789cf903687a94b7a609a5c304e81a3bd7e8a6e15561`. Written BEFORE final user GREEN; result pending in file is historically accurate at writing time.
+- **B227 FULL source ZIP** is the Playwright project with 660 ZIP entries, of which 152 original `.spec.ts` plus 2 live smoke specs. CRC PASS. Source-file checksum list `BATCH_227_SOURCE_FILE_SHA256.csv`.
+- **Batch 227 changes** (exact repository-relative paths; already applied):
+  - `.github/workflows/inventory-original-suite.yml`
+  - `INVENTORY_PLAYWRIGHT_BATCH_227_VERIFICATION.txt`
+  - `playwright-inventory/INVENTORY_PLAYWRIGHT_BATCH_226_GITHUB_113_PASS_12_FAIL.csv`
+  - `playwright-inventory/INVENTORY_PLAYWRIGHT_BATCH_227_SELECTED_12_IDS.csv`
+  - `playwright-inventory/batch-226-baseline.json`
+  - `playwright-inventory/batch-227-baseline.json`
+  - `playwright-inventory/original-suite-approved.json`
+  - `playwright-inventory/playwright.live-original.config.ts`
+  - `playwright-inventory/scripts/check-batch-227-contract.mjs`
+  - `playwright-inventory/scripts/verify-original-suite.mjs`
+  - `playwright-inventory/tests/tenant/operations-feed/operations-feed.spec.ts`
+- The FIX ZIP files are an OVERLAY, not the full project. Previously, each fix ZIP was extracted into the *existing* GitHub frontend repo root, committed to `main`, and run in GitHub Actions. The latest FULL ZIP is for next-assistant offline development; do not upload the full archive into the repo as one ZIP.
+- Some JSON `source_baseline` / `status` / `live_status` fields and older verification TXT files are historically frozen and may say B227 or B222 is pending. They are not later live result evidence. Update only with independently supported user confirmation or log outcomes.
+
+## Important actual repository paths
+- `.github/workflows/inventory-original-suite.yml` — PRESENT
+- `playwright-inventory/original-suite-approved.json` — PRESENT
+- `playwright-inventory/playwright.live-original.config.ts` — PRESENT
+- `playwright-inventory/support/liveOriginalSafeTest.ts` — PRESENT
+- `playwright-inventory/support/tenantSession.ts` — PRESENT
+- `playwright-inventory/support/environment.ts` — PRESENT
+- `playwright-inventory/scripts/verify-original-suite.mjs` — PRESENT
+- `playwright-inventory/scripts/check-live-original-discovery.mjs` — PRESENT
+- `playwright-inventory/scripts/check-bulk-auth-fixture.mjs` — PRESENT
+- `playwright-inventory/scripts/check-batch-227-contract.mjs` — PRESENT
+- `playwright-inventory/batch-226-baseline.json` — PRESENT
+- `playwright-inventory/batch-227-baseline.json` — PRESENT
+- `playwright-inventory/INVENTORY_PLAYWRIGHT_BATCH_226_GITHUB_113_PASS_12_FAIL.csv` — PRESENT
+- `playwright-inventory/INVENTORY_PLAYWRIGHT_BATCH_227_SELECTED_12_IDS.csv` — PRESENT
+- `playwright-inventory/COVERAGE_LEDGER.csv` — PRESENT
+- `playwright-inventory/PAGE_FUNCTION_INVENTORY.csv` — PRESENT
+- `playwright-inventory/PHASE1_SOURCE_AUTHORING_FREEZE_B185.md` — PRESENT
+- `playwright-inventory/PHASE1_STATIC_SOURCE_GATE_B185.json` — PRESENT
+- `playwright-inventory/ORIGINAL_TESTS_EXECUTION.md` — PRESENT
+- `playwright-inventory/README.txt` — PRESENT
+- `playwright-inventory/HANDOFF.txt` — PRESENT
+
+## COMPLETE FILE NAME RECORD — B215–B227, as delivered in THIS conversation
+**B215:** `INVENTORY_PLAYWRIGHT_BATCH_215_BULK_120_GITHUB_FIX.zip` · `INVENTORY_PLAYWRIGHT_BATCH_215_FULL.zip` · `INVENTORY_PLAYWRIGHT_BATCH_215_GITHUB_89_PASS_31_FAIL.csv` · `INVENTORY_PLAYWRIGHT_BATCH_215_SELECTED_120_IDS.csv` · `INVENTORY_PLAYWRIGHT_BATCH_215_VERIFICATION.txt`
+**B216:** `INVENTORY_PLAYWRIGHT_BATCH_216_FULL.zip` · `INVENTORY_PLAYWRIGHT_BATCH_216_RECHECK_31_GITHUB_FIX.zip` · `INVENTORY_PLAYWRIGHT_BATCH_216_SELECTED_31_IDS.csv` · `INVENTORY_PLAYWRIGHT_BATCH_216_VERIFICATION.txt`
+**B217:** `INVENTORY_PLAYWRIGHT_BATCH_217_FULL.zip` · `INVENTORY_PLAYWRIGHT_BATCH_217_RECHECK_4_GITHUB_FIX.zip` · `INVENTORY_PLAYWRIGHT_BATCH_217_VERIFICATION.txt`
+**B218:** `INVENTORY_PLAYWRIGHT_BATCH_218_BULK_120_GITHUB_FIX.zip` · `INVENTORY_PLAYWRIGHT_BATCH_218_FULL.zip` · `INVENTORY_PLAYWRIGHT_BATCH_218_GITHUB_57_PASS_63_FAIL.csv` · `INVENTORY_PLAYWRIGHT_BATCH_218_SELECTED_120_IDS.csv` · `INVENTORY_PLAYWRIGHT_BATCH_218_VERIFICATION.txt`
+**B219:** `INVENTORY_PLAYWRIGHT_BATCH_219_FULL.zip` · `INVENTORY_PLAYWRIGHT_BATCH_219_RECHECK_63_GITHUB_FIX.zip` · `INVENTORY_PLAYWRIGHT_BATCH_219_SELECTED_63_IDS.csv` · `INVENTORY_PLAYWRIGHT_BATCH_219_VERIFICATION.txt`
+**B220:** `INVENTORY_PLAYWRIGHT_BATCH_220_FULL.zip` · `INVENTORY_PLAYWRIGHT_BATCH_220_GITHUB_3_PASS_13_FAIL.csv` · `INVENTORY_PLAYWRIGHT_BATCH_220_RECHECK_16_GITHUB_FIX.zip` · `INVENTORY_PLAYWRIGHT_BATCH_220_VERIFICATION.txt`
+**B221:** `INVENTORY_PLAYWRIGHT_BATCH_221_FULL.zip` · `INVENTORY_PLAYWRIGHT_BATCH_221_RECHECK_13_GITHUB_FIX.zip` · `INVENTORY_PLAYWRIGHT_BATCH_221_SELECTED_13_IDS.csv` · `INVENTORY_PLAYWRIGHT_BATCH_221_VERIFICATION.txt`
+**B222:** `INVENTORY_PLAYWRIGHT_BATCH_222_FULL.zip` · `INVENTORY_PLAYWRIGHT_BATCH_222_RECHECK_1_GITHUB_FIX.zip` · `INVENTORY_PLAYWRIGHT_BATCH_222_VERIFICATION.txt`
+**B223:** `INVENTORY_PLAYWRIGHT_BATCH_223_BULK_160_GITHUB_FIX.zip` · `INVENTORY_PLAYWRIGHT_BATCH_223_FULL.zip` · `INVENTORY_PLAYWRIGHT_BATCH_223_GITHUB_134_PASS_26_FAIL.csv` · `INVENTORY_PLAYWRIGHT_BATCH_223_SELECTED_160_IDS.csv` · `INVENTORY_PLAYWRIGHT_BATCH_223_VERIFICATION.txt`
+**B224:** `INVENTORY_PLAYWRIGHT_BATCH_224_FULL.zip` · `INVENTORY_PLAYWRIGHT_BATCH_224_RECHECK_26_GITHUB_FIX.zip` · `INVENTORY_PLAYWRIGHT_BATCH_224_SELECTED_26_IDS.csv` · `INVENTORY_PLAYWRIGHT_BATCH_224_VERIFICATION.txt`
+**B225:** `INVENTORY_PLAYWRIGHT_BATCH_225_FULL.zip` · `INVENTORY_PLAYWRIGHT_BATCH_225_RECHECK_4_GITHUB_FIX.zip` · `INVENTORY_PLAYWRIGHT_BATCH_225_VERIFICATION.txt`
+**B226:** `INVENTORY_PLAYWRIGHT_BATCH_226_BULK_125_GITHUB_FIX.zip` · `INVENTORY_PLAYWRIGHT_BATCH_226_FULL.zip` · `INVENTORY_PLAYWRIGHT_BATCH_226_HELD_23_IDS.csv` · `INVENTORY_PLAYWRIGHT_BATCH_226_SELECTED_125_IDS.csv` · `INVENTORY_PLAYWRIGHT_BATCH_226_VERIFICATION.txt`
+**B227:** `INVENTORY_PLAYWRIGHT_BATCH_227_APPROVED_GROUPS_CATALOG.csv` · `INVENTORY_PLAYWRIGHT_BATCH_227_COMPLETE_DELIVERED_FILE_CATALOG.csv` · `INVENTORY_PLAYWRIGHT_BATCH_227_CONFIRMED_1205_PASS_IDS.csv` · `INVENTORY_PLAYWRIGHT_BATCH_227_FULL.zip` · `INVENTORY_PLAYWRIGHT_BATCH_227_GITHUB_EXECUTION_CHRONOLOGY.csv` · `INVENTORY_PLAYWRIGHT_BATCH_227_HELD_23_UNVERIFIED_IDS.csv` · `INVENTORY_PLAYWRIGHT_BATCH_227_RECHECK_12_GITHUB_FIX.zip` · `INVENTORY_PLAYWRIGHT_BATCH_227_SHA256.txt` · `INVENTORY_PLAYWRIGHT_BATCH_227_SOURCE_FILE_SHA256.csv` · `INVENTORY_PLAYWRIGHT_BATCH_227_VERIFICATION.txt`
+
+### Uploaded GitHub evidence ZIPs for B215–B226 (actual names preserved)
+- `logs_115070126553.zip` — 57,963 bytes — SHA-256 `0711b5f73be5229405dc4ccdcc05e718b8dd305cec0817a8947fa37dd02cc241`
+- `logs_115081396828.zip` — 31,094 bytes — SHA-256 `ac25fb4ac9999f2ccea61ca0eeab43de175daa315ea2ab243e5a37f93e7892e6`
+- `logs_115129636958 (1).zip` — 38,270 bytes — SHA-256 `6ca50b754c064e1eda2e14925251168e4ed23e0fde1ee54c16c487960ee82e93`
+- `logs_115165617693.zip` — 43,133 bytes — SHA-256 `3fffa18b74ad94a1179636e26e8cde245ede32eb9678e229e212533d034b955b`
+- `logs_115178390345.zip` — 35,358 bytes — SHA-256 `0807281c8a2697964a4e8cca99677fca231d8680ef3ab3746137c9c418240a6d`
+- `logs_115358562022.zip` — 28,899 bytes — SHA-256 `d6761c90de67f58da8e83fce8a2d330307c8e76131d72d684e9fe9e1ce9f7ae5`
+- `logs_115375400916.zip` — 62,604 bytes — SHA-256 `14f8963cab600ab98424625efdbd694cba3ba906b356de5b6f1cd5abd630e2d4`
+- `logs_115399718557.zip` — 34,047 bytes — SHA-256 `57f3e16d009a4860701431d2376ddc65d1ba05285879340abc9c9b5bfe722937`
+- `logs_115412216453.zip` — 29,535 bytes — SHA-256 `104bfb96f53455823cc6ead6ddc364c91b9002126eec209a86fb859ec17eeb1d`
+- `logs_115424410070 (1).zip` — 47,491 bytes — SHA-256 `159352b223bc58eab2bdf2b2774a2e620d66ac8cd38bd0c01ac4aea4b8ef6b83`
+- There is **no uploaded GitHub log** from the final B227 12/12 GREEN run. This is a user-confirmed success.
+- `package.json` was uploaded in the previous turn, but it identified **work-operations-backend version 0.70.87**, NOT Inventory Playwright. It is excluded from the Inventory continuation source. Never use it to determine Inventory test commands.
+
+### Earlier historical artifacts B177–B214
+- **Entire B177–B214 history** (including exact historic B195–B214 FULL/FIX ZIP names, B194/B177 historical handoff and GitHub log names, files offered, summaries, hashes at B214) is reproduced in `ARCHIVE_B214/INVENTORY_PLAYWRIGHT_COMPLETE_HANDOFF_BATCH_214_2026-11-08.txt` and `.md`, and `ARCHIVE_B214/INVENTORY_PLAYWRIGHT_BATCH_214_DELIVERED_ARTIFACTS_CATALOG.csv`. They are included in this pack.
+- Actual B214 `FULL.zip` and its 682-pass CSV are also included, for forensic older-state comparisons ONLY. Do not replace B227 FULL with B214. Earlier B194 continuation ZIP itself was not present among the mounted files during B227 handoff packaging; its filenames and nested contents are preserved in the B214 handoff rather than falsely claiming to re-embed it.
+- `BATCH_227_COMPLETE_DELIVERED_FILE_CATALOG.csv` lists every available current artifact plus historical filenames carried from B214, distinguishes available files from historical name records and includes hashes where bytes exist.
+
+## What to do NEXT: Batch 228, exact continuation plan
+1. **Start from `LATEST_SOURCE/INVENTORY_PLAYWRIGHT_BATCH_227_FULL.zip` only.** Read `BATCH_227_CONFIRMED_1205_PASS_IDS.csv`, `BATCH_227_HELD_23_UNVERIFIED_IDS.csv` and live-original manifest; check exactly 9,900 original distinct IDs, 152 original specs.
+2. **Do NOT run Batch 227 again** (user GREEN), reinstall B227 FIX, or restart test generation. B228 should select **new original IDs** from the 8,672 unapproved ones, excluding ALL 1,205 GREEN and 23 held. Aim roughly 125–200+ if source review and production safety justify it; never hit quota by inventing cases or approving unsafe mutations.
+3. **Read the actual current frontend source** for every selected page. B227 FULL alone does NOT include complete production application code. Use the source in the existing frontend repo or a verified matching snapshot. Inspect actual heading, DOM selectors, URL synchronization, debounce, table contents, pagination, API GET resource type and cache behavior, roles/grants and navigation.
+4. **Preflight source carefully**: API interception must be limited to synthetic GET data; never capture document navigations, auth refresh, provider side effects or unmocked production writes. Confirm actual pages can load; verify `page.route` method/path patterns, async readiness, trace of awaited network calls, no selectors prone to strict duplicate matches, no fake broad assertions. Check auth single-worker fixture and CI session recovery. Avoid role-specific or provider/mutation tests without controlled acceptance environment.
+5. **Update exact-ID allowlists and SHA-256 fingerprints** in `original-suite-approved.json`; select new group `BULK_SAFE_09` (suggested *name*, not yet implemented; inspect workflow naming conventions). Update GitHub workflow choices, config, verifier and new contract script; do not modify already passed test bodies. Maintain retrospective cumulative ledger and held cases.
+6. Run offline checks (original suite count, TS parser, discovery selection, blocked-write guard, auth origin and fixture checks, old batch contract regression, source body hash stability, FIX/FULL path equality, ZIP CRC). If local browser proof cannot be produced, be explicit. 22 previous offline scripts passed for B227 but do not prove live B228.
+7. Provide new **verified FIX ZIP** with repo-root relative replacement paths + cumulative **FULL ZIP** + brief TXT verification. User installs only FIX content, commits `main`, then runs GitHub Actions `Inventory - original 9900 Playwright suite` → group B228 approved name → confirmation `ORIGINALTESTS` → Run. Request **one run**. If RED, parse uploaded GitHub log, preserve passing IDs and fix only failing IDs (unless clear systemic root cause can be proven from code).
+8. Independently, handle the **23 held tests**, particularly `TALERT-008` and `TINS-024`, only with current FE/BE source and approved product behavior, never silent assertion removal. Leave historical 417 / 272 / 357 / 24 obligations as separate acceptance workstreams.
+
+## User requirements — preserve precisely
+- Short, concrete, surgical replies once handoff is understood; downloadable, verified changed-files ZIP plus **one exact GitHub run**. Avoid repetitive explanations, fabricated ZIP links or false reports.
+- Large batches with proactive source review and offline verification before user executes GitHub. The user wants more than ~10 tests at a time; 125–200+ can be justified, but only when safe.
+- No new accounts, helpers, local tools, redundant credentials or setup. Existing GitHub Actions, Vercel and Render are working. GitHub is used for the Playwright workflow despite the user declining GitHub for separate Inventory application code changes.
+- Do not alter Inventory frontend/backend app just to make Playwright tests pass, or weaken production write protection; declare actual product defects and explicitly hold them.
+- Keep 9,900 source IDs, 152 original specs, original route ledger and history intact. Every confirmed pass must correspond to an exact original ID; no padding, rerun double-count or inference that mocked tests prove database persistence.
+- When asking the user to test, provide exact page/action/group/expected result and request logs only after a failure; do not demand screenshots or broad retesting of green groups.
+
+## Exact stop-state copy-paste for new chat
+> On 2026-11-09, user confirmed **B227 BULK_SAFE_08_RECHECK GREEN (12/12)**. Authoritative current source `INVENTORY_PLAYWRIGHT_BATCH_227_FULL.zip`; last applied GitHub overlay `INVENTORY_PLAYWRIGHT_BATCH_227_RECHECK_12_GITHUB_FIX.zip`. Authored: **9,900 distinct original tests** / **152 original specs** / **137 inventoried routes**. Exactly **1,205 distinct original IDs confirmed GREEN (12.17%)** (B227 last 12 are user-confirmed; no final log), **23 specifically held/unverified IDs**, **8,672 not-yet-approved IDs**, **8,695 not yet confirmed passing**. Last B226 log `logs_115424410070 (1).zip` showed 113 PASS / 12 FAIL; those 12 subsequently GREEN by user report. Next action **Batch 228**, substantive preflighted group of new original IDs excluding all 1,205 green and 23 held, then verified changed-files ZIP + FULL ZIP + one GitHub workflow run. Do not restart suite generation, repeat B227, install older archives, or count offline tests as live.**
+
+---
+**Integrity/provenance:** All checksums below were computed from current mounted files. B227 original ZIP CRC PASS and exact group union cross-check PASS. The complete continuation pack includes source, selected historical artifacts, ledger and GitHub logs; names not physically present are cataloged, never falsely claimed embedded.

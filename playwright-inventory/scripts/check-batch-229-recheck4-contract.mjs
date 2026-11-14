@@ -16,11 +16,11 @@ const manifest=json('original-suite-approved.json');
 const approved=manifest.approved_groups;
 const groupName='BULK_SAFE_10_RECHECK_4';
 const group=approved[groupName];
-const prior=Object.fromEntries(Object.entries(approved).filter(([name])=>!['BULK_SAFE_10_RECHECK_4','BULK_SAFE_10_RECHECK_5','BULK_SAFE_10_RECHECK_6'].includes(name)));
+const prior=Object.fromEntries(Object.entries(approved).filter(([name])=>!['BULK_SAFE_10_RECHECK_4','BULK_SAFE_10_RECHECK_5','BULK_SAFE_10_RECHECK_6','BULK_SAFE_11'].includes(name)));
 const historical=json('batch-229-recheck4-prior-approved-groups.json');
 assert.equal(Object.keys(prior).length,historical.prior_group_count,'Historical group count changed');
 assert.equal(sha(JSON.stringify(prior,(k,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b))):v)),historical.previous_approved_groups_sha256,'Historical approved groups changed');
-assert.deepEqual(Object.keys(approved).filter(k=>!['BULK_SAFE_10_RECHECK_5','BULK_SAFE_10_RECHECK_6'].includes(k)).slice(-5),[
+assert.deepEqual(Object.keys(approved).filter(k=>!['BULK_SAFE_10_RECHECK_5','BULK_SAFE_10_RECHECK_6','BULK_SAFE_11'].includes(k)).slice(-5),[
   'BULK_SAFE_10','BULK_SAFE_10_RECHECK','BULK_SAFE_10_RECHECK_2','BULK_SAFE_10_RECHECK_3',groupName]);
 assert.equal(group.secret,true);
 assert.deepEqual(group.entries.map(e=>[e.file,e.ids]),[['tenant/products/products.spec.ts',['TPROD-076']]]);

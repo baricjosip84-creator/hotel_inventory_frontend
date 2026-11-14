@@ -16,7 +16,7 @@ assert.equal(group.secret,true);
 assert.deepEqual(group.entries,[old.entries[1]]);
 assert.equal(group.entries[0].ids[0],'TPROD-076');
 assert(original.entries.some(e=>e.file===group.entries[0].file && e.ids.includes('TPROD-076')));
-assert.deepEqual(Object.keys(manifest.approved_groups).filter(k=>!['BULK_SAFE_10_RECHECK_4','BULK_SAFE_10_RECHECK_5','BULK_SAFE_10_RECHECK_6'].includes(k)).slice(-4),[
+assert.deepEqual(Object.keys(manifest.approved_groups).filter(k=>!['BULK_SAFE_10_RECHECK_4','BULK_SAFE_10_RECHECK_5','BULK_SAFE_10_RECHECK_6','BULK_SAFE_11'].includes(k)).slice(-4),[
  'BULK_SAFE_10','BULK_SAFE_10_RECHECK','BULK_SAFE_10_RECHECK_2','BULK_SAFE_10_RECHECK_3']);
 assert.deepEqual(manifest.batch_229_recheck3.github_pass_ids,['TSUP-054']);
 assert.deepEqual(manifest.batch_229_recheck3.github_fail_ids,['TPROD-076']);

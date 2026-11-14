@@ -1,0 +1,24 @@
+original_test_id,original_approved_group,source_spec,reason_from_B226
+TALERT-004,BULK_SAFE_04,tenant/alerts/alerts.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TALERT-005,BULK_SAFE_04,tenant/alerts/alerts.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TALERT-006,BULK_SAFE_04,tenant/alerts/alerts.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TALERT-007,BULK_SAFE_04,tenant/alerts/alerts.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TALERT-009,BULK_SAFE_04,tenant/alerts/alerts.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TALERT-011,BULK_SAFE_04,tenant/alerts/alerts.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TDASH-049,BULK_SAFE_02,tenant/dashboard/dashboard.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TPO-071,BULK_SAFE_02,tenant/purchase-orders/purchase-orders.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TRC-009,BULK_SAFE_03,tenant/reliability-command/reliability-command.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TRC-048,BULK_SAFE_03,tenant/reliability-command/reliability-command.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TRPT-025,BULK_SAFE_02,tenant/reports/reports.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TSH-069,BULK_SAFE_02,tenant/shipments/shipments.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TSL-040,BULK_SAFE_02,tenant/storage-locations/storage-locations.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TSL-045,BULK_SAFE_02,tenant/storage-locations/storage-locations.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TSMV-050,BULK_SAFE_02,tenant/stock-movements/stock-movements.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TSMV-072,BULK_SAFE_02,tenant/stock-movements/stock-movements.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TST-028,BULK_SAFE_02,tenant/stock/stock.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TST-038,BULK_SAFE_02,tenant/stock/stock.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TST-039,BULK_SAFE_02,tenant/stock/stock.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TSTR-079,BULK_SAFE_02,tenant/stock-transfers/stock-transfers.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TSTR-080,BULK_SAFE_02,tenant/stock-transfers/stock-transfers.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TINS-024,BULK_SAFE_06,tenant/insights/insights.spec.ts,Held before Batch 226; preserve original B220 and B214 held registry for detailed rationale
+TALERT-008,BULK_SAFE_07,tenant/alerts/alerts.spec.ts,TALERT-008 URL/app behavior mismatch in B225; requires FE/deployment verification
