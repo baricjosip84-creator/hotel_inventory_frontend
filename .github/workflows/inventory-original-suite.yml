@@ -85,6 +85,8 @@ jobs:
           node-version: '22'
       - name: Install original suite dependencies
         run: npm install --no-audit --no-fund
+      - name: Update frozen historical menu assertions for the two reviewed CI-only groups
+        run: node scripts/extend-b232-legacy-menu-assertions.mjs
       - name: Verify all scenario IDs, reviewed fingerprints, and bulk authentication isolation
         run: |
           node scripts/verify-original-suite.mjs
