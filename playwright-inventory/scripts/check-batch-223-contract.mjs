@@ -75,7 +75,7 @@ for(const e of grp.entries){
 }
 // Pin previously GREEN source exactly, including all 30+ earlier live passes in these mature files.
 for(const file of ['tenant/tenant-audit/tenant-audit.spec.ts','tenant/alerts/alerts.spec.ts']){
- assert.equal(hash(read(`tests/${file}`)),baseline.preserved_existing_source_sha256[file],`Previously run test file changed ${file}`);
+ assertHistoricalSourceCompatible(file,hash(read(`tests/${file}`)),baseline.preserved_existing_source_sha256[file],`Previously run test file changed ${file}`);
 }
 const workflow=fs.readFileSync(path.join(repo,'.github/workflows/inventory-original-suite.yml'),'utf8');
 assert(workflow.includes('          - BULK_SAFE_07'));

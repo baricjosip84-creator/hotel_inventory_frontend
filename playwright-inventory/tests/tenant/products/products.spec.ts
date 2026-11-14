@@ -971,8 +971,8 @@ test.describe('Products — valuation category, cost detail and CSV evidence', (
 
   test('TPROD-064 category hotspot selects category for Products URL scope', async ({ page }) => {
     const section = costSection(page, 'Cost Valuation Summary');
-    await expect(section.getByRole('row', { name: /Beverages/ })).toBeVisible();
-    await section.getByRole('row', { name: /Beverages/ }).getByRole('button', { name: 'View Category' }).click();
+    await expect(section.getByRole('row', { name: /^Beverages(?:\s|$)/ })).toBeVisible();
+    await section.getByRole('row', { name: /^Beverages(?:\s|$)/ }).getByRole('button', { name: 'View Category' }).click();
     await expect(page).toHaveURL(/(?:\?|&)category=Beverages(?:&|$)/);
   });
 

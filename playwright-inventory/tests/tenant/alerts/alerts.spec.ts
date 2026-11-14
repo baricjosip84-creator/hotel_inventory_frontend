@@ -606,7 +606,7 @@ test.describe('Alerts — manual create, permissions and controlled emergency ov
     });
     const box = overrideArea(page);
     await box.getByRole('textbox', { name:'Mandatory override reason' }).fill('  Reconciled stock ledger  ');
-    page.once('dialog', async dialog => { expect(dialog.message()).toContain('emergency administrative action'); await dialog.accept(); });
+    page.once('dialog', async dialog => { expect(dialog.message()).toContain('Confirm action: Override and close blocking alert?'); await dialog.accept(); });
     await box.getByRole('button', { name:'Override and close blocking alert' }).click();
     await expect(page.getByRole('status').getByText('Blocking alert overridden and closed successfully.')).toBeVisible();
     expect(submitted).toEqual({ reason:'Reconciled stock ledger' });

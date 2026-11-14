@@ -1,0 +1,10 @@
+test_id,original_spec,original_test_name,state
+TALERT-049,tenant/alerts/alerts.spec.ts,successful override sends trimmed reason and displays closure confirmation ,PENDING_GITHUB_BROWSER
+TPROD-064,tenant/products/products.spec.ts,category hotspot selects category for Products URL scope ,PENDING_GITHUB_BROWSER
+TSH-029,tenant/shipments/shipments.spec.ts,Line deletion cancelled in confirmation sends no mutation ,PENDING_GITHUB_BROWSER
+TSTR-034,tenant/stock-transfers/stock-transfers.spec.ts,Draft creation API failure surfaces rejection and retains entered fields ,PENDING_GITHUB_BROWSER
+TSTR-037,tenant/stock-transfers/stock-transfers.spec.ts,Version conflict on edited draft shows feedback without reset ,PENDING_GITHUB_BROWSER
+TSTR-041,tenant/stock-transfers/stock-transfers.spec.ts,Declining native execution confirmation sends no POST ,PENDING_GITHUB_BROWSER
+TSTR-043,tenant/stock-transfers/stock-transfers.spec.ts,Execution API rejection leaves draft actions available and shows error ,PENDING_GITHUB_BROWSER
+TSUP-026,tenant/suppliers/suppliers.spec.ts,delivery SLA row shows overdue count and opens its supplier performance ,PENDING_GITHUB_BROWSER
+TSUP-043,tenant/suppliers/suppliers.spec.ts,missing shipments.read hides performance actions while supplier master remains visible ,PENDING_GITHUB_BROWSER

@@ -1,0 +1,47 @@
+{
+  "TALERT-049": {
+    "file": "tenant/alerts/alerts.spec.ts",
+    "before_sha256": "e3c9b491778ecd69f1974feb25dd303983888c0c08a5010ba828ab9ab9ba998c",
+    "after_sha256": "00fb785a919a32ea9bbf0b917c01b56aeef357901b785ab830cb58d8d91e6274"
+  },
+  "TPROD-064": {
+    "file": "tenant/products/products.spec.ts",
+    "before_sha256": "4e6ed0f40a3bfcec02972111816ca6cbb921ff2aa086b5350376ce3d41ec0ed3",
+    "after_sha256": "15a1726f9055c08b1161ce44690304bea85c94f01bc5f8ad75f00d8e46ec4a46"
+  },
+  "TSH-029": {
+    "file": "tenant/shipments/shipments.spec.ts",
+    "before_sha256": "d9785c4681f2c7d12a65978a9d86826bc8626584653e626b22c4e9711b6ac097",
+    "after_sha256": "a39aebb2a3087513466f631fc9c160a5f6445bce89224d3e41df4f3cfaa2785e"
+  },
+  "TSTR-034": {
+    "file": "tenant/stock-transfers/stock-transfers.spec.ts",
+    "before_sha256": "774303e4843e5357453cfecae0f7f65f4afa7dd5771f74984cd118e4e44ada09",
+    "after_sha256": "a92acce728c07a66af81159e1af5a3bc8b60f1e0b4ca42a965bfb96dce61d694"
+  },
+  "TSTR-037": {
+    "file": "tenant/stock-transfers/stock-transfers.spec.ts",
+    "before_sha256": "f35f22d7b4c4f4592b32e521093b117d91ee25fd9d79b4d48d0817ebe5ca06f9",
+    "after_sha256": "e0f302d341c87ebed4838af9d3004ac1e008a78aaa6a6014b9b8b1f3b7436695"
+  },
+  "TSTR-041": {
+    "file": "tenant/stock-transfers/stock-transfers.spec.ts",
+    "before_sha256": "6e0db1e4ee1a470ef423a96c9d98943844ff7dd2adca092d6ddd4fb0a15d7a77",
+    "after_sha256": "af2f9db35e9f4bfe7a79f00a886d088486f64b36ae0204aa404da3e4f53c0aa4"
+  },
+  "TSTR-043": {
+    "file": "tenant/stock-transfers/stock-transfers.spec.ts",
+    "before_sha256": "788d0c9424781ce6cb140688f8743377b498ad5af7d6a3a32e94b22cbb94b61f",
+    "after_sha256": "9aeeafbb796c42671b873c33333c05f8914269e68a054ec94ce77ffc6f2ee53b"
+  },
+  "TSUP-026": {
+    "file": "tenant/suppliers/suppliers.spec.ts",
+    "before_sha256": "c4e6e9cb1689f4b900546fe3bd8fdfdd5356fd39d96dbcade8fe4519921332f4",
+    "after_sha256": "78a7b66e4b7990a5dab998b00b8b73dea26a904051b7dc9319e825174ba4312a"
+  },
+  "TSUP-043": {
+    "file": "tenant/suppliers/suppliers.spec.ts",
+    "before_sha256": "aa5b85aef90fdf8b1349ebcbd7ecbb31b08e3817282ac98707315adc9f8c0374",
+    "after_sha256": "1a5a75e129cc367527221e3d48dc905242d792d55df8f31e6a2bcc9918859184"
+  }
+}

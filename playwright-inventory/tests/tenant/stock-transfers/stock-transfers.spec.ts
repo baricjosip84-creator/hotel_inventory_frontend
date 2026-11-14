@@ -304,7 +304,7 @@ test.describe('Stock Transfers — draft validation, mutation governance and aud
  test('TSTR-034 Draft creation API failure surfaces rejection and retains entered fields',async({page})=>{
   const {writes}=await openTransferCase(page,{createStatus:422});await fillValidDraft(page);
   await page.getByRole('button',{name:'Create transfer draft'}).click();
-  await expect(page.getByText('Draft creation rejected',{exact:false})).toBeVisible();
+  await expect(page.getByRole('alert').filter({hasText:'Draft creation rejected'})).toBeVisible();
   await expect(formProduct(page)).toHaveValue('pw-product');expect(writes).toHaveLength(1);
  });
  test('TSTR-035 Edit draft loads selected locations, notes and existing item quantity',async({page})=>{
@@ -325,7 +325,7 @@ test.describe('Stock Transfers — draft validation, mutation governance and aud
   const {writes}=await openTransferCase(page,{updateStatus:409},selectedUrl);
   await page.getByRole('button',{name:'Edit draft'}).click();await page.locator('#transfer-notes').fill('Keep me');
   await page.getByRole('button',{name:'Save draft changes'}).click();
-  await expect(page.getByText('Version conflict',{exact:false})).toBeVisible();
+  await expect(page.getByRole('alert').filter({hasText:'Version conflict'})).toBeVisible();
   await expect(page.locator('#transfer-notes')).toHaveValue('Keep me');expect(writes).toHaveLength(1);
  });
  test('TSTR-038 Cancel editing resets create form without any PATCH',async({page})=>{
@@ -349,7 +349,7 @@ test.describe('Stock Transfers — draft validation, mutation governance and aud
  });
  test('TSTR-041 Declining native execution confirmation sends no POST',async({page})=>{
   const {writes}=await openTransferCase(page,{},selectedUrl);
-  page.once('dialog',async dialog=>{expect(dialog.message()).toContain('Execute this stock transfer?');await dialog.dismiss();});
+  page.once('dialog',async dialog=>{expect(dialog.message()).toContain('Confirm action: Execute transfer?');await dialog.dismiss();});
   await page.getByRole('button',{name:'Execute transfer'}).click();
   expect(writes).toHaveLength(0);await expect(page.getByRole('button',{name:'Edit draft'})).toBeVisible();
  });
@@ -363,7 +363,7 @@ test.describe('Stock Transfers — draft validation, mutation governance and aud
  test('TSTR-043 Execution API rejection leaves draft actions available and shows error',async({page})=>{
   const {writes}=await openTransferCase(page,{executeStatus:409},selectedUrl);
   page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Execute transfer'}).click();
-  await expect(page.getByText('Execution rejected',{exact:false})).toBeVisible();
+  await expect(page.getByRole('alert').filter({hasText:'Execution rejected'})).toBeVisible();
   await expect(page.getByRole('button',{name:'Edit draft'})).toBeVisible();expect(writes).toHaveLength(1);
  });
  test('TSTR-044 Declining cancellation confirmation leaves draft and sends no mutation',async({page})=>{

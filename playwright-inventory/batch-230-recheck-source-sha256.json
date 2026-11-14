@@ -1,0 +1,41 @@
+{
+  "tenant/alerts/alerts.spec.ts": {
+    "before_sha256": "2af12d3306161273820d0fac2a7027083b5192eef5d0e903ac40127600850664",
+    "after_sha256": "0bebe256165e1d6134011086a4bca3bd3a3fd32c83da5a4711069cedb5c781d8",
+    "selected_ids": [
+      "TALERT-049"
+    ]
+  },
+  "tenant/products/products.spec.ts": {
+    "before_sha256": "7cb6f6701c944092aa209e6e2e27f4eac747262c0af531e0051f76ea66bb6047",
+    "after_sha256": "51d287ca8ac0878fecfa4200384839f23a758a86b8d0ac4974479c3b2a9ebab1",
+    "selected_ids": [
+      "TPROD-064"
+    ]
+  },
+  "tenant/shipments/shipments.spec.ts": {
+    "before_sha256": "67fe0e2f24d71ea1f546fb69a57b686559e34b2f55b801c6fafec233b2a4a0ab",
+    "after_sha256": "f78829e8a7998e1441bca7cb598aa287d74c0feca7d67f5e32db0bbdc064f158",
+    "selected_ids": [
+      "TSH-029"
+    ]
+  },
+  "tenant/stock-transfers/stock-transfers.spec.ts": {
+    "before_sha256": "499a8231d4b463c9b7d659d6d12279d381d7852e86c2bab3cae1e52f8e9639a3",
+    "after_sha256": "86022ede1772138aa701fb55d40e26ccf990433dc59ea3a0d5376571ba8dd35d",
+    "selected_ids": [
+      "TSTR-034",
+      "TSTR-037",
+      "TSTR-041",
+      "TSTR-043"
+    ]
+  },
+  "tenant/suppliers/suppliers.spec.ts": {
+    "before_sha256": "bf050619db06abe2f5fe4fa4c5b283d96ecc6043c42e1308063839668e41320b",
+    "after_sha256": "c803cfcf0a689143da3c014a2c50fef0d390183e4d2f0a035aee902020bd2d5b",
+    "selected_ids": [
+      "TSUP-026",
+      "TSUP-043"
+    ]
+  }
+}

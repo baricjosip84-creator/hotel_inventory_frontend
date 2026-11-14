@@ -11,8 +11,23 @@ const second=JSON.parse(fs.readFileSync(path.join(root,'batch-229-recheck2-sourc
 const fourth=JSON.parse(fs.readFileSync(path.join(root,'batch-229-recheck4-product-source-sha256.json'),'utf8'));
 const fifth=JSON.parse(fs.readFileSync(path.join(root,'batch-229-recheck5-product-source-sha256.json'),'utf8'));
 const sixth=JSON.parse(fs.readFileSync(path.join(root,'batch-229-recheck6-product-source-sha256.json'),'utf8'));
+const b230Reviewed=JSON.parse(fs.readFileSync(path.join(root,'batch-230-recheck-source-sha256.json'),'utf8'));
+const b230Bodies=JSON.parse(fs.readFileSync(path.join(root,'batch-230-recheck-body-sha256.json'),'utf8'));
+export function assertHistoricalBodyCompatible(id, actual, historical, message='Historical body drift') {
+ if(actual===historical) return;
+ const review=b230Bodies[id];
+ assert(review, `${message}: unreviewed body ${id}`);
+ assert.equal(historical,review.before_sha256,`${message}: unknown baseline ${id}`);
+ assert.equal(actual,review.after_sha256,`${message}: unexpected revised body ${id}`);
+}
 export function assertHistoricalSourceCompatible(filename, actual, historical, message='Historical source drift') {
   if(actual===historical) return;
+  const reviewed230=b230Reviewed[filename.replace(/^tests\//,'').replaceAll('\\','/')];
+  if(reviewed230 && actual===reviewed230.after_sha256 && reviewed230.before_sha256!==reviewed230.after_sha256){
+    // Exact reviewed post-recheck source; recursively validate historical provenance.
+    assertHistoricalSourceCompatible(filename,reviewed230.before_sha256,historical,message);
+    return;
+  }
   const relative=filename.replace(/^tests\//,'').replaceAll('\\','/');
   const reviewed=pinned[relative];
   assert(reviewed, `${message}: unreviewed file ${relative}`);

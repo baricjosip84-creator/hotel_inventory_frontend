@@ -325,7 +325,7 @@ test.describe('Suppliers — shipment performance, SLA and section refresh', () 
   test('TSUP-026 delivery SLA row shows overdue count and opens its supplier performance', async ({ page }) => {
     const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Delivery Follow-up' }) }).first();
     const row = section.getByRole('row').filter({ hasText: 'Synthetic Harbor Foods' });
-    await expect(row.getByText('2')).toBeVisible();
+    await expect(row.locator('span').filter({hasText:/^2$/})).toBeVisible();
     await row.getByRole('button', { name: 'View performance' }).click();
     await expect(page.locator('#supplier-performance-panel')).toBeVisible();
   });
@@ -546,7 +546,7 @@ test.describe('Suppliers — refresh, concurrency and delivery edge cases (Batch
     }));
     await page.reload();
     await expect(supplierRow(page)).toBeVisible();
-    await expect(page.getByText('Shipment performance unavailable for your current permissions')).toBeVisible();
+    await expect(page.locator('.app-empty-state').filter({hasText:'Shipment performance unavailable for your current permissions'})).toBeVisible();
     await expect(supplierRow(page).getByRole('button', { name: 'View performance' })).toHaveCount(0);
     await expect(page.locator('#supplier-performance-panel')).toHaveCount(0);
   });

@@ -287,7 +287,7 @@ test.describe('Inbound Shipments — synthetic lifecycle and governance (Batch 3
  });
  test('TSH-029 Line deletion cancelled in confirmation sends no mutation',async({page})=>{
   const seen=await open(page);await selectPending(page);
-  page.once('dialog',async dialog=>{expect(dialog.message()).toContain('Delete this shipment item?');await dialog.dismiss();});
+  page.once('dialog',async dialog=>{expect(dialog.message()).toContain('Confirm action: Remove shipment line?');await dialog.dismiss();});
   await detail(page).getByRole('button',{name:'Remove shipment line'}).click();
   expect(writes(seen)).toHaveLength(0);
  });

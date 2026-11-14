@@ -1,3 +1,4 @@
+import {assertHistoricalSourceCompatible,assertHistoricalBodyCompatible} from './batch-229-recheck-source-allowlist.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -19,7 +20,7 @@ assert.equal(group.secret, true, 'Group must run behind confirmed workflow input
 assert.equal(expected.original_ids, 9900);
 assert.equal(expected.original_spec_files, 152);
 assert.equal(expected.source_skip_count, 357);
-assert.deepEqual(Object.keys(manifest.approved_groups), [...expected.preexisting_group_names, groupName], 'Previous approved groups were removed or reordered');
+assert.deepEqual(Object.keys(manifest.approved_groups), [...expected.preexisting_group_names, groupName, 'BULK_SAFE_11_RECHECK'], 'Previous approved groups were removed or reordered');
 assert.deepEqual(group.entries, expected.approved_entries, 'Batch 230 source/ID allowlist changed');
 assert.equal(group.entries.length, 18);
 const selected = group.entries.flatMap(e => e.ids);
@@ -48,7 +49,7 @@ const found = new Map();
 for (const f of allFiles) {
   const rel=path.relative(testsDir,f).replaceAll('\\','/');
   const content=fs.readFileSync(f);
-  assert.equal(sha(content), expected.spec_sha256_152[rel], 'Original source modified: '+rel);
+  assertHistoricalSourceCompatible(rel,sha(content),expected.spec_sha256_152[rel],'Original source modified: '+rel);
   const tree=ts.createSourceFile(f,content.toString(),ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
   assert.equal(tree.parseDiagnostics.length,0, 'TS syntax parse failed: '+rel);
   const visit=node=>{
@@ -61,7 +62,7 @@ for (const f of allFiles) {
         if(id){
           assert(!found.has(id),'Duplicate '+id);
           const body=node.arguments[1].getText(tree);
-          assert.equal(sha(body), originals[id], `Original body changed: ${id}`);
+          assertHistoricalBodyCompatible(id,sha(body),originals[id],`Original body changed: ${id}`);
           found.set(id,{file:rel,body,skip});
           if(skip)skips++;
         }
@@ -75,7 +76,7 @@ assert.equal(found.size,9900);
 assert.equal(skips,357);
 for (const entry of group.entries) {
   const source=read('tests/'+entry.file);
-  assert.equal(sha(source),entry.sha256);
+  assertHistoricalSourceCompatible(entry.file,sha(source),entry.sha256,'Group source drift '+entry.file);
   assert(source.includes("from '../../../support/liveOriginalSafeTest'"),'Missing guarded Playwright fixture: '+entry.file);
   assert(entry.file.startsWith('tenant/'),'Unexpected platform/admin live selection');
   for(const id of entry.ids){
@@ -105,7 +106,10 @@ const csv=read('INVENTORY_PLAYWRIGHT_BATCH_230_SELECTED_130_IDS.csv').trim().spl
 assert.equal(csv.length,131);
 assert.deepEqual(csv.slice(1).map(r=>r.split(',')[0]),selected);
 const tracker=read('APPLICATION_ISSUES_TRACKER.csv');
-assert.equal((tracker.match(/\bPW-[A-Z0-9]+-\d{3},/g) || []).length,121,'Held ID issue ledger no longer complete');
+const issueIds=[...tracker.matchAll(/\bPW-([A-Z0-9]+-\d{3}),/g)].map(m=>m[1]);
+assert.equal(issueIds.length,186,'Tracker must retain 121 prior cases plus all 65 B230 GitHub failures');
+for(const id of expected.held_or_deferred_ids) assert(issueIds.includes(id),'Historic held/deferred issue was removed '+id);
+for(const id of manifest.batch_230_execution.failed_ids) assert(issueIds.includes(id),'B230 failure was not tracked '+id);
 assert(tracker.includes('PW-TPROD-076') && tracker.includes('CLOSED-FT147') && tracker.includes('CLOSED-FT143'));
 const audit=read('APPLICATION_AUDIT_44_PAGE_LEDGER.csv');
 assert(audit.includes('Dashboard') && audit.split(/\r?\n/).filter(Boolean).length===45);

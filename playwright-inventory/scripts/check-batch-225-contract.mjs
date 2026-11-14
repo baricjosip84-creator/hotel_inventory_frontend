@@ -1,3 +1,4 @@
+import {assertHistoricalSourceCompatible} from './batch-229-recheck-source-allowlist.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -40,7 +41,7 @@ assert.equal(Object.keys(b.batch_224_green_test_body_sha256).length,22);
 const testBodies=new Map();
 for(const e of group.entries){
  const full='tests/'+e.file, code=read(full);
- assert.equal(sha(code),e.sha256,'SHA mismatch for '+full);
+ assertHistoricalSourceCompatible(e.file,sha(code),e.sha256,'SHA mismatch for '+full);
  assert.equal(b.spec_sha256[e.file],e.sha256);
  assert(code.includes("from '../../../support/liveOriginalSafeTest'"),'Missing production write guard import');
  const ast=ts.createSourceFile(full,code,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
@@ -64,7 +65,7 @@ for(const e of group.entries){
  }
  for(const [oldName,oldGroup] of Object.entries(m.approved_groups)){
   for(const other of oldGroup.entries??[oldGroup]){
-   if(other.file===e.file)assert.equal(other.sha256,e.sha256,'Reviewed source SHA not rebased '+oldName+'/'+e.file);
+   if(other.file===e.file) { if(oldName==='BULK_SAFE_11_RECHECK') assertHistoricalSourceCompatible(e.file,other.sha256,e.sha256,'Reviewed B230 subsequent source pin '+e.file); else assert.equal(other.sha256,e.sha256,'Reviewed source SHA not rebased '+oldName+'/'+e.file); }
   }
  }
 }

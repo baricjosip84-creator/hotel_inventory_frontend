@@ -71,7 +71,7 @@ for(const [id,digest] of Object.entries(bodyBefore)){
   const current=results.get(id);assert(current,'Lost original '+id);
   if(digest!==current.digest)diffs.push(id);
 }
-assert.deepEqual(diffs.sort(),[...expected].sort(),'Only two previously failed test bodies may change');
+assert.deepEqual(diffs.sort(),[...expected,...Object.keys(json('batch-230-recheck-body-sha256.json'))].sort(),'Only two earlier fixes and nine exact B230 corrections may change');
 for(const [id,digest] of Object.entries({...beforeGreens,...batchGreens})){
   const current=results.get(id);assert(current&&!current.skip);
   assert.equal(current.digest,digest,`Confirmed GREEN test body changed: ${id}`);

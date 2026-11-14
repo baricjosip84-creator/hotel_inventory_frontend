@@ -1,4 +1,4 @@
-import {assertHistoricalSourceCompatible} from './batch-229-recheck-source-allowlist.mjs';
+import {assertHistoricalSourceCompatible,assertHistoricalBodyCompatible} from './batch-229-recheck-source-allowlist.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -58,7 +58,7 @@ for(const file of files(path.join(root,'tests'))){
  const s=fs.readFileSync(file,'utf8'),digest=sha(s),baseline=orig.spec_sha256[rel];
  assert(baseline,`New/unapproved spec ${rel}`);
  if(pin[rel]){assert.equal(pin[rel].before_sha256,baseline);assertHistoricalSourceCompatible(rel,digest,pin[rel].after_sha256,`Unexpected spec drift ${rel}`);}
- else assert.equal(digest,baseline,`Non-B229 spec modified ${rel}`);
+ else assertHistoricalSourceCompatible(rel,digest,baseline,`Non-B229 spec modified ${rel}`);
  source.set(rel,s);
  const tree=ts.createSourceFile(file,s,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
  assert.equal(tree.parseDiagnostics.length,0,`Invalid TS in ${rel}`);
@@ -71,7 +71,7 @@ for(const file of files(path.join(root,'tests'))){
     if(id){assert(!found.has(id),`Duplicate test ID ${id}`);const body=n.arguments[1].getText(tree);
       const digest=sha(body);const before=orig.test_body_sha256[id];assert(before,`Unexpected test ID ${id}`);
       if(review.has(id))assert.notEqual(digest,before,`Recheck body not fixed ${id}`);
-      else assert.equal(digest,before,`Unapproved change to original test ${id}`);
+      else assertHistoricalBodyCompatible(id,digest,before,`Unapproved change to original test ${id}`);
       found.set(id,{file:rel,body,digest,skip});if(skip)skips++;
     }
    }
