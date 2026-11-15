@@ -54,6 +54,7 @@ on:
           - BULK_SAFE_12
           - BULK_SAFE_13
           - BULK_SAFE_14
+          - BULK_SAFE_14_RECHECK
       confirmation:
         description: 'Type ORIGINALTESTS to run the selected group'
         required: true
@@ -86,7 +87,7 @@ jobs:
           node-version: '22'
       - name: Install original suite dependencies
         run: npm install --no-audit --no-fund
-      - name: Update frozen historical menu assertions for the three reviewed CI-only groups
+      - name: Update frozen historical menu assertions for the four reviewed CI-only groups
         run: node scripts/extend-b232-legacy-menu-assertions.mjs
       - name: Verify all scenario IDs, reviewed fingerprints, and bulk authentication isolation
         run: |
@@ -141,6 +142,13 @@ jobs:
         run: |
           node scripts/check-batch-233-contract.mjs
           node scripts/prepare-batch-233-runtime.mjs
+      - name: Prepare Batch 233 recheck (40 corrected failed originals only)
+        if: ${{ inputs.group == 'BULK_SAFE_14_RECHECK' }}
+        run: |
+          node scripts/check-batch-233-contract.mjs
+          node scripts/check-batch-233-recheck-contract.mjs
+          node scripts/prepare-batch-233-runtime.mjs
+          node scripts/prepare-batch-233-recheck-runtime.mjs
       - name: Discover all 9,900 authored original tests (no browser, no credentials)
         if: ${{ inputs.group == 'DISCOVER_ALL' }}
         env:
@@ -182,7 +190,7 @@ jobs:
           PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
           PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
         run: |
-          if [[ "${{ inputs.group }}" == "BULK_SAFE_12" || "${{ inputs.group }}" == "BULK_SAFE_13" || "${{ inputs.group }}" == "BULK_SAFE_14" ]]; then
+          if [[ "${{ inputs.group }}" == "BULK_SAFE_12" || "${{ inputs.group }}" == "BULK_SAFE_13" || "${{ inputs.group }}" == "BULK_SAFE_14" || "${{ inputs.group }}" == "BULK_SAFE_14_RECHECK" ]]; then
             npx playwright test --config=playwright.live-original.config.ts --workers=1
           else
             npx playwright test --config=playwright.live-original.config.ts

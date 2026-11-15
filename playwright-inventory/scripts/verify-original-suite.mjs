@@ -240,11 +240,12 @@ const runnerOnly = [
   { group: 'BULK_SAFE_12', batch: 231, count: 180 },
   { group: 'BULK_SAFE_13', batch: 232, count: 240 },
   { group: 'BULK_SAFE_14', batch: 233, count: 500 },
+  { group: 'BULK_SAFE_14_RECHECK', batch: '233-recheck', count: 40 },
 ];
 assert.deepEqual(
   declared,
   ['DISCOVER_ALL', ...Object.keys(manifest.approved_groups), ...runnerOnly.map(x => x.group)],
-  'Workflow group menu must match the reviewed manifest plus exactly B231/B232/B233 ephemeral groups'
+  'Workflow group menu must match the reviewed manifest plus exactly B231/B232/B233 and B233 recheck ephemeral groups'
 );
 assert.equal(new Set(declared).size, declared.length, 'Duplicate live group choice');
 for (const { group, batch, count } of runnerOnly) {

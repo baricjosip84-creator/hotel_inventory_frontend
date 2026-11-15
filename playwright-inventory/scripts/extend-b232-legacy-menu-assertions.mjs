@@ -10,7 +10,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repo = path.dirname(root);
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'original-suite-approved.json'), 'utf8'));
 const historical = Object.keys(manifest.approved_groups);
-const runnerGroups = ['BULK_SAFE_12', 'BULK_SAFE_13', 'BULK_SAFE_14'];
+const runnerGroups = ['BULK_SAFE_12', 'BULK_SAFE_13', 'BULK_SAFE_14', 'BULK_SAFE_14_RECHECK'];
 for (const group of runnerGroups) {
   assert(!Object.hasOwn(manifest.approved_groups, group), `${group} must not mutate the permanent manifest`);
 }
@@ -20,7 +20,7 @@ assert(options, 'Original workflow group menu not found');
 const names = [...options[1].matchAll(/^\s{10}-\s+([A-Z0-9_]+)\s*$/gm)].map(m => m[1]);
 assert.deepEqual(names, ['DISCOVER_ALL', ...historical, ...runnerGroups], 'Unexpected workflow group or group order');
 assert.equal(new Set(names).size, names.length, 'Duplicate workflow group choices');
-for (const [batch, group, count] of [[231, 'BULK_SAFE_12', 180], [232, 'BULK_SAFE_13', 240], [233, 'BULK_SAFE_14', 500]]) {
+for (const [batch, group, count] of [[231, 'BULK_SAFE_12', 180], [232, 'BULK_SAFE_13', 240], [233, 'BULK_SAFE_14', 500], ['233-recheck', 'BULK_SAFE_14_RECHECK', 40]]) {
   const review = JSON.parse(fs.readFileSync(path.join(root, `batch-${batch}-review.json`), 'utf8'));
   assert.equal(review.group, group, `Review group mismatch: ${group}`);
   assert.equal(review.batch, batch, `Review batch mismatch: ${group}`);
@@ -50,10 +50,11 @@ for (const file of files) {
   const matches = [...original.matchAll(matcher)];
   assert.equal(matches.length, 1, `${file}: expected exactly one frozen historical menu assertion`);
   const oldExpression = matches[0][0];
-  const updated = original.replace(oldExpression, `${oldExpression.slice(0, -1)},'BULK_SAFE_12','BULK_SAFE_13','BULK_SAFE_14']`);
-  assert.equal(updated.replace(`${oldExpression.slice(0, -1)},'BULK_SAFE_12','BULK_SAFE_13','BULK_SAFE_14']`, oldExpression), original, `${file}: unrelated source was modified`);
+  const extended = `${oldExpression.slice(0, -1)},${runnerGroups.map(g=>`'${g}'`).join(',')}]`;
+  const updated = original.replace(oldExpression, extended);
+  assert.equal(updated.replace(extended, oldExpression), original, `${file}: unrelated source was modified`);
   fs.writeFileSync(filename, updated, 'utf8');
   patched++;
 }
 assert.equal(patched, 10);
-console.log('PASS B233 legacy menu compatibility: exactly 10 historical assertions extended by 3 reviewed IDs; fail-closed menu and test-source checks preserved.');
+console.log('PASS B233 legacy menu compatibility: exactly 10 historical assertions extended by 4 reviewed IDs; fail-closed menu and test-source checks preserved.');

@@ -1,0 +1,501 @@
+﻿test_id,status,file,evidence,classification
+TAS-001,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-002,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-003,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-004,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-005,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-006,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-007,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-008,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-009,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-010,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-011,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-012,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-013,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-014,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-015,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-016,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-017,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-018,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-024,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-025,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-028,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-029,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-030,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-031,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-032,HELD_NEEDS_TRIAGE,tenant/automation-schedules/automation-schedules.spec.ts,"Error: expect(received).toBe(expected) // Object.is equality | > 360 |     await expect.poll(() => posted(calls, `/automation-schedules/${scheduleId}/pause`).length).toBe(1);",unverified test or application behavior
+TAS-033,HELD_NEEDS_TRIAGE,tenant/automation-schedules/automation-schedules.spec.ts,Error: expect(locator).toContainText(expected) failed | > 367 |     await expect(modal(page)).toContainText('Activate schedule');,unverified test or application behavior
+TAS-034,HELD_NEEDS_TRIAGE,tenant/automation-schedules/automation-schedules.spec.ts,"Test timeout of 90000ms exceeded. | > 375 |     await modal(page).getByRole('button', { name: 'Confirm' }).click();",unverified test or application behavior
+TAS-035,HELD_NEEDS_TRIAGE,tenant/automation-schedules/automation-schedules.spec.ts,"Error: expect(locator).toBeDisabled() failed | > 382 |     await expect(modal(page).getByRole('button', { name: 'Confirm' })).toBeDisabled();",unverified test or application behavior
+TAS-036,HELD_NEEDS_TRIAGE,tenant/automation-schedules/automation-schedules.spec.ts,Test timeout of 90000ms exceeded. | > 391 |     await modal(page).getByLabel('Disable reason').fill('  New governance policy  ');,unverified test or application behavior
+TAS-037,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-038,RECHECK_PENDING,tenant/automation-schedules/automation-schedules.spec.ts,Error: expect(locator).toBeVisible() failed | Error: strict mode violation: locator('#automation-schedule-detail').getByText('Preview only') resolved to 2 elements: | > 408 |     await expect(detail(page).getByText('Preview only')).toBeVisible();,test defect (ambiguous locator / unsupported matcher)
+TAS-039,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-040,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-041,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-042,RECHECK_PENDING,tenant/automation-schedules/automation-schedules.spec.ts,Error: expect(locator).toContainText(expected) failed | Error: strict mode violation: getByRole('status') resolved to 2 elements: | > 438 |     await expect(page.getByRole('status')).toContainText('No duplicate request was created');,test defect (ambiguous locator / unsupported matcher)
+TAS-043,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-044,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-045,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-046,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-047,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-048,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TAS-049,PASS,tenant/automation-schedules/automation-schedules.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-001,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-002,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-003,RECHECK_PENDING,tenant/ai-copilot/ai-copilot.spec.ts,"Error: expect(locator).toHaveValue(expected) failed | Error: strict mode violation: locator('form[data-skip-global-action-feedback=""true""]').getByLabel('Analysis type') resolved to 2 elements: | > 58 |   await expect(analysisPanel(page).getByLabel('Analysis type')).toHaveValue('operational_priority_summary');",test defect (ambiguous locator / unsupported matcher)
+TCOP-004,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-005,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-006,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-007,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-008,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-009,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-010,HELD_NEEDS_TRIAGE,tenant/ai-copilot/ai-copilot.spec.ts,Error: expect(locator).toContainText(expected) failed | >  98 |   await expect(historyList(page)).toContainText('Completed');,unverified test or application behavior
+TCOP-011,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-012,HELD_NEEDS_TRIAGE,tenant/ai-copilot/ai-copilot.spec.ts,Error: expect(locator).toContainText(expected) failed | > 110 |   await expect(page.locator('.ai-copilot-result')).toContainText('Synthetic stock and alert evidence summary');,unverified test or application behavior
+TCOP-013,HELD_NEEDS_TRIAGE,tenant/ai-copilot/ai-copilot.spec.ts,Error: expect(locator).toContainText(expected) failed | > 117 |   await expect(page.locator('.ai-copilot-result')).toContainText('Synthetic stock and alert evidence summary');,unverified test or application behavior
+TCOP-014,HELD_NEEDS_TRIAGE,tenant/ai-copilot/ai-copilot.spec.ts,Error: expect(locator).toContainText(expected) failed | > 122 |   await expect(page.locator('.ai-copilot-result')).toContainText('Synthetic unresolved alert');,unverified test or application behavior
+TCOP-015,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-016,HELD_NEEDS_TRIAGE,tenant/ai-copilot/ai-copilot.spec.ts,TypeError: Invalid URL | > 134 |   await expect.poll(()=>new URL(query).searchParams.get('search')).toBe('Synthetic');,test defect (poll callback throws before request)
+TCOP-017,HELD_NEEDS_TRIAGE,tenant/ai-copilot/ai-copilot.spec.ts,TypeError: Invalid URL | > 140 |   await expect.poll(()=>new URL(query).searchParams.get('intent')).toBe('supplier_performance_summary');,test defect (poll callback throws before request)
+TCOP-018,HELD_NEEDS_TRIAGE,tenant/ai-copilot/ai-copilot.spec.ts,"Test timeout of 90000ms exceeded. | > 145 |   await page.getByLabel('Result',{exact:true}).selectOption('failed');",unverified test or application behavior
+TCOP-019,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-021,HELD_NEEDS_TRIAGE,tenant/ai-copilot/ai-copilot.spec.ts,TypeError: Invalid URL | > 210 |   await expect.poll(()=>new URL(url).searchParams.get('product_search')).toBe('synthetic coffee');,test defect (poll callback throws before request)
+TCOP-022,HELD_NEEDS_TRIAGE,tenant/ai-copilot/ai-copilot.spec.ts,"Test timeout of 90000ms exceeded. | > 217 |   await page.getByLabel('Result',{exact:true}).selectOption('failed');",unverified test or application behavior
+TCOP-023,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-024,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-025,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-026,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-027,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-029,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-031,RECHECK_PENDING,tenant/ai-copilot/ai-copilot.spec.ts,"Error: locator.selectOption: Error: strict mode violation: locator('form[data-skip-global-action-feedback=""true""]').getByLabel('Analysis type') resolved to 2 elements: | > 280 |   await openCopilot(page);await analysisPanel(page).getByLabel('Analysis type').selectOption('product_risk_explanation');",test defect (ambiguous locator / unsupported matcher)
+TCOP-032,RECHECK_PENDING,tenant/ai-copilot/ai-copilot.spec.ts,"Error: locator.selectOption: Error: strict mode violation: locator('form[data-skip-global-action-feedback=""true""]').getByLabel('Analysis type') resolved to 2 elements: | > 288 |   await analysisPanel(page).getByLabel('Analysis type').selectOption('product_risk_explanation');",test defect (ambiguous locator / unsupported matcher)
+TCOP-033,RECHECK_PENDING,tenant/ai-copilot/ai-copilot.spec.ts,"Error: locator.selectOption: Error: strict mode violation: locator('form[data-skip-global-action-feedback=""true""]').getByLabel('Analysis type') resolved to 2 elements: | > 199 |  await analysisPanel(page).getByLabel('Analysis type').selectOption(intent);",test defect (ambiguous locator / unsupported matcher)
+TCOP-034,RECHECK_PENDING,tenant/ai-copilot/ai-copilot.spec.ts,"Error: locator.selectOption: Error: strict mode violation: locator('form[data-skip-global-action-feedback=""true""]').getByLabel('Analysis type') resolved to 2 elements: | > 199 |  await analysisPanel(page).getByLabel('Analysis type').selectOption(intent);",test defect (ambiguous locator / unsupported matcher)
+TCOP-035,RECHECK_PENDING,tenant/ai-copilot/ai-copilot.spec.ts,"Error: locator.selectOption: Error: strict mode violation: locator('form[data-skip-global-action-feedback=""true""]').getByLabel('Analysis type') resolved to 2 elements: | > 199 |  await analysisPanel(page).getByLabel('Analysis type').selectOption(intent);",test defect (ambiguous locator / unsupported matcher)
+TCOP-036,RECHECK_PENDING,tenant/ai-copilot/ai-copilot.spec.ts,"Error: locator.selectOption: Error: strict mode violation: locator('form[data-skip-global-action-feedback=""true""]').getByLabel('Analysis type') resolved to 2 elements: | > 199 |  await analysisPanel(page).getByLabel('Analysis type').selectOption(intent);",test defect (ambiguous locator / unsupported matcher)
+TCOP-037,RECHECK_PENDING,tenant/ai-copilot/ai-copilot.spec.ts,"Error: locator.selectOption: Error: strict mode violation: locator('form[data-skip-global-action-feedback=""true""]').getByLabel('Analysis type') resolved to 2 elements: | > 199 |  await analysisPanel(page).getByLabel('Analysis type').selectOption(intent);",test defect (ambiguous locator / unsupported matcher)
+TCOP-038,RECHECK_PENDING,tenant/ai-copilot/ai-copilot.spec.ts,"Error: locator.selectOption: Error: strict mode violation: locator('form[data-skip-global-action-feedback=""true""]').getByLabel('Analysis type') resolved to 2 elements: | > 199 |  await analysisPanel(page).getByLabel('Analysis type').selectOption(intent);",test defect (ambiguous locator / unsupported matcher)
+TCOP-039,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-040,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-041,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-042,RECHECK_PENDING,tenant/ai-copilot/ai-copilot.spec.ts,"Error: expect(locator).toHaveValue(expected) failed | Error: strict mode violation: locator('form[data-skip-global-action-feedback=""true""]').getByLabel('Analysis type') resolved to 2 elements: | > 374 |   await expect(analysisPanel(page).getByLabel('Analysis type')).toHaveValue('operational_priority_summary');",test defect (ambiguous locator / unsupported matcher)
+TCOP-043,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-046,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-047,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-048,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-049,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TCOP-050,PASS,tenant/ai-copilot/ai-copilot.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-021,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-022,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-023,RECHECK_PENDING,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,Error: expect(locator).toBeVisible() failed | Error: strict mode violation: getByText('Fixture validation rejected') resolved to 2 elements: | > 181 |     await expect(page.getByText('Fixture validation rejected')).toBeVisible();,test defect (ambiguous locator / unsupported matcher)
+TEI-024,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-025,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-026,RECHECK_PENDING,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,Error: expect(locator).toBeVisible() failed | Error: strict mode violation: getByText('Fixture validation rejected') resolved to 2 elements: | > 212 |     await expect(page.getByText('Fixture validation rejected')).toBeVisible();,test defect (ambiguous locator / unsupported matcher)
+TEI-027,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-028,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-029,HELD_NEEDS_TRIAGE,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,Test timeout of 90000ms exceeded.,unverified test or application behavior
+TEI-030,HELD_NEEDS_TRIAGE,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,Test timeout of 90000ms exceeded.,unverified test or application behavior
+TEI-032,HELD_NEEDS_TRIAGE,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,"Error: Approved tenant login failed on both isolated attempts | > 151 |           throw new Error('Approved tenant login failed on both isolated attempts', { cause: secondError });",environment/authentication
+TEI-033,HELD_NEEDS_TRIAGE,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,Test timeout of 90000ms exceeded.,unverified test or application behavior
+TEI-034,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-035,HELD_NEEDS_TRIAGE,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,Test timeout of 90000ms exceeded.,unverified test or application behavior
+TEI-036,RECHECK_PENDING,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,"TypeError: (0 , _liveOriginalSafeTest.expect)(...).toBeInvalid is not a function | > 289 |     await expect(form.getByLabel('Counted quantity')).toBeInvalid();",test defect (ambiguous locator / unsupported matcher)
+TEI-038,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-040,RECHECK_PENDING,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,Error: expect(locator).toBeVisible() failed | Error: strict mode violation: getByText('Fixture validation rejected') resolved to 2 elements: | > 321 |     await expect(page.getByText('Fixture validation rejected')).toBeVisible();,test defect (ambiguous locator / unsupported matcher)
+TEI-041,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-042,HELD_NEEDS_TRIAGE,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,Error: expect(locator).toBeVisible() failed | > 338 |     await expect(returnDraft(page).getByText('Add one or more received lots from the same supplier.')).toBeVisible();,unverified test or application behavior
+TEI-043,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-044,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-045,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-046,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-048,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-049,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-050,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-051,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-052,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-053,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-054,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-055,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-056,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-058,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-059,RECHECK_PENDING,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,"Error: locator.selectOption: Error: strict mode violation: getByRole('heading', { name: 'Manual supplier-product link', exact: true }).locator('..').getByLabel('Supplier') resolved to 4 elements: | > 479 |     await form.getByLabel('Supplier').selectOption(supplierId);",test defect (ambiguous locator / unsupported matcher)
+TEI-060,RECHECK_PENDING,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,"Error: locator.selectOption: Error: strict mode violation: getByRole('heading', { name: 'Manual supplier-product link', exact: true }).locator('..').getByLabel('Supplier') resolved to 4 elements: | > 486 |     await form.getByLabel('Supplier').selectOption(supplierId);",test defect (ambiguous locator / unsupported matcher)
+TEI-061,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-062,RECHECK_PENDING,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,"Error: locator.selectOption: Error: strict mode violation: getByRole('heading', { name: 'Manual supplier-product link', exact: true }).locator('..').getByLabel('Supplier') resolved to 4 elements: | > 504 |     await form.getByLabel('Supplier').selectOption(supplierId);",test defect (ambiguous locator / unsupported matcher)
+TEI-064,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-065,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-066,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-069,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-071,RECHECK_PENDING,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,"Error: locator.selectOption: Error: strict mode violation: getByRole('heading', { name: 'Create printable barcode label', exact: true }).locator('..').getByLabel('Product') resolved to 2 elements: | > 606 |     await form.getByLabel('Product').selectOption(productId);",test defect (ambiguous locator / unsupported matcher)
+TEI-072,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-073,HELD_NEEDS_TRIAGE,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 626 |     await page.getByRole('row').filter({ hasText: 'PW-LOT' }).getByRole('button', { name: 'Print', exact: true }).click();",unverified test or application behavior
+TEI-074,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-076,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-077,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-078,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-079,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-080,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-081,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-082,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-083,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-085,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-086,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-087,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-088,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TEI-089,PASS,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-001,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-002,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-003,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-004,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-005,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-006,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-007,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-008,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-009,HELD_NEEDS_TRIAGE,tenant/execution-tasks/execution-tasks.spec.ts,"Test timeout of 90000ms exceeded. | > 120 |     await queue(page).getByLabel('Status', { exact: true }).selectOption('in_progress');",unverified test or application behavior
+TET-010,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-011,HELD_NEEDS_TRIAGE,tenant/execution-tasks/execution-tasks.spec.ts,"Test timeout of 90000ms exceeded. | > 130 |     await queue(page).getByLabel('Priority', { exact: true }).selectOption('urgent');",unverified test or application behavior
+TET-012,HELD_NEEDS_TRIAGE,tenant/execution-tasks/execution-tasks.spec.ts,"Test timeout of 90000ms exceeded. | > 135 |     await queue(page).getByLabel('Source', { exact: true }).selectOption('reservation');",unverified test or application behavior
+TET-013,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-014,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-015,HELD_NEEDS_TRIAGE,tenant/execution-tasks/execution-tasks.spec.ts,Test timeout of 90000ms exceeded.,unverified test or application behavior
+TET-016,HELD_NEEDS_TRIAGE,tenant/execution-tasks/execution-tasks.spec.ts,Test timeout of 90000ms exceeded.,unverified test or application behavior
+TET-017,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-018,HELD_NEEDS_TRIAGE,tenant/execution-tasks/execution-tasks.spec.ts,"Test timeout of 90000ms exceeded. | > 168 |     await queue(page).getByLabel('Priority', { exact: true }).selectOption('high');",unverified test or application behavior
+TET-019,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-020,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-021,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-022,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-023,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-024,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-025,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-026,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-031,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-033,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-034,HELD_NEEDS_TRIAGE,tenant/execution-tasks/execution-tasks.spec.ts,Error: expect(received).toBe(expected) // Object.is equality | > 328 |     await expect.poll(() => calls.some(c => c.path === `/execution-tasks/${taskId}/ready` && c.method === 'POST')).toBe(true);,unverified test or application behavior
+TET-035,HELD_NEEDS_TRIAGE,tenant/execution-tasks/execution-tasks.spec.ts,Test timeout of 90000ms exceeded. | > 334 |     await dialog.getByLabel('Assign to').selectOption('');,unverified test or application behavior
+TET-036,HELD_NEEDS_TRIAGE,tenant/execution-tasks/execution-tasks.spec.ts,"Error: expect(locator).toBeDisabled() failed | > 343 |     await expect(page.getByRole('dialog').getByLabel('Assign to').locator(`option[value=""${restricted.id}""]`)).toBeDisabled();",unverified test or application behavior
+TET-037,HELD_NEEDS_TRIAGE,tenant/execution-tasks/execution-tasks.spec.ts,Test timeout of 90000ms exceeded. | > 349 |     await dialog.getByLabel('Assign to').selectOption(person.id);,unverified test or application behavior
+TET-038,HELD_NEEDS_TRIAGE,tenant/execution-tasks/execution-tasks.spec.ts,Test timeout of 90000ms exceeded. | > 357 |     await page.getByRole('dialog').getByLabel('Blocked reason').fill('  ');,unverified test or application behavior
+TET-039,HELD_NEEDS_TRIAGE,tenant/execution-tasks/execution-tasks.spec.ts,Test timeout of 90000ms exceeded. | > 364 |     await page.getByRole('dialog').getByLabel('Blocked reason').fill('  Waiting for delivery  ');,unverified test or application behavior
+TET-040,HELD_NEEDS_TRIAGE,tenant/execution-tasks/execution-tasks.spec.ts,Error: expect(received).toBe(expected) // Object.is equality | > 372 |     await expect.poll(() => calls.some(c => c.path.endsWith('/unblock') && c.method === 'POST')).toBe(true);,unverified test or application behavior
+TET-041,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-042,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-044,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-045,HELD_NEEDS_TRIAGE,tenant/execution-tasks/execution-tasks.spec.ts,Error: expect(received).toBe(expected) // Object.is equality | > 422 |     await expect.poll(() => calls.some(c => c.path === `/execution-tasks/batches/${batchId}/release` && c.method === 'POST')).toBe(true);,unverified test or application behavior
+TET-046,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-047,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-048,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TET-049,PASS,tenant/execution-tasks/execution-tasks.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-001,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-002,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-003,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-004,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-005,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-006,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-007,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-008,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-009,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-010,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-011,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-012,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-013,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-014,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-015,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-016,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-017,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-018,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-019,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-021,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities.spec.ts,Error: expect(locator).toBeVisible() failed | > 192 |     await expect(page.getByText('An API client with this name already exists.')).toBeVisible();,unverified test or application behavior
+TICAP-022,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-023,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-024,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-025,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-027,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-028,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-029,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-030,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-031,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-032,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities.spec.ts,Error: expect(locator).toBeVisible() failed | > 281 |     await expect(page.getByText('Enter a valid webhook destination URL.').first()).toBeVisible();,unverified test or application behavior
+TICAP-033,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-034,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-035,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities.spec.ts,Error: expect(locator).toBeVisible() failed | > 299 |     await expect(page.getByText('Webhook disabled.').first()).toBeVisible();,unverified test or application behavior
+TICAP-036,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities.spec.ts,Error: expect(locator).toBeVisible() failed | > 307 |     await expect(page.getByText('PW47_NEW_FAKE_SECRET')).toBeVisible();,unverified test or application behavior
+TICAP-037,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-038,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-039,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-040,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-041,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-044,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Error: expect(locator).toBeDisabled() failed | > 131 |     await expect(page.getByRole('group', { name: 'Events' })).toBeDisabled();",unverified test or application behavior
+TICAP-045,PASS,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-046,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,Error: expect(locator).toBeVisible() failed | > 143 |     await expect(page.getByRole('alert').filter({ hasText: 'This configuration changed' })).toBeVisible();,unverified test or application behavior
+TICAP-047,PASS,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-048,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,Error: expect(locator).toBeVisible() failed | > 156 |     await expect(page.getByRole('alert').filter({ hasText: 'The webhook page is no longer valid. Reload the webhook registry.' })).toBeVisible();,unverified test or application behavior
+TICAP-049,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Error: expect(locator).toHaveValue(expected) failed | > 164 |     await expect(page.getByLabel('Type', { exact: true })).toHaveValue('erp');",unverified test or application behavior
+TICAP-050,PASS,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-051,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,Error: expect(locator).toBeVisible() failed | > 178 |     await expect(page.getByText('Connection disabled.').first()).toBeVisible();,unverified test or application behavior
+TICAP-052,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,Error: expect(locator).toBeVisible() failed | > 189 |     await expect(page.getByText('This configuration changed after you opened it.')).toBeVisible();,unverified test or application behavior
+TICAP-053,PASS,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-054,PASS,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-056,PASS,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-057,PASS,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-058,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-059,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-060,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-061,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-062,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-063,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-064,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-065,PASS,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-066,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-067,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-068,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-070,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-071,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-072,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-073,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-074,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-075,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-076,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-077,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-078,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-079,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-080,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-081,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 102 | const chooseProduct = async (page: Page) => page.getByLabel('Product', { exact: true }).first().selectOption(PRODUCT);",unverified test or application behavior
+TICAP-083,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 460 |     await page.getByLabel('Type', { exact: true }).selectOption('select');",unverified test or application behavior
+TICAP-084,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,Error: expect(locator).toBeVisible() failed | > 472 |     await expect(page.getByText('This configuration changed after you opened it.')).toBeVisible();,unverified test or application behavior
+TICAP-085,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 478 |     await page.getByLabel('Type', { exact: true }).selectOption('select');",unverified test or application behavior
+TICAP-086,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,Error: expect(locator).toBeVisible() failed | > 489 |     await expect(page.getByText('This configuration changed after you opened it.')).toBeVisible();,unverified test or application behavior
+TICAP-087,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,Error: expect(locator).toBeVisible() failed | > 497 |     await expect(page.getByText('This field cannot become required while existing records are missing a value.')).toBeVisible();,unverified test or application behavior
+TICAP-088,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 502 |     await page.getByLabel('Product', { exact: true }).selectOption(PRODUCT);",unverified test or application behavior
+TICAP-089,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,"Test timeout of 90000ms exceeded. | > 511 |     await page.getByLabel('Product', { exact: true }).selectOption(PRODUCT);",unverified test or application behavior
+TICAP-090,RECHECK_PENDING,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,Error: locator.selectOption: Error: strict mode violation: getByLabel('Shipment') resolved to 2 elements: | > 521 |     await page.getByLabel('Shipment').selectOption('shipment-draft-48');,test defect (ambiguous locator / unsupported matcher)
+TICAP-091,RECHECK_PENDING,tenant/inventory-capabilities/inventory-capabilities-workflows.spec.ts,Error: locator.selectOption: Error: strict mode violation: getByLabel('Shipment') resolved to 2 elements: | > 528 |     await page.getByLabel('Shipment').selectOption('shipment-48');,test defect (ambiguous locator / unsupported matcher)
+TICAP-092,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 85 |   await page.getByLabel('Shipment', { exact: true }).selectOption(SHIPMENT);",unverified test or application behavior
+TICAP-093,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 85 |   await page.getByLabel('Shipment', { exact: true }).selectOption(SHIPMENT);",unverified test or application behavior
+TICAP-095,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 85 |   await page.getByLabel('Shipment', { exact: true }).selectOption(SHIPMENT);",unverified test or application behavior
+TICAP-096,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Error: expect(received).toMatchObject(expected) | > 169 |     expect(v?.body).toMatchObject({ name: 'Summer Red', sku: 'PW49-ALPHA-SUMMER-RED', attributes: { Color: 'Red' } });",unverified test or application behavior
+TICAP-097,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-098,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 268 |     await page.getByLabel('Location', { exact: true }).selectOption(BIN);",unverified test or application behavior
+TICAP-099,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-100,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-101,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 85 |   await page.getByLabel('Shipment', { exact: true }).selectOption(SHIPMENT);",unverified test or application behavior
+TICAP-102,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 85 |   await page.getByLabel('Shipment', { exact: true }).selectOption(SHIPMENT);",unverified test or application behavior
+TICAP-103,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 85 |   await page.getByLabel('Shipment', { exact: true }).selectOption(SHIPMENT);",unverified test or application behavior
+TICAP-104,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-105,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-106,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-107,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-108,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-109,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-110,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,Test timeout of 90000ms exceeded.,unverified test or application behavior
+TICAP-111,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-112,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-113,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Error: expect(received).toBe(expected) // Object.is equality | > 227 |     expect(sent(calls, `/products/${ALPHA}/variants`)[0]?.body.sku).toBe('PW49-CUSTOM-RED');",unverified test or application behavior
+TICAP-114,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-115,RECHECK_PENDING,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,Error: expect(locator).toBeVisible() failed | Error: strict mode violation: getByText('Fixture action rejected') resolved to 2 elements: | > 239 |     await expect(page.getByText('Fixture action rejected')).toBeVisible();,test defect (ambiguous locator / unsupported matcher)
+TICAP-116,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-117,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-118,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-120,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Error: expect(locator).toBeDisabled() failed | > 275 |     await expect(page.getByLabel('Location', { exact: true })).toBeDisabled();",unverified test or application behavior
+TICAP-121,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-122,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 285 |     await load(page, { tab: 'hierarchy' }); await page.getByLabel('Location', { exact: true }).selectOption(BIN);",unverified test or application behavior
+TICAP-123,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 292 |     await load(page, { tab: 'hierarchy' }); await page.getByLabel('Location', { exact: true }).selectOption(BIN);",unverified test or application behavior
+TICAP-124,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 301 |     await page.getByLabel('Location', { exact: true }).selectOption(LOCATION);",unverified test or application behavior
+TICAP-125,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 307 |     const calls = await load(page, { tab: 'hierarchy' }); await page.getByLabel('Location', { exact: true }).selectOption(LOCATION);",unverified test or application behavior
+TICAP-126,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 317 |     await page.getByLabel('Location', { exact: true }).selectOption(LOCATION);",unverified test or application behavior
+TICAP-127,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 326 |     await page.getByLabel('Location', { exact: true }).selectOption(BIN);",unverified test or application behavior
+TICAP-129,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 339 |     await page.getByLabel('Location', { exact: true }).selectOption(LOCATION);",unverified test or application behavior
+TICAP-130,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-131,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-132,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,Error: expect(locator).toHaveCount(expected) failed | > 375 |     await expect(form.getByLabel('Component 2')).toHaveCount(0);,unverified test or application behavior
+TICAP-133,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-134,RECHECK_PENDING,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Error: locator.fill: Error: strict mode violation: getByRole('heading', { name: 'Create BOM', exact: true }).locator('..').getByLabel('Quantity') resolved to 2 elements: | > 392 |     await form.getByLabel('Quantity').fill('3.5'); await form.getByLabel('Waste %').fill('2.5');",test defect (ambiguous locator / unsupported matcher)
+TICAP-135,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-136,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 409 |     await bomExecute(page).getByLabel('BOM', { exact: true }).selectOption(BOM);",unverified test or application behavior
+TICAP-137,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 96 |   await bomExecute(page).getByLabel('BOM', { exact: true }).selectOption(BOM);",unverified test or application behavior
+TICAP-138,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 96 |   await bomExecute(page).getByLabel('BOM', { exact: true }).selectOption(BOM);",unverified test or application behavior
+TICAP-139,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 96 |   await bomExecute(page).getByLabel('BOM', { exact: true }).selectOption(BOM);",unverified test or application behavior
+TICAP-140,PASS,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-142,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities.spec.ts,Error: expect(locator).toBeVisible() failed | > 360 |     await expect(page.getByText('Enter a valid webhook destination URL.').first()).toBeVisible();,unverified test or application behavior
+TICAP-143,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities.spec.ts,Error: expect(received).toBe(expected) // Object.is equality | > 373 |     expect(patch?.headers['if-match-version']).toBe('3');,unverified test or application behavior
+TICAP-144,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities.spec.ts,Error: expect(locator).toBeVisible() failed | > 381 |     await expect(page.getByRole('alert').filter({ hasText: /version conflict|changed/i }).first()).toBeVisible();,unverified test or application behavior
+TICAP-145,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-147,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-148,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities.spec.ts,Test timeout of 90000ms exceeded. | > 412 |     await page.getByLabel('Location').selectOption(locationId);,unverified test or application behavior
+TICAP-149,PASS,tenant/inventory-capabilities/inventory-capabilities.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TICAP-150,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities.spec.ts,"Error: expect(received).toMatchObject(expected) | > 433 |     expect(calls.find(c => c.method === 'POST' && c.path.endsWith(`/products/${productId}/uom`))?.body).toMatchObject({ factor_to_base: 24.5, rounding_scale: 0 });",unverified test or application behavior
+TICAP-151,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities.spec.ts,"Test timeout of 90000ms exceeded. | > 441 |     await page.getByLabel('Type', { exact: true }).selectOption('number');",unverified test or application behavior
+TICAP-153,RECHECK_PENDING,tenant/inventory-capabilities/inventory-capabilities.spec.ts,Error: locator.selectOption: Error: strict mode violation: getByLabel('Product') resolved to 2 elements: | > 458 |     await page.getByLabel('Product').selectOption(productId);,test defect (ambiguous locator / unsupported matcher)
+TICAP-154,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 465 |     await page.getByLabel('Shipment', { exact: true }).selectOption(SHIPMENT);",unverified test or application behavior
+TICAP-155,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 85 |   await page.getByLabel('Shipment', { exact: true }).selectOption(SHIPMENT);",unverified test or application behavior
+TICAP-156,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 85 |   await page.getByLabel('Shipment', { exact: true }).selectOption(SHIPMENT);",unverified test or application behavior
+TICAP-158,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 496 |     await page.getByLabel('Location', { exact: true }).selectOption(LOCATION);",unverified test or application behavior
+TICAP-159,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 96 |   await bomExecute(page).getByLabel('BOM', { exact: true }).selectOption(BOM);",unverified test or application behavior
+TICAP-160,HELD_NEEDS_TRIAGE,tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts,"Test timeout of 90000ms exceeded. | > 96 |   await bomExecute(page).getByLabel('BOM', { exact: true }).selectOption(BOM);",unverified test or application behavior
+TPO-021,RECHECK_PENDING,tenant/purchase-orders/purchase-orders-batch28.spec.ts,Error: locator.selectOption: Error: strict mode violation: locator('#purchase-order-form').getByLabel('Supplier') resolved to 3 elements: | > 110 |   const seen=await mount(page);await form(page).getByLabel('Supplier').selectOption(supplier.id);,test defect (ambiguous locator / unsupported matcher)
+TPO-022,RECHECK_PENDING,tenant/purchase-orders/purchase-orders-batch28.spec.ts,Error: locator.selectOption: Error: strict mode violation: locator('#purchase-order-form').getByLabel('Supplier') resolved to 3 elements: | > 117 |   await form(page).getByLabel('Supplier').selectOption(supplier.id);,test defect (ambiguous locator / unsupported matcher)
+TPO-023,RECHECK_PENDING,tenant/purchase-orders/purchase-orders-batch28.spec.ts,Error: locator.selectOption: Error: strict mode violation: locator('#purchase-order-form').getByLabel('Supplier') resolved to 3 elements: | > 100 |  await form(page).getByLabel('Supplier').selectOption(supplier.id);,test defect (ambiguous locator / unsupported matcher)
+TPO-024,RECHECK_PENDING,tenant/purchase-orders/purchase-orders-batch28.spec.ts,Error: locator.selectOption: Error: strict mode violation: locator('#purchase-order-form').getByLabel('Supplier') resolved to 3 elements: | > 100 |  await form(page).getByLabel('Supplier').selectOption(supplier.id);,test defect (ambiguous locator / unsupported matcher)
+TPO-025,RECHECK_PENDING,tenant/purchase-orders/purchase-orders-batch28.spec.ts,Error: locator.selectOption: Error: strict mode violation: locator('#purchase-order-form').getByLabel('Supplier') resolved to 3 elements: | > 135 |   await mount(page);await form(page).getByLabel('Supplier').selectOption(supplier.id);,test defect (ambiguous locator / unsupported matcher)
+TPO-026,RECHECK_PENDING,tenant/purchase-orders/purchase-orders-batch28.spec.ts,Error: locator.selectOption: Error: strict mode violation: locator('#purchase-order-form').getByLabel('Supplier') resolved to 3 elements: | > 100 |  await form(page).getByLabel('Supplier').selectOption(supplier.id);,test defect (ambiguous locator / unsupported matcher)
+TPO-027,HELD_NEEDS_TRIAGE,tenant/purchase-orders/purchase-orders-batch28.spec.ts,"Error: Approved tenant login failed on both isolated attempts | > 151 |           throw new Error('Approved tenant login failed on both isolated attempts', { cause: secondError });",environment/authentication
+TPO-028,HELD_NEEDS_TRIAGE,tenant/purchase-orders/purchase-orders-batch28.spec.ts,"Error: Approved tenant login failed on both isolated attempts | > 151 |           throw new Error('Approved tenant login failed on both isolated attempts', { cause: secondError });",environment/authentication
+TPO-029,PASS,tenant/purchase-orders/purchase-orders-batch28.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPO-030,PASS,tenant/purchase-orders/purchase-orders-batch28.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPO-031,HELD_NEEDS_TRIAGE,tenant/purchase-orders/purchase-orders-batch28.spec.ts,Test timeout of 90000ms exceeded.,unverified test or application behavior
+TPO-032,HELD_NEEDS_TRIAGE,tenant/purchase-orders/purchase-orders-batch28.spec.ts,"Error: Approved tenant login failed on both isolated attempts | > 151 |           throw new Error('Approved tenant login failed on both isolated attempts', { cause: secondError });",environment/authentication
+TPO-034,HELD_NEEDS_TRIAGE,tenant/purchase-orders/purchase-orders-batch28.spec.ts,"Error: Approved tenant login failed on both isolated attempts | > 151 |           throw new Error('Approved tenant login failed on both isolated attempts', { cause: secondError });",environment/authentication
+TPO-035,PASS,tenant/purchase-orders/purchase-orders-batch28.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPO-036,PASS,tenant/purchase-orders/purchase-orders-batch28.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPO-037,PASS,tenant/purchase-orders/purchase-orders-batch28.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPO-038,PASS,tenant/purchase-orders/purchase-orders-batch28.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPO-039,PASS,tenant/purchase-orders/purchase-orders-batch28.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPO-040,PASS,tenant/purchase-orders/purchase-orders-batch28.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPO-041,PASS,tenant/purchase-orders/purchase-orders-batch28.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPO-042,PASS,tenant/purchase-orders/purchase-orders-batch28.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPO-043,PASS,tenant/purchase-orders/purchase-orders-batch28.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPO-044,RECHECK_PENDING,tenant/purchase-orders/purchase-orders-batch28.spec.ts,Error: locator.click: Error: strict mode violation: locator('details.purchase-orders-audit-details summary') resolved to 2 elements: | > 277 |   await page.locator('details.purchase-orders-audit-details summary').click();,test defect (ambiguous locator / unsupported matcher)
+TPO-045,RECHECK_PENDING,tenant/purchase-orders/purchase-orders-batch28.spec.ts,Error: locator.click: Error: strict mode violation: locator('details.purchase-orders-audit-details summary') resolved to 2 elements: | > 283 |   await page.locator('details.purchase-orders-audit-details summary').click();,test defect (ambiguous locator / unsupported matcher)
+TPO-046,RECHECK_PENDING,tenant/purchase-orders/purchase-orders-batch28.spec.ts,Error: locator.click: Error: strict mode violation: locator('details.purchase-orders-audit-details summary') resolved to 2 elements: | > 290 |   await page.locator('details.purchase-orders-audit-details summary').click();,test defect (ambiguous locator / unsupported matcher)
+TPO-047,PASS,tenant/purchase-orders/purchase-orders-batch28.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPO-048,PASS,tenant/purchase-orders/purchase-orders-batch28.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-001,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-002,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-003,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-004,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-005,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-006,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-007,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-008,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-009,RECHECK_PENDING,tenant/procurement-recommendations/procurement-recommendations.spec.ts,Error: locator.selectOption: Error: strict mode violation: locator('.procurement-recommendations-primary-filters').getByLabel('Supplier') resolved to 2 elements: | > 94 |   const seen=await mount(page);await primary(page).getByLabel('Supplier').selectOption(supplier.id);,test defect (ambiguous locator / unsupported matcher)
+TPRC-010,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-011,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-012,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-013,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-014,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-015,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-016,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-017,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-018,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-019,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-020,PASS,tenant/procurement-recommendations/procurement-recommendations.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-021,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-022,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-023,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-025,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-027,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-028,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-029,RECHECK_PENDING,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,Error: expect(locator).toBeDisabled() failed | Error: strict mode violation: getByLabel('Decision note') resolved to 2 elements: | > 168 |   await chooseDetail(page);await expect(page.getByLabel('Decision note')).toBeDisabled();,test defect (ambiguous locator / unsupported matcher)
+TPRC-030,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-031,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-033,HELD_NEEDS_TRIAGE,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,Error: expect(locator).toBeVisible() failed | > 193 |   await expect(page.getByText(/EUR/).first()).toBeVisible();,unverified test or application behavior
+TPRC-035,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-036,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-037,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-039,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-040,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-041,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-042,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-043,HELD_NEEDS_TRIAGE,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,"Test timeout of 90000ms exceeded. | > 250 |   await section.getByRole('button',{name:'Next'}).click();",unverified test or application behavior
+TPRC-044,HELD_NEEDS_TRIAGE,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,"Test timeout of 90000ms exceeded. | > 256 |   await section.getByRole('button',{name:'Next'}).click();",unverified test or application behavior
+TPRC-045,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-047,RECHECK_PENDING,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,"Error: expect(locator).toBeVisible() failed | Error: strict mode violation: getByText('Synthetic resolution conflict') resolved to 2 elements: | > 277 |   await expect(page.getByText('Synthetic resolution conflict',{exact:false})).toBeVisible();",test defect (ambiguous locator / unsupported matcher)
+TPRC-048,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TPRC-049,PASS,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-001,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-002,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-003,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-004,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-005,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-006,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-007,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-008,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-009,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-010,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-011,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-012,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-013,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-014,RECHECK_PENDING,tenant/replenishment-planning/replenishment-planning.spec.ts,"Error: expect(locator).toBeVisible() failed | Error: strict mode violation: getByText('Synthetic planning save rejected') resolved to 2 elements: | > 125 |   await expect(page.getByText('Synthetic planning save rejected',{exact:false})).toBeVisible();",test defect (ambiguous locator / unsupported matcher)
+TRPL-015,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-016,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-017,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-018,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-019,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-020,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-021,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-022,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-023,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-024,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-025,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-026,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-027,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-028,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-029,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-030,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-031,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-032,RECHECK_PENDING,tenant/replenishment-planning/replenishment-planning.spec.ts,"Error: expect(locator).toBeVisible() failed | Error: strict mode violation: getByText('Synthetic stale decision version') resolved to 2 elements: | > 272 |   await saveButton(page).click();await expect(page.getByText('Synthetic stale decision version',{exact:false})).toBeVisible();",test defect (ambiguous locator / unsupported matcher)
+TRPL-033,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-034,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-035,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-039,RECHECK_PENDING,tenant/replenishment-planning/replenishment-planning.spec.ts,"Error: expect(locator).toBeVisible() failed | Error: strict mode violation: getByText('Synthetic stale materialization') resolved to 2 elements: | > 320 |   await expect(page.getByText('Synthetic stale materialization',{exact:false})).toBeVisible();",test defect (ambiguous locator / unsupported matcher)
+TRPL-040,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-041,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-042,HELD_NEEDS_TRIAGE,tenant/replenishment-planning/replenishment-planning.spec.ts,Test timeout of 90000ms exceeded.,unverified test or application behavior
+TRPL-043,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-044,HELD_NEEDS_TRIAGE,tenant/replenishment-planning/replenishment-planning.spec.ts,Test timeout of 90000ms exceeded.,unverified test or application behavior
+TRPL-045,HELD_NEEDS_TRIAGE,tenant/replenishment-planning/replenishment-planning.spec.ts,"Error: Approved tenant login failed on both isolated attempts | > 151 |           throw new Error('Approved tenant login failed on both isolated attempts', { cause: secondError });",environment/authentication
+TRPL-046,HELD_NEEDS_TRIAGE,tenant/replenishment-planning/replenishment-planning.spec.ts,"Error: Approved tenant login failed on both isolated attempts | > 151 |           throw new Error('Approved tenant login failed on both isolated attempts', { cause: secondError });",environment/authentication
+TRPL-047,PASS,tenant/replenishment-planning/replenishment-planning.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TRPL-048,HELD_NEEDS_TRIAGE,tenant/replenishment-planning/replenishment-planning.spec.ts,Test timeout of 90000ms exceeded.,unverified test or application behavior
+TRPL-050,HELD_NEEDS_TRIAGE,tenant/replenishment-planning/replenishment-planning.spec.ts,Test timeout of 90000ms exceeded.,unverified test or application behavior
+TSES-001,PASS,tenant/sessions/sessions.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-002,PASS,tenant/sessions/sessions.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-003,PASS,tenant/sessions/sessions.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-004,PASS,tenant/sessions/sessions.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-005,PASS,tenant/sessions/sessions.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-006,PASS,tenant/sessions/sessions.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-007,PASS,tenant/sessions/sessions.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-008,PASS,tenant/sessions/sessions.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-009,PASS,tenant/sessions/sessions.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-010,HELD_NEEDS_TRIAGE,tenant/sessions/sessions.spec.ts,Error: expect(received).toContain(expected) // indexOf | > 108 |   await expect.poll(()=>requestGets(seen).at(-1)?.search).toContain('page=1');,unverified test or application behavior
+TSES-011,PASS,tenant/sessions/sessions.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-012,PASS,tenant/sessions/sessions.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-013,PASS,tenant/sessions/sessions.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-014,PASS,tenant/sessions/sessions.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-015,PASS,tenant/sessions/sessions.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-033,PASS,tenant/sessions/sessions-batch33.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-035,HELD_NEEDS_TRIAGE,tenant/sessions/sessions-batch33.spec.ts,Error: expect(locator).toContainText(expected) failed | > 142 |   await expect(page.locator('.sessions-message[role=status]')).toContainText('already inactive or unavailable');,unverified test or application behavior
+TSES-063,PASS,tenant/sessions/sessions-batch33.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-066,PASS,tenant/sessions/sessions-batch33.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-067,PASS,tenant/sessions/sessions-batch33.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-069,PASS,tenant/sessions/sessions-batch33.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-070,PASS,tenant/sessions/sessions-batch33.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSES-072,PASS,tenant/sessions/sessions-batch33.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-021,HELD_NEEDS_TRIAGE,tenant/scanner/scanner-batch32.spec.ts,Error: expect(received).toContain(expected) // indexOf | > 68 |   await expect.poll(()=>scans(seen).map(x=>x.path)).toContain(`/shipments/${SHIPMENT}/barcode/ABC-123`);,unverified test or application behavior
+TSN-022,HELD_NEEDS_TRIAGE,tenant/scanner/scanner-batch32.spec.ts,Error: expect(locator).toContainText(expected) failed | > 73 |   await expect(errors(page)).toContainText('This barcode does not match an active item in the selected shipment.');,unverified test or application behavior
+TSN-023,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-024,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-025,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-026,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-027,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-028,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-029,HELD_NEEDS_TRIAGE,tenant/scanner/scanner-batch32.spec.ts,Error: expect(locator).toContainText(expected) failed | > 111 |   await expect(errors(page)).toContainText('more than one active product');expect(receives(seen)).toHaveLength(0);,unverified test or application behavior
+TSN-030,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-031,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-032,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-033,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-034,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-035,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-036,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-037,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-038,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-039,HELD_NEEDS_TRIAGE,tenant/scanner/scanner-batch32.spec.ts,Error: expect(received).toBe(expected) // Object.is equality | > 167 |   expect(tasks(seen)[0].path).toBe('/execution-tasks/pw-execution-task/mobile-scan-verify');,unverified test or application behavior
+TSN-040,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-041,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-042,HELD_NEEDS_TRIAGE,tenant/scanner/scanner-batch32.spec.ts,Error: expect(locator).toBeVisible() failed | > 183 |   await expect(page.getByText('Task item verified. Complete the real source workflow before completing the execution task.')).toBeVisible();,unverified test or application behavior
+TSN-043,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-044,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-047,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-048,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
+TSN-049,PASS,tenant/scanner/scanner-batch32.spec.ts,GitHub log 118322521566: passed,confirmed pass
