@@ -169,7 +169,9 @@ jobs:
           PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
           PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
         run: |
-          node scripts/preflight-batch-233-pages.mjs
+          node scripts/preflight-batch-233-pages.mjs --init
+          npx playwright test --config=playwright.b233-preflight.config.ts
+          node scripts/preflight-batch-233-pages.mjs --apply
           npx playwright test --config=playwright.live-original.config.ts --list > original-selected.txt
           node scripts/check-live-original-discovery.mjs
       - name: Run reviewed ORIGINAL scenarios on live Vercel (not a new smoke suite)
@@ -188,5 +190,5 @@ jobs:
       # No auth snapshots, traces, videos, screenshots, or artifacts uploaded.
       - name: Require every Batch 233 original to have been eligible (no false green)
         if: ${{ always() && inputs.group == 'BULK_SAFE_14' }}
-        run: node -e "const s=require('./batch-233-live-access.json');if(s.blocked.length){console.error('Access-unverified original IDs:',s.blocked.length);process.exit(1)}"
+        run: node -e "const fs=require('node:fs');const f='./batch-233-live-access.json';if(!fs.existsSync(f)){console.error('B233 stopped before access report initialization; all 500 are unverified');process.exit(1)}const s=require(f);if(s.status!=='PROBED'||s.blocked.length){console.error('Access-unverified original IDs:',s.blocked.length);process.exit(1)}"
       # One explicitly approved bulk group or single legacy group per run; no unrestricted 9,900-test live execution.
