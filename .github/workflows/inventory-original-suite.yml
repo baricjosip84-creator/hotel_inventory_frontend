@@ -134,6 +134,7 @@ jobs:
           node scripts/check-batch-232-contract.mjs
           node scripts/prepare-batch-232-runtime.mjs
           node scripts/check-batch-232-contract.mjs
+          node scripts/prepare-batch-232-browser-recheck.mjs
       - name: Discover all 9,900 authored original tests (no browser, no credentials)
         if: ${{ inputs.group == 'DISCOVER_ALL' }}
         env:
