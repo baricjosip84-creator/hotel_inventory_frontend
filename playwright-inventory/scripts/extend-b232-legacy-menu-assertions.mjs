@@ -57,4 +57,19 @@ for (const file of files) {
   patched++;
 }
 assert.equal(patched, 10);
-console.log('PASS B236 legacy menu compatibility: exactly 10 historical assertions extended by 7 reviewed groups; fail-closed menu and test-source checks preserved.');
+// The principal baseline verifier independently pins the runner-only review
+// catalogue. Extend that catalogue as well, preserving all unrelated tests
+// and checks in the installed verifier, including its historical manifest.
+const mainPath = path.join(root, 'scripts', 'verify-original-suite.mjs');
+const main = fs.readFileSync(mainPath, 'utf8');
+const entry = "  { group: 'BULK_SAFE_16', batch: 235, count: 209 },";
+const expandedEntry = entry + "\n  { group: 'BULK_SAFE_17', batch: 236, count: 150 },";
+const contract = '`check-batch-${batch}-contract.mjs`,';
+const expandedContract = "batch === 236 ? 'check-batch-236-fixtures.mjs' : " + contract;
+assert.equal(main.split(entry).length - 1, 1, 'Main verifier B235 catalogue anchor changed');
+assert.equal(main.split(contract).length - 1, 1, 'Main verifier contract script anchor changed');
+assert(!main.includes("group: 'BULK_SAFE_17'"), 'Main verifier already includes B236');
+const updatedMain = main.replace(entry, expandedEntry).replace(contract, expandedContract);
+assert.equal(updatedMain.replace(expandedEntry, entry).replace(expandedContract, contract), main, 'Unrelated main verifier edit');
+fs.writeFileSync(mainPath, updatedMain, 'utf8');
+console.log('PASS B236 main verifier and 10 historical menu assertions: exactly 7 reviewed runner-only groups; fail-closed checks preserved.');
