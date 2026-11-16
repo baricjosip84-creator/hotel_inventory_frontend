@@ -6,7 +6,13 @@ assert.equal(r.batch,234);assert.equal(r.group,'BULK_SAFE_15');assert.equal(r.co
 const ledger=f=>read(f).trim().split(/\r?\n/).slice(1).map(l=>l.split(',')[0]).sort();
 const p=ledger('INVENTORY_PLAYWRIGHT_BATCH_233_FINAL_CONFIRMED_2145_PASS_IDS.csv'),h=ledger('INVENTORY_PLAYWRIGHT_BATCH_233_FINAL_HELD_DEFERRED_407_IDS.csv');
 assert.equal(p.length,2145);assert.equal(h.length,407);assert.equal(new Set([...p,...h]).size,2552);assert.deepEqual(p,[...r.prior_pass_ids].sort());assert.deepEqual(h,[...r.prior_held_ids].sort());
-const tracker=read('docs/issue-evidence/INVENTORY_APPLICATION_ISSUES_TRACKER_BATCH_233_FINAL_2026-11-15.csv');assert.equal(sha(tracker),r.prior_issue_tracker_sha256);
+// Git normalizes the CSV's Windows CRLF records to LF when checking out on
+// Ubuntu. Accept only the pinned original bytes or their exact LF equivalent;
+// all row content, BOM, ordering, and final newline remain hash-protected.
+const tracker=read('docs/issue-evidence/INVENTORY_APPLICATION_ISSUES_TRACKER_BATCH_233_FINAL_2026-11-15.csv');
+const trackerHash=sha(tracker);
+const restoredHash=tracker.includes('\r')?trackerHash:sha(tracker.replace(/\n/g,'\r\n'));
+assert(trackerHash===r.prior_issue_tracker_sha256||restoredHash===r.prior_issue_tracker_sha256,'B233 issue tracker content differs from pinned original (not just Git CRLF-to-LF normalization)');
 const old=json('batch-233-review.json');const closed=new Set([...p,...h]);assert(old.selected.every(s=>closed.has(s.id)));
 const historic=new Set(Object.values(m.approved_groups).flatMap(g=>(g.entries??[g]).flatMap(e=>e.ids??[])));
 const selected=new Map(r.selected.map(s=>[s.id,s]));assert.equal(selected.size,86);assert(![...selected.keys()].some(id=>closed.has(id)||historic.has(id)));assert.equal(Object.keys(r.source_files).length,8);
