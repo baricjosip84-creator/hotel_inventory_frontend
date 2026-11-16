@@ -3,7 +3,7 @@ import { test } from '../support/liveOriginalSafeTest';
 import { loginAsTenant } from '../support/tenantSession';
 test('Batch 234 guarded page access probe',async({page})=>{
  const file='batch-234-live-access.json',initial=JSON.parse(fs.readFileSync(file,'utf8'));
- if(initial.status!=='AUTH_NOT_VERIFIED'||initial.blocked.length!==86)throw new Error('Batch 234 report not initialized');
+ if(initial.status!=='AUTH_NOT_VERIFIED'||initial.blocked.length!==50||Object.keys(initial.pages).sort().join(',')!=='sessions,users')throw new Error('Batch 234 recheck report not initialized');
  await loginAsTenant(page);const access:Record<string,string>={};
  for(const [key,marker] of Object.entries(initial.pages as Record<string,{heading:string;tabs?:string[]}>)){
   try{

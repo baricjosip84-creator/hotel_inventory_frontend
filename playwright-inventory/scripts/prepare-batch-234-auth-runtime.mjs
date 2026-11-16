@@ -16,10 +16,29 @@ export async function applyBatch234AuthRuntime(root) {
     assert.equal(patched.split(before).length, 2, 'Missing or ambiguous auth anchor');
     patched = patched.replace(before, after);
   }
+  replaceOnce("import { requireDisposableTenantCredentials } from './environment';", `import { requireDisposableTenantCredentials } from './environment';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';`);
   replaceOnce('    const authenticate = async (): Promise<AuthState> => {', `    class LoginFailure extends Error {
       constructor(message: string, readonly terminal = false) { super(message); }
     }
+    // Only timestamps and a stop reason survive worker replacement, never auth
+    // state. Sequential workers honor a server 429 across the whole CI job.
+    const stopPath = '.b234-auth-stop';
+    const lastPath = '.b234-last-login';
+    const stopAuthentication = (reason: string) => writeFileSync(stopPath, reason, { mode: 0o600 });
+    const ensureAuthenticationAllowed = () => {
+      if (existsSync(stopPath)) throw new LoginFailure('B234 authentication circuit open; no further live login attempted', true);
+    };
     const authenticate = async (): Promise<AuthState> => {`);
+  replaceOnce(`      const context = await browser.newContext({ baseURL: FRONTEND_ORIGIN, serviceWorkers: 'block' });`, `      ensureAuthenticationAllowed();
+      if (existsSync(lastPath)) {
+        const last = Number(readFileSync(lastPath, 'utf8'));
+        if (!Number.isFinite(last) || last > Date.now()) throw new LoginFailure('Invalid B234 login throttle state', true);
+        const remaining = Math.max(0, 45_000 - (Date.now() - last));
+        if (remaining) await new Promise(resolve => setTimeout(resolve, remaining));
+      }
+      ensureAuthenticationAllowed();
+      const context = await browser.newContext({ baseURL: FRONTEND_ORIGIN, serviceWorkers: 'block' });`);
   replaceOnce(`        await page.goto('/login');
         await page.locator('#login-email').fill(email);
         await page.locator('#login-password').fill(password);
@@ -32,11 +51,14 @@ export async function applyBatch234AuthRuntime(root) {
           const url = response.url();
           if (approvedLogin(method, url) && /^\\/(?:api\\/)?auth\\/login$/.test(new URL(url).pathname)) {
             loginStatus = response.status();
+            if ([400, 401, 403, 429].includes(loginStatus)) stopAuthentication('HTTP '+loginStatus);
           }
         });
         await page.goto('/login', { timeout: 20_000 });
         await page.locator('#login-email').fill(email, { timeout: 10_000 });
         await page.locator('#login-password').fill(password, { timeout: 10_000 });
+        ensureAuthenticationAllowed();
+        writeFileSync(lastPath, String(Date.now()), { mode: 0o600 });
         await page.locator('[data-auth-form="true"] button[type="submit"]').click({ timeout: 15_000 });
         // A pending sign-in (cold backend or slow SPA) is not a failed token.
         // Wait for the actual fresh JWT, not merely a login response or redirect.
@@ -54,6 +76,7 @@ export async function applyBatch234AuthRuntime(root) {
         }
         if (loginStatus !== undefined && loginStatus >= 400) {
           // Do not repeat rejected credentials or exceed rate limits.
+          if (loginStatus < 500 && loginStatus !== 408) stopAuthentication('HTTP '+loginStatus);
           throw new LoginFailure('Approved login HTTP ' + loginStatus, loginStatus >= 400 && loginStatus < 500 && loginStatus !== 408);
         }
         if (!await hasValidToken()) throw new LoginFailure('Approved login did not establish a usable tenant JWT');
@@ -69,8 +92,11 @@ export async function applyBatch234AuthRuntime(root) {
         const state = await context.storageState();
         if (tokenExpiresSoon(state))`);
   replaceOnce(`        await new Promise(resolve => setTimeout(resolve, 2_000));`, `        if (firstError instanceof LoginFailure && firstError.terminal) throw firstError;
+        ensureAuthenticationAllowed();
         await new Promise(resolve => setTimeout(resolve, 5_000));`);
-  replaceOnce(`  }, { scope: 'worker' }],`, `  }, { scope: 'worker', timeout: 300_000 }],`);
+  replaceOnce(`          throw new Error('Approved tenant login failed on both isolated attempts', { cause: secondError });`, `          stopAuthentication('AUTH_NOT_VERIFIED');
+          throw new Error('Approved tenant login failed on both isolated attempts; login circuit open', { cause: secondError });`);
+  replaceOnce(`  }, { scope: 'worker' }],`, `  }, { scope: 'worker', timeout: 420_000 }],`);
   // Validate the exact transformed source, including network safety, before use.
   await checkAuthRuntime(patched, target);
   fs.writeFileSync(target, patched);

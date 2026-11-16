@@ -23,11 +23,14 @@ export async function checkAuthRuntime(source, filename) {
   }});
   const playwright = { expect, test: { extend: f => f } };
   const environment = { requireDisposableTenantCredentials: () => ({ email:'synthetic@example.invalid', password:'NOT_REAL' }) };
+  const markers=new Map();
+  const markerFs={existsSync:p=>markers.has(p),readFileSync:p=>markers.get(p),writeFileSync:(p,v,options)=>{assert(['.b234-auth-stop','.b234-last-login'].includes(p));assert.equal(options.mode,0o600);assert(/^(?:\d+|HTTP \d+|AUTH_NOT_VERIFIED)$/.test(v));markers.set(p,v);}};
   const module = new Module(filename); module.filename = filename;
-  module.require = id => id === '@playwright/test' ? playwright : id === './environment' ? environment : require(id);
+  module.require = id => id === '@playwright/test' ? playwright : id === './environment' ? environment : id==='node:fs'?markerFs:require(id);
   module._compile(outputText, filename);
   const fixtures = module.exports.test;
-  async function run(scenarios, stalled = 0) {
+  async function run(scenarios, stalled = 0, preserveMarkers=false) {
+    if(!preserveMarkers)markers.clear();
     contexts = logins = closed = reads = dashboards = 0; failures = stalled; plans = scenarios;
     const browser = { newContext: async options => {
       assert.equal(options.baseURL, origin); assert.equal(options.serviceWorkers, 'block');
@@ -67,15 +70,16 @@ export async function checkAuthRuntime(source, filename) {
   try {
     process.env.PW_LIVE_ORIGINAL_READONLY='YES';process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_15';process.env.PW_BASE_URL=origin;
     // No actual backoff delays during synthetic testing; verify requested delay.
-    globalThis.setTimeout=(fn, ms, ...args)=>{assert.equal(ms, 5000);return realTimeout(fn,0,...args)};
+    globalThis.setTimeout=(fn, ms, ...args)=>{assert(ms>0&&ms<=45_000);return realTimeout(fn,0,...args)};
     await run([{token:true,status:200,delay:4}]); assert.equal(logins,1); assert(reads>=7); assert.equal(closed,1);
     await run([{token:true,status:200}],1); assert.equal(logins,1);assert.equal(dashboards,1);
     await run([{status:503},{token:true,status:200}]); assert.equal(logins,2); assert.equal(closed,2);
     for(const status of [400,401,403,429]) { await assert.rejects(run([{status}]), new RegExp('HTTP '+status));assert.equal(logins,1);assert.equal(closed,1); }
+    await assert.rejects(run([{token:true,status:200}],0,true),/circuit open/);assert.equal(logins,0);assert.equal(contexts,0);
     for (const plan of [{status:200},{status:200,token:true,expiry:5},{token:true,status:200,wrongPage:true}]) {
       await assert.rejects(run([plan,plan]), /both isolated attempts/);assert.equal(logins,2);assert.equal(closed,2);
     }
-    console.log('PASS B234 auth fixture: 10 synthetic recovery/rejection cases; actual guard blocks unapproved mutations in every context.');
+    console.log('PASS B234 auth fixture: 11 synthetic recovery/rejection cases; cross-worker circuit blocks all login traffic after 429; actual guard blocks unapproved mutations in every context.');
   } finally {
     globalThis.setTimeout=realTimeout;
     for(const k of keys) if(previous[k]===undefined)delete process.env[k];else process.env[k]=previous[k];
