@@ -4,7 +4,9 @@ import type { BrowserContext } from '@playwright/test';
 type State = Awaited<ReturnType<BrowserContext['storageState']>>;
 type Snapshot = { snapshot: State; lastLoginAt: number };
 export async function exchangeB235Session(value?: Snapshot): Promise<Snapshot | null> {
-  if (process.env.PW_ORIGINAL_SUITE_GROUP !== 'BULK_SAFE_16') throw Error('Wrong session group');
+  // The sequential B235 and B236 runners each create their own private broker.
+  // No other original-suite group is allowed to exchange session snapshots.
+  if (!['BULK_SAFE_16', 'BULK_SAFE_17'].includes(process.env.PW_ORIGINAL_SUITE_GROUP ?? '')) throw Error('Wrong session group');
   const socketPath = process.env.PW_B235_SESSION_SOCKET;
   if (!socketPath) throw Error('Missing private B235 session broker');
   const body = value === undefined ? undefined : JSON.stringify(value);

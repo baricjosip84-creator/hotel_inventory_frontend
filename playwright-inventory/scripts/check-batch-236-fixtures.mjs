@@ -1,9 +1,67 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {createRequire} from 'node:module';
+import {EventEmitter} from 'node:events';
+import {createRequire,Module} from 'node:module';
 import {ensureB236Target} from '../support/b236TargetRecovery.mjs';
+import {startBroker} from './b235-session-broker.mjs';
 const ts=createRequire(import.meta.url)('typescript'),plan=JSON.parse(fs.readFileSync('batch-236-review.json'));
+// Use the real compiled client, real private socket, and actual prepared worker
+// fixture together. Merely mocking the client missed the group-17 gate.
+const require=createRequire(import.meta.url);
+const compile=(filename,resolve)=>{
+ const out=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS},reportDiagnostics:true});
+ assert.equal(out.diagnostics.filter(d=>d.category===ts.DiagnosticCategory.Error).length,0);
+ const m=new Module(filename);m.require=resolve;m._compile(out.outputText,filename);return m.exports;
+};
+const envKeys=['PW_ORIGINAL_SUITE_GROUP','PW_B235_SESSION_SOCKET','PW_LIVE_ORIGINAL_READONLY','PW_BASE_URL'];
+const saved=Object.fromEntries(envKeys.map(k=>[k,process.env[k]]));
+// Local sandbox may prohibit Unix socket listeners. Explicit offline mode
+// substitutes only the transport, never the real client/group validation.
+// GitHub always exercises the actual private socket.
+const offline=process.env.PW_B236_OFFLINE_BROKER==='YES'&&process.env.GITHUB_ACTIONS!=='true';
+let stored=null;
+const mockRequest=(options,callback)=>{
+ assert.equal(options.socketPath,'synthetic-private-socket');assert.equal(options.path,'/session');
+ const req=new EventEmitter();req.setTimeout=()=>req;req.destroy=()=>req.emit('error',Error('destroyed'));
+ req.end=body=>queueMicrotask(()=>{
+  const res=new EventEmitter();res.setEncoding=()=>{};res.statusCode=200;
+  if(options.method==='PUT'){assert.equal(options.headers['Content-Length'],Buffer.byteLength(body));stored=JSON.parse(body);}
+  else assert.equal(options.method,'GET');
+  callback(res);res.emit('data',JSON.stringify(options.method==='GET'?stored:null));res.emit('end');
+ });return req;
+};
+const exchange=compile('support/b235SessionBroker.ts',id=>offline&&id==='node:http'?{request:mockRequest}:require(id)).exchangeB235Session;
+let broker;
+try {
+ process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_17';delete process.env.PW_B235_SESSION_SOCKET;
+ await assert.rejects(exchange(),/Missing private B235 session broker/);
+ if(offline)process.env.PW_B235_SESSION_SOCKET='synthetic-private-socket';
+ else {broker=await startBroker();process.env.PW_B235_SESSION_SOCKET=broker.socketPath;assert.equal(fs.statSync(broker.socketPath).mode&0o777,0o600);}
+ const origin='https://hotel-inventory-frontend-mauve.vercel.app';
+ process.env.PW_BASE_URL=origin;process.env.PW_LIVE_ORIGINAL_READONLY='YES';
+ const snapshot={cookies:[],origins:[{origin,localStorage:[{name:'inventory_access_token',value:'synthetic.'+Buffer.from(JSON.stringify({exp:Date.now()/1000+3600})).toString('base64url')+'.synthetic'}]}]};
+ const state={snapshot,lastLoginAt:Date.now()};
+ assert.equal(await exchange(),null);await exchange(state);assert.deepEqual(await exchange(),state);
+ process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_16';assert.deepEqual(await exchange(),state);
+ for(const group of ['BULK_SAFE_15','BULK_SAFE_18','DISCOVER_ALL','']){
+  process.env.PW_ORIGINAL_SUITE_GROUP=group;await assert.rejects(exchange(),/Wrong session group/);
+ }
+ process.env.PW_ORIGINAL_SUITE_GROUP='BULK_SAFE_17';
+ const fixture=compile('support/liveOriginalSafeTest.ts',id=>{
+  if(id==='@playwright/test')return {test:{extend:f=>f},expect:()=>{}};
+  if(id==='./environment')return {requireDisposableTenantCredentials:()=>({email:'fixture@example.invalid',password:'fake'})};
+  if(id==='node:fs')return {existsSync:()=>false,readFileSync:()=>'',writeFileSync:()=>{}};
+  if(id==='./b235SessionBroker')return {exchangeB235Session:exchange};
+  return require(id);
+ }).test.bulkSession[0];
+ for(let worker=0;worker<2;worker++)await fixture({browser:{newContext:async()=>{throw Error('Unexpected login');}}},async session=>assert.deepEqual(session.snapshot,snapshot));
+ assert.deepEqual(await exchange(),state);
+ console.log('PASS B236 real private session client and replacement-worker reuse ('+(offline?'synthetic transport':'actual private socket')+'); group 16 preserved and unrelated groups rejected.');
+}finally{
+ try{if(broker){await broker.close();assert(!fs.existsSync(broker.socketPath));}}
+ finally{for(const k of envKeys)if(saved[k]===undefined)delete process.env[k];else process.env[k]=saved[k];}
+}
 // Execute each actual transpiled setup against a synthetic page/route harness:
 // confirms target before mocks, document fallback, representative fixture GET
 // and write contracts with NO network, browser credentials, or test-pass credit.
