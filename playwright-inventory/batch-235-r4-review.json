@@ -1,0 +1,137 @@
+{
+  "batch": 235,
+  "source_log": "logs_118946026710.zip",
+  "passed": [
+    "TPER-001",
+    "TPER-002",
+    "TPER-003",
+    "TPER-004",
+    "TPER-005",
+    "TPER-006",
+    "TPER-007",
+    "TPER-008",
+    "TPER-009",
+    "TPER-010",
+    "TPER-011",
+    "TPER-013",
+    "TPER-019",
+    "TPER-020",
+    "TPER-021",
+    "TPER-022",
+    "TPER-023",
+    "TPER-024",
+    "TPER-025",
+    "TPER-026",
+    "TPER-027",
+    "TPER-028",
+    "TPER-029",
+    "TPER-030",
+    "TPER-031",
+    "TPER-032",
+    "TPER-033",
+    "TPER-034",
+    "TPER-035",
+    "TPER-036",
+    "TPER-037",
+    "TPER-038",
+    "TPER-039",
+    "TPER-040",
+    "TPER-041",
+    "TPER-042",
+    "TPER-043",
+    "TPER-044",
+    "TPER-045",
+    "TPER-046",
+    "TPER-047",
+    "TPER-048",
+    "TPER-049",
+    "TPER-050",
+    "TPER-051",
+    "TPER-052",
+    "TPER-053",
+    "TPER-054",
+    "TPER-055",
+    "TPER-056",
+    "TPER-057",
+    "TPER-058",
+    "TPER-059",
+    "TPER-060",
+    "TPER-061",
+    "TPER-062",
+    "TPER-063",
+    "TPER-064",
+    "TPER-065",
+    "TPER-066",
+    "TPER-067",
+    "TPER-068",
+    "TPER-069",
+    "TPER-070",
+    "TPER-071",
+    "TPER-072",
+    "TPER-073",
+    "TPER-074",
+    "TPER-075",
+    "TPER-076",
+    "TPER-077",
+    "TPER-078",
+    "TPROD-049"
+  ],
+  "recheck": [
+    "TPER-012",
+    "TPER-014",
+    "TPER-015",
+    "TPER-016",
+    "TPER-017",
+    "TPER-018",
+    "TPROD-048",
+    "TUSR-047",
+    "TUSR-064"
+  ],
+  "edits": {
+    "tenant/tenant-permissions/tenant-permissions.spec.ts": [
+      {
+        "before": "import { loginAsTenant, fulfillJson } from '../../../support/tenantSession';",
+        "after": "import { loginAsTenant, fulfillJson } from '../../../support/tenantSession';\nimport { openB235Target } from '../../../support/b235TargetSession';",
+        "count": 1
+      },
+      {
+        "before": " await loginAsTenant(page);",
+        "after": " await openB235Target(page,'/permissions');",
+        "count": 1
+      }
+    ],
+    "tenant/users/users-lifecycle.spec.ts": [
+      {
+        "before": "import { loginAsTenant, fulfillJson } from '../../../support/tenantSession';",
+        "after": "import { loginAsTenant, fulfillJson } from '../../../support/tenantSession';\nimport { openB235Target } from '../../../support/b235TargetSession';",
+        "count": 1
+      },
+      {
+        "before": " if(readOnly)await loginAsDisposableRole(page,'PW_USERS_READ_ONLY');else await loginAsTenant(page);",
+        "after": " if(readOnly)await loginAsDisposableRole(page,'PW_USERS_READ_ONLY');else await openB235Target(page,'/users');",
+        "count": 1
+      }
+    ],
+    "tenant/products/products.spec.ts": [
+      {
+        "before": "await expect(list(page).getByText('Loading products...')).toBeVisible();",
+        "after": "await expect(list(page).locator('[aria-live=\"polite\"]').filter({hasText:/^Loading products\\.\\.\\.$/})).toBeVisible();",
+        "count": 1
+      }
+    ]
+  },
+  "pages": {
+    "tenant-permissions": {
+      "route": "/permissions",
+      "heading": "Tenant permission management"
+    },
+    "products": {
+      "route": "/products",
+      "heading": "Product workspace"
+    },
+    "users": {
+      "route": "/users",
+      "heading": "Tenant user management"
+    }
+  }
+}
