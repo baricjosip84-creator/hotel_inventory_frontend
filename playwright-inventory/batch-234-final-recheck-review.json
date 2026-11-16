@@ -1,0 +1,164 @@
+{
+  "batch": 234,
+  "group": "BULK_SAFE_15",
+  "source_log": "logs_118742852782.zip",
+  "source_log_sha256": "5b5e80304830997d7ac4e62966de23029dde738e35ccadef4f30186bde3035db",
+  "pass_ids": [
+    "TAS-019",
+    "TAS-021",
+    "TAS-022",
+    "TAS-026",
+    "TAS-027",
+    "TEI-001",
+    "TEI-003",
+    "TEI-004",
+    "TEI-005",
+    "TEI-006",
+    "TEI-007",
+    "TEI-008",
+    "TEI-009",
+    "TEI-010",
+    "TEI-011",
+    "TEI-012",
+    "TEI-013",
+    "TEI-014",
+    "TEI-015",
+    "TEI-016",
+    "TEI-017",
+    "TEI-018",
+    "TET-028",
+    "TET-029",
+    "TET-030",
+    "TRPL-037",
+    "TSES-018",
+    "TSES-020",
+    "TSES-040",
+    "TSES-042",
+    "TSES-071",
+    "TSN-005",
+    "TSN-008",
+    "TUSR-021",
+    "TUSR-022",
+    "TUSR-023",
+    "TUSR-024",
+    "TUSR-025",
+    "TUSR-026",
+    "TUSR-027",
+    "TUSR-028",
+    "TUSR-029",
+    "TUSR-030",
+    "TUSR-033",
+    "TUSR-034",
+    "TUSR-035",
+    "TUSR-036",
+    "TUSR-037",
+    "TUSR-038",
+    "TUSR-039",
+    "TUSR-040",
+    "TUSR-041",
+    "TUSR-043",
+    "TUSR-044",
+    "TUSR-045",
+    "TUSR-046",
+    "TUSR-048",
+    "TUSR-049",
+    "TUSR-051",
+    "TUSR-052",
+    "TUSR-053",
+    "TUSR-054",
+    "TUSR-055",
+    "TUSR-056",
+    "TUSR-057",
+    "TUSR-061",
+    "TUSR-063",
+    "TUSR-065",
+    "TUSR-066",
+    "TUSR-067",
+    "TUSR-068",
+    "TUSR-069",
+    "TUSR-070",
+    "TUSR-071",
+    "TUSR-072",
+    "TUSR-073",
+    "TUSR-074",
+    "TUSR-075"
+  ],
+  "held_ids": [
+    "TSES-039"
+  ],
+  "recheck_ids": [
+    "TSES-016",
+    "TSES-017",
+    "TSES-036",
+    "TSES-038",
+    "TSES-048",
+    "TSES-050",
+    "TUSR-076"
+  ],
+  "count": 7,
+  "cumulative_pass": 2223,
+  "cumulative_held": 408,
+  "unapproved": 7262,
+  "issue_records": 525,
+  "edits": {
+    "tenant/users/users-lifecycle.spec.ts": {
+      "before_sha256": "ebae604c67f6085812bf51343485edbd008b9ed5b626ec2987b099f6d7cb4b67",
+      "after_sha256": "ebae604c67f6085812bf51343485edbd008b9ed5b626ec2987b099f6d7cb4b67",
+      "changes": []
+    },
+    "tenant/sessions/sessions.spec.ts": {
+      "before_sha256": "329ce578c0dd9cb4dad0cff527f918b21e16bd77c836fcb2d902484077d46948",
+      "after_sha256": "d05aaacd9fd5776fabbdf20ff6574f427d1a9f9eb070f3640c98ff11bb6c8d12",
+      "changes": [
+        {
+          "id": "TSES-016",
+          "before": "test('TSES-016 Revoke another active session uses exact ID and success feedback',async({page})=>{\n  const seen=await open(page);const row=table(page).locator('tbody tr').filter({hasText:'198.51.100.11'});\n  await row.getByRole('button',{name:'Revoke'}).click();\n  await expect.poll(()=>requestDeletes(seen).length).toBe(1);\n  expect(requestDeletes(seen)[0].path).toBe('/auth/sessions/pw-other-session-00000002');\n  await expect(page.locator('.sessions-message[role=status]')).toContainText('Session revoked.');\n });\n ",
+          "after": "test('TSES-016 Revoke another active session uses exact ID and success feedback',async({page})=>{\n  const seen=await open(page);const row=table(page).locator('tbody tr').filter({hasText:'198.51.100.11'});\n  page.once('dialog',async d=>{if(d.type()==='confirm' && /revoke/i.test(d.message()) && !/revoke all/i.test(d.message()))await d.accept();else await d.dismiss();});\n  await row.getByRole('button',{name:'Revoke'}).click();\n  await expect.poll(()=>requestDeletes(seen).length).toBe(1);\n  expect(requestDeletes(seen)[0].path).toMatch(/^\\/(?:api\\/)?auth\\/sessions\\/pw-other-session-00000002$/);\n  await expect(page.locator('.sessions-message[role=status]')).toContainText('Session revoked.');\n });\n ",
+          "before_sha256": "d18c894de5aa20bf89d8c334246a819f2225f2151e10b397c1cb2df7cd6b794b",
+          "after_sha256": "73640e5d3c4ab8c6222cdd9136cf915f5dba9b76d2ff031ce0c37c10b9776c55"
+        },
+        {
+          "id": "TSES-017",
+          "before": "test('TSES-017 Failed revoke shows error without navigating out',async({page})=>{\n  const seen=await open(page,{revokeStatus:409});const row=table(page).locator('tbody tr').filter({hasText:'198.51.100.11'});\n  await row.getByRole('button',{name:'Revoke'}).click();\n  await expect(page.getByRole('main').getByRole('alert')).toContainText('Synthetic revoke rejected');\n  await expect(page).toHaveURL(/\\/sessions$/);expect(requestDeletes(seen)).toHaveLength(1);\n });\n ",
+          "after": "test('TSES-017 Failed revoke shows error without navigating out',async({page})=>{\n  const seen=await open(page,{revokeStatus:409});const row=table(page).locator('tbody tr').filter({hasText:'198.51.100.11'});\n  page.once('dialog',async d=>{if(d.type()==='confirm' && /revoke/i.test(d.message()) && !/revoke all/i.test(d.message()))await d.accept();else await d.dismiss();});\n  await row.getByRole('button',{name:'Revoke'}).click();\n  await expect.poll(()=>requestDeletes(seen).length).toBe(1);\n  await expect(page.getByRole('main').getByRole('alert')).toContainText('Synthetic revoke rejected');\n  await expect(page).toHaveURL(/\\/sessions$/);expect(requestDeletes(seen)).toHaveLength(1);\n });\n ",
+          "before_sha256": "d7dcac13e58076657e4c9acbef2f60113e06aa270b5594937570d12dc79c35fc",
+          "after_sha256": "cfc7ab7a80a4b65c85c919efc8c22902adf9441568c15a1a6cf1f818682934a8"
+        }
+      ]
+    },
+    "tenant/sessions/sessions-batch33.spec.ts": {
+      "before_sha256": "b79eb6d0a2ccab53d2ae6c9b505b0214db5dce38369e497aff38fab39ca9c7fe",
+      "after_sha256": "f7151dd3ba0eedfa6e160314e1f04b4d0586809ed1da0767603d1fbe9e35bd8d",
+      "changes": [
+        {
+          "id": "TSES-036",
+          "before": "test('TSES-036 Pending individual revoke disables all revoke actions until response',async({page})=>{\n  const state=await openSessions(page);const gate=deferred();state.deleteWait=gate.promise;\n  try{\n   await rowFor(page,defaultRows[1]).getByRole('button',{name:'Revoke'}).click();\n   await expect(rowFor(page,defaultRows[2]).getByRole('button',{name:'Revoke'})).toBeDisabled();\n   await expect(rowFor(page,defaultRows[1]).getByRole('button',{name:/Revoking/})).toBeDisabled();\n  }finally{gate.resolve();}\n  await expect(page.locator('.sessions-message[role=status]')).toContainText('Session revoked.');\n });\n ",
+          "after": "test('TSES-036 Pending individual revoke disables all revoke actions until response',async({page})=>{\n  const state=await openSessions(page);const gate=deferred();state.deleteWait=gate.promise;\n  try{\n   page.once('dialog',async d=>{if(d.type()==='confirm' && /revoke/i.test(d.message()) && !/revoke all/i.test(d.message()))await d.accept();else await d.dismiss();});\n   await rowFor(page,defaultRows[1]).getByRole('button',{name:'Revoke'}).click();\n   await expect.poll(()=>deletes(state).length).toBe(1);\n   await expect(rowFor(page,defaultRows[2]).getByRole('button',{name:'Revoke'})).toBeDisabled();\n   await expect(rowFor(page,defaultRows[1]).getByRole('button',{name:/Revoking/})).toBeDisabled();\n  }finally{gate.resolve();}\n  await expect(page.locator('.sessions-message[role=status]')).toContainText('Session revoked.');\n });\n ",
+          "before_sha256": "117572a437475c43b1a92ba27f8fd81fdd3ed8c33b5703cf7c103b25643ecd7b",
+          "after_sha256": "c9da2f8c50c56d6be2c12f8bb9a2e18e2b16fc461890c4140044f825b9f0541e"
+        },
+        {
+          "id": "TSES-038",
+          "before": "test('TSES-038 Failed revoke retains session identifier for an operator retry',async({page})=>{\n  const s=makeSession(1);const state=await openSessions(page,{rows:[s],deleteStatus:503});\n  await rowFor(page,s).getByRole('button',{name:'Revoke'}).click();\n  await expect(page.getByRole('main').getByRole('alert')).toContainText('Synthetic session revoke denied');\n  state.deleteStatus=undefined;\n  await rowFor(page,s).getByRole('button',{name:'Revoke'}).click();\n  await expect.poll(()=>deletes(state).length).toBe(2);\n  expect(deletes(state).every(call=>call.path.endsWith(s.id))).toBe(true);\n });\n ",
+          "after": "test('TSES-038 Failed revoke retains session identifier for an operator retry',async({page})=>{\n  const s=makeSession(1);const state=await openSessions(page,{rows:[s],deleteStatus:503});\n  page.once('dialog',async d=>{if(d.type()==='confirm' && /revoke/i.test(d.message()) && !/revoke all/i.test(d.message()))await d.accept();else await d.dismiss();});\n  await rowFor(page,s).getByRole('button',{name:'Revoke'}).click();\n  await expect.poll(()=>deletes(state).length).toBe(1);\n  await expect(page.getByRole('main').getByRole('alert')).toContainText('Synthetic session revoke denied');\n  state.deleteStatus=undefined;\n  page.once('dialog',async d=>{if(d.type()==='confirm' && /revoke/i.test(d.message()) && !/revoke all/i.test(d.message()))await d.accept();else await d.dismiss();});\n  await rowFor(page,s).getByRole('button',{name:'Revoke'}).click();\n  await expect.poll(()=>deletes(state).length).toBe(2);\n  expect(deletes(state).every(call=>call.path.endsWith(s.id))).toBe(true);\n });\n ",
+          "before_sha256": "8eac2d0b061e27be95f2a73432f6727375fe40d95990b24835f25118231cc734",
+          "after_sha256": "5a1698cdbdce65aa855e793b018fc048a9d6c0b081f15e3fb15ef664afd97eea"
+        },
+        {
+          "id": "TSES-048",
+          "before": "test('TSES-048 Zero active sessions shows attention state and disables revoke-all',async({page})=>{\n  const state=await openSessions(page,{rows:[]});\n  await expect(page.getByText('NO ACTIVE SESSIONS')).toBeVisible();\n  await expect(page.getByRole('button',{name:'Revoke all sessions'})).toBeDisabled();\n  await expect(page.getByText('Current browser is not yet tracked.')).toBeVisible();\n  expect(deletes(state)).toHaveLength(0);\n });\n ",
+          "after": "test('TSES-048 Zero active sessions shows attention state and disables revoke-all',async({page})=>{\n  const state=await openSessions(page,{rows:[]});\n  await expect(page.getByText('NO ACTIVE SESSIONS',{exact:true})).toBeVisible();\n  await expect(page.getByRole('button',{name:'Revoke all sessions'})).toBeDisabled();\n  await expect(page.getByText('Current browser is not yet tracked.')).toBeVisible();\n  expect(deletes(state)).toHaveLength(0);\n });\n ",
+          "before_sha256": "f2c286b02e60dfbef3761680032e8cec072a839387b702228ef11614cdbbf939",
+          "after_sha256": "d1aebcf389a40b2272b088a1a3802139e9ffca030ac44e35dcf687cb6e866495"
+        },
+        {
+          "id": "TSES-050",
+          "before": "test('TSES-050 Server 403 for requested session ID surfaces denial without success claim',async({page})=>{\n  const s=makeSession(1,{id:'pw-foreign-session-do-not-revoke'});\n  const state=await openSessions(page,{rows:[s],deleteStatus:403,deleteError:'Session does not belong to your account'});\n  await rowFor(page,s).getByRole('button',{name:'Revoke'}).click();\n  await expect(page.getByRole('main').getByRole('alert')).toContainText('Session does not belong to your account');\n  await expect(page.locator('.sessions-message[role=status]')).toHaveCount(0);\n  expect(deletes(state)[0].path).toContain(s.id);\n });\n});\n\n\n// Batch 173 \u2014 additional source-backed presentation, legacy-state and feedback\n// boundaries from frontend/src/pages/SessionsPage.tsx. ALL requests intercepted.\n// These browser-only contracts do not establish real token revocation or isolation.\ntest.describe('Tenant Sessions \u2014 device/network and legacy-state source boundaries (Batch 173)',()=>{\n ",
+          "after": "test('TSES-050 Server 403 for requested session ID surfaces denial without success claim',async({page})=>{\n  const s=makeSession(1,{id:'pw-foreign-session-do-not-revoke'});\n  const state=await openSessions(page,{rows:[s],deleteStatus:403,deleteError:'Session does not belong to your account'});\n  page.once('dialog',async d=>{if(d.type()==='confirm' && /revoke/i.test(d.message()) && !/revoke all/i.test(d.message()))await d.accept();else await d.dismiss();});\n  await rowFor(page,s).getByRole('button',{name:'Revoke'}).click();\n  await expect.poll(()=>deletes(state).length).toBe(1);\n  await expect(page.getByRole('main').getByRole('alert')).toContainText('Session does not belong to your account');\n  await expect(page.locator('.sessions-message[role=status]')).toHaveCount(0);\n  expect(deletes(state)[0].path).toContain(s.id);\n });\n});\n\n\n// Batch 173 \u2014 additional source-backed presentation, legacy-state and feedback\n// boundaries from frontend/src/pages/SessionsPage.tsx. ALL requests intercepted.\n// These browser-only contracts do not establish real token revocation or isolation.\ntest.describe('Tenant Sessions \u2014 device/network and legacy-state source boundaries (Batch 173)',()=>{\n ",
+          "before_sha256": "e52c9b0de7d1d142657484fc0366d54c32092fa39343345438dffa41599a5981",
+          "after_sha256": "ea6d0f5aa27a4a80423cfd4471c11bb30a2014817b3bd4d258c6657086a51d27"
+        }
+      ]
+    }
+  }
+}

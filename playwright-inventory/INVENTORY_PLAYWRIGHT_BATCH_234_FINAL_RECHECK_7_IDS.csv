@@ -1,0 +1,8 @@
+﻿test_id,status,evidence
+TSES-016,RECHECK_REQUIRED,logs_118742852782.zip; individual revoke confirmation handling and captured DELETE assertion
+TSES-017,RECHECK_REQUIRED,logs_118742852782.zip; individual revoke confirmation handling and captured DELETE assertion
+TSES-036,RECHECK_REQUIRED,logs_118742852782.zip; individual revoke confirmation handling and captured DELETE assertion
+TSES-038,RECHECK_REQUIRED,logs_118742852782.zip; individual revoke confirmation handling and captured DELETE assertion
+TSES-048,RECHECK_REQUIRED,logs_118742852782.zip; corrected exact badge locator
+TSES-050,RECHECK_REQUIRED,logs_118742852782.zip; individual revoke confirmation handling and captured DELETE assertion
+TUSR-076,RECHECK_REQUIRED,logs_118742852782.zip; auth fixture failure
