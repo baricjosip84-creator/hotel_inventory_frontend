@@ -1,0 +1,111 @@
+name: Inventory - original 9900 Playwright Batch 235
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type ORIGINALTESTS to run Batch 235 (209 original cases)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inventory-original-suite-production
+  cancel-in-progress: false
+
+jobs:
+  batch-235-original:
+    if: ${{ inputs.confirmation == 'ORIGINALTESTS' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    environment: Production
+    defaults:
+      run:
+        working-directory: playwright-inventory
+    env:
+      PW_BASE_URL: 'https://hotel-inventory-frontend-mauve.vercel.app'
+    steps:
+      - name: Checkout frontend repository
+        uses: actions/checkout@v4
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install original suite dependencies
+        run: npm install --no-audit --no-fund
+      - name: Extend frozen historical menu assertions
+        run: node scripts/extend-b232-legacy-menu-assertions.mjs
+      - name: Verify all scenario IDs, reviewed fingerprints, and bulk authentication isolation
+        run: |
+          node scripts/verify-original-suite.mjs
+          node scripts/check-bulk-auth-fixture.mjs
+          node scripts/check-stock-route-safety.mjs
+          node scripts/check-batch-209-stock-contract.mjs
+          node scripts/check-batch-210-bulk-contract.mjs
+          node scripts/check-batch-211-contract.mjs
+          node scripts/check-batch-212-contract.mjs
+          node scripts/check-batch-213-contract.mjs
+          node scripts/check-batch-214-contract.mjs
+          node scripts/check-batch-215-contract.mjs
+          node scripts/check-batch-216-contract.mjs
+          node scripts/check-batch-217-contract.mjs
+          node scripts/check-batch-218-contract.mjs
+          node scripts/check-batch-219-contract.mjs
+          node scripts/check-batch-220-contract.mjs
+          node scripts/check-batch-221-contract.mjs
+          node scripts/check-batch-222-contract.mjs
+          node scripts/check-batch-223-contract.mjs
+          node scripts/check-batch-224-contract.mjs
+          node scripts/check-batch-225-contract.mjs
+          node scripts/check-batch-226-contract.mjs
+          node scripts/check-batch-227-contract.mjs
+          node scripts/check-batch-228-contract.mjs
+          node scripts/check-batch-228-recheck-contract.mjs
+          node scripts/check-batch-229-contract.mjs
+          node scripts/check-batch-229-recheck-contract.mjs
+          node scripts/check-batch-229-recheck2-contract.mjs
+          node scripts/check-batch-229-recheck3-contract.mjs
+          node scripts/check-batch-229-recheck4-contract.mjs
+          node scripts/check-batch-229-recheck5-contract.mjs
+          node scripts/check-batch-229-recheck6-contract.mjs
+          node scripts/check-batch-230-contract.mjs
+          node scripts/check-batch-230-recheck-contract.mjs
+      - name: Prepare Batch 235 guarded tenant originals
+        run: |
+          node scripts/check-batch-235-contract.mjs
+          node scripts/prepare-batch-235-runtime.mjs
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Discover exactly 209 originally selected IDs
+        env:
+          PW_LIVE_ORIGINAL_READONLY: 'YES'
+          PW_ORIGINAL_SUITE_GROUP: 'BULK_SAFE_16'
+        run: |
+          npx playwright test --config=playwright.live-original.config.ts --list > original-selected.txt
+          tail -n 1 original-selected.txt
+          node scripts/check-live-original-discovery.mjs
+      - name: Batch 235 guarded live page access preflight
+        env:
+          PW_LIVE_ORIGINAL_READONLY: 'YES'
+          PW_ORIGINAL_SUITE_GROUP: 'BULK_SAFE_16'
+          PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
+          PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: |
+          node scripts/preflight-batch-235-pages.mjs --init
+          npx playwright test --config=playwright.b235-preflight.config.ts
+          node scripts/preflight-batch-235-pages.mjs --apply
+          npx playwright test --config=playwright.live-original.config.ts --list > original-selected.txt
+          node scripts/check-live-original-discovery.mjs
+      - name: Execute only Batch 235 reviewed tenant IDs
+        env:
+          PW_LIVE_ORIGINAL_READONLY: 'YES'
+          PW_ORIGINAL_SUITE_GROUP: 'BULK_SAFE_16'
+          PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
+          PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          PLAYWRIGHT_JSON_OUTPUT_FILE: batch-235-results.json
+        run: npx playwright test --config=playwright.live-original.config.ts --workers=1 --reporter=list,json
+      - name: Require exact Batch 235 actual pass results
+        if: ${{ always() }}
+        run: node scripts/check-batch-235-executed.mjs
