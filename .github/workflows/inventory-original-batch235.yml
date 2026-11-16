@@ -29,6 +29,8 @@ jobs:
     steps:
       - name: Checkout frontend repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Node.js 22
         uses: actions/setup-node@v4
         with:
@@ -37,6 +39,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Extend frozen historical menu assertions
         run: node scripts/extend-b232-legacy-menu-assertions.mjs
+      - name: Pin Batch 230 historical tracker without changing the cumulative tracker
+        run: node scripts/pin-b230-historical-issue-tracker.mjs
       - name: Verify all scenario IDs, reviewed fingerprints, and bulk authentication isolation
         run: |
           node scripts/verify-original-suite.mjs
