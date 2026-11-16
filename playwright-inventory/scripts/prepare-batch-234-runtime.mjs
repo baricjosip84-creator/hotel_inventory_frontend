@@ -1,5 +1,6 @@
 // Ephemeral CI overlay only. Never overwrite the committed original specs or historic groups.
 import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';import crypto from 'node:crypto';import {fileURLToPath} from 'node:url';
+import { applyBatch234AuthRuntime } from './prepare-batch-234-auth-runtime.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');const target=path.join(root,'original-suite-approved.json');
 const m=JSON.parse(fs.readFileSync(target,'utf8')),r=JSON.parse(fs.readFileSync(path.join(root,'batch-234-review.json'),'utf8'));
 const sha=s=>crypto.createHash('sha256').update(s).digest('hex');assert(!m.approved_groups[r.group]);
@@ -18,5 +19,6 @@ for(const [file,info] of Object.entries(r.source_files)){
  outputs.push({target,patched,entry:{file,ids:info.ids,sha256:sha(patched)}});
 }
 assert.equal(outputs.flatMap(o=>o.entry.ids).length,86);assert.deepEqual(outputs.flatMap(o=>o.entry.ids).sort(),r.selected.map(s=>s.id).sort());
+await applyBatch234AuthRuntime(root);
 for(const o of outputs)fs.writeFileSync(o.target,o.patched);m.approved_groups[r.group]={secret:true,entries:outputs.map(o=>o.entry)};fs.writeFileSync(target,JSON.stringify(m,null,2)+'\n');
 console.log('PASS B234: 86 exact reviewed originals, safe fixture, source-pinned scoped locator repairs and fallback guards.');
