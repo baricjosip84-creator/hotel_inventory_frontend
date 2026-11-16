@@ -242,6 +242,7 @@ const runnerOnly = [
   { group: 'BULK_SAFE_14', batch: 233, count: 500 },
   { group: 'BULK_SAFE_14_RECHECK', batch: '233-recheck', count: 40 },
   { group: 'BULK_SAFE_15', batch: 234, count: 86 },
+  { group: 'BULK_SAFE_16', batch: 235, count: 209 },
 ];
 assert.deepEqual(
   declared,

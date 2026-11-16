@@ -1,0 +1,210 @@
+﻿id,file,title,previous,review_note
+TADM-001,tenant/admin-system/admin-system.spec.ts,TADM-001 Tenant admin system loads through actual status GET,HELD,test fixture / production safety
+TADM-002,tenant/admin-system/admin-system.spec.ts,TADM-002 Unlocked status renders WRITES OPEN and individual CLEAR lock badges,HELD,test fixture / production safety
+TADM-003,tenant/admin-system/admin-system.spec.ts,TADM-003 Platform-only write lock reports blocked operations,HELD,test fixture / production safety
+TADM-004,tenant/admin-system/admin-system.spec.ts,TADM-004 Tenant-only write lock identifies tenant as blocker,HELD,test fixture / production safety
+TADM-005,tenant/admin-system/admin-system.spec.ts,TADM-005 Combined locks identify both sources without mutation control,HELD,test fixture / production safety
+TADM-006,tenant/admin-system/admin-system.spec.ts,TADM-006 Maintenance mode enabled is visible and read-only,HELD,test fixture / production safety
+TADM-007,tenant/admin-system/admin-system.spec.ts,TADM-007 Disabled maintenance reports OFF instead of active,HELD,test fixture / production safety
+TADM-008,tenant/admin-system/admin-system.spec.ts,TADM-008 Blocking KPI uses authoritative status count not loaded row count,HELD,test fixture / production safety
+TADM-009,tenant/admin-system/admin-system.spec.ts,TADM-009 Malformed status blocker count falls back to numeric zero,HELD,test fixture / production safety
+TADM-010,tenant/admin-system/admin-system.spec.ts,TADM-010 Forbidden system-status reports unavailable and preserves diagnostic area,HELD,test fixture / production safety
+TADM-011,tenant/admin-system/admin-system.spec.ts,TADM-011 Reported timestamp does not fall back to missing placeholder,HELD,test fixture / production safety
+TADM-012,tenant/admin-system/admin-system.spec.ts,TADM-012 Tenant ID is displayed from status response,HELD,test fixture / production safety
+TADM-013,tenant/admin-system/admin-system.spec.ts,TADM-013 Posture does not expose controls to alter platform/tenant locks,HELD,test fixture / production safety
+TADM-014,tenant/admin-system/admin-system.spec.ts,TADM-014 Blocking alert presents mapped readable type and evidence text,HELD,test fixture / production safety
+TADM-015,tenant/admin-system/admin-system.spec.ts,TADM-015 Blocking alert shows source severity and acknowledgement state,HELD,test fixture / production safety
+TADM-016,tenant/admin-system/admin-system.spec.ts,"TADM-016 Negative stock renders product, storage and quantity",HELD,test fixture / production safety
+TADM-017,tenant/admin-system/admin-system.spec.ts,TADM-017 Finalized shipment shortage displays PO and source counts,HELD,test fixture / production safety
+TADM-018,tenant/admin-system/admin-system.spec.ts,TADM-018 Empty diagnostic lists render three separate safe empty states,HELD,test fixture / production safety
+TADM-019,tenant/admin-system/admin-system.spec.ts,TADM-019 Partial diagnostic forbidden failure does not hide other sections,HELD,test fixture / production safety
+TADM-020,tenant/admin-system/admin-system.spec.ts,TADM-020 Refresh re-queries status and all three diagnostics without POST,HELD,test fixture / production safety
+TADM-033,tenant/admin-system/admin-system-actions.spec.ts,TADM-033 Platform lock disables alert mutations,UNAPPROVED,new original; source-reviewed UI fixture
+TADM-034,tenant/admin-system/admin-system-actions.spec.ts,TADM-034 Tenant lock retains readable diagnostics but disables actions,UNAPPROVED,new original; source-reviewed UI fixture
+TADM-037,tenant/admin-system/admin-system-actions.spec.ts,TADM-037 Failed status refetch reports incomplete refresh,UNAPPROVED,new original; source-reviewed UI fixture
+TADM-038,tenant/admin-system/admin-system-actions.spec.ts,TADM-038 Refresh disabled while status is loading,UNAPPROVED,new original; source-reviewed UI fixture
+TADM-039,tenant/admin-system/admin-system-actions.spec.ts,TADM-039 Missing optional status keys use safe fallbacks,UNAPPROVED,new original; source-reviewed UI fixture
+TADM-040,tenant/admin-system/admin-system-actions.spec.ts,TADM-040 Unknown alert type remains source text,UNAPPROVED,new original; source-reviewed UI fixture
+TADM-041,tenant/admin-system/admin-system-actions.spec.ts,TADM-041 Unknown severity remains source text,UNAPPROVED,new original; source-reviewed UI fixture
+TADM-042,tenant/admin-system/admin-system-actions.spec.ts,TADM-042 Stock labels fall back to shortened identifiers,UNAPPROVED,new original; source-reviewed UI fixture
+TADM-043,tenant/admin-system/admin-system-actions.spec.ts,TADM-043 Shipment without PO uses shortened shipment identifier,UNAPPROVED,new original; source-reviewed UI fixture
+TADM-044,tenant/admin-system/admin-system-actions.spec.ts,TADM-044 Numeric shipment counts normalize numeric text,UNAPPROVED,new original; source-reviewed UI fixture
+TADM-045,tenant/admin-system/admin-system-actions.spec.ts,TADM-045 All diagnostic GETs use bounded limit 100,UNAPPROVED,new original; source-reviewed UI fixture
+TADM-046,tenant/admin-system/admin-system-actions.spec.ts,TADM-046 Forbidden shipment diagnostics do not remove other evidence,UNAPPROVED,new original; source-reviewed UI fixture
+TADM-047,tenant/admin-system/admin-system-actions.spec.ts,TADM-047 Tenant diagnostics cannot write platform locks,UNAPPROVED,new original; source-reviewed UI fixture
+TADM-048,tenant/admin-system/admin-system-actions.spec.ts,TADM-048 Keyboard refresh makes GET requests only,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-001,tenant/outbound/outbound.spec.ts,TOUT-001 Outbound displays the real fulfillment workflow and status labels,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-002,tenant/outbound/outbound.spec.ts,TOUT-002 Delayed summary GET renders its loading message before data,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-003,tenant/outbound/outbound.spec.ts,TOUT-003 Failed summary GET reports an inline status error,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-004,tenant/outbound/outbound.spec.ts,TOUT-004 Refresh status re-requests summary and orders,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-005,tenant/outbound/outbound.spec.ts,TOUT-005 Outbound workflow accordion reveals draft-to-dispatch steps,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-006,tenant/outbound/outbound.spec.ts,TOUT-006 Default route has Orders selected and no tab query parameter,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-007,tenant/outbound/outbound.spec.ts,TOUT-007 Dispatch trace tab maintains unrelated URL search keys,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-008,tenant/outbound/outbound.spec.ts,TOUT-008 Unknown tab query falls back to Orders view,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-009,tenant/outbound/outbound.spec.ts,TOUT-009 Trace GET remains lazy until Dispatch trace tab is selected,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-010,tenant/outbound/outbound.spec.ts,TOUT-010 Selecting a status filter passes exact status to orders GET,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-011,tenant/outbound/outbound.spec.ts,TOUT-011 Search orders sends trimmed text to GET query parameter,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-012,tenant/outbound/outbound.spec.ts,TOUT-012 Unmatched search shows filter-specific empty state,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-013,tenant/outbound/outbound.spec.ts,TOUT-013 Empty Orders view offers action to begin draft when create allowed,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-014,tenant/outbound/outbound.spec.ts,"TOUT-014 Populated orders show customer, order number and item identity",UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-015,tenant/outbound/outbound.spec.ts,TOUT-015 Ten-per-page order pagination updates page and visible order,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-016,tenant/outbound/outbound.spec.ts,TOUT-016 Refresh orders re-requests only the order listing from the workbench,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-017,tenant/outbound/outbound.spec.ts,"TOUT-017 Opening order details lazy-loads activity, docs and communications",UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-018,tenant/outbound/outbound.spec.ts,TOUT-018 Cancelled order exposes its cancellation reason on its own card,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-019,tenant/outbound/outbound.spec.ts,TOUT-019 Customer tab sends include-archived change in registry query,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-020,tenant/outbound/outbound.spec.ts,TOUT-020 Customer returns tab shows zero-return state and filter controls,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-021,tenant/outbound/outbound.spec.ts,TOUT-021 New customer requires nonblank name before Add Customer enables,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-022,tenant/outbound/outbound.spec.ts,TOUT-022 Add Customer posts trimmed name and hides editor on success,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-023,tenant/outbound/outbound.spec.ts,TOUT-023 Archive customer only posts after confirmation and carries version,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-024,tenant/outbound/outbound.spec.ts,TOUT-024 Customer search trims text and uses 12 records per page,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-026,tenant/outbound/outbound.spec.ts,TOUT-026 Product choice scopes location choices to stock-available locations,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-027,tenant/outbound/outbound.spec.ts,TOUT-027 Add line preserves at least one order line,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-028,tenant/outbound/outbound.spec.ts,"TOUT-028 Draft creation posts selected customer, source and normalized quantity",UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-029,tenant/outbound/outbound.spec.ts,TOUT-029 Cancel Edit restores read-only draft card without PUT,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-030,tenant/outbound/outbound.spec.ts,TOUT-030 Confirm sends If-Match-Version and shows local reservation outcome only,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-032,tenant/outbound/outbound.spec.ts,TOUT-032 Lot-tracked pick cannot be recorded without selecting physical lot,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-033,tenant/outbound/outbound.spec.ts,TOUT-033 Serialized pick requires exact count of serial checkboxes,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-034,tenant/outbound/outbound.spec.ts,TOUT-034 Packing appears only when picked quantity is waiting,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-035,tenant/outbound/outbound.spec.ts,TOUT-035 Dispatch prompts and posts only after explicit approval,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-036,tenant/outbound/outbound.spec.ts,TOUT-036 Partial dispatch displays remaining reserved order quantity,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-037,tenant/outbound/outbound.spec.ts,TOUT-037 Cancel order requires three-character reason and uses version header,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-038,tenant/outbound/outbound.spec.ts,TOUT-038 Preview document sends preview request but no PDF creation,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-039,tenant/outbound/outbound.spec.ts,TOUT-039 Stored PDF creation posts and leaves its source order visible,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-040,tenant/outbound/outbound.spec.ts,TOUT-040 Email preview enforces recipient and subject before confirmed send,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-042,tenant/outbound/outbound.spec.ts,TOUT-042 Order audit pane requests page two after expanding audit history,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-043,tenant/outbound/outbound.spec.ts,"TOUT-043 Return editor offers dispatched allocation, not arbitrary product line",UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-044,tenant/outbound/outbound.spec.ts,TOUT-044 Return quantity above remaining returnable amount disables create,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-045,tenant/outbound/outbound.spec.ts,"TOUT-045 Customer return posts allocation, location, condition and trimmed reason",UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-046,tenant/outbound/outbound.spec.ts,TOUT-046 Receive return prompts before sending version-guarded mutation,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-047,tenant/outbound/outbound.spec.ts,TOUT-047 Cancel return requires a reason of three trimmed characters,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-048,tenant/outbound/outbound.spec.ts,TOUT-048 Received return exposes receipt preview and audit evidence,UNAPPROVED,new original; source-reviewed UI fixture
+TOUT-049,tenant/outbound/outbound.spec.ts,TOUT-049 Dispatch trace query preserves lot identity and uses 15-per-page size,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-001,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-001 Policy editor loads tenant GET matrix with no write,HELD,permission / page access unverified
+TPER-002,tenant/tenant-permissions/tenant-permissions.spec.ts,"TPER-002 Overview gives source-backed permission, built-in and custom counts",HELD,permission / page access unverified
+TPER-003,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-003 Admin baseline is protected and save stays disabled,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-004,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-004 Selecting Manager changes role panel without a policy write,HELD,permission / page access unverified
+TPER-005,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-005 Selecting Staff shows its own defaults and assigned users,HELD,permission / page access unverified
+TPER-006,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-006 Custom role card identifies starting template,HELD,permission / page access unverified
+TPER-007,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-007 Search by human-readable permission label narrows result,HELD,authentication / setup
+TPER-008,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-008 Search by technical permission key matches hidden key,HELD,authentication / setup
+TPER-009,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-009 Search by permission group matches all group members,HELD,authentication / setup
+TPER-010,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-010 No-match search provides Clear search recovery,HELD,authentication / setup
+TPER-011,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-011 Show technical keys reveals permission identifiers,HELD,permission / page access unverified
+TPER-012,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-012 Hide technical keys removes identifiers from accessible rows,HELD,permission / page access unverified
+TPER-013,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-013 Expand all reveals grouped permissions without mutation,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-014,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-014 Collapse all hides permission rows until expanded,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-015,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-015 Clicking Inventory group toggles its expansion state,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-016,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-016 Manager can locally enable permitted Product editing with dependency,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-017,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-017 Locked dashboard access cannot be disabled for Manager,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-018,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-018 Reserved tenant-delete permission cannot be granted,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-019,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-019 Unsaved draft makes Save active but sends no request before confirmation,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-020,tenant/tenant-permissions/tenant-permissions.spec.ts,TPER-020 Cancelled Save confirmation performs no policy PUT,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-021,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-021 Manager policy save confirms and submits expected_revision,HELD,permission / page access unverified
+TPER-022,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-022 Cancelling policy save leaves draft and sends no PUT,HELD,permission / page access unverified
+TPER-023,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-023 Successful save refreshes matrix and acknowledges result,HELD,permission / page access unverified
+TPER-024,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-024 Stale revision rejection keeps local draft,HELD,permission / page access unverified
+TPER-025,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-025 Failed policy request leaves Save available for retry,HELD,permission / page access unverified
+TPER-026,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-026 Default built-in baseline disables Reset,HELD,permission / page access unverified
+TPER-027,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-027 Overridden Manager policy reset sends revisioned DELETE,HELD,permission / page access unverified
+TPER-028,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-028 Cancelled built-in reset does not issue DELETE,HELD,permission / page access unverified
+TPER-029,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-029 Discard draft accepts confirmation and restores server state,HELD,permission / page access unverified
+TPER-030,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-030 Cancelled discard retains unsaved policy draft,HELD,permission / page access unverified
+TPER-031,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-031 Confirmed role change discards draft and selects Staff,HELD,permission / page access unverified
+TPER-032,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-032 Cancelled dirty role change remains on Manager,HELD,authentication / setup
+TPER-033,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-033 Custom workspace lists roles and reveals empty state,HELD,authentication / setup
+TPER-034,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-034 Blank and one-character custom names cannot submit,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-035,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-035 Protected Admin name rejects POST before network,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-036,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-036 Template choice previews description and count,HELD,permission / page access unverified
+TPER-037,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-037 Creation trims name and passes template_key in POST,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-038,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-038 Custom role creation failure keeps form values,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-039,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-039 Custom metadata PATCH passes version and refreshed name,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-040,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-040 Custom role metadata rejects Manager as reserved name,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-041,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-041 Duplicate via prompt posts the trimmed copied name,HELD,permission / page access unverified
+TPER-042,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-042 Cancelled duplicate prompt has no POST,HELD,permission / page access unverified
+TPER-043,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-043 Active user assignment disables custom deactivation,HELD,permission / page access unverified
+TPER-044,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-044 Cancelled deactivation dialog makes no PATCH,HELD,permission / page access unverified
+TPER-045,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-045 Confirmed deactivation then reactivation use versioned PATCH,HELD,permission / page access unverified
+TPER-046,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-046 Assigned users disable custom role deletion,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-047,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-047 Confirmed delete passes numeric version and refreshes matrix,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-048,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-048 Custom role policy save sends version and excludes locked/reserved rights,HELD,permission / page access unverified
+TPER-049,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-049 Reset to starting template sends versioned DELETE,HELD,permission / page access unverified
+TPER-050,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-050 Forbidden policy matrix renders access failure without editor,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-051,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-051 Whitespace-only create role name cannot enable submit,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-052,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-052 Eighty-character custom name shows the source-backed boundary counter,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-053,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-053 Create description accepts its five-hundred-character boundary locally,HELD,permission / page access unverified
+TPER-054,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-054 Blank template and description produce explicit null custom-role payload fields,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-055,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-055 New-role description is trimmed before the intercepted POST,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-056,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-056 Whitespace-only optional creation description becomes null on POST,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-057,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-057 Unchanged custom role metadata cannot issue a PATCH,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-058,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-058 Metadata name counter reaches eighty with client-side length bound,HELD,permission / page access unverified
+TPER-059,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-059 Description-only metadata edit sends trimmed PATCH and current version,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-060,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-060 Whitespace-only metadata description clears it with explicit null,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-061,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-061 Whitespace-only metadata name disables Save details,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-062,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-062 Rejected metadata update keeps unsaved details for correction,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-063,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-063 Single-character duplicate name is rejected before any POST,HELD,permission / page access unverified
+TPER-064,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-064 Reserved Staff duplicate name is rejected before POST,HELD,permission / page access unverified
+TPER-065,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-065 Whitespace duplicate prompt exits without creating a role,HELD,permission / page access unverified
+TPER-066,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-066 Rejected duplicate POST keeps current role selected and reports error,HELD,permission / page access unverified
+TPER-067,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-067 Inactive custom role is identifiable and exposes an Activate action,HELD,permission / page access unverified
+TPER-068,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-068 Unassigned custom role explains safe deactivation,HELD,permission / page access unverified
+TPER-069,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-069 One active assignment produces singular blocking explanation,HELD,permission / page access unverified
+TPER-070,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-070 Multiple active assignments produce plural blocking explanation,HELD,permission / page access unverified
+TPER-071,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-071 Historical inactive assignments permit deactivation but prevent deletion,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-072,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-072 Inactive role lifecycle guidance explains reactivation prerequisite,HELD,permission / page access unverified
+TPER-073,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-073 Rejected custom permission PUT preserves the dirty permission draft,HELD,permission / page access unverified
+TPER-074,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-074 Rejected custom-policy reset preserves the stored override,HELD,permission / page access unverified
+TPER-075,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-075 Rejected deactivation PATCH preserves the active custom role,HELD,permission / page access unverified
+TPER-076,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-076 Rejected delete keeps the role in its tenant library,UNAPPROVED,new original; source-reviewed UI fixture
+TPER-077,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-077 Unchecking required Product viewing cascades to Product editing,HELD,permission / page access unverified
+TPER-078,tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts,TPER-078 A filtered group action changes only visible editable permissions,UNAPPROVED,new original; source-reviewed UI fixture
+TCOP-016,tenant/ai-copilot/ai-copilot.spec.ts,TCOP-016 history search query is trimmed and sent to backend,HELD,test defect (poll callback throws before request)
+TCOP-017,tenant/ai-copilot/ai-copilot.spec.ts,TCOP-017 analysis-type history filter reaches backend,HELD,test defect (poll callback throws before request)
+TCOP-021,tenant/ai-copilot/ai-copilot.spec.ts,TCOP-021 product-name search is sent independently as trimmed product_search,HELD,test defect (poll callback throws before request)
+TAS-020,tenant/automation-schedules/automation-schedules.spec.ts,TAS-020 Invalid IANA timezone stops scheduled creation with visible validation,UNAPPROVED,new original; source-reviewed UI fixture
+TAS-023,tenant/automation-schedules/automation-schedules.spec.ts,TAS-023 Monthly day outside 1–31 rejects locally before POST,UNAPPROVED,new original; source-reviewed UI fixture
+TET-027,tenant/execution-tasks/execution-tasks.spec.ts,TET-027 Create trims title and description in synthetic POST body,UNAPPROVED,new original; source-reviewed UI fixture
+TET-032,tenant/execution-tasks/execution-tasks.spec.ts,TET-032 Create carries selected metadata and converted due dates in intercepted POST,UNAPPROVED,new original; source-reviewed UI fixture
+TEXR-031,tenant/execution-requests/execution-requests.spec.ts,TEXR-031 Submitting draft posts fixed human-review note to submit endpoint,UNAPPROVED,new original; source-reviewed UI fixture
+TEXR-043,tenant/execution-requests/execution-requests.spec.ts,TEXR-043 Valid cancellation reason is trimmed and posted to cancellation action only,UNAPPROVED,new original; source-reviewed UI fixture
+TEXR-044,tenant/execution-requests/execution-requests.spec.ts,TEXR-044 Failed eligible request can prepare one governed retry with reason,UNAPPROVED,new original; source-reviewed UI fixture
+TIR-023,tenant/inventory-requisitions/inventory-requisitions.spec.ts,TIR-023 Product selector emits the actual product ID in draft payload,UNAPPROVED,new original; source-reviewed UI fixture
+TIR-025,tenant/inventory-requisitions/inventory-requisitions.spec.ts,TIR-025 Date-picker needed-by selection reaches draft create payload,UNAPPROVED,new original; source-reviewed UI fixture
+TIR-030,tenant/inventory-requisitions/inventory-requisitions.spec.ts,TIR-030 Governed rejection posts an adequate trimmed reason,UNAPPROVED,new original; source-reviewed UI fixture
+TIR-031,tenant/inventory-requisitions/inventory-requisitions.spec.ts,TIR-031 Cancelling a permitted draft POSTs a nonempty reason,UNAPPROVED,new original; source-reviewed UI fixture
+TIR-032,tenant/inventory-requisitions/inventory-requisitions.spec.ts,TIR-032 Reopening is exposed only for rejected/cancelled state and posts reason,UNAPPROVED,new original; source-reviewed UI fixture
+TIR-033,tenant/inventory-requisitions/inventory-requisitions.spec.ts,TIR-033 Selected approved request sends readiness POST distinct from fulfillment,UNAPPROVED,new original; source-reviewed UI fixture
+TIR-039,tenant/inventory-requisitions/inventory-requisitions.spec.ts,TIR-039 Selected approved bulk request previews readiness independently from bulk fulfillment,UNAPPROVED,new original; source-reviewed UI fixture
+TIR-041,tenant/inventory-requisitions/inventory-requisitions.spec.ts,TIR-041 Activity comment POST trims note before sending,UNAPPROVED,new original; source-reviewed UI fixture
+TPROD-020,tenant/products/products.spec.ts,TPROD-020 duplicate SKU rejects creation and leaves the unsaved form visible,UNAPPROVED,new original; source-reviewed UI fixture
+TPROD-023,tenant/products/products.spec.ts,TPROD-023 PATCH carries If-Match-Version and normalized product update,UNAPPROVED,new original; source-reviewed UI fixture
+TPROD-025,tenant/products/products.spec.ts,TPROD-025 confirmed archive sends DELETE with original version and success status,UNAPPROVED,new original; source-reviewed UI fixture
+TPROD-032,tenant/products/products.spec.ts,TPROD-032 package form blocks invalid quantity natively without creating a package,UNAPPROVED,new original; source-reviewed UI fixture
+TPROD-034,tenant/products/products.spec.ts,TPROD-034 package archive prompts then deletes the exact versioned package,UNAPPROVED,new original; source-reviewed UI fixture
+TPROD-044,tenant/products/products.spec.ts,TPROD-044 failed product write shows server error and never displays created confirmation,UNAPPROVED,new original; source-reviewed UI fixture
+TPROD-048,tenant/products/products.spec.ts,TPROD-048 slow catalog GET shows Loading products before data arrives,UNAPPROVED,new original; source-reviewed UI fixture
+TPROD-049,tenant/products/products.spec.ts,TPROD-049 exact barcode result precedes partial-name match,UNAPPROVED,new original; source-reviewed UI fixture
+TPROD-051,tenant/products/products.spec.ts,TPROD-051 creating a package sends normalized base-unit conversion and success feedback,UNAPPROVED,new original; source-reviewed UI fixture
+TPROD-054,tenant/products/products.spec.ts,TPROD-054 backend validation errors prevent CSV commit and enable error-row download,UNAPPROVED,new original; source-reviewed UI fixture
+TPROD-056,tenant/products/products.spec.ts,TPROD-056 negative minimum stock is rejected by native numeric validity before POST,UNAPPROVED,new original; source-reviewed UI fixture
+TPROD-057,tenant/products/products.spec.ts,TPROD-057 hidden archive dependencies present a human-readable conflict error,UNAPPROVED,new original; source-reviewed UI fixture
+TPROD-062,tenant/products/products.spec.ts,TPROD-062 negative standard unit cost is blocked before creating a product,UNAPPROVED,new original; source-reviewed UI fixture
+TPRC-024,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,TPRC-024 Bulk approval requires a separate explicit modal confirmation,UNAPPROVED,new original; source-reviewed UI fixture
+TPRC-026,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,TPRC-026 Bulk decision note is carried in the confirmed payload,UNAPPROVED,new original; source-reviewed UI fixture
+TPRC-032,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,TPRC-032 Approved selection requires confirmation and preserves exact product ID,UNAPPROVED,new original; source-reviewed UI fixture
+TPRC-034,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,TPRC-034 Conversion result presents a draft link rather than posting stock,UNAPPROVED,new original; source-reviewed UI fixture
+TPRC-046,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,TPRC-046 Exception approval prompts before posting exact action,UNAPPROVED,new original; source-reviewed UI fixture
+TUSR-031,tenant/users/users-lifecycle.spec.ts,TUSR-031 Own directory card hides deactivate and delete buttons,UNAPPROVED,new original; source-reviewed UI fixture
+TUSR-032,tenant/users/users-lifecycle.spec.ts,TUSR-032 Own role selector is locked while profile remains editable,UNAPPROVED,new original; source-reviewed UI fixture
+TUSR-047,tenant/users/users-lifecycle.spec.ts,TUSR-047 Directory refresh failure reports server error not success,UNAPPROVED,new original; source-reviewed UI fixture
+TUSR-059,tenant/users/users-lifecycle.spec.ts,TUSR-059 Editing current identity preserves server-side role fields,UNAPPROVED,new original; source-reviewed UI fixture
+TUSR-060,tenant/users/users-lifecycle.spec.ts,TUSR-060 Own password change explains that other active sessions are revoked,UNAPPROVED,new original; source-reviewed UI fixture
+TUSR-062,tenant/users/users-lifecycle.spec.ts,TUSR-062 Admin role selection unlocks when another active administrator exists,UNAPPROVED,new original; source-reviewed UI fixture
+TUSR-064,tenant/users/users-lifecycle.spec.ts,TUSR-064 Update email uniqueness rejection highlights email and keeps draft open,UNAPPROVED,new original; source-reviewed UI fixture
+TSL-035,tenant/storage-locations/storage-locations.spec.ts,TSL-035 Validated CSV preview only claims committed after confirmation and server success,UNAPPROVED,new original; source-reviewed UI fixture
+TSL-036,tenant/storage-locations/storage-locations.spec.ts,TSL-036 Failed CSV commit never displays committed feedback,UNAPPROVED,new original; source-reviewed UI fixture
+TEI-002,tenant/enterprise-inventory/enterprise-inventory.spec.ts,TEI-002 Nine retained permission-visible work areas are in one tablist,UNAPPROVED,new original; source-reviewed UI fixture
+TEI-019,tenant/enterprise-inventory/enterprise-inventory.spec.ts,TEI-019 Par level form cannot submit without required product and quantities,UNAPPROVED,new original; source-reviewed UI fixture
+TEI-020,tenant/enterprise-inventory/enterprise-inventory.spec.ts,"TEI-020 Cycle count form requires product, location, and counted quantity",UNAPPROVED,new original; source-reviewed UI fixture
+TEI-032,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,"TEI-032 Active-workspace par-level GET error is visible, not mistaken for empty successful list",HELD,environment/authentication
+TEI-037,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,TEI-037 Draft with trusted evidence shows Submit; approved count shows Reconcile instead,UNAPPROVED,new original; source-reviewed UI fixture
+TEI-070,tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts,TEI-070 Label creation requires selected product and valid barcode symbology/value,UNAPPROVED,new original; source-reviewed UI fixture
