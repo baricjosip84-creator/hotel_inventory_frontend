@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: 'Type ORIGINALTESTS to run Batch 235 (162 unresolved original cases)'
+        description: 'Type ORIGINALTESTS to run Batch 235 (118 unresolved original cases)'
         required: true
         type: string
 
@@ -81,9 +81,10 @@ jobs:
           node scripts/check-batch-235-contract.mjs
           node scripts/prepare-batch-235-runtime.mjs
           node scripts/check-batch-235-recheck-auth.mjs
+          node scripts/check-b235-dashboard-recovery.mjs
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Discover exactly 162 unresolved IDs
+      - name: Discover exactly 118 unresolved IDs
         env:
           PW_LIVE_ORIGINAL_READONLY: 'YES'
           PW_ORIGINAL_SUITE_GROUP: 'BULK_SAFE_16'
@@ -91,7 +92,7 @@ jobs:
           npx playwright test --config=playwright.live-original.config.ts --list > original-selected.txt
           tail -n 1 original-selected.txt
           node scripts/check-live-original-discovery.mjs
-      - name: Batch 235 recheck - guarded access and 162 unresolved originals
+      - name: Batch 235 recheck - guarded access and 118 unresolved originals
         env:
           PW_LIVE_ORIGINAL_READONLY: 'YES'
           PW_ORIGINAL_SUITE_GROUP: 'BULK_SAFE_16'

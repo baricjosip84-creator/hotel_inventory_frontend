@@ -21,5 +21,28 @@ try{
  await required(['scripts/preflight-batch-235-pages.mjs','--apply']);
  await required(['node_modules/playwright/cli.js','test','--config=playwright.live-original.config.ts','--list'],'original-selected.txt');
  await required(['scripts/check-live-original-discovery.mjs']);
- process.exitCode=await run(['node_modules/playwright/cli.js','test','--config=playwright.live-original.config.ts','--workers=1','--reporter=list,json']);
+ const manifestPath='original-suite-approved.json',original=fs.readFileSync(manifestPath,'utf8');
+ const manifest=JSON.parse(original),group=manifest.approved_groups.BULK_SAFE_16;
+ const phaseGroups=[group.entries.filter(e=>e.file.startsWith('tenant/tenant-permissions/')),group.entries.filter(e=>!e.file.startsWith('tenant/tenant-permissions/'))];
+ let combined=null,failed=false;
+ try{
+  for(let i=0;i<phaseGroups.length;i++){
+   const entries=phaseGroups[i];if(!entries.length)continue;
+   if(fs.existsSync('.b234-auth-stop')){failed=true;console.error('B235 circuit open: remaining phase unresolved');break;}
+   group.entries=entries;fs.writeFileSync(manifestPath,JSON.stringify(manifest,null,2)+'\n');
+   await required(['node_modules/playwright/cli.js','test','--config=playwright.live-original.config.ts','--list'],'original-selected.txt');
+   await required(['scripts/check-live-original-discovery.mjs']);
+   const reportFile='batch-235-phase-'+(i+1)+'-results.json';
+   env.PLAYWRIGHT_JSON_OUTPUT_FILE=reportFile;
+   console.log('B235 phase '+(i+1)+': '+entries.flatMap(e=>e.ids).length+' eligible original IDs');
+   const code=await run(['node_modules/playwright/cli.js','test','--config=playwright.live-original.config.ts','--workers=1','--reporter=list,json']);
+   if(code!==0)failed=true;
+   if(!fs.existsSync(reportFile)){failed=true;continue;}
+   const report=JSON.parse(fs.readFileSync(reportFile,'utf8'));
+   if(!combined)combined={...report,suites:[]};
+   combined.suites.push(...report.suites);
+   fs.writeFileSync('batch-235-results.json',JSON.stringify(combined,null,2));
+  }
+ }finally{fs.writeFileSync(manifestPath,original);}
+ process.exitCode=failed?1:0;
 }finally{await broker.close();}
