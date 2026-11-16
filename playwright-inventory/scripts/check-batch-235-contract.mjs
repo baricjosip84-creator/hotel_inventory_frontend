@@ -86,5 +86,6 @@ const guard=read('support/liveOriginalSafeTest.ts');
 assert(guard.includes("route.abort('blockedbyclient')")&&guard.includes('mockedWriteRequests')&&guard.includes('unexpectedlyCompletedWrites'));
 const wf=read('../.github/workflows/inventory-original-suite.yml');
 assert(wf.includes("inputs.group != 'BULK_SAFE_16'")&&wf.includes('PLAYWRIGHT_JSON_OUTPUT_FILE: batch-235-results.json'));
-assert(wf.includes('node scripts/check-batch-235-executed.mjs')&&wf.includes('--workers=1 --reporter=list,json'));
+assert(wf.includes('node scripts/check-batch-235-executed.mjs')&&wf.includes('node scripts/run-batch-235-recheck.mjs'));
+assert(read('scripts/run-batch-235-recheck.mjs').includes("'--workers=1','--reporter=list,json'"));
 console.log('PASS B235: 209 unique unresolved tenant IDs, 71 tracked rechecks, 138 first executions; 16 pinned source specs; 13 access gates.');

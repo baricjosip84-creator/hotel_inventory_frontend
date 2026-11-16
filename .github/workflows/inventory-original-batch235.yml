@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: 'Type ORIGINALTESTS to run Batch 235 (209 original cases)'
+        description: 'Type ORIGINALTESTS to run Batch 235 (162 unresolved original cases)'
         required: true
         type: string
 
@@ -76,9 +76,10 @@ jobs:
         run: |
           node scripts/check-batch-235-contract.mjs
           node scripts/prepare-batch-235-runtime.mjs
+          node scripts/check-batch-235-recheck-auth.mjs
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Discover exactly 209 originally selected IDs
+      - name: Discover exactly 162 unresolved IDs
         env:
           PW_LIVE_ORIGINAL_READONLY: 'YES'
           PW_ORIGINAL_SUITE_GROUP: 'BULK_SAFE_16'
@@ -86,26 +87,14 @@ jobs:
           npx playwright test --config=playwright.live-original.config.ts --list > original-selected.txt
           tail -n 1 original-selected.txt
           node scripts/check-live-original-discovery.mjs
-      - name: Batch 235 guarded live page access preflight
-        env:
-          PW_LIVE_ORIGINAL_READONLY: 'YES'
-          PW_ORIGINAL_SUITE_GROUP: 'BULK_SAFE_16'
-          PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
-          PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
-        run: |
-          node scripts/preflight-batch-235-pages.mjs --init
-          npx playwright test --config=playwright.b235-preflight.config.ts
-          node scripts/preflight-batch-235-pages.mjs --apply
-          npx playwright test --config=playwright.live-original.config.ts --list > original-selected.txt
-          node scripts/check-live-original-discovery.mjs
-      - name: Execute only Batch 235 reviewed tenant IDs
+      - name: Batch 235 recheck - guarded access and 162 unresolved originals
         env:
           PW_LIVE_ORIGINAL_READONLY: 'YES'
           PW_ORIGINAL_SUITE_GROUP: 'BULK_SAFE_16'
           PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
           PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           PLAYWRIGHT_JSON_OUTPUT_FILE: batch-235-results.json
-        run: npx playwright test --config=playwright.live-original.config.ts --workers=1 --reporter=list,json
+        run: node scripts/run-batch-235-recheck.mjs
       - name: Require exact Batch 235 actual pass results
         if: ${{ always() }}
         run: node scripts/check-batch-235-executed.mjs

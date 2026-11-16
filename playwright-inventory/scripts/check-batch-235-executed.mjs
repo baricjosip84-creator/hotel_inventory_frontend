@@ -1,7 +1,7 @@
 import fs from 'node:fs';import assert from 'node:assert/strict';
-const plan=JSON.parse(fs.readFileSync('batch-235-review.json','utf8'));
-const expected=plan.selected.map(x=>x.id),sort=x=>[...x].sort();
-assert.equal(expected.length,209);
+const plan=JSON.parse(fs.readFileSync('batch-235-recheck-review.json','utf8'));
+const expected=plan.recheck,sort=x=>[...x].sort();
+assert.equal(expected.length,162);
 assert(fs.existsSync('batch-235-live-access.json'),'B235 not executed: access preflight missing');
 const access=JSON.parse(fs.readFileSync('batch-235-live-access.json','utf8'));
 assert.equal(access.status,'PROBED','B235 access preflight incomplete');
@@ -20,7 +20,7 @@ function walk(s){
 for(const s of report.suites??[])walk(s);
 assert([...seen.keys()].every(i=>access.runnable.includes(i)));
 const pass=expected.filter(i=>seen.get(i)==='PASS'),unresolved=expected.filter(i=>seen.get(i)!=='PASS');
-console.log('B235 ACTUAL PASS '+pass.length+'/209');
+console.log('B235 RECHECK ACTUAL PASS '+pass.length+'/162');
 console.log('PASS IDs: '+pass.join(','));
 console.log('UNRESOLVED IDs: '+unresolved.join(','));
 assert.equal(unresolved.length,0,'No false green: failed, skipped, unexecuted and access-gated originals remain unresolved.');

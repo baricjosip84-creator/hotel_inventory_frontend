@@ -169,6 +169,7 @@ jobs:
         run: |
           node scripts/check-batch-235-contract.mjs
           node scripts/prepare-batch-235-runtime.mjs
+          node scripts/check-batch-235-recheck-auth.mjs
       - name: Install browser for reviewed existing tests
         if: ${{ inputs.group != 'DISCOVER_ALL' }}
         run: npx playwright install --with-deps chromium
@@ -232,20 +233,7 @@ jobs:
       - name: Require exact Batch 234 actual pass results (no false green)
         if: ${{ always() && inputs.group == 'BULK_SAFE_15' }}
         run: node scripts/check-batch-234-executed.mjs
-      - name: Batch 235 guarded live page access preflight
-        if: ${{ inputs.group == 'BULK_SAFE_16' }}
-        env:
-          PW_LIVE_ORIGINAL_READONLY: 'YES'
-          PW_ORIGINAL_SUITE_GROUP: ${{ inputs.group }}
-          PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
-          PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
-        run: |
-          node scripts/preflight-batch-235-pages.mjs --init
-          npx playwright test --config=playwright.b235-preflight.config.ts
-          node scripts/preflight-batch-235-pages.mjs --apply
-          npx playwright test --config=playwright.live-original.config.ts --list > original-selected.txt
-          node scripts/check-live-original-discovery.mjs
-      - name: Execute only Batch 235 reviewed tenant IDs
+      - name: Batch 235 recheck - guarded access and 162 unresolved originals
         if: ${{ inputs.group == 'BULK_SAFE_16' }}
         env:
           PW_LIVE_ORIGINAL_READONLY: 'YES'
@@ -253,7 +241,7 @@ jobs:
           PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
           PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           PLAYWRIGHT_JSON_OUTPUT_FILE: batch-235-results.json
-        run: npx playwright test --config=playwright.live-original.config.ts --workers=1 --reporter=list,json
+        run: node scripts/run-batch-235-recheck.mjs
       - name: Require exact Batch 235 actual pass results
         if: ${{ always() && inputs.group == 'BULK_SAFE_16' }}
         run: node scripts/check-batch-235-executed.mjs
