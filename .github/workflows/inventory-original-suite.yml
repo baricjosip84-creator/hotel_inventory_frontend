@@ -55,6 +55,7 @@ on:
           - BULK_SAFE_13
           - BULK_SAFE_14
           - BULK_SAFE_14_RECHECK
+          - BULK_SAFE_15
       confirmation:
         description: 'Type ORIGINALTESTS to run the selected group'
         required: true
@@ -87,7 +88,7 @@ jobs:
           node-version: '22'
       - name: Install original suite dependencies
         run: npm install --no-audit --no-fund
-      - name: Update frozen historical menu assertions for the four reviewed CI-only groups
+      - name: Update frozen historical menu assertions for the five reviewed CI-only groups
         run: node scripts/extend-b232-legacy-menu-assertions.mjs
       - name: Verify all scenario IDs, reviewed fingerprints, and bulk authentication isolation
         run: |
@@ -149,6 +150,11 @@ jobs:
           node scripts/check-batch-233-recheck-contract.mjs
           node scripts/prepare-batch-233-runtime.mjs
           node scripts/prepare-batch-233-recheck-runtime.mjs
+      - name: Prepare Batch 234 (86 new original tenant scenarios)
+        if: ${{ inputs.group == 'BULK_SAFE_15' }}
+        run: |
+          node scripts/check-batch-234-contract.mjs
+          node scripts/prepare-batch-234-runtime.mjs
       - name: Discover all 9,900 authored original tests (no browser, no credentials)
         if: ${{ inputs.group == 'DISCOVER_ALL' }}
         env:
@@ -183,7 +189,7 @@ jobs:
           npx playwright test --config=playwright.live-original.config.ts --list > original-selected.txt
           node scripts/check-live-original-discovery.mjs
       - name: Run reviewed ORIGINAL scenarios on live Vercel (not a new smoke suite)
-        if: ${{ inputs.group != 'DISCOVER_ALL' }}
+        if: ${{ inputs.group != 'DISCOVER_ALL' && inputs.group != 'BULK_SAFE_15' }}
         env:
           PW_LIVE_ORIGINAL_READONLY: 'YES'
           PW_ORIGINAL_SUITE_GROUP: ${{ inputs.group }}
@@ -195,6 +201,31 @@ jobs:
           else
             npx playwright test --config=playwright.live-original.config.ts
           fi
+      - name: Batch 234 guarded live page access preflight
+        if: ${{ inputs.group == 'BULK_SAFE_15' }}
+        env:
+          PW_LIVE_ORIGINAL_READONLY: 'YES'
+          PW_ORIGINAL_SUITE_GROUP: ${{ inputs.group }}
+          PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
+          PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: |
+          node scripts/preflight-batch-234-pages.mjs --init
+          npx playwright test --config=playwright.b234-preflight.config.ts
+          node scripts/preflight-batch-234-pages.mjs --apply
+          npx playwright test --config=playwright.live-original.config.ts --list > original-selected.txt
+          node scripts/check-live-original-discovery.mjs
+      - name: Execute only Batch 234 reviewed original IDs
+        if: ${{ inputs.group == 'BULK_SAFE_15' }}
+        env:
+          PW_LIVE_ORIGINAL_READONLY: 'YES'
+          PW_ORIGINAL_SUITE_GROUP: ${{ inputs.group }}
+          PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
+          PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          PLAYWRIGHT_JSON_OUTPUT_FILE: batch-234-results.json
+        run: npx playwright test --config=playwright.live-original.config.ts --workers=1 --reporter=list,json
+      - name: Require exact Batch 234 actual pass results (no false green)
+        if: ${{ always() && inputs.group == 'BULK_SAFE_15' }}
+        run: node scripts/check-batch-234-executed.mjs
       # No auth snapshots, traces, videos, screenshots, or artifacts uploaded.
       - name: Require every Batch 233 original to have been eligible (no false green)
         if: ${{ always() && inputs.group == 'BULK_SAFE_14' }}

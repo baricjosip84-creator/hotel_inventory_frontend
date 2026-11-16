@@ -1,0 +1,11 @@
+import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';import {fileURLToPath} from 'node:url';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');const target=path.join(root,'original-suite-approved.json');
+const m=JSON.parse(fs.readFileSync(target,'utf8')),r=JSON.parse(fs.readFileSync(path.join(root,'batch-234-review.json'),'utf8'));const group=m.approved_groups.BULK_SAFE_15;assert.equal(group.secret,true);assert.equal(group.entries.flatMap(e=>e.ids).length,86);
+const area=e=>e.file.split('/')[1];assert.deepEqual([...new Set(group.entries.map(area))].sort(),Object.keys(r.pages).sort());
+if(process.argv.includes('--plan')){console.log('PASS B234: 7 authorized page probes cover all 86 IDs');process.exit(0);}
+assert.equal(process.env.PW_BASE_URL,'https://hotel-inventory-frontend-mauve.vercel.app');assert.equal(process.env.PW_LIVE_ORIGINAL_READONLY,'YES');assert.equal(process.env.PW_ORIGINAL_SUITE_GROUP,'BULK_SAFE_15');
+const report=path.join(root,'batch-234-live-access.json');
+if(process.argv.includes('--init')){fs.writeFileSync(report,JSON.stringify({status:'AUTH_NOT_VERIFIED',pages:r.pages,access:{},runnable:[],blocked:group.entries.flatMap(e=>e.ids)},null,2)+'\n');process.exit(0);}
+assert(process.argv.includes('--apply'));const observed=JSON.parse(fs.readFileSync(report,'utf8'));assert.equal(observed.status,'PROBED');assert.deepEqual(Object.keys(observed.access).sort(),Object.keys(r.pages).sort());assert(Object.values(observed.access).every(v=>['ACCESS_CONFIRMED','ACCESS_UNVERIFIED'].includes(v)));
+const allowed=group.entries.filter(e=>observed.access[area(e)]==='ACCESS_CONFIRMED'),blocked=group.entries.filter(e=>observed.access[area(e)]!=='ACCESS_CONFIRMED').flatMap(e=>e.ids),runnable=allowed.flatMap(e=>e.ids);assert.equal(runnable.length+blocked.length,86);
+fs.writeFileSync(report,JSON.stringify({status:'PROBED',access:observed.access,runnable,blocked},null,2)+'\n');for(const id of blocked)console.log(`B234 ACCESS_UNVERIFIED ${id} (not executed, not PASS)`);console.log(`B234: ${runnable.length} runnable; ${blocked.length} access-unverified`);assert(runnable.length>0);group.entries=allowed;fs.writeFileSync(target,JSON.stringify(m,null,2)+'\n');
