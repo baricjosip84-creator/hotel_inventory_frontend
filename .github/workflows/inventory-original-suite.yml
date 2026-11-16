@@ -175,6 +175,8 @@ jobs:
           node scripts/prepare-batch-235-runtime.mjs
           node scripts/check-batch-235-recheck-auth.mjs
           node scripts/check-b235-dashboard-recovery.mjs
+          node scripts/check-b235-r3-phase-plan.mjs
+          node scripts/check-b235-r3-permission-fixture.mjs
       - name: Install browser for reviewed existing tests
         if: ${{ inputs.group != 'DISCOVER_ALL' }}
         run: npx playwright install --with-deps chromium
@@ -238,7 +240,7 @@ jobs:
       - name: Require exact Batch 234 actual pass results (no false green)
         if: ${{ always() && inputs.group == 'BULK_SAFE_15' }}
         run: node scripts/check-batch-234-executed.mjs
-      - name: Batch 235 recheck - guarded access and 118 unresolved originals
+      - name: Batch 235 R3 - guarded access and 82 unresolved originals
         if: ${{ inputs.group == 'BULK_SAFE_16' }}
         env:
           PW_LIVE_ORIGINAL_READONLY: 'YES'

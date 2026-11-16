@@ -1,0 +1,216 @@
+{
+  "batch": 235,
+  "source_log": "logs_118833148393.zip",
+  "passed": [
+    "TOUT-021",
+    "TOUT-022",
+    "TOUT-026",
+    "TOUT-028",
+    "TOUT-040",
+    "TOUT-042",
+    "TOUT-043",
+    "TOUT-044",
+    "TOUT-045",
+    "TOUT-046",
+    "TOUT-047",
+    "TOUT-048",
+    "TOUT-049",
+    "TPROD-020",
+    "TPROD-023",
+    "TPROD-025",
+    "TPROD-032",
+    "TPROD-044",
+    "TPROD-051",
+    "TPROD-054",
+    "TPROD-056",
+    "TPROD-057",
+    "TPROD-062",
+    "TPRC-024",
+    "TPRC-026",
+    "TPRC-032",
+    "TPRC-034",
+    "TPRC-046",
+    "TUSR-031",
+    "TUSR-032",
+    "TUSR-059",
+    "TUSR-060",
+    "TUSR-062",
+    "TSL-035",
+    "TSL-036"
+  ],
+  "held": [
+    "TPROD-034"
+  ],
+  "recheck": [
+    "TPER-001",
+    "TPER-002",
+    "TPER-003",
+    "TPER-004",
+    "TPER-005",
+    "TPER-006",
+    "TPER-007",
+    "TPER-008",
+    "TPER-009",
+    "TPER-010",
+    "TPER-011",
+    "TPER-012",
+    "TPER-013",
+    "TPER-014",
+    "TPER-015",
+    "TPER-016",
+    "TPER-017",
+    "TPER-018",
+    "TPER-019",
+    "TPER-020",
+    "TPER-021",
+    "TPER-022",
+    "TPER-023",
+    "TPER-024",
+    "TPER-025",
+    "TPER-026",
+    "TPER-027",
+    "TPER-028",
+    "TPER-029",
+    "TPER-030",
+    "TPER-031",
+    "TPER-032",
+    "TPER-033",
+    "TPER-034",
+    "TPER-035",
+    "TPER-036",
+    "TPER-037",
+    "TPER-038",
+    "TPER-039",
+    "TPER-040",
+    "TPER-041",
+    "TPER-042",
+    "TPER-043",
+    "TPER-044",
+    "TPER-045",
+    "TPER-046",
+    "TPER-047",
+    "TPER-048",
+    "TPER-049",
+    "TPER-050",
+    "TPER-051",
+    "TPER-052",
+    "TPER-053",
+    "TPER-054",
+    "TPER-055",
+    "TPER-056",
+    "TPER-057",
+    "TPER-058",
+    "TPER-059",
+    "TPER-060",
+    "TPER-061",
+    "TPER-062",
+    "TPER-063",
+    "TPER-064",
+    "TPER-065",
+    "TPER-066",
+    "TPER-067",
+    "TPER-068",
+    "TPER-069",
+    "TPER-070",
+    "TPER-071",
+    "TPER-072",
+    "TPER-073",
+    "TPER-074",
+    "TPER-075",
+    "TPER-076",
+    "TPER-077",
+    "TPER-078",
+    "TPROD-048",
+    "TPROD-049",
+    "TUSR-047",
+    "TUSR-064"
+  ],
+  "edits": {
+    "tenant/tenant-permissions/tenant-permissions.spec.ts": [
+      {
+        "before": "  const p=new URL(req.url()).pathname,m=req.method();const body=req.postDataJSON?.()??null;",
+        "after": "  const p=new URL(req.url()).pathname,m=req.method();if(m==='GET'&&p.endsWith('/permissions/me'))return route.fallback();\n  if(!['fetch','xhr'].includes(req.resourceType()))return route.fallback();\n  const body=req.postDataJSON?.()??null;",
+        "count": 1
+      },
+      {
+        "before": "  if(m==='GET'&&p.endsWith('/permissions/me'))return fulfillJson(route,{scope:'tenant',tenant_id:'pw-tenant',user_id:'pw-admin',role:'admin',permissions:catalog.map(x=>x.permission)});\n",
+        "after": "",
+        "count": 1
+      }
+    ],
+    "tenant/tenant-permissions/tenant-permissions-lifecycle.spec.ts": [
+      {
+        "before": "    const method = req.method(), path = new URL(req.url()).pathname;",
+        "after": "    const method = req.method(), path = new URL(req.url()).pathname;\n    if (method === 'GET' && path.endsWith('/permissions/me')) return route.fallback();\n    if (!['fetch','xhr'].includes(req.resourceType())) return route.fallback();",
+        "count": 1
+      },
+      {
+        "before": "    if (path.endsWith('/permissions/me') && method === 'GET') return fulfillJson(route, { scope: 'tenant', tenant_id: 'pw-tenant', user_id: 'pw-admin', role: 'admin', permissions: catalog.map(x => x.permission) });\n",
+        "after": "",
+        "count": 1
+      },
+      {
+        "before": "page.getByRole('button', { name: /Custom roles/ }).first().click()",
+        "after": "page.getByRole('tab', { name: /Custom roles/ }).click()",
+        "count": 1
+      },
+      {
+        "before": "managePanel(page).getByRole('textbox', { name: 'Name', exact: true })",
+        "after": "managePanel(page).locator('input[aria-describedby=\"tenant-custom-role-manage-name-count\"]')",
+        "count": 6
+      },
+      {
+        "before": "if (method === 'PATCH') { Object.assign(found, body, { version: (found.version ?? 1) + 1 }); return fulfillJson(route, found); }",
+        "after": "if (method === 'PATCH') {\n        const nextVersion=(found.version??1)+1;\n        if (typeof body?.name==='string') found.display_name=body.name;\n        if (body && 'description' in body) found.description=body.description;\n        if (typeof body?.is_active==='boolean') found.is_active=body.is_active;\n        found.version=nextVersion; return fulfillJson(route,found);\n      }",
+        "count": 1
+      },
+      {
+        "before": "found.is_default = method === 'DELETE'; found.version = (found.version ?? 1) + 1;",
+        "after": "found.is_default = method === 'DELETE'; found.override_count=method==='DELETE'?0:1; found.version = (found.version ?? 1) + 1;",
+        "count": 1
+      }
+    ],
+    "tenant/products/products.spec.ts": [
+      {
+        "before": "    let release: (() => void) | undefined;\n    const hold = new Promise<void>(resolve => { release = resolve; });\n    await page.route('**/products', async route => {\n      if (route.request().method() !== 'GET') return route.fallback();\n      await hold;\n      await fulfillJson(route, testProducts);\n    });\n    const navigation = page.reload({ waitUntil: 'domcontentloaded' });\n    await expect(list(page).getByText('Loading products...')).toBeVisible();\n    release?.();\n    await navigation;",
+        "after": "    let release: (() => void) | undefined;\n    let intercepted=0;\n    const hold = new Promise<void>(resolve => { release = resolve; });\n    await page.route(url=>url.pathname.endsWith('/products'), async route => {\n      if (!isApiGet(route)) return route.fallback();\n      intercepted++;\n      await hold;\n      await fulfillJson(route, testProducts);\n    });\n    try {\n      await page.reload({ waitUntil: 'domcontentloaded' });\n      await expect.poll(()=>intercepted).toBeGreaterThan(0);\n      await expect(list(page).getByText('Loading products...')).toBeVisible();\n    } finally { release?.(); }",
+        "count": 1
+      },
+      {
+        "before": "await page.route('**/products', route => route.request().method() === 'GET' ? fulfillJson(route, overrides) : route.fallback());",
+        "after": "await page.route(url=>url.pathname.endsWith('/products'), route => isApiGet(route) ? fulfillJson(route, overrides) : route.fallback());",
+        "count": 1
+      }
+    ],
+    "tenant/users/users-lifecycle.spec.ts": [
+      {
+        "before": "  const s=await setup(page,{refreshFailure:true});await page.getByRole('button',{name:'Refresh'}).click();\n  await expect(page.locator('#tenant-users-workspace-top').getByRole('alert')).toContainText('Synthetic directory unavailable');\n  await expect(page.locator('#tenant-users-workspace-top').getByRole('status')).not.toContainText('Users refreshed.');expect(writes(s.calls)).toHaveLength(0);",
+        "after": "  const s=await setup(page,{refreshFailure:true});\n  const failed=page.waitForResponse(r=>r.request().method()==='GET'&&new URL(r.url()).pathname.endsWith('/users')&&r.status()===503);\n  await page.getByRole('button',{name:'Refresh'}).click();await failed;\n  await expect(page.locator('.app-error-state').filter({hasText:'Failed to load users:'})).toContainText('Synthetic directory unavailable');\n  await expect(page.getByRole('status').filter({hasText:'Users refreshed.'})).toHaveCount(0);expect(writes(s.calls)).toHaveLength(0);",
+        "count": 1
+      },
+      {
+        "before": "   if(opts.updateStatus)return fulfillJson(route,{message:opts.updateErrorMessage??'Synthetic revision conflict',...(opts.updateErrorCode?{code:opts.updateErrorCode}:{})},opts.updateStatus);",
+        "after": "   if(opts.updateStatus&&opts.updateErrorCode==='UNIQUE_CONSTRAINT_VIOLATION')return fulfillJson(route,{error:{message:opts.updateErrorMessage??'Duplicate user email',code:opts.updateErrorCode,details:{constraint:'users_email_tenant_unique'}}},opts.updateStatus);\n   if(opts.updateStatus)return fulfillJson(route,{message:opts.updateErrorMessage??'Synthetic revision conflict',...(opts.updateErrorCode?{code:opts.updateErrorCode}:{})},opts.updateStatus);",
+        "count": 1
+      }
+    ]
+  },
+  "pages": {
+    "tenant-permissions": {
+      "route": "/permissions",
+      "heading": "Tenant permission management"
+    },
+    "products": {
+      "route": "/products",
+      "heading": "Product workspace"
+    },
+    "users": {
+      "route": "/users",
+      "heading": "Tenant user management"
+    }
+  },
+  "canary": [
+    "TPER-001",
+    "TPER-033"
+  ]
+}

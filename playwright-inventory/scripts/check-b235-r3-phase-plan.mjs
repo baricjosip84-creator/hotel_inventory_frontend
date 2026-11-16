@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {phasePlan,exactPass} from './b235-r3-phase-plan.mjs';
+const plan=JSON.parse(fs.readFileSync('batch-235-r3-review.json','utf8'));
+const entries=JSON.parse(fs.readFileSync('original-suite-approved.json','utf8')).approved_groups.BULK_SAFE_16.entries;
+const phases=phasePlan(entries,plan.canary);
+assert.deepEqual(phases.map(p=>p.flatMap(e=>e.ids).length),[2,76,4]);
+assert.deepEqual(phases.flatMap(p=>p.flatMap(e=>e.ids)).sort(),[...plan.recheck].sort());
+const spec=(id,status='passed')=>({title:id+' original',tests:[{expectedStatus:'passed',results:[{status}]}]});
+const report=(specs)=>({suites:[{suites:[{specs}]}]});
+const good=plan.canary.map(id=>spec(id));
+assert(exactPass(report(good),plan.canary));
+assert(!exactPass(report([good[0],spec(plan.canary[1],'skipped')]),plan.canary));
+assert(!exactPass(report([good[0]]),plan.canary));
+assert(!exactPass(report([good[0],good[0]]),plan.canary));
+assert(!exactPass(report([good[0],spec(plan.canary[1],'failed')]),plan.canary));
+assert(!exactPass(null,plan.canary));
+console.log('PASS R3 exact phases 2 + 76 + 4; missing, duplicate, skipped and failed canaries rejected.');
