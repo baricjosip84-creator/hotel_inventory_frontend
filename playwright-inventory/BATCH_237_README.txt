@@ -30,3 +30,17 @@ discovered. Reporting gate exercised with synthetic complete and failed reports
 No authenticated live test claims before receipt of the new GitHub logs.
 Other role-specific, hardware, identity-specific, and unresolved cases remain
 in the outstanding ledger. Do not count them as passed.
+
+Batch 237 fingerprint fix (logs_119265088771.zip):
+The workflow stopped at the source validation before discovery or execution.
+No new cases ran; cumulative confirmed PASS stays at 2,568.
+The recovered reference lacks the nine installed Batch 230 green corrections.
+The fingerprint gate now accepts differences solely inside those exact,
+previously confirmed, non-selected test calls in the installed B230 manifest.
+It preserves the installed bodies, verifies all surrounding source and selected
+calls against the pinned reference, and applies the same guarded transport
+adaptation to the actual source. Every other difference remains rejected.
+Local discovery: 95/95 selected. Synthetic historical edits across six relevant
+calls retained; selected-body and helper drift rejected. The exact installed
+historical bodies are unavailable locally, so the real CI run remains required.
+No application changes or altered test expectations. Same workflow inputs.
