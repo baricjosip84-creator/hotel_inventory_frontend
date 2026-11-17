@@ -1,0 +1,253 @@
+{
+  "batch": 238,
+  "group": "BULK_SAFE_17",
+  "count": 20,
+  "selected": [
+    "TET-034",
+    "TET-035",
+    "TET-036",
+    "TET-037",
+    "TET-038",
+    "TET-039",
+    "TET-040",
+    "TET-045",
+    "TICAP-093",
+    "TICAP-094",
+    "TICAP-095",
+    "TICAP-110",
+    "TICAP-132",
+    "TICAP-155",
+    "TLOG-008",
+    "TLOG-009",
+    "TLOG-012",
+    "TSES-019",
+    "TSES-037",
+    "TSES-041"
+  ],
+  "r4_user_confirmed_pass": [
+    "TALERT-004",
+    "TALERT-005",
+    "TALERT-006",
+    "TALERT-007",
+    "TALERT-008",
+    "TALERT-009",
+    "TALERT-011",
+    "TEI-042",
+    "TEI-073",
+    "TPO-071",
+    "TPRC-033",
+    "TPRC-043",
+    "TPRC-044",
+    "TRPT-025",
+    "TSES-010",
+    "TSES-043",
+    "TSMV-050",
+    "TSMV-072"
+  ],
+  "pages": {
+    "execution-tasks": {
+      "route": "/execution-tasks",
+      "heading": "Operational task queue"
+    },
+    "inventory-capabilities": {
+      "route": "/inventory-capabilities",
+      "heading": "Advanced inventory workspace"
+    },
+    "sessions": {
+      "route": "/sessions",
+      "heading": "Sessions"
+    },
+    "login": {
+      "route": "/dashboard",
+      "heading": "Operations Dashboard"
+    }
+  },
+  "patches": {
+    "tenant/execution-tasks/execution-tasks.spec.ts": {
+      "sha256": "7c6435edb9f78f8407c722a912a3cc46ae7b2167d66c121594b01e47e291f14c",
+      "cases": {
+        "TET-034": [
+          [
+            "await queue(page).getByRole('row').filter({hasText:'PW-TASK-0001'}).getByRole('button', { name: 'Mark ready', exact:true }).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Mark ready?'?d.accept():d.dismiss()); await queue(page).getByRole('row').filter({hasText:'PW-TASK-0001'}).getByRole('button', { name: 'Mark ready', exact:true }).click();"
+          ]
+        ],
+        "TET-035": [
+          [
+            "await queue(page).getByRole('row').filter({hasText:'PW-TASK-0001'}).getByRole('button', { name: 'Assign', exact:true }).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Assign?'?d.accept():d.dismiss()); await queue(page).getByRole('row').filter({hasText:'PW-TASK-0001'}).getByRole('button', { name: 'Assign', exact:true }).click();"
+          ]
+        ],
+        "TET-036": [
+          [
+            "await queue(page).getByRole('row').filter({hasText:'PW-TASK-0001'}).getByRole('button', { name: 'Assign', exact:true }).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Assign?'?d.accept():d.dismiss()); await queue(page).getByRole('row').filter({hasText:'PW-TASK-0001'}).getByRole('button', { name: 'Assign', exact:true }).click();"
+          ]
+        ],
+        "TET-037": [
+          [
+            "await queue(page).getByRole('row').filter({hasText:'PW-TASK-0001'}).getByRole('button', { name: 'Assign', exact:true }).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Assign?'?d.accept():d.dismiss()); await queue(page).getByRole('row').filter({hasText:'PW-TASK-0001'}).getByRole('button', { name: 'Assign', exact:true }).click();"
+          ]
+        ],
+        "TET-038": [
+          [
+            "await queue(page).getByRole('row').filter({hasText:'PW-TASK-0001'}).getByRole('button', { name: 'Block', exact:true }).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Block?'?d.accept():d.dismiss()); await queue(page).getByRole('row').filter({hasText:'PW-TASK-0001'}).getByRole('button', { name: 'Block', exact:true }).click();"
+          ]
+        ],
+        "TET-039": [
+          [
+            "await queue(page).getByRole('row').filter({hasText:'PW-TASK-0001'}).getByRole('button', { name: 'Block', exact:true }).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Block?'?d.accept():d.dismiss()); await queue(page).getByRole('row').filter({hasText:'PW-TASK-0001'}).getByRole('button', { name: 'Block', exact:true }).click();"
+          ]
+        ],
+        "TET-040": [
+          [
+            "await queue(page).getByRole('row').filter({hasText:'PW-TASK-0001'}).getByRole('button', { name: 'Unblock', exact:true }).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Unblock?'?d.accept():d.dismiss()); await queue(page).getByRole('row').filter({hasText:'PW-TASK-0001'}).getByRole('button', { name: 'Unblock', exact:true }).click();"
+          ]
+        ],
+        "TET-045": [
+          [
+            "await management(page).getByRole('button', { name: 'Release' }).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Release?'?d.accept():d.dismiss()); await management(page).getByRole('button', { name: 'Release' }).click();"
+          ]
+        ]
+      }
+    },
+    "tenant/inventory-capabilities/inventory-capabilities-advanced.spec.ts": {
+      "sha256": "5b27b77b1a2031400e4b0933d7a7cb441632bb600b0ab2fecf02ae5ecfb70860",
+      "cases": {
+        "TICAP-093": [
+          [
+            "await finalizeButton(page).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Finalize cost?'?d.accept():d.dismiss()); await finalizeButton(page).click();"
+          ]
+        ],
+        "TICAP-094": [
+          [
+            "await finalizeButton(page).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Finalize cost?'?d.accept():d.dismiss()); await finalizeButton(page).click();"
+          ],
+          [
+            "expect(sent(calls, '/finalize')).toHaveLength(1);",
+            "await expect.poll(() => sent(calls, '/finalize')).toHaveLength(1);"
+          ],
+          [
+            "// Source has NO additional window.confirm here: record that separately in handoff, not fake a dialog.",
+            "// Current AppProviders requires an explicit native action confirmation."
+          ]
+        ],
+        "TICAP-095": [
+          [
+            "await finalizeButton(page).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Finalize cost?'?d.accept():d.dismiss()); await finalizeButton(page).click();"
+          ]
+        ],
+        "TICAP-110": [
+          [
+            "await page.getByRole('button', { name: 'Remove attribute 1' }).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Remove attribute?'?d.accept():d.dismiss()); await page.getByRole('button', { name: 'Remove attribute 1' }).click(); await expect(page.getByLabel('Attribute name')).toHaveCount(0);"
+          ],
+          [
+            "expect(sent(calls, `/products/${ALPHA}/variants`)[0]?.body.attributes).toEqual({});",
+            "await expect.poll(() => sent(calls, `/products/${ALPHA}/variants`)[0]?.body.attributes).toEqual({});"
+          ]
+        ],
+        "TICAP-132": [
+          [
+            "await removeButtons.nth(1).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Remove?'?d.accept():d.dismiss()); await removeButtons.nth(1).click();"
+          ]
+        ],
+        "TICAP-155": [
+          [
+            "await charges(page);",
+            "await charges(page); await expect(page.locator(`option[value=\"${SHIPMENT}\"]`)).toContainText(/partial/i);"
+          ],
+          [
+            "await previewButton(page).click();",
+            "await previewButton(page).click(); await expect(page.getByRole('heading', {name:/Allocation preview/})).toBeVisible();"
+          ]
+        ]
+      },
+      "helpers": [["shipment: { id: SHIPMENT, status: 'received', po_number: 'PO-49' }", "shipment: { id: SHIPMENT, status: (opts.shipments ?? [shipment]).find(s => s.id === SHIPMENT)?.status ?? 'received', po_number: 'PO-49' }"]]
+    },
+    "tenant/sessions/sessions.spec.ts": {
+      "sha256": "25c5f0d80e8d6d1a057e428b9448fe694a73012e53890bbde4a2dd9025042f49",
+      "cases": {
+        "TSES-019": [
+          [
+            "page.once('dialog',dialog=>dialog.accept());",
+            "await page.route('**/auth/refresh',r=>fulfillJson(r,{error:{code:'SESSION_REVOKED',message:'Synthetic revoked session'}},401)); page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Revoke all sessions?'?d.accept():d.dismiss()); "
+          ],
+          [
+            "r.path==='/auth/sessions'",
+            "/^\\/(?:api\\/)?auth\\/sessions$/.test(r.path)"
+          ],
+          [
+            "await expect(page).toHaveURL(/\\/login$/);",
+            "await expect(page).toHaveURL(/\\/login$/);expect(await page.evaluate(()=>localStorage.getItem('inventory_access_token'))).toBeNull();"
+          ]
+        ]
+      }
+    },
+    "tenant/sessions/sessions-batch33.spec.ts": {
+      "sha256": "00778d5caf0e036d343cb8c20294b8c3e37e3379a440eba8ea64bfbe4aea2051",
+      "cases": {
+        "TSES-037": [
+          [
+            "page.once('dialog',d=>d.accept());",
+            "await page.route('**/auth/refresh',r=>fulfillJson(r,{error:{code:'SESSION_REVOKED',message:'Synthetic revoked session'}},401)); page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Revoke all sessions?'?d.accept():d.dismiss()); "
+          ],
+          [
+            "await expect(page.getByRole('button',{name:'Revoke all sessions'})).toBeDisabled();",
+            "await expect(page.locator('.sessions-hero-actions').getByRole('button',{name:'Revoking…',exact:true})).toBeDisabled();"
+          ],
+          [
+            "await expect(page).toHaveURL(/\\/login$/);",
+            "await expect(page).toHaveURL(/\\/login$/);expect(await page.evaluate(()=>localStorage.getItem('inventory_access_token'))).toBeNull();"
+          ]
+        ],
+        "TSES-041": [
+          [
+            "page.once('dialog',d=>d.accept());",
+            "await page.route('**/auth/refresh',r=>fulfillJson(r,{error:{code:'SESSION_REVOKED',message:'Synthetic revoked session'}},401)); page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Revoke all sessions?'?d.accept():d.dismiss()); "
+          ],
+          [
+            "const before=state.getCount;",
+            "await expect(page.getByRole('button',{name:'Refresh',exact:true})).toBeEnabled();await expect.poll(()=>state.getCount).toBeGreaterThan(0);const before=state.getCount;"
+          ],
+          [
+            "await expect(page).toHaveURL(/\\/login$/);",
+            "await expect(page).toHaveURL(/\\/login$/);expect(await page.evaluate(()=>localStorage.getItem('inventory_access_token'))).toBeNull();"
+          ]
+        ]
+      }
+    },
+    "tenant/login/login.spec.ts": {
+      "sha256": "e90756d002efc4bef6eaecc8e6b053c62cda2458d10022ba9eaf2438d0888c47",
+      "cases": {
+        "TLOG-008": [
+          [
+            "await loginAsTenant(page);",
+            "await loginAsTenant(page); await expect(page.getByRole('heading',{name:'Operations Dashboard',exact:true})).toBeVisible();"
+          ]
+        ],
+        "TLOG-009": [
+          [
+            "await loginAsTenant(page);",
+            "await loginAsTenant(page); await expect(page.getByRole('heading',{name:'Operations Dashboard',exact:true})).toBeVisible();"
+          ]
+        ],
+        "TLOG-012": [
+          [
+            "let release!: () => void;",
+            "await page.context().clearCookies();\n    await page.addInitScript(()=>{localStorage.removeItem('inventory_access_token');localStorage.removeItem('inventory_refresh_token');});\n    await page.route('**/auth/refresh',r=>fulfillJson(r,{error:{code:'SESSION_REVOKED',message:'Synthetic revoked session'}},401)); \n    let release!: () => void;"
+          ]
+        ]
+      }
+    }
+  }
+}

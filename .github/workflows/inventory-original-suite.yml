@@ -193,11 +193,11 @@ jobs:
       - name: Verify Batch 236 R3 locator and confirmation behavior without network
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         run: node scripts/check-batch-236-r3-locators.mjs
-      - name: Prepare Batch 237 guarded remaining tenant originals
+      - name: Prepare Batch 238 guarded remaining tenant originals
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         run: |
           node scripts/prepare-batch-237-runtime.mjs
-          node scripts/prepare-batch-237-r4-runtime.mjs
+          node scripts/prepare-batch-238-runtime.mjs
       - name: List the approved original test IDs before execution
         if: ${{ inputs.group != 'DISCOVER_ALL' }}
         env:
@@ -270,7 +270,7 @@ jobs:
       - name: Require exact Batch 235 actual pass results
         if: ${{ always() && inputs.group == 'BULK_SAFE_16' }}
         run: node scripts/check-batch-235-executed.mjs
-      - name: Batch 237 R4 - guarded access and corrected unresolved originals
+      - name: Batch 238 - guarded access and corrected unresolved originals
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         env:
           PW_LIVE_ORIGINAL_READONLY: 'YES'
@@ -279,7 +279,7 @@ jobs:
           PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           PLAYWRIGHT_JSON_OUTPUT_FILE: batch-237-results.json
         run: node scripts/run-batch-237.mjs
-      - name: Require exact Batch 237 actual pass results
+      - name: Require exact Batch 238 actual pass results
         if: ${{ always() && inputs.group == 'BULK_SAFE_17' }}
         run: node scripts/check-batch-237-executed.mjs
       # No auth snapshots, traces, videos, screenshots, or artifacts uploaded.
