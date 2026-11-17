@@ -1,0 +1,66 @@
+{
+  "batch": 240,
+  "group": "BULK_SAFE_17",
+  "count": 3,
+  "prior_green": [
+    "TMOB-044",
+    "TMOB-045",
+    "TMOB-046",
+    "TMOB-048",
+    "TPO-033"
+  ],
+  "confirmed_before": 2680,
+  "remaining_before": 258,
+  "selected": [
+    "TIR-030",
+    "TIR-032",
+    "TOUT-027"
+  ],
+  "pages": {
+    "inventory-requisitions": {
+      "route": "/inventory-requisitions",
+      "text": "Internal stock requests"
+    },
+    "outbound": {
+      "route": "/outbound",
+      "heading": "Outbound workspace"
+    }
+  },
+  "spec_files": {
+    "tenant/inventory-requisitions/inventory-requisitions.spec.ts": {
+      "selected": [
+        "TIR-030",
+        "TIR-032"
+      ]
+    },
+    "tenant/outbound/outbound.spec.ts": {
+      "selected": [
+        "TOUT-027"
+      ]
+    }
+  },
+  "tests": {
+    "TIR-030": {
+      "file": "tenant/inventory-requisitions/inventory-requisitions.spec.ts",
+      "title": "TIR-030 Governed rejection posts an adequate trimmed reason",
+      "click": "await page.getByRole('button',{name:'Reject',exact:true}).click();",
+      "message": "Confirm action: Reject?",
+      "sha256_original_body": "a8e42374a678e14815706b386331ba29d793a387414d2c4d97cd367bbbd0d89b"
+    },
+    "TIR-032": {
+      "file": "tenant/inventory-requisitions/inventory-requisitions.spec.ts",
+      "title": "TIR-032 Reopening is exposed only for rejected/cancelled state and posts reason",
+      "click": "await page.getByRole('button',{name:'Reopen to draft'}).click();",
+      "message": "Confirm action: Reopen to draft?",
+      "sha256_original_body": "3d81c2200d26a83eb406c68afb2441871f13bf48ccf00d82c09e7f2154dd31b5"
+    },
+    "TOUT-027": {
+      "file": "tenant/outbound/outbound.spec.ts",
+      "title": "TOUT-027 Add line preserves at least one order line",
+      "click": "await editor.last().getByRole('button',{name:'Remove'}).click();",
+      "message": "Confirm action: Remove?",
+      "sha256_original_body": "2b9f0aa09d5237d66eddba307a2fca33a5440f83856c973641c4c16916b35c62"
+    }
+  },
+  "basis": "Confirmed B235-era failure evidence: two missing reason POSTs and one Remove click leaving two line editors. Later B238 exact global confirmation handling succeeded in multiple original tests. B240 hypothesis only; no assertion weakened."
+}
