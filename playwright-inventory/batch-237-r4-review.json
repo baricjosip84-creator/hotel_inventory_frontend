@@ -1,0 +1,274 @@
+{
+  "batch": 237,
+  "revision": 4,
+  "group": "BULK_SAFE_17",
+  "count": 18,
+  "selected": [
+    "TALERT-004",
+    "TALERT-005",
+    "TALERT-006",
+    "TALERT-007",
+    "TALERT-008",
+    "TALERT-009",
+    "TALERT-011",
+    "TEI-042",
+    "TEI-073",
+    "TPO-071",
+    "TPRC-033",
+    "TPRC-043",
+    "TPRC-044",
+    "TRPT-025",
+    "TSES-010",
+    "TSES-043",
+    "TSMV-050",
+    "TSMV-072"
+  ],
+  "passed": [
+    "TALERT-042",
+    "TCOP-010",
+    "TCOP-012",
+    "TCOP-013",
+    "TCOP-014",
+    "TCOP-018",
+    "TCOP-022",
+    "TMOB-013",
+    "TMOB-023",
+    "TMOB-024",
+    "TMOB-025",
+    "TMOB-026",
+    "TMOB-027",
+    "TMOB-028",
+    "TMOB-029",
+    "TMOB-041",
+    "TMOB-042",
+    "TMOB-043",
+    "TPO-031",
+    "TPO-034",
+    "TRPL-046",
+    "TSES-021",
+    "TSES-022",
+    "TSH-032"
+  ],
+  "held": [
+    "TINS-024",
+    "TIU-032",
+    "TRC-009",
+    "TRC-048",
+    "TSES-039",
+    "TSH-069",
+    "TSL-040",
+    "TSL-045",
+    "TSN-042",
+    "TST-038",
+    "TST-039"
+  ],
+  "pages": {
+    "alerts": {
+      "route": "/alerts",
+      "heading": "Alert workspace"
+    },
+    "enterprise-inventory": {
+      "route": "/enterprise-inventory",
+      "heading": "Specialized inventory workflows"
+    },
+    "procurement-recommendations": {
+      "route": "/procurement-recommendations",
+      "heading": "Procurement recommendations"
+    },
+    "purchase-orders": {
+      "route": "/purchase-orders",
+      "heading": "Purchase orders"
+    },
+    "reports": {
+      "route": "/reports",
+      "heading": "Management reporting workspace"
+    },
+    "sessions": {
+      "route": "/sessions",
+      "heading": "Sessions"
+    },
+    "stock-movements": {
+      "route": "/stock-movements",
+      "heading": "Stock movement ledger"
+    }
+  },
+  "patches": {
+    "tenant/alerts/alerts.spec.ts": {
+      "cases": {
+        "TALERT-004": [
+          [
+            "await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Apply filters?'?d.accept():d.dismiss());\n    await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();"
+          ]
+        ],
+        "TALERT-005": [
+          [
+            "await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Apply filters?'?d.accept():d.dismiss());\n    await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();"
+          ]
+        ],
+        "TALERT-006": [
+          [
+            "await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Apply filters?'?d.accept():d.dismiss());\n    await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();"
+          ]
+        ],
+        "TALERT-007": [
+          [
+            "await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Apply filters?'?d.accept():d.dismiss());\n    await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();"
+          ]
+        ],
+        "TALERT-008": [
+          [
+            "selectOption('50');\n    await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();",
+            "selectOption('50');\n    page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Apply filters?'?d.accept():d.dismiss());\n    await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();"
+          ],
+          [
+            "selectOption('25');\n    await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();",
+            "selectOption('25');\n    page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Apply filters?'?d.accept():d.dismiss());\n    await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();"
+          ]
+        ],
+        "TALERT-009": [
+          [
+            "await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Apply filters?'?d.accept():d.dismiss());\n    await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();"
+          ]
+        ],
+        "TALERT-011": [
+          [
+            "await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Apply filters?'?d.accept():d.dismiss());\n    await filtersPanel(page).getByRole('button', { name:'Apply filters' }).click();"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/enterprise-inventory/enterprise-inventory-workflows.spec.ts": {
+      "cases": {
+        "TEI-042": [
+          [
+            "await returnDraft(page).getByRole('button', { name: 'Remove' }).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Remove?'?d.accept():d.dismiss());\n    await returnDraft(page).getByRole('button', { name: 'Remove' }).click();"
+          ]
+        ],
+        "TEI-073": [
+          [
+            "const dialog = page.waitForEvent('dialog');",
+            "let alertMessage='';\n    page.once('dialog',async d=>{alertMessage=d.message();await d.accept();});"
+          ],
+          [
+            "const alert = await dialog;\n    expect(alert.message()).toContain('blocked the print window');\n    await alert.accept();",
+            "await expect.poll(()=>alertMessage).toContain('blocked the print window');"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/purchase-orders/purchase-orders.spec.ts": {
+      "cases": {
+        "TPO-071": [
+          [
+            "await b178Attention(page).getByRole('button',{name:/Approve/}).click();",
+            "const approve=b178Attention(page).getByRole('button',{name:/Approve/});const label=(await approve.innerText()).replace(/\\s+/g,' ').trim();\n  expect(label).toMatch(/^Approve\\s+\\d+$/);page.once('dialog',d=>d.type()==='confirm'&&d.message()===`Confirm action: ${label}?`?d.accept():d.dismiss());\n  await approve.click();"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/stock-movements/stock-movements.spec.ts": {
+      "cases": {
+        "TSMV-050": [
+          [
+            "await page.locator('.stock-movements-legacy-filter').getByRole('button',{name:'Remove'}).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Remove?'?d.accept():d.dismiss());\n    await page.locator('.stock-movements-legacy-filter').getByRole('button',{name:'Remove'}).click();"
+          ]
+        ],
+        "TSMV-072": [
+          [
+            "getByText('Historical package evidence unavailable',{exact:true})",
+            "getByText('1 \u00d7 Historical package evidence unavailable',{exact:true})"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/sessions/sessions-batch33.spec.ts": {
+      "cases": {
+        "TSES-043": [
+          [
+            "const gate=deferred();state.getWait=gate.promise;",
+            "await expect(statusSelector(page)).toBeEnabled();const initialCount=state.getCount;const gate=deferred();state.getWait=gate.promise;"
+          ],
+          [
+            "await expect(statusSelector(page)).toBeDisabled();\n   await expect(sizeSelector(page)).toBeDisabled();",
+            "await expect.poll(()=>state.getCount).toBe(initialCount+1);\n   await expect(page.locator('.sessions-state-panel')).toHaveText('Loading sessions\u2026');\n   await expect(statusSelector(page)).toHaveCount(0);\n   await expect(sizeSelector(page)).toHaveCount(0);"
+          ],
+          [
+            "await expect(sessionsTable(page)).toContainText('REVOKED');",
+            "await expect(sessionsTable(page)).toContainText('REVOKED');\n  await expect(statusSelector(page)).toHaveValue('revoked');await expect(statusSelector(page)).toBeEnabled();await expect(sizeSelector(page)).toBeEnabled();"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/sessions/sessions.spec.ts": {
+      "cases": {
+        "TSES-010": [
+          [
+            "const seen=await open(page,{hasNext:true});",
+            "const seen=await open(page,{rows:Array.from({length:26},(_,i)=>({...current,id:`pw-session-${i}`,ip_address:`198.51.100.${i+1}`,is_current:i===0}))});\n  await expect.poll(()=>requestGets(seen)[0]?.search).toContain(\"page=1\");"
+          ],
+          [
+            "await page.getByRole('button',{name:'Previous',exact:true}).click();",
+            "await expect(table(page)).toContainText('198.51.100.26');\n  await page.getByRole('button',{name:'Previous',exact:true}).click();"
+          ],
+          [
+            "await expect.poll(()=>requestGets(seen).at(-1)?.search).toContain('page=1');",
+            "await expect(page.locator('.sessions-list-meta')).toContainText('Page 1');\n  await expect(table(page).locator('tbody tr')).toHaveCount(25);\n  await expect(table(page)).not.toContainText('198.51.100.26');"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts": {
+      "cases": {
+        "TPRC-033": [
+          [
+            "await expect(page.getByText(/EUR/).first()).toBeVisible();\n  await expect(page.getByText(/USD/).first()).toBeVisible();",
+            "const spend=page.locator('.io-workspace-stat').filter({has:page.getByText('Recommendation spend',{exact:true})}).locator('.io-workspace-stat__value');\n  await expect(spend).toContainText(/(?:\u20ac\\s*72|72(?:[.,]00)?\\s*\u20ac|EUR\\s*72)/);\n  await expect(spend).toContainText(/(?:US?\\$\\s*35|\\$\\s*35|35(?:[.,]00)?\\s*(?:US)?\\$|USD\\s*35)/);"
+          ]
+        ],
+        "TPRC-043": [
+          [
+            "page.getByRole('heading',{name:'Procurement execution history'}).locator('..').locator('..')",
+            "page.locator('section').filter({has:page.getByRole('heading',{name:'Procurement execution history',exact:true})})"
+          ]
+        ],
+        "TPRC-044": [
+          [
+            "page.getByRole('heading',{name:'Recommendation outcomes'}).locator('..').locator('..')",
+            "page.locator('section').filter({has:page.getByRole('heading',{name:'Recommendation outcomes',exact:true})})"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/reports/reports.spec.ts": {
+      "cases": {
+        "TRPT-025": [
+          [
+            "const msg=page.getByRole('status').filter({hasText:'CSV ready:'});",
+            "const msg=page.getByRole('status').filter({hasText:'CSV ready:'});await expect(msg).toBeVisible();"
+          ]
+        ]
+      },
+      "helpers": [
+        [
+          "'Content-Disposition':`attachment; filename=\"synthetic-report.${format}\"`",
+          "'Access-Control-Expose-Headers':'X-Report-Exported-Rows, X-Report-Source-Rows, X-Report-Row-Limit, X-Report-Row-Limit-Applied, Content-Disposition',\n   'Content-Disposition':`attachment; filename=\"synthetic-report.${format}\"`"
+        ]
+      ]
+    }
+  }
+}
