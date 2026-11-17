@@ -1,0 +1,12 @@
+test_id,spec_file,indirect_helper,status
+TAPE-022,tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts,openApplicationForm() -> openPolicy({role:PW_GOVERNOR}),HELD — genuine restricted-role identity required before live execution
+TAPE-023,tenant/adaptive-policy-engine/adaptive-policy-engine.spec.ts,openApplicationForm() -> openPolicy({role:PW_GOVERNOR}),HELD — genuine restricted-role identity required before live execution
+TDLF-022,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,openGovernedFeedback() -> loginAsDisposableRole(PW_GOVERNOR),HELD — genuine restricted-role identity required before live execution
+TDLF-026,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,openGovernedFeedback() -> loginAsDisposableRole(PW_GOVERNOR),HELD — genuine restricted-role identity required before live execution
+TDLF-029,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,openGovernedFeedback() -> loginAsDisposableRole(PW_GOVERNOR),HELD — genuine restricted-role identity required before live execution
+TDLF-031,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,openGovernedFeedback() -> loginAsDisposableRole(PW_GOVERNOR),HELD — genuine restricted-role identity required before live execution
+TDLF-033,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,openGovernedFeedback() -> loginAsDisposableRole(PW_GOVERNOR),HELD — genuine restricted-role identity required before live execution
+TDLF-034,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,openGovernedFeedback() -> loginAsDisposableRole(PW_GOVERNOR),HELD — genuine restricted-role identity required before live execution
+TDLF-037,tenant/decision-learning-feedback/decision-learning-feedback.spec.ts,openGovernedFeedback() -> loginAsDisposableRole(PW_GOVERNOR),HELD — genuine restricted-role identity required before live execution
+TPRC-038,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,"mount(...,readonly=true) -> loginAsDisposableRole(PW_PO_READ_ONLY)",HELD — genuine restricted-role identity required before live execution
+TPRC-050,tenant/procurement-recommendations/procurement-recommendations-batch29.spec.ts,"mount(...,readonly=true) -> loginAsDisposableRole(PW_PO_READ_ONLY)",HELD — genuine restricted-role identity required before live execution

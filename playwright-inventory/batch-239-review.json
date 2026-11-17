@@ -1,0 +1,185 @@
+{
+  "batch": 239,
+  "group": "BULK_SAFE_17",
+  "count": 16,
+  "tenant_confirmed_before_run": 2672,
+  "tenant_outstanding_before_run": 266,
+  "previous_batch": "238 R2",
+  "previous_batch_green": [
+    "TICAP-095",
+    "TICAP-155"
+  ],
+  "evidence": "User confirmed GREEN for exactly Batch 238 R2 strict 2 original IDs; no raw ZIP provided",
+  "selected": [
+    "TDASH-049",
+    "TINT-038",
+    "TINT-040",
+    "TINT-043",
+    "TINT-044",
+    "TMOB-044",
+    "TMOB-045",
+    "TMOB-046",
+    "TMOB-047",
+    "TMOB-048",
+    "TPO-033",
+    "TPO-050",
+    "TPROD-035",
+    "TPROD-065",
+    "TPROD-071",
+    "TPROD-077"
+  ],
+  "pages": {
+    "dashboard": {
+      "route": "/dashboard",
+      "heading": "Operations Dashboard"
+    },
+    "intelligence-review": {
+      "route": "/intelligence-review",
+      "heading": "Intelligence Review"
+    },
+    "mobile-execution": {
+      "route": "/mobile-execution",
+      "heading": "Mobile Execution"
+    },
+    "purchase-orders": {
+      "route": "/purchase-orders",
+      "heading": "Purchase orders"
+    },
+    "products": {
+      "route": "/products",
+      "heading": "Product workspace"
+    }
+  },
+  "spec_files": {
+    "tenant/dashboard/dashboard.spec.ts": {
+      "selected": [
+        "TDASH-049"
+      ],
+      "sha256_reconstructed_reference": "c3c58a50d910bb449e75d33976afbaea081d2ceb807cb6551080e22aba6c3484"
+    },
+    "tenant/intelligence-review/intelligence-review.spec.ts": {
+      "selected": [
+        "TINT-038",
+        "TINT-040",
+        "TINT-043",
+        "TINT-044"
+      ],
+      "sha256_reconstructed_reference": "19dbc5638216b2d9c70cf324451be9976afeb214a8876848c40cb273beef9c59"
+    },
+    "tenant/mobile-execution/mobile-execution.spec.ts": {
+      "selected": [
+        "TMOB-044",
+        "TMOB-045",
+        "TMOB-046",
+        "TMOB-047",
+        "TMOB-048"
+      ],
+      "sha256_reconstructed_reference": "0308a8e22cf0bdf83fe090bafc6089e4d3d3cc95b2a1656066d00bc8596c4ad7"
+    },
+    "tenant/purchase-orders/purchase-orders-batch28.spec.ts": {
+      "selected": [
+        "TPO-033",
+        "TPO-050"
+      ],
+      "sha256_reconstructed_reference": "4dfd4cca40095b6929827381a0ad66a77a6779ba970e6fb92f354b11d9d32756"
+    },
+    "tenant/products/products.spec.ts": {
+      "selected": [
+        "TPROD-035",
+        "TPROD-065",
+        "TPROD-071",
+        "TPROD-077"
+      ],
+      "sha256_reconstructed_reference": "7cb6f6701c944092aa209e6e2e27f4eac747262c0af531e0051f76ea66bb6047"
+    }
+  },
+  "tests": {
+    "TDASH-049": {
+      "file": "tenant/dashboard/dashboard.spec.ts",
+      "title": "TDASH-049 incomplete setup shows progress and visibly distinguishes completed steps",
+      "sha256_original_body": "c91f2d78cea44fe7590146135093af29dc28c05a60d0a848534dadedc542df26"
+    },
+    "TINT-038": {
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-038 business readiness renders source-reported features and priority",
+      "sha256_original_body": "988837baf915ca6c1974cc7932256bd9a673c3bff69335d117136a80887c22b4"
+    },
+    "TINT-040": {
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-040 explicit readiness refresh requests refresh=true for new evidence",
+      "sha256_original_body": "c53e8976869034e589220cc3e395ba79536017b89b5aa126a294d1391ab6c319"
+    },
+    "TINT-043": {
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-043 history opens for selected action and shows persisted event actor",
+      "sha256_original_body": "cdffe73ecc12678353bd85beff177880f124ef70c1d5b0c57cb0678881a2f9c5"
+    },
+    "TINT-044": {
+      "file": "tenant/intelligence-review/intelligence-review.spec.ts",
+      "title": "TINT-044 history request error retains selected source review",
+      "sha256_original_body": "214d22ad58778e374be0f6e2507671567c7375a6e3d33844a1a319f46f35d660"
+    },
+    "TMOB-044": {
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-044 completion permission alone does not allow update-only actions",
+      "sha256_original_body": "dd4451bca2e401ee00773fbfa6d1bb46e0b099491a0904708d221317ccef364d"
+    },
+    "TMOB-045": {
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-045 attachment read denied keeps evidence recovery panel with explicit alert",
+      "sha256_original_body": "c053e815ed82e3c3fc2d5eb4bdbc32ec81687f1f21fedaf531072e36e8677d91"
+    },
+    "TMOB-046": {
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-046 nonpermitted transfer source does not expose source workflow link",
+      "sha256_original_body": "350860d159c6f0fe52714a41defa157935c2492857238f6b9bbe0552944cae50"
+    },
+    "TMOB-047": {
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-047 refresh failure in attachment history displays actionable error",
+      "sha256_original_body": "ef5645999b7b5e4128b65e0eeefa1e1b647e1aa5f931d6d00bc171af85a71c10"
+    },
+    "TMOB-048": {
+      "file": "tenant/mobile-execution/mobile-execution.spec.ts",
+      "title": "TMOB-048 missing scanner and upload permissions removes only those controls",
+      "sha256_original_body": "9a833f42352bc87356394953efec2d3f7052efc276e4558791dba18e1e20a2f6"
+    },
+    "TPO-033": {
+      "file": "tenant/purchase-orders/purchase-orders-batch28.spec.ts",
+      "title": "TPO-033 Separate approver setting disables self-approval",
+      "sha256_original_body": "057ff2f72db7e98610df5aa760ec88b2401799035f918794cf1505ff28a473cb"
+    },
+    "TPO-050": {
+      "file": "tenant/purchase-orders/purchase-orders-batch28.spec.ts",
+      "title": "TPO-050 Unentitled subscription blocks PO registry and actions",
+      "sha256_original_body": "706c851862f5bac509c3d83815b456ecc6e0753555cf455ac546cfe6350b0906"
+    },
+    "TPROD-035": {
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-035 product_packages.read role sees package data but cannot create/edit/archive",
+      "sha256_original_body": "b174e2bdf535063bab17d9af0b282b662c1276ace927ec6b156010d89a2c2474"
+    },
+    "TPROD-065": {
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-065 valuation detail controls issue valuation_basis/search/sort/direction requests",
+      "sha256_original_body": "f9d4329d9d425fd0c22d917837240a277d4a172c80b95e7d7adac3dc3251abfb"
+    },
+    "TPROD-071": {
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-071 cost action filters preserve chosen type/search/sort/order in the API request",
+      "sha256_original_body": "e6d037c37b1d96a57e56af4d8b2eea1477f68ef2a1bf1bd85de016846e986d32"
+    },
+    "TPROD-077": {
+      "file": "tenant/products/products.spec.ts",
+      "title": "TPROD-077 human-review queue renders sourced queue counts and reviewer guidance",
+      "sha256_original_body": "82853e77c18bae40ae5204bb8d3b90238193293694d98cec5620a362ff3f77e4"
+    }
+  },
+  "scope": "Browser synthetic fixtures against authorized existing Vercel deployment, no claim of actual production DB persistence or restricted-role isolation",
+  "safety_exclusions": [
+    "214 canonical role-gated originals remain held",
+    "11 additional indirectly role-dependent original candidates held separately",
+    "Device camera originals TSN-045 and TSN-046 held",
+    "Known suspected application defects held pending source review"
+  ]
+}

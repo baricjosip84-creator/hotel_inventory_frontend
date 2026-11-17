@@ -1,0 +1,17 @@
+test_id,spec_file,title,previous,next_stage,reason
+TDASH-049,tenant/dashboard/dashboard.spec.ts,TDASH-049 incomplete setup shows progress and visibly distinguishes completed steps,HELD,B236_REVIEW,unclassified test / app behavior
+TINT-038,tenant/intelligence-review/intelligence-review.spec.ts,TINT-038 business readiness renders source-reported features and priority,HELD,B236_REVIEW,authentication / setup
+TINT-040,tenant/intelligence-review/intelligence-review.spec.ts,TINT-040 explicit readiness refresh requests refresh=true for new evidence,HELD,B236_REVIEW,authentication / setup
+TINT-043,tenant/intelligence-review/intelligence-review.spec.ts,TINT-043 history opens for selected action and shows persisted event actor,HELD,B236_REVIEW,authentication / setup
+TINT-044,tenant/intelligence-review/intelligence-review.spec.ts,TINT-044 history request error retains selected source review,HELD,B236_REVIEW,authentication / setup
+TMOB-044,tenant/mobile-execution/mobile-execution.spec.ts,TMOB-044 completion permission alone does not allow update-only actions,HELD,B236_REVIEW,authentication / setup
+TMOB-045,tenant/mobile-execution/mobile-execution.spec.ts,TMOB-045 attachment read denied keeps evidence recovery panel with explicit alert,HELD,B236_REVIEW,authentication / setup
+TMOB-046,tenant/mobile-execution/mobile-execution.spec.ts,TMOB-046 nonpermitted transfer source does not expose source workflow link,HELD,B236_REVIEW,authentication / setup
+TMOB-047,tenant/mobile-execution/mobile-execution.spec.ts,TMOB-047 refresh failure in attachment history displays actionable error,UNAPPROVED,B236_REVIEW,Remaining original needs source and safety review.
+TMOB-048,tenant/mobile-execution/mobile-execution.spec.ts,TMOB-048 missing scanner and upload permissions removes only those controls,UNAPPROVED,B236_REVIEW,Remaining original needs source and safety review.
+TPO-033,tenant/purchase-orders/purchase-orders-batch28.spec.ts,TPO-033 Separate approver setting disables self-approval,UNAPPROVED,B236_REVIEW,Remaining original needs source and safety review.
+TPO-050,tenant/purchase-orders/purchase-orders-batch28.spec.ts,TPO-050 Unentitled subscription blocks PO registry and actions,UNAPPROVED,B236_REVIEW,Remaining original needs source and safety review.
+TPROD-035,tenant/products/products.spec.ts,TPROD-035 product_packages.read role sees package data but cannot create/edit/archive,UNAPPROVED,B236_REVIEW,Remaining original needs source and safety review.
+TPROD-065,tenant/products/products.spec.ts,TPROD-065 valuation detail controls issue valuation_basis/search/sort/direction requests,HELD,B236_REVIEW,browser failure / root cause unconfirmed
+TPROD-071,tenant/products/products.spec.ts,TPROD-071 cost action filters preserve chosen type/search/sort/order in the API request,HELD,B236_REVIEW,browser failure / root cause unconfirmed
+TPROD-077,tenant/products/products.spec.ts,TPROD-077 human-review queue renders sourced queue counts and reviewer guidance,HELD,B236_REVIEW,unclassified test / app behavior

@@ -1,0 +1,30 @@
+{
+  "checkpoint": "Batch 238 R2 GREEN (user confirmed)",
+  "new_pass_ids": [
+    "TICAP-095",
+    "TICAP-155"
+  ],
+  "new_pass_count": 2,
+  "cumulative_pass": 2672,
+  "tenant_remaining": 266,
+  "batch_239_selected": [
+    "TDASH-049",
+    "TINT-038",
+    "TINT-040",
+    "TINT-043",
+    "TINT-044",
+    "TMOB-044",
+    "TMOB-045",
+    "TMOB-046",
+    "TMOB-047",
+    "TMOB-048",
+    "TPO-033",
+    "TPO-050",
+    "TPROD-035",
+    "TPROD-065",
+    "TPROD-071",
+    "TPROD-077"
+  ],
+  "batch_239_result": "UNVERIFIED \u2014 not run",
+  "notes": "All 16 remain in pending ledger until actual reviewed execution. No new PASS credit assigned to Batch 239."
+}

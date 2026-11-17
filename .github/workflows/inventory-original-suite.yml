@@ -193,12 +193,13 @@ jobs:
       - name: Verify Batch 236 R3 locator and confirmation behavior without network
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         run: node scripts/check-batch-236-r3-locators.mjs
-      - name: Prepare Batch 238 R2 (failed originals only)
+      - name: Prepare Batch 239 (16 outstanding original tenant scenarios)
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         run: |
           node scripts/prepare-batch-237-runtime.mjs
           node scripts/prepare-batch-238-runtime.mjs
           node scripts/prepare-batch-238-r2-runtime.mjs
+          node scripts/prepare-batch-239-runtime.mjs
       - name: List the approved original test IDs before execution
         if: ${{ inputs.group != 'DISCOVER_ALL' }}
         env:
@@ -271,7 +272,7 @@ jobs:
       - name: Require exact Batch 235 actual pass results
         if: ${{ always() && inputs.group == 'BULK_SAFE_16' }}
         run: node scripts/check-batch-235-executed.mjs
-      - name: Batch 238 R2 - guarded access and 2 corrected failed originals
+      - name: Batch 239 - guarded access and 16 reviewed original tenant scenarios
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         env:
           PW_LIVE_ORIGINAL_READONLY: 'YES'
@@ -279,10 +280,10 @@ jobs:
           PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
           PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           PLAYWRIGHT_JSON_OUTPUT_FILE: batch-237-results.json
-        run: node scripts/run-batch-237.mjs
-      - name: Require exact Batch 238 R2 actual pass results
+        run: node scripts/run-batch-239.mjs
+      - name: Require exact Batch 239 actual pass results
         if: ${{ always() && inputs.group == 'BULK_SAFE_17' }}
-        run: node scripts/check-batch-237-executed.mjs
+        run: node scripts/check-batch-239-executed.mjs
       # No auth snapshots, traces, videos, screenshots, or artifacts uploaded.
       - name: Require every Batch 233 original to have been eligible (no false green)
         if: ${{ always() && inputs.group == 'BULK_SAFE_14' }}
