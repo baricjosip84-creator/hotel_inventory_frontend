@@ -1,0 +1,85 @@
+{
+  "batch": 239,
+  "stage": "R2",
+  "group": "BULK_SAFE_17",
+  "count": 5,
+  "prior_checkpoint": 2672,
+  "confirmed_after_batch_239": 2675,
+  "remaining_after_batch_239": 263,
+  "log_archive": "logs_119600359077.zip",
+  "pass": [
+    "TDASH-049",
+    "TMOB-047",
+    "TPO-050"
+  ],
+  "failed": [
+    "TMOB-044",
+    "TMOB-045",
+    "TMOB-046",
+    "TMOB-048",
+    "TPO-033"
+  ],
+  "access_unverified_not_executed": [
+    "TINT-038",
+    "TINT-040",
+    "TINT-043",
+    "TINT-044",
+    "TPROD-035",
+    "TPROD-065",
+    "TPROD-071",
+    "TPROD-077"
+  ],
+  "selected": [
+    "TMOB-044",
+    "TMOB-045",
+    "TMOB-046",
+    "TMOB-048",
+    "TPO-033"
+  ],
+  "pages": {
+    "mobile-execution": {
+      "route": "/mobile-execution",
+      "heading": "Mobile Execution"
+    },
+    "purchase-orders": {
+      "route": "/purchase-orders",
+      "heading": "Purchase orders"
+    }
+  },
+  "spec_files": {
+    "tenant/mobile-execution/mobile-execution.spec.ts": {
+      "selected": [
+        "TMOB-044",
+        "TMOB-045",
+        "TMOB-046",
+        "TMOB-048"
+      ]
+    },
+    "tenant/purchase-orders/purchase-orders-batch28.spec.ts": {
+      "selected": [
+        "TPO-033"
+      ]
+    }
+  },
+  "original_test_sha256": {
+    "TMOB-044": "dd4451bca2e401ee00773fbfa6d1bb46e0b099491a0904708d221317ccef364d",
+    "TMOB-045": "c053e815ed82e3c3fc2d5eb4bdbc32ec81687f1f21fedaf531072e36e8677d91",
+    "TMOB-046": "350860d159c6f0fe52714a41defa157935c2492857238f6b9bbe0552944cae50",
+    "TMOB-048": "9a833f42352bc87356394953efec2d3f7052efc276e4558791dba18e1e20a2f6",
+    "TPO-033": "057ff2f72db7e98610df5aa760ec88b2401799035f918794cf1505ff28a473cb"
+  },
+  "fixes": {
+    "TMOB-044": "retain operational_action_center.read while isolating complete permission",
+    "TMOB-045": "retain operational_action_center.read while denying attachments.read",
+    "TMOB-046": "retain operational_action_center.read while denying stock transfer access",
+    "TMOB-048": "retain operational_action_center.read while removing scanner/upload grants",
+    "TPO-033": "use selfApproval synthetic detail created_by_user_id derived from genuine session JWT; bind seen and reject missing user id"
+  },
+  "never_waive": [
+    "Keep all original expect assertions",
+    "Do not grant restricted role",
+    "Do not auto-PASS access-blocked IDs",
+    "Do not perform real live writes",
+    "Do not replace authenticated user"
+  ]
+}

@@ -1,0 +1,6 @@
+test_id,spec_file,title,previous,next_stage,reason
+TMOB-044,tenant/mobile-execution/mobile-execution.spec.ts,TMOB-044 completion permission alone does not allow update-only actions,HELD,B239_R2_RECHECK,Batch 239 actual browser FAIL; source-pinned fixture recheck of original assertion
+TMOB-045,tenant/mobile-execution/mobile-execution.spec.ts,TMOB-045 attachment read denied keeps evidence recovery panel with explicit alert,HELD,B239_R2_RECHECK,Batch 239 actual browser FAIL; source-pinned fixture recheck of original assertion
+TMOB-046,tenant/mobile-execution/mobile-execution.spec.ts,TMOB-046 nonpermitted transfer source does not expose source workflow link,HELD,B239_R2_RECHECK,Batch 239 actual browser FAIL; source-pinned fixture recheck of original assertion
+TMOB-048,tenant/mobile-execution/mobile-execution.spec.ts,TMOB-048 missing scanner and upload permissions removes only those controls,UNAPPROVED,B239_R2_RECHECK,Batch 239 actual browser FAIL; source-pinned fixture recheck of original assertion
+TPO-033,tenant/purchase-orders/purchase-orders-batch28.spec.ts,TPO-033 Separate approver setting disables self-approval,UNAPPROVED,B239_R2_RECHECK,Batch 239 actual browser FAIL; source-pinned fixture recheck of original assertion

@@ -1,0 +1,45 @@
+{
+  "source": "logs_119600359077.zip",
+  "date": "2026-11-17",
+  "original_selected": 16,
+  "executed": 8,
+  "actual_pass_ids": [
+    "TDASH-049",
+    "TMOB-047",
+    "TPO-050"
+  ],
+  "actual_fail_ids": [
+    "TMOB-044",
+    "TMOB-045",
+    "TMOB-046",
+    "TMOB-048",
+    "TPO-033"
+  ],
+  "access_unverified_ids": [
+    "TINT-038",
+    "TINT-040",
+    "TINT-043",
+    "TINT-044",
+    "TPROD-035",
+    "TPROD-065",
+    "TPROD-071",
+    "TPROD-077"
+  ],
+  "verified_pass_before": 2672,
+  "new_confirmed_pass": 3,
+  "verified_pass_after": 2675,
+  "tenant_total": 2938,
+  "tenant_pass_percentage": 91.05,
+  "overall_9900_percentage": 27.02,
+  "tenant_remaining": 263,
+  "suite_remaining": 7225,
+  "pending_r2": [
+    "TMOB-044",
+    "TMOB-045",
+    "TMOB-046",
+    "TMOB-048",
+    "TPO-033"
+  ],
+  "permission_gated_214_untouched": true,
+  "comments": "Do not present 13 unverified as 13 browser failures. Five failed in browser; eight did not execute because preflight denied or could not verify access."
+}
