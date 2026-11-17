@@ -1,0 +1,339 @@
+{
+  "batch": 237,
+  "revision": 3,
+  "group": "BULK_SAFE_17",
+  "count": 25,
+  "selected": [
+    "TALERT-042",
+    "TCOP-010",
+    "TCOP-012",
+    "TCOP-013",
+    "TCOP-014",
+    "TCOP-018",
+    "TCOP-022",
+    "TMOB-013",
+    "TMOB-023",
+    "TMOB-024",
+    "TMOB-025",
+    "TMOB-026",
+    "TMOB-027",
+    "TMOB-028",
+    "TMOB-029",
+    "TMOB-041",
+    "TMOB-042",
+    "TMOB-043",
+    "TPO-031",
+    "TPO-034",
+    "TRPL-046",
+    "TSES-021",
+    "TSES-022",
+    "TSES-043",
+    "TSH-032"
+  ],
+  "passed": [
+    "TAS-032",
+    "TAS-033",
+    "TAS-034",
+    "TAS-035",
+    "TAS-036",
+    "TPO-027",
+    "TPO-028",
+    "TRPL-038",
+    "TSES-035",
+    "TSN-006",
+    "TSN-021",
+    "TSN-022",
+    "TSN-029",
+    "TSN-039",
+    "TST-032",
+    "TST-033",
+    "TST-034",
+    "TSTR-079",
+    "TSTR-080",
+    "TUSR-020"
+  ],
+  "held": [
+    "TALERT-004",
+    "TALERT-005",
+    "TALERT-006",
+    "TALERT-007",
+    "TALERT-008",
+    "TALERT-009",
+    "TALERT-011",
+    "TEI-042",
+    "TEI-073",
+    "TINS-024",
+    "TIU-032",
+    "TPO-071",
+    "TPRC-033",
+    "TPRC-043",
+    "TPRC-044",
+    "TRC-009",
+    "TRC-048",
+    "TRPT-025",
+    "TSES-010",
+    "TSES-039",
+    "TSH-069",
+    "TSL-040",
+    "TSL-045",
+    "TSMV-050",
+    "TSMV-072",
+    "TSN-042",
+    "TST-038",
+    "TST-039"
+  ],
+  "pages": {
+    "alerts": {
+      "route": "/alerts",
+      "heading": "Alert workspace"
+    },
+    "ai-copilot": {
+      "route": "/ai-copilot",
+      "text": "Start a new analysis"
+    },
+    "mobile-execution": {
+      "route": "/mobile-execution",
+      "heading": "Mobile Execution"
+    },
+    "purchase-orders": {
+      "route": "/purchase-orders",
+      "heading": "Purchase orders"
+    },
+    "replenishment-planning": {
+      "route": "/replenishment-planning",
+      "heading": "Replenishment planning"
+    },
+    "sessions": {
+      "route": "/sessions",
+      "heading": "Sessions"
+    },
+    "shipments": {
+      "route": "/shipments",
+      "heading": "Inbound shipments"
+    }
+  },
+  "patches": {
+    "tenant/ai-copilot/ai-copilot.spec.ts": {
+      "cases": {
+        "TCOP-010": [
+          [
+            "await expect(historyList(page)).toContainText('Completed');",
+            "await expect(historyList(page).locator('.ai-copilot-history-button').getByText('completed',{exact:true})).toBeVisible();"
+          ]
+        ],
+        "TCOP-018": [
+          [
+            "page.getByLabel('Result',{exact:true})",
+            "page.getByRole('combobox').filter({has:page.locator('option[value=failed]')}).filter({has:page.locator('option[value=completed]')})"
+          ]
+        ],
+        "TCOP-022": [
+          [
+            "page.getByLabel('Result',{exact:true})",
+            "page.getByRole('combobox').filter({has:page.locator('option[value=failed]')}).filter({has:page.locator('option[value=completed]')})"
+          ]
+        ],
+        "TCOP-012": [
+          [
+            "[run()]",
+            "[run('pw-copilot-001',{context_snapshot:{section_totals:{unresolved_alerts:3,low_stock_products:2,late_shipments:1,open_execution_requests:4}}})]"
+          ],
+          [
+            "toContainText('Synthetic stock and alert evidence summary')",
+            "toContainText('Permitted operational evidence shows 3 unresolved alerts, 2 low-stock products, 1 late open shipments, and 4 open Execution Requests.')"
+          ]
+        ],
+        "TCOP-013": [
+          [
+            "[run()]",
+            "[run('pw-copilot-001',{context_snapshot:{section_totals:{unresolved_alerts:3,low_stock_products:2,late_shipments:1,open_execution_requests:4}}})]"
+          ],
+          [
+            "toContainText('Synthetic stock and alert evidence summary')",
+            "toContainText('Permitted operational evidence shows 3 unresolved alerts, 2 low-stock products, 1 late open shipments, and 4 open Execution Requests.')"
+          ]
+        ],
+        "TCOP-014": [
+          [
+            "[run()]",
+            "[run('pw-copilot-001',{context_snapshot:{section_totals:{unresolved_alerts:3,low_stock_products:2,late_shipments:1,open_execution_requests:4}}})]"
+          ],
+          [
+            "toContainText('Synthetic unresolved alert')",
+            "toContainText('3 unresolved alerts')"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/purchase-orders/purchase-orders-batch28.spec.ts": {
+      "cases": {
+        "TPO-034": [
+          [
+            "await actions(page).getByRole('button',{name:'Approve order'}).click();",
+            "page.once('dialog', d => d.type()==='confirm'&&d.message()==='Confirm action: Approve order?'?d.accept():d.dismiss());\n  await actions(page).getByRole('button',{name:'Approve order'}).click();"
+          ],
+          [
+            "page.getByText('Version conflict.',{exact:false})",
+            "page.locator('#purchase-order-detail').getByText('Version conflict. Refresh and retry.',{exact:true})"
+          ]
+        ],
+        "TPO-031": [
+          [
+            "await actions(page).getByRole('button',{name:'Submit blocked'}).click();",
+            "await expect(actions(page).getByRole('button',{name:'Submit blocked'})).toBeDisabled();"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/alerts/alerts.spec.ts": {
+      "cases": {
+        "TALERT-042": [
+          [
+            "page.getByRole('status').getByText('Manual alert created successfully.')",
+            "page.locator('.app-success-state[role=status]').filter({hasText:/^Manual alert created successfully\\.$/})"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/mobile-execution/mobile-execution.spec.ts": {
+      "cases": {
+        "TMOB-023": [
+          [
+            "await card.getByRole('button',{name:'Block',exact:true}).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Block?'?d.accept():d.dismiss());\n    await card.getByRole('button',{name:'Block',exact:true}).click();"
+          ]
+        ],
+        "TMOB-024": [
+          [
+            "await card.getByRole('button',{name:'Block',exact:true}).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Block?'?d.accept():d.dismiss());\n    await card.getByRole('button',{name:'Block',exact:true}).click();"
+          ]
+        ],
+        "TMOB-025": [
+          [
+            "await taskCard(page,'pw-mobile-ready').getByRole('button',{name:'Start',exact:true}).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Start?'?d.accept():d.dismiss());\n    await taskCard(page,'pw-mobile-ready').getByRole('button',{name:'Start',exact:true}).click();"
+          ]
+        ],
+        "TMOB-026": [
+          [
+            "await taskCard(page,'pw-mobile-ready').getByRole('button',{name:'Start',exact:true}).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Start?'?d.accept():d.dismiss());\n    await taskCard(page,'pw-mobile-ready').getByRole('button',{name:'Start',exact:true}).click();"
+          ]
+        ],
+        "TMOB-027": [
+          [
+            "await taskCard(page,'pw-mobile-ready').getByRole('button',{name:'Start',exact:true}).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Start?'?d.accept():d.dismiss());\n    await taskCard(page,'pw-mobile-ready').getByRole('button',{name:'Start',exact:true}).click();"
+          ]
+        ],
+        "TMOB-028": [
+          [
+            "await taskCard(page,'pw-mobile-ready').getByRole('button',{name:'Start',exact:true}).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Start?'?d.accept():d.dismiss());\n    await taskCard(page,'pw-mobile-ready').getByRole('button',{name:'Start',exact:true}).click();"
+          ]
+        ],
+        "TMOB-029": [
+          [
+            "await taskCard(page,'pw-mobile-ready').getByRole('button',{name:'Start',exact:true}).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Start?'?d.accept():d.dismiss());\n    await taskCard(page,'pw-mobile-ready').getByRole('button',{name:'Start',exact:true}).click();"
+          ],
+          [
+            "await page.getByRole('button',{name:'Remove queued action'}).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Remove queued action?'?d.accept():d.dismiss());\n    await page.getByRole('button',{name:'Remove queued action'}).click();"
+          ]
+        ],
+        "TMOB-041": [
+          [
+            "await taskCard(page,'pw-mobile-ready').getByRole('button',{name:'Start',exact:true}).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Start?'?d.accept():d.dismiss());\n    await taskCard(page,'pw-mobile-ready').getByRole('button',{name:'Start',exact:true}).click();"
+          ]
+        ],
+        "TMOB-042": [
+          [
+            "await taskCard(page,'pw-mobile-ready').getByRole('button',{name:'Start',exact:true}).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Start?'?d.accept():d.dismiss());\n    await taskCard(page,'pw-mobile-ready').getByRole('button',{name:'Start',exact:true}).click();"
+          ]
+        ],
+        "TMOB-043": [
+          [
+            "await taskCard(page,'pw-mobile-ready').getByRole('button',{name:'Start',exact:true}).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Start?'?d.accept():d.dismiss());\n    await taskCard(page,'pw-mobile-ready').getByRole('button',{name:'Start',exact:true}).click();"
+          ]
+        ],
+        "TMOB-013": [
+          [
+            "await page.reload();",
+            "await expect(taskCard(page,'pw-mobile-ready')).toBeVisible();\n    await page.evaluate(()=>{for(const key of Object.keys(localStorage))if(key.startsWith('inventory-mobile-execution-snapshot-v3:'))localStorage.removeItem(key);});\n    await page.reload();"
+          ],
+          [
+            "await expect(page.locator('.mobile-execution-controls-shell .form-error')).toBeVisible();",
+            "await expect(page.locator('.mobile-execution-controls-shell .form-error')).toContainText('Synthetic queue access denied');"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/replenishment-planning/replenishment-planning.spec.ts": {
+      "cases": {
+        "TRPL-046": [
+          [
+            "await expect(row).toContainText('Draft');",
+            "await expect(row.getByText('In review',{exact:true})).toBeVisible();"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/sessions/sessions-batch33.spec.ts": {
+      "cases": {
+        "TSES-021": [
+          [
+            "const state=await openSessions(page);state.getErrorAt=2;",
+            "const state=await openSessions(page);await expect(page.getByRole('button',{name:'Refresh',exact:true})).toBeEnabled();state.getErrorFrom=state.getCount+1;"
+          ]
+        ],
+        "TSES-022": [
+          [
+            "const state=await openSessions(page);const gate=deferred();state.getWait=gate.promise;",
+            "const state=await openSessions(page);await expect(page.getByRole('button',{name:'Refresh',exact:true})).toBeEnabled();const initialCount=state.getCount;const gate=deferred();state.getWait=gate.promise;"
+          ],
+          [
+            "expect(state.getCount).toBe(2);",
+            "await expect.poll(()=>state.getCount).toBe(initialCount+1);"
+          ]
+        ],
+        "TSES-043": [
+          [
+            "const gate=deferred();state.getWait=gate.promise;",
+            "await expect(statusSelector(page)).toBeEnabled();const gate=deferred();state.getWait=gate.promise;"
+          ]
+        ]
+      },
+      "helpers": [
+        [
+          "getErrorAt?:number;",
+          "getErrorAt?:number;getErrorFrom?:number;"
+        ],
+        [
+          "if(state.getErrorAt===state.getCount)",
+          "if(state.getErrorAt===state.getCount||(state.getErrorFrom!==undefined&&state.getCount>=state.getErrorFrom))"
+        ]
+      ]
+    },
+    "tenant/shipments/shipments.spec.ts": {
+      "cases": {
+        "TSH-032": [
+          [
+            "detail(page).getByText('Default receiving location',{exact:true}).locator('..').locator('select')",
+            "detail(page).locator('label').filter({hasText:'Default receiving location'}).locator('xpath=following-sibling::select[1]')"
+          ]
+        ]
+      },
+      "helpers": []
+    }
+  }
+}

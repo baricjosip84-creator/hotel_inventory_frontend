@@ -197,7 +197,7 @@ jobs:
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         run: |
           node scripts/prepare-batch-237-runtime.mjs
-          node scripts/prepare-batch-237-r2-runtime.mjs
+          node scripts/prepare-batch-237-r2-runtime.mjs --r3
       - name: List the approved original test IDs before execution
         if: ${{ inputs.group != 'DISCOVER_ALL' }}
         env:
@@ -270,7 +270,7 @@ jobs:
       - name: Require exact Batch 235 actual pass results
         if: ${{ always() && inputs.group == 'BULK_SAFE_16' }}
         run: node scripts/check-batch-235-executed.mjs
-      - name: Batch 237 R2 - guarded access and corrected unresolved originals
+      - name: Batch 237 R3 - guarded access and corrected unresolved originals
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         env:
           PW_LIVE_ORIGINAL_READONLY: 'YES'
