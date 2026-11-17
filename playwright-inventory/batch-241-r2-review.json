@@ -1,0 +1,34 @@
+{
+  "batch": 241,
+  "stage": "R2",
+  "group": "BULK_SAFE_17",
+  "count": 1,
+  "prior_batch_actual_pass": [
+    "TSN-045"
+  ],
+  "prior_batch_actual_fail": [
+    "TSN-046"
+  ],
+  "source_log": "logs_119640111964.zip",
+  "source_log_sha256": "0273841d2bc4dc165da9fe6d7b2b1ce778925a0e9a1c99d7a203f33e2b725900",
+  "confirmed_before": 2684,
+  "remaining_before": 254,
+  "selected": [
+    "TSN-046"
+  ],
+  "pages": {
+    "scanner": {
+      "route": "/scanner",
+      "heading": "Shipment QR Scanner"
+    }
+  },
+  "spec_files": {
+    "tenant/scanner/scanner-batch32.spec.ts": {
+      "selected": [
+        "TSN-046"
+      ]
+    }
+  },
+  "basis": "Live B241 line 210 exact Start button was absent after active=1 passed. Require no enabled Start-like camera button while Stop remains enabled and one fake track stays active. All other assertions unchanged.",
+  "original_body_sha256": "68bdcf72525e30c8250dfb5b8817a701325a6fb19f954013653c456d7d633f25"
+}

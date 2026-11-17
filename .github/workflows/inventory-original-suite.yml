@@ -193,7 +193,7 @@ jobs:
       - name: Verify Batch 236 R3 locator and confirmation behavior without network
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         run: node scripts/check-batch-236-r3-locators.mjs
-      - name: Prepare Batch 241 (two controlled camera originals)
+      - name: Prepare Batch 241 R2 (one failed camera original)
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         run: |
           node scripts/prepare-batch-237-runtime.mjs
@@ -203,6 +203,7 @@ jobs:
           node scripts/prepare-batch-239-r2-runtime.mjs
           node scripts/prepare-batch-240-runtime.mjs
           node scripts/prepare-batch-241-runtime.mjs
+          node scripts/prepare-batch-241-r2-runtime.mjs
       - name: Verify simulated camera fixture before any live session
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         run: node scripts/check-batch-241-camera-fixture.mjs
@@ -278,18 +279,18 @@ jobs:
       - name: Require exact Batch 235 actual pass results
         if: ${{ always() && inputs.group == 'BULK_SAFE_16' }}
         run: node scripts/check-batch-235-executed.mjs
-      - name: Batch 241 - guarded scanner access and two controlled camera originals
+      - name: Batch 241 R2 - guarded scanner access and one failed camera original
         if: ${{ inputs.group == 'BULK_SAFE_17' }}
         env:
           PW_LIVE_ORIGINAL_READONLY: 'YES'
           PW_ORIGINAL_SUITE_GROUP: ${{ inputs.group }}
           PW_TENANT_EMAIL: ${{ secrets.E2E_EMAIL }}
           PW_TENANT_PASSWORD: ${{ secrets.E2E_PASSWORD }}
-          PLAYWRIGHT_JSON_OUTPUT_FILE: batch-241-results.json
-        run: node scripts/run-batch-241.mjs
-      - name: Require exact Batch 241 actual pass results
+          PLAYWRIGHT_JSON_OUTPUT_FILE: batch-241-r2-results.json
+        run: node scripts/run-batch-241-r2.mjs
+      - name: Require exact Batch 241 R2 actual pass result
         if: ${{ always() && inputs.group == 'BULK_SAFE_17' }}
-        run: node scripts/check-batch-241-executed.mjs
+        run: node scripts/check-batch-241-r2-executed.mjs
       # No auth snapshots, traces, videos, screenshots, or artifacts uploaded.
       - name: Require every Batch 233 original to have been eligible (no false green)
         if: ${{ always() && inputs.group == 'BULK_SAFE_14' }}

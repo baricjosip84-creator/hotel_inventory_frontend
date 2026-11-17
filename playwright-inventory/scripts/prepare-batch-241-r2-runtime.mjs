@@ -1,0 +1,21 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';import crypto from 'node:crypto';import {createRequire} from 'node:module';
+const ts=createRequire(import.meta.url)('typescript');const sha=s=>crypto.createHash('sha256').update(s).digest('hex');
+const json=f=>JSON.parse(fs.readFileSync(f,'utf8'));const ids=f=>fs.readFileSync(f,'utf8').replace(/^\uFEFF/,'').trim().split(/\r?\n/).slice(1).map(s=>s.split(',')[0]);const sort=x=>[...x].sort();
+const p=json('batch-241-r2-review.json'),prior=json('batch-241-review.json'),m=json('original-suite-approved.json');
+const c=ids('INVENTORY_PLAYWRIGHT_BATCH_241_R2_CONFIRMED_2684_PASS_IDS.csv'),r=ids('INVENTORY_PLAYWRIGHT_BATCH_241_R2_REMAINING_254_IDS.csv'),s=ids('INVENTORY_PLAYWRIGHT_BATCH_241_R2_SELECTED_1_IDS.csv'),roles=ids('INVENTORY_PLAYWRIGHT_TENANT_ROLE_GATE_214_IDS.csv'),blocked=ids('INVENTORY_PLAYWRIGHT_BATCH_239_ACCESS_UNVERIFIED_8_IDS.csv');
+assert.equal(p.batch,241);assert.equal(p.stage,'R2');assert.equal(p.group,'BULK_SAFE_17');assert.equal(c.length,2684);assert.equal(r.length,254);assert.equal(roles.length,214);assert.equal(blocked.length,8);assert.equal(new Set([...c,...r]).size,2938);assert.deepEqual(s,['TSN-046']);assert.deepEqual(s,p.selected);assert(c.includes('TSN-045'));assert(s.every(x=>r.includes(x)&&!c.includes(x)&&!roles.includes(x)&&!blocked.includes(x)));assert.deepEqual(sort(m.approved_groups.BULK_SAFE_17.entries.flatMap(e=>e.ids)),sort(prior.selected),'B241 original runtime must precede R2');
+function cases(str,file){const tree=ts.createSourceFile(file,str,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);assert.equal(tree.parseDiagnostics.length,0,'TS parse '+file);const a=[];function walk(n){if(ts.isCallExpression(n)&&ts.isIdentifier(n.expression)&&n.expression.text==='test'&&n.arguments[0]&&ts.isStringLiteral(n.arguments[0])){const title=n.arguments[0].text,id=title.match(/^([A-Z0-9]+-\d{3})\b/)?.[1];if(id)a.push({id,title,body:n.getText(tree),start:n.getStart(tree),end:n.end});}ts.forEachChild(n,walk);}walk(tree);return a;}
+const file='tenant/scanner/scanner-batch32.spec.ts',path='tests/'+file;let str=fs.readFileSync(path,'utf8').replace(/\r\n/g,'\n');
+assert(str.includes('support/liveOriginalSafeTest')&&str.includes('b241CameraInit'));assert(!/\b(?:route|r)\.(?:continue|fetch)\(/.test(str));
+const before=cases(str,file),t=before.find(t=>t.id==='TSN-046');assert(t);assert.equal(sha(t.body),p.original_body_sha256,'Unreviewed B241 camera lifecycle source drift');
+const anchor="const state=()=>page.evaluate(()=>((window as any).__b241CameraState)());";
+assert.equal(t.body.split(anchor).length,2);
+// The live log proves the exact Start label disappears after recording starts. A hidden or
+// disabled Start is valid exclusivity; no enabled Start-like camera button may remain.
+const addition=String.raw`const assertExclusive=async()=>{const starts=page.getByRole('button',{name:/\bstart(?:ing)?\b.*\bcamera\b|\bcamera\b.*\bstart(?:ing)?\b/i});await expect(stop).toBeEnabled();await expect.poll(()=>starts.evaluateAll(buttons=>buttons.filter(b=>!b.matches(':disabled')&&!b.closest('[aria-disabled="true"]')).length)).toBe(0);await expect.poll(async()=> (await state()).active).toBe(1);};`;
+const old="await expect(start).toBeDisabled();await expect(stop).toBeEnabled();";
+assert.equal(t.body.split(old).length,3,'Expected both running-state checks');
+const next=t.body.replace(anchor,anchor+' '+addition).replaceAll(old,'await assertExclusive();');
+assert.equal(next.split('await assertExclusive();').length,3);assert.equal(next.replace(' '+addition,'').replaceAll('await assertExclusive();',old),t.body,'No other assertions may change');
+str=str.slice(0,t.start)+next+str.slice(t.end);const after=cases(str,file);assert.deepEqual(before.map(t=>t.id),after.map(t=>t.id));assert.deepEqual(before.map(t=>t.title),after.map(t=>t.title));for(const x of before)if(x.id!=='TSN-046')assert.equal(after.find(a=>a.id===x.id).body,x.body,'Unselected original modified '+x.id);
+fs.writeFileSync(path,str);m.approved_groups.BULK_SAFE_17={secret:true,entries:[{file,ids:s,sha256:sha(str)}]};fs.writeFileSync('original-suite-approved.json',JSON.stringify(m,null,2)+'\n');console.log('PASS B241 R2: only TSN-046; TSN-045 PASS excluded; no actionable Start while Stop enabled and one live track; all other assertions unchanged.');
