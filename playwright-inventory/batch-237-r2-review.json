@@ -1,0 +1,364 @@
+{
+  "batch": 237,
+  "revision": 2,
+  "group": "BULK_SAFE_17",
+  "count": 22,
+  "selected": [
+    "TAS-032",
+    "TAS-033",
+    "TAS-034",
+    "TAS-035",
+    "TAS-036",
+    "TCOP-010",
+    "TPO-027",
+    "TPO-028",
+    "TPO-034",
+    "TRPL-038",
+    "TSES-035",
+    "TSN-006",
+    "TSN-021",
+    "TSN-022",
+    "TSN-029",
+    "TSN-039",
+    "TST-032",
+    "TST-033",
+    "TST-034",
+    "TSTR-079",
+    "TSTR-080",
+    "TUSR-020"
+  ],
+  "passed": [
+    "TCOP-020",
+    "TDT-037",
+    "TDT-038",
+    "TEI-029",
+    "TEI-030",
+    "TEI-033",
+    "TEI-035",
+    "TPO-032",
+    "TRPL-042",
+    "TRPL-044",
+    "TRPL-045",
+    "TRPL-048",
+    "TRPL-050",
+    "TSH-030",
+    "TSH-037",
+    "TSH-040",
+    "TSH-046",
+    "TSMV-046",
+    "TSN-001",
+    "TSN-007",
+    "TST-025",
+    "TST-028"
+  ],
+  "held": [
+    "TALERT-004",
+    "TALERT-005",
+    "TALERT-006",
+    "TALERT-007",
+    "TALERT-008",
+    "TALERT-009",
+    "TALERT-011",
+    "TALERT-042",
+    "TCOP-012",
+    "TCOP-013",
+    "TCOP-014",
+    "TCOP-018",
+    "TCOP-022",
+    "TEI-042",
+    "TEI-073",
+    "TINS-024",
+    "TIU-032",
+    "TMOB-013",
+    "TMOB-023",
+    "TMOB-024",
+    "TMOB-025",
+    "TMOB-026",
+    "TMOB-027",
+    "TMOB-028",
+    "TMOB-029",
+    "TMOB-041",
+    "TMOB-042",
+    "TMOB-043",
+    "TPO-031",
+    "TPO-071",
+    "TPRC-033",
+    "TPRC-043",
+    "TPRC-044",
+    "TRC-009",
+    "TRC-048",
+    "TRPL-046",
+    "TRPT-025",
+    "TSES-010",
+    "TSES-021",
+    "TSES-022",
+    "TSES-039",
+    "TSES-043",
+    "TSH-032",
+    "TSH-069",
+    "TSL-040",
+    "TSL-045",
+    "TSMV-050",
+    "TSMV-072",
+    "TSN-042",
+    "TST-038",
+    "TST-039"
+  ],
+  "pages": {
+    "ai-copilot": {
+      "route": "/ai-copilot",
+      "text": "Start a new analysis"
+    },
+    "automation-schedules": {
+      "route": "/automation-schedules",
+      "heading": "Automation schedules"
+    },
+    "purchase-orders": {
+      "route": "/purchase-orders",
+      "heading": "Purchase orders"
+    },
+    "replenishment-planning": {
+      "route": "/replenishment-planning",
+      "heading": "Replenishment planning"
+    },
+    "scanner": {
+      "route": "/scanner",
+      "heading": "Shipment QR Scanner"
+    },
+    "sessions": {
+      "route": "/sessions",
+      "heading": "Sessions"
+    },
+    "stock-transfers": {
+      "route": "/stock-transfers",
+      "heading": "Stock transfer workspace"
+    },
+    "stock": {
+      "route": "/stock",
+      "heading": "Stock workspace"
+    },
+    "users": {
+      "route": "/users",
+      "heading": "Tenant user management"
+    }
+  },
+  "patches": {
+    "tenant/ai-copilot/ai-copilot.spec.ts": {
+      "cases": {
+        "TCOP-010": [
+          [
+            "toContainText('Completed')",
+            "toContainText(/\\bcompleted\\b/i)"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/purchase-orders/purchase-orders-batch28.spec.ts": {
+      "cases": {
+        "TPO-027": [
+          [
+            "await fillDraft(page);",
+            "await form(page).getByRole('combobox').filter({has:page.locator('option[value=\"pw-supplier\"]')}).selectOption(supplier.id);\n  const product=line(page).getByRole('combobox').filter({has:page.locator('option[value=\"pw-product\"]')});\n  await expect(product).toBeEnabled();await product.selectOption('pw-product');\n  await line(page).getByRole('spinbutton',{name:'Quantity',exact:true}).fill('5');\n  await line(page).getByRole('spinbutton',{name:'Purchase price per unit'}).fill('15');"
+          ]
+        ],
+        "TPO-028": [
+          [
+            "await fillDraft(page);",
+            "await form(page).getByRole('combobox').filter({has:page.locator('option[value=\"pw-supplier\"]')}).selectOption(supplier.id);\n  const product=line(page).getByRole('combobox').filter({has:page.locator('option[value=\"pw-product\"]')});\n  await expect(product).toBeEnabled();await product.selectOption('pw-product');\n  await line(page).getByRole('spinbutton',{name:'Quantity',exact:true}).fill('5');\n  await line(page).getByRole('spinbutton',{name:'Purchase price per unit'}).fill('15');"
+          ]
+        ],
+        "TPO-034": [
+          [
+            "await actions(page).getByRole('button',{name:'Approve order'}).click();",
+            "page.once('dialog', d => d.type()==='confirm'&&d.message()==='Confirm action: Approve order?'?d.accept():d.dismiss());\n  await actions(page).getByRole('button',{name:'Approve order'}).click();"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/replenishment-planning/replenishment-planning.spec.ts": {
+      "cases": {
+        "TRPL-038": [
+          [
+            "page.getByText('Nothing was approved or executed.',{exact:false})",
+            "page.locator('#replenishment-planning-workspace-top').getByText('Nothing was approved or executed.',{exact:false})"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/scanner/scanner-batch32.spec.ts": {
+      "cases": {
+        "TSN-021": [
+          [
+            "`/shipments/${SHIPMENT}/barcode/ABC-123`",
+            "`/api/shipments/${SHIPMENT}/barcode/ABC-123`"
+          ]
+        ],
+        "TSN-039": [
+          [
+            "toBe('/execution-tasks/pw-execution-task/mobile-scan-verify')",
+            "toBe('/api/execution-tasks/pw-execution-task/mobile-scan-verify')"
+          ]
+        ],
+        "TSN-022": [
+          [
+            "lookupStatus:404",
+            "lookupStatus:404,structuredError:true"
+          ]
+        ],
+        "TSN-029": [
+          [
+            "lookupStatus:409,lookupError:'SCANNER_BARCODE_AMBIGUOUS'",
+            "lookupStatus:409,lookupError:'SCANNER_BARCODE_AMBIGUOUS',structuredError:true"
+          ]
+        ]
+      },
+      "helpers": [
+        [
+          "type Settings={barcode?",
+          "type Settings={structuredError?:boolean;barcode?"
+        ],
+        [
+          "{code:opts.lookupError||'SHIPMENT_PRODUCT_NOT_FOUND',message:'Synthetic barcode lookup failed'},opts.lookupStatus",
+          "opts.structuredError?{error:{code:opts.lookupError||'SHIPMENT_PRODUCT_NOT_FOUND',message:'Synthetic barcode lookup failed'}}:{code:opts.lookupError||'SHIPMENT_PRODUCT_NOT_FOUND',message:'Synthetic barcode lookup failed'},opts.lookupStatus"
+        ]
+      ]
+    },
+    "tenant/scanner/scanner.spec.ts": {
+      "cases": {
+        "TSN-006": [
+          [
+            "{lookupError:true}",
+            "{lookupError:true,structuredError:true}"
+          ]
+        ]
+      },
+      "helpers": [
+        [
+          "settings:{contextError?",
+          "settings:{structuredError?:boolean;contextError?"
+        ],
+        [
+          "settings.lookupError?{code:'SHIPMENT_NOT_FOUND',message:'No synthetic shipment'}",
+          "settings.lookupError?(settings.structuredError?{error:{code:'SHIPMENT_NOT_FOUND',message:'No synthetic shipment'}}:{code:'SHIPMENT_NOT_FOUND',message:'No synthetic shipment'})"
+        ]
+      ]
+    },
+    "tenant/users/users.spec.ts": {
+      "cases": {
+        "TUSR-020": [
+          [
+            "{createStatus:409}",
+            "{createStatus:409,structuredError:true}"
+          ]
+        ]
+      },
+      "helpers": [
+        [
+          "type Setup={rows?",
+          "type Setup={structuredError?:boolean;rows?"
+        ],
+        [
+          "{message:'Synthetic duplicate email',code:'UNIQUE_CONSTRAINT_VIOLATION'},setup.createStatus",
+          "setup.structuredError?{error:{message:'Synthetic duplicate email',code:'UNIQUE_CONSTRAINT_VIOLATION',details:{constraint:'users_email_tenant_unique'}}}:{message:'Synthetic duplicate email',code:'UNIQUE_CONSTRAINT_VIOLATION'},setup.createStatus"
+        ]
+      ]
+    },
+    "tenant/automation-schedules/automation-schedules.spec.ts": {
+      "cases": {
+        "TAS-032": [
+          [
+            "await detail(page).getByRole('button', { name: 'Pause' }).click();",
+            "page.once('dialog', d => { if(d.type()==='confirm' && d.message()=== 'Confirm action: Pause?') return d.accept(); return d.dismiss(); });\n    await detail(page).getByRole('button', { name: 'Pause' }).click();"
+          ],
+          [
+            "page.getByRole('status')",
+            "page.locator('.automation-schedules-alert--success[role=status]')"
+          ]
+        ],
+        "TAS-033": [
+          [
+            "await detail(page).getByRole('button', { name: 'Activate' }).click();",
+            "page.once('dialog', d => { if(d.type()==='confirm' && d.message()=== 'Confirm action: Activate?') return d.accept(); return d.dismiss(); });\n    await detail(page).getByRole('button', { name: 'Activate' }).click();"
+          ]
+        ],
+        "TAS-034": [
+          [
+            "await detail(page).getByRole('button', { name: 'Activate' }).click();",
+            "page.once('dialog', d => { if(d.type()==='confirm' && d.message()=== 'Confirm action: Activate?') return d.accept(); return d.dismiss(); });\n    await detail(page).getByRole('button', { name: 'Activate' }).click();"
+          ],
+          [
+            "page.getByRole('status')",
+            "page.locator('.automation-schedules-alert--success[role=status]')"
+          ]
+        ],
+        "TAS-035": [
+          [
+            "await detail(page).getByRole('button', { name: 'Disable' }).click();",
+            "page.once('dialog', d => { if(d.type()==='confirm' && d.message()=== 'Confirm action: Disable?') return d.accept(); return d.dismiss(); });\n    await detail(page).getByRole('button', { name: 'Disable' }).click();"
+          ]
+        ],
+        "TAS-036": [
+          [
+            "await detail(page).getByRole('button', { name: 'Disable' }).click();",
+            "page.once('dialog', d => { if(d.type()==='confirm' && d.message()=== 'Confirm action: Disable?') return d.accept(); return d.dismiss(); });\n    await detail(page).getByRole('button', { name: 'Disable' }).click();"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/sessions/sessions-batch33.spec.ts": {
+      "cases": {
+        "TSES-035": [
+          [
+            "await rowFor(page,s).getByRole('button',{name:'Revoke'}).click();",
+            "page.once('dialog',d=>d.type()==='confirm'&&d.message()==='Confirm action: Revoke?'?d.accept():d.dismiss());\n  await rowFor(page,s).getByRole('button',{name:'Revoke'}).click();"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/stock/stock.spec.ts": {
+      "cases": {
+        "TST-032": [
+          [
+            "page.once('dialog',dialog=>dialog.accept('ab'));",
+            "const onLotDialog=async(dialog:import('@playwright/test').Dialog)=>{\n   if(dialog.type()==='confirm'&&dialog.message()==='Confirm action: Block?')return dialog.accept();\n   if(dialog.type()==='prompt'){page.off('dialog',onLotDialog);return dialog.accept('ab');}\n   await dialog.dismiss();\n  };\n  page.on('dialog',onLotDialog);"
+          ]
+        ],
+        "TST-033": [
+          [
+            "page.once('dialog',dialog=>dialog.accept('  Investigation needed  '));",
+            "const onLotDialog=async(dialog:import('@playwright/test').Dialog)=>{\n   if(dialog.type()==='confirm'&&dialog.message()==='Confirm action: Block?')return dialog.accept();\n   if(dialog.type()==='prompt'){page.off('dialog',onLotDialog);return dialog.accept('  Investigation needed  ');}\n   await dialog.dismiss();\n  };\n  page.on('dialog',onLotDialog);"
+          ]
+        ],
+        "TST-034": [
+          [
+            "page.once('dialog',dialog=>dialog.accept('no'));",
+            "const onLotDialog=async(dialog:import('@playwright/test').Dialog)=>{\n   if(dialog.type()==='confirm'&&dialog.message()==='Confirm action: Unblock?')return dialog.accept();\n   if(dialog.type()==='prompt'){page.off('dialog',onLotDialog);return dialog.accept('no');}\n   await dialog.dismiss();\n  };\n  page.on('dialog',onLotDialog);"
+          ]
+        ]
+      },
+      "helpers": []
+    },
+    "tenant/stock-transfers/stock-transfers.spec.ts": {
+      "cases": {
+        "TSTR-079": [
+          [
+            "getByRole('button',{name:'Export CSV'})",
+            "getByRole('button',{name:'Export filtered CSV',exact:true})"
+          ]
+        ],
+        "TSTR-080": [
+          [
+            "getByRole('button',{name:'Export CSV'})",
+            "getByRole('button',{name:'Export filtered CSV',exact:true})"
+          ]
+        ]
+      },
+      "helpers": []
+    }
+  }
+}

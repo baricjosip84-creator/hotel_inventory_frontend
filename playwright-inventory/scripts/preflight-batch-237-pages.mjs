@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-const m=JSON.parse(fs.readFileSync('original-suite-approved.json','utf8')),p=JSON.parse(fs.readFileSync('batch-237-review.json','utf8'));
+const m=JSON.parse(fs.readFileSync('original-suite-approved.json','utf8')),p=JSON.parse(fs.readFileSync('batch-237-r2-review.json','utf8'));
 const g=m.approved_groups.BULK_SAFE_17,all=g.entries.flatMap(e=>e.ids),sort=x=>[...x].sort();
 assert.deepEqual(sort(all),sort(p.selected));
 assert.equal(process.env.PW_BASE_URL,'https://hotel-inventory-frontend-mauve.vercel.app');

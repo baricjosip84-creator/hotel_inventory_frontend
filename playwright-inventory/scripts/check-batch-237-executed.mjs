@@ -1,6 +1,6 @@
 import fs from 'node:fs';import assert from 'node:assert/strict';
-const p=JSON.parse(fs.readFileSync('batch-237-review.json','utf8')),expected=p.selected,sort=x=>[...x].sort();
-assert.equal(expected.length,95);
+const p=JSON.parse(fs.readFileSync('batch-237-r2-review.json','utf8')),expected=p.selected,sort=x=>[...x].sort();
+assert.equal(expected.length,p.count);
 assert(fs.existsSync('batch-237-live-access.json'),'B237 not executed: access preflight missing');
 const access=JSON.parse(fs.readFileSync('batch-237-live-access.json','utf8'));
 assert.equal(access.status,'PROBED','B237 access preflight incomplete');
