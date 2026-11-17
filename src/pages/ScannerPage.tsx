@@ -1043,6 +1043,10 @@ export default function ScannerPage() {
           </div>
         ) : null}
 
+        {mode === 'task' && taskVerification && lastReceivedMessage ? (
+          <div className="app-success-state" role="status" style={styles.sessionMessage}>{lastReceivedMessage}</div>
+        ) : null}
+
         <div style={mode === 'product' ? styles.operationNoticeWarn : styles.operationNoticeInfo}>
           {mode === 'product'
             ? ui("Simple product and package scans are received in this scanner session. Items that need serial, lot/batch, or expiry details open the shipment form so those controls are not bypassed.")

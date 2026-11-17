@@ -1,0 +1,31 @@
+{
+  "batch": 243,
+  "group": "BULK_SAFE_17",
+  "count": 1,
+  "prior_batch_user_confirmed_green": [
+    "TSN-046"
+  ],
+  "confirmed_before": 2685,
+  "remaining_before": 253,
+  "selected": [
+    "TSN-042"
+  ],
+  "pages": {
+    "scanner": {
+      "route": "/scanner",
+      "heading": "Shipment QR Scanner"
+    }
+  },
+  "spec_files": {
+    "tenant/scanner/scanner-batch32.spec.ts": {
+      "selected": [
+        "TSN-042"
+      ]
+    }
+  },
+  "basis": "Application source repair restores missing task-mode message; original transfer fixture restored exactly; all assertions unchanged.",
+  "original_body_sha256": "a3706ebcf1ce13a5146ae70e7f217f1e6ee37bbfdcd82c771aa2e8b62e49ea2d",
+  "source_log": "logs_119656260841.zip",
+  "source_log_sha256": "13984b57ff3c3a50ea826a98173ae49a1a28436f4426e66b12432d72f148b277",
+  "b242_body_sha256": "faa14773a9c44175803342e19838b7b3680fa8fe3e86a44ed7704f47e615f662"
+}

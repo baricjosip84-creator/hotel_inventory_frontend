@@ -1,0 +1,2 @@
+test_id,spec_file,title,previous,next_stage,reason
+TSN-042,tenant/scanner/scanner-batch32.spec.ts,TSN-042 Task verification is not a stock receive transaction,FAILED_B237,B243_SOURCE_FIX_RECHECK,Actual B242 failure repeated exact visible-message assertion. Archived ScannerPage.tsx sets task message but renders it only within product-mode receiving panel. Fix current source with exact context guard; deploy; recheck unmodified original transfer-task contract.
